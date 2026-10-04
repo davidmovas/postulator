@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	Provider = "openai"
-
 	DefaultBaseURL = "https://api.openai.com/v1"
 	DefaultTimeout = 4 * time.Minute
 	DefaultSize    = "1024x1024"
@@ -121,7 +119,7 @@ func (i *Images) Generate(ctx context.Context, prompt images.Prompt) (images.Ima
 		text += ". " + extra
 	}
 
-	key, err := i.secrets.Get(ctx, domainllm.SecretRef(Provider))
+	key, err := i.secrets.Get(ctx, domainllm.SecretRef(domainllm.ProviderOpenAI))
 	if err != nil {
 		return images.Image{}, err
 	}

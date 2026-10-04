@@ -16,8 +16,7 @@ import {
     StatusBadge,
     TaskAltIcon,
 } from "../../ui/index.js";
-import { statusLabel } from "../runs/labels.js";
-import { itemStatusTone } from "./labels.js";
+import { runStatusLabel, runStatusTone } from "../runs/labels.js";
 
 function fieldOf(held: unknown, key: string): unknown {
     if (typeof held !== "object" || held === null) {
@@ -81,7 +80,7 @@ export function PageReportPanel({ pageId, siteId }: PageReportPanelProps): React
     return (
         <Panel>
             <PanelHeader title={copy.pages.detail.report}>
-                <StatusBadge tone={itemStatusTone(held.status)}>{statusLabel(held.status)}</StatusBadge>
+                <StatusBadge tone={runStatusTone(held.status)}>{runStatusLabel(held.status)}</StatusBadge>
             </PanelHeader>
             <div className="flex flex-col gap-2 p-3">
                 <Link

@@ -9,9 +9,10 @@ import (
 const importsApplyName = "imports_apply"
 
 type importsApplyArgs struct {
-	Path          string      `json:"path" description:"The absolute path of the .xlsx or .csv file on this machine"`
-	Mapping       mappingArgs `json:"mapping,omitempty" description:"Which spreadsheet column fills which page field; leave it out and the columns detected by imports_inspect are used"`
-	SaveMappingAs string      `json:"saveMappingAs,omitempty" description:"Keep the mapping under this name so the next import can reuse it; leave it out to use it once"`
+	Path          string      `json:"path" description:"Absolute path of the .xlsx or .csv file"`
+	Mapping       mappingArgs `json:"mapping,omitempty" description:"Sheet mapping; default the first sheet, detected"`
+	Sheets        []sheetArgs `json:"sheets,omitempty" description:"Several sheets in workbook order, each mapped"`
+	SaveMappingAs string      `json:"saveMappingAs,omitempty" description:"Save mappings under this name, per sheet as name / sheet"`
 }
 
 func importsApply(deps Deps) Tool {
@@ -21,7 +22,7 @@ func importsApply(deps Deps) Tool {
 		Risk:        RiskDangerous,
 	}, func(ctx context.Context, b Binding, in importsApplyArgs) (imports.ApplyResponse, error) {
 		return deps.Imports.Apply(ctx, imports.ApplyRequest{
-			SiteID: b.SiteID, Path: in.Path, Mapping: in.Mapping.mapping(b.SiteID),
+			SiteID: b.SiteID, Path: in.Path, Mapping: in.Mapping.mapping(b.SiteID), Sheets: sheetMappings(b.SiteID, in.Sheets),
 			Options: imports.ApplyOptions{SaveMappingAs: in.SaveMappingAs},
 		})
 	})

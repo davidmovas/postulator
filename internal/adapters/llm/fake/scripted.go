@@ -20,7 +20,11 @@ type Scripted struct {
 }
 
 func NewScripted(replies ...Reply) *Scripted {
-	return &Scripted{client: New(), replies: replies}
+	return NewScriptedOver(New(), replies...)
+}
+
+func NewScriptedOver(client *Client, replies ...Reply) *Scripted {
+	return &Scripted{client: client, replies: replies}
 }
 
 func (s *Scripted) Complete(ctx context.Context, req port.Request) (port.Response, error) {

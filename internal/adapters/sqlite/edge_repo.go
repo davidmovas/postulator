@@ -86,20 +86,7 @@ func (r *EdgeRepo) List(ctx context.Context, q graph.EdgeQuery, page paging.Requ
 		builder = builder.Where(squirrel.Or{squirrel.Eq{"from_entity_id": q.EntityID}, squirrel.Eq{"to_entity_id": q.EntityID}})
 	}
 
-	keyset := edgeKeyset(q.Desc)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[graph.Edge]{}, err
-	}
-	query, args, err := buildQuery(keyed, "edges")
-	if err != nil {
-		return paging.List[graph.Edge]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanEdge, "list the edges")
-	if err != nil {
-		return paging.List[graph.Edge]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, edgeKeyset(q.Desc), page, scanEdge, "edges")
 }
 
 func scanEdge(rows *sql.Rows) (graph.Edge, error) {

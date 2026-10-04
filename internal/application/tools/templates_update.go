@@ -10,10 +10,10 @@ import (
 const templatesUpdateName = "templates_update"
 
 type templatesUpdateArgs struct {
-	ID       string            `json:"id" description:"The id of the template, exactly as templates_list returned it"`
-	Name     *string           `json:"name,omitempty" description:"The new name, left out to keep the current one"`
-	PageKind *string           `json:"pageKind,omitempty" enum:"hub,category,guide,comparison,product" description:"The new page kind, left out to keep the current one"`
-	Spec     *templateSpecArgs `json:"spec,omitempty" description:"The whole replacement specification, left out to keep the current one"`
+	ID       string            `json:"id" description:"Template id"`
+	Name     *string           `json:"name,omitempty" description:"New name"`
+	PageKind *string           `json:"pageKind,omitempty" enum:"hub,category,guide,comparison,product" description:"New page kind"`
+	Spec     *templateSpecArgs `json:"spec,omitempty" description:"Full replacement specification"`
 }
 
 func templatesUpdate(deps Deps) Tool {

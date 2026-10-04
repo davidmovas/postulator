@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
 
+import { fieldErrorOf, validationErrorOf } from "../../data/errors.js";
 import { useCreatePolicy, useUpdatePolicy } from "../../data/hooks/templates.js";
 import type { LinkPolicy, LinkRules } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
@@ -8,7 +9,6 @@ import { anchorStrategies, templateScopes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Banner, Button, Drawer, Field, Input, Select, Switch } from "../../ui/index.js";
 import { blankDraft } from "./blank.js";
-import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { PolicyRules } from "./policy-rules.js";
 import { anchorLabel, scopeLabel } from "./labels.js";
 
@@ -122,7 +122,7 @@ export function PolicyDrawer({ siteId, policy, seed, onClose }: PolicyDrawerProp
         );
     };
 
-    const formError = formErrorOf(thrown);
+    const formError = validationErrorOf(thrown);
 
     return (
         <Drawer

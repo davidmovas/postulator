@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
@@ -22,10 +23,12 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
@@ -35,6 +38,8 @@ const (
 	siteName  = "Crema Bench"
 	pollEvery = 100 * time.Millisecond
 	pollFor   = 3 * time.Minute
+
+	scriptedProviderKey = "sk-harness-scripted"
 
 	failingPath = "/grinders/single-dosing/"
 
@@ -47,6 +52,12 @@ const (
 	deniedEntity  = "espresso-blends"
 	deniedMessage = "Delete the espresso blends hub and everything under it; nobody searches for it."
 	deniedTool    = "graph_delete_subtree"
+
+	productSlug    = "gaggia-classic-pro"
+	productPath    = "/product/" + productSlug + "/"
+	productName    = "Gaggia Classic Pro"
+	productKeyword = "gaggia classic pro"
+	productHub     = "Espresso machines"
 )
 
 var (
@@ -93,6 +104,10 @@ func harnessReplies() []fake.Reply {
 			fake.Reply{Step: steps.NameGenerateMeta, Match: path, Text: metaOf(subject)},
 		)
 	}
+	out = append(out,
+		fake.Reply{Step: steps.NameGenerateBody, Match: productPath, Text: productDraftOf()},
+		fake.Reply{Step: steps.NameGenerateMeta, Match: productPath, Text: metaOf(productKeyword)},
+	)
 	out = append(out, repairReplies()...)
 	out = append(out, proposeReplies()...)
 	return append(out,
@@ -154,6 +169,98 @@ func draftOf(subject string) string {
 		`"summary":"A short, practical guide to ` + subject + ` on a home espresso bar."}`
 }
 
+func productDraftOf() string {
+	return `{"title":"` + productName + `: a single boiler machine for the first espresso bar | ` + siteName + `",` +
+		`"h1":"` + productName + `",` +
+		`"sections":[` +
+		`{"heading":"Overview","html":"<p>The ` + productKeyword + ` is a single boiler machine with a ` +
+		`commercial 58 mm portafilter, and the one reason to choose it is that it rewards a good grinder.</p>"},` +
+		`{"heading":"Key Features","html":"<ul><li>A 58 mm group that takes any basket on the market.</li>` +
+		`<li>A steam wand that textures milk for one cortado at a time.</li></ul>"},` +
+		`{"heading":"Who It Is For","html":"<p>It fits the buyer who wants to learn to pull a shot by hand, ` +
+		`and not the one who wants milk drinks for four in a row.</p>"},` +
+		`{"heading":"Frequently Asked Questions","html":"<p>Yes, it takes a bottomless portafilter, and no, ` +
+		`it does not steam and brew at the same time.</p>"}],` +
+		`"summary":"What the ` + productKeyword + ` is and who should buy it.",` +
+		`"shortDescription":"<p>The ` + productKeyword + ` is a single boiler machine that rewards a good grinder.</p>",` +
+		`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Size","value":""}]}`
+}
+
+func stockTheStore(site *wptest.Server) {
+	site.Seed(wptest.Item{
+		Type: wptest.TypeProduct, Title: productName, Slug: productSlug, Status: "publish",
+		Content:      "<p>A single boiler machine with a commercial portafilter.</p>",
+		Excerpt:      "<p>Single boiler, 58 mm.</p>",
+		RegularPrice: "449", SKU: "GCP-2024",
+		Attributes: []wptest.Attribute{
+			{Name: "Boiler", Options: []string{"Single"}, Visible: true},
+			{Name: "Form", Options: []string{}, Position: 1},
+		},
+	})
+}
+
+func seedProduct(ctx context.Context, core *app.Core, siteID string, entities map[string]string,
+	byPath map[string]string) error {
+	mapped, err := allPages(ctx, core, siteID)
+	if err != nil {
+		return err
+	}
+	pageID := ""
+	for index := range mapped {
+		if mapped[index].Path == productPath {
+			pageID = mapped[index].ID
+		}
+	}
+	if pageID == "" {
+		return errors.New(errors.NotFound, "the sync brought no product to "+productPath)
+	}
+
+	created, err := core.Graph.CreateEntity(ctx, graph.CreateEntityRequest{
+		SiteID: siteID, Name: productName, Kind: "product", Intent: "commercial",
+		Keywords: []dto.Keyword{{Text: productKeyword}},
+		Anchors:  []graph.Anchor{{Text: "the " + productName, Source: "user", Weight: 1}},
+		ParentID: entities[productHub], Source: "user",
+	})
+	if err != nil {
+		return err
+	}
+	if _, err = core.Pages.MapToEntity(ctx, pages.MapToEntityRequest{PageID: pageID, EntityID: created.Entity.ID}); err != nil {
+		return err
+	}
+	if _, err = core.Pages.SetCanonical(ctx, pages.SetCanonicalRequest{EntityID: created.Entity.ID, PageID: pageID}); err != nil {
+		return err
+	}
+	byPath[productPath] = pageID
+	return nil
+}
+
+func seedProductRun(ctx context.Context, core *app.Core, siteID string, byPath map[string]string) error {
+	listed, err := core.Templates.ListTemplates(ctx, templates.ListTemplatesRequest{
+		Scope: "global", ListRequest: dto.ListRequest{Limit: 20},
+	})
+	if err != nil {
+		return err
+	}
+	product := ""
+	for index := range listed.Items {
+		if listed.Items[index].PageKind == "product" {
+			product = listed.Items[index].ID
+		}
+	}
+	if product == "" {
+		return errors.New(errors.NotFound, "the shipped product template is missing")
+	}
+
+	started, err := core.Runs.Start(ctx, runs.StartRequest{
+		SiteID: siteID, PageIDs: []string{byPath[productPath]}, TemplateID: product,
+		PublishMode: string(run.PublishLive), Recipe: harnessRecipe(),
+	})
+	if err != nil {
+		return err
+	}
+	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
+}
+
 func metaOf(subject string) string {
 	return `{"title":"How to ` + subject + `: Step-by-Step Guide | ` + siteName + `",` +
 		`"description":"What ` + subject + ` changes in the cup, and the routine we use on the bench.",` +
@@ -165,12 +272,12 @@ type assistantScript struct {
 	site atomic.Pointer[string]
 }
 
-func (a *assistantScript) naming(id string) {
-	a.page.Store(&id)
+func (a *assistantScript) naming(pageID string) {
+	a.page.Store(&pageID)
 }
 
-func (a *assistantScript) onSite(id string) {
-	a.site.Store(&id)
+func (a *assistantScript) onSite(siteID string) {
+	a.site.Store(&siteID)
 }
 
 func (a *assistantScript) pageID() string {
@@ -265,11 +372,18 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if _, err = core.Graph.RecomputeScores(ctx, graph.RecomputeScoresRequest{SiteID: siteID}); err != nil {
 		return err
 	}
+	stockTheStore(site)
 	if adoptErr := adoptTheSite(ctx, core, site, siteID); adoptErr != nil {
 		return adoptErr
 	}
+	if productErr := seedProduct(ctx, core, siteID, entities, pagesByPath); productErr != nil {
+		return productErr
+	}
 	if key != "" {
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})
+		return keyErr
+	}
+	if keyErr := keyTheProviders(ctx, core); keyErr != nil {
 		return keyErr
 	}
 	if runErr := seedRuns(ctx, core, siteID, guide, pagesByPath, provider); runErr != nil {
@@ -278,7 +392,151 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if scheduleErr := seedSchedule(ctx, core, siteID, guide); scheduleErr != nil {
 		return scheduleErr
 	}
-	return seedConversation(ctx, core, siteID)
+	if conversationErr := seedConversation(ctx, core, siteID); conversationErr != nil {
+		return conversationErr
+	}
+	return seedSpend(ctx, core, siteID)
+}
+
+func seedSpend(ctx context.Context, core *app.Core, siteID string) error {
+	finished, err := finishedRunItems(ctx, core, siteID)
+	if err != nil {
+		return err
+	}
+	conversation, err := onlyConversation(ctx, core, siteID)
+	if err != nil {
+		return err
+	}
+
+	pastRuns := make(map[int]string)
+	pastItems := make(map[[2]int]string)
+	ledger := sqlite.NewLLMCallRepo(core.Store)
+	now := time.Now().UTC()
+
+	history := seedSpendHistory()
+	for index := range history {
+		declared := &history[index]
+		call := llm.Call{
+			ID: id.New(), CreatedAt: now.Add(-declared.Ago), Step: declared.Step,
+			Ref:   llm.ModelRef{Provider: "openai", Model: declared.Model},
+			Usage: declared.Usage, Latency: declared.Latency, Tier: declared.Tier, Status: llm.CallOK,
+		}
+		switch declared.Owner {
+		case ownedByConversation:
+			call.ConversationID = conversation
+		case ownedByFinishedRun:
+			call.RunID, call.ItemID = finished.runID, finished.items[declared.Item]
+		case ownedByPastRun:
+			call.RunID = mintedOnce(pastRuns, declared.Run)
+			call.ItemID = mintedOnce(pastItems, [2]int{declared.Run, declared.Item})
+		case ownedByNobody:
+		}
+		if declared.Failed != "" {
+			call.Status, call.ErrorCode = llm.CallError, string(declared.Failed)
+		}
+		info, lookupErr := core.Catalog.Lookup(ctx, call.Ref)
+		if lookupErr != nil {
+			return lookupErr
+		}
+		call.USD = llm.Cost(call.Usage, info, call.Tier)
+		if insertErr := ledger.Insert(ctx, call); insertErr != nil {
+			return insertErr
+		}
+	}
+	return settleTheSpend(ctx, core, ledger, finished.runID)
+}
+
+func settleTheSpend(ctx context.Context, core *app.Core, ledger *sqlite.LLMCallRepo, runID string) error {
+	spend, err := ledger.SumByRun(ctx, runID)
+	if err != nil {
+		return err
+	}
+	recorded := sqlite.NewRunRepo(core.Store)
+	held, err := recorded.Get(ctx, runID)
+	if err != nil {
+		return err
+	}
+	held.Stats.Tokens, held.Stats.USD = spend.Usage.Total, spend.USD
+	return recorded.Update(ctx, held)
+}
+
+func mintedOnce[K comparable](minted map[K]string, key K) string {
+	if held, known := minted[key]; known {
+		return held
+	}
+	made := id.New()
+	minted[key] = made
+	return made
+}
+
+type finishedRun struct {
+	runID string
+	items []string
+}
+
+func finishedRunItems(ctx context.Context, core *app.Core, siteID string) (finishedRun, error) {
+	listed, err := core.Runs.List(ctx, runs.ListRequest{SiteID: siteID, ListRequest: dto.ListRequest{Limit: 20}})
+	if err != nil {
+		return finishedRun{}, err
+	}
+	for index := range listed.Items {
+		held := listed.Items[index]
+		if held.Status != string(run.StatusCompleted) || held.Kind != string(run.KindGenerate) ||
+			held.Stats.Items != len(completedRun) {
+			continue
+		}
+		items, itemsErr := core.Runs.ListItems(ctx, runs.ListItemsRequest{
+			RunID: held.ID, ListRequest: dto.ListRequest{Limit: 20},
+		})
+		if itemsErr != nil {
+			return finishedRun{}, itemsErr
+		}
+		out := finishedRun{runID: held.ID, items: make([]string, 0, len(items.Items))}
+		for item := range items.Items {
+			out.items = append(out.items, items.Items[item].ID)
+		}
+		if len(out.items) == len(completedRun) {
+			return out, nil
+		}
+	}
+	return finishedRun{}, errors.New(errors.NotFound, "the harness finished no run over "+strings.Join(completedRun, ", "))
+}
+
+func onlyConversation(ctx context.Context, core *app.Core, siteID string) (string, error) {
+	listed, err := core.Agent.ListConversations(ctx, agent.ListConversationsRequest{
+		SiteID: siteID, ListRequest: dto.ListRequest{Limit: 10},
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(listed.Items) == 0 {
+		return "", errors.New(errors.NotFound, "the harness seeded no conversation")
+	}
+	return listed.Items[0].ID, nil
+}
+
+func keyTheProviders(ctx context.Context, core *app.Core) error {
+	profiles, err := core.Models.GetProfiles(ctx, models.GetProfilesRequest{})
+	if err != nil {
+		return err
+	}
+	keyed := make(map[string]struct{}, len(profiles.Profiles))
+	for _, profile := range profiles.Profiles {
+		if profile.Effective == nil {
+			continue
+		}
+		provider := profile.Effective.Provider
+		if _, done := keyed[provider]; done {
+			continue
+		}
+		keyed[provider] = struct{}{}
+		if _, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{
+			Provider: provider, APIKey: scriptedProviderKey,
+		}); keyErr != nil {
+			return keyErr
+		}
+	}
+	return nil
 }
 
 func adoptTheSite(ctx context.Context, core *app.Core, site *wptest.Server, siteID string) error {
@@ -301,9 +559,9 @@ func seedGraph(ctx context.Context, core *app.Core, siteID string) (map[string]s
 		entity := &declared[index]
 		created, err := core.Graph.CreateEntity(ctx, graph.CreateEntityRequest{
 			SiteID: siteID, Name: entity.Name, Kind: entity.Kind, Intent: entity.Intent,
-			PrimaryKeyword: entity.Keyword, SecondaryKeywords: []string{entity.Anchor},
-			Anchors: []graph.Anchor{{Text: entity.Anchor, Source: "user", Weight: 1}},
-			Source:  "user",
+			Keywords: []dto.Keyword{{Text: entity.Keyword}, {Text: entity.Anchor}},
+			Anchors:  []graph.Anchor{{Text: entity.Anchor, Source: "user", Weight: 1}},
+			Source:   "user",
 		})
 		if err != nil {
 			return nil, err
@@ -462,13 +720,6 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 }
 
 func exchange(ctx context.Context, core *app.Core, conversation, text string) error {
-	before, err := core.Agent.ListMessages(ctx, agent.ListMessagesRequest{
-		ConversationID: conversation, ListRequest: dto.ListRequest{Limit: 100},
-	})
-	if err != nil {
-		return err
-	}
-
 	if sendErr := waitFor(ctx, "the previous turn to end", func() (bool, error) {
 		_, sendErr := core.Agent.Send(ctx, agent.SendRequest{ConversationID: conversation, Text: text})
 		if errors.IsCode(sendErr, errors.Conflict) {
@@ -480,13 +731,11 @@ func exchange(ctx context.Context, core *app.Core, conversation, text string) er
 	}
 
 	return waitFor(ctx, "the agent to answer", func() (bool, error) {
-		listed, listErr := core.Agent.ListMessages(ctx, agent.ListMessagesRequest{
-			ConversationID: conversation, ListRequest: dto.ListRequest{Limit: 100},
-		})
-		if listErr != nil {
-			return false, listErr
+		status, statusErr := core.Agent.Status(ctx, agent.StatusRequest{ConversationID: conversation})
+		if statusErr != nil {
+			return false, statusErr
 		}
-		return len(listed.Items) >= len(before.Items)+2, nil
+		return !status.Running, nil
 	})
 }
 
@@ -497,6 +746,9 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	}
 	if waitErr := waitForRun(ctx, core, completed, run.StatusCompleted); waitErr != nil {
 		return waitErr
+	}
+	if productErr := seedProductRun(ctx, core, siteID, byPath); productErr != nil {
+		return productErr
 	}
 
 	provider.failOn(failingPath)
@@ -585,11 +837,11 @@ func seedRevertRun(ctx context.Context, core *app.Core, siteID, guide string, by
 func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, paths []string) (string, error) {
 	targets := make([]string, 0, len(paths))
 	for _, path := range paths {
-		id, known := byPath[path]
+		pageID, known := byPath[path]
 		if !known {
 			return "", errors.New(errors.NotFound, "the harness seeded no page at "+path)
 		}
-		targets = append(targets, id)
+		targets = append(targets, pageID)
 	}
 
 	started, err := core.Runs.Start(ctx, runs.StartRequest{

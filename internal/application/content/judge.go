@@ -2,6 +2,7 @@ package content
 
 import (
 	"context"
+	"html"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
@@ -40,19 +41,22 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 	}
 
 	system, user, err := render(NameJudge, judgePrompt{
-		Page: req.Page, Entity: req.Entity, Spec: req.Spec, Body: req.Body,
+		Page: req.Page, Entity: req.Entity, Keywords: pagemap.Keywords(req.Page, req.Entity), Spec: req.Spec, Body: req.Body,
 		Meta: req.Snippet, HasMeta: req.HasSnippet, Targets: req.Targets,
+		Store: req.Page.WPType == pagemap.WPProduct, Product: req.Product,
 	})
 	if err != nil {
 		return AssessResponse{}, err
 	}
 
+	booked := req.Call
+	booked.Role = domainllm.RoleJudge
 	answer, usage, err := llm.Structured[judgeAnswer](ctx, s.deps.LLM, llm.Request{
 		Ref:       ref,
 		System:    system,
 		Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 		MaxTokens: JudgeTokens,
-		Meta:      req.Call,
+		Meta:      booked,
 	})
 	if err != nil {
 		return AssessResponse{Tokens: usage.Total}, err
@@ -79,9 +83,12 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 			WithDetail("pageId", pageID)
 	}
 
-	raw, err := s.deps.Raw.RawContent(ctx, page.SiteID, *page.WPID)
+	raw, err := s.deps.Raw.RawContent(ctx, page.SiteID, *page.WPID, string(page.WPType))
 	if err != nil {
 		return JudgeResponse{}, err
+	}
+	if page.WPType == pagemap.WPProduct {
+		raw = "<h1>" + html.EscapeString(contentdomain.StoreName(page)) + "</h1>" + raw
 	}
 	doc, err := contentdomain.Parse(raw)
 	if err != nil {
@@ -107,6 +114,7 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 		Snippet:    Snippet{Title: page.MetaTitle, Description: page.MetaDescription},
 		HasSnippet: page.MetaTitle != "" || page.MetaDescription != "",
 		Targets:    targets,
+		Call:       llm.CallMeta{Step: domainllm.StepJudge},
 	})
 	if err != nil {
 		return JudgeResponse{}, err
@@ -158,6 +166,7 @@ func (s *Service) context(ctx context.Context, page pagemap.Page,
 	planned := contentdomain.PlanLinks(built, pagemap.NewIndex(pages), contentdomain.Subject{
 		PageID: page.ID, PagePath: page.Path, EntityID: entity.ID,
 	}, policy)
+	entity.Name = built.Label(entity.ID)
 	return entity, planned.Context.Targets, nil
 }
 

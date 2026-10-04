@@ -88,5 +88,16 @@ func (s TemplateSpec) Expanded(vars Vars) TemplateSpec {
 		expanded.Sections[i] = section
 	}
 	expanded.MetaRules.TitlePattern = Expand(s.MetaRules.TitlePattern, vars)
+	if s.Product != nil {
+		product := *s.Product
+		product.ShortDescription.Intent = Expand(s.Product.ShortDescription.Intent, vars)
+		product.Specifications = make([]ProductSpecification, len(s.Product.Specifications))
+		for i, specification := range s.Product.Specifications {
+			product.Specifications[i] = ProductSpecification{
+				Name: Expand(specification.Name, vars), Intent: Expand(specification.Intent, vars),
+			}
+		}
+		expanded.Product = &product
+	}
 	return expanded
 }

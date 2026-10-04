@@ -19,6 +19,7 @@ type callStore interface {
 	SumByConversation(ctx context.Context, conversationID string) (llm.Spend, error)
 	SumAll(ctx context.Context) (llm.Spend, error)
 	List(ctx context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error)
+	Aggregate(ctx context.Context, q llm.SpendQuery) ([]llm.SpendSlice, error)
 }
 
 type catalogReader interface {
@@ -41,10 +42,39 @@ func New(next port.Client, store callStore, catalog catalogReader, publisher pub
 	return &Ledger{next: next, store: store, catalog: catalog, events: publisher, clock: clk}
 }
 
+type outcome struct {
+	failure  error
+	usage    llm.Usage
+	tier     llm.ServiceTier
+	latency  time.Duration
+	finished bool
+}
+
+func (o *outcome) absorb(delta port.Delta) {
+	if delta.Usage != nil {
+		o.usage = *delta.Usage
+	}
+	if delta.Tier != "" {
+		o.tier = delta.Tier
+	}
+	if delta.Err != nil {
+		o.failure = delta.Err
+	}
+	if delta.Done {
+		o.finished = true
+	}
+}
+
+func (o *outcome) cancelled(ctx context.Context) {
+	o.failure = errors.New(errors.Cancelled, "the caller cancelled the stream before it ended").
+		WithInternal(context.Cause(ctx))
+}
+
 func (l *Ledger) Complete(ctx context.Context, req port.Request) (port.Response, error) {
 	started := time.Now()
 	resp, err := l.next.Complete(ctx, req)
-	if recordErr := l.record(ctx, req, resp.Usage, time.Since(started), err); recordErr != nil {
+	done := outcome{usage: resp.Usage, tier: resp.Tier, latency: time.Since(started), failure: err}
+	if recordErr := l.record(ctx, req, done); recordErr != nil {
 		return port.Response{}, recordErr
 	}
 	return resp, err
@@ -55,7 +85,7 @@ func (l *Ledger) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 
 	deltas, err := l.next.Stream(ctx, req)
 	if err != nil {
-		if recordErr := l.record(ctx, req, llm.Usage{}, time.Since(started), err); recordErr != nil {
+		if recordErr := l.record(ctx, req, outcome{latency: time.Since(started), failure: err}); recordErr != nil {
 			return nil, recordErr
 		}
 		return nil, err
@@ -65,22 +95,9 @@ func (l *Ledger) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 	go func() {
 		defer close(out)
 
-		var usage llm.Usage
-		var failure error
-		for delta := range deltas {
-			if delta.Usage != nil {
-				usage = *delta.Usage
-			}
-			if delta.Err != nil {
-				failure = delta.Err
-			}
-			select {
-			case out <- delta:
-			case <-ctx.Done():
-				return
-			}
-		}
-		if recordErr := l.record(ctx, req, usage, time.Since(started), failure); recordErr != nil {
+		done := relay(ctx, deltas, out)
+		done.latency = time.Since(started)
+		if recordErr := l.record(ctx, req, done); recordErr != nil {
 			select {
 			case out <- port.Delta{Err: recordErr}:
 			case <-ctx.Done():
@@ -90,7 +107,28 @@ func (l *Ledger) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 	return out, nil
 }
 
-func (l *Ledger) record(ctx context.Context, req port.Request, usage llm.Usage, latency time.Duration, failure error) error {
+func relay(ctx context.Context, deltas <-chan port.Delta, out chan<- port.Delta) outcome {
+	var done outcome
+	for delta := range deltas {
+		done.absorb(delta)
+		select {
+		case out <- delta:
+		case <-ctx.Done():
+			for rest := range deltas {
+				done.absorb(rest)
+			}
+			done.cancelled(ctx)
+			return done
+		}
+	}
+	if done.failure == nil && !done.finished && ctx.Err() != nil {
+		done.cancelled(ctx)
+	}
+	return done
+}
+
+func (l *Ledger) record(ctx context.Context, req port.Request, done outcome) error {
+	tier := served(done.tier)
 	call := llm.Call{
 		ID:             id.New(),
 		RunID:          req.Meta.RunID,
@@ -98,21 +136,22 @@ func (l *Ledger) record(ctx context.Context, req port.Request, usage llm.Usage, 
 		Step:           req.Meta.Step,
 		ConversationID: req.Meta.ConversationID,
 		Ref:            req.Ref,
-		Usage:          usage,
-		USD:            l.cost(ctx, req.Ref, usage),
-		Latency:        latency,
+		Usage:          done.usage,
+		USD:            l.cost(ctx, req.Ref, done.usage, tier),
+		Latency:        done.latency,
 		Status:         llm.CallOK,
+		Tier:           tier,
 		CreatedAt:      l.clock.Now().UTC().Truncate(time.Second),
 	}
-	if failure != nil {
+	if done.failure != nil {
 		call.Status = llm.CallError
-		call.ErrorCode = errors.CodeOf(failure).String()
+		call.ErrorCode = errors.CodeOf(done.failure).String()
 	}
 
-	if err := l.store.Insert(ctx, call); err != nil {
+	if err := l.store.Insert(context.WithoutCancel(ctx), call); err != nil {
 		return err
 	}
-	if usage.Total == 0 {
+	if call.Usage.Total == 0 {
 		return nil
 	}
 	return l.events.Publish(events.LLMUsage, events.LLMUsagePayload{
@@ -120,21 +159,31 @@ func (l *Ledger) record(ctx context.Context, req port.Request, usage llm.Usage, 
 		ItemID:           call.ItemID,
 		Provider:         call.Ref.Provider,
 		Model:            call.Ref.Model,
-		PromptTokens:     usage.Input,
-		CompletionTokens: usage.Output,
+		Tier:             string(call.Tier),
+		PromptTokens:     call.Usage.Input,
+		CompletionTokens: call.Usage.Output,
+		ReasoningTokens:  call.Usage.Reasoning,
+		CacheWriteTokens: call.Usage.CacheWrite,
 		USD:              call.USD,
 	})
 }
 
-func (l *Ledger) cost(ctx context.Context, ref llm.ModelRef, usage llm.Usage) float64 {
+func served(tier llm.ServiceTier) llm.ServiceTier {
+	if tier.Valid() {
+		return tier
+	}
+	return llm.TierDefault
+}
+
+func (l *Ledger) cost(ctx context.Context, ref llm.ModelRef, usage llm.Usage, tier llm.ServiceTier) float64 {
 	if usage.Total == 0 {
 		return 0
 	}
-	info, err := l.catalog.Lookup(ctx, ref)
+	info, err := l.catalog.Lookup(context.WithoutCancel(ctx), ref)
 	if err != nil {
 		return 0
 	}
-	return llm.Cost(usage, info)
+	return llm.Cost(usage, info, tier)
 }
 
 func (l *Ledger) SumByRun(ctx context.Context, runID string) (llm.Spend, error) {
@@ -151,4 +200,8 @@ func (l *Ledger) SumAll(ctx context.Context) (llm.Spend, error) {
 
 func (l *Ledger) List(ctx context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error) {
 	return l.store.List(ctx, q, page)
+}
+
+func (l *Ledger) Aggregate(ctx context.Context, q llm.SpendQuery) ([]llm.SpendSlice, error) {
+	return l.store.Aggregate(ctx, q)
 }

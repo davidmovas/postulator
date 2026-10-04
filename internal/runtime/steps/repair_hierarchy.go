@@ -11,18 +11,30 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const NameRepairHierarchy = string(run.StepRepairHierarchy)
+const (
+	NameRepairHierarchy = string(run.StepRepairHierarchy)
+
+	CodeStorePlaced  = "store_placed"
+	CodePostUnnested = "post_unnested"
+)
 
 func RepairHierarchy(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameRepairHierarchy,
-		Produces: []run.ArtifactKind{run.ArtifactPublishResult},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  publishTimeout,
+		Name:      NameRepairHierarchy,
+		Preflight: storePlacedPreflight,
+		Produces:  []run.ArtifactKind{run.ArtifactPublishResult},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   publishTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			itemType, err := itemTypeOf(sc.Page)
 			if err != nil {
 				return run.Result{}, err
+			}
+			if !hierarchical(sc.Page) {
+				return run.Result{}, errors.New(errors.Invalid,
+					"a "+string(sc.Page.WPType)+" never sits under a parent in WordPress, so there is nothing to move").
+					WithDetail("pageId", sc.Page.ID).WithDetail("path", sc.Page.Path).
+					WithDetail("wpType", string(sc.Page.WPType))
 			}
 			if sc.Page.WPID == nil {
 				return run.Result{}, errors.New(errors.Invalid,
@@ -63,18 +75,27 @@ func RepairHierarchy(deps Deps) run.StepDef {
 			if rememberErr := remember(ctx, deps, sc, moved); rememberErr != nil {
 				return run.Result{}, rememberErr
 			}
-
-			blob, err := encode(result, "publish result")
-			if err != nil {
-				return run.Result{}, err
-			}
-			return run.Result{
-				Artifacts: []run.Artifact{{Kind: run.ArtifactPublishResult, Blob: blob}},
-				Message: "moved " + sc.Page.Path + " under " +
-					strconv.FormatInt(placement.wpID, 10),
-			}, nil
+			return publishedAs(result, "moved "+sc.Page.Path+" under "+strconv.FormatInt(placement.wpID, 10))
 		},
 	}
+}
+
+func storePlacedPreflight(_ context.Context, record run.Run, targets map[string]run.Target) ([]run.EstimateFinding, error) {
+	findings := make([]run.EstimateFinding, 0)
+	for _, targetID := range record.Targets {
+		page := targets[targetID].Page
+		switch {
+		case page.WPType.StoreAddressed():
+			findings = append(findings, pageFinding(content.SeverityError, CodeStorePlaced, page,
+				page.Path+" is a "+string(page.WPType)+", which sits where its store puts it, so a repair has no parent "+
+					"to move it under; leave it out of the repair"))
+		case page.WPType == pagemap.WPPost:
+			findings = append(findings, pageFinding(content.SeverityError, CodePostUnnested, page,
+				page.Path+" is a post, which WordPress never puts under a parent, so a repair has nothing to move "+
+					"it under; leave it out of the repair"))
+		}
+	}
+	return findings, nil
 }
 
 func placedAs(page pagemap.Page, parent int64, item wp.Item) []pagemap.Mismatch {

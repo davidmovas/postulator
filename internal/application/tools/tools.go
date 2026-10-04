@@ -204,7 +204,7 @@ func orderedOnly(tool Tool) Tool {
 	}
 
 	direction := *ordering
-	direction.Description = "Whether to read the rows the other way round; this listing takes no other order"
+	direction.Description = "Set desc to reverse"
 	direction.Properties = maps.Clone(ordering.Properties)
 	delete(direction.Properties, fieldField)
 	direction.Required = slices.DeleteFunc(slices.Clone(ordering.Required), func(name string) bool {

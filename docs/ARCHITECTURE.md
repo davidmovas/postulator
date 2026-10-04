@@ -10,24 +10,26 @@ code path.
 ```
 cmd/postulator        Wails bootstrap only
 internal/kernel       errors, paging, id, clock, log, ctx, dto, settings, middleware
-internal/domain       pure logic: site graph pagemap template content run schedule settings llm
+internal/domain       pure logic: site graph pagemap keyword importmap template content run schedule settings llm
 internal/application  use cases, UnitOfWork, tool registry, event registry
-internal/adapters     sqlite, wp, llm, images, secrets, importer
+internal/adapters     sqlite, wp, llm (openai, tuning, retry, limiter, ledger, recordreplay, catalog, profiles, fake), images, secrets, importer
 internal/runtime      the run engine and its step catalog
 internal/transport    wails services and event bridge, agent runner and tools
-internal/app          composition root, manual wiring, no DI container
+internal/app          composition root, manual wiring by area in build_*.go, no DI container
 wp-plugin             the WordPress companion plugin
 frontend              React + Tailwind over the generated bindings; src/canvas is the 2D engine under the graph map, src/features/agent the dock, the agent screens and the confirmation cards
 ```
 
 ## The dependency rule
 
-- `domain` imports `kernel` and the standard library. Nothing else. The one third-party
-  package it may ever reach is `golang.org/x/net/html`, because the content model is an
-  HTML document.
+- `domain` imports `kernel` and the standard library. Nothing else. The third-party packages
+  it may reach are `golang.org/x/net/html`, because the content model is an HTML document,
+  and `github.com/robfig/cron/v3`, because a schedule is a cron expression.
 - `application` imports `domain` and `kernel`.
 - `adapters`, `runtime` and `transport` import `application`, `domain` and `kernel`.
 - Only `app` imports `transport`.
+- `internal/transport/agent` never reaches `internal/adapters/llm/openai`: the agent asks the
+  llm port, and the composition root picks the provider behind it.
 - `paging` is the only kernel package allowed to import a query builder. Domain never
   sees SQL.
 
@@ -50,29 +52,33 @@ that calls them, not in the package that implements them.
 The shared vocabulary every layer is allowed to speak.
 
 - `errors` — a frozen `Code` set (`NotFound Conflict Invalid Unauthorized RateLimited
-  BudgetExceeded External Internal Cancelled NeedsHuman Locked`), a stack captured at
-  construction, `Is` comparing by code, clone-and-mutate enrichment. `CodeOf` answers
-  `Internal` for foreign errors, so everything is classifiable at a boundary.
+  BudgetExceeded External Internal Cancelled NeedsHuman Locked`), `Is` comparing by code,
+  clone-and-mutate enrichment. `CodeOf` answers `Internal` for foreign errors, so everything
+  is classifiable at a boundary. No stack is captured: nothing ever read it.
 - `paging` — opaque base64url cursors carrying `{o,d,v,i}`, typed sort keys, a row-value
   keyset predicate with an id tie-break, and `Cut` to turn `limit+1` rows into a page.
   Offset pagination does not exist in this codebase.
-- `id`, `clock`, `ctx`, `dto` — UUID v4 text, an injectable clock, run/conversation/actor
-  context values, and the RFC3339 UTC time type every DTO uses.
+- `id`, `clock`, `ctx`, `dto` — UUID v4 text, an injectable clock, the actor carried on a
+  context, and the RFC3339 UTC time type every DTO uses with `dto.TimeOf` for an instant that
+  may be missing.
 - `log` — zap over a console core and two lumberjack files (`app.log`, `errors.log`),
   with `password`, `apiKey`, `token` and `authorization` redacted by key.
 - `settings` — settings-as-code: each setting is declared next to the code that reads
   it, with its default and its validators, and the registry can describe the whole set
   as a schema for the UI.
-- `middleware` — generic `Recover`, `Timeout` and `Audit` wrappers over
-  `func(ctx, In) (Out, error)`.
+- `middleware` — generic `Recover` and `Audit` wrappers over `func(ctx, In) (Out, error)`.
 
 ## Domain
 
 Value types and pure functions. `site`, `graph` (a DAG on `parent` edges plus weighted
-undirected `related` edges), `pagemap` (paths, tree, index), `template` (spec plus link
-policy, resolved global → site → page by JSON merge patch), `content` (an HTML document,
-link context, link insertion, compliance and structure reports), `run`, `schedule`,
-`settings`, and the `llm` model catalog types.
+undirected `related` edges, an entity's name unique under the parent it is scoped to, and the
+labels that tell a shared name apart), `pagemap` (paths, tree, index, a page's keywords and
+notes), `keyword` (the ordered list with volumes and the one cell grammar), `importmap` (the
+mapping of a sheet's headers, its level and note columns, and what each column became),
+`template` (spec plus link policy, resolved global → site → page by JSON merge patch),
+`content` (an HTML document, link context, link insertion, compliance and structure reports),
+`run`, `schedule`, `settings`, and the `llm` model catalog types with the service tiers, the
+reasoning allowance per effort, `Cost` and the purpose rules the spend report groups by.
 
 The heart of it is `content`: `PlanLinks` turns a graph, a page index and a
 `content.Subject{Site, PageID, PagePath, EntityID}` into the set of links that page owes,
@@ -144,7 +150,9 @@ of the parent keeps the item id, so the relation holds.
 
 Before a run costs anything, `EstimateRun` resolves the template of every target, or the
 template the start is about to assign to it, runs the preflight each step declares, checks each
-model role it will call (profile, API key, catalog entry) and prices every page on its own spec;
+model role it will call (profile, API key, catalog entry) and prices every page on its own spec,
+each step at its role's service tier and, on a model that reasons, with half the allowance of the
+role's effort as output, both read from the same tuning policy the calls are sent with;
 a finding graded `error` stops `Start`. The step that completes an item may return a notice, which
 the engine keeps as the item's note and sends on `item.done`; the report step words what the
 page lacks there. A page
@@ -165,17 +173,34 @@ one `EventBridge` per process, because the application-event `seq` is a counter 
 that instance and a second bridge would restart it.
 
 The guard itself is not transport's. `Fence`, `Permit` and `Cap` live in
-`internal/application/agent`; `internal/transport/agent` adapts them to gollem middleware
-and `Confirm` calls them directly, so a confirmed tool is fenced, permitted and capped by
-construction rather than by a second implementation. Nothing is injected through `Deps` and
-nothing in `application` imports `transport`, so the dependency rule holds without a new
-seam.
+`internal/application/agent`; the runner in `internal/transport/agent` calls them for every
+call the model makes and `Confirm` calls them directly, so a confirmed tool is fenced, permitted
+and capped by construction rather than by a second implementation. Nothing is injected through
+`Deps` and nothing in `application` imports `transport`, so the dependency rule holds without a
+new seam.
 
-Every model call of an agent turn is its own `llm_calls` row with `step = "chat"`, priced
-against the catalog per round and written outside the turn's cancellation, so a stopped turn
-is still billed for the rounds that ran. The turn's cost is the sum of those rows, which is
-what makes the spend badge and the ledger agree by construction instead of by two independent
-pricings; each round also announces itself as `agent.usage`.
+A turn runs on the same `llm.Client` chain as the runs. Each round streams from it, its calls
+are dispatched in order, the history is saved after every complete round as
+`responses/1`, and the turn ends with a budget refusal at the loop limit. Every attempt the chain
+makes is its own `llm_calls` row with `step = "chat"`, written by the ledger decorator outside the
+caller's cancellation, so a stopped turn is still billed for what ran; each round announces its
+cost as `agent.usage`, priced with the same `Cost` the ledger uses, so the spend badge and the
+ledger agree by construction.
+
+## The model client
+
+One chain carries every model call, composed in `build_llm.go`: `tuning` fills the effort and the
+service tier of the role a call names, then `retry`, `limiter`, `ledger` and `recordreplay`, then
+`openai`, our own client for OpenAI's Responses API. The tuning decorator sits outermost so that
+the ledger and a fixture record what was sent. The client sends `store: false`, a strict
+`json_schema` for a structured answer, an explicit reasoning effort to a model that reasons and
+flex only where the catalog prices it; it falls back to the default tier once when flex has no
+capacity or answers nothing within the patience, classifies an error that arrives inside a
+stream like the same error over HTTP, and reads a rate limit's delay from the response headers.
+A call with no tools and no cache key is kept out of the prompt cache, because a single call
+would pay to write its whole prompt and never read it; the agent names its prefix family.
+`openaitest` fakes the API from what a live probe recorded, and `fake` scripts a model on the port
+for the harnesses, which `Config.Provider` puts in place of `openai` at the bottom of the chain.
 
 ## The locked core
 
@@ -219,6 +244,13 @@ name is refused from the cached manifest before any request, so a site still on 
 
 Raw writes rely on that role's `unfiltered_html` rather than removing kses filters. With no
 SEO plugin the head is replaced, not appended, and every value is escaped on the way out.
+
+The post routes read their number through `get_post()`, so a product is written there like a
+page and a product category never is: a term id names whatever post shares its number, which is
+why the client names the item type on every call and refuses `product_cat` before the request.
+A product's other fields go through WooCommerce's `wc/v3` with the same application password, the
+store's fields before the description, because saving the short description makes WooCommerce
+save the whole post again.
 
 See `docs/CONTRACTS.md` for the wire shapes and `docs/superpowers/specs/` for the full
 design.

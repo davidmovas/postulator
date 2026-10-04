@@ -15,7 +15,6 @@ type runStore interface {
 	Insert(ctx context.Context, record run.Run) error
 	Get(ctx context.Context, id string) (run.Run, error)
 	Update(ctx context.Context, record run.Run) error
-	Active(ctx context.Context) ([]run.Run, error)
 	PastDeadline(ctx context.Context, now time.Time, limit int) ([]run.Run, error)
 }
 
@@ -76,6 +75,11 @@ type modelCatalog interface {
 
 type profileResolver interface {
 	Resolve(ctx context.Context, siteID string, role llm.Role, templateProfiles map[llm.Role]llm.ModelRef) (llm.ModelRef, error)
+}
+
+type modelTuning interface {
+	Effort(role llm.Role) llm.ReasoningEffort
+	Tier(role llm.Role) llm.ServiceTier
 }
 
 type publisher interface {

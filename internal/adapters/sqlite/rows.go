@@ -11,6 +11,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/dbx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 func selectAll[T any](ctx context.Context, exec executor, query string, args []any, scan func(*sql.Rows) (T, error), message string) (items []T, err error) {
@@ -51,6 +52,23 @@ func selectOne[T any](ctx context.Context, exec executor, query string, args []a
 		NotFound(notFound).
 		WrapErr(func(cause error) error { return dbx.Convert(cause, message) }).
 		Unwrap()
+}
+
+func selectKeyed[T any](ctx context.Context, exec executor, builder squirrel.SelectBuilder, keyset paging.Keyset[T],
+	page paging.Request, scan func(*sql.Rows) (T, error), what string) (paging.List[T], error) {
+	keyed, err := keyset.Apply(builder, page)
+	if err != nil {
+		return paging.List[T]{}, err
+	}
+	query, args, err := buildQuery(keyed, what)
+	if err != nil {
+		return paging.List[T]{}, err
+	}
+	rows, err := selectAll(ctx, exec, query, args, scan, "list the "+what)
+	if err != nil {
+		return paging.List[T]{}, err
+	}
+	return keyset.Cut(rows, page)
 }
 
 func execWrite(ctx context.Context, exec executor, query string, args []any, conflict *errors.Error, message string) (int64, error) {
@@ -118,6 +136,46 @@ func optString(raw sql.NullString) *string {
 		return nil
 	}
 	value := raw.String
+	return &value
+}
+
+func nullText(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func nullTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return formatTime(*t)
+}
+
+func parseNullTime(raw sql.NullString) (*time.Time, error) {
+	if !raw.Valid {
+		return nil, nil
+	}
+	parsed, err := parseTime(raw.String)
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func nullInt(v *int64) any {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
+
+func optInt(raw sql.NullInt64) *int64 {
+	if !raw.Valid {
+		return nil
+	}
+	value := raw.Int64
 	return &value
 }
 

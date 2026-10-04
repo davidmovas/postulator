@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -59,6 +60,16 @@ type stubKeys struct{}
 
 func (stubKeys) Has(context.Context, string) (bool, error) {
 	return true, nil
+}
+
+type stubTuning struct{}
+
+func (stubTuning) Effort(domainllm.Role) domainllm.ReasoningEffort {
+	return domainllm.EffortNone
+}
+
+func (stubTuning) Tier(domainllm.Role) domainllm.ServiceTier {
+	return domainllm.TierDefault
 }
 
 type recorder struct {
@@ -213,10 +224,9 @@ func seedEntity(t *testing.T, repo *sqlite.EntityRepo, siteID, name, anchor stri
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, PrimaryKeyword: anchor,
-		SecondaryKeywords: []string{},
-		Anchors:           []graph.Anchor{{Text: anchor, Source: graph.AnchorUser, Weight: 1}},
-		Source:            graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(anchor),
+		Anchors: []graph.Anchor{{Text: anchor, Source: graph.AnchorUser, Weight: 1}},
+		Source:  graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if err := repo.Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the entity %s: %v", name, err)
@@ -269,7 +279,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 	engine := runtime.New(runtime.Deps{
 		Runs: f.runs, Items: f.items, Artifacts: f.blobs, Execs: sqlite.NewStepExecRepo(f.store),
 		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs, Keys: stubKeys{},
-		Spend: sqlite.NewLLMCallRepo(f.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
+		Spend: sqlite.NewLLMCallRepo(f.store), Catalog: stubCatalog{}, Profiles: stubProfiles{}, Tuning: stubTuning{},
 		UnitOfWork: f.store, Publisher: f.bus,
 	}, registry, runtime.Config{
 		Workers: 1, PerSite: 1, SweepInterval: 20 * time.Millisecond,

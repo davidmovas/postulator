@@ -84,6 +84,21 @@ describe("buildGraphIndex", () => {
         expect(empty.roots).toStrictEqual([]);
         expect(empty.counts.total).toBe(0);
     });
+
+    it("labels a shared name with the parent it sits under", () => {
+        const shared = buildGraphIndex(
+            [
+                entity({ id: "bpc", name: "BPC-157" }),
+                entity({ id: "tb", name: "TB-500" }),
+                entity({ id: "bpc-liquid", name: "Liquid", scope: "bpc" }),
+                entity({ id: "tb-liquid", name: "Liquid", scope: "tb" }),
+            ],
+            [edge("p1", "bpc-liquid", "bpc", "parent"), edge("p2", "tb-liquid", "tb", "parent")],
+        );
+        expect(shared.labels.get("bpc-liquid")).toBe("BPC-157 › Liquid");
+        expect(shared.labels.get("tb")).toBe("TB-500");
+        expect(index.labels.get("mugs")).toBe("Ceramic Mugs");
+    });
 });
 
 describe("node state", () => {

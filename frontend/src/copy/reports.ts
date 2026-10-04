@@ -81,6 +81,17 @@ export const reports = {
         tokens: "Tokens",
         perPage: "Per page",
         choose: "Choose a run to read its report.",
+        costByStep: {
+            title: "Cost by step",
+            loading: "Adding up what each step cost",
+            none: "No step of this run called a model, so it cost nothing.",
+            unnamed: "Without a step",
+            ofRun: (share: string) => `${share} of the run`,
+            calls: (count: number) => (count === 1 ? "1 call" : `${count.toLocaleString("en")} calls`),
+            reasoning: (share: string) => `${share} reasoning`,
+            reasoningHint: "How much of what this step's model wrote was thinking. Thinking is billed like written text.",
+            failed: (count: number) => `${count.toLocaleString("en")} failed`,
+        },
     },
     pages: {
         search: "Find a page by path",

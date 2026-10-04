@@ -1,123 +1,144 @@
 package imports
 
 import (
+	"cmp"
+	"maps"
 	"slices"
 	"strings"
+
+	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
-func key(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
-}
-
-func union(into, more []string) []string {
-	seen := make(map[string]struct{}, len(into)+len(more))
-	out := make([]string, 0, len(into)+len(more))
-	for _, values := range [][]string{into, more} {
-		for _, value := range values {
-			trimmed := strings.TrimSpace(value)
-			if trimmed == "" {
-				continue
-			}
-			if _, dup := seen[strings.ToLower(trimmed)]; dup {
-				continue
-			}
-			seen[strings.ToLower(trimmed)] = struct{}{}
-			out = append(out, trimmed)
-		}
-	}
-	return out
-}
-
-func fill(current, next string) string {
-	if strings.TrimSpace(current) != "" {
-		return current
-	}
-	return strings.TrimSpace(next)
-}
-
-type entityDraft struct {
-	name     string
-	kind     string
-	primary  string
-	keywords []string
-	anchors  []string
-	parent   string
-	related  []string
-	row      int
-}
-
 type pageDraft struct {
-	path      string
-	title     string
-	h1        string
-	metaTitle string
-	metaDesc  string
-	wpType    string
-	pageKind  string
-	entity    string
-	primary   string
-	keywords  []string
-	generated bool
-	row       int
+	path       string
+	title      string
+	h1         string
+	metaTitle  string
+	metaDesc   string
+	wpType     string
+	pageKind   string
+	entity     string
+	keywords   keyword.List
+	notes      []pagemap.Note
+	own        ownership
+	modeType   pagemap.WPType
+	matchedBy  pagemap.MatchedBy
+	rows       []int
+	unit       int
+	generated  bool
+	entityOnly bool
+	at         importmap.Origin
+}
+
+func (p *pageDraft) kind() string {
+	return strings.ToLower(strings.TrimSpace(p.pageKind))
+}
+
+func (p *pageDraft) cellType() pagemap.WPType {
+	wpType := pagemap.WPType(strings.ToLower(strings.TrimSpace(p.wpType)))
+	if !wpType.Valid() {
+		return ""
+	}
+	return wpType
+}
+
+func (p *pageDraft) createdType() pagemap.WPType {
+	return cmp.Or(p.cellType(), p.modeType, pagemap.WPPage)
+}
+
+func (p *pageDraft) technical() bool {
+	return p.own == ownNo
+}
+
+func (p *pageDraft) merge(row *rowDraft, at int) {
+	p.title = fill(p.title, row.title)
+	p.h1 = fill(p.h1, row.h1)
+	p.metaTitle = fill(p.metaTitle, row.metaTitle)
+	p.metaDesc = fill(p.metaDesc, row.metaDesc)
+	p.wpType = fill(p.wpType, row.wpType)
+	p.pageKind = fill(p.pageKind, row.pageKind)
+	p.keywords = p.keywords.Merge(row.keywords)
+	p.notes = pagemap.MergeNotes(p.notes, row.notes)
+	if p.own == ownUnset {
+		p.own = row.own
+	}
+	p.rows = append(p.rows, at)
 }
 
 type drafts struct {
-	entities map[string]*entityDraft
-	pages    map[string]*pageDraft
-	order    []string
-	paths    []string
+	pages  map[string]*pageDraft
+	sorted []string
 }
 
 func newDrafts() *drafts {
-	return &drafts{entities: make(map[string]*entityDraft), pages: make(map[string]*pageDraft)}
+	return &drafts{pages: make(map[string]*pageDraft)}
 }
 
-func (d *drafts) entity(name string, row int) *entityDraft {
-	at := key(name)
-	current, known := d.entities[at]
-	if known {
-		return current
-	}
-	current = &entityDraft{name: strings.TrimSpace(name), row: row}
-	d.entities[at] = current
-	d.order = append(d.order, at)
-	return current
-}
-
-func (d *drafts) page(path string, row int) (draft *pageDraft, known bool) {
-	current, known := d.pages[path]
-	if known {
+func (d *drafts) page(path string, at importmap.Origin) (draft *pageDraft, known bool) {
+	if current, held := d.pages[path]; held {
 		return current, true
 	}
-	current = &pageDraft{path: path, row: row}
-	d.pages[path] = current
-	d.paths = append(d.paths, path)
-	return current, false
+	draft = &pageDraft{path: path, at: at, unit: -1}
+	d.pages[path] = draft
+	d.sorted = nil
+	return draft, false
 }
 
 func (d *drafts) sortedPaths() []string {
-	out := slices.Clone(d.paths)
-	slices.Sort(out)
-	return out
+	if d.sorted == nil {
+		d.sorted = slices.Sorted(maps.Keys(d.pages))
+	}
+	return d.sorted
 }
 
-func (e *entityDraft) merge(other entityDraft) {
-	e.kind = fill(e.kind, other.kind)
-	e.primary = fill(e.primary, other.primary)
-	e.parent = fill(e.parent, other.parent)
-	e.keywords = union(e.keywords, other.keywords)
-	e.anchors = union(e.anchors, other.anchors)
-	e.related = union(e.related, other.related)
+func pagesOf(rows []rowDraft, p *plan) *drafts {
+	sheet := newDrafts()
+	for i := range rows {
+		row := &rows[i]
+		if row.path == "" {
+			continue
+		}
+		draft, known := sheet.page(row.path, row.at)
+		if known {
+			p.noteAt(row.at, string(importmap.FieldPath), CodeDuplicatePath, "the path repeats an earlier row and was merged: "+row.path)
+		}
+		draft.merge(row, i)
+	}
+	return sheet
 }
 
-func (p *pageDraft) merge(other pageDraft) {
-	p.title = fill(p.title, other.title)
-	p.h1 = fill(p.h1, other.h1)
-	p.metaTitle = fill(p.metaTitle, other.metaTitle)
-	p.metaDesc = fill(p.metaDesc, other.metaDesc)
-	p.wpType = fill(p.wpType, other.wpType)
-	p.pageKind = fill(p.pageKind, other.pageKind)
-	p.entity = fill(p.entity, other.entity)
-	p.primary = fill(p.primary, other.primary)
-	p.keywords = union(p.keywords, other.keywords)
+func fillGaps(sheet *drafts, state *siteState, p *plan) {
+	needsPage := make(map[string]bool)
+	order := make([]string, 0)
+	for _, path := range sheet.sortedPaths() {
+		product := state.productDraft(sheet.pages[path])
+		for parent := pagemap.ParentPath(path); parent != "" && parent != pagemap.RootPath; parent = pagemap.ParentPath(parent) {
+			if _, planned := sheet.pages[parent]; planned {
+				continue
+			}
+			if _, exists := state.held(parent); exists {
+				continue
+			}
+			page, seen := needsPage[parent]
+			if !seen {
+				order = append(order, parent)
+			}
+			needsPage[parent] = page || !product
+		}
+	}
+
+	for _, parent := range order {
+		draft, _ := sheet.page(parent, p.whole())
+		draft.generated = true
+		draft.title = titleFrom(parent)
+		if !needsPage[parent] {
+			draft.entityOnly = true
+			p.noteAt(draft.at, string(importmap.FieldPath), CodeIntermediateLevel,
+				"the level above the products was kept as an entity without a page, because the store decides where a product sits: "+parent)
+			continue
+		}
+		p.noteAt(draft.at, string(importmap.FieldPath), CodeIntermediatePath, "the missing intermediate path was created: "+parent)
+	}
 }

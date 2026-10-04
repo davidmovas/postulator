@@ -92,20 +92,7 @@ func (r *LinkPolicyRepo) List(ctx context.Context, q template.PolicyQuery, page 
 		builder = builder.Where(squirrel.Eq{"name": q.Name})
 	}
 
-	keyset := policyKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[template.LinkPolicy]{}, err
-	}
-	query, args, err := buildQuery(keyed, "link policies")
-	if err != nil {
-		return paging.List[template.LinkPolicy]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanPolicy, "list the link policies")
-	if err != nil {
-		return paging.List[template.LinkPolicy]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, policyKeyset(q), page, scanPolicy, "link policies")
 }
 
 func scanPolicy(rows *sql.Rows) (template.LinkPolicy, error) {

@@ -10,10 +10,9 @@ export interface ImportQuery {
     tab: ImportTab;
     step: ImportStep;
     path: string;
-    mappingId: string;
 }
 
-export const defaultQuery: ImportQuery = { tab: "import", step: "file", path: "", mappingId: "" };
+export const defaultQuery: ImportQuery = { tab: "import", step: "file", path: "" };
 
 function isTab(value: string): value is ImportTab {
     return (importTabs as readonly string[]).includes(value);
@@ -48,7 +47,6 @@ export function readQuery(params: URLSearchParams): ImportQuery {
         tab: isTab(tab) ? tab : "import",
         step: reachable(wanted, path) ? wanted : "file",
         path,
-        mappingId: params.get("mapping") ?? "",
     };
 }
 
@@ -62,9 +60,6 @@ export function writeQuery(query: ImportQuery): URLSearchParams {
     }
     if (query.path !== "") {
         params.set("path", query.path);
-    }
-    if (query.mappingId !== "") {
-        params.set("mapping", query.mappingId);
     }
     return params;
 }

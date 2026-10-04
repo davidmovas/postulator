@@ -3,7 +3,7 @@ import { flagLabel, roleLabel, stepLabel } from "./labels.js";
 import { allRules } from "./rules-blocks.js";
 import type { Rule } from "./rules-model.js";
 import { shown } from "./rules-model.js";
-import type { ProfileDraft, SpecDraft, StepDraft } from "./spec.js";
+import type { ProductDraft, ProfileDraft, SpecDraft, StepDraft } from "./spec.js";
 
 export interface DiffRow {
     key: string;
@@ -67,6 +67,20 @@ function sectionText(draft: SpecDraft): string {
     return copy.templates.sectionCount(draft.sections.length);
 }
 
+function productText(product: ProductDraft | null): string {
+    if (product === null) {
+        return copy.templates.product.none;
+    }
+    return copy.templates.product.summary(product.shortEnabled, product.specifications.length);
+}
+
+function productCopy(product: ProductDraft | null): ProductDraft | null {
+    if (product === null) {
+        return null;
+    }
+    return { ...product, specifications: product.specifications.map((row) => ({ ...row })) };
+}
+
 export function diffRows(below: SpecDraft, here: SpecDraft): readonly DiffRow[] {
     const rows: DiffRow[] = [];
 
@@ -77,6 +91,16 @@ export function diffRows(below: SpecDraft, here: SpecDraft): readonly DiffRow[] 
             below: sectionText(below),
             here: sectionText(here),
             revert: { sections: below.sections.map((section) => ({ ...section, include: [...section.include] })) },
+        });
+    }
+
+    if (JSON.stringify(below.product) !== JSON.stringify(here.product)) {
+        rows.push({
+            key: "product",
+            label: copy.templates.product.title,
+            below: productText(below.product),
+            here: productText(here.product),
+            revert: { product: productCopy(below.product) },
         });
     }
 

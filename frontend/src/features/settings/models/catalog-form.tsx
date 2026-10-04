@@ -2,68 +2,143 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { formErrorOf } from "../../../data/errors.js";
+import { fieldErrorOf, formErrorOf } from "../../../data/errors.js";
 import { useUpsertModel } from "../../../data/hooks/models.js";
 import type { CatalogModel } from "../../../data/types.js";
-import { reasoningEfforts } from "../../../generated/vocab.js";
-import { Banner, Button, Field, Input, Select, Switch } from "../../../ui/index.js";
-import type { SelectOption } from "../../../ui/index.js";
+import { Banner, Button, Field, Input, SectionLabel, Switch } from "../../../ui/index.js";
 
 const said = copy.settings.models.catalog;
 
-const providerDefault = "default";
+const openaiProvider = "openai";
 
-const effortOptions: readonly SelectOption<string>[] = [
-    { value: providerDefault, label: said.effortDefault },
-    ...reasoningEfforts.map((effort) => ({ value: effort, label: said.effortLabels[effort] })),
+type Limit = "contextTokens" | "maxOutputTokens" | "rpm" | "tpm";
+
+type Price =
+    | "inputUsdPerM"
+    | "cachedInputUsdPerM"
+    | "cacheWriteUsdPerM"
+    | "outputUsdPerM"
+    | "flexInputUsdPerM"
+    | "flexCachedInputUsdPerM"
+    | "flexCacheWriteUsdPerM"
+    | "flexOutputUsdPerM";
+
+const limitFields: readonly Limit[] = ["contextTokens", "maxOutputTokens", "rpm", "tpm"];
+
+const standardPrices: readonly Price[] = ["inputUsdPerM", "cachedInputUsdPerM", "cacheWriteUsdPerM", "outputUsdPerM"];
+
+const flexPrices: readonly Price[] = [
+    "flexInputUsdPerM",
+    "flexCachedInputUsdPerM",
+    "flexCacheWriteUsdPerM",
+    "flexOutputUsdPerM",
 ];
 
-type Numeric = "contextTokens" | "maxOutputTokens" | "inputUsdPerM" | "outputUsdPerM" | "rpm" | "tpm";
+const optionalFields: ReadonlySet<Limit | Price> = new Set<Limit | Price>([
+    "cachedInputUsdPerM",
+    "cacheWriteUsdPerM",
+    ...flexPrices,
+]);
 
-const numericFields: readonly Numeric[] = [
-    "contextTokens",
-    "maxOutputTokens",
-    "inputUsdPerM",
-    "outputUsdPerM",
-    "rpm",
-    "tpm",
-];
+type Numbers = Record<Limit | Price, string>;
 
-interface Draft {
-    provider: string;
+interface Draft extends Numbers {
     model: string;
-    contextTokens: string;
-    maxOutputTokens: string;
-    inputUsdPerM: string;
-    outputUsdPerM: string;
-    rpm: string;
-    tpm: string;
     supportsStructured: boolean;
     supportsImages: boolean;
     reasoning: boolean;
-    reasoningEffort: string;
+}
+
+interface ModelRequest {
+    provider: string;
+    model: string;
+    contextTokens: number;
+    maxOutputTokens: number;
+    inputUsdPerM: number;
+    cachedInputUsdPerM: number;
+    cacheWriteUsdPerM: number;
+    outputUsdPerM: number;
+    flexInputUsdPerM: number;
+    flexCachedInputUsdPerM: number;
+    flexCacheWriteUsdPerM: number;
+    flexOutputUsdPerM: number;
+    rpm: number;
+    tpm: number;
+    supportsStructured: boolean;
+    supportsImages: boolean;
+    reasoning: boolean;
+}
+
+function shown(model: CatalogModel | null, field: Limit | Price): string {
+    const value = model?.[field];
+    if (value === undefined || (optionalFields.has(field) && value === 0)) {
+        return "";
+    }
+    return String(value);
 }
 
 function draftOf(model: CatalogModel | null): Draft {
     return {
-        provider: model?.provider ?? "",
         model: model?.model ?? "",
-        contextTokens: String(model?.contextTokens ?? ""),
-        maxOutputTokens: String(model?.maxOutputTokens ?? ""),
-        inputUsdPerM: String(model?.inputUsdPerM ?? ""),
-        outputUsdPerM: String(model?.outputUsdPerM ?? ""),
-        rpm: String(model?.rpm ?? ""),
-        tpm: String(model?.tpm ?? ""),
+        contextTokens: shown(model, "contextTokens"),
+        maxOutputTokens: shown(model, "maxOutputTokens"),
+        rpm: shown(model, "rpm"),
+        tpm: shown(model, "tpm"),
+        inputUsdPerM: shown(model, "inputUsdPerM"),
+        cachedInputUsdPerM: shown(model, "cachedInputUsdPerM"),
+        cacheWriteUsdPerM: shown(model, "cacheWriteUsdPerM"),
+        outputUsdPerM: shown(model, "outputUsdPerM"),
+        flexInputUsdPerM: shown(model, "flexInputUsdPerM"),
+        flexCachedInputUsdPerM: shown(model, "flexCachedInputUsdPerM"),
+        flexCacheWriteUsdPerM: shown(model, "flexCacheWriteUsdPerM"),
+        flexOutputUsdPerM: shown(model, "flexOutputUsdPerM"),
         supportsStructured: model?.supportsStructured ?? false,
         supportsImages: model?.supportsImages ?? false,
         reasoning: model?.reasoning ?? false,
-        reasoningEffort: model?.reasoningEffort ?? "",
     };
 }
 
-function numberOf(text: string): number | null {
-    const held = Number(text.trim());
-    return text.trim() === "" || !Number.isFinite(held) || held < 0 ? null : held;
+function numberOf(draft: Draft, field: Limit | Price): number | null {
+    const trimmed = draft[field].trim();
+    if (trimmed === "") {
+        return optionalFields.has(field) ? 0 : null;
+    }
+    const held = Number(trimmed);
+    return Number.isFinite(held) && held >= 0 ? held : null;
+}
+
+function requestOf(draft: Draft): ModelRequest | null {
+    const held: Partial<Record<Limit | Price, number>> = {};
+    for (const field of [...limitFields, ...standardPrices, ...flexPrices]) {
+        const value = numberOf(draft, field);
+        if (value === null) {
+            return null;
+        }
+        held[field] = value;
+    }
+    const model = draft.model.trim();
+    if (model === "") {
+        return null;
+    }
+    return {
+        provider: openaiProvider,
+        model,
+        contextTokens: held.contextTokens ?? 0,
+        maxOutputTokens: held.maxOutputTokens ?? 0,
+        inputUsdPerM: held.inputUsdPerM ?? 0,
+        cachedInputUsdPerM: held.cachedInputUsdPerM ?? 0,
+        cacheWriteUsdPerM: held.cacheWriteUsdPerM ?? 0,
+        outputUsdPerM: held.outputUsdPerM ?? 0,
+        flexInputUsdPerM: held.flexInputUsdPerM ?? 0,
+        flexCachedInputUsdPerM: held.flexCachedInputUsdPerM ?? 0,
+        flexCacheWriteUsdPerM: held.flexCacheWriteUsdPerM ?? 0,
+        flexOutputUsdPerM: held.flexOutputUsdPerM ?? 0,
+        rpm: held.rpm ?? 0,
+        tpm: held.tpm ?? 0,
+        supportsStructured: draft.supportsStructured,
+        supportsImages: draft.supportsImages,
+        reasoning: draft.reasoning,
+    };
 }
 
 export interface ModelFormProps {
@@ -80,41 +155,48 @@ export function ModelForm({ editing, onDone }: ModelFormProps): ReactElement {
         setDraft({ ...draft, [field]: value });
     };
 
-    const missing = draft.provider.trim() === "" || draft.model.trim() === "";
-    const numbers = numericFields.map((field) => numberOf(draft[field]));
-    const ready = !missing && numbers.every((held) => held !== null);
+    const problemOf = (field: Limit | Price): string | null => {
+        if (touched && numberOf(draft, field) === null) {
+            return draft[field].trim() === "" ? copy.settings.problem.empty : copy.settings.problem.number;
+        }
+        return fieldErrorOf(save.error, field);
+    };
+
+    const modelProblem =
+        touched && draft.model.trim() === ""
+            ? copy.settings.problem.empty
+            : (fieldErrorOf(save.error, "ref") ?? fieldErrorOf(save.error, "provider"));
+
+    const numberField = (field: Limit | Price): ReactElement => (
+        <Field key={field} label={said.field[field]} required={!optionalFields.has(field)} error={problemOf(field)}>
+            {(binding) => (
+                <Input
+                    id={binding.id}
+                    mono={true}
+                    inputMode="decimal"
+                    aria-describedby={binding["aria-describedby"]}
+                    invalid={binding.invalid}
+                    value={draft[field]}
+                    onChange={(event) => {
+                        set(field, event.target.value);
+                    }}
+                />
+            )}
+        </Field>
+    );
+
+    const formError = formErrorOf(save.error);
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <div className="min-h-0 flex-1 overflow-auto p-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-3">
                 <div className="grid grid-cols-2 gap-3">
-                    <Field
-                        label={said.field.provider}
-                        required={true}
-                        error={touched && draft.provider.trim() === "" ? copy.settings.problem.empty : null}
-                    >
+                    <Field label={said.field.model} required={true} hint={said.modelHint} error={modelProblem}>
                         {(binding) => (
                             <Input
                                 id={binding.id}
                                 mono={true}
-                                invalid={binding.invalid}
-                                disabled={editing !== null}
-                                value={draft.provider}
-                                onChange={(event) => {
-                                    set("provider", event.target.value);
-                                }}
-                            />
-                        )}
-                    </Field>
-                    <Field
-                        label={said.field.model}
-                        required={true}
-                        error={touched && draft.model.trim() === "" ? copy.settings.problem.empty : null}
-                    >
-                        {(binding) => (
-                            <Input
-                                id={binding.id}
-                                mono={true}
+                                aria-describedby={binding["aria-describedby"]}
                                 invalid={binding.invalid}
                                 disabled={editing !== null}
                                 value={draft.model}
@@ -124,29 +206,23 @@ export function ModelForm({ editing, onDone }: ModelFormProps): ReactElement {
                             />
                         )}
                     </Field>
-                    {numericFields.map((field, index) => (
-                        <Field
-                            key={field}
-                            label={said.field[field]}
-                            required={true}
-                            error={touched && numbers[index] === null ? copy.settings.problem.number : null}
-                        >
-                            {(binding) => (
-                                <Input
-                                    id={binding.id}
-                                    mono={true}
-                                    inputMode="decimal"
-                                    invalid={binding.invalid}
-                                    value={draft[field]}
-                                    onChange={(event) => {
-                                        set(field, event.target.value);
-                                    }}
-                                />
-                            )}
-                        </Field>
-                    ))}
+                    <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-ink-soft">{said.field.provider}</span>
+                        <span className="flex h-7 items-center text-sm text-ink">{said.providerFixed}</span>
+                    </div>
+                    {limitFields.map(numberField)}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-4">
+                <section className="flex flex-col gap-2" aria-label={said.sections.standard}>
+                    <SectionLabel>{said.sections.standard}</SectionLabel>
+                    <div className="grid grid-cols-4 gap-3">{standardPrices.map(numberField)}</div>
+                    <p className="text-xs text-ink-dim">{said.standardHelp}</p>
+                </section>
+                <section className="flex flex-col gap-2" aria-label={said.sections.flex}>
+                    <SectionLabel>{said.sections.flex}</SectionLabel>
+                    <div className="grid grid-cols-4 gap-3">{flexPrices.map(numberField)}</div>
+                    <p className="text-xs text-ink-dim">{said.flexHelp}</p>
+                </section>
+                <div className="flex flex-wrap gap-4">
                     <Switch
                         label={said.structured}
                         checked={draft.supportsStructured}
@@ -169,28 +245,8 @@ export function ModelForm({ editing, onDone }: ModelFormProps): ReactElement {
                         }}
                     />
                 </div>
-                {draft.reasoning ? (
-                    <div className="mt-3 max-w-64">
-                        <Field label={said.field.effort} hint={said.effortHint}>
-                            {(binding) => (
-                                <Select
-                                    id={binding.id}
-                                    aria-describedby={binding["aria-describedby"]}
-                                    value={draft.reasoningEffort === "" ? providerDefault : draft.reasoningEffort}
-                                    options={effortOptions}
-                                    onValueChange={(next) => {
-                                        set("reasoningEffort", next === providerDefault ? "" : next);
-                                    }}
-                                />
-                            )}
-                        </Field>
-                    </div>
-                ) : null}
-                {formErrorOf(save.error) === null ? null : (
-                    <div className="pt-3">
-                        <Banner tone="danger" title={formErrorOf(save.error) ?? ""} />
-                    </div>
-                )}
+                {draft.reasoning ? <p className="text-xs text-ink-dim">{said.reasoningHint}</p> : null}
+                {formError === null ? null : <Banner tone="danger" title={formError} />}
             </div>
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-hairline p-3">
                 <Button variant="ghost" onClick={onDone}>
@@ -201,26 +257,11 @@ export function ModelForm({ editing, onDone }: ModelFormProps): ReactElement {
                     busy={save.isPending}
                     onClick={() => {
                         setTouched(true);
-                        if (!ready) {
+                        const request = requestOf(draft);
+                        if (request === null) {
                             return;
                         }
-                        save.mutate(
-                            {
-                                provider: draft.provider.trim(),
-                                model: draft.model.trim(),
-                                contextTokens: numbers[0] ?? 0,
-                                maxOutputTokens: numbers[1] ?? 0,
-                                inputUsdPerM: numbers[2] ?? 0,
-                                outputUsdPerM: numbers[3] ?? 0,
-                                rpm: numbers[4] ?? 0,
-                                tpm: numbers[5] ?? 0,
-                                supportsStructured: draft.supportsStructured,
-                                supportsImages: draft.supportsImages,
-                                reasoning: draft.reasoning,
-                                reasoningEffort: draft.reasoning ? draft.reasoningEffort : "",
-                            },
-                            { onSuccess: onDone },
-                        );
+                        save.mutate(request, { onSuccess: onDone });
                     }}
                 >
                     {copy.app.save}

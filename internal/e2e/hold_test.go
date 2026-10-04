@@ -165,7 +165,7 @@ func plantChild(t *testing.T, entities *graph.Service, service *pages.Service, s
 		t.Fatalf("read the parent entity: %v", err)
 	}
 	created, err := entities.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: siteID, Name: "House Cocktails", Kind: kin.Entity.Kind, PrimaryKeyword: childTopic,
+		SiteID: siteID, Name: "House Cocktails", Kind: kin.Entity.Kind, Keywords: []dto.Keyword{{Text: childTopic}},
 	})
 	if err != nil {
 		t.Fatalf("create the child entity: %v", err)

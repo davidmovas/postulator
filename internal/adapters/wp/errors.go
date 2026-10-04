@@ -103,6 +103,11 @@ func retryAfter(header string) time.Duration {
 	return delay
 }
 
+func Forbidden(err error) bool {
+	status, ok := detailValue(err, "status")
+	return errors.IsCode(err, errors.Unauthorized) && ok && status == http.StatusForbidden
+}
+
 func retryable(err error) bool {
 	code := errors.CodeOf(err)
 	return code == errors.RateLimited || code == errors.External

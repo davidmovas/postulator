@@ -24,6 +24,19 @@ export interface StepDraft {
     params: JsonObject | null;
 }
 
+export interface SpecificationDraft {
+    name: string;
+    intent: string;
+}
+
+export interface ProductDraft {
+    shortEnabled: boolean;
+    shortIntent: string;
+    shortWords: number;
+    shortKeyword: boolean;
+    specifications: SpecificationDraft[];
+}
+
 export interface SpecDraft {
     sections: SectionDraft[];
     tone: string;
@@ -33,6 +46,7 @@ export interface SpecDraft {
     primaryInH1: boolean;
     primaryInFirstParagraph: boolean;
     maxDensity: number;
+    requiredKeywords: number | null;
     upDepth: number;
     downLinks: boolean;
     siblingMinWeight: number;
@@ -45,6 +59,7 @@ export interface SpecDraft {
     featuredImage: boolean;
     inlineImages: number;
     imageSource: string;
+    product: ProductDraft | null;
     profiles: ProfileDraft[];
     recipe: StepDraft[];
 }
@@ -72,6 +87,11 @@ function text(parent: JsonObject | null, key: string): string {
 function count(parent: JsonObject | null, key: string): number {
     const held = parent === null ? undefined : parent[key];
     return typeof held === "number" && Number.isFinite(held) ? held : 0;
+}
+
+function countOrNone(parent: JsonObject | null, key: string): number | null {
+    const held = parent === null ? undefined : parent[key];
+    return typeof held === "number" && Number.isFinite(held) ? held : null;
 }
 
 function flag(parent: JsonObject | null, key: string): boolean {
@@ -104,6 +124,38 @@ function sectionOf(value: JsonValue): SectionDraft {
         include: words(rules, "include"),
         primaryInHeading: flag(rules, "primaryInHeading"),
     };
+}
+
+function productOf(held: JsonObject | null): ProductDraft | null {
+    if (held === null) {
+        return null;
+    }
+    const short = branch(held, "shortDescription");
+    return {
+        shortEnabled: flag(short, "enabled"),
+        shortIntent: text(short, "intent"),
+        shortWords: count(short, "targetWords"),
+        shortKeyword: flag(short, "primaryKeyword"),
+        specifications: series(held, "specifications")
+            .filter(isJsonObject)
+            .map((row) => ({ name: text(row, "name"), intent: text(row, "intent") })),
+    };
+}
+
+function productJson(product: ProductDraft): JsonObject {
+    return {
+        shortDescription: {
+            enabled: product.shortEnabled,
+            intent: product.shortIntent,
+            targetWords: product.shortWords,
+            primaryKeyword: product.shortKeyword,
+        },
+        specifications: product.specifications.map((row) => ({ name: row.name, intent: row.intent })),
+    };
+}
+
+export function emptyProduct(): ProductDraft {
+    return { shortEnabled: true, shortIntent: "", shortWords: 0, shortKeyword: false, specifications: [] };
 }
 
 function profilesOf(held: JsonObject | null): ProfileDraft[] {
@@ -159,6 +211,7 @@ export function draftFromJson(value: JsonValue): SpecDraft {
         primaryInH1: flag(keywords, "primaryInH1"),
         primaryInFirstParagraph: flag(keywords, "primaryInFirstParagraph"),
         maxDensity: count(keywords, "maxDensity"),
+        requiredKeywords: countOrNone(keywords, "requiredKeywords"),
         upDepth: count(links, "upDepth"),
         downLinks: flag(links, "downLinks"),
         siblingMinWeight: count(links, "siblingMinWeight"),
@@ -171,6 +224,7 @@ export function draftFromJson(value: JsonValue): SpecDraft {
         featuredImage: flag(images, "featured"),
         inlineImages: count(images, "inline"),
         imageSource: text(images, "source"),
+        product: productOf(branch(root, "product")),
         profiles: profilesOf(branch(root, "modelProfiles")),
         recipe: recipeOf(series(root, "recipe")),
     };
@@ -196,7 +250,16 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         }
         recipe.push(row);
     }
-    return {
+    const keywordRules: JsonObject = {
+        primaryInTitle: draft.primaryInTitle,
+        primaryInH1: draft.primaryInH1,
+        primaryInFirstParagraph: draft.primaryInFirstParagraph,
+        maxDensity: draft.maxDensity,
+    };
+    if (draft.requiredKeywords !== null) {
+        keywordRules["requiredKeywords"] = draft.requiredKeywords;
+    }
+    const spec: JsonObject = {
         sections: draft.sections.map((section) => ({
             heading: section.heading,
             intent: section.intent,
@@ -206,12 +269,7 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         })),
         tone: draft.tone,
         length: { min: draft.lengthMin, max: draft.lengthMax },
-        keywordRules: {
-            primaryInTitle: draft.primaryInTitle,
-            primaryInH1: draft.primaryInH1,
-            primaryInFirstParagraph: draft.primaryInFirstParagraph,
-            maxDensity: draft.maxDensity,
-        },
+        keywordRules,
         linkRules: {
             upDepth: draft.upDepth,
             downLinks: draft.downLinks,
@@ -226,6 +284,10 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         modelProfiles: profiles,
         recipe,
     };
+    if (draft.product !== null) {
+        spec["product"] = productJson(draft.product);
+    }
+    return spec;
 }
 
 export function specOf(draft: SpecDraft): TemplateSpec {

@@ -24,6 +24,7 @@ import type { Wire } from "./wire.js";
 export type ListFilter<T> = Omit<T, "cursor" | "limit" | "sort">;
 
 export type SortSpec = DtoModels.Sort;
+export type Keyword = Wire<DtoModels.Keyword>;
 
 export type Site = Wire<SitesModels.Site>;
 export type SiteDefaults = Wire<SitesModels.Defaults>;
@@ -89,9 +90,15 @@ export type RoleProfile = Wire<CatalogModels.Profile>;
 export type TokenUsage = Wire<CatalogModels.Usage>;
 export type UsageSummary = Wire<CatalogModels.UsageSummaryResponse>;
 export type ProviderKey = Wire<CatalogModels.ProviderKey>;
+export type SpendReport = Wire<CatalogModels.SpendReportResponse>;
+export type SpendTotals = Wire<CatalogModels.SpendTotals>;
+export type SpendSlice = Wire<CatalogModels.SpendSlice>;
+export type ModelCall = Wire<CatalogModels.Call>;
+export type ModelCallFilter = ListFilter<CatalogModels.ListCallsRequest>;
 
 export type ImportSheet = Wire<ImportModels.Sheet>;
 export type ImportMapping = Wire<ImportModels.Mapping>;
+export type ImportSheetMapping = Wire<ImportModels.SheetMapping>;
 export type ImportOptions = Wire<ImportModels.Options>;
 export type ImportFinding = Wire<ImportModels.Finding>;
 export type ImportConflict = Wire<ImportModels.Conflict>;
@@ -99,6 +106,7 @@ export type ImportCounts = Wire<ImportModels.Counts>;
 export type PreviewReport = Wire<ImportModels.PreviewReport>;
 export type PreviewPage = Wire<ImportModels.PreviewPage>;
 export type PreviewEntity = Wire<ImportModels.PreviewEntity>;
+export type PreviewGroup = Wire<ImportModels.PreviewGroup>;
 export type PreviewEdge = Wire<ImportModels.PreviewEdge>;
 export type InspectResult = Wire<ImportModels.InspectResponse>;
 

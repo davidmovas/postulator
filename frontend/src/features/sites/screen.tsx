@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { useSites } from "../../data/hooks/sites.js";
+import { wantsNew } from "../../data/params.js";
 import type { SiteSort } from "../../data/sorts.js";
 import type { Site, SiteFilter } from "../../data/types.js";
 import { siteStatuses } from "../../generated/vocab.js";
@@ -72,10 +73,10 @@ export function SitesScreen(): ReactElement {
         });
     }, [ids]);
 
-    const asked = searchParams.get("action");
+    const asked = wantsNew(searchParams);
 
     useEffect(() => {
-        if (asked !== "new") {
+        if (!asked) {
             return;
         }
         setForm({ mode: "create" });

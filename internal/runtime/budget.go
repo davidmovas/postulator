@@ -20,13 +20,16 @@ const (
 	fallbackTargetWords = 800
 	inputShareOfOutput  = 0.5
 
-	CodeUnpricedStep       = "unpriced_step"
-	CodeTemplateUnresolved = "template_unresolved"
-	CodeRecipeDiffers      = "recipe_differs"
-	CodeModelUnresolved    = "model_unresolved"
-	CodeModelUnknown       = "model_unknown"
-	CodeProviderKeyMissing = "provider_key_missing"
-	CodeImagesStepOff      = "images_step_off"
+	reasoningShareOfAllowance = 0.5
+
+	CodeUnpricedStep         = "unpriced_step"
+	CodeTemplateUnresolved   = "template_unresolved"
+	CodeRecipeDiffers        = "recipe_differs"
+	CodeModelUnresolved      = "model_unresolved"
+	CodeModelUnknown         = "model_unknown"
+	CodeModelProviderRemoved = "model_provider_removed"
+	CodeProviderKeyMissing   = "provider_key_missing"
+	CodeImagesStepOff        = "images_step_off"
 )
 
 type pricing struct {
@@ -71,7 +74,7 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[s
 		}
 	}
 
-	priced.targets = e.pricedTargets(record, targets)
+	priced.targets = pricedTargets(record, targets)
 	for t := range priced.targets {
 		for i := range defs {
 			if priceErr := e.price(ctx, record, defs[i], &priced.targets[t], priced); priceErr != nil {
@@ -148,7 +151,7 @@ func writesWithoutImages(recipe []template.StepSpec) bool {
 	return slices.Contains(names, string(run.StepGenerateBody)) && !slices.Contains(names, string(run.StepGenerateImages))
 }
 
-func (e *Engine) pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
+func pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
 	if !record.Kind.PageScoped() {
 		return []run.Target{{}}
 	}
@@ -201,9 +204,12 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 		return nil
 	}
 
-	usage := usageOf(outputOf(def, int(float64(targetWords(target.Spec))*tokensPerWord)))
+	usage := usageOf(
+		outputOf(def, int(float64(targetWords(target.Spec, target.Page.WPType))*tokensPerWord)),
+		reasoningOf(info, e.deps.Tuning.Effort(def.Role)),
+	)
 	priced.tokens += usage.Total * calls
-	priced.usd += llm.Cost(usage, info) * float64(calls)
+	priced.usd += llm.Cost(usage, info, e.deps.Tuning.Tier(def.Role)) * float64(calls)
 	return nil
 }
 
@@ -227,6 +233,14 @@ func (e *Engine) modelOf(ctx context.Context, record run.Run, def run.StepDef, t
 		})
 		return llm.ModelRef{}, false, nil
 	}
+	if pinned := target.Spec.ModelProfiles[def.Role]; pinned.Valid() && !pinned.Supported() {
+		priced.add(run.EstimateFinding{
+			Severity: content.SeverityWarn, Code: CodeModelProviderRemoved, PageID: target.Page.ID, Path: target.Page.Path,
+			Message: "the template of " + pathOrID(target.Page, target.Page.ID) + " pins " + pinned.String() +
+				" for the role " + string(def.Role) + ", a provider Postulator no longer works with, so the role uses " +
+				ref.String() + " instead; choose an OpenAI model in the template",
+		})
+	}
 	return ref, true, nil
 }
 
@@ -245,9 +259,16 @@ func stepNames(recipe []template.StepSpec) []string {
 	return out
 }
 
-func usageOf(output int) llm.Usage {
+func usageOf(output, reasoning int) llm.Usage {
 	input := promptOverhead + int(float64(output)*inputShareOfOutput)
-	return llm.Usage{Input: input, Output: output, Total: input + output}
+	return llm.Usage{Input: input, Output: output + reasoning, Reasoning: reasoning, Total: input + output + reasoning}
+}
+
+func reasoningOf(info llm.ModelInfo, effort llm.ReasoningEffort) int {
+	if !info.Reasoning {
+		return 0
+	}
+	return int(float64(llm.Allowance(effort)) * reasoningShareOfAllowance)
 }
 
 func outputOf(def run.StepDef, body int) int {
@@ -264,7 +285,7 @@ func callsOf(def run.StepDef, spec template.TemplateSpec, params map[string]any)
 	return max(def.Price.Calls(spec, params), 0)
 }
 
-func targetWords(spec template.TemplateSpec) int {
+func targetWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
 	words := 0
 	for i := range spec.Sections {
 		words += spec.Sections[i].TargetWords
@@ -274,6 +295,9 @@ func targetWords(spec template.TemplateSpec) int {
 	}
 	if words == 0 {
 		words = fallbackTargetWords
+	}
+	if wpType == pagemap.WPProduct {
+		words += spec.Product.Words()
 	}
 	return words
 }

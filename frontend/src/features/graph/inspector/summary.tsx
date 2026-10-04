@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { copy } from "../../../copy/index.js";
 import { entityKinds } from "../../../generated/vocab.js";
 import { Button, CalculateIcon, SectionLabel, toneClasses } from "../../../ui/index.js";
-import { entityIcon, formatScore, kindLabel, kindTone, lensLabel, lensTone, scored } from "../labels.js";
+import { entityIcon, formatScore, entityKindLabel, kindTone, lensLabel, lensTone, scored } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 
@@ -67,7 +67,7 @@ export function Summary({ index, recomputing, onLens, onSelect, onRecompute }: S
                             <li key={kind} className="flex items-center justify-between text-xs">
                                 <span className="flex items-center gap-2 text-ink-soft">
                                     <Icon size={14} className={toneClasses[kindTone(kind)].ink} />
-                                    {kindLabel(kind)}
+                                    {entityKindLabel(kind)}
                                 </span>
                                 <span className="font-mono text-2xs text-ink-dim">{count}</span>
                             </li>

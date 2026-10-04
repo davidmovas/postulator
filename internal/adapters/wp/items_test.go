@@ -52,24 +52,6 @@ func TestListItemsTreatsThePageNumberErrorAsTheEndOfTheList(t *testing.T) {
 	}
 }
 
-func TestListItemsStopsAtTheEndOfAWooCommerceCollection(t *testing.T) {
-	t.Parallel()
-
-	server := wptest.New(t)
-	server.Seed(
-		wptest.Item{Type: wptest.TypeProduct, Title: "One"},
-		wptest.Item{Type: wptest.TypeProduct, Title: "Two"},
-	)
-
-	result, err := newClient(t, server).ListItems(t.Context(), wp.TypeProduct, wp.ListQuery{Page: 9, PerPage: 1})
-	if err != nil {
-		t.Fatalf("ListItems: %v", err)
-	}
-	if len(result.Items) != 0 || result.HasMore {
-		t.Errorf("result = %+v, want an empty final page", result)
-	}
-}
-
 func TestTheQueryMatchesTheNamespace(t *testing.T) {
 	t.Parallel()
 
@@ -93,16 +75,12 @@ func TestTheQueryMatchesTheNamespace(t *testing.T) {
 			wantFieldList: "id,slug",
 		},
 		{
-			name:         "woocommerce takes one status and no context",
-			itemType:     wp.TypeProduct,
-			query:        wp.ListQuery{Status: []string{"publish", "draft"}, ModifiedAfter: &cut},
-			wantStatus:   "publish",
-			wantModified: "2026-09-18T09:00:00",
-		},
-		{
-			name:     "a product category has no modification date to filter on",
-			itemType: wp.TypeProductCategory,
-			query:    wp.ListQuery{ModifiedAfter: &cut},
+			name:         "a post takes the same edit context",
+			itemType:     wp.TypePost,
+			query:        wp.ListQuery{Status: []string{"draft"}},
+			wantContext:  "edit",
+			wantStatus:   "draft",
+			wantModified: "",
 		},
 	}
 
@@ -180,53 +158,6 @@ func TestGetItemReadsTheRawPostRatherThanTheRendering(t *testing.T) {
 	}
 	if item.Meta != nil {
 		t.Errorf("meta = %v, want nil when the site sends the empty array", item.Meta)
-	}
-}
-
-func TestGetItemMapsAWooCommerceProduct(t *testing.T) {
-	t.Parallel()
-
-	server := wptest.New(t)
-	category := server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein"})[0]
-	seeded := server.Seed(wptest.Item{
-		Type:       wptest.TypeProduct,
-		Title:      "Powder",
-		Content:    "<p>long</p>",
-		Excerpt:    "short",
-		Categories: []int64{category.ID},
-	})
-
-	item, err := newClient(t, server).GetItem(t.Context(), wp.TypeProduct, seeded[0].ID)
-	if err != nil {
-		t.Fatalf("GetItem: %v", err)
-	}
-
-	if item.Title != "Powder" || item.Content != "<p>long</p>" || item.Excerpt != "short" {
-		t.Errorf("item = %+v", item)
-	}
-	if item.Type != wp.TypeProduct || item.Link == "" {
-		t.Errorf("item = %+v", item)
-	}
-	if len(item.Categories) != 1 || item.Categories[0] != category.ID {
-		t.Errorf("categories = %v", item.Categories)
-	}
-}
-
-func TestGetItemMapsAProductCategory(t *testing.T) {
-	t.Parallel()
-
-	server := wptest.New(t)
-	seeded := server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein", Content: "the hub"})
-
-	item, err := newClient(t, server).GetItem(t.Context(), wp.TypeProductCategory, seeded[0].ID)
-	if err != nil {
-		t.Fatalf("GetItem: %v", err)
-	}
-	if item.Title != "Koffein" || item.Content != "the hub" || item.Slug != "koffein" {
-		t.Errorf("item = %+v", item)
-	}
-	if !item.Modified.IsZero() {
-		t.Error("a product category is a term and carries no modification date")
 	}
 }
 

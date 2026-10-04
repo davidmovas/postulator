@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
@@ -32,7 +33,7 @@ func entity(id, name string, score float64, anchors []string, canonical string) 
 	}
 
 	record := graph.Entity{
-		ID: id, SiteID: siteID, Name: name, Kind: graph.KindTopic, PrimaryKeyword: name,
+		ID: id, SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
 		Anchors: list, Source: graph.SourceUser, Score: score,
 	}
 	if canonical != "" {
@@ -251,26 +252,142 @@ func TestPlanLinksSkipsWhatCannotBeLinked(t *testing.T) {
 	}
 }
 
-func TestATargetFallsBackToTheEntityName(t *testing.T) {
-	t.Parallel()
+func passThroughFixture(t *testing.T, groupPages []pagemap.Page) dag {
+	t.Helper()
 
 	entities := []graph.Entity{
-		entity("child", "Child", 0.5, nil, "page-child"),
-		entity("parent", "Parent Topic", 1, nil, "page-parent"),
+		entity("root", "Peptides", 1, []string{"peptides"}, "page-root"),
+		entity("group", "BPC-157", 0.8, []string{"bpc 157"}, ""),
+		entity("leaf", "Liquid", 0.5, []string{"bpc 157 liquid"}, "page-leaf"),
 	}
-	g, err := graph.New(entities, []graph.Edge{parentEdge("e1", "child", "parent")})
+	g, err := graph.New(entities, []graph.Edge{parentEdge("e1", "group", "root"), parentEdge("e2", "leaf", "group")})
 	if err != nil {
 		t.Fatalf("graph.New: %v", err)
 	}
+	pages := append([]pagemap.Page{
+		page("page-root", "/peptides/", "root"), page("page-leaf", "/peptides/bpc-157/liquid/", "leaf"),
+	}, groupPages...)
+	return dag{g: g, index: pagemap.NewIndex(pages)}
+}
 
-	index := pagemap.NewIndex([]pagemap.Page{
-		page("page-child", "/child/", "child"),
-		page("page-parent", "/parent/", "parent"),
-	})
+func TestAParentWithNoPageIsPassedThrough(t *testing.T) {
+	t.Parallel()
 
-	lc := plannedFor(dag{g: g, index: index}, "child", template.LinkRules{UpDepth: 1})
-	if len(lc.Targets) != 1 || len(lc.Targets[0].Anchors) != 1 || lc.Targets[0].Anchors[0] != "Parent Topic" {
-		t.Fatalf("the fallback anchor = %+v", lc.Targets)
+	cases := []struct {
+		name       string
+		groupPages []pagemap.Page
+		subject    string
+		rules      template.LinkRules
+		targets    []string
+		blocked    content.BlockedReason
+		required   bool
+	}{
+		{
+			name:    "up past a group that has no page",
+			subject: "leaf", rules: template.LinkRules{UpDepth: 1},
+			targets: []string{"/peptides/"}, blocked: content.BlockedNoPage,
+		},
+		{
+			name:    "down past a group that has no page",
+			subject: "root", rules: template.LinkRules{DownLinks: true},
+			targets: []string{"/peptides/bpc-157/liquid/"}, blocked: content.BlockedNoPage,
+		},
+		{
+			name:       "a group with a page that is not canonical still blocks",
+			groupPages: []pagemap.Page{page("page-group", "/peptides/bpc-157/", "group")},
+			subject:    "leaf", rules: template.LinkRules{UpDepth: 1},
+			targets: []string{}, blocked: content.BlockedNoCanonicalPage, required: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := passThroughFixture(t, tc.groupPages)
+			plan := content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: tc.subject}, policy(tc.rules))
+			if got := urls(plan.Context.Targets); !slices.Equal(got, tc.targets) {
+				t.Fatalf("targets = %v, want %v", got, tc.targets)
+			}
+			if len(plan.Blocked) != 1 || plan.Blocked[0].EntityID != "group" || plan.Blocked[0].Reason != tc.blocked ||
+				plan.Blocked[0].Required != tc.required {
+				t.Fatalf("blocked = %+v, want the group as %s, required %t", plan.Blocked, tc.blocked, tc.required)
+			}
+		})
+	}
+
+	fixture := passThroughFixture(t, nil)
+	reachable := content.MayLinkTo(fixture.g, fixture.index, "leaf")
+	ids := make([]string, 0, len(reachable))
+	for _, held := range reachable {
+		ids = append(ids, held.ID)
+	}
+	if !slices.Contains(ids, "root") || !slices.Contains(ids, "group") {
+		t.Fatalf("MayLinkTo(leaf) = %v, want the group and the page above it", ids)
+	}
+}
+
+func scoped(record graph.Entity, scope string) graph.Entity {
+	record.ScopeID = ref(scope)
+	return record
+}
+
+func TestATargetFallsBackToTheEntityName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		entities []graph.Entity
+		edges    []graph.Edge
+		pages    []pagemap.Page
+		subject  string
+		rules    template.LinkRules
+		want     string
+	}{
+		{
+			name: "a name used once",
+			entities: []graph.Entity{
+				entity("child", "Child", 0.5, nil, "page-child"),
+				entity("parent", "Parent Topic", 1, nil, "page-parent"),
+			},
+			edges:   []graph.Edge{parentEdge("e1", "child", "parent")},
+			pages:   []pagemap.Page{page("page-child", "/child/", "child"), page("page-parent", "/parent/", "parent")},
+			subject: "child",
+			rules:   template.LinkRules{UpDepth: 1},
+			want:    "Parent Topic",
+		},
+		{
+			name: "a name another entity shares carries its parent",
+			entities: []graph.Entity{
+				entity("bpc", "BPC-157", 1, []string{"bpc 157"}, "page-bpc"),
+				entity("tb", "TB-500", 1, []string{"tb 500"}, "page-tb"),
+				scoped(entity("bpc-liquid", "Liquid", 0.5, nil, "page-bpc-liquid"), "bpc"),
+				scoped(entity("tb-liquid", "Liquid", 0.5, nil, "page-tb-liquid"), "tb"),
+			},
+			edges: []graph.Edge{parentEdge("e1", "bpc-liquid", "bpc"), parentEdge("e2", "tb-liquid", "tb")},
+			pages: []pagemap.Page{
+				page("page-bpc", "/bpc-157/", "bpc"), page("page-tb", "/tb-500/", "tb"),
+				page("page-bpc-liquid", "/bpc-157/liquid/", "bpc-liquid"), page("page-tb-liquid", "/tb-500/liquid/", "tb-liquid"),
+			},
+			subject: "bpc",
+			rules:   template.LinkRules{DownLinks: true},
+			want:    "BPC-157 Liquid",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			g, err := graph.New(tc.entities, tc.edges)
+			if err != nil {
+				t.Fatalf("graph.New: %v", err)
+			}
+			lc := plannedFor(dag{g: g, index: pagemap.NewIndex(tc.pages)}, tc.subject, tc.rules)
+			if len(lc.Targets) != 1 || len(lc.Targets[0].Anchors) != 1 || lc.Targets[0].Anchors[0] != tc.want {
+				t.Fatalf("the fallback anchor = %+v, want %q", lc.Targets, tc.want)
+			}
+		})
 	}
 }
 
@@ -293,7 +410,7 @@ func TestMayLinkToNamesEveryEntityThatCanOweALink(t *testing.T) {
 		t.Run(tc.entity, func(t *testing.T) {
 			t.Parallel()
 
-			found := content.MayLinkTo(fixture.g, tc.entity)
+			found := content.MayLinkTo(fixture.g, fixture.index, tc.entity)
 			ids := make([]string, 0, len(found))
 			for i := range found {
 				ids = append(ids, found[i].ID)

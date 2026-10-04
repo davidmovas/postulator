@@ -103,7 +103,7 @@ func (s *Service) turn(ctx context.Context, conversation domainagent.Conversatio
 func (s *Service) answer(ctx context.Context, conversationID string, spec RunSpec) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			s.deps.Turns.Note(errors.New(errors.Internal, "the agent turn panicked"))
+			s.drop(errors.New(errors.Internal, "the agent turn panicked"))
 			s.emit(events.AgentDone, events.AgentDonePayload{
 				ConversationID: conversationID, MessageID: spec.MessageID,
 				Code: string(errors.Internal), Error: "the agent turn failed unexpectedly",
@@ -157,9 +157,7 @@ func (s *Service) append(ctx context.Context, conversationID string, message dom
 }
 
 func (s *Service) emit(eventType events.Type, payload any) {
-	if err := s.deps.Publisher.Publish(eventType, payload); err != nil {
-		s.deps.Turns.Note(err)
-	}
+	s.drop(s.deps.Publisher.Publish(eventType, payload))
 }
 
 func describe(ctx context.Context, err error) (code, message string) {

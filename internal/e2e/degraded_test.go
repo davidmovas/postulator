@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
@@ -107,6 +108,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	if len(applied.Report.Errors) != 0 {
 		t.Fatalf("the import reported %+v", applied.Report.Errors)
 	}
+	assertAProductIsRefusedWithoutThePlugin(t, core, siteID)
 
 	stored = pagesByPath(t, core.Pages, siteID)
 	targets := make([]string, 0, len(degradedTargets))
@@ -234,6 +236,45 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 
 	t.Logf("%d drafts under /menu/main-courses/, %d pages in the store, %d of %d edges realized",
 		len(drafts), len(after), overview.Edges.Realized, overview.Edges.Approved)
+}
+
+func assertAProductIsRefusedWithoutThePlugin(t *testing.T, core *app.Core, siteID string) {
+	t.Helper()
+
+	entity, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
+		SiteID: siteID, Name: "Gift card", Kind: "product", Keywords: []dto.Keyword{{Text: "restaurant gift card"}},
+	})
+	if err != nil {
+		t.Fatalf("give the product row an entity: %v", err)
+	}
+	created, err := core.Pages.Create(t.Context(), pages.CreateRequest{
+		SiteID: siteID, Path: "/menu/gift-card/", WPType: string(pagemap.WPProduct), Title: "Gift card",
+		EntityID: &entity.Entity.ID,
+	})
+	if err != nil {
+		t.Fatalf("plan a product row: %v", err)
+	}
+	estimated, err := core.Runs.Estimate(t.Context(), runs.StartRequest{
+		SiteID: siteID, PageIDs: []string{created.Page.ID}, TemplateID: productTemplate(t, core),
+		PublishMode: string(run.PublishLive), Recipe: recipe(),
+	})
+	if err != nil {
+		t.Fatalf("estimate a run over the product: %v", err)
+	}
+	refused := false
+	for _, finding := range estimated.Estimate.Blocking() {
+		refused = refused || finding.Code == steps.CodeProductNeedsPlugin
+	}
+	if !refused {
+		t.Fatalf("the estimate over a product without the plugin = %+v, want the %s refusal before anything is spent",
+			estimated.Estimate.Findings, steps.CodeProductNeedsPlugin)
+	}
+	if _, err = core.Pages.Delete(t.Context(), pages.DeleteRequest{ID: created.Page.ID}); err != nil {
+		t.Fatalf("drop the product row: %v", err)
+	}
+	if _, err = core.Graph.DeleteEntity(t.Context(), graph.DeleteEntityRequest{ID: entity.Entity.ID}); err != nil {
+		t.Fatalf("drop the product row's entity: %v", err)
+	}
 }
 
 func assertARevertWithoutThePluginPausesRatherThanFails(t *testing.T, core *app.Core, live *site,
@@ -380,15 +421,15 @@ func assertPluginCallsAreRefusedAsInvalid(t *testing.T, core *app.Core, siteID s
 			return callErr
 		},
 		"seo meta": func() error {
-			_, callErr := client.SetSEOMeta(t.Context(), wpID, wp.SEOMeta{Title: "Our Menu"})
+			_, callErr := client.SetSEOMeta(t.Context(), wp.TypePage, wpID, wp.SEOMeta{Title: "Our Menu"})
 			return callErr
 		},
-		"raw read": func() error { _, callErr := client.GetRaw(t.Context(), wpID); return callErr },
+		"raw read": func() error { _, callErr := client.GetRaw(t.Context(), wp.TypePage, wpID); return callErr },
 		"raw write": func() error {
-			_, callErr := client.PutRaw(t.Context(), wpID, "<p>never written</p>", "")
+			_, callErr := client.PutRaw(t.Context(), wp.TypePage, wpID, "<p>never written</p>", "")
 			return callErr
 		},
-		"preview": func() error { _, callErr := client.PreviewLink(t.Context(), wpID); return callErr },
+		"preview": func() error { _, callErr := client.PreviewLink(t.Context(), wp.TypePage, wpID); return callErr },
 	}
 
 	for name, call := range calls {

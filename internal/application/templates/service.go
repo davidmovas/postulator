@@ -45,7 +45,7 @@ type siteReader interface {
 }
 
 type entityReader interface {
-	Get(ctx context.Context, id string) (graph.Entity, error)
+	ListBySite(ctx context.Context, siteID string) ([]graph.Entity, error)
 }
 
 type unitOfWork interface {

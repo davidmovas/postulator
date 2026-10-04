@@ -23,7 +23,7 @@ type IssuedPreview struct {
 }
 
 type previewIssuer interface {
-	IssuePreview(ctx context.Context, siteID string, wpID int64) (IssuedPreview, error)
+	IssuePreview(ctx context.Context, siteID string, wpID int64, wpType string) (IssuedPreview, error)
 	TrashItem(ctx context.Context, siteID string, wpID int64, wpType string) error
 }
 
@@ -56,7 +56,7 @@ func (s *Service) PreviewLink(ctx context.Context, req PreviewLinkRequest) (Prev
 		}, nil
 	}
 
-	issued, err := s.preview.IssuePreview(ctx, page.SiteID, *page.WPID)
+	issued, err := s.preview.IssuePreview(ctx, page.SiteID, *page.WPID, string(page.WPType))
 	if err != nil {
 		return PreviewLinkResponse{}, err
 	}

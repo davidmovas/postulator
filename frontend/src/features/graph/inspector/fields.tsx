@@ -2,25 +2,25 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { react } from "../../../data/errors.js";
+import { fieldErrorOf, formErrorOf } from "../../../data/errors.js";
 import { useUpdateEntity } from "../../../data/hooks/graph.js";
-import type { Entity } from "../../../data/types.js";
+import type { Entity, Keyword } from "../../../data/types.js";
+import { keywordList, sameKeywords } from "../../../domain/keywords.js";
 import { entityKinds } from "../../../generated/vocab.js";
-import { Button, ChipInput, Field, Input, Select, Textarea } from "../../../ui/index.js";
-import { kindLabel } from "../labels.js";
+import { Button, Field, Input, KeywordInput, Select, Textarea } from "../../../ui/index.js";
+import { entityKindLabel } from "../labels.js";
 import type { SelectOption } from "../../../ui/index.js";
 
 const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({
     value,
-    label: kindLabel(value),
+    label: entityKindLabel(value),
 }));
 
 interface Draft {
     name: string;
     kind: string;
     intent: string;
-    primaryKeyword: string;
-    secondaryKeywords: string[];
+    keywords: Keyword[];
 }
 
 function draftOf(entity: Entity): Draft {
@@ -28,29 +28,8 @@ function draftOf(entity: Entity): Draft {
         name: entity.name,
         kind: entity.kind,
         intent: entity.intent,
-        primaryKeyword: entity.primaryKeyword,
-        secondaryKeywords: [...(entity.secondaryKeywords ?? [])],
+        keywords: keywordList(entity.keywords),
     };
-}
-
-function sameList(left: readonly string[], right: readonly string[]): boolean {
-    return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-export function fieldErrorOf(thrown: unknown, field: string): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "field" && reaction.field === field ? reaction.message : null;
-}
-
-export function formErrorOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "silent" || reaction.kind === "unlock" || reaction.kind === "field" ? null : reaction.message;
 }
 
 export interface EntityFieldsProps {
@@ -75,8 +54,7 @@ export function EntityFields({ entity }: EntityFieldsProps): ReactElement {
         draft.name !== base.name ||
         draft.kind !== base.kind ||
         draft.intent !== base.intent ||
-        draft.primaryKeyword !== base.primaryKeyword ||
-        !sameList(draft.secondaryKeywords, base.secondaryKeywords);
+        !sameKeywords(draft.keywords, base.keywords);
 
     const save = (): void => {
         update.mutate({
@@ -84,8 +62,7 @@ export function EntityFields({ entity }: EntityFieldsProps): ReactElement {
             name: draft.name !== base.name ? draft.name : null,
             kind: draft.kind !== base.kind ? draft.kind : null,
             intent: draft.intent !== base.intent ? draft.intent : null,
-            primaryKeyword: draft.primaryKeyword !== base.primaryKeyword ? draft.primaryKeyword : null,
-            secondaryKeywords: sameList(draft.secondaryKeywords, base.secondaryKeywords) ? null : draft.secondaryKeywords,
+            keywords: sameKeywords(draft.keywords, base.keywords) ? null : draft.keywords,
         });
     };
 
@@ -126,33 +103,18 @@ export function EntityFields({ entity }: EntityFieldsProps): ReactElement {
                     />
                 )}
             </Field>
-            <Field label={copy.graph.form.primaryKeyword} error={fieldErrorOf(update.error, "primaryKeyword")}>
+            <Field label={copy.graph.form.keywords} hint={copy.graph.form.keywordsHint} error={fieldErrorOf(update.error, "keywords")}>
                 {(control) => (
-                    <Input
-                        {...control}
-                        mono={true}
-                        value={draft.primaryKeyword}
-                        onChange={(event) => {
-                            edit({ primaryKeyword: event.target.value });
-                        }}
-                    />
-                )}
-            </Field>
-            <Field
-                label={copy.graph.form.secondaryKeywords}
-                hint={copy.graph.form.keywordsHint}
-                error={fieldErrorOf(update.error, "secondaryKeywords")}
-            >
-                {(control) => (
-                    <ChipInput
+                    <KeywordInput
                         id={control.id}
                         aria-describedby={control["aria-describedby"]}
                         invalid={control.invalid}
-                        mono={true}
-                        values={draft.secondaryKeywords}
+                        values={draft.keywords}
                         removeLabel={copy.graph.form.remove}
-                        onChange={(secondaryKeywords) => {
-                            edit({ secondaryKeywords });
+                        phraseLabel={copy.graph.form.keyword}
+                        volumeLabel={copy.graph.form.volume}
+                        onChange={(keywords) => {
+                            edit({ keywords });
                         }}
                     />
                 )}

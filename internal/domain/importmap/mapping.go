@@ -1,39 +1,63 @@
 package importmap
 
 import (
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
 const (
-	DefaultKeywordSeparator = ","
-	DefaultAnchorSeparator  = "|"
-	DefaultListSeparator    = ","
+	DefaultAnchorSeparator = "|"
+	DefaultListSeparator   = ","
 )
 
+var placeholderCells = []string{"-", "—", "–", "n/a", "na", "none"}
+
 type Options struct {
-	PathPrefixStrip  string   `json:"pathPrefixStrip,omitempty"`
-	KeywordSeparator string   `json:"keywordSeparator,omitempty"`
-	AnchorSeparator  string   `json:"anchorSeparator,omitempty"`
-	ListSeparator    string   `json:"listSeparator,omitempty"`
-	Sheets           []string `json:"sheets,omitempty"`
-	IndentColumns    []string `json:"indentColumns,omitempty"`
-	NoHeader         bool     `json:"noHeader,omitempty"`
+	PathPrefixStrip string   `json:"pathPrefixStrip,omitempty"`
+	AnchorSeparator string   `json:"anchorSeparator,omitempty"`
+	ListSeparator   string   `json:"listSeparator,omitempty"`
+	Sheets          []string `json:"sheets,omitempty"`
+	IndentColumns   []string `json:"indentColumns,omitempty"`
+	LevelColumns    []string `json:"levelColumns,omitempty"`
+	NoteColumns     []string `json:"noteColumns,omitempty"`
+	RowType         RowType  `json:"rowType,omitempty"`
+	NoHeader        bool     `json:"noHeader,omitempty"`
+}
+
+type RowType string
+
+const (
+	RowPages    RowType = "pages"
+	RowProducts RowType = "products"
+	RowKind     RowType = "kind"
+)
+
+func (r RowType) Valid() bool {
+	switch r {
+	case "", RowPages, RowProducts, RowKind:
+		return true
+	default:
+		return false
+	}
+}
+
+func unknownRowType(rowType RowType) error {
+	return invalid("the row type is not recognized; rows are pages, products or read by their kind", "rowType").
+		WithDetail("rowType", string(rowType))
 }
 
 func DefaultOptions() Options {
 	return Options{
-		KeywordSeparator: DefaultKeywordSeparator,
-		AnchorSeparator:  DefaultAnchorSeparator,
-		ListSeparator:    DefaultListSeparator,
+		AnchorSeparator: DefaultAnchorSeparator,
+		ListSeparator:   DefaultListSeparator,
 	}
 }
 
 func (o Options) OrDefault() Options {
 	o.PathPrefixStrip = strings.TrimSpace(o.PathPrefixStrip)
-	if o.KeywordSeparator == "" {
-		o.KeywordSeparator = DefaultKeywordSeparator
-	}
 	if o.AnchorSeparator == "" {
 		o.AnchorSeparator = DefaultAnchorSeparator
 	}
@@ -45,14 +69,10 @@ func (o Options) OrDefault() Options {
 
 func (o Options) Separator(field Field) string {
 	ready := o.OrDefault()
-	switch field {
-	case FieldKeywords:
-		return ready.KeywordSeparator
-	case FieldAnchors:
+	if field == FieldAnchors {
 		return ready.AnchorSeparator
-	default:
-		return ready.ListSeparator
 	}
+	return ready.ListSeparator
 }
 
 func (o Options) Split(field Field, raw string) []string {
@@ -99,8 +119,10 @@ func NewMapping(m Mapping) (Mapping, error) {
 		return Mapping{}, invalid("mapping site id must not be empty", "siteId")
 	case m.Name == "":
 		return Mapping{}, invalid("mapping name must not be empty", "name")
-	case len(m.Columns) == 0 && len(m.Options.IndentColumns) == 0:
+	case m.Unmapped():
 		return Mapping{}, invalid("mapping must map at least one column", "columns")
+	case !m.Options.RowType.Valid():
+		return Mapping{}, unknownRowType(m.Options.RowType)
 	}
 
 	columns := make(map[Field]string, len(m.Columns))
@@ -128,10 +150,24 @@ func NewMapping(m Mapping) (Mapping, error) {
 	}
 	m.Options.IndentColumns = indent
 
+	levels, err := namedColumns(m.Options.LevelColumns, "levelColumns", "a level column")
+	if err != nil {
+		return Mapping{}, err
+	}
+	notes, err := namedColumns(m.Options.NoteColumns, "noteColumns", "a note column")
+	if err != nil {
+		return Mapping{}, err
+	}
+	roots := rootColumns(levels)
+	if apartErr := apart(columns, roots, notes); apartErr != nil {
+		return Mapping{}, apartErr
+	}
+	m.Options.LevelColumns, m.Options.NoteColumns = levels, notes
+
 	_, hasPath := columns[FieldPath]
 	_, hasEntity := columns[FieldEntity]
-	if !hasPath && !hasEntity && len(indent) == 0 {
-		return Mapping{}, invalid("mapping must carry a path, an entity column or indent columns", "columns")
+	if !hasPath && !hasEntity && len(indent) == 0 && len(roots) == 0 {
+		return Mapping{}, invalid("mapping must carry a path, an entity column, indent columns or a root column", "columns")
 	}
 
 	m.Columns = columns
@@ -139,23 +175,99 @@ func NewMapping(m Mapping) (Mapping, error) {
 	return m, nil
 }
 
+func (m Mapping) Unmapped() bool {
+	return len(m.Columns) == 0 && len(m.Options.IndentColumns) == 0 && len(rootColumns(m.Options.LevelColumns)) == 0
+}
+
+func namedColumns(raw []string, field, what string) ([]string, error) {
+	out := make([]string, 0, len(raw))
+	for _, column := range raw {
+		trimmed := strings.TrimSpace(column)
+		if trimmed == "" {
+			return nil, invalid(what+" must not be empty", field)
+		}
+		out = append(out, trimmed)
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
+}
+
+func apart(columns map[Field]string, levels, notes []string) error {
+	taken := make(map[string]string, len(columns)+len(levels)+len(notes))
+	claim := func(column, use, field string) error {
+		key := strings.ToLower(column)
+		if held, seen := taken[key]; seen {
+			return invalid("the column "+column+" is read twice, as "+held+" and as "+use, field).
+				WithDetail("column", column)
+		}
+		taken[key] = use
+		return nil
+	}
+	for _, field := range fields {
+		if column, mapped := columns[field]; mapped {
+			taken[strings.ToLower(column)] = string(field)
+		}
+	}
+	for _, column := range levels {
+		if err := claim(column, "a level", "levelColumns"); err != nil {
+			return err
+		}
+	}
+	for _, column := range notes {
+		if err := claim(column, "a note", "noteColumns"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type noteColumn struct {
+	label string
+	at    int
+}
+
 type Binding struct {
 	index   map[Field]int
 	indent  []int
+	levels  []int
+	notes   []noteColumn
 	options Options
 }
 
-func (m Mapping) Bind(headers []string) (Binding, error) {
-	positions := make(map[string]int, len(headers))
+type headerIndex struct {
+	exact      map[string]int
+	normalized map[string]int
+}
+
+func indexHeaders(headers []string) headerIndex {
+	index := headerIndex{exact: make(map[string]int, len(headers)), normalized: make(map[string]int, len(headers))}
 	for i, header := range headers {
-		key := normalizeHeader(header)
-		if key == "" {
-			continue
+		if trimmed := strings.TrimSpace(header); trimmed != "" {
+			if _, taken := index.exact[trimmed]; !taken {
+				index.exact[trimmed] = i
+			}
 		}
-		if _, taken := positions[key]; !taken {
-			positions[key] = i
+		if key := Words(header); key != "" {
+			if _, taken := index.normalized[key]; !taken {
+				index.normalized[key] = i
+			}
 		}
 	}
+	return index
+}
+
+func (h headerIndex) find(column string) (int, bool) {
+	if at, found := h.exact[strings.TrimSpace(column)]; found {
+		return at, true
+	}
+	at, found := h.normalized[Words(column)]
+	return at, found
+}
+
+func (m Mapping) Bind(headers []string) (Binding, error) {
+	positions := indexHeaders(headers)
 
 	index := make(map[Field]int, len(m.Columns))
 	for _, field := range fields {
@@ -163,7 +275,7 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 		if !mapped {
 			continue
 		}
-		at, found := positions[normalizeHeader(column)]
+		at, found := positions.find(column)
 		if !found {
 			return Binding{}, invalid("the mapped column is not in the file", "columns").
 				WithDetail("importField", string(field)).WithDetail("column", column)
@@ -175,17 +287,80 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 			return Binding{}, invalid("import field is not recognized", "columns").WithDetail("importField", string(field))
 		}
 	}
-
-	indent := make([]int, 0, len(m.Options.IndentColumns))
-	for _, column := range m.Options.IndentColumns {
-		at, found := positions[normalizeHeader(column)]
-		if !found {
-			return Binding{}, invalid("the indent column is not in the file", "indentColumns").
-				WithDetail("column", column)
-		}
-		indent = append(indent, at)
+	if !m.Options.RowType.Valid() {
+		return Binding{}, unknownRowType(m.Options.RowType)
 	}
-	return Binding{index: index, indent: indent, options: m.Options.OrDefault()}, nil
+
+	indent, err := bindAll(positions, m.Options.IndentColumns, "indentColumns", "the indent column is not in the file")
+	if err != nil {
+		return Binding{}, err
+	}
+	levels, err := bindAll(positions, rootColumns(m.Options.LevelColumns), "levelColumns", "the level column is not in the file")
+	if err != nil {
+		return Binding{}, err
+	}
+	notes, err := bindNotes(positions, m.Options.NoteColumns)
+	if err != nil {
+		return Binding{}, err
+	}
+	return Binding{index: index, indent: indent, levels: levels, notes: notes, options: m.Options.OrDefault()}, nil
+}
+
+func bindNotes(positions headerIndex, columns []string) ([]noteColumn, error) {
+	found, err := bindAll(positions, columns, "noteColumns", "the note column is not in the file")
+	if err != nil {
+		return nil, err
+	}
+	notes := make([]noteColumn, 0, len(found))
+	for i, at := range found {
+		notes = append(notes, noteColumn{label: strings.TrimSpace(columns[i]), at: at})
+	}
+	return notes, nil
+}
+
+func bindAll(positions headerIndex, columns []string, field, missing string) ([]int, error) {
+	out := make([]int, 0, len(columns))
+	for _, column := range columns {
+		at, found := positions.find(column)
+		if !found {
+			return nil, invalid(missing, field).WithDetail("column", column)
+		}
+		out = append(out, at)
+	}
+	return out, nil
+}
+
+func cellAt(row []string, at int) string {
+	if at >= len(row) {
+		return ""
+	}
+	return strings.TrimSpace(row[at])
+}
+
+func levelCell(row []string, at int) string {
+	value := cellAt(row, at)
+	if slices.Contains(placeholderCells, strings.ToLower(value)) {
+		return ""
+	}
+	return value
+}
+
+func (b Binding) Levels(row []string) []string {
+	out := make([]string, 0, len(b.levels))
+	for _, at := range b.levels {
+		if name := levelCell(row, at); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func (b Binding) Notes(row []string) []pagemap.Note {
+	notes := make([]pagemap.Note, 0, len(b.notes))
+	for _, column := range b.notes {
+		notes = append(notes, pagemap.Note{Label: column.label, Text: cellAt(row, column.at)})
+	}
+	return pagemap.NewNotes(notes)
 }
 
 func (b Binding) Options() Options {
@@ -199,10 +374,10 @@ func (b Binding) Has(field Field) bool {
 
 func (b Binding) Text(row []string, field Field) string {
 	at, mapped := b.index[field]
-	if !mapped || at >= len(row) {
+	if !mapped {
 		return ""
 	}
-	return strings.TrimSpace(row[at])
+	return cellAt(row, at)
 }
 
 func (b Binding) List(row []string, field Field) []string {
@@ -219,7 +394,15 @@ func (b Binding) Path(row []string) string {
 
 func (b Binding) Blank(row []string) bool {
 	for _, at := range b.index {
-		if at < len(row) && strings.TrimSpace(row[at]) != "" {
+		if cellAt(row, at) != "" {
+			return false
+		}
+	}
+	if len(b.Levels(row)) > 0 {
+		return false
+	}
+	for _, column := range b.notes {
+		if cellAt(row, column.at) != "" {
 			return false
 		}
 	}

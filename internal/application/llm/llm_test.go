@@ -42,30 +42,232 @@ func userMessage(text string) []llm.Message {
 	return []llm.Message{{Role: llm.RoleUser, Text: text}}
 }
 
+func call(id, name, args string) llm.Message {
+	return llm.Message{Role: llm.RoleAssistant, Call: &llm.ToolCall{ID: id, Name: name, Args: json.RawMessage(args)}}
+}
+
+func result(callID, output string) llm.Message {
+	return llm.Message{Role: llm.RoleTool, Result: &llm.ToolResult{CallID: callID, Output: json.RawMessage(output)}}
+}
+
+func conversation(messages ...llm.Message) func(*llm.Request) {
+	return func(r *llm.Request) { r.Messages = messages }
+}
+
+func searched(kind llm.SearchKind, payload string) llm.Message {
+	return llm.Message{Role: llm.RoleAssistant, Search: &llm.ToolSearch{Kind: kind, Execution: "server", Payload: json.RawMessage(payload)}}
+}
+
+func namespaced(id, namespace, name string) llm.Message {
+	return llm.Message{Role: llm.RoleAssistant, Call: &llm.ToolCall{ID: id, Name: name, Args: json.RawMessage(`{}`), Namespace: namespace}}
+}
+
+func deferred(name, group, description string) llm.Tool {
+	return llm.Tool{
+		Name: name, Description: "reads", Schema: &llm.Schema{Type: llm.SchemaObject},
+		Deferred: &llm.ToolGroup{Name: group, Description: description},
+	}
+}
+
 func TestRequestValidate(t *testing.T) {
 	t.Parallel()
 
 	hot := 9.0
+	user := llm.Message{Role: llm.RoleUser, Text: "find the pages"}
+	developer := llm.Message{Role: llm.RoleDeveloper, Text: "the site is example.com"}
+	answer := llm.Message{Role: llm.RoleAssistant, Text: "here they are"}
+	listing := llm.Tool{Name: "pages_list", Description: "lists pages", Schema: &llm.Schema{Type: llm.SchemaObject}}
+
 	cases := []struct {
 		name    string
 		mutate  func(*llm.Request)
-		wantErr bool
+		wantErr string
 	}{
 		{name: "a plain request is valid"},
-		{name: "the provider is required", mutate: func(r *llm.Request) { r.Ref.Provider = "" }, wantErr: true},
-		{name: "the model is required", mutate: func(r *llm.Request) { r.Ref.Model = "" }, wantErr: true},
-		{name: "messages are required", mutate: func(r *llm.Request) { r.Messages = nil }, wantErr: true},
-		{name: "a role must be known", mutate: func(r *llm.Request) { r.Messages[0].Role = "system" }, wantErr: true},
-		{name: "a message must not be empty", mutate: func(r *llm.Request) { r.Messages[0].Text = "" }, wantErr: true},
+		{name: "the provider is required", mutate: func(r *llm.Request) { r.Ref.Provider = "" }, wantErr: "the model reference"},
+		{name: "the model is required", mutate: func(r *llm.Request) { r.Ref.Model = "" }, wantErr: "the model reference"},
+		{name: "messages are required", mutate: func(r *llm.Request) { r.Messages = nil }, wantErr: "at least one message"},
+		{name: "a role must be known", mutate: func(r *llm.Request) { r.Messages[0].Role = "system" }, wantErr: "a message role"},
+		{name: "a message must not be empty", mutate: func(r *llm.Request) { r.Messages[0].Text = "" }, wantErr: "must not be empty"},
 		{
 			name: "the last message comes from the user",
 			mutate: func(r *llm.Request) {
 				r.Messages = append(r.Messages, llm.Message{Role: llm.RoleAssistant, Text: "hi"})
 			},
-			wantErr: true,
+			wantErr: "the last message",
 		},
-		{name: "the ceiling is not negative", mutate: func(r *llm.Request) { r.MaxTokens = -1 }, wantErr: true},
-		{name: "the temperature is bounded", mutate: func(r *llm.Request) { r.Temperature = &hot }, wantErr: true},
+		{name: "the ceiling is not negative", mutate: func(r *llm.Request) { r.MaxTokens = -1 }, wantErr: "the token ceiling"},
+		{name: "the temperature is bounded", mutate: func(r *llm.Request) { r.Temperature = &hot }, wantErr: "the temperature"},
+		{name: "developer context may precede the user", mutate: conversation(developer, user)},
+		{name: "developer context may close the request", mutate: conversation(user, developer)},
+		{
+			name:   "a tool round ends on its result",
+			mutate: conversation(user, call("call_1", "pages_list", `{"siteId":"s"}`), result("call_1", `{"pages":[]}`)),
+		},
+		{
+			name: "two calls of one round are answered in turn",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), call("call_2", "pages_get", `{"id":"p"}`),
+				result("call_1", `{"pages":[]}`), result("call_2", `"gone"`)),
+		},
+		{
+			name: "the user speaks again after a finished round",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), result("call_1", `[]`), answer,
+				llm.Message{Role: llm.RoleUser, Text: "thanks, now publish"}),
+		},
+		{
+			name: "a message carries one thing",
+			mutate: conversation(llm.Message{
+				Role: llm.RoleAssistant, Text: "calling",
+				Call: &llm.ToolCall{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)},
+			}, user),
+			wantErr: "only one of",
+		},
+		{
+			name: "a tool message carries its result and nothing else",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), llm.Message{
+				Role: llm.RoleTool, Text: "done",
+				Result: &llm.ToolResult{CallID: "call_1", Output: json.RawMessage(`[]`)},
+			}),
+			wantErr: "only one of",
+		},
+		{
+			name: "a tool call comes from the assistant",
+			mutate: conversation(llm.Message{
+				Role: llm.RoleUser, Call: &llm.ToolCall{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)},
+			}, user),
+			wantErr: "a tool call must come from the assistant",
+		},
+		{
+			name: "a tool result travels in a tool message",
+			mutate: conversation(user, call("call_1", "pages_list", `{}`), llm.Message{
+				Role: llm.RoleUser, Result: &llm.ToolResult{CallID: "call_1", Output: json.RawMessage(`[]`)},
+			}),
+			wantErr: "a tool result must travel in a tool message",
+		},
+		{
+			name:    "a tool message carries a tool result",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`), llm.Message{Role: llm.RoleTool, Text: "[]"}),
+			wantErr: "a tool message must carry a tool result",
+		},
+		{
+			name:    "a tool call has an identifier",
+			mutate:  conversation(user, call("", "pages_list", `{}`), user),
+			wantErr: "a tool call needs an identifier",
+		},
+		{
+			name:    "a tool call names its tool",
+			mutate:  conversation(user, call("call_1", "", `{}`), user),
+			wantErr: "a tool call must name its tool",
+		},
+		{
+			name:    "a tool call's arguments are JSON",
+			mutate:  conversation(user, call("call_1", "pages_list", `{"siteId":`), user),
+			wantErr: "arguments must be JSON",
+		},
+		{
+			name:    "a tool call carries its arguments",
+			mutate:  conversation(user, call("call_1", "pages_list", ``), user),
+			wantErr: "arguments must be JSON",
+		},
+		{
+			name:    "a tool result names the call it answers",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`), result("", `[]`)),
+			wantErr: "a tool result must name the call it answers",
+		},
+		{
+			name:    "a tool result is JSON",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`), result("call_1", `not json`)),
+			wantErr: "a tool result must be JSON",
+		},
+		{
+			name:    "a tool result answers a call",
+			mutate:  conversation(user, result("call_9", `[]`)),
+			wantErr: "a call made before it",
+		},
+		{
+			name:    "a tool result follows its call",
+			mutate:  conversation(user, result("call_1", `[]`), call("call_1", "pages_list", `{}`), user),
+			wantErr: "a call made before it",
+		},
+		{
+			name:    "a request does not end on a tool call",
+			mutate:  conversation(user, call("call_1", "pages_list", `{}`)),
+			wantErr: "the last message",
+		},
+		{name: "a known effort is accepted", mutate: func(r *llm.Request) { r.Effort = domain.EffortLow }},
+		{name: "an effort must be known", mutate: func(r *llm.Request) { r.Effort = "extreme" }, wantErr: "the reasoning effort"},
+		{name: "the flex tier is accepted", mutate: func(r *llm.Request) { r.Tier = domain.TierFlex }},
+		{name: "a tier must be known", mutate: func(r *llm.Request) { r.Tier = "priority" }, wantErr: "the service tier"},
+		{name: "a cache key is free text", mutate: func(r *llm.Request) { r.CacheKey = "agent:v1" }},
+		{name: "tools may be offered", mutate: func(r *llm.Request) { r.Tools = []llm.Tool{listing, {Name: "pages_get"}} }},
+		{
+			name:    "a tool has a name",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{listing, {Description: "nameless"}} },
+			wantErr: "a tool needs a name",
+		},
+		{
+			name:    "tool names are unique",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{listing, listing} },
+			wantErr: "two tools share one name",
+		},
+		{
+			name: "a tool's parameters are an object",
+			mutate: func(r *llm.Request) {
+				r.Tools = []llm.Tool{{Name: "pages_list", Schema: &llm.Schema{Type: llm.SchemaString}}}
+			},
+			wantErr: "a tool's parameters must be an object",
+		},
+		{
+			name: "deferred tools sit beside the tools sent whole",
+			mutate: func(r *llm.Request) {
+				r.Tools = []llm.Tool{listing, deferred("pages_get", "pages", "the page map"), deferred("pages_tree", "pages", "the page map")}
+			},
+		},
+		{
+			name:    "a deferred tool's group has a name",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{deferred("pages_get", "", "the page map")} },
+			wantErr: "a group with a name and a description",
+		},
+		{
+			name:    "a deferred tool's group says what it holds",
+			mutate:  func(r *llm.Request) { r.Tools = []llm.Tool{deferred("pages_get", "pages", "")} },
+			wantErr: "a group with a name and a description",
+		},
+		{
+			name: "a group is described one way",
+			mutate: func(r *llm.Request) {
+				r.Tools = []llm.Tool{deferred("pages_get", "pages", "the page map"), deferred("pages_tree", "pages", "the tree")}
+			},
+			wantErr: "a tool group is described two ways",
+		},
+		{
+			name: "a tool search is replayed before the namespaced call it loaded",
+			mutate: conversation(user, searched(llm.SearchCall, `{"paths":["pages"]}`), searched(llm.SearchOutput, `[]`),
+				namespaced("call_1", "pages", "pages_get"), result("call_1", `{}`)),
+		},
+		{
+			name:    "a tool search comes from the assistant",
+			mutate:  conversation(llm.Message{Role: llm.RoleUser, Search: &llm.ToolSearch{Kind: llm.SearchCall, Payload: json.RawMessage(`{}`)}}, user),
+			wantErr: "a tool search must come from the assistant",
+		},
+		{
+			name:    "a tool search is a call or its output",
+			mutate:  conversation(user, searched("lookup", `{}`), user),
+			wantErr: "a tool search is a call or its output",
+		},
+		{
+			name:    "a tool search carries JSON",
+			mutate:  conversation(user, searched(llm.SearchOutput, `[`), user),
+			wantErr: "a tool search must carry JSON",
+		},
+		{
+			name: "a tool search is a message of its own",
+			mutate: conversation(llm.Message{
+				Role: llm.RoleAssistant, Text: "searching",
+				Search: &llm.ToolSearch{Kind: llm.SearchCall, Payload: json.RawMessage(`{}`)},
+			}, user),
+			wantErr: "only one of",
+		},
 	}
 
 	for _, tc := range cases {
@@ -78,11 +280,130 @@ func TestRequestValidate(t *testing.T) {
 			}
 
 			err := req.Validate()
-			if tc.wantErr != (err != nil) {
-				t.Fatalf("Validate() = %v, want error %t", err, tc.wantErr)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Validate() = %v, want no error", err)
+				}
+				return
 			}
-			if tc.wantErr && !errors.IsCode(err, errors.Invalid) {
-				t.Errorf("Validate() code = %s, want %s", errors.CodeOf(err), errors.Invalid)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Validate() = %v, want %s", err, errors.Invalid)
+			}
+			if _, message := errors.Describe(err); !strings.Contains(message, tc.wantErr) {
+				t.Errorf("Validate() message = %q, want it to say %q", message, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestTheRequestEncoding(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{
+			name: "a request that uses none of the new fields keeps its recorded fixtures findable",
+			value: llm.Request{
+				Ref: ref(), System: "you write", Messages: userMessage("write"), MaxTokens: 128,
+				Meta: llm.CallMeta{RunID: "r"},
+			},
+			want: `{"ref":{"provider":"openai","model":"gpt-5.1"},"system":"you write",` +
+				`"messages":[{"role":"user","text":"write"}],` +
+				`"meta":{"runId":"r","itemId":"","step":"","conversationId":""},"maxTokens":128}`,
+		},
+		{
+			name: "the tool fields, the effort, the tier and the cache key are camelCase",
+			value: llm.Request{
+				Ref: ref(),
+				Messages: []llm.Message{
+					call("call_1", "pages_list", `{"siteId":"s"}`),
+					result("call_1", `{"pages":[]}`),
+				},
+				Meta:     llm.CallMeta{ConversationID: "c", Role: domain.RoleChat},
+				Tools:    []llm.Tool{{Name: "pages_list", Description: "lists pages", Schema: &llm.Schema{Type: llm.SchemaObject}}},
+				Effort:   domain.EffortLow,
+				Tier:     domain.TierFlex,
+				CacheKey: "agent",
+			},
+			want: `{"ref":{"provider":"openai","model":"gpt-5.1"},"system":"",` +
+				`"messages":[{"role":"assistant","text":"","call":{"id":"call_1","name":"pages_list","args":{"siteId":"s"}}},` +
+				`{"role":"tool","text":"","result":{"callId":"call_1","output":{"pages":[]}}}],` +
+				`"meta":{"runId":"","itemId":"","step":"","conversationId":"c","role":"chat"},"maxTokens":0,` +
+				`"tools":[{"name":"pages_list","description":"lists pages","schema":{"type":"object"}}],` +
+				`"effort":"low","tier":"flex","cacheKey":"agent"}`,
+		},
+		{
+			name:  "a plain response",
+			value: llm.Response{Text: "hi", FinishReason: llm.FinishStop},
+			want: `{"text":"hi","usage":{"input":0,"cachedInput":0,"cacheWrite":0,"output":0,"reasoning":0,"total":0},` +
+				`"finishReason":"stop"}`,
+		},
+		{
+			name: "a response that calls tools on flex",
+			value: llm.Response{
+				Usage:        domain.Usage{Input: 1, Output: 2, Reasoning: 1, Total: 3},
+				FinishReason: llm.FinishStop,
+				Calls:        []llm.ToolCall{{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)}},
+				Tier:         domain.TierFlex,
+			},
+			want: `{"text":"","usage":{"input":1,"cachedInput":0,"cacheWrite":0,"output":2,"reasoning":1,"total":3},` +
+				`"finishReason":"stop",` +
+				`"calls":[{"id":"call_1","name":"pages_list","args":{}}],"tier":"flex"}`,
+		},
+		{
+			name: "a delta that carries a call and the end of the answer",
+			value: llm.Delta{
+				Done:   true,
+				Call:   &llm.ToolCall{ID: "call_1", Name: "pages_list", Args: json.RawMessage(`{}`)},
+				Finish: llm.FinishStop,
+				Tier:   domain.TierDefault,
+			},
+			want: `{"text":"","done":true,"call":{"id":"call_1","name":"pages_list","args":{}},"finish":"stop","tier":"default"}`,
+		},
+		{
+			name: "a deferred tool names its group and a replayed round carries the search and the namespace",
+			value: llm.Request{
+				Ref: ref(),
+				Messages: []llm.Message{
+					searched(llm.SearchCall, `{"paths":["pages"]}`),
+					searched(llm.SearchOutput, `[]`),
+					namespaced("call_1", "pages", "pages_get"),
+				},
+				Tools: []llm.Tool{deferred("pages_get", "pages", "the page map")},
+			},
+			want: `{"ref":{"provider":"openai","model":"gpt-5.1"},"system":"",` +
+				`"messages":[{"role":"assistant","text":"","search":{"kind":"call","execution":"server","payload":{"paths":["pages"]}}},` +
+				`{"role":"assistant","text":"","search":{"kind":"output","execution":"server","payload":[]}},` +
+				`{"role":"assistant","text":"","call":{"id":"call_1","name":"pages_get","args":{},"namespace":"pages"}}],` +
+				`"meta":{"runId":"","itemId":"","step":"","conversationId":""},"maxTokens":0,` +
+				`"tools":[{"name":"pages_get","description":"reads","schema":{"type":"object"},` +
+				`"deferred":{"name":"pages","description":"the page map"}}]}`,
+		},
+		{
+			name: "a response and a delta carry the tool search the model ran",
+			value: []any{
+				llm.Response{Searches: []llm.ToolSearch{{Kind: llm.SearchOutput, CallID: "ts_1", Payload: json.RawMessage(`[]`)}}},
+				llm.Delta{Search: &llm.ToolSearch{Kind: llm.SearchCall, Payload: json.RawMessage(`{}`)}},
+			},
+			want: `[{"text":"","usage":{"input":0,"cachedInput":0,"cacheWrite":0,"output":0,"reasoning":0,"total":0},` +
+				`"finishReason":"","searches":[{"kind":"output","callId":"ts_1","payload":[]}]},` +
+				`{"text":"","done":false,"search":{"kind":"call","payload":{}}}]`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			encoded, err := json.Marshal(tc.value)
+			if err != nil {
+				t.Fatalf("Marshal: %v", err)
+			}
+			if string(encoded) != tc.want {
+				t.Fatalf("Marshal =\n%s\nwant\n%s", encoded, tc.want)
 			}
 		})
 	}
@@ -276,28 +597,28 @@ func TestStructured(t *testing.T) {
 			wantCalls: 1,
 		},
 		{
-			name: "repairs once and sums the usage",
+			name: "hands a malformed answer to the step's retry instead of asking again",
 			responses: []llm.Response{
 				{Text: "not json", Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
 				{Text: `{"heading":"Powder","html":"<p>y</p>"}`, Usage: domain.Usage{Input: 20, Output: 4, Total: 24}},
 			},
-			wantTitle: "Powder",
-			wantUsage: domain.Usage{Input: 30, Output: 6, Total: 36},
-			wantCalls: 2,
-		},
-		{
-			name: "gives up after the repair",
-			responses: []llm.Response{
-				{Text: "not json", Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
-				{Text: "still not json", Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
-			},
-			wantUsage: domain.Usage{Input: 20, Output: 4, Total: 24},
-			wantCalls: 2,
+			wantUsage: domain.Usage{Input: 10, Output: 2, Total: 12},
+			wantCalls: 1,
 			wantCode:  errors.External,
 			wantWhy:   llm.ReasonMalformedAnswer,
 		},
 		{
-			name: "does not repair an answer that stopped for length",
+			name: "refuses an answer of another shape",
+			responses: []llm.Response{
+				{Text: `{"heading":7}`, Usage: domain.Usage{Input: 10, Output: 2, Total: 12}},
+			},
+			wantUsage: domain.Usage{Input: 10, Output: 2, Total: 12},
+			wantCalls: 1,
+			wantCode:  errors.External,
+			wantWhy:   llm.ReasonMalformedAnswer,
+		},
+		{
+			name: "stops at an answer that stopped for length",
 			responses: []llm.Response{
 				{Text: `{"heading":"Koff`, Usage: domain.Usage{Input: 10, Output: 8, Total: 18}, FinishReason: llm.FinishLength},
 			},
@@ -353,20 +674,31 @@ func TestStructured(t *testing.T) {
 			if first.Schema == nil || first.Schema.Type != llm.SchemaObject {
 				t.Errorf("schema = %+v, want the derived object schema", first.Schema)
 			}
-			if !strings.HasPrefix(first.System, "you write pages") || !strings.Contains(first.System, "single JSON object") {
-				t.Errorf("system = %q, want the caller prompt plus the json instruction", first.System)
+			if first.System != "you write pages" {
+				t.Errorf("system = %q, want the caller's prompt as it was written; the strict schema says the shape", first.System)
 			}
-			if tc.wantCalls > 1 {
-				repaired := client.seen[1].Messages
-				if len(repaired) != 3 || repaired[1].Role != llm.RoleAssistant || repaired[1].Text != "not json" ||
-					!strings.Contains(repaired[2].Text, "could not be decoded") {
-					t.Errorf("repair messages = %+v, want the answer shown back with the decoder error", repaired)
-				}
-				if len(first.Messages) != 1 {
-					t.Errorf("first request messages = %+v, want the original single message", first.Messages)
-				}
+			if len(first.Messages) != 1 {
+				t.Errorf("request messages = %+v, want the caller's single message", first.Messages)
 			}
 		})
+	}
+}
+
+func TestAMalformedAnswerNamesItsModelAndWhyItFailed(t *testing.T) {
+	t.Parallel()
+
+	client := &scriptedClient{responses: []llm.Response{{Text: "Sure! Here is the section."}}}
+	_, _, err := llm.Structured[section](t.Context(), client, llm.Request{Ref: ref(), Messages: userMessage("go")})
+
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) {
+		t.Fatalf("Structured error = %v, want a kernel error", err)
+	}
+	if kernel.Details["model"] != ref().String() || kernel.Details["reason"] != llm.ReasonMalformedAnswer {
+		t.Fatalf("the refusal carries %v", kernel.Details)
+	}
+	if !strings.Contains(err.Error(), "invalid character") {
+		t.Fatalf("the refusal does not keep the decoder's reason: %v", err)
 	}
 }
 

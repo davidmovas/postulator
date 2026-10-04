@@ -22,6 +22,7 @@ export function blankDraft(): SpecDraft {
         primaryInH1: true,
         primaryInFirstParagraph: true,
         maxDensity: 0.02,
+        requiredKeywords: null,
         upDepth: 1,
         downLinks: true,
         siblingMinWeight: 0.5,
@@ -34,6 +35,7 @@ export function blankDraft(): SpecDraft {
         featuredImage: false,
         inlineImages: 0,
         imageSource: "wpmedia",
+        product: null,
         profiles: [],
         recipe: stepNames.map((name) => ({ name, enabled: name !== imageStep, declared: true, params: null })),
     };

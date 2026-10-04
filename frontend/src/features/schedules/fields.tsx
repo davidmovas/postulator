@@ -4,7 +4,9 @@ import { useMemo } from "react";
 import { copy } from "../../copy/index.js";
 import { fieldErrorOf } from "../../data/errors.js";
 import type { Entity, Schedule, Template } from "../../data/types.js";
+import { pageStatuses } from "../../generated/vocab.js";
 import { Field, Input, Segmented, SectionLabel, Select, StatusBadge } from "../../ui/index.js";
+import { pageStatusLabel } from "../pages/labels.js";
 import { stepLabel } from "../runs/labels.js";
 import { CadenceFields } from "./cadence.js";
 import type { ScheduleDraft } from "./form.js";
@@ -104,10 +106,7 @@ export function ScheduleFields({
                         value={draft.status === "" ? anyStatus : draft.status}
                         options={[
                             { value: anyStatus, label: copy.schedules.panel.anyStatus },
-                            { value: "planned", label: copy.schedules.statuses.planned },
-                            { value: "exists", label: copy.schedules.statuses.exists },
-                            { value: "published", label: copy.schedules.statuses.published },
-                            { value: "archived", label: copy.schedules.statuses.archived },
+                            ...pageStatuses.map((status) => ({ value: status, label: pageStatusLabel(status) })),
                         ]}
                         onValueChange={(next) => {
                             onChange({ ...draft, status: next === anyStatus ? "" : next });

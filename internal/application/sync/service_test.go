@@ -55,12 +55,13 @@ func (s *sites) Update(_ context.Context, record site.Site) error {
 }
 
 type prober struct {
-	state site.PluginState
-	err   error
+	state    site.PluginState
+	err      error
+	commerce site.Commerce
 }
 
-func (p prober) Probe(context.Context, site.Site) (site.PluginState, error) {
-	return p.state, p.err
+func (p prober) Probe(context.Context, site.Site) (site.Extensions, error) {
+	return site.Extensions{Plugin: p.state, Commerce: p.commerce}, p.err
 }
 
 type packer struct {
@@ -149,7 +150,7 @@ func TestCheckPluginStoresWhatItFound(t *testing.T) {
 	store := newSites()
 	service := newService(store, &queue{}, prober{state: site.PluginState{
 		Installed: true, Version: "1.0.0", Capabilities: []string{"bulk", "seo_meta"}, SEOPlugin: "yoast",
-	}}, packer{})
+	}, commerce: site.CommerceReady}, packer{})
 
 	resp, err := service.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
 	if err != nil {
@@ -158,7 +159,10 @@ func TestCheckPluginStoresWhatItFound(t *testing.T) {
 	if !resp.Plugin.Installed || resp.Plugin.Version != "1.0.0" || resp.Plugin.SEOPlugin != "yoast" {
 		t.Fatalf("plugin = %+v", resp.Plugin)
 	}
-	if len(store.written) != 1 || !store.written[0].Plugin.Installed {
+	if resp.Commerce != string(site.CommerceReady) {
+		t.Errorf("commerce = %q, want ready", resp.Commerce)
+	}
+	if len(store.written) != 1 || !store.written[0].Plugin.Installed || store.written[0].Commerce != site.CommerceReady {
 		t.Fatalf("the site was written as %+v", store.written)
 	}
 }

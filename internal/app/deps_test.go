@@ -19,12 +19,11 @@ const (
 	transportTree   = "internal/transport"
 	appTree         = "internal/app"
 	pagingPackage   = "internal/kernel/paging"
+	agentTree       = "internal/transport/agent"
+	providerTree    = "internal/adapters/llm/openai"
 )
 
-const (
-	squirrel = "github.com/Masterminds/squirrel"
-	gollem   = "github.com/gollem-dev/gollem"
-)
+const squirrel = "github.com/Masterminds/squirrel"
 
 func repoRoot(t *testing.T) string {
 	t.Helper()
@@ -179,25 +178,13 @@ func TestOnlyPagingUsesTheQueryBuilder(t *testing.T) {
 	}
 }
 
-func TestTheAgentFrameworkStaysAtTheEdge(t *testing.T) {
+func TestTheAgentTalksToTheModelOnlyThroughThePort(t *testing.T) {
 	t.Parallel()
 
-	for _, dep := range transitiveDeps(t, applicationTree) {
-		if dep == gollem || strings.HasPrefix(dep, gollem+"/") {
-			t.Errorf("application depends on %s; only internal/transport/agent may name the agent framework", dep)
-		}
-	}
-
-	for pkg, imports := range directImports(t) {
-		if ownPackage(pkg, appTree) || pkg == modulePath+"/internal/transport/agent" ||
-			ownPackage(pkg, adaptersTree) {
-			continue
-		}
-		for _, imported := range imports {
-			if imported == gollem || strings.HasPrefix(imported, gollem+"/") {
-				t.Errorf("%s imports %s; the agent framework belongs to internal/transport/agent and the llm adapters",
-					pkg, imported)
-			}
+	for _, dep := range transitiveDeps(t, agentTree) {
+		if ownPackage(dep, providerTree) {
+			t.Errorf("%s depends on %s; the agent asks the llm port and the composition root picks the provider",
+				agentTree, dep)
 		}
 	}
 }

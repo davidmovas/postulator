@@ -32,20 +32,10 @@ export interface LiveStats {
     calls: number;
 }
 
-export type RunPhase =
-    | "queued"
-    | "running"
-    | "paused"
-    | "cancelled"
-    | "completed"
-    | "failed"
-    | "budget_exceeded";
-
 type Events = readonly RunEventRecord[];
 
 const progressCache = new WeakMap<Events, ReadonlyMap<string, ItemProgress>>();
 const statsCache = new WeakMap<Events, LiveStats>();
-const phaseCache = new WeakMap<Events, RunPhase | null>();
 
 function blank(itemId: string): ItemProgress {
     return { itemId, step: null, stepStartedAt: null, attempt: 0, lastError: null, state: "pending", note: "" };
@@ -204,42 +194,4 @@ export function liveStats(events: Events): LiveStats {
     const frozen = Object.freeze(totals);
     statsCache.set(events, frozen);
     return frozen;
-}
-
-export function runPhase(events: Events): RunPhase | null {
-    const cached = phaseCache.get(events);
-    if (cached !== undefined) {
-        return cached;
-    }
-    let phase: RunPhase | null = null;
-    for (const record of events) {
-        switch (record.type) {
-            case "run.queued":
-                phase = "queued";
-                break;
-            case "run.started":
-            case "run.resumed":
-                phase = "running";
-                break;
-            case "run.paused":
-                phase = "paused";
-                break;
-            case "run.budget_exceeded":
-                phase = "budget_exceeded";
-                break;
-            case "run.cancelled":
-                phase = "cancelled";
-                break;
-            case "run.completed":
-                phase = "completed";
-                break;
-            case "run.failed":
-                phase = "failed";
-                break;
-            default:
-                break;
-        }
-    }
-    phaseCache.set(events, phase);
-    return phase;
 }

@@ -3,6 +3,7 @@ package tools_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/importer"
@@ -36,8 +37,8 @@ import (
 
 type stubProbe struct{}
 
-func (stubProbe) Probe(context.Context, site.Site) (site.PluginState, error) {
-	return site.PluginState{Capabilities: []string{}}, nil
+func (stubProbe) Probe(context.Context, site.Site) (site.Extensions, error) {
+	return site.Extensions{Plugin: site.PluginState{Capabilities: []string{}}}, nil
 }
 
 func (stubProbe) TestConnection(context.Context, site.Candidate) (site.Reachability, error) {
@@ -46,7 +47,7 @@ func (stubProbe) TestConnection(context.Context, site.Candidate) (site.Reachabil
 
 type stubPreview struct{}
 
-func (stubPreview) IssuePreview(context.Context, string, int64) (pages.IssuedPreview, error) {
+func (stubPreview) IssuePreview(context.Context, string, int64, string) (pages.IssuedPreview, error) {
 	return pages.IssuedPreview{}, errors.New(errors.Invalid, "no site in this test issues a preview").
 		WithDetail("code", "plugin_missing")
 }
@@ -145,7 +146,10 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Sites: siteRepo, Specs: templateService, Policies: templateService,
 	})
 
-	pagesService := pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now, stubPreview{})
+	pagesService := pages.New(pages.Deps{
+		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, UnitOfWork: store,
+		Publisher: bus, Clock: now, Preview: stubPreview{},
+	})
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{
@@ -255,6 +259,81 @@ const minimalSpec = `{"sections":[{"heading":"Overview","intent":"what it is","t
 	`"parentLinkWithinParagraphs":2,"childrenSection":false},` +
 	`"metaRules":{"titlePattern":"{primaryKeyword}","descriptionMax":155},` +
 	`"images":{"featured":false,"inline":0,"source":"ai"}}`
+
+func TestATemplateToolSaysHowManyKeywordsThePageMustUse(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, _ := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+
+	cases := []struct {
+		name string
+		rule string
+		want string
+	}{
+		{name: "the first three", rule: `,"requiredKeywords":3`, want: `"requiredKeywords":3`},
+		{name: "none of them", rule: `,"requiredKeywords":0`, want: `"requiredKeywords":0`},
+		{name: "every one when the tool does not say", rule: ``, want: ``},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := strings.Replace(minimalSpec, `"maxDensity":0.02}`, `"maxDensity":0.02`+tc.rule+`}`, 1)
+			out, err := registry.Call(t.Context(), binding, "templates_create",
+				json.RawMessage(`{"name":"Keyed `+tc.name+`","pageKind":"guide","spec":`+spec+`}`))
+			if err != nil {
+				t.Fatalf("templates_create: %v", err)
+			}
+			encoded, err := json.Marshal(out)
+			if err != nil {
+				t.Fatalf("encode the answer: %v", err)
+			}
+			if tc.want == "" {
+				if strings.Contains(string(encoded), "requiredKeywords") {
+					t.Fatalf("the template carries a keyword count nobody set: %s", encoded)
+				}
+				return
+			}
+			if !strings.Contains(string(encoded), tc.want) {
+				t.Fatalf("the template lost %s: %s", tc.want, encoded)
+			}
+		})
+	}
+}
+
+func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, _ := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+
+	product := `,"product":{"shortDescription":{"enabled":true,"intent":"Say what it is","targetWords":40,` +
+		`"primaryKeyword":true},"specifications":[{"name":"Form","intent":"As the notes say"}]}}`
+	spec := strings.TrimSuffix(minimalSpec, "}") + product
+	out, err := registry.Call(t.Context(), binding, "templates_create",
+		json.RawMessage(`{"name":"Product outputs","pageKind":"product","spec":`+spec+`}`))
+	if err != nil {
+		t.Fatalf("templates_create: %v", err)
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("encode the answer: %v", err)
+	}
+	for _, want := range []string{`"shortDescription":{"enabled":true`, `"targetWords":40`, `"name":"Form"`} {
+		if !strings.Contains(string(encoded), want) {
+			t.Errorf("the template lost %s: %s", want, encoded)
+		}
+	}
+
+	bare, err := registry.Call(t.Context(), binding, "templates_create",
+		json.RawMessage(`{"name":"No product outputs","pageKind":"guide","spec":`+minimalSpec+`}`))
+	if err != nil {
+		t.Fatalf("templates_create: %v", err)
+	}
+	if encoded, err = json.Marshal(bare); err != nil || strings.Contains(string(encoded), `"product":{`) {
+		t.Errorf("a template that says nothing of products carries a product block: %s", encoded)
+	}
+}
 
 func argumentsFor(name string) json.RawMessage {
 	switch name {

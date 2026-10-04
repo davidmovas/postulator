@@ -28,30 +28,27 @@ type PreviewSummaryResponse struct {
 }
 
 func (s *Service) PreviewSummary(ctx context.Context, req PreviewRequest) (PreviewSummaryResponse, error) {
-	computed, err := s.compute(ctx, req.SiteID, req.Path, req.Mapping)
+	book, err := s.compute(ctx, req)
 	if err != nil {
 		return PreviewSummaryResponse{}, err
 	}
-	return summarize(computed.report, computed.counts(), req.Mapping.Options.Sheets, computed.rows), nil
+	return summarize(&book), nil
 }
 
-func summarize(report PreviewReport, counts Counts, sheets []string, rows int) PreviewSummaryResponse {
-	pages := report.Pages
+func summarize(book *workbook) PreviewSummaryResponse {
+	pages := book.report.Pages
 	more := len(pages) > SummaryPages
 	if more {
 		pages = pages[:SummaryPages]
 	}
-	if sheets == nil {
-		sheets = []string{}
-	}
 
 	return PreviewSummaryResponse{
-		Counts:   counts,
-		Sheets:   sheets,
-		Findings: group(report),
+		Counts:   book.counts(),
+		Sheets:   book.sheets(),
+		Findings: group(book.report),
 		Pages:    slices.Clone(pages),
-		Rows:     rows,
-		Blocking: len(report.Errors) > 0,
+		Rows:     book.rows(),
+		Blocking: book.broken(),
 		More:     more,
 	}
 }

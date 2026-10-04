@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../copy/index.js";
+import { entity } from "../graph/model/fixture.js";
+import { buildGraphIndex } from "../graph/model/index.js";
 import { LinkFilters } from "./filters.js";
 import { showLabel } from "./labels.js";
 import { rows as auditedRows, showCounts } from "./model/audit.js";
@@ -46,6 +48,29 @@ describe("the link filters", () => {
 
         filters({ ...defaultQuery, show: "missing" });
         expect(screen.getByRole("button", { name: copy.links.filters.reset }).hasAttribute("disabled")).toBe(false);
+    });
+
+    it("names a shared entity by the parent it sits under", () => {
+        const index = buildGraphIndex(
+            [
+                entity({ id: "bpc", name: "BPC-157" }),
+                entity({ id: "tb", name: "TB-500" }),
+                entity({ id: "bpc-liquid", name: "Liquid", scope: "bpc" }),
+                entity({ id: "tb-liquid", name: "Liquid", scope: "tb" }),
+            ],
+            [],
+        );
+        render(
+            <LinkFilters
+                query={{ ...defaultQuery, entity: "tb-liquid" }}
+                counts={showCounts(auditRows)}
+                statusCounts={new Map()}
+                index={index}
+                onChange={() => {}}
+            />,
+        );
+
+        expect(screen.getByRole("combobox", { name: copy.links.filters.entity }).textContent).toContain("TB-500 › Liquid");
     });
 
     it("puts the narrowing back on a reset and keeps the order that was chosen", () => {

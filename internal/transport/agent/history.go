@@ -6,11 +6,16 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gollem-dev/gollem"
-
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/tools"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+)
+
+const (
+	historyFormat  = "responses/1"
+	historyVersion = 1
 )
 
 type historyStore interface {
@@ -18,15 +23,29 @@ type historyStore interface {
 	Save(ctx context.Context, conversationID string, body []byte, version int, at time.Time) error
 }
 
-type bounded struct {
-	store  historyStore
-	clock  clock.Clock
-	budget int
-	cap    int
+type history struct {
+	Format string        `json:"format"`
+	Items  []llm.Message `json:"items"`
 }
 
-func (b bounded) Load(ctx context.Context, conversationID string) (*gollem.History, error) {
-	body, _, err := b.store.Load(ctx, conversationID)
+type memory struct {
+	store          historyStore
+	clock          clock.Clock
+	conversationID string
+	budget         int
+	cap            int
+}
+
+func (m memory) kept() bool {
+	return m.store != nil && m.conversationID != ""
+}
+
+func (m memory) load(ctx context.Context) ([]llm.Message, error) {
+	if !m.kept() {
+		return nil, nil
+	}
+
+	body, _, err := m.store.Load(ctx, m.conversationID)
 	if errors.IsCode(err, errors.NotFound) {
 		return nil, nil
 	}
@@ -34,121 +53,136 @@ func (b bounded) Load(ctx context.Context, conversationID string) (*gollem.Histo
 		return nil, err
 	}
 
-	var history gollem.History
-	if unmarshalErr := json.Unmarshal(body, &history); unmarshalErr != nil {
+	var held history
+	if json.Unmarshal(body, &held) != nil || held.Format != historyFormat {
 		return nil, nil
 	}
-	return trim(shorten(&history, b.cap), b.budget), nil
+	return trim(shorten(held.Items, m.cap), m.budget), nil
 }
 
-func (b bounded) Save(ctx context.Context, conversationID string, history *gollem.History) error {
-	if history == nil {
+func (m memory) save(ctx context.Context, items []llm.Message) error {
+	if !m.kept() {
 		return nil
 	}
 
-	trimmed := trim(shorten(history, b.cap), b.budget)
-	body, err := json.Marshal(trimmed)
+	kept := trim(shorten(masked(replayable(items)), m.cap), m.budget)
+	body, err := json.Marshal(history{Format: historyFormat, Items: kept})
 	if err != nil {
 		return errors.Wrap(err, errors.Internal, "encode the conversation history")
 	}
-	return b.store.Save(ctx, conversationID, body, trimmed.Version, b.clock.Now().UTC().Truncate(time.Second))
+	return m.store.Save(context.WithoutCancel(ctx), m.conversationID, body, historyVersion,
+		m.clock.Now().UTC().Truncate(time.Second))
 }
 
-func shorten(history *gollem.History, limit int) *gollem.History {
-	if history == nil || limit <= 0 || len(history.Messages) == 0 {
-		return history
-	}
-
-	out := *history
-	out.Messages = slices.Clone(history.Messages)
-	for i := range out.Messages {
-		out.Messages[i].Contents = shortenContents(out.Messages[i].Contents, limit)
-	}
-	return &out
-}
-
-func shortenContents(contents []gollem.MessageContent, limit int) []gollem.MessageContent {
-	out := contents
-	for i := range contents {
-		if contents[i].Type != gollem.MessageContentTypeToolResponse {
+func replayable(items []llm.Message) []llm.Message {
+	out := make([]llm.Message, 0, len(items))
+	for _, item := range items {
+		if item.Search != nil {
 			continue
 		}
-		held, err := contents[i].GetToolResponseContent()
-		if err != nil || held == nil {
-			continue
+		if item.Call != nil && item.Call.Namespace != "" {
+			call := *item.Call
+			call.Namespace = ""
+			item.Call = &call
 		}
-		capped, cut := compact(held.Response, limit)
-		if !cut {
-			continue
-		}
-		content, err := gollem.NewToolResponseContent(held.ToolCallID, held.Name, capped, held.IsError)
-		if err != nil {
-			continue
-		}
-		content.Meta = contents[i].Meta
-		if &out[0] == &contents[0] {
-			out = slices.Clone(contents)
-		}
-		out[i] = content
+		out = append(out, item)
 	}
 	return out
 }
 
-func compact(response map[string]any, limit int) (map[string]any, bool) {
-	fenced, marked := response[agentapp.UntrustedMarker].(bool)
-	held, wrapped := response[agentapp.UntrustedData].(map[string]any)
-	if !marked || !fenced || !wrapped {
-		return agentapp.Cap(response, limit)
+func masked(items []llm.Message) []llm.Message {
+	out := slices.Clone(items)
+	for i := range out {
+		if held := out[i].Call; held != nil {
+			call := *held
+			call.Args = tools.Redact(call.Args)
+			out[i].Call = &call
+		}
 	}
-
-	capped, cut := agentapp.Cap(held, limit)
-	if !cut {
-		return response, false
-	}
-	return agentapp.Fence(capped), true
+	return out
 }
 
-func trim(history *gollem.History, budget int) *gollem.History {
-	if history == nil || len(history.Messages) == 0 || budget <= 0 || size(history) <= budget {
-		return history
+func shorten(items []llm.Message, limit int) []llm.Message {
+	if limit <= 0 || len(items) == 0 {
+		return items
 	}
 
-	starts := turnStarts(history.Messages)
-	if len(starts) == 0 {
-		return &gollem.History{LLType: history.LLType, Version: history.Version}
-	}
-
-	suffixes := suffixSizes(history.Messages)
-	newest := starts[len(starts)-1]
-
-	for _, start := range starts[:len(starts)-1] {
-		if suffixes[start] > budget {
+	out := items
+	for i := range items {
+		held := items[i].Result
+		if held == nil {
 			continue
 		}
-		candidate := from(history, start)
-		if size(candidate) <= budget {
-			return candidate
+		output, cut := compact(held.Output, limit)
+		if !cut {
+			continue
+		}
+		if &out[0] == &items[0] {
+			out = slices.Clone(items)
+		}
+		out[i].Result = &llm.ToolResult{CallID: held.CallID, Output: output}
+	}
+	return out
+}
+
+func compact(output json.RawMessage, limit int) (json.RawMessage, bool) {
+	value, err := decoded(output)
+	if err != nil {
+		return output, false
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return output, false
+	}
+
+	fenced, marked := object[agentapp.UntrustedMarker].(bool)
+	data, wrapped := object[agentapp.UntrustedData].(map[string]any)
+	if !marked || !fenced || !wrapped {
+		capped, cut := agentapp.Cap(object, limit)
+		return reencoded(output, capped, cut)
+	}
+
+	capped, cut := agentapp.Cap(data, limit)
+	return reencoded(output, agentapp.Fence(capped), cut)
+}
+
+func reencoded(original json.RawMessage, value map[string]any, cut bool) (json.RawMessage, bool) {
+	if !cut {
+		return original, false
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return original, false
+	}
+	return encoded, true
+}
+
+func trim(items []llm.Message, budget int) []llm.Message {
+	if len(items) == 0 || budget <= 0 {
+		return items
+	}
+
+	suffixes := suffixSizes(items)
+	if suffixes[0] <= budget {
+		return items
+	}
+
+	starts := turnStarts(items)
+	if len(starts) == 0 {
+		return nil
+	}
+	for _, start := range starts[:len(starts)-1] {
+		if suffixes[start] <= budget {
+			return items[start:]
 		}
 	}
-	return from(history, newest)
+	return items[starts[len(starts)-1]:]
 }
 
-func from(history *gollem.History, start int) *gollem.History {
-	return &gollem.History{LLType: history.LLType, Version: history.Version, Messages: history.Messages[start:]}
-}
-
-func size(history *gollem.History) int {
-	encoded, err := json.Marshal(history)
-	if err != nil {
-		return 0
-	}
-	return len(encoded)
-}
-
-func suffixSizes(messages []gollem.Message) []int {
-	sizes := make([]int, len(messages)+1)
-	for i := len(messages) - 1; i >= 0; i-- {
-		encoded, err := json.Marshal(messages[i])
+func suffixSizes(items []llm.Message) []int {
+	sizes := make([]int, len(items)+1)
+	for i := len(items) - 1; i >= 0; i-- {
+		encoded, err := json.Marshal(items[i])
 		if err != nil {
 			sizes[i] = sizes[i+1]
 			continue
@@ -158,22 +192,12 @@ func suffixSizes(messages []gollem.Message) []int {
 	return sizes
 }
 
-func turnStarts(messages []gollem.Message) []int {
-	starts := make([]int, 0, len(messages))
-	for i := range messages {
-		if messages[i].Role != gollem.RoleUser || carriesToolResponse(messages[i]) {
-			continue
+func turnStarts(items []llm.Message) []int {
+	starts := make([]int, 0, len(items))
+	for i := range items {
+		if items[i].Role == llm.RoleDeveloper {
+			starts = append(starts, i)
 		}
-		starts = append(starts, i)
 	}
 	return starts
-}
-
-func carriesToolResponse(message gollem.Message) bool {
-	for _, content := range message.Contents {
-		if content.Type == gollem.MessageContentTypeToolResponse {
-			return true
-		}
-	}
-	return false
 }

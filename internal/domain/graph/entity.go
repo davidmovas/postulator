@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -51,7 +52,7 @@ const (
 	AnchorAI   AnchorSource = "ai"
 )
 
-func (s AnchorSource) Valid() bool {
+func (s AnchorSource) valid() bool {
 	switch s {
 	case AnchorUser, AnchorAI:
 		return true
@@ -67,19 +68,19 @@ type Anchor struct {
 }
 
 type Entity struct {
-	ID                string
-	SiteID            string
-	Name              string
-	Kind              Kind
-	Intent            string
-	PrimaryKeyword    string
-	SecondaryKeywords []string
-	Anchors           []Anchor
-	CanonicalPageID   *string
-	Score             float64
-	Source            Source
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID              string
+	SiteID          string
+	Name            string
+	Kind            Kind
+	Intent          string
+	Keywords        keyword.List
+	Anchors         []Anchor
+	ScopeID         *string
+	CanonicalPageID *string
+	Score           float64
+	Source          Source
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 func invalid(message, field string) *errors.Error {
@@ -89,7 +90,6 @@ func invalid(message, field string) *errors.Error {
 func NewEntity(e Entity) (Entity, error) {
 	e.Name = strings.TrimSpace(e.Name)
 	e.Intent = strings.TrimSpace(e.Intent)
-	e.PrimaryKeyword = strings.TrimSpace(e.PrimaryKeyword)
 
 	switch {
 	case e.ID == "":
@@ -106,10 +106,14 @@ func NewEntity(e Entity) (Entity, error) {
 		return Entity{}, invalid("entity score must not be negative", "score")
 	case e.CanonicalPageID != nil && *e.CanonicalPageID == "":
 		return Entity{}, invalid("canonical page id must not be empty when set", "canonicalPageId")
+	case e.ScopeID != nil && *e.ScopeID == "":
+		return Entity{}, invalid("the entity a name sits under must not be empty when set", "scopeId")
+	case e.ScopeID != nil && *e.ScopeID == e.ID:
+		return Entity{}, invalid("an entity cannot sit under itself", "scopeId")
 	}
 
-	e.SecondaryKeywords = CleanKeywords(e.SecondaryKeywords)
-	anchors, err := NewAnchors(e.Anchors)
+	e.Keywords = keyword.New(e.Keywords)
+	anchors, err := newAnchors(e.Anchors)
 	if err != nil {
 		return Entity{}, err
 	}
@@ -117,25 +121,7 @@ func NewEntity(e Entity) (Entity, error) {
 	return e, nil
 }
 
-func CleanKeywords(raw []string) []string {
-	out := make([]string, 0, len(raw))
-	seen := make(map[string]struct{}, len(raw))
-	for _, keyword := range raw {
-		trimmed := strings.TrimSpace(keyword)
-		if trimmed == "" {
-			continue
-		}
-		key := strings.ToLower(trimmed)
-		if _, dup := seen[key]; dup {
-			continue
-		}
-		seen[key] = struct{}{}
-		out = append(out, trimmed)
-	}
-	return out
-}
-
-func NewAnchors(anchors []Anchor) ([]Anchor, error) {
+func newAnchors(anchors []Anchor) ([]Anchor, error) {
 	out := make([]Anchor, 0, len(anchors))
 	seen := make(map[string]struct{}, len(anchors))
 	for i, anchor := range anchors {
@@ -144,16 +130,15 @@ func NewAnchors(anchors []Anchor) ([]Anchor, error) {
 		switch {
 		case anchor.Text == "":
 			return nil, invalid("anchor text must not be empty", field+".text")
-		case !anchor.Source.Valid():
+		case !anchor.Source.valid():
 			return nil, invalid("anchor source is not recognized", field+".source")
 		case anchor.Weight < 0 || anchor.Weight > 1:
 			return nil, invalid("anchor weight must be between 0 and 1", field+".weight")
 		}
-		key := strings.ToLower(anchor.Text)
-		if _, dup := seen[key]; dup {
+		if _, dup := seen[Key(anchor.Text)]; dup {
 			return nil, invalid("anchor text is repeated", field+".text")
 		}
-		seen[key] = struct{}{}
+		seen[Key(anchor.Text)] = struct{}{}
 		out = append(out, anchor)
 	}
 	return out, nil

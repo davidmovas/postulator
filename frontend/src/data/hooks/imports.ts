@@ -7,7 +7,6 @@ import {
     inspectSheet,
     listMappings,
     previewSheet,
-    saveMapping,
 } from "../endpoints/imports.js";
 import { keys } from "../keys.js";
 import { useUnlockedQuery } from "../query.js";
@@ -27,6 +26,23 @@ export function useInspectSheet() {
         onSuccess: (answered, request) => {
             client.setQueryData(keys.imports.inspect(request.siteId, request.path), answered);
         },
+    });
+}
+
+interface SheetSampleRequest {
+    siteId: string;
+    path: string;
+    sheet: string;
+    noHeader: boolean;
+}
+
+export function useSheetSample(request: SheetSampleRequest, enabled: boolean) {
+    const { siteId, path, sheet, noHeader } = request;
+    return useUnlockedQuery({
+        queryKey: [...keys.imports.inspect(siteId, path), sheet, noHeader],
+        queryFn: ({ signal }) => inspectSheet({ siteId, path, sheets: sheet === "" ? [] : [sheet], noHeader }, signal),
+        enabled: enabled && siteId !== "" && path !== "",
+        refetchOnWindowFocus: false,
     });
 }
 
@@ -59,16 +75,6 @@ export function useApplySheet() {
 export function useExportSite() {
     return useMutation({
         mutationFn: (request: Parameters<typeof exportSite>[0]) => exportSite(request),
-    });
-}
-
-export function useSaveMapping() {
-    const client = useQueryClient();
-    return useMutation({
-        mutationFn: (request: Parameters<typeof saveMapping>[0]) => saveMapping(request),
-        onSuccess: () => {
-            void client.invalidateQueries({ queryKey: keys.imports.mappingsAll() });
-        },
     });
 }
 

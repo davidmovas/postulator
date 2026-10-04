@@ -301,6 +301,50 @@ func TestProposeRelatedConnectsExistingEntities(t *testing.T) {
 	}
 }
 
+func TestProposeRelatedTellsSharedNamesApartByTheirParents(t *testing.T) {
+	t.Parallel()
+
+	reply := `{"edges":[
+		{"from":"BPC-157 Liquid","to":"TB-500 Liquid","weight":0.6,"reason":"the same form of two compounds"},
+		{"from":"Liquid","to":"Powder","weight":0.5,"reason":"a bare name that two entities share"}
+	]}`
+	f := newProposeFixture(t, &scriptedModel{replies: []string{reply}}, fixedProfiles{})
+	entities := sqlite.NewEntityRepo(f.store)
+	underParent := func(name string, parent graphdomain.Entity) graphdomain.Entity {
+		entity := sqlitetest.Entity(t, f.store, f.siteID, name)
+		if err := entities.SetScope(t.Context(), entity.ID, &parent.ID, sqlitetest.Stamp); err != nil {
+			t.Fatalf("put %s under %s: %v", name, parent.Name, err)
+		}
+		return entity
+	}
+	bpc := sqlitetest.Entity(t, f.store, f.siteID, "BPC-157")
+	tb := sqlitetest.Entity(t, f.store, f.siteID, "TB-500")
+	bpcLiquid, tbLiquid := underParent("Liquid", bpc), underParent("Liquid", tb)
+	underParent("Powder", bpc)
+
+	out, err := f.service.ProposeRelated(t.Context(), appgraph.ProposeRelatedRequest{SiteID: f.siteID, EntityID: bpcLiquid.ID})
+	if err != nil {
+		t.Fatalf("ProposeRelated: %v", err)
+	}
+	prompt := f.model.calls[0].Messages[0].Text
+	for _, want := range []string{"Propose pairs that involve BPC-157 Liquid.", "- BPC-157 Liquid (topic)", "- TB-500 Liquid (topic)", "- Powder (topic)"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "- Liquid (") {
+		t.Fatalf("the prompt lists a bare shared name:\n%s", prompt)
+	}
+
+	if len(out.Edges) != 1 || out.Skipped != 1 {
+		t.Fatalf("response = %+v, want the labeled pair and the bare name skipped", out)
+	}
+	ends := []string{out.Edges[0].FromEntityID, out.Edges[0].ToEntityID}
+	if !slices.Contains(ends, bpcLiquid.ID) || !slices.Contains(ends, tbLiquid.ID) {
+		t.Fatalf("the edge joins %v, want the two Liquids", ends)
+	}
+}
+
 func TestProposeRelatedClipsATalkativeReason(t *testing.T) {
 	t.Parallel()
 
@@ -393,6 +437,18 @@ func TestProposalsNameTheStepTheySpendOn(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name:  "from the keywords",
+			reply: keywordProposal,
+			want:  appgraph.NameProposeFromKeywords,
+			run: func(t *testing.T, f proposeFixture) error {
+				t.Helper()
+				_, err := f.service.ProposeFromKeywords(t.Context(), appgraph.ProposeFromKeywordsRequest{
+					SiteID: f.siteID, Keywords: []string{"trail running shoes"},
+				})
+				return err
+			},
+		},
 	}
 
 	for _, tc := range cases {
@@ -407,9 +463,24 @@ func TestProposalsNameTheStepTheySpendOn(t *testing.T) {
 			if len(model.calls) == 0 {
 				t.Fatal("the model was never called")
 			}
-			if step := model.calls[0].Meta.Step; step != tc.want {
-				t.Errorf("step = %q, want %q; the ledger and the harness both key on it", step, tc.want)
+			for _, call := range model.calls {
+				if call.Meta.Step != tc.want {
+					t.Errorf("step = %q, want %q; the ledger and the harness both key on it", call.Meta.Step, tc.want)
+				}
+				if call.Meta.Role != domainllm.RoleEditor {
+					t.Errorf("role = %q, want the editor, whose effort and tier the call is sent on", call.Meta.Role)
+				}
 			}
 		})
+	}
+}
+
+func TestTheProposalStepsAreTheOnesTheSpendReportCountsAsGraphWork(t *testing.T) {
+	t.Parallel()
+
+	for _, step := range []string{appgraph.NameProposeFromPages, appgraph.NameProposeFromKeywords, appgraph.NameProposeRelated} {
+		if purpose := domainllm.PurposeOf("", step); purpose != domainllm.PurposeGraph {
+			t.Errorf("%s is counted as %q, want graph", step, purpose)
+		}
 	}
 }

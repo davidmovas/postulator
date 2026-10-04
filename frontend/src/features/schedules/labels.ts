@@ -1,9 +1,6 @@
 import { copy } from "../../copy/index.js";
 import { actors, isOneOf, pageStatuses, publishModes } from "../../generated/vocab.js";
-
-export function pageStatusLabel(status: string): string {
-    return isOneOf(pageStatuses, status) ? copy.schedules.statuses[status] : status;
-}
+import { pageStatusLabel } from "../pages/labels.js";
 
 export function publishLabel(mode: string): string {
     return isOneOf(publishModes, mode) ? copy.schedules.publishModes[mode] : mode;
@@ -15,7 +12,7 @@ export function actorLabel(actor: string): string {
 
 export function targetsSentence(status: string, limit: number, entityName: string): string {
     const capped = limit > 0 ? limit : 500;
-    const named = isOneOf(pageStatuses, status) ? copy.schedules.statuses[status].toLowerCase() : "";
+    const named = isOneOf(pageStatuses, status) ? pageStatusLabel(status).toLowerCase() : "";
     if (named !== "" && entityName !== "") {
         return copy.schedules.targets.both(capped, named, entityName);
     }

@@ -32,6 +32,26 @@ describe("diffRows", () => {
         expect(rows[0].here).toBe("3%");
     });
 
+    it("names the product outputs a layer adds, changes or drops, and reverts to the layer below", () => {
+        const below = blankDraft();
+        const outputs = {
+            shortEnabled: true,
+            shortIntent: "",
+            shortWords: 40,
+            shortKeyword: false,
+            specifications: [{ name: "Form", intent: "" }],
+        };
+        const added = diffRows(below, { ...below, product: outputs });
+        expect(added.map((row) => row.key)).toEqual(["product"]);
+        expect(added[0].below).toBe(copy.templates.product.none);
+        expect(added[0].here).toBe(copy.templates.product.summary(true, 1));
+        expect(applied(below, added).product).toBeNull();
+
+        const changed = diffRows({ ...below, product: outputs }, { ...below, product: { ...outputs, specifications: [] } });
+        expect(changed[0].here).toBe(copy.templates.product.summary(true, 0));
+        expect(applied(below, changed).product?.specifications).toEqual([{ name: "Form", intent: "" }]);
+    });
+
     it("counts the sections rather than listing them", () => {
         const below = blankDraft();
         const here: SpecDraft = { ...below, sections: [...below.sections, ...below.sections] };
@@ -88,7 +108,7 @@ describe("diffRows", () => {
             tone: "plain",
             featuredImage: true,
             imageSource: "ai",
-            profiles: [{ role: "judge", provider: "anthropic", model: "claude-opus-4.1" }],
+            profiles: [{ role: "judge", provider: "openai", model: "gpt-5.6-sol" }],
             recipe: below.recipe.map((step) => (step.name === "publish" ? { ...step, enabled: false } : step)),
             sections: [],
         };

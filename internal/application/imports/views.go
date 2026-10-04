@@ -3,6 +3,7 @@ package imports
 import (
 	"slices"
 
+	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -33,10 +34,22 @@ const (
 	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
 	CodeUnknownWPType     FindingCode = "unknown_wp_type"
 	CodeRootPageSkipped   FindingCode = "root_page_skipped"
+	CodeBadVolume         FindingCode = "bad_volume"
+	CodeUnknownOwnEntity  FindingCode = "unknown_own_entity"
+	CodeTechnicalParent   FindingCode = "technical_parent"
+	CodeGroupWithoutPage  FindingCode = "group_without_page"
+	CodeAmbiguousParent   FindingCode = "ambiguous_parent"
+	CodeAmbiguousEntity   FindingCode = "ambiguous_entity"
+	CodeProductNotInStore FindingCode = "product_not_in_store"
+	CodeProductRowLeft    FindingCode = "product_row_left"
+	CodeWPTypeKept        FindingCode = "wp_type_kept"
+	CodeIntermediateLevel FindingCode = "intermediate_level"
+	CodeScopeClash        FindingCode = "scope_clash"
 )
 
 var blockingFindingCodes = []FindingCode{
-	CodeBadPath, CodeUnknownParent, CodeUnknownRelated, CodeSelfEdge, CodeCycle,
+	CodeBadPath, CodeUnknownParent, CodeUnknownRelated, CodeSelfEdge, CodeCycle, CodeAmbiguousParent, CodeAmbiguousEntity,
+	CodeScopeClash,
 }
 
 func (c FindingCode) Blocking() bool {
@@ -44,19 +57,22 @@ func (c FindingCode) Blocking() bool {
 }
 
 type Options struct {
-	PathPrefixStrip  string   `json:"pathPrefixStrip,omitempty" description:"Remove this prefix from every path in the sheet, such as a domain the export wrote in"`
-	KeywordSeparator string   `json:"keywordSeparator,omitempty" description:"What separates several keywords inside one cell, a comma by default"`
-	AnchorSeparator  string   `json:"anchorSeparator,omitempty" description:"What separates several anchors inside one cell, a comma by default"`
-	ListSeparator    string   `json:"listSeparator,omitempty" description:"What separates any other list inside one cell, a comma by default"`
-	Sheets           []string `json:"sheets,omitempty" description:"Which sheets of the workbook to read, exactly as inspect named them; leave it out for the first sheet alone"`
-	IndentColumns    []string `json:"indentColumns,omitempty" description:"Columns whose position carries the hierarchy, shallowest first; a row's path is built from the cells of its own column and of the columns to its left"`
-	NoHeader         bool     `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter and every row is data"`
+	PathPrefixStrip string            `json:"pathPrefixStrip,omitempty" description:"Prefix to strip from every path, such as a domain"`
+	AnchorSeparator string            `json:"anchorSeparator,omitempty" description:"Anchor separator in a cell; default comma"`
+	ListSeparator   string            `json:"listSeparator,omitempty" description:"Other list separator in a cell; default comma"`
+	Sheets          []string          `json:"sheets,omitempty" description:"Sheet names to read; default the first"`
+	IndentColumns   []string          `json:"indentColumns,omitempty" description:"Columns whose position nests the path, shallowest first"`
+	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Root Entity or Root group columns, outermost first"`
+	NoteColumns     []string          `json:"noteColumns,omitempty" description:"Columns kept as notes for the writer"`
+	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"Default pages; a parent of products stays a page, a wp_type cell wins"`
+	NoHeader        bool              `json:"noHeader,omitempty" description:"No header row: columns go by letter, every row is data"`
 }
 
 type Sheet struct {
-	Name    string   `json:"name"`
-	Headers []string `json:"headers"`
-	Rows    int      `json:"rows"`
+	Name     string   `json:"name"`
+	Headers  []string `json:"headers"`
+	Rows     int      `json:"rows"`
+	Detected Mapping  `json:"detected"`
 }
 
 type Mapping struct {
@@ -78,30 +94,57 @@ type Finding struct {
 }
 
 type PreviewPage struct {
-	Path            string   `json:"path"`
-	Title           string   `json:"title"`
-	H1              string   `json:"h1,omitempty"`
-	MetaTitle       string   `json:"metaTitle,omitempty"`
-	MetaDescription string   `json:"metaDescription,omitempty"`
-	PrimaryKeyword  string   `json:"primaryKeyword,omitempty"`
-	Keywords        []string `json:"keywords"`
-	WPType          string   `json:"wpType"`
-	PageKind        string   `json:"pageKind,omitempty"`
-	Entity          string   `json:"entity,omitempty"`
-	Action          string   `json:"action"`
-	Generated       bool     `json:"generated,omitempty"`
+	Sheet           string        `json:"sheet,omitempty"`
+	Path            string        `json:"path"`
+	PlannedPath     string        `json:"plannedPath,omitempty"`
+	StoreName       string        `json:"storeName,omitempty"`
+	MatchedBy       string        `json:"matchedBy,omitempty"`
+	Title           string        `json:"title"`
+	H1              string        `json:"h1,omitempty"`
+	MetaTitle       string        `json:"metaTitle,omitempty"`
+	MetaDescription string        `json:"metaDescription,omitempty"`
+	Keywords        []dto.Keyword `json:"keywords"`
+	WPType          string        `json:"wpType"`
+	PageKind        string        `json:"pageKind,omitempty"`
+	Entity          string        `json:"entity,omitempty"`
+	Action          string        `json:"action"`
+	Generated       bool          `json:"generated,omitempty"`
 }
 
 type PreviewEntity struct {
-	Name           string   `json:"name"`
-	Kind           string   `json:"kind"`
-	PrimaryKeyword string   `json:"primaryKeyword,omitempty"`
-	Keywords       []string `json:"keywords"`
-	Anchors        []string `json:"anchors"`
-	Action         string   `json:"action"`
+	Sheet    string        `json:"sheet,omitempty"`
+	Name     string        `json:"name"`
+	Parent   string        `json:"parent,omitempty"`
+	Kind     string        `json:"kind"`
+	Keywords []dto.Keyword `json:"keywords"`
+	Anchors  []string      `json:"anchors"`
+	Action   string        `json:"action"`
+}
+
+type PreviewColumn struct {
+	Sheet  string `json:"sheet,omitempty"`
+	Header string `json:"header"`
+	Use    string `json:"use"`
+	Field  string `json:"field,omitempty"`
+}
+
+func columnViews(sheet string, uses []importmap.ColumnUse) []PreviewColumn {
+	out := make([]PreviewColumn, 0, len(uses))
+	for _, use := range uses {
+		out = append(out, PreviewColumn{Sheet: sheet, Header: use.Header, Use: string(use.Use), Field: string(use.Field)})
+	}
+	return out
+}
+
+type PreviewGroup struct {
+	Sheet string   `json:"sheet,omitempty"`
+	Path  []string `json:"path"`
+	Page  string   `json:"page,omitempty"`
+	Rows  int      `json:"rows"`
 }
 
 type PreviewEdge struct {
+	Sheet  string `json:"sheet,omitempty"`
 	From   string `json:"from"`
 	To     string `json:"to"`
 	Kind   string `json:"kind"`
@@ -116,8 +159,10 @@ type Conflict struct {
 }
 
 type PreviewReport struct {
+	Columns         []PreviewColumn `json:"columns"`
 	Pages           []PreviewPage   `json:"pages"`
 	Entities        []PreviewEntity `json:"entities"`
+	Groups          []PreviewGroup  `json:"groups"`
 	Edges           []PreviewEdge   `json:"edges"`
 	Warnings        []Finding       `json:"warnings"`
 	Errors          []Finding       `json:"errors"`
@@ -150,16 +195,12 @@ func mappingView(m importmap.Mapping) Mapping {
 	}
 }
 
-func sheetViews(list []importmap.SheetInfo) []Sheet {
-	out := make([]Sheet, 0, len(list))
-	for i := range list {
-		headers := list[i].Headers
-		if headers == nil {
-			headers = []string{}
-		}
-		out = append(out, Sheet{Name: list[i].Name, Headers: headers, Rows: list[i].Rows})
+func sheetView(info importmap.SheetInfo, detected importmap.Mapping) Sheet {
+	headers := info.Headers
+	if headers == nil {
+		headers = []string{}
 	}
-	return out
+	return Sheet{Name: info.Name, Headers: headers, Rows: info.Rows, Detected: mappingView(detected)}
 }
 
 func mappingViews(list []importmap.Mapping) []Mapping {
@@ -189,11 +230,17 @@ func conflictView(evidence pagemap.Evidence) Conflict {
 }
 
 func (r *PreviewReport) settle() {
+	if r.Columns == nil {
+		r.Columns = []PreviewColumn{}
+	}
 	if r.Pages == nil {
 		r.Pages = []PreviewPage{}
 	}
 	if r.Entities == nil {
 		r.Entities = []PreviewEntity{}
+	}
+	if r.Groups == nil {
+		r.Groups = []PreviewGroup{}
 	}
 	if r.Edges == nil {
 		r.Edges = []PreviewEdge{}
@@ -209,37 +256,37 @@ func (r *PreviewReport) settle() {
 	}
 }
 
-func listOf(values []string) []string {
-	if values == nil {
-		return []string{}
-	}
-	return values
-}
-
-func entityView(e graph.Entity, action Action) PreviewEntity {
+func entityView(sheet string, e graph.Entity, parent string, action Action) PreviewEntity {
 	return PreviewEntity{
-		Name:           e.Name,
-		Kind:           string(e.Kind),
-		PrimaryKeyword: e.PrimaryKeyword,
-		Keywords:       listOf(e.SecondaryKeywords),
-		Anchors:        anchorTexts(e.Anchors),
-		Action:         string(action),
+		Sheet:    sheet,
+		Name:     e.Name,
+		Parent:   parent,
+		Kind:     string(e.Kind),
+		Keywords: application.KeywordViews(e.Keywords),
+		Anchors:  anchorTexts(e.Anchors),
+		Action:   string(action),
 	}
 }
 
-func pageView(p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
-	return PreviewPage{
+func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
+	view := PreviewPage{
+		Sheet:           sheet,
 		Path:            p.Path,
+		PlannedPath:     p.PlannedPath,
+		MatchedBy:       string(draft.matchedBy),
 		Title:           p.Title,
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
-		PrimaryKeyword:  p.PrimaryKeyword,
-		Keywords:        listOf(p.Keywords),
+		Keywords:        application.KeywordViews(p.Keywords),
 		WPType:          string(p.WPType),
 		PageKind:        draft.pageKind,
 		Entity:          draft.entity,
 		Action:          string(action),
 		Generated:       draft.generated,
 	}
+	if p.WPType == pagemap.WPProduct && p.WPID != nil {
+		view.StoreName = p.Observed.Title
+	}
+	return view
 }

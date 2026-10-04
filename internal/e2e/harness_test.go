@@ -20,6 +20,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/app"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
@@ -30,6 +31,8 @@ const (
 	guideJudge = `{"score":0.9,"issues":[],"suggestions":["Add a photograph of the plated dish."]}`
 
 	repairSentence = `{"sentence":"It sits on our menu next to the other main courses we serve."}`
+
+	scriptedProviderKey = "the-scripted-provider-needs-no-real-key"
 )
 
 type target struct {
@@ -361,7 +364,33 @@ func openCoreWith(t *testing.T, provider llmport.Client) *app.Core {
 			t.Errorf("close the application: %v", closeErr)
 		}
 	})
+	keyTheProviders(t, core)
 	return core
+}
+
+func keyTheProviders(t *testing.T, core *app.Core) {
+	t.Helper()
+
+	profiles, err := core.Models.GetProfiles(t.Context(), models.GetProfilesRequest{})
+	if err != nil {
+		t.Fatalf("read the model profiles: %v", err)
+	}
+	keyed := make(map[string]struct{}, len(profiles.Profiles))
+	for _, profile := range profiles.Profiles {
+		if profile.Effective == nil {
+			continue
+		}
+		provider := profile.Effective.Provider
+		if _, done := keyed[provider]; done {
+			continue
+		}
+		keyed[provider] = struct{}{}
+		if _, keyErr := core.Models.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+			Provider: provider, APIKey: scriptedProviderKey,
+		}); keyErr != nil {
+			t.Fatalf("give the provider %s a key: %v", provider, keyErr)
+		}
+	}
 }
 
 func waitFor(t *testing.T, what string, done func() bool) {

@@ -1,38 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { Page, PageTreeNode } from "../../../data/types.js";
+import { aPage } from "../../../testing/pages.js";
 import { branchOf, everyPage, indexTree, narrowTree, tick, toggled } from "./model.js";
-
-function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
-    return {
-        id,
-        siteId: "s1",
-        path,
-        slug: "",
-        parentPageId: null,
-        wpType: "page",
-        wpId: null,
-        title: `Title ${id}`,
-        h1: "",
-        metaTitle: "",
-        metaDescription: "",
-        canonical: "",
-        primaryKeyword: "",
-        keywords: [],
-        status: "planned",
-        entityId: null,
-        templateId: null,
-        contentHash: "",
-        observed: { link: "", slug: "", status: "", title: "", h1: "" },
-        mismatches: [],
-        wpModifiedAt: null,
-        lastSyncedAt: null,
-        drift: false,
-        createdAt: "2026-09-24T09:00:00Z",
-        updatedAt: "2026-09-24T09:00:00Z",
-        ...overrides,
-    };
-}
 
 const roots: PageTreeNode[] = [
     {

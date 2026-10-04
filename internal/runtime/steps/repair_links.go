@@ -72,7 +72,7 @@ func RepairLinks(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc)
+			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -80,19 +80,19 @@ func RepairLinks(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			ref, err := deps.Profiles.Resolve(ctx, sc.Run.SiteID, domainllm.RoleLinker, sc.Spec.ModelProfiles)
+			call, err := modelFor(ctx, deps, sc, NameRepairLinks, domainllm.RoleLinker)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			linker := sentenceWriter{deps: deps, sc: sc, entity: entity, ref: ref, tries: iterationsOf(sc)}
+			linker := sentenceWriter{deps: deps, sc: sc, entity: entity, call: call, tries: iterationsOf(sc)}
 			findings := make([]content.Finding, 0)
 			settled := make(map[string]struct{})
 			tokens, written := 0, 0
 
 			result := content.InsertLinks(doc, lc, policy)
 			for {
-				owed, ok := nextOwed(doc, result, policy, sc.Spec, entity, settled)
+				owed, ok := nextOwed(doc, result, policy, sc.Spec, pagemap.Keywords(sc.Page, entity).Main(), settled)
 				if !ok {
 					break
 				}
@@ -155,8 +155,7 @@ func iterations(params map[string]any) int {
 }
 
 func nextOwed(doc *content.Document, result content.InsertResult, policy template.LinkPolicy,
-	spec template.TemplateSpec, entity graph.Entity, settled map[string]struct{}) (owedPhrase, bool) {
-	primary := strings.TrimSpace(entity.PrimaryKeyword)
+	spec template.TemplateSpec, primary string, settled map[string]struct{}) (owedPhrase, bool) {
 	if spec.KeywordRules.PrimaryInFirstParagraph && primary != "" {
 		if _, done := settled[primary]; !done && !leadCarries(doc, primary) {
 			return owedPhrase{text: primary, why: leadWhy, lead: true}, true
@@ -238,7 +237,7 @@ type sentenceWriter struct {
 	deps   Deps
 	sc     *run.StepContext
 	entity graph.Entity
-	ref    domainllm.ModelRef
+	call   modelCall
 	tries  int
 }
 
@@ -248,20 +247,14 @@ func (w sentenceWriter) write(ctx context.Context, doc *content.Document, owed o
 			return "", used, stoppedWhileWriting(err, owed)
 		}
 
-		system, user, renderErr := render(NameRepairLinks, repairPrompt{
+		request, renderErr := stepRequest(w.sc, w.call, repairPrompt{
 			Page: w.sc.Page, Entity: w.entity, Phrase: owed.text, Why: owed.why, Paragraph: contextParagraph(doc, owed.index),
-		})
+		}, repairTokens)
 		if renderErr != nil {
 			return "", used, renderErr
 		}
 
-		response, usage, callErr := port.Structured[content.RepairResponse](ctx, w.deps.LLM, port.Request{
-			Ref:       w.ref,
-			System:    system,
-			Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-			MaxTokens: repairTokens,
-			Meta:      callMeta(w.sc, NameRepairLinks),
-		})
+		response, usage, callErr := port.Structured[content.RepairResponse](ctx, w.deps.LLM, request)
 		used += usage.Total
 		if callErr != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {

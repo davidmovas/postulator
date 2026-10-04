@@ -88,14 +88,13 @@ func TestTemplateRepoRoundTrip(t *testing.T) {
 func TestAStoredEarlierBuiltInReadsBackAsShipped(t *testing.T) {
 	t.Parallel()
 
-	store := sqlitetest.Open(t)
-	repo := sqlite.NewTemplateRepo(store)
 	current := make(map[string]template.Template)
 	for _, seed := range template.Seed() {
 		current[seed.Name] = seed
 	}
 
 	for _, earlier := range template.Superseded() {
+		repo := sqlite.NewTemplateRepo(sqlitetest.Open(t))
 		record := earlier
 		record.ID = id.New()
 		record.CreatedAt = sqlitetest.Stamp

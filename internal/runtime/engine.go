@@ -27,6 +27,7 @@ type Deps struct {
 	Spend      spendReader
 	Catalog    modelCatalog
 	Profiles   profileResolver
+	Tuning     modelTuning
 	UnitOfWork unitOfWork
 	Publisher  publisher
 }
@@ -91,7 +92,7 @@ func (e *Engine) Start(ctx context.Context) error {
 	e.wg.Add(1)
 	go e.keeper(base)
 
-	if err := e.Recover(ctx); err != nil {
+	if err := e.sweep(ctx); err != nil {
 		return err
 	}
 	e.nudge()

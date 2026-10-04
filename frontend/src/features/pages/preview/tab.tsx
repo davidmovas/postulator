@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { failure, needsPlugin, pluginCodeOf, react } from "../../../data/errors.js";
@@ -22,6 +22,7 @@ import {
     SkeletonRows,
     StatusBadge,
     TabletIcon,
+    useNow,
 } from "../../../ui/index.js";
 import type { SegmentedOption } from "../../../ui/index.js";
 import type { PreviewState, Viewport } from "./model.js";
@@ -46,19 +47,6 @@ const blocked: Readonly<Record<string, { title: string; body: string }>> = {
     archived: { title: copy.pages.preview.archived, body: copy.pages.preview.archivedBody },
 };
 
-function useNow(): number {
-    const [now, setNow] = useState(() => Date.now());
-    useEffect(() => {
-        const timer = window.setInterval(() => {
-            setNow(Date.now());
-        }, tickMs);
-        return () => {
-            window.clearInterval(timer);
-        };
-    }, []);
-    return now;
-}
-
 function iconOf(state: PreviewState): typeof PreviewIcon {
     if (state === "draft-needs-plugin" || state === "draft-plugin-outdated") {
         return ExtensionOffIcon;
@@ -75,7 +63,7 @@ export function PreviewTab({ page, siteId }: PreviewTabProps): ReactElement {
     const said = copy.pages.preview;
     const site = useSite(siteId);
     const link = usePreviewLink(page);
-    const now = useNow();
+    const now = useNow(tickMs, true);
     const [viewport, setViewport] = useState<Viewport>("desktop");
 
     const state = previewState({ status: page.status, wpId: page.wpId }, site.data?.site.plugin ?? null);

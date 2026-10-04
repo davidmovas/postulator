@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -30,9 +31,13 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 			WithDetail("field", "entities")
 	}
 	for i := range req.Entities {
+		field := "entities[" + strconv.Itoa(i) + "]"
 		if strings.TrimSpace(req.Entities[i].Name) == "" {
 			return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a proposal needs a name").
-				WithDetail("field", "entities["+strconv.Itoa(i)+"].name")
+				WithDetail("field", field+".name")
+		}
+		if _, keywordsErr := application.KeywordList(req.Entities[i].Keywords, field+".keywords"); keywordsErr != nil {
+			return ApplyProposalsResponse{}, keywordsErr
 		}
 	}
 
@@ -49,7 +54,10 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 				return adoptErr
 			}
 		}
-		return s.connect(c, siteID, req.Entities, &state, &response, now)
+		if connectErr := s.connect(c, siteID, req.Entities, &state, &response, now); connectErr != nil {
+			return connectErr
+		}
+		return s.settleScopes(c, siteID)
 	})
 	if err != nil {
 		return ApplyProposalsResponse{}, err
@@ -83,20 +91,23 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 		}
 	}
 
-	entityID, exists := state.byName[fold(name)]
+	entityID, exists := state.byName[graphdomain.Key(name)]
 	if !exists {
+		keywords, keywordsErr := application.KeywordList(proposed.Keywords, "keywords")
+		if keywordsErr != nil {
+			return keywordsErr
+		}
 		entity, buildErr := graphdomain.NewEntity(graphdomain.Entity{
-			ID:                id.New(),
-			SiteID:            siteID,
-			Name:              name,
-			Kind:              kindOf(proposed.Kind),
-			Intent:            strings.TrimSpace(proposed.Intent),
-			PrimaryKeyword:    proposed.PrimaryKeyword,
-			SecondaryKeywords: proposed.SecondaryKeywords,
-			Anchors:           proposedAnchors(proposed.Anchors),
-			Source:            graphdomain.SourceAI,
-			CreatedAt:         now,
-			UpdatedAt:         now,
+			ID:        id.New(),
+			SiteID:    siteID,
+			Name:      name,
+			Kind:      kindOf(proposed.Kind),
+			Intent:    strings.TrimSpace(proposed.Intent),
+			Keywords:  keywords,
+			Anchors:   proposedAnchors(proposed.Anchors),
+			Source:    graphdomain.SourceAI,
+			CreatedAt: now,
+			UpdatedAt: now,
 		})
 		if buildErr != nil {
 			out.Skipped++
@@ -106,7 +117,8 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 			return insertErr
 		}
 		state.entities = append(state.entities, entity)
-		state.byName[fold(name)] = entity.ID
+		state.labels[entity.ID] = name
+		state.byName[graphdomain.Key(name)] = entity.ID
 		entityID = entity.ID
 		out.Entities = append(out.Entities, entityView(entity))
 	}
@@ -175,7 +187,7 @@ func (s *Service) connect(ctx context.Context, siteID string, proposals []Propos
 	out *ApplyProposalsResponse, now time.Time) error {
 	for i := range proposals {
 		proposed := &proposals[i]
-		from, known := state.byName[fold(proposed.Name)]
+		from, known := state.byName[graphdomain.Key(proposed.Name)]
 		if !known {
 			continue
 		}
@@ -215,7 +227,7 @@ func resolveRef(state *siteGraph, raw string) (string, bool) {
 	if entityID, ok := state.byPath[ref]; ok {
 		return entityID, true
 	}
-	entityID, ok := state.byName[fold(ref)]
+	entityID, ok := state.byName[graphdomain.Key(ref)]
 	return entityID, ok
 }
 

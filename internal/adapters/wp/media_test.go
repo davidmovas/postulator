@@ -86,37 +86,6 @@ func TestUploadMediaRefusesAnEmptyUpload(t *testing.T) {
 	}
 }
 
-func TestCategoriesAreListedAndCreated(t *testing.T) {
-	t.Parallel()
-
-	server := wptest.New(t)
-	server.SeedCategory(wptest.Category{Name: "Koffein", Description: "the hub"})
-	client := newClient(t, server)
-
-	listed, err := client.ListCategories(t.Context(), wp.ListQuery{})
-	if err != nil {
-		t.Fatalf("ListCategories: %v", err)
-	}
-	if listed.Total != 1 || len(listed.Items) != 1 || listed.Items[0].Name != "Koffein" {
-		t.Fatalf("listed = %+v", listed)
-	}
-
-	created, err := client.CreateCategory(t.Context(), wp.CreateCategory{Name: "Koffein", Description: "a second one"})
-	if err != nil {
-		t.Fatalf("CreateCategory: %v", err)
-	}
-	if created.Slug != "koffein-2" {
-		t.Errorf("slug = %q, want koffein-2", created.Slug)
-	}
-	if created.Description != "a second one" {
-		t.Errorf("description = %q", created.Description)
-	}
-
-	if _, err = client.CreateCategory(t.Context(), wp.CreateCategory{}); !errors.IsCode(err, errors.Invalid) {
-		t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Invalid)
-	}
-}
-
 func TestListMediaSearchesTheLibrary(t *testing.T) {
 	t.Parallel()
 

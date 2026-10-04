@@ -4,7 +4,7 @@ import { copy } from "../../copy/index.js";
 import { entityKinds } from "../../generated/vocab.js";
 import { Button, cx, LinkIcon, Segmented, Switch, Toolbar, toneClasses } from "../../ui/index.js";
 import type { SegmentedOption } from "../../ui/index.js";
-import { entityIcon, kindLabel, kindTone, lensHint, lensLabel, stateHint, stateLabel, stateTone } from "./labels.js";
+import { entityIcon, entityKindLabel, kindTone, lensHint, lensLabel, stateHint, stateLabel, stateTone } from "./labels.js";
 import { nodeStates } from "./model/index.js";
 import type { GraphIndex, NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
@@ -68,8 +68,8 @@ export function GraphToolbar({ index, query, proofBusy, focusSearch, onChange, o
                             key={kind}
                             type="button"
                             aria-pressed={active}
-                            title={kindLabel(kind)}
-                            aria-label={kindLabel(kind)}
+                            title={entityKindLabel(kind)}
+                            aria-label={entityKindLabel(kind)}
                             className={cx(
                                 "flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-100",
                                 active ? `bg-raised ${toneClasses[kindTone(kind)].ink}` : "text-ink-faint hover:bg-inset hover:text-ink-dim",

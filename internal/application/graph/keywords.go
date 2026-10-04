@@ -5,13 +5,16 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
-	NameProposeFromKeywords = "propose_from_keywords"
+	NameProposeFromKeywords = domainllm.StepProposeFromKeywords
 	KeywordsPerCall         = 40
 )
 
@@ -42,12 +45,11 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 	if err := requireSite(siteID); err != nil {
 		return ProposeFromKeywordsResponse{}, err
 	}
-	keywords := graphdomain.CleanKeywords(req.Keywords)
-	if len(keywords) == 0 {
+	given, _ := keyword.Parse(strings.Join(req.Keywords, "\n"))
+	if len(given) == 0 {
 		return ProposeFromKeywordsResponse{}, errors.New(errors.Invalid, "a proposal from keywords needs at least one keyword").
 			WithDetail("field", "keywords")
 	}
-
 	owner, err := s.sites.Get(ctx, siteID)
 	if err != nil {
 		return ProposeFromKeywordsResponse{}, err
@@ -63,11 +65,7 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 
 	parent := ""
 	if parentID := strings.TrimSpace(req.ParentEntityID); parentID != "" {
-		for i := range state.entities {
-			if state.entities[i].ID == parentID {
-				parent = state.entities[i].Name
-			}
-		}
+		parent = state.labels[parentID]
 		if parent == "" {
 			return ProposeFromKeywordsResponse{}, errors.New(errors.NotFound, "entity not found").
 				WithDetail("entityId", parentID)
@@ -75,7 +73,7 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 	}
 
 	response := ProposeFromKeywordsResponse{Entities: []ProposedEntity{}}
-	for batch := range slices.Chunk(keywords, KeywordsPerCall) {
+	for batch := range slices.Chunk(given.Texts(), KeywordsPerCall) {
 		system, user, renderErr := prompts.Render(NameProposeFromKeywords, keywordsPrompt{
 			SiteName: owner.Name, Parent: parent, Known: knownEntitiesOf(state), Keywords: batch,
 		})
@@ -88,7 +86,7 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 			System:    system,
 			Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 			MaxTokens: proposalTokens,
-			Meta:      llm.CallMeta{Step: NameProposeFromKeywords},
+			Meta:      proposalCall(NameProposeFromKeywords),
 		})
 		if callErr != nil {
 			return ProposeFromKeywordsResponse{}, callErr
@@ -97,9 +95,9 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 
 		for i := range proposal.Entities {
 			proposed := &proposal.Entities[i]
-			keyword := strings.TrimSpace(proposed.Keyword)
+			answered, known := given.Find(proposed.Keyword)
 			name := strings.TrimSpace(proposed.Name)
-			if name == "" || !containsFold(batch, keyword) {
+			if name == "" || !known {
 				response.Skipped++
 				continue
 			}
@@ -108,35 +106,38 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 				parentName = parent
 			}
 			response.Entities = append(response.Entities, ProposedEntity{
-				Name:              name,
-				Kind:              string(kindOf(proposed.Kind)),
-				Intent:            strings.TrimSpace(proposed.Intent),
-				PrimaryKeyword:    strings.ToLower(keyword),
-				SecondaryKeywords: graphdomain.CleanKeywords(proposed.SecondaryKeywords),
-				Anchors:           graphdomain.CleanKeywords(proposed.Anchors),
-				Parent:            parentName,
-				Related:           graphdomain.CleanKeywords(proposed.RelatedNames),
-				ExistingEntityID:  state.byName[fold(name)],
+				Name:             name,
+				Kind:             string(kindOf(proposed.Kind)),
+				Intent:           strings.TrimSpace(proposed.Intent),
+				Keywords:         application.KeywordViews(answeredKeywords(answered, proposed.SecondaryKeywords, given)),
+				Anchors:          graphdomain.Distinct(proposed.Anchors),
+				Parent:           parentName,
+				Related:          graphdomain.Distinct(proposed.RelatedNames),
+				ExistingEntityID: state.byName[graphdomain.Key(name)],
 			})
 		}
 	}
 	return response, nil
 }
 
+func answeredKeywords(answered keyword.Keyword, others []string, given keyword.List) keyword.List {
+	listed := make([]keyword.Keyword, 0, len(others)+1)
+	listed = append(listed, answered)
+	for _, other := range others {
+		if asked, known := given.Find(other); known {
+			listed = append(listed, asked)
+			continue
+		}
+		listed = append(listed, keyword.Keyword{Text: other})
+	}
+	return keyword.New(listed)
+}
+
 func knownEntitiesOf(state siteGraph) []knownEntity {
 	known := make([]knownEntity, 0, len(state.entities))
 	for i := range state.entities {
-		known = append(known, knownEntity{Name: state.entities[i].Name, Kind: string(state.entities[i].Kind)})
+		known = append(known, knownEntity{Name: state.labels[state.entities[i].ID], Kind: string(state.entities[i].Kind)})
 	}
 	slices.SortFunc(known, func(a, b knownEntity) int { return strings.Compare(a.Name, b.Name) })
 	return known
-}
-
-func containsFold(values []string, wanted string) bool {
-	for _, value := range values {
-		if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(wanted)) {
-			return true
-		}
-	}
-	return false
 }

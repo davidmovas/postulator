@@ -11,13 +11,13 @@ import (
 const runsStartName = "runs_start"
 
 type runsStartArgs struct {
-	PageIDs     []string `json:"pageIds" description:"The ids of the pages to work on, exactly as a read tool returned them"`
-	TemplateID  string   `json:"templateId,omitempty" description:"The template the pages move to, left out to keep each page's own"`
-	Steps       []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"The steps to run in order, left out to take the recipe of the resolved template"`
-	PublishMode string   `json:"publishMode,omitempty" enum:"draft,publish" description:"Whether the run leaves a draft in WordPress or publishes it; leave it out for draft"`
-	Kind        string   `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,repair,revert,custom" description:"What the run is for; leave it out and the steps decide"`
-	MaxUSD      float64  `json:"maxUsd,omitempty" minimum:"0" description:"Stop the run once it has spent this many dollars; leave it out for the configured ceiling"`
-	MaxTokens   int      `json:"maxTokens,omitempty" minimum:"0" description:"Stop the run once it has used this many tokens; leave it out for the configured ceiling"`
+	PageIDs     []string `json:"pageIds" description:"Page ids"`
+	TemplateID  string   `json:"templateId,omitempty" description:"Template id to move pages to; default their own"`
+	Steps       []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Steps in order; default the template's recipe"`
+	PublishMode string   `json:"publishMode,omitempty" enum:"draft,publish" description:"Default draft"`
+	Kind        string   `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,repair,revert,custom" description:"Run purpose; default from the steps"`
+	MaxUSD      float64  `json:"maxUsd,omitempty" minimum:"0" description:"Dollar ceiling; default configured"`
+	MaxTokens   int      `json:"maxTokens,omitempty" minimum:"0" description:"Token ceiling; default configured"`
 }
 
 func runsStart(deps Deps) Tool {

@@ -16,9 +16,7 @@ const (
 	messageColumns = `id, conversation_id, seq, role, text, tool, call_id, payload, created_at`
 	insertMessage  = `INSERT INTO messages (` + messageColumns + `)
 		SELECT ?, ?, coalesce(max(seq), 0) + 1, ?, ?, ?, ?, ?, ? FROM messages WHERE conversation_id = ?`
-	selectMessage     = `SELECT ` + messageColumns + ` FROM messages WHERE id = ?`
-	selectLatestSeq   = `SELECT coalesce(max(seq), 0) FROM messages WHERE conversation_id = ?`
-	selectMessagesAll = `SELECT ` + messageColumns + ` FROM messages WHERE conversation_id = ? ORDER BY seq`
+	selectMessage = `SELECT ` + messageColumns + ` FROM messages WHERE id = ?`
 )
 
 type MessageRepo struct {
@@ -41,42 +39,19 @@ func (r *MessageRepo) Append(ctx context.Context, m agent.Message) (agent.Messag
 	if err != nil {
 		return agent.Message{}, err
 	}
-	return r.Get(ctx, m.ID)
+	return r.get(ctx, m.ID)
 }
 
-func (r *MessageRepo) Get(ctx context.Context, id string) (agent.Message, error) {
+func (r *MessageRepo) get(ctx context.Context, id string) (agent.Message, error) {
 	return selectOne(ctx, r.store.execFrom(ctx), selectMessage, []any{id}, scanMessage, messageNotFound(id),
 		"read the message")
-}
-
-func (r *MessageRepo) ByConversation(ctx context.Context, conversationID string) ([]agent.Message, error) {
-	return selectAll(ctx, r.store.execFrom(ctx), selectMessagesAll, []any{conversationID}, scanMessage,
-		"read the conversation messages")
-}
-
-func (r *MessageRepo) LatestSeq(ctx context.Context, conversationID string) (int64, error) {
-	return selectOne(ctx, r.store.execFrom(ctx), selectLatestSeq, []any{conversationID}, scanSeq, nil,
-		"read the latest message sequence")
 }
 
 func (r *MessageRepo) List(ctx context.Context, q agent.MessageQuery, page paging.Request) (paging.List[agent.Message], error) {
 	builder := squirrel.Select(messageColumns).From("messages").
 		Where(squirrel.Eq{"conversation_id": q.ConversationID})
 
-	keyset := messageKeyset(q.Desc)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[agent.Message]{}, err
-	}
-	query, args, err := buildQuery(keyed, "messages")
-	if err != nil {
-		return paging.List[agent.Message]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanMessage, "list the messages")
-	if err != nil {
-		return paging.List[agent.Message]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, messageKeyset(q.Desc), page, scanMessage, "messages")
 }
 
 func messageKeyset(desc bool) paging.Keyset[agent.Message] {
@@ -95,14 +70,6 @@ func payloadOf(raw json.RawMessage) json.RawMessage {
 		return json.RawMessage("{}")
 	}
 	return raw
-}
-
-func scanSeq(rows *sql.Rows) (int64, error) {
-	var seq int64
-	if err := rows.Scan(&seq); err != nil {
-		return 0, err
-	}
-	return seq, nil
 }
 
 func scanMessage(rows *sql.Rows) (agent.Message, error) {

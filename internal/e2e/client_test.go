@@ -135,6 +135,10 @@ func assertEverySheetIsNamed(t *testing.T, core *app.Core, siteID string) {
 		if seen.Sheets[i].Rows == 0 {
 			t.Fatalf("the sheet %q reports no rows", seen.Sheets[i].Name)
 		}
+		if detected := seen.Sheets[i].Detected; !slices.Equal(detected.Options.Sheets, []string{seen.Sheets[i].Name}) ||
+			detected.Options.RowType == "" {
+			t.Fatalf("the sheet %q is detected as %+v, want its own mapping and row type", seen.Sheets[i].Name, detected)
+		}
 	}
 }
 
@@ -459,7 +463,7 @@ func take(t *testing.T, core *app.Core, live *site, siteID string) snapshot {
 		}
 		shot.served = append(shot.served, item.Path)
 
-		raw, err := client.GetRaw(t.Context(), int64(item.ID))
+		raw, err := client.GetRaw(t.Context(), wp.TypePage, int64(item.ID))
 		if err != nil {
 			t.Fatalf("read %s raw: %v", item.Path, err)
 		}
@@ -673,7 +677,8 @@ func relinkPutsOneStrippedLinkBack(t *testing.T, core *app.Core, siteID, path, r
 	page := pageAt(t, core, siteID, path)
 	client := wordpress(t, core, siteID)
 
-	before, err := client.GetRaw(t.Context(), *page.WPID)
+	itemType := wp.ItemType(page.WPType)
+	before, err := client.GetRaw(t.Context(), itemType, *page.WPID)
 	if err != nil {
 		t.Fatalf("read %s back raw: %v", path, err)
 	}
@@ -681,7 +686,7 @@ func relinkPutsOneStrippedLinkBack(t *testing.T, core *app.Core, siteID, path, r
 	if !found {
 		t.Fatalf("%s carries no link to %s to take away: %s", path, removed, before.Content)
 	}
-	if _, putErr := client.PutRaw(t.Context(), *page.WPID, stripped, before.ContentHash); putErr != nil {
+	if _, putErr := client.PutRaw(t.Context(), itemType, *page.WPID, stripped, before.ContentHash); putErr != nil {
 		t.Fatalf("write %s back without its link to %s: %v", path, removed, putErr)
 	}
 
@@ -693,7 +698,7 @@ func relinkPutsOneStrippedLinkBack(t *testing.T, core *app.Core, siteID, path, r
 	}
 	awaitRun(t, core.Runs, started.RunID)
 
-	after, err := client.GetRaw(t.Context(), *page.WPID)
+	after, err := client.GetRaw(t.Context(), itemType, *page.WPID)
 	if err != nil {
 		t.Fatalf("read %s back after the relink: %v", path, err)
 	}

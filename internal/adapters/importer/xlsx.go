@@ -2,6 +2,7 @@ package importer
 
 import (
 	stderrors "errors"
+	"slices"
 
 	"github.com/xuri/excelize/v2"
 
@@ -77,7 +78,7 @@ func readSheets(path string, opts ReadOptions) (table importmap.Table, err error
 		}
 		if len(joined.Headers) == 0 {
 			joined.Headers = part.Headers
-		} else if !sameHeaders(joined.Headers, part.Headers) {
+		} else if !slices.Equal(joined.Headers, part.Headers) {
 			return importmap.Table{}, errors.New(errors.Invalid,
 				"the sheets do not carry the same columns, so they cannot be imported together").
 				WithDetail("sheet", name).WithDetail("headers", part.Headers).
@@ -108,18 +109,6 @@ func wantedSheets(present, asked []string) ([]string, error) {
 		}
 	}
 	return asked, nil
-}
-
-func sameHeaders(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for i := range left {
-		if left[i] != right[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func sheetRefusal(cause error, name string) error {

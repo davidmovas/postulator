@@ -21,9 +21,7 @@ const (
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateRun = `UPDATE runs SET status = ?, stats_items = ?, stats_done = ?, stats_failed = ?, stats_tokens = ?,
 		stats_usd = ?, pause_reason = ?, error = ?, deadline_at = ?, started_at = ?, finished_at = ? WHERE id = ?`
-	selectRun       = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
-	selectActiveRun = `SELECT ` + runColumns + ` FROM runs WHERE status IN ('pending', 'running', 'waiting')
-		ORDER BY created_at, id`
+	selectRun      = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
 	selectStaleRun = `SELECT ` + runColumns + ` FROM runs
 		WHERE status IN ('pending', 'running', 'waiting') AND deadline_at <= ? ORDER BY created_at, id LIMIT ?`
 	selectChildRuns = `SELECT ` + runColumns + ` FROM runs WHERE parent_run_id = ? ORDER BY created_at, id`
@@ -81,10 +79,6 @@ func (r *RunRepo) ByParent(ctx context.Context, parentRunID string) ([]run.Run, 
 		"list the runs started from this one")
 }
 
-func (r *RunRepo) Active(ctx context.Context) ([]run.Run, error) {
-	return selectAll(ctx, r.store.execFrom(ctx), selectActiveRun, nil, scanRun, "list the active runs")
-}
-
 func (r *RunRepo) PastDeadline(ctx context.Context, now time.Time, limit int) ([]run.Run, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectStaleRun, []any{formatTime(now), limit}, scanRun,
 		"list the runs past their deadline")
@@ -117,20 +111,7 @@ func (r *RunRepo) List(ctx context.Context, q run.Query, page paging.Request) (p
 		builder = builder.Where(squirrel.Eq{"kind": string(*q.Kind)})
 	}
 
-	keyset := runKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[run.Run]{}, err
-	}
-	query, args, err := buildQuery(keyed, "runs")
-	if err != nil {
-		return paging.List[run.Run]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanRun, "list the runs")
-	if err != nil {
-		return paging.List[run.Run]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, runKeyset(q), page, scanRun, "runs")
 }
 
 func scanRun(rows *sql.Rows) (run.Run, error) {

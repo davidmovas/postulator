@@ -106,20 +106,7 @@ func (r *TemplateRepo) List(ctx context.Context, q template.Query, page paging.R
 		builder = builder.Where(squirrel.Eq{"name": q.Name})
 	}
 
-	keyset := templateKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[template.Template]{}, err
-	}
-	query, args, err := buildQuery(keyed, "templates")
-	if err != nil {
-		return paging.List[template.Template]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanTemplate, "list the templates")
-	if err != nil {
-		return paging.List[template.Template]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, templateKeyset(q), page, scanTemplate, "templates")
 }
 
 func overrideTarget(o *template.Override) (siteID, pageID any) {

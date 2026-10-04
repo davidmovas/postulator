@@ -22,6 +22,25 @@ func Retries(values *settings.Values) int {
 	return retriesSetting.Get(values)
 }
 
+type Wait struct {
+	Cause   error
+	Attempt int
+	Delay   time.Duration
+}
+
+type observerKey struct{}
+
+func Observing(ctx context.Context, observe func(Wait)) context.Context {
+	return context.WithValue(ctx, observerKey{}, observe)
+}
+
+func observerOf(ctx context.Context) func(Wait) {
+	if observe, ok := ctx.Value(observerKey{}).(func(Wait)); ok {
+		return observe
+	}
+	return nil
+}
+
 type Client struct {
 	next    port.Client
 	backoff time.Duration
@@ -84,7 +103,12 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 }
 
 func (c *Client) pause(ctx context.Context, last error, attempt int) error {
-	timer := time.NewTimer(delayFor(last, c.backoffFor(attempt-1)))
+	delay := delayFor(last, c.backoffFor(attempt-1))
+	if observe := observerOf(ctx); observe != nil {
+		observe(Wait{Cause: last, Attempt: attempt, Delay: delay})
+	}
+
+	timer := time.NewTimer(delay)
 	defer timer.Stop()
 
 	select {

@@ -95,6 +95,7 @@ type KeywordRules struct {
 	PrimaryInH1             bool    `json:"primaryInH1" description:"The primary keyword must appear in the first heading"`
 	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph" description:"The primary keyword must appear in the opening paragraph"`
 	MaxDensity              float64 `json:"maxDensity" minimum:"0" maximum:"1" description:"The largest share of the words the primary keyword may take, between 0 and 1"`
+	RequiredKeywords        *int    `json:"requiredKeywords,omitempty" minimum:"0" description:"How many of the page's keywords, the most searched first, the body must use; left out, it must use every one"`
 }
 
 type LinkRules struct {
@@ -116,6 +117,30 @@ type Images struct {
 	Featured bool        `json:"featured" description:"The page carries a featured image"`
 	Inline   int         `json:"inline" minimum:"0" description:"How many images to place inside the body; zero for a page without images"`
 	Source   ImageSource `json:"source" enum:"ai,wpmedia,local" description:"Where the images come from: drawn by a model, picked from the WordPress library, or read from a folder"`
+}
+
+type ProductShortDescription struct {
+	Enabled        bool   `json:"enabled" description:"Write the product's short description, the text the store shows beside the price"`
+	Intent         string `json:"intent" description:"What the short description has to say, one short sentence to the writer"`
+	TargetWords    int    `json:"targetWords" minimum:"0" description:"About how many words the short description should run to"`
+	PrimaryKeyword bool   `json:"primaryKeyword" description:"The primary keyword must appear in the short description"`
+}
+
+type ProductSpecification struct {
+	Name   string `json:"name" description:"The attribute the product shows, for example Form or Size"`
+	Intent string `json:"intent" description:"Where its value comes from, one short sentence to the writer; a value the page data does not state is left out"`
+}
+
+type Product struct {
+	ShortDescription ProductShortDescription `json:"shortDescription" description:"The short description the product shows beside its price"`
+	Specifications   []ProductSpecification  `json:"specifications" description:"The attributes the writer fills in where the product does not carry them yet"`
+}
+
+func (p *Product) Words() int {
+	if p == nil || !p.ShortDescription.Enabled {
+		return 0
+	}
+	return max(p.ShortDescription.TargetWords, 0)
 }
 
 func (i Images) Wanted() int {
@@ -140,6 +165,7 @@ type TemplateSpec struct {
 	LinkRules     LinkRules                 `json:"linkRules"`
 	MetaRules     MetaRules                 `json:"metaRules"`
 	Images        Images                    `json:"images"`
+	Product       *Product                  `json:"product,omitempty"`
 	ModelProfiles map[llm.Role]llm.ModelRef `json:"modelProfiles"`
 	Recipe        []StepSpec                `json:"recipe"`
 }

@@ -9,6 +9,7 @@ import { useGraph } from "../../data/hooks/graph.js";
 import { useRuns } from "../../data/hooks/runs.js";
 import { useDisableSchedule, useEnableSchedule, useSchedules } from "../../data/hooks/schedules.js";
 import { useTemplates } from "../../data/hooks/templates.js";
+import { actionNew, actionParam, wantsNew } from "../../data/params.js";
 import type { Run, Schedule } from "../../data/types.js";
 import {
     AddIcon,
@@ -24,7 +25,7 @@ import {
 } from "../../ui/index.js";
 import { SchedulePanel } from "./panel.js";
 import type { EnabledFilter, SchedulesQuery } from "./params.js";
-import { enabledOf, readQuery, wantsNew, writeQuery } from "./params.js";
+import { enabledOf, readQuery, writeQuery } from "./params.js";
 import { SchedulesTable } from "./table.js";
 
 const runsPage = 100;
@@ -73,7 +74,7 @@ export function SchedulesScreen(): ReactElement {
     const change = (next: SchedulesQuery, createNew = false): void => {
         const written = writeQuery(next);
         if (createNew) {
-            written.set("action", "new");
+            written.set(actionParam, actionNew);
         }
         setSearchParams(written, { replace: true });
     };

@@ -80,4 +80,14 @@ export const sites = {
         noSeo: "none detected",
         noCapabilities: "none reported",
     },
+    store: {
+        readyTitle: "The WooCommerce store can be edited",
+        readyBody:
+            "Products you create in WooCommerce get their description, short description, missing attributes and SEO meta written here. Their name, price, stock, SKU, status, slug and categories are never touched.",
+        needsPlugin:
+            "Product descriptions are written through the companion plugin, so products are refused until it is installed.",
+        forbiddenTitle: "The store refuses to let this user edit products",
+        forbiddenBody: (username: string) =>
+            `${username} may not edit products, so every product is refused before a run spends anything. Use the application password of an administrator or a shop manager, then check again.`,
+    },
 };

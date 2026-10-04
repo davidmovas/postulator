@@ -17,9 +17,10 @@ import {
     SkeletonRows,
     StatusBadge,
 } from "../../ui/index.js";
-import { kindLabel, statusLabel, statusTone } from "../runs/labels.js";
+import { runKindLabel, runStatusLabel, runStatusTone } from "../runs/labels.js";
 import { flattenTree } from "./model/site.js";
 import { itemRows } from "./model/runs.js";
+import { RunCostPanel } from "./run-cost.js";
 
 export interface RunPanelProps {
     siteId: string;
@@ -75,8 +76,8 @@ export function RunReportPanel({ siteId, runId }: RunPanelProps): ReactElement {
     return (
         <div className="flex flex-col gap-3 p-3">
             <Panel>
-                <PanelHeader title={kindLabel(held.kind)}>
-                    <StatusBadge tone={statusTone(held.status)}>{statusLabel(held.status)}</StatusBadge>
+                <PanelHeader title={runKindLabel(held.kind)}>
+                    <StatusBadge tone={runStatusTone(held.status)}>{runStatusLabel(held.status)}</StatusBadge>
                 </PanelHeader>
                 <div className="flex flex-col gap-2 p-3">
                     <dl className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-dim">
@@ -108,13 +109,14 @@ export function RunReportPanel({ siteId, runId }: RunPanelProps): ReactElement {
                     </Link>
                 </div>
             </Panel>
+            <RunCostPanel runId={held.runId} />
             <Panel>
                 <PanelHeader title={copy.reports.runs.perPage} />
                 <ul className="flex flex-col">
                     {rows.map((row) => (
                         <li key={row.itemId} className="flex flex-col gap-1 border-b border-hairline p-3 last:border-b-0">
                             <div className="flex items-center gap-2">
-                                <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>
+                                <StatusBadge tone={runStatusTone(row.status)}>{runStatusLabel(row.status)}</StatusBadge>
                                 <Link
                                     to={`/s/${siteId}/runs/${held.runId}/items/${row.itemId}`}
                                     title={row.path}

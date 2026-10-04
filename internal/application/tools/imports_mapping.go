@@ -1,17 +1,39 @@
 package tools
 
-import "github.com/davidmovas/postulator/internal/application/imports"
+import (
+	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/domain/importmap"
+)
 
 type columnArgs struct {
-	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,entity_kind,parent_entity,related,page_kind,meta_title,meta_description,wp_type" description:"The page field this column fills"`
-	Column string `json:"column" description:"The spreadsheet header the field is read from"`
+	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,entity_kind,parent_entity,related,page_kind,meta_title,meta_description,wp_type,own_entity" description:"Page field"`
+	Column string `json:"column" description:"Source header"`
 }
 
 type mappingArgs struct {
-	ID      string           `json:"id,omitempty" description:"The id of a saved mapping to reuse, left out for a mapping given here"`
-	Name    string           `json:"name,omitempty" description:"What to call the mapping when it is saved"`
-	Columns []columnArgs     `json:"columns,omitempty" description:"Which spreadsheet column fills which page field; leave it out and the columns detected by imports_inspect are used"`
-	Options *imports.Options `json:"options,omitempty" description:"How to read the cells: what to strip from a path and what separates a list; leave it out for the defaults"`
+	ID      string           `json:"id,omitempty" description:"Saved mapping id, used when no columns are given"`
+	Name    string           `json:"name,omitempty" description:"Save under this name"`
+	Columns []columnArgs     `json:"columns,omitempty" description:"Header per page field; omit to detect"`
+	Options *imports.Options `json:"options,omitempty" description:"Cell reading options"`
+}
+
+type sheetArgs struct {
+	Sheet     string            `json:"sheet" description:"Sheet name from imports_inspect"`
+	MappingID string            `json:"mappingId,omitempty" description:"Saved mapping id; default detect"`
+	RowType   importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"New row type; default pages"`
+}
+
+func sheetMappings(siteID string, sheets []sheetArgs) []imports.SheetMapping {
+	if len(sheets) == 0 {
+		return nil
+	}
+	out := make([]imports.SheetMapping, 0, len(sheets))
+	for _, sheet := range sheets {
+		out = append(out, imports.SheetMapping{Sheet: sheet.Sheet, Mapping: imports.Mapping{
+			ID: sheet.MappingID, SiteID: siteID, Options: imports.Options{RowType: sheet.RowType},
+		}})
+	}
+	return out
 }
 
 func (m mappingArgs) mapping(siteID string) imports.Mapping {

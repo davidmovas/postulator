@@ -3,6 +3,8 @@ package models_test
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -16,6 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type catalog struct {
@@ -37,10 +40,7 @@ func newCatalog() *catalog {
 }
 
 func (c *catalog) List(context.Context) ([]llm.ModelInfo, error) {
-	out := make([]llm.ModelInfo, 0, len(c.models))
-	for _, info := range c.models {
-		out = append(out, info)
-	}
+	out := slices.Collect(maps.Values(c.models))
 	slices.SortFunc(out, func(a, b llm.ModelInfo) int { return int(a.InputUSDPerM - b.InputUSDPerM) })
 	return out, nil
 }
@@ -91,11 +91,34 @@ func (p *profiles) Resolve(_ context.Context, siteID string, role llm.Role, _ ma
 	return ref, nil
 }
 
+type heardSpend struct {
+	aggregate llm.SpendQuery
+	calls     llm.CallQuery
+	page      paging.Request
+}
+
 type spend struct {
 	run          llm.Spend
 	conversation llm.Spend
 	everything   llm.Spend
 	err          error
+	slices       []llm.SpendSlice
+	listed       paging.List[llm.Call]
+	heard        *heardSpend
+}
+
+func (s spend) Aggregate(_ context.Context, q llm.SpendQuery) ([]llm.SpendSlice, error) {
+	if s.heard != nil {
+		s.heard.aggregate = q
+	}
+	return s.slices, s.err
+}
+
+func (s spend) List(_ context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error) {
+	if s.heard != nil {
+		s.heard.calls, s.heard.page = q, page
+	}
+	return s.listed, s.err
 }
 
 func (s spend) SumByRun(context.Context, string) (llm.Spend, error) {
@@ -164,6 +187,8 @@ type harness struct {
 	events   *applicationtest.Recorder
 }
 
+var harnessNow = time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC)
+
 func newHarness(t *testing.T, book spend) harness {
 	t.Helper()
 
@@ -173,8 +198,7 @@ func newHarness(t *testing.T, book spend) harness {
 	keys := &vault{stored: map[string]string{}}
 	recorder := &applicationtest.Recorder{}
 	return harness{
-		service: models.New(known, known, people, book, keys, probe, recorder,
-			clock.NewFake(time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC))),
+		service:  models.New(known, known, people, book, keys, probe, recorder, clock.NewFake(harnessNow)),
 		catalog:  known,
 		profiles: people,
 		prober:   probe,
@@ -188,12 +212,21 @@ func TestProviderKeysReportsWhichProvidersAreConfiguredAndNeverTheKey(t *testing
 
 	h := newHarness(t, spend{})
 	if _, err := h.service.UpsertModel(t.Context(), models.UpsertModelRequest{
-		Provider: "anthropic", Model: "claude-sonnet-5", ContextTokens: 1000000, MaxOutputTokens: 128000,
-		InputUSDPerM: 2, OutputUSDPerM: 10, RPM: 60, TPM: 120000,
+		Provider: "openai", Model: "gpt-5.6-sol", ContextTokens: 1050000, MaxOutputTokens: 128000,
+		InputUSDPerM: 4, OutputUSDPerM: 20, RPM: 60, TPM: 120000,
 	}); err != nil {
 		t.Fatalf("UpsertModel: %v", err)
 	}
-	if _, err := h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+
+	unset, err := h.service.ProviderKeys(t.Context(), models.ProviderKeysRequest{})
+	if err != nil {
+		t.Fatalf("ProviderKeys: %v", err)
+	}
+	if want := []models.ProviderKey{{Provider: "openai", Configured: false}}; !reflect.DeepEqual(unset.Providers, want) {
+		t.Fatalf("ProviderKeys before a key = %+v, want %+v", unset.Providers, want)
+	}
+
+	if _, err = h.service.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
 		Provider: "openai", APIKey: "sk-secret",
 	}); err != nil {
 		t.Fatalf("SetProviderKey: %v", err)
@@ -203,12 +236,7 @@ func TestProviderKeysReportsWhichProvidersAreConfiguredAndNeverTheKey(t *testing
 	if err != nil {
 		t.Fatalf("ProviderKeys: %v", err)
 	}
-
-	want := []models.ProviderKey{
-		{Provider: "anthropic", Configured: false},
-		{Provider: "openai", Configured: true},
-	}
-	if !reflect.DeepEqual(answered.Providers, want) {
+	if want := []models.ProviderKey{{Provider: "openai", Configured: true}}; !reflect.DeepEqual(answered.Providers, want) {
 		t.Fatalf("ProviderKeys = %+v, want %+v", answered.Providers, want)
 	}
 
@@ -219,7 +247,7 @@ func TestProviderKeysReportsWhichProvidersAreConfiguredAndNeverTheKey(t *testing
 	if strings.Contains(string(encoded), "sk-secret") {
 		t.Fatalf("the response carries the key: %s", encoded)
 	}
-	if string(encoded) != `{"providers":[{"provider":"anthropic","configured":false},{"provider":"openai","configured":true}]}` {
+	if string(encoded) != `{"providers":[{"provider":"openai","configured":true}]}` {
 		t.Fatalf("response = %s", encoded)
 	}
 }
@@ -315,24 +343,35 @@ func TestUpsertModel(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		req     models.UpsertModelRequest
-		wantErr bool
+		name      string
+		req       models.UpsertModelRequest
+		wantErr   bool
+		wantField string
 	}{
 		{
 			name: "a new model",
 			req: models.UpsertModelRequest{
-				Provider: " anthropic ", Model: " claude-sonnet-5 ",
+				Provider: " openai ", Model: " gpt-house-blend ",
 				ContextTokens: 1000000, MaxOutputTokens: 128000,
 				InputUSDPerM: 2, OutputUSDPerM: 10, RPM: 60, TPM: 120000,
 				SupportsStructured: true,
 			},
 		},
-		{name: "no reference", req: models.UpsertModelRequest{ContextTokens: 10, MaxOutputTokens: 5, RPM: 1, TPM: 1}, wantErr: true},
+		{name: "no reference", req: models.UpsertModelRequest{ContextTokens: 10, MaxOutputTokens: 5, RPM: 1, TPM: 1}, wantErr: true, wantField: "ref"},
 		{
-			name:    "no context window",
-			req:     models.UpsertModelRequest{Provider: "openai", Model: "x", MaxOutputTokens: 5, RPM: 1, TPM: 1},
-			wantErr: true,
+			name:      "no context window",
+			req:       models.UpsertModelRequest{Provider: "openai", Model: "x", MaxOutputTokens: 5, RPM: 1, TPM: 1},
+			wantErr:   true,
+			wantField: "contextTokens",
+		},
+		{
+			name: "a model of a provider Postulator no longer works with",
+			req: models.UpsertModelRequest{
+				Provider: "retired", Model: "old-model", ContextTokens: 1000000, MaxOutputTokens: 128000,
+				InputUSDPerM: 2, OutputUSDPerM: 10, RPM: 60, TPM: 120000,
+			},
+			wantErr:   true,
+			wantField: "provider",
 		},
 	}
 
@@ -346,16 +385,144 @@ func TestUpsertModel(t *testing.T) {
 				if !errors.IsCode(err, errors.Invalid) {
 					t.Fatalf("UpsertModel error = %v, want %s", err, errors.Invalid)
 				}
+				if field := detail(err, "field"); field != tc.wantField {
+					t.Errorf("field = %v, want %s", field, tc.wantField)
+				}
+				if len(h.catalog.overrides) != 0 {
+					t.Errorf("overrides = %+v, want nothing stored", h.catalog.overrides)
+				}
 				return
 			}
 			if err != nil {
 				t.Fatalf("UpsertModel: %v", err)
 			}
-			if resp.Model.Provider != "anthropic" || resp.Model.Model != "claude-sonnet-5" {
+			if resp.Model.Provider != "openai" || resp.Model.Model != "gpt-house-blend" {
 				t.Errorf("model = %+v, want the trimmed reference", resp.Model)
 			}
 			if len(h.catalog.overrides) != 1 || !h.catalog.overrides[0].Enabled {
 				t.Errorf("overrides = %+v, want one enabled row", h.catalog.overrides)
+			}
+		})
+	}
+}
+
+func TestUpsertModelKeepsEveryPrice(t *testing.T) {
+	t.Parallel()
+
+	request := func(change func(req *models.UpsertModelRequest)) models.UpsertModelRequest {
+		req := models.UpsertModelRequest{
+			Provider: "openai", Model: "gpt-5.6-terra", ContextTokens: 1050000, MaxOutputTokens: 128000,
+			InputUSDPerM: 2, OutputUSDPerM: 12, RPM: 500, TPM: 500000,
+		}
+		change(&req)
+		return req
+	}
+
+	cases := []struct {
+		name string
+		req  models.UpsertModelRequest
+		want models.Prices
+	}{
+		{
+			name: "standard prices only",
+			req:  request(func(*models.UpsertModelRequest) {}),
+			want: models.Prices{InputUSDPerM: 2, OutputUSDPerM: 12},
+		},
+		{
+			name: "a cache read price",
+			req:  request(func(req *models.UpsertModelRequest) { req.CachedInputUSDPerM = 0.2 }),
+			want: models.Prices{InputUSDPerM: 2, CachedInputUSDPerM: 0.2, OutputUSDPerM: 12},
+		},
+		{
+			name: "a cache write price",
+			req:  request(func(req *models.UpsertModelRequest) { req.CacheWriteUSDPerM = 2.5 }),
+			want: models.Prices{InputUSDPerM: 2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12},
+		},
+		{
+			name: "every standard and flex price",
+			req: request(func(req *models.UpsertModelRequest) {
+				req.CachedInputUSDPerM, req.CacheWriteUSDPerM = 0.2, 2.5
+				req.FlexInputUSDPerM, req.FlexCachedInputUSDPerM = 1, 0.1
+				req.FlexCacheWriteUSDPerM, req.FlexOutputUSDPerM = 1.25, 6
+			}),
+			want: models.Prices{
+				InputUSDPerM: 2, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12,
+				FlexInputUSDPerM: 1, FlexCachedInputUSDPerM: 0.1, FlexCacheWriteUSDPerM: 1.25, FlexOutputUSDPerM: 6,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t, spend{})
+			resp, err := h.service.UpsertModel(t.Context(), tc.req)
+			if err != nil {
+				t.Fatalf("UpsertModel: %v", err)
+			}
+			if resp.Model.Prices != tc.want {
+				t.Errorf("saved view prices = %+v, want %+v", resp.Model.Prices, tc.want)
+			}
+
+			stored := h.catalog.overrides[0].Info
+			got := models.Prices{
+				InputUSDPerM: stored.InputUSDPerM, CachedInputUSDPerM: stored.CachedInputUSDPerM,
+				CacheWriteUSDPerM: stored.CacheWriteUSDPerM, OutputUSDPerM: stored.OutputUSDPerM,
+				FlexInputUSDPerM: stored.FlexInputUSDPerM, FlexCachedInputUSDPerM: stored.FlexCachedInputUSDPerM,
+				FlexCacheWriteUSDPerM: stored.FlexCacheWriteUSDPerM, FlexOutputUSDPerM: stored.FlexOutputUSDPerM,
+			}
+			if got != tc.want {
+				t.Errorf("stored prices = %+v, want %+v", got, tc.want)
+			}
+
+			listed, err := h.service.ListModels(t.Context(), models.ListModelsRequest{})
+			if err != nil {
+				t.Fatalf("ListModels: %v", err)
+			}
+			for _, model := range listed.Models {
+				if model.Model == "gpt-5.6-terra" && model.Prices != tc.want {
+					t.Errorf("listed prices = %+v, want %+v", model.Prices, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestUpsertModelRefusesAPriceTheCatalogCannotCharge(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		field string
+		set   func(req *models.UpsertModelRequest)
+	}{
+		{name: "a negative cache write", field: "cacheWriteUsdPerM", set: func(req *models.UpsertModelRequest) { req.CacheWriteUSDPerM = -1 }},
+		{name: "a cached read dearer than a fresh one", field: "cachedInputUsdPerM", set: func(req *models.UpsertModelRequest) { req.CachedInputUSDPerM = 3 }},
+		{name: "a flex input with no flex output", field: "flexOutputUsdPerM", set: func(req *models.UpsertModelRequest) { req.FlexInputUSDPerM = 1 }},
+		{name: "a negative flex output", field: "flexOutputUsdPerM", set: func(req *models.UpsertModelRequest) { req.FlexOutputUSDPerM = -6 }},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := models.UpsertModelRequest{
+				Provider: "openai", Model: "gpt-5.6-terra", ContextTokens: 1050000, MaxOutputTokens: 128000,
+				InputUSDPerM: 2, OutputUSDPerM: 12, RPM: 500, TPM: 500000,
+			}
+			tc.set(&req)
+
+			h := newHarness(t, spend{})
+			_, err := h.service.UpsertModel(t.Context(), req)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("UpsertModel error = %v, want %s", err, errors.Invalid)
+			}
+			if field := detail(err, "field"); field != tc.field {
+				t.Errorf("field = %q, want %q", field, tc.field)
+			}
+			if len(h.catalog.overrides) != 0 {
+				t.Errorf("overrides = %+v, want nothing stored", h.catalog.overrides)
 			}
 		})
 	}
@@ -436,8 +603,11 @@ func TestTestProvider(t *testing.T) {
 	if resp.Model.Model != "gpt-5.6-luna" || resp.Usage.Total != 2 {
 		t.Errorf("response = %+v, want the probe usage", resp)
 	}
-	if h.prober.seen.MaxTokens <= 1 || h.prober.seen.Meta.Step != "test_provider" {
-		t.Errorf("probe request = %+v, want room for an answer a reasoning model can reach", h.prober.seen)
+	if h.prober.seen.MaxTokens <= 1 || llm.PurposeOf(h.prober.seen.Meta.RunID, h.prober.seen.Meta.Step) != llm.PurposeProbe {
+		t.Errorf("probe request = %+v, want room for a short answer, booked as a probe", h.prober.seen)
+	}
+	if h.prober.seen.Effort != llm.EffortNone || h.prober.seen.MaxTokens > 64 {
+		t.Errorf("probe asked effort %q and %d tokens, want no reasoning and a few tokens", h.prober.seen.Effort, h.prober.seen.MaxTokens)
 	}
 
 	if _, err = h.service.TestProvider(t.Context(), models.TestProviderRequest{Provider: "openai", Model: "ghost"}); !errors.IsCode(err, errors.NotFound) {
@@ -562,4 +732,12 @@ func TestSetProviderKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func detail(err error, key string) any {
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) || kernel == nil {
+		return nil
+	}
+	return kernel.Details[key]
 }

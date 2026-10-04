@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import { runKinds, runStatuses } from "../../generated/vocab.js";
 import { Button, cx, SectionLabel } from "../../ui/index.js";
-import { kindLabel, statusLabel } from "./labels.js";
+import { runKindLabel, runStatusLabel } from "./labels.js";
 import { defaultQuery, narrowed } from "./params.js";
 import type { RunsQuery } from "./params.js";
 
@@ -63,7 +63,7 @@ export function RunFilters({ query, onChange }: RunFiltersProps): ReactElement {
                 {runStatuses.map((status) => (
                     <FilterRow
                         key={status}
-                        label={statusLabel(status)}
+                        label={runStatusLabel(status)}
                         active={query.status === status}
                         onSelect={() => {
                             onChange({ ...query, status: query.status === status ? "" : status });
@@ -84,7 +84,7 @@ export function RunFilters({ query, onChange }: RunFiltersProps): ReactElement {
                 {runKinds.map((kind) => (
                     <FilterRow
                         key={kind}
-                        label={kindLabel(kind)}
+                        label={runKindLabel(kind)}
                         active={query.kind === kind}
                         onSelect={() => {
                             onChange({ ...query, kind: query.kind === kind ? "" : kind });

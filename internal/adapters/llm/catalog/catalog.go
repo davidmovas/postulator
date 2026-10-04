@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"maps"
 	"slices"
 	"strings"
 
@@ -36,11 +37,12 @@ func New(store overrideStore) (*Catalog, error) {
 	}
 
 	base := make(map[string]llm.ModelInfo, len(parsed.Models))
-	for _, info := range parsed.Models {
+	for i := range parsed.Models {
+		info := &parsed.Models[i]
 		if err := info.Validate(); err != nil {
 			return nil, err
 		}
-		base[info.Ref.String()] = info
+		base[info.Ref.String()] = *info
 	}
 
 	for role, ref := range parsed.Defaults {
@@ -63,20 +65,41 @@ func (c *Catalog) resolved(ctx context.Context) (map[string]llm.ModelInfo, error
 		return nil, err
 	}
 
-	merged := make(map[string]llm.ModelInfo, len(c.base)+len(overrides))
-	for key, info := range c.base {
-		merged[key] = info
-	}
+	merged := maps.Clone(c.base)
 	for i := range overrides {
 		override := &overrides[i]
+		if !override.Info.Ref.Supported() {
+			continue
+		}
 		key := override.Info.Ref.String()
 		if !override.Enabled {
 			delete(merged, key)
 			continue
 		}
-		merged[key] = override.Info
+		merged[key] = withBasePrices(override.Info, c.base[key])
 	}
 	return merged, nil
+}
+
+func withBasePrices(info, base llm.ModelInfo) llm.ModelInfo {
+	for _, price := range []struct {
+		own  *float64
+		base float64
+	}{
+		{own: &info.InputUSDPerM, base: base.InputUSDPerM},
+		{own: &info.CachedInputUSDPerM, base: base.CachedInputUSDPerM},
+		{own: &info.CacheWriteUSDPerM, base: base.CacheWriteUSDPerM},
+		{own: &info.OutputUSDPerM, base: base.OutputUSDPerM},
+		{own: &info.FlexInputUSDPerM, base: base.FlexInputUSDPerM},
+		{own: &info.FlexCachedInputUSDPerM, base: base.FlexCachedInputUSDPerM},
+		{own: &info.FlexCacheWriteUSDPerM, base: base.FlexCacheWriteUSDPerM},
+		{own: &info.FlexOutputUSDPerM, base: base.FlexOutputUSDPerM},
+	} {
+		if *price.own == 0 && price.base > 0 {
+			*price.own = price.base
+		}
+	}
+	return info
 }
 
 func (c *Catalog) Lookup(ctx context.Context, ref llm.ModelRef) (llm.ModelInfo, error) {
@@ -99,10 +122,7 @@ func (c *Catalog) List(ctx context.Context) ([]llm.ModelInfo, error) {
 		return nil, err
 	}
 
-	out := make([]llm.ModelInfo, 0, len(models))
-	for _, info := range models {
-		out = append(out, info)
-	}
+	out := slices.Collect(maps.Values(models))
 	slices.SortFunc(out, func(a, b llm.ModelInfo) int {
 		if provider := strings.Compare(a.Ref.Provider, b.Ref.Provider); provider != 0 {
 			return provider

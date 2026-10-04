@@ -5,7 +5,7 @@ import { copy } from "../../copy/index.js";
 import { useRun } from "../../data/hooks/runs.js";
 import { absoluteTime, relativeTime, usd } from "../../domain/format.js";
 import { ChevronRightIcon, Panel, PanelHeader, Skeleton, StatusBadge } from "../../ui/index.js";
-import { kindLabel, statusLabel, statusTone } from "../runs/labels.js";
+import { runKindLabel, runStatusLabel, runStatusTone } from "../runs/labels.js";
 
 export interface LastRunCardProps {
     siteId: string;
@@ -20,7 +20,7 @@ export function LastRunCard({ siteId, runId }: LastRunCardProps): ReactElement {
         <Panel>
             <PanelHeader title={copy.schedules.panel.lastRun}>
                 {held === undefined ? null : (
-                    <StatusBadge tone={statusTone(held.status)}>{statusLabel(held.status)}</StatusBadge>
+                    <StatusBadge tone={runStatusTone(held.status)}>{runStatusLabel(held.status)}</StatusBadge>
                 )}
             </PanelHeader>
             <div className="flex flex-col gap-2 p-3">
@@ -33,7 +33,7 @@ export function LastRunCard({ siteId, runId }: LastRunCardProps): ReactElement {
                             className="flex items-center gap-2 rounded-md border border-hairline bg-inset px-2.5 py-2 hover:bg-raised"
                         >
                             <div className="flex min-w-0 flex-1 flex-col">
-                                <span className="truncate text-xs font-semibold text-ink">{kindLabel(held.kind)}</span>
+                                <span className="truncate text-xs font-semibold text-ink">{runKindLabel(held.kind)}</span>
                                 <span
                                     className="truncate text-2xs text-ink-faint"
                                     title={absoluteTime(held.finishedAt ?? held.createdAt)}

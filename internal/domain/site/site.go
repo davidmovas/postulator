@@ -37,6 +37,29 @@ type PluginState struct {
 	SEOPlugin    string
 }
 
+type Commerce string
+
+const (
+	CommerceUnknown   Commerce = ""
+	CommerceAbsent    Commerce = "absent"
+	CommerceForbidden Commerce = "forbidden"
+	CommerceReady     Commerce = "ready"
+)
+
+func (c Commerce) Valid() bool {
+	switch c {
+	case CommerceUnknown, CommerceAbsent, CommerceForbidden, CommerceReady:
+		return true
+	default:
+		return false
+	}
+}
+
+type Extensions struct {
+	Plugin   PluginState
+	Commerce Commerce
+}
+
 type Defaults struct {
 	TemplateID    *string
 	LinkPolicyID  *string
@@ -52,6 +75,7 @@ type Site struct {
 	Status        Status
 	AllowInsecure bool
 	Plugin        PluginState
+	Commerce      Commerce
 	Defaults      Defaults
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
@@ -144,6 +168,9 @@ func (s Site) Validate() error {
 	}
 	if !s.Status.Valid() {
 		return invalid("site status is not recognized", "status")
+	}
+	if !s.Commerce.Valid() {
+		return invalid("site store state is not recognized", "commerce")
 	}
 	if s.SecretRef != SecretRef(s.ID) {
 		return invalid("site secret reference does not belong to the site", "secretRef")

@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
+	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
@@ -67,12 +68,19 @@ func (r *recordingStream) settled() []agentapp.ToolOutcome {
 }
 
 type bareRunner struct {
-	runner *agentrunner.Runner
-	model  *fake.Gollem
-	siteID string
+	runner    *agentrunner.Runner
+	model     *fake.Client
+	siteID    string
+	resultCap int
 }
 
 func newBareRunner(t *testing.T, resultCap int) *bareRunner {
+	t.Helper()
+
+	return newBareRunnerOver(t, resultCap, nil)
+}
+
+func newBareRunnerOver(t *testing.T, resultCap int, wrap func(*fake.Client) llmport.Client) *bareRunner {
 	t.Helper()
 
 	store := sqlitetest.Open(t)
@@ -82,25 +90,32 @@ func newBareRunner(t *testing.T, resultCap int) *bareRunner {
 
 	now := clock.NewFake(sqlitetest.Stamp)
 	bus := &applicationtest.Recorder{}
-	model := fake.NewGollem()
+	model := fake.New()
 
 	registered := tools.New(tools.Deps{
-		Pages: pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store),
-			sqlite.NewSiteRepo(store), store, bus, now, stubPreview{}),
+		Pages: pages.New(pages.Deps{
+			Pages: sqlite.NewPageRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
+			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: bus,
+			Clock: now, Preview: stubPreview{},
+		}),
 		Actions:   sqlite.NewPendingActionRepo(store),
 		Publisher: bus,
 		Clock:     now,
 	})
 
+	var client llmport.Client = model
+	if wrap != nil {
+		client = wrap(model)
+	}
 	return &bareRunner{
 		runner: agentrunner.New(agentrunner.Deps{
-			Factory:  staticFactory{client: model},
+			Client:   client,
 			Registry: registered,
 			Catalog:  fixedCatalog{},
 			Clock:    now,
 			Logger:   zaptest.NewLogger(t),
-		}, agentrunner.Config{MaxToolResultBytes: resultCap}),
-		model: model, siteID: owner.ID,
+		}),
+		model: model, siteID: owner.ID, resultCap: resultCap,
 	}
 }
 
@@ -109,14 +124,26 @@ func (b *bareRunner) spec(input string, allowed []string, stream agentapp.Stream
 		Binding: tools.Binding{
 			SiteID: b.siteID, ConversationID: "conversation-1", Mode: domainagent.ModeAutonomous,
 		},
-		Ref:       domainllm.ModelRef{Provider: "openai", Model: "chat"},
-		Context:   agentapp.SiteContext{SiteName: "Shop", Mode: string(domainagent.ModeAutonomous)},
-		Input:     input,
-		MessageID: "message-1",
-		Allowed:   allowed,
-		Stream:    stream,
-		LoopLimit: 4,
+		Ref:           domainllm.ModelRef{Provider: "openai", Model: "chat"},
+		Context:       agentapp.SiteContext{SiteName: "Shop", Mode: string(domainagent.ModeAutonomous)},
+		Input:         input,
+		MessageID:     "message-1",
+		Allowed:       allowed,
+		Stream:        stream,
+		LoopLimit:     4,
+		MaxToolResult: b.resultCap,
 	}
+}
+
+func fencedForTheModel(requests []llmport.Request) bool {
+	for i := range requests {
+		for _, message := range requests[i].Messages {
+			if message.Result != nil && strings.Contains(string(message.Result.Output), agentapp.UntrustedMarker) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func TestAToolOutsideTheAllowListIsDenied(t *testing.T) {
@@ -299,20 +326,7 @@ func TestTheFenceWrapsTheModelCopyAndTheLedgerKeepsTheRaw(t *testing.T) {
 		t.Fatalf("the audited result is %v; the audit records what the tool answered", outcome)
 	}
 
-	history, err := b.model.Sessions()[0].History()
-	if err != nil {
-		t.Fatalf("read the model history: %v", err)
-	}
-
-	fenced := false
-	for _, message := range history.Messages {
-		for _, content := range message.Contents {
-			if strings.Contains(string(content.Data), "untrustedContent") {
-				fenced = true
-			}
-		}
-	}
-	if !fenced {
+	if !fencedForTheModel(b.model.Requests()) {
 		t.Fatal("the model was handed a tool result that was not fenced as untrusted data")
 	}
 }

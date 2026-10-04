@@ -44,6 +44,41 @@ func (s *Server) routeCore(mux *http.ServeMux) {
 			s.handleDelete(w, r, resource.itemType)
 		})
 	}
+	mux.HandleFunc("GET "+coreNamespace+"/users/me", s.handleMe)
+}
+
+var (
+	coreCapabilities = []string{
+		"read", "edit_posts", "edit_pages", "edit_others_posts", "edit_others_pages",
+		"edit_published_posts", "edit_published_pages", "publish_posts", "publish_pages",
+		"upload_files", "unfiltered_html",
+	}
+	productCapabilities = []string{
+		"read_private_products", "edit_products", "edit_published_products", "edit_others_products",
+		"publish_products",
+	}
+)
+
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	user := s.user
+	granted := make(map[string]bool, len(coreCapabilities)+len(productCapabilities))
+	for _, name := range coreCapabilities {
+		granted[name] = true
+	}
+	if !s.noProductEdit {
+		for _, name := range productCapabilities {
+			granted[name] = true
+		}
+	}
+	s.mu.Unlock()
+
+	me := map[string]any{"id": 1, "name": user, "slug": user}
+	if r.URL.Query().Get("context") == "edit" {
+		me["roles"] = []string{"administrator"}
+		me["capabilities"] = granted
+	}
+	s.respond(w, http.StatusOK, me)
 }
 
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request, itemType string) {
@@ -204,13 +239,17 @@ func (s *Server) filter(itemType string, query url.Values) []*Item {
 	slugs := splitList(query.Get("slug"))
 	after := parseQueryTime(query.Get("modified_after"))
 
-	matched := make([]*Item, 0, len(s.order))
-	for _, id := range s.order {
-		stored := s.items[id]
+	store, order := s.storeOf(itemType)
+	matched := make([]*Item, 0, len(order))
+	for _, id := range order {
+		stored := store[id]
 		if stored.Type != itemType {
 			continue
 		}
 		if len(statuses) > 0 && !slices.Contains(statuses, stored.Status) {
+			continue
+		}
+		if len(statuses) == 0 && itemType == TypeProduct && stored.Status == "trash" {
 			continue
 		}
 		if len(slugs) > 0 && !slices.Contains(slugs, stored.Slug) {
@@ -258,17 +297,22 @@ func (s *Server) itemFields(stored *Item) map[string]any {
 func (s *Server) permalink(stored *Item) string {
 	switch stored.Status {
 	case "draft", "pending", "future", "auto-draft":
-		return s.http.URL + "/?" + permalinkKey(stored.Type) + "=" + strconv.FormatInt(stored.ID, 10)
+		return s.http.URL + "/?" + draftQuery(stored)
 	default:
 		return s.http.URL + s.itemPath(stored)
 	}
 }
 
-func permalinkKey(itemType string) string {
-	if itemType == TypePage {
-		return "page_id"
+func draftQuery(stored *Item) string {
+	id := strconv.FormatInt(stored.ID, 10)
+	switch stored.Type {
+	case TypePage:
+		return "page_id=" + id
+	case TypePost:
+		return "p=" + id
+	default:
+		return "post_type=" + stored.Type + "&p=" + id
 	}
-	return "p"
 }
 
 func applyUpdate(stored *Item, body map[string]any) {

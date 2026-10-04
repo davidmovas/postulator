@@ -20,7 +20,7 @@ var delimiters = []rune{defaultDelimiter, ';', '\t'}
 
 func sniff(head []byte) rune {
 	for line := range strings.SplitSeq(strings.ReplaceAll(string(head), "\r\n", "\n"), "\n") {
-		if strings.TrimSpace(strings.TrimPrefix(line, "\ufeff")) == "" {
+		if bare(line) == "" {
 			continue
 		}
 		best, count := ',', 0

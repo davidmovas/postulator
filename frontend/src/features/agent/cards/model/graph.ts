@@ -1,7 +1,9 @@
 import { copy } from "../../../../copy/index.js";
+import type { Keyword } from "../../../../data/types.js";
+import { keywordsLine } from "../../../../domain/keywords.js";
 import { percent } from "../../../templates/labels.js";
 import type { Args, Describer, Line } from "./card.js";
-import { line, listed, num, records, ref, strings, text, view } from "./card.js";
+import { line, listed, num, records, ref, text, view } from "./card.js";
 
 const said = copy.agent.describe.graph;
 
@@ -25,15 +27,18 @@ function entityFields(args: Args, renaming: boolean): Line[] {
     if (intent !== null) {
         lines.push(line("field", said.intent(intent)));
     }
-    const primary = text(args, "primaryKeyword");
-    if (primary !== null) {
-        lines.push(line("target", said.primary(primary)));
-    }
-    const secondary = strings(args, "secondaryKeywords");
-    if (secondary.length > 0) {
-        lines.push(line("list", said.secondary(listed(secondary))));
+    const keywords = keywordsOf(args);
+    if (keywords.length > 0) {
+        lines.push(line("target", said.keywords(keywordsLine(keywords))));
     }
     return lines;
+}
+
+function keywordsOf(args: Args): Keyword[] {
+    return records(args, "keywords").map((held) => {
+        const volume = num(held, "volume");
+        return volume === null ? { text: text(held, "text") ?? "" } : { text: text(held, "text") ?? "", volume };
+    });
 }
 
 export const describeGraph: Describer = (tool, args) => {

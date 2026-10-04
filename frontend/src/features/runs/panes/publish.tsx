@@ -3,8 +3,9 @@ import type { ReactElement, ReactNode } from "react";
 import { copy } from "../../../copy/index.js";
 import { absoluteTime } from "../../../domain/format.js";
 import { SectionLabel } from "../../../ui/index.js";
-import { finalView, publishView, relinkView, syncView } from "../artifacts.js";
+import { finalView, publishView, relinkView, revertView, syncView } from "../artifacts.js";
 import { FindingList, FindingTotals } from "../findings.js";
+import { revertOutcomeLabel } from "../labels.js";
 import { ExternalUrl, Rows, Unreadable } from "./shared.js";
 
 export interface PayloadPaneProps {
@@ -41,10 +42,57 @@ export function PublishPane({ payload }: PayloadPaneProps): ReactElement {
     if (view.skipped.length > 0) {
         entries.push([copy.runs.review.publish.skipped, view.skipped.join(", ")]);
     }
+    if (view.product !== null) {
+        const said = copy.runs.review.publish;
+        entries.push(
+            [said.productShort, view.product.shortWritten ? said.productShortWritten : said.productShortKept],
+            [said.productAdded, view.product.added.length === 0 ? said.productAddedNone : view.product.added.join(", ")],
+            [said.productImage, view.product.imageSet ? said.productImageSet : said.productImageKept],
+        );
+    }
     return (
         <div className="flex flex-col gap-2 pb-3" title={copy.runs.review.noDiff}>
             <Rows entries={entries} />
             <LiveUrl url={view.url} />
+            <FindingTotals findings={view.findings} />
+            <FindingList findings={view.findings} empty={copy.runs.review.links.clean} />
+        </div>
+    );
+}
+
+export function RevertPane({ payload }: PayloadPaneProps): ReactElement {
+    const view = revertView(payload);
+    if (view === null) {
+        return <Unreadable />;
+    }
+    const said = copy.runs.review.revert;
+    return (
+        <div className="flex flex-col gap-2 pb-3">
+            <Rows
+                entries={[
+                    [copy.pages.detail.path, view.path],
+                    [said.outcome, revertOutcomeLabel(view.outcome)],
+                    [said.detail, view.detail],
+                ]}
+            />
+            <SectionLabel className="px-3">{said.neighbours}</SectionLabel>
+            {view.neighbours.length === 0 ? (
+                <p className="px-3 text-xs text-ink-dim">{said.none}</p>
+            ) : (
+                <ul className="flex flex-col">
+                    {view.neighbours.map((neighbour) => (
+                        <li
+                            key={neighbour.pageId}
+                            className="flex items-center gap-2 border-b border-inset px-3 py-1.5 text-xs last:border-b-0"
+                        >
+                            <span className="min-w-0 flex-1 truncate font-mono text-ink-soft">{neighbour.path}</span>
+                            <span className="w-40 shrink-0 truncate text-2xs text-ink-faint" title={neighbour.detail}>
+                                {revertOutcomeLabel(neighbour.outcome)}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
             <FindingTotals findings={view.findings} />
             <FindingList findings={view.findings} empty={copy.runs.review.links.clean} />
         </div>
@@ -104,6 +152,9 @@ export function SyncPane({ payload }: PayloadPaneProps): ReactElement {
                 ]}
             />
             <LiveUrl url={view.url} />
+            {view.findings.length === 0 ? null : (
+                <FindingList findings={view.findings} empty={copy.runs.review.links.clean} />
+            )}
         </div>
     );
 }

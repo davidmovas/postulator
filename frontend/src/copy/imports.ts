@@ -1,3 +1,14 @@
+function listed(names: readonly string[]): string {
+    if (names.length < 2) {
+        return names.join("");
+    }
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
+}
+
+function quoted(names: readonly string[]): string[] {
+    return names.map((name) => `“${name}”`);
+}
+
 export const imports = {
     dropped: {
         ask: (path: string) => `Inspect the sheet at ${path} and tell me what it would import into this site. `,
@@ -30,6 +41,7 @@ export const imports = {
         reading: "Reading the sheet",
         rows: (count: number) => (count === 1 ? "1 row" : `${count} rows`),
         columns: (count: number) => (count === 1 ? "1 column" : `${count} columns`),
+        sheets: (count: number) => (count === 1 ? "1 sheet" : `${count} sheets`),
         recent: "Recent files",
         forget: "Forget this file",
         gone: "The file could not be read. Choose it again.",
@@ -41,9 +53,6 @@ export const imports = {
         delete: "Delete mapping",
         deleted: "Mapping deleted",
         saved: "Mapping saved",
-        saveAs: "Save this mapping as",
-        namePlaceholder: "Sitemap export",
-        save: "Save mapping",
         updated: (when: string) => `saved ${when}`,
         fields: (count: number) => (count === 1 ? "1 field" : `${count} fields`),
     },
@@ -56,13 +65,24 @@ export const imports = {
         detected: "Matched automatically",
         unmapped: (count: number) =>
             count === 1 ? "1 column has no target and will be ignored." : `${count} columns have no target and will be ignored.`,
-        needsTarget: "Map a column to Path or to Entity, or tick the columns that carry the hierarchy, before going on.",
+        needsTarget:
+            "Map a column to Path or to Entity, or tick the columns that carry the hierarchy or name the groups, before going on.",
         options: "Reading options",
         sheets: "Sheets",
-        sheetsHint: "Sheets that do not carry the same columns have to be imported one at a time.",
+        sheetsHint:
+            "Every sheet turned on here is imported in one go, in the order of the workbook, so a later sheet can name the entities of an earlier one. Each sheet keeps its own columns and options: open it with the tabs above the table.",
         sheetRows: (rows: number) => (rows === 1 ? "1 row" : `${rows} rows`),
         reading: (names: readonly string[]) =>
-            names.length === 0 ? "Reading nothing yet." : `Reading ${names.join(", ")}.`,
+            names.length === 0 ? "No sheet is turned on, so nothing will be imported." : `Importing ${listed(names)}.`,
+        sheetTabs: "Sheets to import",
+        settingsOf: (name: string) => `Settings of ${name}`,
+        noSheet: "Turn on at least one sheet on the right to import it.",
+        otherSheet: (name: string) =>
+            `The ${name} sheet has no column for Path or Entity yet. Map one in its tab, or turn that sheet off.`,
+        openSheet: (name: string) => `Open ${name}`,
+        saved: "Start from a saved mapping",
+        savedHint: "Picking one replaces the columns and options of this sheet with the ones it saved.",
+        savedPlaceholder: "Choose a saved mapping",
         noHeaderHelp: "Nothing matched automatically.",
         noHeaderHelpBody:
             "If this sheet carries no header row, turn on “The sheet has no header row”: the columns become A, B, C and every line is read as data. Then tick the columns whose position carries the hierarchy.",
@@ -72,16 +92,27 @@ export const imports = {
         unnamed: (letter: string) => `Column ${letter}`,
         indentHint:
             "Tick the columns whose position carries the hierarchy, left to right. A row's path is its own cell prefixed by the columns to its left.",
+        levels: "Group columns",
+        levelsHint:
+            "Tick the Root Entity or Root columns that name the groups a row sits in, outermost first; rows that repeat the same names belong to the same group, under a hub entity. No other column makes a group.",
+        noGroupColumns: "The sheet has no Root Entity or Root column left to group its rows by.",
+        notes: "Notes for the writer",
+        notesHint:
+            "Tick the columns to keep on each page as notes, such as Notes or Intent Owner. The writer reads them as context and an export writes them back.",
+        noFreeColumns: "Every column is already read as a field.",
         pathPrefixStrip: "Strip from the start of every path",
-        keywordSeparator: "Keywords separated by",
+        keywordsFormat:
+            "Keywords sit in one cell, separated by commas, each with its monthly searches in brackets when known: bpc 157 (12000), buy bpc 157 (5,400), bpc-157. The most searched keyword leads.",
         anchorSeparator: "Anchors separated by",
         listSeparator: "Other lists separated by",
         empty: "The sheet has no readable header row.",
     },
     preview: {
         title: "What the sheet will do",
+        columns: "Each column becomes",
         pages: "Pages",
         entities: "Entities",
+        groups: "Groups",
         edges: "Relationships",
         rows: "Rows",
         conflicts: "Competing pages",
@@ -91,23 +122,62 @@ export const imports = {
         counted: (action: string, count: number) => `${count} ${action}`,
         blocked: "Fix the errors in the sheet before applying it.",
         row: (row: number) => `row ${row}`,
+        place: (sheet: string, row: number) => (row > 0 ? `${sheet} · row ${row}` : sheet),
+        columnSheet: "Sheet",
+        columnGroup: "Group",
+        columnPage: "Page",
+        columnRows: "Rows",
+        noPage: "no page",
         columnPath: "Page path",
         columnTitle: "Title",
         columnEntity: "Entity",
         columnKind: "Kind",
         columnAction: "Action",
         columnName: "Name",
-        columnKeyword: "Primary keyword",
+        columnKeyword: "Keywords, most searched first",
         columnFrom: "From",
         columnTo: "To",
         columnRelation: "Relation",
         columnReason: "Reason",
+        waitingProduct: "A product the store does not hold yet",
+        storeProduct: (name: string, by: string, planned: string) =>
+            planned === "" ? `The store's ${name}, found by ${by}` : `The store's ${name}, found by ${by}, from ${planned}`,
+        matchedBy: {
+            path: "its address",
+            slug: "its slug",
+            name: "its name",
+        } as Readonly<Record<string, string>>,
+    },
+    rowTypes: {
+        pages: "Pages",
+        products: "Products",
+        kind: "By entity kind",
+    },
+    rowType: {
+        title: "Rows become",
+        hint: "What a new row of the sheet becomes. A row with product rows under it stays a page, a wp_type column wins over this choice, and a row already on the site keeps its type.",
+        products:
+            "A product row is matched to the product you created in WooCommerce by its address, its slug, then its name; Postulator never creates a product.",
     },
     apply: {
         title: "Apply the sheet",
+        titleWorkbook: "Apply the workbook",
         start: "Apply",
+        reads: (names: readonly string[]) =>
+            names.length < 2 ? `Reads ${listed(names)}.` : `Reads ${listed(names)}, in the order of the workbook.`,
+        saveAs: "Save the columns and options for the next import as",
+        savePlaceholder: "Client workbook",
+        saveOne: "Optional. Leave it empty to apply without saving a mapping.",
+        saveEach: (names: readonly string[]) =>
+            `Optional. One mapping is saved for each sheet: ${quoted(names).join(", ")}.`,
         working: (rows: number) => `Writing ${rows} rows. Leave this screen open.`,
         done: "Applied",
+        applied: (names: readonly string[]) =>
+            names.length < 2 ? `Applied ${listed(names)}.` : `Applied ${listed(names)}, in the order of the workbook.`,
+        saved: (names: readonly string[]) =>
+            names.length === 1
+                ? `Saved the mapping ${quoted(names).join("")}.`
+                : `Saved ${names.length} mappings: ${quoted(names).join(", ")}.`,
         entitiesCreated: "Entities created",
         entitiesUpdated: "Entities updated",
         edgesCreated: "Relationships created",
@@ -150,6 +220,7 @@ export const imports = {
         meta_title: "Meta title",
         meta_description: "Meta description",
         wp_type: "WordPress type",
+        own_entity: "Is an entity (yes or no)",
     },
     findings: {
         bad_path: "The path cannot be used",
@@ -165,6 +236,24 @@ export const imports = {
         unknown_page_kind: "The page kind is not one Postulator knows",
         unknown_wp_type: "The WordPress type is not one Postulator knows",
         root_page_skipped: "The root of the site already exists on WordPress, so the import leaves it alone",
+        bad_volume: "A search volume in the keywords cannot be read, so that keyword was kept without one",
+        unknown_own_entity: "The entity column says neither yes nor no, so the row was read as an entity",
+        technical_parent: "A page that is not an entity sits above pages of the sheet, so they wait until it is published",
+        group_without_page: "A group has no page of its own; it stays an entity and the links pass over it",
+        ambiguous_parent: "Several entities carry the parent's name, so the row has to say which one it means",
+        ambiguous_entity: "Several entities carry this name, so the row needs a parent or a group to say which one",
+        product_not_in_store: "The store holds no product for this row yet; create it in WooCommerce and sync the site",
+        product_row_left: "An earlier row waited for this product and is left beside it; delete it on the Pages screen",
+        wp_type_kept: "The row is already on the site, so it keeps its WordPress type",
+        intermediate_level: "The level above the products stays an entity without a page",
+        scope_clash: "Two entities of one name would sit under the same parent; rename one or give it another parent",
+    },
+    columnUses: {
+        field: "A page field",
+        level: "Group",
+        note: "Note for the writer",
+        indent: "Hierarchy",
+        ignored: "Ignored",
     },
     actions: {
         create: "new",

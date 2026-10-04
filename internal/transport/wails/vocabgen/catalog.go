@@ -26,6 +26,7 @@ func catalog() []vocabulary {
 	return []vocabulary{
 		{export: "siteStatuses", tsType: "SiteStatus", pkg: "internal/domain/site", typeName: "Status"},
 		{export: "siteReaches", tsType: "SiteReach", pkg: "internal/domain/site", typeName: "Reach"},
+		{export: "siteCommerces", tsType: "SiteCommerce", pkg: "internal/domain/site", typeName: "Commerce"},
 		{export: "pageStatuses", tsType: "PageStatus", pkg: "internal/domain/pagemap", typeName: "Status"},
 		{export: "pageWpTypes", tsType: "PageWpType", pkg: "internal/domain/pagemap", typeName: "WPType"},
 		{export: "linkOrigins", tsType: "LinkOrigin", pkg: "internal/domain/pagemap", typeName: "LinkOrigin"},
@@ -108,6 +109,8 @@ func catalog() []vocabulary {
 			export: "reasoningEfforts", tsType: "ReasoningEffort", pkg: "internal/domain/llm",
 			typeName: "ReasoningEffort",
 		},
+		{export: "serviceTiers", tsType: "ServiceTier", pkg: "internal/domain/llm", typeName: "ServiceTier"},
+		{export: "spendPurposes", tsType: "SpendPurpose", pkg: "internal/domain/llm", typeName: "Purpose"},
 		{export: "conversationModes", tsType: "ConversationMode", pkg: "internal/domain/agent", typeName: "Mode"},
 		{export: "messageRoles", tsType: "MessageRole", pkg: "internal/domain/agent", typeName: "Role"},
 		{
@@ -125,6 +128,8 @@ func catalog() []vocabulary {
 		},
 		{export: "toolCallStatuses", tsType: "ToolCallStatus", pkg: "internal/domain/agent", typeName: "CallStatus"},
 		{export: "importFields", tsType: "ImportField", pkg: "internal/domain/importmap", typeName: "Field"},
+		{export: "importColumnUses", tsType: "ImportColumnUse", pkg: "internal/domain/importmap", typeName: "Use"},
+		{export: "importRowTypes", tsType: "ImportRowType", pkg: "internal/domain/importmap", typeName: "RowType"},
 		{
 			export: "importFindingCodes", tsType: "ImportFindingCode", pkg: "internal/application/imports",
 			typeName: "FindingCode",

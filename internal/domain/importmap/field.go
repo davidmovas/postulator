@@ -19,11 +19,13 @@ const (
 	FieldMetaTitle       Field = "meta_title"
 	FieldMetaDescription Field = "meta_description"
 	FieldWPType          Field = "wp_type"
+	FieldOwnEntity       Field = "own_entity"
 )
 
 var fields = []Field{
 	FieldPath, FieldTitle, FieldH1, FieldPrimaryKeyword, FieldKeywords, FieldAnchors, FieldEntity,
 	FieldEntityKind, FieldParentEntity, FieldRelated, FieldPageKind, FieldMetaTitle, FieldMetaDescription, FieldWPType,
+	FieldOwnEntity,
 }
 
 func Fields() []Field {

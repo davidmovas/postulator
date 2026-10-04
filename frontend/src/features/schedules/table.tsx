@@ -6,7 +6,7 @@ import type { Run, Schedule } from "../../data/types.js";
 import { cadenceWords } from "../../domain/cron.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { DenseTable, StatusBadge, Switch, TableCell, TableHead, TableRow } from "../../ui/index.js";
-import { statusLabel, statusTone } from "../runs/labels.js";
+import { runStatusLabel, runStatusTone } from "../runs/labels.js";
 import { targetsSentence } from "./labels.js";
 
 const grid = "minmax(6rem,1.3fr) minmax(5rem,1.1fr) minmax(5rem,1.2fr) 6.5rem 10rem 2.5rem";
@@ -83,8 +83,8 @@ export function SchedulesTable({
                                     }}
                                 >
                                     {lastRun === undefined ? null : (
-                                        <StatusBadge tone={statusTone(lastRun.status)}>
-                                            {statusLabel(lastRun.status)}
+                                        <StatusBadge tone={runStatusTone(lastRun.status)}>
+                                            {runStatusLabel(lastRun.status)}
                                         </StatusBadge>
                                     )}
                                     <span className="truncate text-2xs text-ink-faint">

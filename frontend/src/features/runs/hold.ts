@@ -2,7 +2,7 @@ import { copy } from "../../copy/index.js";
 import type { AwaitedParent, RunItem } from "../../data/types.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
 import { HourglassTopIcon, TaskAltIcon } from "../../ui/index.js";
-import { statusIcon, statusLabel, statusTone, stepLabel } from "./labels.js";
+import { runStatusIcon, runStatusLabel, runStatusTone, stepLabel } from "./labels.js";
 import {
     itemPaused,
     itemPending,
@@ -78,7 +78,7 @@ export function itemBadge(item: RunItem): ItemBadge {
     if (finishedShort(item)) {
         return { tone: "warn", icon: TaskAltIcon, label: copy.runs.noted.badge };
     }
-    return { tone: statusTone(item.status), icon: statusIcon(item.status), label: statusLabel(item.status) };
+    return { tone: runStatusTone(item.status), icon: runStatusIcon(item.status), label: runStatusLabel(item.status) };
 }
 
 export function itemNote(item: RunItem): string {

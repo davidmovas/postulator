@@ -535,8 +535,8 @@ func TestKeysetRejectsIncompleteSortKeys(t *testing.T) {
 		name   string
 		keyset paging.Keyset[row]
 	}{
-		{name: "no field", keyset: paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{{Kind: paging.Text, Column: "name", Value: value}}}},
-		{name: "no column", keyset: paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{{Kind: paging.Text, Field: "name", Value: value}}}},
+		{name: "no field", keyset: paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{paging.TextKey[row]("", "name", value)}}},
+		{name: "no column", keyset: paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{paging.TextKey[row]("name", "", value)}}},
 		{name: "no accessor", keyset: paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{paging.TextKey[row]("name", "name", nil)}}},
 	}
 
@@ -570,13 +570,13 @@ func TestPositionRejectsMistypedValue(t *testing.T) {
 
 	id := func(r row) string { return r.id }
 	numeric := paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{paging.IntKey[row]("v", "v", func(r row) any { return r.score })}}
-	boolean := paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{paging.BoolKey[row]("v", "v", func(row) any { return true })}}
+	textual := paging.Keyset[row]{IDColumn: "id", ID: id, Keys: []paging.SortKey[row]{paging.TextKey[row]("v", "v", func(r row) any { return r.name })}}
 
 	cursor, err := numeric.Encode(row{id: "a", score: 7})
 	if err != nil {
 		t.Fatalf("Encode() error: %v", err)
 	}
-	if _, err = boolean.Position(cursor); !errors.IsCode(err, errors.Invalid) {
+	if _, err = textual.Position(cursor); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Position() error = %v, want code %s", err, errors.Invalid)
 	}
 }

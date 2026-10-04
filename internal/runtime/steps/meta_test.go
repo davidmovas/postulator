@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -238,6 +239,28 @@ func TestGenerateMetaCarriesThePatternIntoThePrompt(t *testing.T) {
 	}
 	if !strings.Contains(recorder.last, "A short guide to espresso.") {
 		t.Fatalf("the prompt does not carry the draft summary:\n%s", recorder.last)
+	}
+}
+
+func TestGenerateMetaWritesForTheKeywordsOfThePage(t *testing.T) {
+	t.Parallel()
+
+	sc, deps := metaContext(t, `{"title":"espresso at home | Shop"}`)
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{{Text: "moka pot"}, {Text: "espresso at home", Volume: new(800)}})
+	recorder := &promptRecorder{reply: `{"title":"espresso at home | Shop"}`}
+	deps.LLM = recorder
+
+	if _, err := steps.GenerateMeta(deps).Run(t.Context(), sc); err != nil {
+		t.Fatalf("GenerateMeta: %v", err)
+	}
+	for _, want := range []string{
+		"Primary keyword: espresso at home",
+		"Keywords, the most searched first: espresso at home, moka pot",
+		"The title follows this shape exactly: espresso at home | Shop",
+	} {
+		if !strings.Contains(recorder.last, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+		}
 	}
 }
 

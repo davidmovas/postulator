@@ -2,9 +2,10 @@ import type { ReactElement } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { react } from "../../../data/errors.js";
+import { errorMessageOf } from "../../../data/errors.js";
 import { useApplyProposals, usePreviewFromPages, useProposeFromKeywords } from "../../../data/hooks/graph.js";
 import type { ApplyProposalsResponse, Page, ProposedEntity } from "../../../data/types.js";
+import { keywordList, mainKeyword } from "../../../domain/keywords.js";
 import type { SegmentedOption, SelectOption } from "../../../ui/index.js";
 import {
     Button,
@@ -19,10 +20,11 @@ import {
     TableHead,
     TableRow,
     Textarea,
+    useElapsed,
 } from "../../../ui/index.js";
 import { everyPage } from "../../pages/pick/model.js";
 import { PageTree } from "../../pages/pick/tree.js";
-import { kindLabel } from "../labels.js";
+import { entityKindLabel } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 
 const drawerWidth = 688;
@@ -57,32 +59,6 @@ export function keywordLines(text: string): string[] {
         out.push(line);
     }
     return out;
-}
-
-function useElapsed(running: boolean): number {
-    const [seconds, setSeconds] = useState(0);
-    useEffect(() => {
-        if (!running) {
-            setSeconds(0);
-            return undefined;
-        }
-        const started = Date.now();
-        const timer = window.setInterval(() => {
-            setSeconds(Math.round((Date.now() - started) / 1000));
-        }, 1000);
-        return () => {
-            window.clearInterval(timer);
-        };
-    }, [running]);
-    return seconds;
-}
-
-function messageOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "silent" || reaction.kind === "unlock" ? null : reaction.message;
 }
 
 function placeOf(proposal: ProposedEntity): string {
@@ -202,7 +178,8 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
         onOpenChange(next);
     };
 
-    const error = messageOf(previewPages.error) ?? messageOf(previewKeywords.error) ?? messageOf(apply.error);
+    const error =
+        errorMessageOf(previewPages.error) ?? errorMessageOf(previewKeywords.error) ?? errorMessageOf(apply.error);
     const ready = source === "pages" ? selected.size : lines.length;
     const edges = outcome?.edges?.length ?? 0;
 
@@ -391,9 +368,9 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
                                             <span className="ml-1 text-2xs text-ink-faint">{copy.graph.ai.existing}</span>
                                         ) : null}
                                     </TableCell>
-                                    <TableCell muted={true}>{kindLabel(proposal.kind ?? "")}</TableCell>
-                                    <TableCell muted={true} title={proposal.primaryKeyword ?? ""}>
-                                        {proposal.primaryKeyword ?? ""}
+                                    <TableCell muted={true}>{entityKindLabel(proposal.kind ?? "")}</TableCell>
+                                    <TableCell muted={true} title={mainKeyword(keywordList(proposal.keywords))}>
+                                        {mainKeyword(keywordList(proposal.keywords))}
                                     </TableCell>
                                     <TableCell mono={true} muted={true} title={placeOf(proposal)}>
                                         {placeOf(proposal)}

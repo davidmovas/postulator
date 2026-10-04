@@ -5,7 +5,6 @@ import (
 	stderrors "errors"
 	"io"
 	"testing"
-	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -44,9 +43,6 @@ func TestRecover(t *testing.T) {
 			if !errors.IsCode(err, errors.Internal) {
 				t.Fatalf("err = %v, want code %s", err, errors.Internal)
 			}
-			if got := errors.Stack(err); len(got) == 0 {
-				t.Fatal("a recovered panic must carry a stack")
-			}
 			var kernelErr *errors.Error
 			if !stderrors.As(err, &kernelErr) {
 				t.Fatalf("err = %v, want a kernel error", err)
@@ -81,58 +77,6 @@ func TestRecoverKeepsTheHandlerError(t *testing.T) {
 
 	if _, err := handler(context.Background(), "x"); !stderrors.Is(err, sentinel) {
 		t.Fatalf("err = %v, want the handler error", err)
-	}
-}
-
-func TestTimeout(t *testing.T) {
-	t.Parallel()
-
-	release := make(chan struct{})
-	t.Cleanup(func() { close(release) })
-
-	handler := middleware.Timeout(10*time.Millisecond, func(ctx context.Context, _ string) (string, error) {
-		select {
-		case <-release:
-		case <-ctx.Done():
-		}
-		return "late", nil
-	})
-
-	out, err := handler(context.Background(), "x")
-	if out != "" {
-		t.Fatalf("out = %q, want the zero value", out)
-	}
-	if !errors.IsCode(err, errors.Cancelled) {
-		t.Fatalf("err = %v, want code %s", err, errors.Cancelled)
-	}
-}
-
-func TestTimeoutPassesThrough(t *testing.T) {
-	t.Parallel()
-
-	handler := middleware.Timeout(time.Minute, func(_ context.Context, in int) (int, error) {
-		return in * 2, nil
-	})
-
-	out, err := handler(context.Background(), 21)
-	if err != nil || out != 42 {
-		t.Fatalf("handler() = (%d, %v)", out, err)
-	}
-}
-
-func TestTimeoutPropagatesCancellation(t *testing.T) {
-	t.Parallel()
-
-	parent, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	handler := middleware.Timeout(time.Minute, func(ctx context.Context, _ int) (int, error) {
-		<-ctx.Done()
-		return 0, ctx.Err()
-	})
-
-	if _, err := handler(parent, 1); !errors.IsCode(err, errors.Cancelled) {
-		t.Fatalf("err = %v, want code %s", err, errors.Cancelled)
 	}
 }
 
@@ -193,7 +137,7 @@ func TestAudit(t *testing.T) {
 	}
 }
 
-func TestAuditCarriesContextIdentifiers(t *testing.T) {
+func TestAuditCarriesTheActor(t *testing.T) {
 	t.Parallel()
 
 	core, logs := observer.New(zapcore.DebugLevel)
@@ -201,17 +145,13 @@ func TestAuditCarriesContextIdentifiers(t *testing.T) {
 		return 0, nil
 	})
 
-	carried := kernelctx.WithActor(
-		kernelctx.WithConversationID(kernelctx.WithRunID(context.Background(), "run-1"), "conv-1"),
-		kernelctx.ActorAgent,
-	)
-	if _, err := handler(carried, 0); err != nil {
+	if _, err := handler(kernelctx.WithActor(context.Background(), kernelctx.ActorAgent), 0); err != nil {
 		t.Fatalf("handler() error: %v", err)
 	}
 
 	fields := logs.All()[0].ContextMap()
-	if fields["runId"] != "run-1" || fields["conversationId"] != "conv-1" || fields["actor"] != "agent" {
-		t.Fatalf("context identifiers missing: %v", fields)
+	if fields["actor"] != "agent" {
+		t.Fatalf("the actor is missing: %v", fields)
 	}
 }
 
@@ -220,11 +160,9 @@ func TestChain(t *testing.T) {
 
 	core, logs := observer.New(zapcore.DebugLevel)
 	handler := middleware.Audit(zap.New(core), "pages.Create",
-		middleware.Recover(
-			middleware.Timeout(time.Minute, func(context.Context, int) (int, error) {
-				panic("boom")
-			}),
-		),
+		middleware.Recover(func(context.Context, int) (int, error) {
+			panic("boom")
+		}),
 	)
 
 	if _, err := handler(context.Background(), 0); !errors.IsCode(err, errors.Internal) {

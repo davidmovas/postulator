@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -36,7 +37,9 @@ func validEntity() graph.Entity {
 	at := time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
 	return graph.Entity{
 		ID: entA, SiteID: siteA, Name: " Running Shoes ", Kind: graph.KindHub, Intent: "commercial",
-		PrimaryKeyword: "running shoes", SecondaryKeywords: []string{"trail shoes", " Trail Shoes ", "", "road shoes"},
+		Keywords: keyword.List{
+			{Text: "trail shoes"}, {Text: " Trail Shoes "}, {Text: ""}, {Text: "road shoes", Volume: new(400)}, {Text: " running shoes ", Volume: new(9000)},
+		},
 		Anchors: []graph.Anchor{{Text: "running shoes", Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, CreatedAt: at, UpdatedAt: at,
 	}
@@ -52,8 +55,25 @@ func TestNewEntityNormalises(t *testing.T) {
 	if entity.Name != "Running Shoes" {
 		t.Errorf("Name = %q, want trimmed", entity.Name)
 	}
-	if !slices.Equal(entity.SecondaryKeywords, []string{"trail shoes", "road shoes"}) {
-		t.Errorf("SecondaryKeywords = %v, want trimmed and deduplicated", entity.SecondaryKeywords)
+	if !slices.Equal(entity.Keywords.Texts(), []string{"running shoes", "road shoes", "trail shoes"}) {
+		t.Errorf("Keywords = %v, want them trimmed, deduplicated and ordered by volume", entity.Keywords.Texts())
+	}
+	if entity.Keywords.Main() != "running shoes" {
+		t.Errorf("main keyword = %q, want the one with the highest volume", entity.Keywords.Main())
+	}
+}
+
+func TestNewEntityWithoutKeywordsCarriesAnEmptyList(t *testing.T) {
+	t.Parallel()
+
+	bare := validEntity()
+	bare.Keywords = nil
+	entity, err := graph.NewEntity(bare)
+	if err != nil {
+		t.Fatalf("NewEntity: %v", err)
+	}
+	if entity.Keywords == nil || len(entity.Keywords) != 0 {
+		t.Errorf("Keywords = %#v, want an empty list that is not nil", entity.Keywords)
 	}
 }
 
@@ -99,20 +119,23 @@ func TestNewEntityRejects(t *testing.T) {
 	}
 }
 
-func TestNewAnchorsKeepsOrderAndTrims(t *testing.T) {
+func TestNewEntityKeepsTheAnchorOrderAndTrims(t *testing.T) {
 	t.Parallel()
 
-	anchors, err := graph.NewAnchors([]graph.Anchor{{Text: " b ", Source: graph.AnchorAI, Weight: 0.5}, {Text: "a", Source: graph.AnchorUser, Weight: 1}})
+	entity := validEntity()
+	entity.Anchors = []graph.Anchor{{Text: " b ", Source: graph.AnchorAI, Weight: 0.5}, {Text: "a", Source: graph.AnchorUser, Weight: 1}}
+	got, err := graph.NewEntity(entity)
 	if err != nil {
-		t.Fatalf("NewAnchors: %v", err)
+		t.Fatalf("NewEntity: %v", err)
 	}
-	if len(anchors) != 2 || anchors[0].Text != "b" || anchors[1].Text != "a" {
-		t.Fatalf("anchors = %+v", anchors)
+	if len(got.Anchors) != 2 || got.Anchors[0].Text != "b" || got.Anchors[1].Text != "a" {
+		t.Fatalf("anchors = %+v", got.Anchors)
 	}
 
-	empty, err := graph.NewAnchors(nil)
-	if err != nil || empty == nil || len(empty) != 0 {
-		t.Fatalf("NewAnchors(nil) = %v, %v; want an empty slice", empty, err)
+	entity.Anchors = nil
+	got, err = graph.NewEntity(entity)
+	if err != nil || got.Anchors == nil || len(got.Anchors) != 0 {
+		t.Fatalf("an entity with no anchors = %v, %v; want an empty slice", got.Anchors, err)
 	}
 }
 
@@ -134,7 +157,7 @@ func TestEnums(t *testing.T) {
 			t.Errorf("%q must be valid", status)
 		}
 	}
-	if graph.Kind("x").Valid() || graph.Source("x").Valid() || graph.AnchorSource("x").Valid() || graph.EdgeKind("x").Valid() || graph.EdgeStatus("x").Valid() {
+	if graph.Kind("x").Valid() || graph.Source("x").Valid() || graph.EdgeKind("x").Valid() || graph.EdgeStatus("x").Valid() {
 		t.Error("unknown enum values must be invalid")
 	}
 	if !graph.EntitySortCreatedAt.Valid() || !graph.EntitySortName.Valid() || graph.EntitySort("x").Valid() {

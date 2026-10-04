@@ -1,0 +1,70 @@
+{
+  "model": "gpt-5.6-terra",
+  "instructions": "You are the assistant.",
+  "input": [
+    {
+      "role": "developer",
+      "content": "Site: Example."
+    },
+    {
+      "role": "user",
+      "content": "List the pages."
+    },
+    {
+      "type": "function_call",
+      "call_id": "call_1",
+      "name": "pages_list",
+      "arguments": "{\"limit\":5}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_1",
+      "output": "{\"pages\":[]}"
+    }
+  ],
+  "store": false,
+  "max_output_tokens": 2048,
+  "reasoning": {
+    "effort": "none"
+  },
+  "tools": [
+    {
+      "type": "function",
+      "name": "pages_list",
+      "description": "Lists pages.",
+      "parameters": {
+        "properties": {
+          "limit": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "strict": false
+    },
+    {
+      "type": "function",
+      "name": "pages_get",
+      "description": "Reads a page.",
+      "parameters": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "strict": false
+    }
+  ],
+  "service_tier": "default",
+  "prompt_cache_key": "chat:conv-1",
+  "stream": true,
+  "stream_options": {
+    "include_obfuscation": false
+  }
+}

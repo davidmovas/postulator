@@ -117,10 +117,11 @@ case "$SEO" in
 esac
 
 if [ "$WOO" = "1" ] && ! wp plugin is-active woocommerce >/dev/null 2>&1; then
-	wp plugin install woocommerce --activate
+	wp plugin install woocommerce --version=11.1.2 --activate
 fi
 
 if [ "$WOO" = "1" ]; then
+	wp option update woocommerce_coming_soon no
 	if [ "$(wp term list product_cat --slug=postulator-koffein --format=count)" = "0" ]; then
 		wp term create product_cat "Koffein" \
 			--slug=postulator-koffein \

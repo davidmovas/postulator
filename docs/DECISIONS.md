@@ -244,7 +244,9 @@ the record behind it. Sections are moved verbatim from STATUS as each phase ends
   percent-decode, collapse duplicate slashes, force exactly one leading and one trailing
   slash, lowercase the whole path, and make no exception for a file extension.
   `wp.NormalizePath` and `wp.InternalPath` are now one-line calls into
-  `internal/domain/pagemap`.
+  `internal/domain/pagemap`. *(Superseded 2026-10-04: both wrappers had no caller and are gone,
+  and `pagemap.InternalPath` with them; `pagemap.NormalizePath` and `pagemap.Site.Resolve` are
+  the one answer.)*
 
 ## Decisions taken in Phase 3B
 
@@ -1703,3 +1705,762 @@ said, never dropped in silence.
   audit and in the site overview. The table says **Not written yet** for a planned page, the panel
   labels each owed link by its state and does not offer to relink a page that is not on the site,
   and the run's Links & compliance pane says it is the page as it stood at validation.
+
+## 2026-10-02 — the client's sheets: keywords with volumes, an entity for every row, names under their parent
+
+The client's SEO workbooks did not import: a list of keywords with their monthly volume in one
+cell, `Root Entity | Category | Subcategory` level columns, a wide sheet an assistant wrote with
+columns that mean nothing, and a variation sheet whose `Entity?` column would have created
+entities named Yes and No. The client cannot share the files, so the work follows their headers.
+The owner's rules for all of it: the file is the source of truth, used as it is; what it lacks is
+generated; any cell may be empty and an empty cell erases nothing; everything is an entity except
+a technical page; and no content is hard-coded, because a template says it. The WooCommerce half
+of the approved plan was taken out by the owner and handed to its own session.
+
+### Keywords
+
+- **A page and an entity carry one ordered keyword list**, `keyword.List` of `{text, volume?}`,
+  in place of a primary keyword and secondary keywords (migration 0029). The list is trimmed,
+  deduplicated without case and sorted by volume, highest first, with unmeasured keywords after;
+  the first is the main keyword, so `primaryInTitle` and `{primaryKeyword}` keep their names and
+  read it. This **supersedes** "an existing entity keeps its spelling and its primary keyword"
+  and "a page keeps the keywords its row carried": the volume decides the order, never the column.
+- **A keyword cell reads `bpc 157 (12000), buy bpc 157 (5,400), bpc-157`.** Commas, semicolons,
+  pipes and line breaks separate keywords outside brackets; a volume is the digits in trailing
+  `(…)` or `[…]`, with `1,200`, `1 200` and `1.2k` read alike; a bracket holding words stays part
+  of the keyword; a volume that cannot be read is a `bad_volume` warning and the keyword is kept
+  without one. The export writes the same grammar in one column, so the keyword separator setting
+  is gone; a `primary_keyword` column still reads, placed before the list is sorted.
+- **A re-import merges** (`List.Merge`): the file's volume replaces the stored one, new keywords
+  are added, none is dropped, and an empty cell changes nothing.
+- **Generation reads the page's keywords, or its entity's** when the page carries none
+  (`pagemap.Keywords`), in the brief, the placeholders, the writer, the meta, the image alt, the
+  judge, `repair_links`, validation and cannibalization. The writer gets them numbered with their
+  volume; `keywordRules.requiredKeywords` in a template says how many must appear, all by default;
+  the missing ones are one `keywords_missing` warning in order of importance.
+
+### Entities and names
+
+- **An entity's name is unique under its parent, not across the site** (the owner's choice over
+  qualifying names or a separate notion of variants). Liquid under BPC-157 and Liquid under TB-500
+  are two entities named as the file names them. `entities.scope_entity_id` is the parent the name
+  is unique under (migration 0030 rebuilds the table, with the unique index on
+  `(site_id, coalesce(scope_entity_id, ''), name)`); the earliest approved parent edge sets it, a
+  move or a removed edge settles it again (`graph.Settle`), and a clash is a conflict that names
+  the parent.
+- **A shared name is told apart by its parent wherever it is read.** `graph.Labels` gives "BPC-157
+  Liquid" to the writer, the meta, the judge, the image alt, a link's fallback anchor,
+  `{entityName}`, the link audit and the graph proposals, which resolve the model's answer by the
+  same label; a name used once stays as it is, and a parent whose name is shared too is climbed.
+  Lists, filters and search on the screens show "BPC-157 › Liquid".
+
+### The import
+
+- **The client's headers are read.** Recommended URL Layer and Canonical URL are the path, Entity
+  Level is the kind (Compound/Product reads as product, GEO as custom, Commercial Taxonomy as
+  category, Root and Pillar as hub), Parent Product Entity is the parent. A header that ends in a
+  question mark is never detected, so `Entity?` stays ignored; `own_entity` is a field the client
+  maps by hand, and `no` makes a technical page. Bind prefers the header exactly as written.
+- **Level columns and note columns are options of a mapping**, detected and ticked in the wizard.
+  A level cell of `-`, `—`, `n/a` or `none` is empty. A note column is kept on the page as
+  `{label, text}`, shown on the page card, read by the writer as context it never copies, merged by
+  label on a re-import and written back by the export.
+- **Every row with a page gets an entity**, named by its entity cell, else its H1, else its title,
+  else its slug; a row whose path the site already maps and that names none keeps that entity. The
+  root row is the exception: it makes an entity only when it names one or the site holds the root.
+- **A parent comes from the parent cell, else the row's deepest group, else the URL tree**, which
+  also gives an entity to the intermediate pages the import fills in and to an unpublished,
+  unmapped ancestor on the site. A technical page above a sheet page is `technical_parent`, because
+  a run refuses a child whose unpublished parent carries no entity. When a parent the URL tree gave
+  bears the child's own name, the two rows are one entity with two pages.
+- **The level columns build a tree of groups, and a group takes a page only on evidence:** a row
+  of its own level named as it, a row whose slug is its name, a row above all its other rows, or a
+  free page above all of them whose slug is its name. Nothing is placed by position; a group
+  without a page is kept and reported as `group_without_page`.
+- **Entities are matched by their parent and their name**, parents first: under the same parent,
+  else an orphan of that name at the top (adopted, and settled under its new parent), else, when
+  the row gives no parent or only the URL tree's, the one entity of that name on the site. A name
+  or a parent more than one entity carries is a blocking `ambiguous_entity` or `ambiguous_parent`;
+  a named parent is looked for under the row's group first. A repeated import changes nothing.
+- **The preview says what each column became** (`Mapping.Uses`: field, group, note, hierarchy or
+  ignored), lists the groups with their pages and names each entity with its parent.
+
+### Links past a group without a page
+
+- **An entity that no page carries at all is passed through.** The link plan records it as an
+  optional blocked target, `no_page`, and walks on to its parents or its children, so a form links
+  up to its product's category; `MayLinkTo` climbs past it the same way. An entity that has pages
+  but no canonical one still blocks, required, as `no_canonical_page`. This **supersedes** the
+  rule that every parent is a required target, which made a group the sheet named without a page
+  a link nobody could place.
+
+### The pages screen
+
+- **The page list filters by an entity and everything under it** (`includeDescendants`,
+  `graph.Descendants`), so a category lists its subcategories' and products' pages.
+
+### Decided without asking
+
+- A revert treats a relink's before-copy as missing only when it has no hash: an empty neighbour
+  that the relink wrote a sentence into is emptied again instead of handed to a human.
+- The UI harness seed stores a key for each provider its profiles name, as the e2e harness does,
+  and declares its posts at the flat addresses WordPress gives posts.
+- The products stage is out of this branch: its plan, the owner's words and the research live in
+  the handoff file the owner keeps, not in the repository.
+
+## 2026-10-03 — the products the client creates in WooCommerce, edited where they stand
+
+The client adds every product by hand in WooCommerce, with its name, price and stock, so
+Postulator creates none: it edits a product the way it edits a page. It writes the description with
+its links, the short description the store shows beside the price, the attributes the product
+lacks and the SEO meta. The owner's rules are those of 2026-10-02, plus one: a product's name,
+price, stock, SKU, status, slug and categories are never written. The plan that created products and
+gave them addresses through the plugin was dropped when the owner said so; the plugin stays 1.2.0
+and `wp-plugin/openapi.yaml` is unchanged.
+
+### What a run writes into a product
+
+- **The description is the body without its H1, written through the plugin's raw route** with
+  compare-and-swap. WooCommerce passes `description` through kses for every user, so its REST API
+  cannot write it as it was composed.
+- **The store's fields go first and the description last.** A changed short description makes
+  WooCommerce save the whole post again through `wp_update_post`, and `content_save_pre` runs kses
+  over `post_content` for a user without `unfiltered_html`. Written after that save, and against a
+  hash read again after it, the description stays what the run wrote. This **supersedes** the
+  Phase 3 line that `UpdateProduct` is the one write path into a shop: the description goes
+  through the raw route, and the short description, the attributes and the image through
+  `UpdateProduct`.
+- **Attributes are filled where the product lacks them.** The template names them; one is written
+  only when the product carries no attribute of that name, compared without case, or an empty one.
+  A global, a variation or a filled attribute is sent back untouched, because WooCommerce replaces
+  the whole list, and a variable product keeps its attributes as they are with `product_type_kept`.
+  The featured image is set only on a product with none.
+- **The name stays as the store has it.** The writer writes under the store's name, a file H1 that
+  differs is `product_name_differs`, and the primary keyword missing from the name is a warning,
+  because only the client can rename a product.
+- **A product is edited live.** It has no draft copy, so a draft run over a product is refused
+  before anything is spent, `product_edited_live`.
+- **The publish result keeps what the product held and what the run wrote**, as the store answered
+  it, so a revert can tell its own work from a human's.
+
+### Before anything is spent
+
+- A run over a product is refused when the site's store is not known to be editable
+  (`commerce_unknown`, `commerce_absent`, `commerce_forbidden`), when the plugin cannot write raw
+  content (`product_needs_plugin`), when the row has no product (`product_not_in_store`) and when it
+  is a draft run; a product category is refused, `product_category_unwritable`, because the plugin
+  does not write a term's description. A template with no product outputs over a product, and one
+  with them over a page, are warnings. A repair refuses both, `store_placed`.
+
+### The revert
+
+- **A product changed since the run is handed to a human**: a short description, an attribute the
+  run filled or a description that is no longer what the run wrote. Otherwise the store's fields
+  go first and the description last, against its own hash. Only the attributes the run filled are
+  taken back, and one a human removed since stays removed; only the image the run set is taken
+  off. The REST API has no compare-and-swap, so a human edit between the revert's read and its
+  write of the store's fields is the one race left, and the description keeps its own.
+- **A body counts as never copied only when no hash was kept**, so an empty description is put
+  back as empty, the rule a relink's neighbour already followed.
+- **A product or a product category is not deleted on the site** by `pages.Delete{onSite}`; the
+  client deletes it in WooCommerce.
+
+### Where a product sits
+
+- **The store decides a product's address.** The row's path is the store's, and the address the
+  sheet gave is kept beside it as `pages.planned_path`, migration 0032, which a second import reads
+  and the export writes. No product takes a parent from its path, and the level above a run of
+  products stays an entity without a page, `intermediate_level`.
+- **A site knows whether its store can be edited**, `sites.commerce`, migration 0031: absent when
+  WooCommerce answers no route, forbidden when the user may not edit products, ready otherwise. The
+  probe, the plugin check and the first batch of a sync set it, and a 401 or a 5xx keeps what was
+  known.
+- **A row is matched by its id and its type**, because post ids and term ids are two sequences, and
+  a path only within its family of types, `path_taken_on_site` otherwise.
+
+### The import
+
+- **A mapping says what a new row becomes**: pages by default, products, or read by the entity
+  kind. A row with product rows under it stays a page, a `wp_type` cell wins over the mode, and a
+  row with a WordPress id keeps its type, `wp_type_kept`.
+- **A product row finds the product the client created** by its address, then by the slug the URL
+  ends in, then by the one product whose name is the row's H1 or title. Ambiguous or not found, the
+  row waits with `product_not_in_store` and no invented title. A product the sync meets later claims
+  the row that waited for it through the same matcher, read from the row's side: only when the
+  product is the one the row itself would match, and only when no other row claims it.
+
+### What the screens and the read-back say
+
+- The site's detail says whether the store can be edited, the template editor has a Product group,
+  the import options say what the rows become and the preview names the product a row found, a
+  product's card shows both addresses, the store's name against the sheet's H1 and the outputs of
+  its last run, and the run panes show what a product was written with.
+- **`sync_back` opens a published product's page as a visitor would** and warns,
+  `product_description_hidden`, when the opening words of its description are not in the text a
+  visitor reads; it ignores the head, scripts and styles, where WooCommerce's structured data
+  repeats the description, and it compares words, so a theme's typographic quotes do not count. A
+  page builder, a cache and the store's coming-soon mode are the causes it names;
+  `product_page_unread` says the page could not be opened.
+
+### A correction
+
+- **Phase 3B says a term id is a 404 on the plugin's post routes; it is not.** `get_post()` reads
+  the number as a post id, so a term id that a post also carries answers that post. The client
+  names the item type on every plugin route, refuses a product category before the request, and
+  treats a raw read whose type differs from the one it asked for as `NotFound`.
+
+### Decided without asking
+
+- The tool schemas grew to 84,923 bytes with the row type, and the ceiling is 85,000.
+- A page report carries a draft's product outputs and nothing else of the draft, so the agent's
+  context is not filled with section HTML.
+- An import that finds a store's product for a row that waited under the sheet's address leaves
+  the waiting row and says `product_row_left`: an import deletes nothing.
+- The sandbox starts without WooCommerce unless `E2E_WOO=1`, and the UI harness stocks its fake
+  store with a product it runs the shipped Product template over.
+
+## 2026-10-03 and 04 — what a model call costs: OpenAI only, our own client, the spend in view
+
+The client paid OpenAI $10 and could not say what it bought: the window showed one total. The
+ledger already kept a row per call, but nothing read it by purpose, and the research found where
+the money could go without anyone seeing it. Reasoning was billed as output and hidden, because
+gollem folded it in. One stubborn page could pay the writer about fifteen times, the ceiling
+doubling three times over `Retry{Max:3}`. The agent resent 93 tool schemas, about 21,000 tokens,
+on every round of up to twelve, and the site context in its system prompt made the first round
+after every write cold. GPT-5.6 bills a cache write at 1.25 times a fresh input token, and its
+implicit cache puts the breakpoint at the end of the latest message, so a single call wrote its
+whole prompt into a cache it never read again. gollem spoke Chat Completions only: no service
+tier, no prompt cache key, strict schemas off, no reasoning count, response headers dropped. Five
+spend bugs sat beside them: a catalog save dropped the cached price, an `insufficient_quota` was
+retried five times, an on-demand judge wrote rows without a step, a cancelled stream wrote no row,
+and the agent went round the retry, limiter and ledger chain. The owner decided on 2026-10-03:
+OpenAI only, on our own client for the Responses API; old conversations keep their transcript and
+lose the model's memory of them; the writer on flex with a fallback, every role's effort as it was.
+
+### OpenAI only
+
+- **Postulator works with OpenAI alone.** Anthropic, Gemini and gemini-openai leave the code, the
+  catalog, the settings and the screens, and gollem, `anthropic-sdk-go`, `go-openai` and the Google
+  SDKs leave `go.mod`. The embedded catalog keeps `gpt-5.6-{sol,terra,luna}` and `gpt-image-2`; an
+  override row of another provider is passed over, `ModelInfo.Validate` and `profiles.Set` refuse
+  one, and profile resolution passes over one at the template, the site and the global level and
+  falls to the next. Migration 0038 deletes the global profiles of the removed providers so a role
+  falls back to the catalog's default. **This supersedes** the Phase 4 lines on gollem's limits and
+  on the catalog's other vendors.
+- **A template that pins a removed provider stays saveable.** `template.Validate` stays permissive,
+  and the estimate warns `model_provider_removed`, naming the pinned model and the one the role uses
+  instead, so a client's template is never locked out of editing by an upgrade.
+- **The keys of removed providers stay sealed** in the secret store, unused; the key list is read
+  from the catalog, so they are no longer shown.
+
+### Our own Responses client
+
+- **`internal/adapters/llm/openai` speaks `POST /v1/responses` over `net/http`**, and
+  `openaitest` is its httptest fake. The fake never imports `openai`, for the reason `wptest`
+  never imports `wp`: it is a second implementation of what the live server did, and it refuses
+  what the server refused (minimal effort, sampling at an effort, an unknown tier, a ceiling under
+  16, a cache key over 64, a loose strict schema, an unpaired call, a reasoning item without its
+  encrypted content).
+- **The live probe cost nothing.** A key with no credit is answered 429
+  `credit_balance_exhausted` only after the request has been validated, so every request shape the
+  client sends was proven against the real API on 2026-10-03 without spending a cent. What only a
+  funded key can show is listed in `STATUS.md` for the pre-release smoke; the probe's bodies were
+  kept out of the repository.
+- **What a request carries.** Instructions, typed input items (messages, function calls without an
+  id, their outputs), `store: false`, and `max_output_tokens` as the asked ceiling plus the effort's
+  reasoning allowance, clamped to the catalog row and never under 16. An effort is always sent to a
+  model that reasons, because the server's default is medium even on luna, and a row that says
+  `minimal`, which the API refuses, goes out as low. No temperature or `top_p`, which a reasoning
+  effort refuses. Markup travels as written: the default encoder sent page HTML as unicode escapes.
+- **A structured answer is one strict call.** The `json_schema` format is strict: every object
+  closed, every property required, an optional one nullable. The JSON instruction and the repair
+  round go, which **supersedes** the Phase 4 line that `Structured` appends an instruction and
+  repairs one decode failure, and the 2.2.0 line that a malformed answer gets a repair round. An
+  answer that does not decode is `EXTERNAL malformed_answer` for the step's own retry; a refusal
+  still holds the page and a truncation is still `output_truncated`.
+- **A refusal is classified from the provider's own code.** A quota, a spending limit or an
+  exhausted credit balance is `NEEDS_HUMAN` and never retried, and its sentence says to add credit;
+  it used to be a rate limit tried five times. A rate limit waits for `retry-after-ms`, then
+  `Retry-After` in seconds or as a date, then the reset of a bucket whose remaining count is zero,
+  then the provider's own sentence, up to two minutes, beyond which the backoff decides. This
+  **supersedes** the V5 line that `Retry-After` is unreachable for OpenAI, and closes that gap. A
+  key quoted back in a message is masked.
+- **An error can arrive inside a stream that answered 200.** The probe saw `response.created`, an
+  `error` event and `response.failed`, with no `[DONE]`. A refusal before the model has spoken is a
+  failed start, classified exactly like the same refusal over HTTP, so the retry and the flex
+  fallback work on a stream; one after it is the stream's last delta.
+- **Flex, with one fallback.** A request asked on flex for a model the catalog prices on flex goes
+  out on flex and is sent once more, at once, on the default tier when the provider has no flex
+  capacity (a 429 or an in-stream refusal that names resource unavailability or capacity and no
+  quota) or when nothing arrived within `llm.flexPatience`; a stream waits its patience only until
+  the provider admits it. A credit refusal, an ordinary rate limit and a caller who left are never
+  resent, and the answer carries the tier and the usage of the attempt that answered. The capacity
+  body is assumed, not probed.
+- **A single call neither writes nor reads the prompt cache.** A call with no tools and no cache
+  key is sent `prompt_cache_options {mode: explicit}` with no breakpoint, which writes nothing and
+  pays no 1.25 times; the agent names its prefix family with `prompt_cache_key` `chat:<mode>`, and a
+  key past 64 characters is sent as its hash. The runs therefore price no cache write.
+
+### Effort and speed per role
+
+- **Reasoning effort and service tier are settings per role**, `llm.effort.<writer|editor|linker|
+  judge|titler>` (medium, low, low, low, none) and `llm.tier.<role>` (`standard` or `flex`, the
+  writer on flex), with `llm.flexPatience` (8 minutes, between 30 seconds and 14). `tuning.Client`
+  fills `Effort` and `Tier` from `Meta.Role` when a request leaves them empty and is the outermost
+  link, tuning → retry → limiter → ledger → recordreplay → openai, so the ledger and a fixture see
+  what was sent. Chat stays at effort none on the default tier and is not a setting. Effort and
+  tier are read live; the flex patience, `llm.timeout` and `llm.openai.baseUrl` when the core is
+  composed, so they take effect after a restart.
+- **The effort leaves the catalog row** (migration 0037; its down brings the column back with the
+  `CHECK` of 0021), so a role's effort has one source. A call made for no role is sent the effort
+  it asks for, else low on a model that reasons, and the provider test asks for none and sixteen
+  tokens, so a probe never pays for thinking. `max` is accepted by the API and not offered, because
+  no allowance for it is verified to price it with.
+- **Every model call names its role.** The steps resolve the model and the role together, the graph
+  proposals are the editor's, `Assess` always books the judge, and an audit on demand is booked as
+  the judge step with no run, so its rows count as audit spend.
+
+### The writer, the estimate and the prices
+
+- **The writer is paid for at most two truncated answers.** A truncated answer is tried once with
+  double the room, and a truncation at double the room holds the page `needs_human` with a note
+  that says it is unfinished and to lower the template's word counts or choose another model. This
+  **supersedes** the 2.2.0 ceiling doubled per attempt up to three times. A throttled call or a
+  malformed answer keeps the step's retry, and a later attempt keeps the doubled room, which costs
+  nothing unless it is written. No pause reason was added, because one would ripple into
+  `vocab.ts` and the runs screens for a sentence the note already carries.
+- **The estimate prices each step at its role's tier**, at flex prices where the row offers them,
+  and a model that reasons adds half the allowance of the role's effort as output (none 0, low
+  2,048, medium 8,192, high 24,576, xhigh 49,152). `runtime.Deps.Tuning` is required, like `Keys`.
+- **GPT-5.6 prices a cache write at 1.25 times its input and flex at half the standard tier**
+  (sol 2 / 0.20 / 2.50 / 10, terra 1 / 0.10 / 1.25 / 6, luna 0.10 / 0.01 / 0.125 / 0.60 per
+  million for input, cached input, cache write and output). `llm.Cost` charges the ordinary input,
+  the cached reads, the cache writes and the output each once at its own rate; reasoning is inside
+  the output and never charged twice.
+- **A catalog save keeps every price**: `UpsertModel` never copied the cached price, so after any
+  save the ledger booked cached reads at the full rate. The request now carries all eight prices.
+- **An override takes the base price for every price it left at zero.** An override replaces its
+  whole base row, so one saved before the flex and cache-write prices existed priced flex at
+  nothing and offered no flex, and one saved before the fix above booked cached reads in full. A
+  price of exactly zero is never meant for an OpenAI model, so the catalog fills each zero of an
+  override from the built-in row it overrides, which repaired the stored rows without a migration.
+  **A ruling:** a built-in model's price can no longer be set to 0; the tier setting, not a price,
+  turns flex off. A model the built-in list does not carry keeps its zeros, and there a zero cached
+  price still falls back to the fresh rate, as decided on 2026-09-22.
+
+### Spend in view
+
+- **The ledger books what the provider served.** `llm_calls` gains `reasoning_tokens`,
+  `cache_write_tokens` and `service_tier` (migration 0035, with an index on `created_at`; the tier
+  carries no `CHECK`, so a new tier needs no rebuild, and an empty one reads as default), and
+  `model_catalog` the cache-write and the four flex prices (0036). A call is priced at the tier it
+  was served at, `llm.usage` names the tier, the reasoning and the cache writes, a stream its
+  caller cancelled is still a row with the usage that arrived and `CANCELLED`, and every row is
+  written past the caller's cancellation.
+- **The purpose of a call is derived, never stored.** `llm.PurposeRules` maps a run and a step to
+  `run`, `chat`, `title`, `probe`, `graph`, `audit` or `other`, and the SQL that groups the ledger is
+  built from those rules, so the Go and the query cannot disagree.
+- **`ModelsService.SpendReport` is an aggregate, not a list, so it takes no cursor.** It totals the
+  ledger over the last 1 to 366 days (30 when left out), or one run step by step, into one slice
+  per purpose, provider, model and tier: a number of rows bounded by the catalog, which the cursor
+  rule is not about. `ListCalls` is the ledger itself, cursor-paged, newest first, and the first
+  caller `ledger.List` ever had.
+- **Settings → Models says where the money went**: a week, a month or a quarter; calls and failed
+  calls; the cached, reasoning and flex shares; spend by purpose and by model and tier; and the
+  recent calls, where an exhausted OpenAI account says to add credit. Reports → Runs says what each
+  step of a run cost. The window refetches on `llm.usage` and also on the events that end something
+  with a failed call, because a refused call spends no tokens and publishes no `llm.usage`.
+
+### The agent on the port
+
+- **A turn runs on the same `llm.Client` chain as the runs.** The runner streams each round,
+  dispatches the calls in order through the same guard (unknown tool, `Permit`, the argument check
+  gollem used to make, now `transport/agent/arguments.go` with its wording, `Authorize`, `Run`,
+  `Cap`, the audit, `Fence`), saves the history after every complete round and ends with a budget
+  refusal at the loop limit. Waits reach the window as `agent.waiting` through the retry observer.
+  `patience.go`, the runner's own ledger writes, `Config.AgentProvider` and the gollem factory are
+  gone, and `Config.Provider` is the one seam a harness uses. The dependency test now says that
+  `internal/transport/agent` never reaches `internal/adapters/llm/openai`.
+- **Every attempt is a ledger row.** The ledger sits inside the retry, so a refused attempt is a
+  row with its status. This **supersedes** the V5 line that a retry inside a round is not a second
+  call; the spend panel counts the `ok` rows as calls and every row's dollars as spend, and the
+  turn's `calls` counts the rounds that answered.
+- **The history is ours: `{"format":"responses/1","items":[…]}`** of port messages, with call
+  arguments masked by `tools.Redact`, results shortened to the history cap with the fence kept, and
+  trimmed by whole turns. Any other body loads empty, so a conversation from before keeps its
+  transcript and the model forgets it, as the owner chose. This **supersedes** the Phases 9 and 10
+  line that the gollem history is a blob whose shape gollem owns. Reasoning items are never kept.
+- **The site context is a developer message.** The instructions are static per mode and the site's
+  counts open each turn as a developer message, so the cached prefix survives a write.
+- **The fake and the fixtures speak the port.** The scripted fake calls tools on the port from the
+  turn's own user message (`TOOL:`, `FAKE:`, `FAIL:`, `ERROR:`), and `recordreplay` keeps the calls,
+  the finish, the tier and the tool searches, masks tool arguments with the composition root's
+  redaction before a fixture is named, and never records a stream that did not finish.
+
+### What a round of the agent sends
+
+- **The tool schemas say what a field takes in fewer words.** Restated types and boilerplate went
+  from the tool and argument descriptions, which keep their limits, defaults and the tool each id
+  comes from; the chat instructions say once that an id is used as a read tool returned it and that
+  a field left out of a change keeps its current value. Two cuts, the tool descriptions first
+  (85,991 bytes to 76,479) and then the request structs' field descriptions (76,347, after the
+  category fields, to 63,304), leave 26.4% less than before, about 15,800 tokens a round, and the
+  ceiling follows to 63,400. The ceiling test names the widest schemas.
+- **Loading tools on demand waits behind `agent.toolLoading`, `all` by default.** `deferred` sends
+  ten orienting reads whole (`sites_list`, `sites_get`, `reports_site_overview`,
+  `graph_list_entities`, `pages_list`, `pages_get`, `pages_tree`, `runs_list`, `runs_get`,
+  `templates_list`) and every other tool inside its group, the tool name's prefix, as `defer_loading`
+  functions of a namespace beside a `tool_search` tool: 6,506 bytes a round before any search,
+  against 63,304. A turn replays the searches and the namespaced calls of its own earlier rounds and
+  stores neither, so the next turn searches again whatever the setting is by then. The probe proved
+  the shape is accepted, not that the model searches well, so the default stays until the seven
+  checks in `STATUS.md` pass on a funded key.
+
+### Decided without asking
+
+- A flex refusal for capacity is assumed unbilled, and a flex attempt abandoned for patience
+  returns no usage, so if OpenAI bills the partial work it is not metered.
+- The timing tests that raced a loaded machine now ring their own clocks: the flex patience waits
+  on an alarm the test arms, a run is awaited until every event it recorded reached the bus, and
+  the client timeout is tested through a transport that always sees the request.
+- The fixtures that named another provider name OpenAI models, and a refusal of another provider
+  is shown with a made-up one.
+
+## 2026-10-04 — WordPress categories, their own records, and the whole workbook in one import
+
+*Superseded the same day by "no categories: the client's Category columns are WooCommerce's" at
+the end of this file, all but the whole workbook; kept as history.*
+
+The client writes Category and Subcategory in his sheets, and none of it reached the site,
+although categories are a second way through it for his visitors; and a workbook imported one sheet
+at a time, in an order that mattered. The owner's decisions of 2026-10-03: only the Category,
+Subcategory and deeper columns are WordPress categories, never Root Entity; a page is filed under
+the whole chain, a missing term is created and an existing one reused; a product gains our product
+categories and never loses the client's, and a revert takes back only ours; a workbook is one
+preview and one apply. The first model built that day made a category a flag on an entity. On
+2026-10-04 the owner corrected it: categories are WordPress categories, entities are entities,
+different records, never mixed.
+
+### The model
+
+- **A category is its own record**, `internal/domain/category`: a site, a name, the key the name
+  folds to and a parent, with `Chain` reading a leaf's path root first and stopping at a loop.
+  `categories` (migration 0039) keeps a key unique under its parent and at the top of its site, a
+  child goes with its parent and everything with the site; `category_terms` (0040) keeps one term
+  per category and taxonomy, `category` or `product_cat`; `pages.category_id` (0041) is the leaf a
+  page is filed under, `''` for none.
+- **`pages.category_id` has no foreign key**, for the reason `run_items.blocked_by` has none:
+  SQLite's `DROP COLUMN` refuses a constrained column, so the down migration could not round-trip.
+  `CategoryRepo.Delete` therefore removes the branch, whose terms cascade, and files every page
+  under it under no category itself.
+- **`category.Key` is the rule WordPress compares term names by**: decoded once, trimmed, inner
+  whitespace collapsed, a non-breaking space included, and Unicode case folded, so two names share
+  a key exactly when `wp.SameTermName` says they match. It is deliberately not `graph.Key`, which
+  trims and lowers ASCII letters the way SQLite's `NOCASE` does, because an entity's name is
+  refused by the store under that rule and a category's by WordPress under the other.
+- **A page is filed by its category, never by its entity.** One leaf per page; a technical page or a
+  page whose entity was deleted is filed when it has a category, and a page with an entity and no
+  category is not. Nothing files a page by hand: a page planned by a person or the agent is filed
+  once a sheet names its category.
+- **The flag model is undone by new migrations, not edited out.** `entities.site_category` (0033),
+  `entity_terms` (0034), `graph.CategoryChain`, the term repository and `siteCategory` in the views
+  and the `graph_update_entity` tool are gone; 0033 and 0034 may already be applied to a database on
+  `dev`, so 0042 and 0043 drop what they made and each down brings it back exactly. Nothing is
+  converted: the work was unreleased, and the flag model had flagged roots too.
+
+### The import
+
+- **Only a root level makes a group.** `Root Entity` and `Root` columns make entity groups as
+  before; every other level column gives the row a chain of category names and makes no group, no
+  entity, no parent edge and no `group_without_page`. This **supersedes** the 2026-10-02 line that
+  the level columns build a tree of groups. A row with only category levels and no path, entity or
+  root is skipped, `no_target`.
+- **A root's name is never a category.** A category level whose key is in the request's root set is
+  dropped from the chain, the next level hanging on the previous kept one, and reported with the
+  sheet and row as `category_level_is_root`, which blocks nothing. The root set is every name in a
+  root column of any chosen sheet; the name of every entity of the site with no parent whose kind
+  is hub or category; and the name of every such entity the request itself plans, when one of its
+  category levels uses it. For that third part the request is planned again until the set stops
+  growing. Peptides is the Root Entity of the Groups sheet and the Category of Catalog and
+  Entities, and it never becomes a category, whether the sheets come together or one by one.
+- **Why hub or category, and not every entity at the top.** Counting every parentless entity made
+  a top-level topic, a Blends page, remove the category Blends on the second import of the sheet
+  that created both. A dropped level keeps its place among the row's levels, so it still tells
+  apart two entities of one name below it.
+- **One edge stays open by that rule:** the site's half is read as the site was before the import,
+  so a request that relabels a top-level hub as a topic and also uses its name as a category level
+  drops that level on its first import and makes the category on the second. Reading it from the
+  planned state instead could flip between passes.
+- **A row's entity takes its parent from** its parent cell; else the entity named like the deepest
+  category level that exactly one entity carries, skipping the row's own name; else its root
+  group, or a root-named level it dropped; else the URL tree. The category stays its own record:
+  this places the entity in the graph only, as weakly as the URL tree, so an entity that already
+  has a parent gets no second one. The category's entity comes before the root group because the
+  Catalog's "BPC-157 10 mg vial" sits under Peptides › BPC-157, and the dropped Peptides would
+  otherwise take it from BPC-157.
+- **Categories are matched by parent and key** against the site's records and those an earlier
+  sheet of the same request planned, and created parent first when missing, spelled as the first
+  sheet that names them. The page takes the leaf; an empty chain leaves it where it was, because an
+  empty cell erases nothing, and a different chain files it again. The apply writes the categories
+  before the pages and, in the same transaction, deletes every category with no page and no term
+  anywhere under it, deepest first, so a renamed level leaves no ghost; the preview says so first.
+- **The export writes a page's chain** into Category, Subcategory and Sub Subcategory, as many
+  columns as the deepest chain needs and no more than the three the detector reads back; a deeper
+  chain keeps its first three levels and the export answers `category_chain_cut`.
+
+### The whole workbook
+
+- **A workbook is one preview and one apply.** A request may name its sheets, each with its own
+  mapping; they are planned in the workbook's order, each on the site as the sheets before it would
+  leave it, which `siteState.after` folds the way `write` persists a plan, scopes and categories
+  included. One transaction writes every plan, the row budget is shared, and a mapping saved from a
+  workbook is kept per sheet as "name / sheet". The one-sheet `mapping` stays. A scope that would
+  clash is a blocking `scope_clash` in the preview, where it was a conflict at apply.
+- **`Inspect` reads every sheet as its own**: the mapping detected from its own headers and its row
+  type, products only when the site sells and every row with a path finds one product.
+- **Every finding names its sheet**, as "Catalog · row 4", and one with no row names its sheet.
+- **A mapping is resolved before it is used**: a saved id loads that mapping of the same site, and
+  one with no columns, groups or indents is detected from the sheet's headers; an apply saves what
+  it resolved. The agent's `imports_preview` and `imports_apply` now do what their descriptions
+  promised, where they imported nothing without a mapping and never loaded a saved id, and take
+  `sheets`.
+- **The client workbook as one import equals its four sheets one by one**: entities, kinds,
+  scopes, keywords, edges, pages, canonical pages, categories and the filing of every page; and a
+  second import writes nothing.
+
+### The run engine files a page
+
+- **Publish files a page or a post under its whole chain**, in the write that carries its body; no
+  step was added. A stored term is reused while it still sits under the wanted parent, the rest is
+  ensured in WordPress (found under its parent by decoded name, else created, else, on
+  `term_exists`, the term WordPress names), and every term is kept against its category. A create
+  sends the chain and an update the union with what the item carries; `added` is what the item did
+  not carry before, which is all a revert takes back.
+- **A category never stops a page.** A refused permission is `categories_forbidden`, another refusal
+  from WordPress `category_refused` in its own words, a page on a site without `page_categories`
+  `page_categories_need_plugin`, an item that did not keep the list `categories_not_taken`; all are
+  warnings and the report's note says the page's categories are not on the site. A term row that
+  cannot be kept is an error, a 5xx is the step's retry, and a retried ensure creates nothing twice.
+- **A product gains our product categories beside the client's.** The chain's `product_cat` terms
+  are added to the categories the product carries, in the `wc/v3` save of its other fields, before
+  the hash is read again and the description goes through the raw route; nothing is sent when the
+  product already carries them, and the client's are never taken off. WooCommerce replaces the
+  whole list, so the union is what is sent. This **supersedes** the 2026-10-03 rule that a
+  product's categories are never written; its name, price, stock, SKU, status and slug still never
+  are.
+- **A revert takes back only what the run added.** A page or a post gets its current categories
+  less the run's, an explicit empty list when none are left, and a product the same inside its one
+  `wc/v3` restore. The terms the run created stay on the site and the revert names them,
+  `revert_terms_kept`, as it keeps media: a term may have been reused since. A list it cannot put
+  back is `revert_categories_kept`.
+- **A sync adopts the terms already on the site.** Every category record is matched from the root
+  down by its key under the parent term already matched, in `category` and, when the store is
+  ready, in `product_cat`; a match is kept with no run, a mapping whose term is gone is dropped, and
+  a taxonomy the site will not list is `categories_unread`, not a failed sync. It reads no entity,
+  so an entity named like a term files nothing.
+- **The estimate warns `page_categories_need_plugin`** for a WordPress page with a category on a
+  site whose stored capabilities lack `page_categories`, at no request; the publish checks the live
+  manifest.
+- `publish_result.categories` keeps `{taxonomy, terms[{categoryId, name, termId, parentId,
+  created}], previous, added, taken}`. A revert reads only what was added and created, so a result
+  written under the flag model, which named an `entityId`, still reverts.
+
+### The companion plugin 1.3.0
+
+- **It files pages under categories and lists them on category archives.** It registers the core
+  category taxonomy for pages on `init` after core does, so `/wp/v2/pages` takes and returns
+  `categories`, and adds pages to the post types of a category archive's main query outside
+  wp-admin, keeping what the query already names. The manifest advertises `page_categories`.
+  Without it, posts and products are still filed, and a page goes up uncategorised and says so.
+- **Accepted with it:** a client's category archives, feeds and sitemaps list pages once the plugin
+  is updated, and the page editor gains a Categories box.
+
+### What the screens and the services say
+
+- **A page names the categories it is filed under**, root first, as `{id, name, termId?}`: in
+  `category` for a page or a post, in `product_cat` for a product, none for a product category; a
+  WordPress page on a site whose plugin cannot file it says so. An entity shows its canonical page's
+  chain, else its only page's.
+- **`PagesService.ListCategories` is unpaged, like `Tree`**: it answers every category of the site
+  with its pages and terms, a number of rows bounded by what imports create. The page list's
+  `categoryId` always keeps the whole branch, with no flag beside it.
+- The Pages rail holds the category tree, each node with its pages and whether the site has its
+  term yet; the pages, the entities, the runs, the revert, the site and the import preview name
+  the categories in words.
+
+### Decided without asking
+
+- `Root` and `Root Entity` are the only root headers; `Root Category` and any other level header,
+  `Brand` say, is a category level.
+- A run over the client workbook's pages needs a template picked at start or a site default,
+  because the workbook carries no page kind; on a site with WooCommerce, the Catalog's `/shop/`
+  parent is WooCommerce's own page.
+- Real WordPress gives a new post with no category "Uncategorized", which the union keeps beside
+  ours and an emptied list brings back; the site's own category is never taken off.
+
+## 2026-10-03 and 04 — the code rewritten many times, read again
+
+The owner asked for the code that had been rewritten many times to be read again: the composition
+root had 43 commits and a 235-line `build`, `sync_site.go` 861 lines. Behaviour was held still by
+tests written before each move.
+
+- **The composition root builds by area.** `core.go` keeps the core, `Open` and a `build` that calls
+  `build_repos.go`, `build_llm.go`, `build_services.go`, `build_runtime.go` and `build_agent.go` in
+  the order their dependencies fix: repositories, the model chain, authoring, the engine, the use
+  cases, the agent, the scheduler.
+- **The steps live by concern.** `steps.go` keeps the registry; the dependencies, the artifacts, the
+  link policy (one, for the steps and the preflight), the writer's ceiling, the prompts and the one
+  request every model step sends, the WordPress helpers and the page links each have a file;
+  `sync_site` splits into pull, cursor, reconcile, archive and settle; the two relinks share one
+  core; publish reads as named stages. A page's parent from its path comes from
+  `pagemap.Index.PathParentID` in the sync and the pages service alike, and the import keeps store
+  items out of that index, so a store item is never a page's parent.
+- **The run engine reads by life cycle**: claim, execute, settle an item, settle a run, enqueue,
+  control, requeue, regenerate, each in its own file, with a test pinning every path by the events
+  and executions it records. `Engine.Wake`, called only by its own test, and `Engine.Recover`, which
+  only renamed the sweep, are gone. `domain/run` keeps a file per concern with its const blocks
+  whole, so `vocab.ts` renders byte for byte the same.
+- **The import is a pipeline of named stages**, with one identity for a unit, by its entity once
+  matched and by its chain of parents before.
+- **The frontend shares what it had copied**: one query codec for a screen's address, the sort
+  helpers, the failure readers, one clock, the page badges and cells. The reports Pages tab coloured
+  an item's status by its page, so a failed item on a published page showed green; it reads the
+  item now.
+- **What nothing called is gone.** In Go: `wp.SEOFields`, the `wp` path wrappers `pagemap` owns,
+  `wp.StoreForbidden`, `Brief.RequiredHeadings` and `PhraseTexts`, `dbx.Ok` and `Err`, the UUID,
+  enum, float and bool sort keys, `ctx.WithRunID` and `WithConversationID` with the audit log
+  fields that read them, `errors.Stack` and `Frame` with the stack every error captured,
+  `middleware.Timeout`, the two `"openai"` provider constants beside `llm.ProviderOpenAI`,
+  `RunRepo.Active`, `Graph.Roots`, `MessageRepo.LatestSeq` and `ByConversation`,
+  `CategoryRepo.Get`, `ScanUpdatedAt`, `Store.Path`, `sqlitetest.OpenEncrypted`,
+  `pagemap.Unmapped`, `InternalPath`, `Index.Len` and `Observed.Empty`, with `Index.PathParent`
+  folded into `PathParentID`, and exports one file used, `graph.NewAnchors` and `graph.Scopes`
+  among them, are unexported. In the frontend: three hooks with no
+  caller and their endpoint wrappers, `runPhase`, `actionStatusTone`, `keywordTexts`, a second run
+  status tone and a second copy of the page status words. This **supersedes** the Phase 0 note that
+  `Stack` is nil-receiver safe. The errors the agent could hand to nobody go to `Deps.Dropped`,
+  which the composition root logs.
+- **Three keys, each the rule of whoever refuses a duplicate.** `graph.Key` trims and lowers
+  ASCII letters only, which is what SQLite's `NOCASE` does to `entities.name` and
+  `entity_anchors.text`; `TestTheGraphKeyRefusesWhatTheStoreRefuses` inserts each pair into a real
+  store and shows the store refuses exactly the pairs the key folds together, so Café and CAFÉ under
+  one parent are two entities in Go as they always were in the database. It replaces the name key,
+  the anchor check and the name sort of `graph`, the fold of `application/graph` and the import's
+  key, which lowered every letter and so merged in Go what the store keeps apart. A keyword is one by
+  its own Unicode lowercase, found in its list by `keyword.List.Find`; a category by
+  `category.Key`, WordPress's term-name rule, stored as `name_key`.
+- **One helper per job**: `dto.TimeOf` for an instant that may be missing,
+  `dto.PageSize` for a list's limit in place of `ListRequest.Normalize`, and `graph.Distinct`,
+  which keeps a list of texts once as the store tells them apart, in place of a
+  `CleanKeywords` that cleaned no keyword. The four `anchorsOf` say what each builds
+  (`requestedAnchors`, `sheetAnchors`, `targetAnchors`, `placedAnchors`). Thirteen repository
+  `List` methods repeated the keyset, the query, the select and the cut; `selectKeyed` does it once
+  and each keeps only its filters, and the nullable-column helpers live together in `rows.go`.
+- **A run or an item that waited before its first step still starts.** A run paused before it
+  started and then resumed came back running, so its first claim never set `StartedAt` nor
+  announced `run.started`, and the window showed a finished run with no start; an item held behind
+  its parent before its first claim never announced `item.started`. A run now starts on its first
+  real claim whatever its status, and an item when it reaches its first step with nothing recorded.
+- **A repair leaves a post where its permalink puts it.** `repair_hierarchy` sent a post the parent
+  its path implied, WordPress kept the post flat, and the item paused on a mismatch nobody could
+  resolve. The preflight refuses a post with `post_unnested`, beside `store_placed`, and the step
+  refuses one before it writes.
+- **A matched entity keeps the anchors it carries.** An import rewrote every anchor of a matched
+  entity as a user anchor of weight 1 whenever anything about it changed, so a re-import that added
+  a keyword turned the agent's anchors into the user's and reset every weight. The sheet's anchors
+  are unioned with the carried ones: those the entity holds stay exactly as they are, one
+  `graph.Key` finds in none of them is added as a user anchor of weight 1, and `sameEntity`
+  compares whole anchors, so an entity is skipped only when its anchors are equal in text, source
+  and weight.
+- The canvas under the graph map was left as it is, by the owner's choice.
+
+## 2026-10-04 — no categories: the client's Category columns are WooCommerce's
+
+The client saw the categories built that day and said that the Category, Subcategory and Sub
+Subcategory columns of his sheets are WooCommerce's product categories, which he keeps himself in
+the store. The owner removed categories from the whole application the same day, the Go and the
+screens, as if they had never been added, and kept every other change of the same commits: the
+OpenAI-only client, the spend panel, the whole workbook in one import, the rewrite and `graph.Key`.
+None of it had been released.
+
+### The owner's answers
+
+- **The Category columns are ignored.** Category, Subcategory, Sub Subcategory and every other
+  level column make no category and no entity group; only a `Root Entity` or `Root` column makes a
+  group. That holds wherever a level column comes from: the detection proposes only the root
+  headers, and a saved mapping or the agent that names Category keeps it stored and reads it
+  ignored. `Mapping.Bind` and `Uses` keep only the root level columns and report every other one,
+  `Root Category` and `Brand` among them, as `ignored`; a mapping maps something only through a
+  field, an indent column or a root column (`Mapping.Unmapped`), so one that names only Category
+  and Subcategory is refused when saved and detected from the sheet's headers when previewed; the
+  wizard offers as group columns only the root headers detected for the sheet. The option keeps its
+  name, `levelColumns`, because it is stored JSON and part of a tool's schema, and no stored mapping
+  is migrated.
+- **No product category is written again.** A product's name, price, stock, SKU, status, slug and
+  categories are never sent, the 2026-10-03 rule, and a product revert touches no category.
+- **A URL parent wins inside the row's Root group.** A row's entity takes its parent from its
+  parent cell; else from its URL parent, when that parent lies inside the row's own Root group; else
+  from the Root group; else from the URL tree. With Root Peptides, `/peptides/bpc-157/liquid/` puts
+  Liquid under BPC-157, not under Peptides. One predicate, `inGroup`, says whether a parent lies
+  inside the group: a planned unit does when it, or a unit above it, is the group or one of its
+  rows, the walk ending at a parent a cell names; an entity on the site does when it, or an entity
+  it is named under, carries the group's name by `graph.Key`, and a planned unit whose parent is on
+  the site walks on there. A URL parent that is the group's own page gives the group, as before,
+  and one in another Root group gives the row's own group. The URL parent is kept as weakly as the
+  URL tree, so a matched entity that has a parent keeps it. A parent cell is resolved by the same
+  predicate, so one that names a namesake deeper in the group is found instead of being
+  `ambiguous_parent`.
+- **What it does to the client workbook.** The Groups sheet keeps its eight entities and seven
+  edges, because every URL parent in it lies inside Peptides, so BPC-157's Liquid and Powder stay
+  under BPC-157 and TB-500's Liquid and Capsules under TB-500. The Catalog, which names no root, puts
+  its four products under the generated Shop by the URL tree, where its Category column had put
+  three of them under BPC-157 and TB-500. The workbook as one import still makes sixteen entities,
+  equal to its sheets one by one.
+
+### Decided without asking
+
+- **A forward migration undoes the records.** 0044 drops the index `pages_category`, then
+  `pages.category_id`, then `category_terms` with its index and `categories` with its two; its down
+  recreates them with the exact text and index names of 0039–0041, the column last. 0039–0043 are
+  not edited, as 0042 and 0043 undid the flag model's 0033 and 0034 without editing them. Nothing is
+  converted: a development database loses its category records and its filings, which were never
+  released.
+- **The companion plugin returns to 1.2.0**, byte for byte its content at `v2.3.0`: 1.3.0 and its
+  `page_categories` was the only plugin change since, and it never shipped. `wp-plugin/openapi.yaml`
+  is the 1.2.0 contract again.
+- **`wp/category.go` is not restored**: its `ListCategories` and `CreateCategory` had no production
+  caller even before the category work. The terms client, `wp.SameTermName` and the term id a
+  refusal named go with the rest of the adapter's category code.
+- **What the range added for categories and other code now uses stays**: `wp.Forbidden`, which
+  three other callers read; `pages.Deps`, without its two category fields; the run screens' revert
+  and sync findings lists, which show every finding, `revert_meta_kept` among them; the workbook's
+  per-sheet `after` fold, which keeps the scopes, and `scope_clash`.
+- **Not this feature, and kept**: the graph's entity kind `category` and its synonyms, the Category
+  template, a product category page (`product_cat` as a page type, `product_category_unwritable`)
+  and every guard that refuses to write one.
+- **What an earlier run left is harmless.** A run artifact written with `publish_result.categories`
+  decodes with the field ignored, and its revert touches no category. A site whose stored
+  capabilities still name `page_categories` keeps the word until its next sync, and nothing reads
+  it.
+
+### What it supersedes
+
+- **The whole 2026-10-04 categories section** as it bears on categories: the category records and
+  `category.Key`, the category chains and the root rule of the import, the parent taken from the
+  deepest category level, the export's category columns and `category_chain_cut`, the filing on
+  publish, the product categories, the revert's terms, the sync's adoption,
+  `page_categories_need_plugin`, `publish_result.categories`, the plugin 1.3.0 and what the screens
+  and the services said of categories, `PagesService.ListCategories` among them. Its whole workbook
+  stands, less the categories it named: the `after` fold keeps the scopes, and the workbook as one
+  import equals its sheets one by one with no category or filing left to compare. Its line that
+  only a root level makes a group stands, with every other level column ignored where it was a
+  category level, and its undoing of the flag model by 0042 and 0043 is the precedent 0044 follows.
+- **The 2026-10-04 line that a product gains our product categories beside the client's**, which
+  had superseded the 2026-10-03 rule: the 2026-10-03 rule holds again.
+- **The 2026-10-02 line that the level columns build a tree of groups**: only the Root levels do,
+  as they had since 2026-10-04, and the others are ignored.
+- **The parent precedence** of 2026-10-02, "the parent cell, else the row's deepest group, else the
+  URL tree", and its 2026-10-04 form through the deepest category level: the precedence is the one
+  above.
+- **The third of the rewrite's three keys**: `category.Key` goes with the records; `graph.Key` and
+  a keyword's own lowercase remain.

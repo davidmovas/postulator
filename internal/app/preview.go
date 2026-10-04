@@ -11,13 +11,13 @@ type previewIssuer struct {
 	clients siteClients
 }
 
-func (p previewIssuer) IssuePreview(ctx context.Context, siteID string, wpID int64) (pages.IssuedPreview, error) {
+func (p previewIssuer) IssuePreview(ctx context.Context, siteID string, wpID int64, wpType string) (pages.IssuedPreview, error) {
 	client, err := p.clients.Client(ctx, siteID)
 	if err != nil {
 		return pages.IssuedPreview{}, err
 	}
 
-	link, err := client.PreviewLink(ctx, wpID)
+	link, err := client.PreviewLink(ctx, wp.ItemType(wpType), wpID)
 	if err != nil {
 		return pages.IssuedPreview{}, err
 	}

@@ -1,6 +1,7 @@
 package llm_test
 
 import (
+	stderrors "errors"
 	"testing"
 	"time"
 
@@ -31,6 +32,7 @@ func TestModelInfoValidate(t *testing.T) {
 	}{
 		{name: "a catalog entry is valid"},
 		{name: "the reference is required", mutate: func(i *llm.ModelInfo) { i.Ref.Model = "" }, wantErr: true},
+		{name: "only an OpenAI model is accepted", mutate: func(i *llm.ModelInfo) { i.Ref.Provider = "retired" }, wantErr: true},
 		{name: "the context window is positive", mutate: func(i *llm.ModelInfo) { i.ContextTokens = 0 }, wantErr: true},
 		{name: "the output ceiling is positive", mutate: func(i *llm.ModelInfo) { i.MaxOutputTokens = 0 }, wantErr: true},
 		{name: "the output fits the context", mutate: func(i *llm.ModelInfo) { i.MaxOutputTokens = i.ContextTokens + 1 }, wantErr: true},
@@ -41,6 +43,37 @@ func TestModelInfoValidate(t *testing.T) {
 		{name: "the cached price may be left undeclared", mutate: func(i *llm.ModelInfo) { i.CachedInputUSDPerM = 0 }},
 		{name: "the request rate is positive", mutate: func(i *llm.ModelInfo) { i.RPM = 0 }, wantErr: true},
 		{name: "the token rate is positive", mutate: func(i *llm.ModelInfo) { i.TPM = 0 }, wantErr: true},
+		{name: "flex prices may be declared", mutate: withFlex(1, 0.1, 6)},
+		{name: "a flex row may leave its cached price undeclared", mutate: withFlex(1, 0, 6)},
+		{name: "the flex input price is not negative", mutate: withFlex(-1, 0, 6), wantErr: true},
+		{name: "the flex cached price is not negative", mutate: withFlex(1, -0.1, 6), wantErr: true},
+		{name: "the flex output price is not negative", mutate: withFlex(1, 0.1, -6), wantErr: true},
+		{name: "the flex cached price does not exceed the flex input price", mutate: withFlex(1, 2, 6), wantErr: true},
+		{name: "a flex input price needs a flex output price", mutate: withFlex(1, 0.1, 0), wantErr: true},
+		{name: "a flex output price needs a flex input price", mutate: withFlex(0, 0, 6), wantErr: true},
+		{name: "a flex cached price needs a flex input price", mutate: withFlex(0, 0.1, 0), wantErr: true},
+		{name: "a cache write price may be declared", mutate: func(i *llm.ModelInfo) { i.CacheWriteUSDPerM = 2.5 }},
+		{name: "the cache write price is not negative", mutate: func(i *llm.ModelInfo) { i.CacheWriteUSDPerM = -1 }, wantErr: true},
+		{
+			name: "a flex cache write price may be declared",
+			mutate: func(i *llm.ModelInfo) {
+				withFlex(1, 0.1, 6)(i)
+				i.FlexCacheWriteUSDPerM = 1.25
+			},
+		},
+		{
+			name: "the flex cache write price is not negative",
+			mutate: func(i *llm.ModelInfo) {
+				withFlex(1, 0.1, 6)(i)
+				i.FlexCacheWriteUSDPerM = -1
+			},
+			wantErr: true,
+		},
+		{
+			name:    "a flex cache write price needs a flex input price",
+			mutate:  func(i *llm.ModelInfo) { i.FlexCacheWriteUSDPerM = 1.25 },
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range cases {
@@ -63,6 +96,32 @@ func TestModelInfoValidate(t *testing.T) {
 	}
 }
 
+func TestModelInfoValidateRefusesAnotherProviderOnItsField(t *testing.T) {
+	t.Parallel()
+
+	for _, provider := range []string{"retired", "OpenAI", " openai"} {
+		info := validInfo()
+		info.Ref.Provider = provider
+
+		err := info.Validate()
+		var kernel *errors.Error
+		if !stderrors.As(err, &kernel) || kernel.Code != errors.Invalid {
+			t.Fatalf("Validate() with %q = %v, want %s", provider, err, errors.Invalid)
+		}
+		if kernel.Details["field"] != "provider" {
+			t.Errorf("Validate() with %q names the field %v, want provider", provider, kernel.Details["field"])
+		}
+	}
+}
+
+func withFlex(input, cached, output float64) func(*llm.ModelInfo) {
+	return func(i *llm.ModelInfo) {
+		i.FlexInputUSDPerM = input
+		i.FlexCachedInputUSDPerM = cached
+		i.FlexOutputUSDPerM = output
+	}
+}
+
 func TestCallValidate(t *testing.T) {
 	t.Parallel()
 
@@ -82,6 +141,9 @@ func TestCallValidate(t *testing.T) {
 		{name: "the identifier is required", mutate: func(c *llm.Call) { c.ID = "" }, wantErr: true},
 		{name: "the reference is required", mutate: func(c *llm.Call) { c.Ref = llm.ModelRef{} }, wantErr: true},
 		{name: "the status is known", mutate: func(c *llm.Call) { c.Status = "maybe" }, wantErr: true},
+		{name: "a call served on flex is valid", mutate: func(c *llm.Call) { c.Tier = llm.TierFlex }},
+		{name: "a call served on the default tier is valid", mutate: func(c *llm.Call) { c.Tier = llm.TierDefault }},
+		{name: "the tier is known", mutate: func(c *llm.Call) { c.Tier = "priority" }, wantErr: true},
 	}
 
 	for _, tc := range cases {

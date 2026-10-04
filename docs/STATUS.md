@@ -3,13 +3,101 @@
 The handoff point between sessions. Read this first. The reasoning behind every phase and
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
-**Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks. The
-2026-09-25 work is on `claude/cool-archimedes-5qgsre`, to reach `dev` when the owner asks.
-**Released:** `v2.1.0` on 2026-09-23; **`v2.2.0` is on `dev` awaiting the owner's build and tag**
-(this session ran on Linux, so `task build`, `task e2e:full` and the sandbox walk are listed
-under **Next steps** rather than under **The gate**).
+**Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
+**Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02,
+2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
+run is under **The gate**.
 
 ## Where we are
+
+**2026-10-03 and 04** answers the client's $10 of OpenAI spend that bought little, imports a
+whole workbook at once, and reads again the code that had been rewritten many times; the
+WordPress categories built that day for the Category and Subcategory of his sheets were removed
+the same day on his word. The reasoning is under the four sections of those dates in
+`DECISIONS.md`.
+
+- **OpenAI only, through our own Responses API client** (`internal/adapters/llm/openai`, faked
+  by `openaitest`); gollem and the Anthropic, Gemini and go-openai SDKs are gone, and migration
+  0038 drops the profiles of the removed providers. A structured answer is one strict call, a
+  credit refusal waits for a person instead of five retries, `Retry-After` is read, the writer runs
+  on flex and falls back to the default tier, and a single call stays out of the prompt cache.
+- **Reasoning and speed per role** are settings in Settings → Models (`llm.effort.*`,
+  `llm.tier.*`, `llm.flexPatience`); the effort left the catalog row (0037). The writer is paid
+  for at most two truncated answers, then the page waits for a person. The estimate prices each
+  step at its role's tier and reasoning.
+- **The spend is in view** (0035, 0036): the ledger books reasoning, cache writes, the served tier
+  and a cancelled stream; Settings → Models shows the spend by purpose, by model and tier and the
+  recent calls, and a run's report what each step cost. Five spend bugs are fixed, and a price an
+  override left at zero takes the built-in price.
+- **The agent runs on the same chain as the runs**, with a ledger row per attempt and its own
+  `responses/1` history: a conversation from before keeps its transcript and the model forgets
+  it. Its tool schemas went from 85,991 to 63,183 bytes a round; loading tools on demand
+  (`agent.toolLoading: deferred`, 6,506 bytes a round) is built and off until a funded key has
+  tried it.
+- **WordPress categories were built and removed the same day.** Records of their own
+  (`categories`, `category_terms`, `pages.category_id`, migrations 0039 to 0041, after a first
+  model as a flag on an entity that 0042 and 0043 undid) filed pages, posts and products under the
+  chain of a sheet's Category columns. The client then said those columns are WooCommerce's, which
+  he keeps himself, and the owner took categories out of the whole application: migration 0044
+  drops the three, nothing is filed under a WordPress or WooCommerce category and none is written,
+  the import ignores every level column but Root Entity and Root, and a URL parent wins inside the
+  row's Root group. The Catalog's products, which no Root names, sit under its Shop page by the URL
+  tree.
+- **The companion plugin stays 1.2.0**: the 1.3.0 that filed pages under categories never shipped,
+  and the plugin's sources are those of `v2.3.0` again.
+- **A workbook imports in one go**: one preview and one apply over the chosen sheets in the
+  workbook's order, a tab per sheet, every finding naming its sheet, a scope clash caught in the
+  preview, and a saved mapping or the sheet's own headers resolved before use, which is what makes
+  the agent's import tools work without a mapping.
+- **The refactor**: the composition root builds by area, the steps live by concern, the run engine
+  reads by life cycle (`Engine.Wake` and `Recover` are gone), the import is a pipeline of named
+  stages, the frontend shares its helpers, and the exports nothing called are deleted. The reports
+  Pages tab no longer colours a failed item green; a re-import no longer rewrites a matched
+  entity's anchors as the user's at weight 1, losing the agent's and every weight, but keeps them
+  and adds only the sheet's new ones; a run resumed before it started now starts; a repair refuses
+  a post, which WordPress keeps flat. An entity's name and anchors compare by `graph.Key`, the
+  store's own `NOCASE`.
+
+**2026-10-03** edits the products the client creates by hand in WooCommerce; the reasoning is
+under **2026-10-03** in `DECISIONS.md`.
+
+- **A product run writes** the description through the plugin's raw route, then the short
+  description, the attributes the product lacks and an image where it has none through
+  WooCommerce's REST API, and the SEO meta; the name, price, stock, SKU, status, slug and
+  categories are never written. A template declares the outputs in its `product` block.
+- **A product is refused before anything is spent** when the store is not editable, the plugin is
+  missing, the row has no product or the run is a draft; a revert hands back a product a human
+  changed since and otherwise puts back exactly what the run replaced.
+- **A sheet says its rows are products** (`rowType`), each row finds the client's product by its
+  address, its slug or its name and keeps the sheet's URL as `planned_path` (migration 0032), and a
+  product created after the import claims the row that waited for it on the next sync. A site
+  records whether its store can be edited (`sites.commerce`, migration 0031).
+- **`sync_back` warns when a published product's page does not show its description** to a
+  visitor, the sign of a page builder, a cache or coming-soon mode.
+- `internal/e2e/products_test.go` runs the whole loop against WooCommerce 11.1.2 on the docker
+  stack.
+
+**2026-10-02** makes the client's SEO workbooks import: the reasoning is under **2026-10-02** in
+`DECISIONS.md`, and `samples/client-sheets.xlsx` carries the four sheet shapes the client uses.
+
+- **Keywords are one list with volumes** on pages and entities (migration 0029), read from one
+  cell as `bpc 157 (12000), buy bpc 157 (5,400), bpc-157`, sorted by volume, merged on a
+  re-import, and given to the writer numbered with their volume; a template says how many must
+  appear (`keywordRules.requiredKeywords`) and the missing ones are one `keywords_missing` warning.
+- **An entity's name is unique under its parent** (`entities.scope_entity_id`, migration 0030),
+  so a form's name repeats under every product; a shared name is labelled with its parent for the
+  model and the anchors, and shown as a path on the screens.
+- **The import reads the client's headers**: level columns (`Root Entity | Category |
+  Subcategory`) make groups that take a page only on evidence (since 2026-10-04 only a root level
+  does; the others are ignored), every row with a page gets an entity, a parent comes from the
+  parent cell, the group or the URL tree (since 2026-10-04 a URL parent inside the row's group
+  first), `Entity?` and other
+  questions stay ignored, `own_entity: no` makes a technical page, the entity level reads as the
+  kind, note columns travel with the page to the writer and back out, and the preview says what
+  each column became. Matching is by parent and name, an ambiguous name is a blocking finding, and
+  a repeated import changes nothing.
+- **A group without a page is passed through by the link plan** (`no_page`, optional), and the
+  page list filters by an entity and everything under it.
 
 **Phases 0 through 13 are complete, and the production hardening of 2026-09-22 and 23 with
 them.** The application composes a Wails v3 window over an adiantum-encrypted SQLite store:
@@ -23,8 +111,8 @@ events on their own windows.
 for a human, links not placed, the order wrong, every retry paid for again. The reasoning is
 under **2026-09-24 — 2.2.0** in `DECISIONS.md`.
 
-- **The import never plans `/`**, and a row's keywords land on the page (`pages.primary_keyword`,
-  `pages.keywords`, migration 0027) even when the row names no entity.
+- **The import never plans `/`**, and a row's keywords land on the page (migration 0027; one
+  list with volumes since 0029) even when the row names no entity.
 - **Entities are proposed for chosen pages or pasted keywords and written only once reviewed.**
   `GraphService.PreviewFromPages`, `ProposeFromKeywords` and `ApplyProposals`, the three tools
   beside them, and a three-step dialog on the Graph screen: pick pages or paste keywords, preview,
@@ -33,7 +121,8 @@ under **2026-09-24 — 2.2.0** in `DECISIONS.md`.
   are expanded per page in `ResolveForPage`, anything else is refused by `Validate`, and the writer
   gets the brief's headings back through `content.Assemble`, so `section_missing` cannot happen.
 - **The pipeline stops itself less.** A truncated or malformed answer is tried again with more room
-  and a repair round; the linker writes the phrases the body owes and falls back to a plain sentence
+  and a repair round (since 2026-10-03 with double the room once, and with no repair round, the
+  schema being strict); the linker writes the phrases the body owes and falls back to a plain sentence
   with a warning; validation only grades and holds a page with residual errors for a decision that
   `Engine.Accept` settles in one click; the judge and the image step never fail a page on their own
   clock; a post is sent no parent.
@@ -76,6 +165,52 @@ docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now
 by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
 
 ## The gate
+
+**2026-10-04, on Windows, whole, after the categories came out, at `2b74b4a`.** `gofmt -l .`
+silent, the comment check, `golangci-lint run` and `task lint:e2e` 0 issues, `go vet -tags e2e`
+and `-tags uiharness` clean; `go test -race -count=1 -p 2 -covermode=atomic` green over every
+package in the same five groups, the profiles merged into `coverage.out`; `go run
+./cmd/covergate` **domain+application 87.87% of 9166** (gate 80%), **total 88.40% of 21989**
+(gate 70%); `task build` green and `task vocab` and `task events` leave no diff; `npm run
+typecheck` clean and **1509 vitest tests in 143 files**; `task ui:lint` green (376 s); on a fresh
+8088 stack with WooCommerce on, `task e2e:test`, `task e2e:full` and `task e2e:full:noplugin`
+green. Migrations end at **0044**; **93 tools**, 63,183 bytes of schema against the 63,200 the
+registry test allows; **124 bound methods**; the plugin is **1.2.0**. Not run: a live OpenAI call
+with a funded key, and the `E2E_SEO=yoast` pass.
+
+**2026-10-04, on Windows, whole, over the 2026-10-03 and 04 work at `dad410e`.** `gofmt -l .`
+silent, the comment check, `golangci-lint run` and `task lint:e2e` 0 issues; `go test -race
+-count=1 -p 2 -covermode=atomic` green over every package, run in five groups (kernel+domain,
+adapters, application, runtime, transport+app+cmd) because one whole run was stopped by the
+machine running low on memory, the five profiles merged into `coverage.out`; `go run
+./cmd/covergate` **domain+application 87.92% of 9677** (gate 80%), **total 88.63% of 23151**
+(gate 70%); `task build` green and leaves no generated diff; `npm run typecheck` clean and **1624
+vitest tests in 151 files**; `task ui:lint` green (427 s); `task e2e:test`, `task e2e:full` and
+`task e2e:full:noplugin` green on 8088 with WooCommerce on (the `E2E_SEO=yoast` pass was run by
+unit K6 at `2cd8f18`). Migrations end at **0043**; **93 tools**, 63,304 bytes of schema against
+the 63,400 the registry test allows; **125 bound methods**. Not run: a live OpenAI call with a
+funded key (see Known gaps).
+
+**2026-10-03, on Windows, whole, over the 2026-10-02 and 2026-10-03 work.** `go test -race
+-count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...` green; `go run ./cmd/covergate`
+**domain+application 87.22% of 8819** (gate 80%), **total 87.28% of 21287** (gate 70%);
+`golangci-lint run`, `task lint:e2e` and the comment check 0 issues, `gofmt -l .` silent; `task
+build` green and leaves no generated diff; `npm run typecheck` clean and **1238 vitest tests in 121
+files**; `task e2e:test` and `task e2e:full` green on 8088 with WooCommerce 11.1.2, the adapter
+suite and the product loop green again under `E2E_SEO=yoast`, and `task e2e:full:noplugin` green.
+`task ui:lint` failed once at 369 s on a test its output did not keep and passed on the two runs
+after it. Migrations end at **0032**; **93 tools**, 84,923 bytes of schema against the 85,000 the
+registry test allows.
+
+**2026-10-02, on Windows, partial.** Run: `gofmt -l .` silent, the comment check,
+`golangci-lint run` 0 issues, `go vet -tags uiharness` and `go vet -tags e2e` clean, `task ui:lint`
+green (at `116a77c`), `npm run typecheck` clean and **1202 vitest tests in 119 files**; `go test
+-race -count=1 -p 2 ./...` green through `0701b03` apart from the wall-clock flakes of
+`internal/runtime`, each green alone, and every later commit green over the packages it touches,
+because the full run for `9d84f48` was stopped by the machine running low on memory. Migrations
+end at **0030**; **93 tools**, schema ceiling 80,700 bytes. **Not run:** `go run ./cmd/covergate`,
+`task build`, `task lint:e2e`, `task e2e:full`; the import side of the e2e client loop was checked
+without docker and holds (61 entities, 56 edges, the planted faults with their rows).
 
 Green on 2026-09-25 over the head of `claude/cool-archimedes-5qgsre`, on Linux, where
 `cmd/postulator`, `internal/app`, `adapters/browser/tor` and `adapters/secrets/{dpapi,masterkey}`
@@ -136,6 +271,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 12 | Master password, backup, retention, e2e, release | done, reviewed |
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
+| — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
 
 ## Known gaps
 
@@ -150,13 +286,37 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 - **The estimate prices the linker on up links and the lead keyword**, not on the down and
   sideways phrases `repair_links` now writes when the body lacks them (256 output tokens each).
 - **The image settings apply after a restart**: the adapter and the price reference are built
-  with the composition, and the Settings copy says so.
+  with the composition, and the Settings copy says so. So do `llm.timeout`,
+  `llm.openai.baseUrl` and `llm.flexPatience`, read when the model client is composed.
+- **What only a funded key can show.** The live probe ran on a key with no credit, which proves a
+  request's shape and nothing it costs. Owed at the pre-release smoke: the probe's open tests
+  (minimal effort and sampling, a stateless tool loop replayed across rounds, the replay forms of
+  an assistant message, a stream's `[DONE]` and obfuscation, what breaks the cache prefix, flex
+  served on terra and luna, the strict keyword matrix, whether output counts reasoning, field
+  limits, image tokens per quality), the body of a flex capacity refusal, `anyOf` for a nullable
+  object or array, and `cache_write_tokens` against a real bill. **The estimate prices an image at
+  1,056 output tokens whatever its quality.**
+- **Seven checks before `agent.toolLoading` becomes `deferred`**, with a funded key: a turn that
+  triggers `tool_search` parses its `tool_search_call` and `tool_search_output` items and its calls
+  carry the namespace; the next round, under `store: false`, accepts the search items replayed
+  without `id` or `status` and the namespaced call; a second turn accepts history calls replayed
+  without their namespace, and the setting switched both ways between turns works; `cached_tokens`
+  shows from round two and the tools cost about 1,600 input tokens a round before a search; the
+  model finds the
+  right group from the descriptions (`templates_create`, `imports_preview`, `runs_start`); a turn
+  stays within the loop limit of twelve; the loaded tool definitions show in the usage and the
+  ledger.
+- **A flex attempt abandoned for its patience returns no usage**, so partial work OpenAI may bill
+  for it is not metered, and a capacity refusal is assumed unbilled.
+- **`relink_page` reads the site record only after it wrote the page**: if that read fails, the
+  site holds the relinked body while the map keeps the old hash, and the next sync reports the
+  run's own write as drift.
 - **What a revert cannot put back:** media a run uploaded, because a delete needs `force=true`
   and sweeping media a human may have reused is worse; and, against plugin 1.1.0, the SEO meta,
   because the read is refused from the manifest and `revert_meta_kept` names it instead.
-- **The agent ledger is coarse and OpenAI's `Retry-After` is unreachable**: `go-openai` drops
-  the response headers, so the delay is read out of the provider's sentence and honoured up to
-  two minutes; `llm_calls` has no `message_id` or `round`, and `ledger.List` has no caller.
+- **`llm_calls` has no `message_id` or `round`**, so an agent turn's rows are found by its
+  conversation and their time. `Retry-After` is read since 2026-10-03, and `ledger.List` has its
+  caller in `ModelsService.ListCalls`.
 - **`ProposeFromPages` is one bound call** making one model call per forty unmapped pages, so
   thousands of them hold the window's call for minutes. Turning it into a run is the fix.
 - **UI residue, all seen in the walk, none of it wrong output:** the Models table shows about
@@ -187,20 +347,21 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Owner, on Windows and docker, for the 2026-09-25 work:** `task build`, `task ui:lint`,
-   `task e2e:full` (the client loop now asks the linker for down and sideways phrases and sees
-   `target_not_published` on a parent written before its children), then a sandbox walk with a
-   real provider: a hub and a child in one run, where the hub links to the child and a missing
-   link reads **Done, check** on the row; a template with AI images picked in the start drawer,
-   which moves the pages to it and draws the images; a planned page on the Linking screen, which
-   reads **Not written yet**; and an untouched built-in, which shows as version 2 without images.
-2. **Owner, before the 2.2.0 tag, on Windows and docker:** `task build` (the bindings and the
-   frontend under the real toolchain), `task ui:lint`, `task e2e:full` (the held-parent scenario
-   now exhausts the writer), and `task package`; then a walk on the sandbox with a real provider:
-   import a workbook with a `/` row and keywords, preview and apply entities for one branch and for
-   a pasted keyword list, a template with `{primaryKeyword}` in a heading, a run over a parent and
-   two children with one page held at validate and accepted, a regenerated parent whose children go
-   on by themselves, and the start dialog refusing a run whose provider has no key.
-3. The residue above: the denied tool row's decision, the four narrow-width UI items, the ledger
-   screen, `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared
-   value.
+1. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
+   (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
+   tokens from its second round), and the spend panel naming both by purpose and model; then the
+   probe's open tests and the seven checks under **Known gaps**, and only then a decision on
+   `agent.toolLoading`.
+2. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
+   E2E_PLUGIN=1 E2E_WOO=1`, after `task sandbox:reset` if it still carries plugin 1.3.0 and its
+   terms): import `samples/client-sheets.xlsx` as one workbook and check each sheet's tab, the
+   Groups segment, that Category and Subcategory read ignored, and the Groups sheet's deeper rows
+   under their URL parent inside Peptides; sync; run a page under TB-500 › Liquid; create a product
+   by hand in WooCommerce under a category of the client's own, import the variation sheet in
+   products mode, run it and see its categories untouched; revert both.
+3. **The client's own sites**: what a real model writes into the attributes, and whether a page
+   builder hides the description, which `product_description_hidden` will say.
+4. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
+   minor version.
+5. The residue above: the denied tool row's decision, the four narrow-width UI items,
+   `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared value.

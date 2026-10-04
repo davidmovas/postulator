@@ -5,6 +5,16 @@ import ExcelJS from "exceljs";
 import { planHeaders, planRows, messyHeaders, messyRows } from "./plan.mjs";
 import { crawlHeaders, crawlRows, feedHeaders, feedRows } from "./site.mjs";
 import {
+  catalogHeaders,
+  catalogRows,
+  groupsHeaders,
+  groupsRows,
+  variationsHeaders,
+  variationsRows,
+  wideHeaders,
+  wideRows,
+} from "./client.mjs";
+import {
   bikesRows,
   brokenHeaders,
   brokenRows,
@@ -103,6 +113,18 @@ async function main() {
           { name: "Notes", headers: notesHeaders, rows: notesRows },
         ],
         "messy-sheets.xlsx",
+      ),
+    ],
+    [
+      "client-sheets.xlsx",
+      await sheets(
+        [
+          { name: "Groups", headers: groupsHeaders, rows: groupsRows },
+          { name: "Catalog", headers: catalogHeaders, rows: catalogRows },
+          { name: "Entities", headers: wideHeaders, rows: wideRows },
+          { name: "Variations", headers: variationsHeaders, rows: variationsRows },
+        ],
+        "client-sheets.xlsx",
       ),
     ],
   ];

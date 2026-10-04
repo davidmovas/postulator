@@ -15,7 +15,9 @@ import (
 const (
 	NameSyncBack = string(run.StepSyncBack)
 
-	CodePlanNotKept = "plan_not_kept"
+	CodePlanNotKept              = "plan_not_kept"
+	CodeProductDescriptionHidden = "product_description_hidden"
+	CodeProductPageUnread        = "product_page_unread"
 
 	syncBackTimeout = 2 * time.Minute
 )
@@ -50,7 +52,7 @@ func SyncBack(deps Deps) run.StepDef {
 					WithDetail("pageId", sc.Page.ID)
 			}
 
-			itemType, err := itemTypeOf(sc.Page)
+			itemType, err := readType(sc.Page)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -67,12 +69,12 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			item, err := client.GetItem(ctx, itemType, published.WPID)
+			item, err := readItem(ctx, client, itemType, published.WPID)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			body, source, err := readBack(ctx, client, published.WPID, item.Content)
+			body, source, err := readBack(ctx, client, itemType, published.WPID, item.Content)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -111,6 +113,9 @@ func SyncBack(deps Deps) run.StepDef {
 				Source: source, Links: len(links), ModifiedAt: item.Modified.UTC(),
 				Mismatches: mismatches, Findings: planFindings(next, mismatches),
 			}
+			if seen := storefrontFinding(ctx, client, next, item, body); seen != nil {
+				result.Findings = append(result.Findings, *seen)
+			}
 			blob, err := encode(result, "sync result")
 			if err != nil {
 				return run.Result{}, err
@@ -140,26 +145,65 @@ func planFindings(page pagemap.Page, mismatches []pagemap.Mismatch) []content.Fi
 	return out
 }
 
-func readBack(ctx context.Context, client *wp.Client, wpID int64, fallback string) (body, source string, err error) {
-	raw, err := client.GetRaw(ctx, wpID)
+func storefrontFinding(ctx context.Context, client *wp.Client, page pagemap.Page, item wp.Item, description string) *content.Finding {
+	if item.Type != wp.TypeProduct || item.Status != "publish" || item.Link == "" {
+		return nil
+	}
+	details := map[string]any{"class": ClassNeedsHuman, "pageId": page.ID, "path": page.Path, "url": item.Link}
+
+	visit, err := client.Visit(ctx, item.Link)
+	if err == nil {
+		shown, readErr := content.DescriptionShown(description, visit.Body)
+		switch {
+		case readErr != nil:
+			err = readErr
+		case shown:
+			return nil
+		default:
+			return &content.Finding{
+				Severity: content.SeverityWarn, Code: CodeProductDescriptionHidden, Details: details,
+				Message: "the store saved the description of " + page.Path + ", and the product page a visitor opens " +
+					"does not show it: the theme or a page builder may lay the product page out without the description, " +
+					"a cache may still serve the page as it was, or the store may be in coming-soon mode",
+			}
+		}
+	}
+	details["reason"] = err.Error()
+	return &content.Finding{
+		Severity: content.SeverityWarn, Code: CodeProductPageUnread, Details: details,
+		Message: "the product page of " + page.Path + " could not be opened as a visitor sees it, " +
+			"so nothing says its description shows there: " + err.Error(),
+	}
+}
+
+func readType(page pagemap.Page) (wp.ItemType, error) {
+	if page.WPType == pagemap.WPProduct {
+		return wp.TypeProduct, nil
+	}
+	return itemTypeOf(page)
+}
+
+func readItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID int64) (wp.Item, error) {
+	if itemType != wp.TypeProduct {
+		return client.GetItem(ctx, itemType, wpID)
+	}
+	product, err := client.GetProduct(ctx, wpID)
+	if err != nil {
+		return wp.Item{}, err
+	}
+	return product.Item(), nil
+}
+
+func readBack(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID int64, fallback string) (body, source string, err error) {
+	raw, err := client.GetRaw(ctx, itemType, wpID)
 	if err == nil {
 		return raw.Content, "plugin", nil
+	}
+	if wp.IsPluginMissing(err) && itemType == wp.TypeProduct {
+		return fallback, "store", nil
 	}
 	if wp.IsPluginMissing(err) {
 		return fallback, "core", nil
 	}
 	return "", "", err
-}
-
-func persist(ctx context.Context, deps Deps, page pagemap.Page, links []pagemap.PageLink) error {
-	apply := func(c context.Context) error {
-		if err := deps.Pages.Update(c, page); err != nil {
-			return err
-		}
-		return deps.Links.ReplaceForPage(c, page.ID, links)
-	}
-	if deps.UnitOfWork == nil {
-		return apply(ctx)
-	}
-	return deps.UnitOfWork.Do(ctx, apply)
 }

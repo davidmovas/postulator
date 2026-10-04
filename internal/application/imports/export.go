@@ -44,7 +44,8 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 	slices.SortFunc(pages, func(a, b pagemap.Page) int { return strings.Compare(a.Path, b.Path) })
 
 	options := importmap.DefaultOptions()
-	table := importmap.Table{Headers: headers(), Rows: make([][]string, 0, len(pages)+len(state.entities))}
+	labels := noteLabels(pages)
+	table := importmap.Table{Headers: append(headers(), labels...), Rows: make([][]string, 0, len(pages)+len(state.entities))}
 	mapped := make(map[string]struct{}, len(state.entities))
 
 	for i := range pages {
@@ -54,7 +55,8 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 			entity = byID[*page.EntityID]
 			mapped[entity.ID] = struct{}{}
 		}
-		table.Rows = append(table.Rows, row(page, &entity, kinds[refOf(page.TemplateID)], g, options))
+		cells := row(page, &entity, kinds[refOf(page.TemplateID)], g, options)
+		table.Rows = append(table.Rows, append(cells, noteCells(page.Notes, labels)...))
 	}
 
 	loose := g.Entities()
@@ -62,7 +64,8 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 		if _, written := mapped[loose[i].ID]; written {
 			continue
 		}
-		table.Rows = append(table.Rows, row(nil, &loose[i], "", g, options))
+		cells := row(nil, &loose[i], "", g, options)
+		table.Rows = append(table.Rows, append(cells, noteCells(nil, labels)...))
 	}
 
 	if err := s.deps.Tables.Write(req.Path, table); err != nil {
@@ -116,8 +119,18 @@ func refOf(ref *string) string {
 	return *ref
 }
 
+func exportedFields() []importmap.Field {
+	out := make([]importmap.Field, 0, len(importmap.Fields()))
+	for _, field := range importmap.Fields() {
+		if field != importmap.FieldPrimaryKeyword && field != importmap.FieldOwnEntity {
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
 func headers() []string {
-	fields := importmap.Fields()
+	fields := exportedFields()
 	out := make([]string, 0, len(fields))
 	for _, field := range fields {
 		out = append(out, string(field))
@@ -129,22 +142,21 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 	cells := make(map[importmap.Field]string, len(importmap.Fields()))
 	if page != nil {
 		cells[importmap.FieldPath] = page.Path
+		if page.PlannedPath != "" {
+			cells[importmap.FieldPath] = page.PlannedPath
+		}
 		cells[importmap.FieldTitle] = page.Title
 		cells[importmap.FieldH1] = page.H1
 		cells[importmap.FieldMetaTitle] = page.MetaTitle
 		cells[importmap.FieldMetaDescription] = page.MetaDescription
 		cells[importmap.FieldWPType] = string(page.WPType)
 		cells[importmap.FieldPageKind] = pageKind
-		cells[importmap.FieldPrimaryKeyword] = page.PrimaryKeyword
-		cells[importmap.FieldKeywords] = options.Join(importmap.FieldKeywords, page.Keywords)
+		cells[importmap.FieldKeywords] = page.Keywords.Cell()
 	}
 	if entity.ID != "" {
 		cells[importmap.FieldEntity] = entity.Name
 		cells[importmap.FieldEntityKind] = string(entity.Kind)
-		cells[importmap.FieldPrimaryKeyword] = fill(cells[importmap.FieldPrimaryKeyword], entity.PrimaryKeyword)
-		if cells[importmap.FieldKeywords] == "" {
-			cells[importmap.FieldKeywords] = options.Join(importmap.FieldKeywords, entity.SecondaryKeywords)
-		}
+		cells[importmap.FieldKeywords] = fill(cells[importmap.FieldKeywords], entity.Keywords.Cell())
 		cells[importmap.FieldAnchors] = options.Join(importmap.FieldAnchors, anchorTexts(entity.Anchors))
 		if parents := g.Parents(entity.ID, 1); len(parents) > 0 {
 			cells[importmap.FieldParentEntity] = parents[0].Name
@@ -152,10 +164,37 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 		cells[importmap.FieldRelated] = options.Join(importmap.FieldRelated, relatedNames(g, entity.ID))
 	}
 
-	fields := importmap.Fields()
+	fields := exportedFields()
 	out := make([]string, 0, len(fields))
 	for _, field := range fields {
 		out = append(out, cells[field])
+	}
+	return out
+}
+
+func noteLabels(pages []pagemap.Page) []string {
+	out := make([]string, 0)
+	seen := make(map[string]struct{})
+	for i := range pages {
+		for _, note := range pages[i].Notes {
+			if _, held := seen[strings.ToLower(note.Label)]; held {
+				continue
+			}
+			seen[strings.ToLower(note.Label)] = struct{}{}
+			out = append(out, note.Label)
+		}
+	}
+	return out
+}
+
+func noteCells(notes []pagemap.Note, labels []string) []string {
+	out := make([]string, len(labels))
+	for at, label := range labels {
+		for _, note := range notes {
+			if strings.EqualFold(note.Label, label) {
+				out[at] = note.Text
+			}
+		}
 	}
 	return out
 }

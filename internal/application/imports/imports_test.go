@@ -165,6 +165,5 @@ func graphMapping(h harness) imports.Mapping {
 	})
 	mapping.Columns[string(importmap.FieldParentEntity)] = "parent"
 	mapping.Columns[string(importmap.FieldRelated)] = "related"
-	mapping.Options.KeywordSeparator = ";"
 	return mapping
 }

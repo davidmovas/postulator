@@ -4,12 +4,12 @@ import { Link } from "react-router";
 
 import { copy } from "../../../copy/index.js";
 import { flatten } from "../../../data/call.js";
+import { formErrorOf } from "../../../data/errors.js";
 import { useMapPageToEntity, usePage, usePages, useSetCanonicalPage } from "../../../data/hooks/pages.js";
 import type { Entity } from "../../../data/types.js";
 import { Banner, Button, Input, LinkOffIcon, Select, Skeleton, StatusBadge } from "../../../ui/index.js";
 import type { SelectOption } from "../../../ui/index.js";
-import { pageStatusLabel, statusTone } from "../../pages/labels.js";
-import { formErrorOf } from "./fields.js";
+import { PageStatusBadge } from "../../pages/badges.js";
 
 const pickLimit = 100;
 const findLimit = 50;
@@ -33,7 +33,7 @@ function CurrentPage({ siteId, pageId }: { siteId: string; pageId: string }): Re
             </Link>
             {held === undefined ? null : (
                 <span className="flex items-center gap-2">
-                    <StatusBadge tone={statusTone(held.status)}>{pageStatusLabel(held.status)}</StatusBadge>
+                    <PageStatusBadge status={held.status} />
                     {held.drift ? (
                         <StatusBadge tone="warn" dot={false}>
                             {copy.graph.pageForm.drift}

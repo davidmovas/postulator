@@ -32,18 +32,18 @@ the composition root binds the two.
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity` |
 | `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
-| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep RevertRun` |
+| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
-| `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary` |
+| `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary SpendReport ListCalls` |
 | `AgentService` | `CreateConversation SetMode RenameConversation DeleteConversation Send Status Confirm Cancel ListConversations ListMessages ListPendingActions` |
 | `SchedulesService` | `Create Update Delete Get List Enable Disable RunNow` |
 | `ToolsService` | `List` |
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and eighteen methods. Where a use case answers with bytes the service writes them
+A hundred and twenty-four methods. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
@@ -56,7 +56,8 @@ still active, and a run that wrote nothing to the site.
 
 `ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
 judge rubric against it and answers with the report, one model call inside the request.
-`PageReport` and `RunReport` read what a run already recorded; `SiteOverview`,
+`PageReport` and `RunReport` read what a run already recorded, and a page report carries, as
+`product`, the short description and attributes of the newest draft and nothing else of it; `SiteOverview`,
 `LinkAudit{siteId}` and `LinkAuditPage{pageId}` read the graph and the page map. The audit
 plans every mapped page's link targets with the rules of the page's resolved template and the
 site's effective policy, exactly as `resolve_context` does, and answers one summary row per
@@ -68,7 +69,43 @@ one site, like `Tree` and `LoadGraph`. Each owed link carries a `state` from `li
 `missing` and `missingRequired` count real misses only, while `pending` counts the links that
 wait for a page to be written or published and `unpublished` the placed links to a page that is
 not on the site yet. `orphan` holds only for a page on the site, in the audit and in
-`SiteOverview` alike.
+`SiteOverview` alike. A blocked target carries `blockedReason` from `linkBlockedReasons`:
+`no_canonical_page` for an entity that has pages but no canonical one, which stays required, and
+`no_page` for an entity no page carries at all, which is optional and passed through to its own
+parents or children. Entity names in the audit are labels: a name another entity shares carries
+its parent.
+
+`ImportService.Preview` and `Apply` answer a report whose `columns` say, for every header of the
+sheet in order, what it became (`use` from `importColumnUses`: `field` with the `field` it fills,
+`level`, `note`, `indent` or `ignored`); `groups` list the chains the root level columns name,
+with the page each took (`page`, empty for none) and the rows under it; each entity carries its
+`parent`. A keyword cell reads `text (volume), text`, separated by `, ; |` or a line break outside
+brackets; `levelColumns` and `noteColumns` are mapping options, and `own_entity` is a field. Only
+a level column headed `Root Entity` or `Root` is a level, and it makes entity groups; the
+detection names no other. Any other column a saved mapping or the agent puts in `levelColumns`,
+Category, `Root Category` and `Brand` among them, stays stored, is `ignored` and makes nothing. A
+mapping maps something only through a field, an indent column or a root column: one that names
+none of them is detected from its sheet's headers on a preview and refused `INVALID` with
+`details.field = columns` when saved. A row's entity takes its parent from its parent cell,
+else from its URL parent when that parent lies inside the row's own root group, else from the
+group, else from the URL tree. Findings `ambiguous_parent`, `ambiguous_entity` and `scope_clash`
+block an apply like an unknown parent; `bad_volume`, `technical_parent`, `group_without_page` and
+`unknown_own_entity` are warnings.
+
+A whole workbook is one request: `PreviewRequest` and `ApplyRequest` take `sheets: [{sheet,
+mapping}]` in place of the one-sheet `mapping`, which stays; `sheets` beside a `mapping` that names
+columns, root levels, indents or an id is `INVALID` with `details.field = sheets`, and so is an unknown
+sheet or one named twice. The sheets are planned in the workbook's order whatever order the
+request gives, share the `import.maxRows` budget and are written in one transaction;
+`saveMappingAs` keeps one mapping per sheet as `"<name> / <sheet>"`. A mapping with an `id` and no columns loads that saved mapping of the
+same site, and one with no columns, root levels or indents is detected from its sheet's headers.
+`InspectResponse.sheets[i].detected` is each sheet's own detected mapping, with `options.rowType`
+`pages` or `products`. Every report item and finding carries its `sheet`, and `summary.sheets`
+lists the sheets read.
+
+`PagesService.List` takes `includeDescendants` with an `entityId` and keeps the pages of that
+entity and of every entity under it; it refuses the flag alone. A page carries `notes`, each
+`{label, text}`, from the note columns of an import.
 
 Every method but `HealthService.Ping` and the four lock methods of `SettingsService`
 answers `LOCKED` while a master password is set and the application has not been unlocked,
@@ -188,8 +225,16 @@ enabled step that declares no ceiling and no model, `template_unresolved`, `enti
 and `RunsService.Start` refuses the run with `INVALID` and `details.findings` while they
 stand, and `recipe_differs`, `model_unknown`, `image_source_unavailable` and `plugin_missing`
 are warnings, as is `images_step_off`, raised per page whose template asks for images the run's
-recipe will not draw. `Budget` carries `maxUsd` and `maxTokens` and either one pauses the run with
-`budget_exceeded`, and a negative one is refused.
+recipe will not draw. Over a product, `commerce_unknown`, `commerce_absent`, `commerce_forbidden`,
+`product_needs_plugin`, `product_not_in_store`, `product_edited_live` and
+`product_category_unwritable` are errors and `product_outputs_missing` and
+`product_outputs_ignored` warnings; a repair over a product or a product category is refused with
+`store_placed`, and one over a post, which WordPress keeps flat, with `post_unnested`.
+`model_provider_removed` warns of a template that pins a model of a provider Postulator no longer
+works with and names the model the role uses instead. Each step is priced at its role's service tier and, on a model that
+reasons, with half the allowance of the role's effort added to its output. `Budget` carries
+`maxUsd` and `maxTokens` and either one pauses the run with `budget_exceeded`, and a negative one
+is refused.
 
 `StartRequest.templateId` assigns that template to the chosen pages: `Estimate` prices and
 preflights every chosen page on it without writing anything, and `Start`, once the estimate lets
@@ -233,6 +278,9 @@ nothing. Warning findings added on 2026-09-25: `target_not_published` (`targetPa
 `relation`) from `validate` and `relink_page`, `images_short`, `relink_phrase_templated`
 (`sentence`, `targetPageId`), `neighbor_link_missing` (`reason`, `targetPageId`), and
 `target_missing` from `relink_page` when the page's budget is spent.
+
+A writer that runs out of room twice holds the page `needs_human` with a note that says to lower
+the template's word counts or choose another model.
 
 ## Events
 
@@ -281,8 +329,11 @@ published once per round, and `agent.done` carries the authoritative totals with
 `cachedInputTokens` and `calls`, the number of model calls the turn made. A round the
 provider held back announces `agent.waiting{conversationId, messageId, reason, attempt,
 afterMs}`, where `reason` is the kernel code of the refusal, so a turn that is waiting is
-not silence. `llm.usage` is unchanged and stays a run event: it is published with a run
-sequence and an agent turn has no run. `run.budget_exceeded` carries `spentTokens` and
+not silence. `llm.usage` stays a run event: it is published with a run sequence and an agent turn
+has no run. It carries `tier`, the service tier the provider served, and `reasoningTokens` and
+`cacheWriteTokens` beside `promptTokens` and `completionTokens`, both parts of those counts rather
+than additions to them, and it is published only for a call that used tokens, so a refused call is
+seen through the item and run events instead. `run.budget_exceeded` carries `spentTokens` and
 `budgetTokens` beside `spentUsd` and `budgetUsd`, and is published for a token overrun as
 well as a money one.
 
@@ -309,6 +360,50 @@ hour-long signed link the companion plugin issued and rotates on every call. A p
 WordPress id answers `INVALID` with `details.field = wpId`, an archived one with `details.field =
 status`. A site that cannot issue a link answers `INVALID` with `details.code` set to
 `plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`.
+
+## Products
+
+A product is a page row whose `wpType` is `product`, created by the client in WooCommerce and
+edited where it stands. `Site.commerce` is one of `siteCommerces` in `vocab.ts` (empty until the
+store is asked, then `absent`, `forbidden` or `ready`) and `CheckPluginResponse.commerce` answers
+the store as the check found it. `Page.plannedPath` is the address the sheet gave a product whose
+address the store decides, empty when the two agree. `ImportOptions.rowType` is one of
+`importRowTypes` (`pages`, `products`, `kind`), and a `PreviewPage` of a product carries
+`plannedPath`, `storeName` and `matchedBy` (`path`, `slug` or `name`); the import findings
+`product_not_in_store`, `product_row_left`, `wp_type_kept` and `intermediate_level` are warnings.
+
+A publish over a product writes the description through the plugin's raw route and the short
+description, the filled attributes and an image through WooCommerce's REST API, and its result
+carries `previousProduct {shortDescription, writtenShort, attributes, written, images, added,
+imageId, shortWritten, attributesSent}`, what the product held and what the run wrote, which the
+revert reads. A sync result may carry `product_description_hidden` or `product_page_unread`, both
+warnings. `PagesService.Delete{onSite: true}` refuses a product or a product category with
+`details.field = onSite`. The name, price, stock, SKU, status, slug and categories of a product
+are never written.
+
+## Models and spend
+
+The catalog is OpenAI's alone. `UpsertModel` takes `provider` `openai` and refuses another on that
+field; it carries the input, cached input, cache write and output prices and the four flex prices
+(`flexInputUsdPerM`, `flexCachedInputUsdPerM`, `flexCacheWriteUsdPerM`, `flexOutputUsdPerM`, the
+input and output declared together), and no reasoning effort. A model offers flex when its flex
+input price is above zero, and a price left at zero on a built-in model reads as the built-in
+price. `SetProfile` refuses another provider. The effort and the tier of each role are settings,
+`llm.effort.<writer|editor|linker|judge|titler>` (`none low medium high xhigh`) and
+`llm.tier.<role>` (`standard flex`), beside `llm.flexPatience`; `serviceTiers` in `vocab.ts` names
+the tier a call was served at, `default` or `flex`.
+
+`SpendReport{days?, runId?}` totals the ledger over the last 1 to 366 days, 30 when left out, or
+one run whole and step by step, with `since` null. It answers `{since, days, runId, totals,
+slices}`: `totals` counts `calls` (the `ok` rows), `failed`, `input`, `cachedInput`, `cacheWrite`,
+`output`, `reasoning` and `usd` (every row) with `cachedShare`, `reasoningShare` and `flexShare`,
+and `slices` holds one row per `purpose` (from `spendPurposes`: `run chat title probe graph audit
+other`), `provider`, `model`, `tier` and, for a run, `step`, dearest first. It is an aggregate whose
+rows the catalog bounds, not a list, so it takes no cursor. `ListCalls{cursor?, limit?, sort?,
+runId?, conversationId?}` pages the ledger by cursor, newest first unless a sort says otherwise,
+refuses a run and a conversation together, and answers each call with its purpose, step, provider,
+model, tier, tokens (`input cachedInput cacheWrite output reasoning total`), `usd`, `latencyMs`,
+`status`, `errorCode` and the run, item or conversation it served.
 
 ## The companion plugin's version
 
@@ -343,6 +438,16 @@ panic underneath it ends the turn with `INTERNAL` rather than the process. In `c
 read with `ListConversations`, `ListMessages` and `ListPendingActions`, all of which
 survive a restart; `ToolsService.List` is the capability list the UI shows.
 
+What the model remembers of a conversation is stored apart from the transcript as
+`{"format":"responses/1","items":[…]}`: the port's messages, call arguments masked, tool results
+shortened to `agent.historyToolResultBytes`, trimmed by whole turns. A body in any other shape loads
+empty, which is how a conversation from before 2026-10-03 keeps its transcript and starts the
+model afresh. Each round is sent at effort `none` on the default tier with the prompt cache key
+`chat:<mode>`, the instructions static per mode and the site's counts as the developer message
+that opens the turn. `agent.toolLoading` (`all` by default, or `deferred`) says whether every tool
+goes out on every round or only the orienting reads, with the rest found by tool search; a turn
+replays its own searches and stores none.
+
 ## Bindings generation
 
 `wails3 generate bindings -f '<build flags>' -clean=true -ts -i ./...` writes the
@@ -364,9 +469,20 @@ A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authoriz
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
 every call. Ninety-three tools, `runs_revert` (`dangerous`), `graph_move_entity` (`write`),
 `graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`) and
-`graph_apply_proposals` (`write`) among them, measuring 78,971 bytes of schema — about 19,700
+`graph_apply_proposals` (`write`) among them, measuring 63,183 bytes of schema — about 15,800
 tokens resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds
-against `schemaCeilingBytes` (79,000).
+against `schemaCeilingBytes` (63,200) and logs with the eight widest. A description names what a
+field takes, its default, its limits and the tool an id comes from, and no more; the chat
+instructions say once that an id is used as a read tool returned it and that a field left out
+keeps its value. `imports_preview` and `imports_apply` take `sheets: [{sheet, mappingId?,
+rowType?}]`.
+
+With `agent.toolLoading` set to `deferred`, a round sends ten orienting reads whole (`sites_list
+sites_get reports_site_overview graph_list_entities pages_list pages_get pages_tree runs_list
+runs_get templates_list`) and every other tool inside its group, the prefix of its name, as a
+namespace of `defer_loading` functions beside one `tool_search` tool: 6,506 bytes before any
+search, which a test in `registry_test.go` logs without a ceiling. It is experimental until it has
+been tried with a funded key.
 
 The guard chain runs in this order and the order matters: `fence` wraps tool output as
 untrusted data so a result cannot inject instructions into the model, `audit` writes the
@@ -374,8 +490,9 @@ ledger row and emits the stream event, `capResult` shortens an oversized answer 
 re-enters the model, `permission` checks the conversation allow-list and calls `Authorize`,
 denying with `UNAUTHORIZED`. The audit middleware records what the tool answered; the fence
 wraps the copy the model reads. `Fence`, `Permit` and `Cap` live in
-`internal/application/agent`; transport adapts them to gollem middleware and `Confirm` calls
-them directly, so a confirmed tool is guarded exactly as the model's own call is.
+`internal/application/agent`; the runner in transport calls them for every call the model makes
+and `Confirm` calls them directly, so a confirmed tool is guarded exactly as the model's own call
+is.
 
 A result over the ceiling is shortened, not truncated: `Cap` halves the widest list, then the
 longest string at a rune boundary, and only when neither helps falls back to
@@ -394,10 +511,11 @@ reason). A live row carries the status from the event; a saved row carries `tool
 
 A field of a tool request is required only where its own schema says so, nested fields and
 list items included: the rule is that a field is required only when the use case refuses its
-absence, because gollem validates the whole tree before the tool runs and its refusal teaches
-the model nothing. `dto.Sort.desc`, `graph.Anchor.weight` and `.source`,
+absence, because the runner checks the arguments against the whole tree before the tool runs
+(`transport/agent/arguments.go`, the check gollem used to make) and its refusal teaches the model
+nothing. `dto.Sort.desc`, `graph.Anchor.weight` and `.source`,
 `graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`,
-`pages.ReplaceLinksRequest.links` and the five catalog fields of
+`pages.ReplaceLinksRequest.links` and the eight prices and three capability flags of
 `models.UpsertModelRequest` are all optional. Where a tool's input reaches into
 `internal/domain/template` it takes a tool-owned argument struct instead of the window's DTO,
 so `templates_create` asks for a name, a page kind and one section with a heading rather than

@@ -92,7 +92,7 @@ func TestStoreReportsWhetherASecretIsHeldWithoutOpeningIt(t *testing.T) {
 		want bool
 	}{
 		{name: "a reference the vault holds", ref: "llm:openai:api_key", want: true},
-		{name: "a reference the vault does not hold", ref: "llm:anthropic:api_key"},
+		{name: "a reference the vault does not hold", ref: "site:s1:wp_password"},
 	}
 
 	for _, tc := range cases {

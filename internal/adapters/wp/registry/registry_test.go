@@ -136,9 +136,18 @@ func TestProbeReadsTheManifest(t *testing.T) {
 		opts      []wptest.Option
 		installed bool
 		seo       string
+		commerce  site.Commerce
 	}{
-		{name: "the plugin answers", installed: true, seo: "yoast"},
-		{name: "the plugin is absent", opts: []wptest.Option{wptest.WithoutPlugin()}},
+		{name: "the plugin answers", installed: true, seo: "yoast", commerce: site.CommerceReady},
+		{name: "the plugin is absent", opts: []wptest.Option{wptest.WithoutPlugin()}, commerce: site.CommerceReady},
+		{
+			name: "a site without a store", opts: []wptest.Option{wptest.WithoutCommerce()},
+			installed: true, seo: "yoast", commerce: site.CommerceAbsent,
+		},
+		{
+			name: "a user who may not edit products", opts: []wptest.Option{wptest.WithoutProductEdit()},
+			installed: true, seo: "yoast", commerce: site.CommerceForbidden,
+		},
 	}
 
 	for _, tc := range cases {
@@ -149,10 +158,14 @@ func TestProbeReadsTheManifest(t *testing.T) {
 			store := newSites(server)
 			held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
 
-			state, err := held.Probe(t.Context(), store.record)
+			found, err := held.Probe(t.Context(), store.record)
 			if err != nil {
 				t.Fatalf("Probe: %v", err)
 			}
+			if found.Commerce != tc.commerce {
+				t.Errorf("commerce = %q, want %q", found.Commerce, tc.commerce)
+			}
+			state := found.Plugin
 			if state.Installed != tc.installed || state.SEOPlugin != tc.seo {
 				t.Fatalf("state = %+v", state)
 			}

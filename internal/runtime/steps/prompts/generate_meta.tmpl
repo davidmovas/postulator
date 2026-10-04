@@ -15,8 +15,8 @@ Canonical: {{.Canonical}}
 
 ENTITY
 Name: {{.Entity.Name}}
-Primary keyword: {{.Entity.PrimaryKeyword}}
-{{if .Entity.SecondaryKeywords}}Secondary keywords: {{range $index, $keyword := .Entity.SecondaryKeywords}}{{if $index}}, {{end}}{{$keyword}}{{end}}{{end}}
+Primary keyword: {{.Keywords.Main}}
+{{if .Keywords}}Keywords, the most searched first: {{range $index, $keyword := .Keywords}}{{if $index}}, {{end}}{{$keyword.Text}}{{end}}{{end}}
 
 DRAFT
 Title: {{.Draft.Title}}

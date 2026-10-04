@@ -78,6 +78,20 @@ gate on the last commit of each wave, not per agent, and keeps a ledger of every
 docs are written last, by one agent, from the reports: a doc written mid-wave is stale before
 the wave ends.
 
+The work of 2026-10-03 and 04 ran the same way with what it taught. The owner allowed up to four
+agents at once: Opus implementers, Sonnet researchers, and a Fable critic that read the plan and
+its addendum before any unit started and found the blocking faults in both. A fact about an
+outside API was settled before a unit was cut for it (a live probe, here with a key that has no
+credit), and no column or field was planned for what the probe did not show. Each unit owned its
+packages, no two agents worked in one Go package in the same wave, and a file several units had
+to touch (a composition-root builder, the migrations test, the tool registry test, `vocab.ts`) was
+marked shared: re-read right before the edit and committed at once. An agent that changed a
+generator's source ran the generator under the commit lock and committed its output with the
+change; only the orchestrator ran `task build`. A commit made while others had staged files used
+a private index (`GIT_INDEX_FILE`) holding only its own paths. Each unit's state and its notes for
+later units were kept in a gitignored ledger under `.superpowers/`, which is what survives a
+context reset.
+
 ## Rules that apply to every agent
 
 - Read `docs/STATUS.md` first. It is the handoff point between sessions.
@@ -91,4 +105,4 @@ the wave ends.
 - Bad code is rewritten, not patched.
 - Markdown files are limited to `CLAUDE.md` and the set in section 10 of the spec. Do
   not add others.
-- Commit on `rewrite/v2`. Never amend, rebase, force-push or `--no-verify`.
+- Commit on `dev`. Never amend, rebase, force-push or `--no-verify`.

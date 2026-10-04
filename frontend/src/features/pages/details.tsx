@@ -2,15 +2,17 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { react } from "../../data/errors.js";
+import { fieldErrorOf, validationErrorOf } from "../../data/errors.js";
 import { useUpdatePage } from "../../data/hooks/pages.js";
-import type { Page } from "../../data/types.js";
+import type { Keyword, Page } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
+import { keywordList, sameKeywords } from "../../domain/keywords.js";
 import { pageStatuses, pageWpTypes } from "../../generated/vocab.js";
 import { pageStatusLabel } from "./labels.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Banner, Button, Field, Input, Select, SyncProblemIcon, Textarea } from "../../ui/index.js";
+import { Banner, Button, Field, Input, KeywordInput, Select, SyncProblemIcon, Textarea } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
+import { ProductPanel } from "./product-panel.js";
 
 const wpTypeOptions: readonly SelectOption<string>[] = pageWpTypes.map((value) => ({ value, label: value }));
 const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) => ({
@@ -40,22 +42,6 @@ function draftOf(page: Page): Draft {
         wpType: page.wpType,
         status: page.status,
     };
-}
-
-function fieldErrorOf(thrown: unknown, field: string): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "field" && reaction.field === field ? reaction.message : null;
-}
-
-function formErrorOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "form" ? reaction.message : null;
 }
 
 function DriftNotice({ page }: { page: Page }): ReactElement {
@@ -88,9 +74,11 @@ export interface PageDetailsProps {
 export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactElement {
     const update = useUpdatePage();
     const [draft, setDraft] = useState<Draft>(() => draftOf(page));
+    const [keywords, setKeywords] = useState<Keyword[]>(() => keywordList(page.keywords));
 
     useEffect(() => {
         setDraft(draftOf(page));
+        setKeywords(keywordList(page.keywords));
         update.reset();
     }, [page.id, page.updatedAt]);
 
@@ -99,8 +87,10 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
     };
 
     const original = draftOf(page);
+    const storedKeywords = keywordList(page.keywords);
     const keys = Object.keys(original) as (keyof Draft)[];
-    const dirty = keys.some((key) => original[key] !== draft[key]);
+    const keywordsChanged = !sameKeywords(storedKeywords, keywords);
+    const dirty = keywordsChanged || keys.some((key) => original[key] !== draft[key]);
 
     const save = (): void => {
         const request: Parameters<typeof update.mutate>[0] = { id: page.id };
@@ -109,12 +99,16 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                 request[key] = draft[key];
             }
         }
+        if (keywordsChanged) {
+            request.keywords = keywords;
+        }
         update.mutate(request);
     };
 
     return (
         <div className="flex flex-col gap-3 p-3">
             {page.drift ? <DriftNotice page={page} /> : null}
+            {page.wpType === "product" ? <ProductPanel page={page} /> : null}
             <Field
                 label={copy.pages.detail.path}
                 tooltip={copy.pages.detail.pathHint}
@@ -188,6 +182,38 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                 )}
             </Field>
             <Field
+                label={copy.pages.detail.keywords}
+                hint={keywords.length > 0 ? copy.pages.detail.keywordsOwn : copy.pages.detail.keywordsInherited}
+                error={fieldErrorOf(update.error, "keywords")}
+            >
+                {(control) => (
+                    <KeywordInput
+                        id={control.id}
+                        aria-describedby={control["aria-describedby"]}
+                        invalid={control.invalid}
+                        values={keywords}
+                        removeLabel={copy.pages.detail.removeKeyword}
+                        phraseLabel={copy.pages.detail.keyword}
+                        volumeLabel={copy.pages.detail.volume}
+                        onChange={setKeywords}
+                    />
+                )}
+            </Field>
+            {(page.notes ?? []).length === 0 ? null : (
+                <section aria-label={copy.pages.detail.notes} className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-ink-dim">{copy.pages.detail.notes}</span>
+                    <dl className="flex flex-col gap-1 rounded-md border border-hairline bg-inset px-2.5 py-2 text-xs">
+                        {(page.notes ?? []).map((note) => (
+                            <div key={note.label} className="flex gap-2">
+                                <dt className="shrink-0 text-ink-faint">{note.label}</dt>
+                                <dd className="min-w-0 text-ink-soft">{note.text}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <p className="text-2xs text-ink-faint">{copy.pages.detail.notesHint}</p>
+                </section>
+            )}
+            <Field
                 label={copy.pages.detail.metaTitle}
                 hint={copy.pages.detail.characters(draft.metaTitle.length)}
                 error={fieldErrorOf(update.error, "metaTitle")}
@@ -236,8 +262,8 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                     />
                 )}
             </Field>
-            {formErrorOf(update.error) === null ? null : (
-                <p className="text-xs text-danger">{formErrorOf(update.error)}</p>
+            {validationErrorOf(update.error) === null ? null : (
+                <p className="text-xs text-danger">{validationErrorOf(update.error)}</p>
             )}
             <ConflictNotice thrown={update.error} siteId={siteId} search={search} />
             <div className="flex justify-end gap-2">
@@ -246,6 +272,7 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                     disabled={!dirty}
                     onClick={() => {
                         setDraft(original);
+                        setKeywords(storedKeywords);
                         update.reset();
                     }}
                 >

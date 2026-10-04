@@ -52,8 +52,14 @@ var (
 	tagPattern     = regexp.MustCompile(`(?s)<[^>]*>`)
 )
 
+const (
+	phasePosts = "post"
+	phaseTerms = "term"
+)
+
 type cursor struct {
-	Modified string `json:"m"`
+	Phase    string `json:"p"`
+	Modified string `json:"m,omitempty"`
 	ID       int64  `json:"i"`
 }
 
@@ -116,8 +122,60 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 
 	since := parseQueryTime(query.Get("since"))
 	limit := contentLimit(query.Get("limit"))
+	wantsTerms := slices.Contains(types, TypeProductCategory)
+	postTypes := slices.DeleteFunc(slices.Clone(types), term)
+
+	phase := after.Phase
+	if phase == "" {
+		phase = phasePosts
+		if len(postTypes) == 0 {
+			phase = phaseTerms
+		}
+	}
 
 	s.mu.Lock()
+	items := make([]map[string]any, 0, limit)
+	if phase == phasePosts {
+		matched := s.postsAfter(postTypes, since, after)
+		taken := matched[:min(len(matched), limit)]
+		for _, stored := range taken {
+			items = append(items, s.contentItem(stored))
+		}
+		if len(taken) == limit {
+			last := taken[len(taken)-1]
+			s.mu.Unlock()
+			s.respondContent(w, items, cursor{
+				Phase: phasePosts, Modified: last.Modified.UTC().Format(time.RFC3339), ID: last.ID,
+			})
+			return
+		}
+		after = cursor{}
+	}
+
+	remaining := limit - len(items)
+	if !wantsTerms || remaining < 1 {
+		s.mu.Unlock()
+		s.respond(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nil})
+		return
+	}
+
+	scanned := s.termsAfter(after.ID, remaining)
+	for _, stored := range scanned {
+		if !since.IsZero() && !stored.Modified.After(since) {
+			continue
+		}
+		items = append(items, s.contentItem(stored))
+	}
+	s.mu.Unlock()
+
+	if len(scanned) == remaining {
+		s.respondContent(w, items, cursor{Phase: phaseTerms, ID: scanned[len(scanned)-1].ID})
+		return
+	}
+	s.respond(w, http.StatusOK, map[string]any{"items": items, "nextCursor": nil})
+}
+
+func (s *Server) postsAfter(types []string, since time.Time, after cursor) []*Item {
 	matched := make([]*Item, 0, len(s.order))
 	for _, id := range s.order {
 		stored := s.items[id]
@@ -138,28 +196,33 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 		}
 		return left.Modified.Compare(right.Modified)
 	})
+	return matched
+}
 
-	var next any
-	if len(matched) > limit {
-		matched = matched[:limit]
-		last := matched[len(matched)-1]
+func (s *Server) termsAfter(after int64, limit int) []*Item {
+	ids := slices.Clone(s.termOrder)
+	slices.Sort(ids)
 
-		encoded, err := encodeCursor(cursor{Modified: last.Modified.UTC().Format(time.RFC3339), ID: last.ID})
-		if err != nil {
-			s.mu.Unlock()
-			s.fail(w, http.StatusInternalServerError, "cursor_failed", "The next cursor could not be built.")
-			return
+	scanned := make([]*Item, 0, limit)
+	for _, id := range ids {
+		if id <= after {
+			continue
 		}
-		next = encoded
+		if len(scanned) == limit {
+			break
+		}
+		scanned = append(scanned, s.terms[id])
 	}
+	return scanned
+}
 
-	items := make([]map[string]any, 0, len(matched))
-	for _, stored := range matched {
-		items = append(items, s.contentItem(stored))
+func (s *Server) respondContent(w http.ResponseWriter, items []map[string]any, next cursor) {
+	encoded, err := encodeCursor(next)
+	if err != nil {
+		s.fail(w, http.StatusInternalServerError, "cursor_failed", "The next cursor could not be built.")
+		return
 	}
-	s.mu.Unlock()
-
-	s.respond(w, http.StatusOK, map[string]any{"items": items, "nextCursor": next})
+	s.respond(w, http.StatusOK, map[string]any{"items": items, "nextCursor": encoded})
 }
 
 func (s *Server) handleSEOMetaGet(w http.ResponseWriter, r *http.Request) {
@@ -174,8 +237,8 @@ func (s *Server) handleSEOMetaGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	stored, found := s.items[id]
-	if !found || !postType(stored.Type) {
+	stored, found := s.editablePost(id)
+	if !found {
 		s.mu.Unlock()
 		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
 		return
@@ -208,8 +271,8 @@ func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	stored, found := s.items[id]
-	if !found || !postType(stored.Type) {
+	stored, found := s.editablePost(id)
+	if !found {
 		s.mu.Unlock()
 		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
 		return
@@ -253,9 +316,9 @@ func (s *Server) handleRawGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	stored, found := s.items[id]
+	stored, found := s.editablePost(id)
 	var payload map[string]any
-	if found && postType(stored.Type) {
+	if found {
 		payload = map[string]any{
 			"id":          stored.ID,
 			"type":        stored.Type,
@@ -297,8 +360,8 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 	_, _ = s.takePendingEdit()
 
 	s.mu.Lock()
-	stored, found := s.items[id]
-	if !found || !postType(stored.Type) {
+	stored, found := s.editablePost(id)
+	if !found {
 		s.mu.Unlock()
 		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
 		return
@@ -325,7 +388,7 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) contentItem(stored *Item) map[string]any {
 	keys := seoKeys[s.seoPlugin]
-	return map[string]any{
+	item := map[string]any{
 		"id":          stored.ID,
 		"type":        stored.Type,
 		"slug":        stored.Slug,
@@ -343,10 +406,19 @@ func (s *Server) contentItem(stored *Item) map[string]any {
 		},
 		"links": s.internalLinks(stored.Content),
 	}
+	if term(stored.Type) {
+		item["h1"] = ""
+		item["links"] = []map[string]any{}
+	}
+	return item
 }
 
-func postType(itemType string) bool {
-	return itemType != TypeProductCategory
+func (s *Server) editablePost(id int64) (*Item, bool) {
+	stored, found := s.items[id]
+	if !found || stored.Status == "trash" {
+		return nil, false
+	}
+	return stored, true
 }
 
 func (s *Server) reportedHash(content string) string {
@@ -515,8 +587,8 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.mu.Lock()
-	stored, found := s.items[id]
-	if !found || !postType(stored.Type) {
+	stored, found := s.editablePost(id)
+	if !found {
 		s.mu.Unlock()
 		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
 		return

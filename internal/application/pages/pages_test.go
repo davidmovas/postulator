@@ -14,10 +14,12 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 type harness struct {
@@ -42,8 +44,11 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
-		service: pages.New(sqlite.NewPageRepo(store), sqlite.NewPageLinkRepo(store), sqlite.NewEntityRepo(store),
-			sqlite.NewSiteRepo(store), store, recorder, clk, issuer),
+		service: pages.New(pages.Deps{
+			Pages: sqlite.NewPageRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
+			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store),
+			UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
+		}),
 		store:    store,
 		recorder: recorder,
 		clock:    clk,
@@ -94,6 +99,37 @@ func evidenceOf(t *testing.T, err error) []pages.Conflict {
 		t.Fatalf("error %v carries no evidence", err)
 	}
 	return evidence
+}
+
+func TestAProductIsNeverPlacedUnderThePathAboveIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	product, err := h.service.Create(t.Context(), pages.CreateRequest{
+		SiteID: h.siteID, Path: "/shop/liquid/", Title: "Liquid", WPType: string(pagemap.WPProduct),
+	})
+	if err != nil {
+		t.Fatalf("Create the product: %v", err)
+	}
+	shop := h.page(t, "/shop/", nil)
+
+	stored, err := h.service.Get(t.Context(), pages.GetRequest{ID: product.Page.ID})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if stored.Page.ParentPageID != nil {
+		t.Errorf("the product was adopted by %s; the store decides where a product lives", *stored.Page.ParentPageID)
+	}
+
+	later, err := h.service.Create(t.Context(), pages.CreateRequest{
+		SiteID: h.siteID, Path: "/shop/powder/", Title: "Powder", WPType: string(pagemap.WPProduct),
+	})
+	if err != nil {
+		t.Fatalf("Create the second product: %v", err)
+	}
+	if later.Page.ParentPageID != nil {
+		t.Errorf("a product created under %s got it as its parent", shop.Path)
+	}
 }
 
 func TestCreateResolvesTheParentAndAdoptsChildren(t *testing.T) {
@@ -148,6 +184,65 @@ func TestCreateResolvesTheParentAndAdoptsChildren(t *testing.T) {
 	}
 }
 
+func TestANewPageAdoptsOnlyTheOrphansRightUnderIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	h.page(t, "/shop/shoes/", nil)
+	h.page(t, "/shop/bags/red/", nil)
+	h.page(t, "/elsewhere/news/", nil)
+	if _, err := h.service.Create(t.Context(), pages.CreateRequest{
+		SiteID: h.siteID, Path: "/shop/liquid/", Title: "Liquid", WPType: string(pagemap.WPProduct),
+	}); err != nil {
+		t.Fatalf("Create the product: %v", err)
+	}
+	blog := h.page(t, "/blog/", nil)
+	kept := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: "/shop/kept/", Slug: "kept", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPlanned, ParentPageID: &blog.ID,
+		CreatedAt: h.clock.Now(), UpdatedAt: h.clock.Now(),
+	}
+	if err := sqlite.NewPageRepo(h.store).Insert(t.Context(), kept); err != nil {
+		t.Fatalf("insert a page that already sits under another: %v", err)
+	}
+
+	shop := h.page(t, "/shop/", nil)
+
+	cases := []struct {
+		name   string
+		path   string
+		parent string
+	}{
+		{name: "an orphan right under it", path: "/shop/shoes/", parent: shop.ID},
+		{name: "an orphan two levels down", path: "/shop/bags/red/"},
+		{name: "an orphan elsewhere", path: "/elsewhere/news/"},
+		{name: "a product right under it", path: "/shop/liquid/"},
+		{name: "a page that already sits under another", path: "/shop/kept/", parent: blog.ID},
+	}
+
+	listed, err := sqlite.NewPageRepo(h.store).ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	index := pagemap.NewIndex(listed)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stored, found := index.ByPath(tc.path)
+			if !found {
+				t.Fatalf("no page at %s", tc.path)
+			}
+			if tc.parent == "" && stored.ParentPageID != nil {
+				t.Fatalf("%s sits under %s, want no parent", tc.path, *stored.ParentPageID)
+			}
+			if tc.parent != "" && (stored.ParentPageID == nil || *stored.ParentPageID != tc.parent) {
+				t.Fatalf("%s sits under %v, want %s", tc.path, stored.ParentPageID, tc.parent)
+			}
+		})
+	}
+}
+
 func TestCreateRefusesCannibalization(t *testing.T) {
 	t.Parallel()
 
@@ -179,7 +274,7 @@ func TestCreateRefusesCannibalization(t *testing.T) {
 	}
 
 	rival := h.entity(t, "Rival")
-	rival.PrimaryKeyword = "SHOES"
+	rival.Keywords = keyword.Of("SHOES")
 	if err = sqlite.NewEntityRepo(h.store).Update(t.Context(), rival); err != nil {
 		t.Fatalf("give the rival the same keyword: %v", err)
 	}
@@ -487,6 +582,40 @@ func TestDeleteKeepsThePageWhenTheSiteRefuses(t *testing.T) {
 	}
 }
 
+func TestDeleteOnSiteLeavesWhatTheStoreKeepsToTheStore(t *testing.T) {
+	t.Parallel()
+
+	for _, wpType := range []pagemap.WPType{pagemap.WPProduct, pagemap.WPProductCategory} {
+		t.Run(string(wpType), func(t *testing.T) {
+			t.Parallel()
+
+			issuer := &recordingIssuer{}
+			h := newPreviewHarness(t, issuer)
+			placed := h.placed(t, "/product/espresso-machine/", pagemap.StatusPublished, 42)
+			repo := sqlite.NewPageRepo(h.store)
+			stored, err := repo.Get(t.Context(), placed.ID)
+			if err != nil {
+				t.Fatalf("Get: %v", err)
+			}
+			stored.WPType = wpType
+			if err = repo.Update(t.Context(), stored); err != nil {
+				t.Fatalf("Update: %v", err)
+			}
+
+			_, err = h.service.Delete(t.Context(), pages.DeleteRequest{ID: placed.ID, OnSite: true})
+			if !errors.IsCode(err, errors.Invalid) || fieldOf(err) != "onSite" || !strings.Contains(err.Error(), "WooCommerce") {
+				t.Fatalf("Delete = %v, want a refusal that sends the delete to WooCommerce", err)
+			}
+			if len(issuer.trashed) != 0 {
+				t.Errorf("the site was asked %+v", issuer.trashed)
+			}
+			if _, err = h.service.Get(t.Context(), pages.GetRequest{ID: placed.ID}); err != nil {
+				t.Errorf("the row was dropped although the delete was refused: %v", err)
+			}
+		})
+	}
+}
+
 func TestDeleteOnSiteNeedsAPageThatIsOnTheSite(t *testing.T) {
 	t.Parallel()
 
@@ -505,21 +634,41 @@ func TestCreateAndUpdateCarryTheKeywordsOfThePage(t *testing.T) {
 
 	h := newHarness(t)
 	created, err := h.service.Create(t.Context(), pages.CreateRequest{
-		SiteID: h.siteID, Path: "/shoes/", Title: "Shoes", PrimaryKeyword: " running shoes ", Keywords: []string{"trail shoes", "Trail Shoes", ""},
+		SiteID: h.siteID, Path: "/shoes/", Title: "Shoes",
+		Keywords: []dto.Keyword{{Text: "trail shoes"}, {Text: " running shoes ", Volume: new(9000)}, {Text: "Trail Shoes"}},
 	})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if created.Page.PrimaryKeyword != "running shoes" || !slices.Equal(created.Page.Keywords, []string{"trail shoes"}) {
-		t.Fatalf("Create answered %q %v", created.Page.PrimaryKeyword, created.Page.Keywords)
+	if got := keywordTexts(created.Page.Keywords); !slices.Equal(got, []string{"running shoes", "trail shoes"}) {
+		t.Fatalf("Create answered %v, want the list trimmed, deduplicated and ordered by volume", got)
+	}
+	if volume := created.Page.Keywords[0].Volume; volume == nil || *volume != 9000 {
+		t.Fatalf("Create answered %+v, want the volume kept", created.Page.Keywords[0])
 	}
 
-	updated, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Keywords: []string{"road shoes"}})
+	renamed, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Title: new("Running shoes")})
+	if err != nil {
+		t.Fatalf("Update the title: %v", err)
+	}
+	if got := keywordTexts(renamed.Page.Keywords); !slices.Equal(got, []string{"running shoes", "trail shoes"}) {
+		t.Fatalf("an update that leaves the keywords out answered %v, want them kept", got)
+	}
+
+	updated, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Keywords: &[]dto.Keyword{{Text: "road shoes"}}})
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if updated.Page.PrimaryKeyword != "running shoes" || !slices.Equal(updated.Page.Keywords, []string{"road shoes"}) {
-		t.Fatalf("Update answered %q %v, want the primary kept and the list replaced", updated.Page.PrimaryKeyword, updated.Page.Keywords)
+	if got := keywordTexts(updated.Page.Keywords); !slices.Equal(got, []string{"road shoes"}) {
+		t.Fatalf("Update answered %v, want the whole list replaced", got)
+	}
+
+	cleared, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: created.Page.ID, Keywords: &[]dto.Keyword{}})
+	if err != nil {
+		t.Fatalf("Update to no keywords: %v", err)
+	}
+	if cleared.Page.Keywords == nil || len(cleared.Page.Keywords) != 0 {
+		t.Fatalf("an empty list answered %#v, want the page to carry none", cleared.Page.Keywords)
 	}
 
 	bare, err := h.service.Create(t.Context(), pages.CreateRequest{SiteID: h.siteID, Path: "/socks/"})
@@ -528,5 +677,104 @@ func TestCreateAndUpdateCarryTheKeywordsOfThePage(t *testing.T) {
 	}
 	if bare.Page.Keywords == nil {
 		t.Fatal("a page without keywords answers null instead of an empty list")
+	}
+}
+
+func keywordTexts(keywords []dto.Keyword) []string {
+	out := make([]string, 0, len(keywords))
+	for _, item := range keywords {
+		out = append(out, item.Text)
+	}
+	return out
+}
+
+func TestListKeepsThePagesOfAnEntityAndEverythingUnderIt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	peptides, bpc, liquid, other := h.entity(t, "Peptides"), h.entity(t, "BPC-157"), h.entity(t, "Liquid"), h.entity(t, "Other")
+	edges := sqlite.NewEdgeRepo(h.store)
+	for _, pair := range [][2]string{{bpc.ID, peptides.ID}, {liquid.ID, bpc.ID}} {
+		if err := edges.Insert(t.Context(), graph.Edge{
+			ID: id.New(), SiteID: h.siteID, FromEntityID: pair[0], ToEntityID: pair[1], Kind: graph.EdgeParent, Weight: 1,
+			Source: graph.SourceUser, Status: graph.StatusApproved, CreatedAt: sqlitetest.Stamp,
+		}); err != nil {
+			t.Fatalf("insert the edge: %v", err)
+		}
+	}
+	h.page(t, "/peptides/", &peptides.ID)
+	h.page(t, "/peptides/bpc-157/", &bpc.ID)
+	h.page(t, "/peptides/bpc-157/liquid/", &liquid.ID)
+	h.page(t, "/other/", &other.ID)
+
+	cases := []struct {
+		name   string
+		entity string
+		under  bool
+		want   []string
+	}{
+		{name: "the entity alone", entity: peptides.ID, want: []string{"/peptides/"}},
+		{name: "the entity and everything under it", entity: peptides.ID, under: true,
+			want: []string{"/peptides/", "/peptides/bpc-157/", "/peptides/bpc-157/liquid/"}},
+		{name: "a leaf and nothing more", entity: liquid.ID, under: true, want: []string{"/peptides/bpc-157/liquid/"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			listed, err := h.service.List(t.Context(), pages.ListRequest{
+				SiteID: h.siteID, EntityID: tc.entity, IncludeDescendants: tc.under,
+				ListRequest: dto.ListRequest{Limit: 20, Sort: &dto.Sort{Field: "path"}},
+			})
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			got := make([]string, 0, len(listed.Items))
+			for _, item := range listed.Items {
+				got = append(got, item.Path)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("paths = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	_, err := h.service.List(t.Context(), pages.ListRequest{SiteID: h.siteID, IncludeDescendants: true})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("List without an entity = %v, want it refused", err)
+	}
+}
+
+func TestAPageShowsTheNotesItCarries(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	noted, bare := h.page(t, "/bpc-157/", nil), h.page(t, "/tb-500/", nil)
+	repo := sqlite.NewPageRepo(h.store)
+	stored, err := repo.Get(t.Context(), noted.ID)
+	if err != nil {
+		t.Fatalf("read the page: %v", err)
+	}
+	stored.Notes = []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}}
+	if err = repo.Update(t.Context(), stored); err != nil {
+		t.Fatalf("store the notes: %v", err)
+	}
+
+	cases := []struct {
+		name   string
+		pageID string
+		want   []pages.Note
+	}{
+		{name: "a page with notes", pageID: noted.ID, want: []pages.Note{{Label: "Intent Owner", Text: "Commercial"}}},
+		{name: "a page without any", pageID: bare.ID, want: []pages.Note{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, getErr := h.service.Get(t.Context(), pages.GetRequest{ID: tc.pageID})
+			if getErr != nil {
+				t.Fatalf("Get: %v", getErr)
+			}
+			if !slices.Equal(got.Page.Notes, tc.want) || got.Page.Notes == nil {
+				t.Fatalf("notes = %#v, want %#v", got.Page.Notes, tc.want)
+			}
+		})
 	}
 }

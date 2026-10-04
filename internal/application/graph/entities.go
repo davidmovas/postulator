@@ -2,9 +2,11 @@ package graph
 
 import (
 	"context"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -34,25 +36,50 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 	if req.Source == "" {
 		source = graphdomain.SourceUser
 	}
+	keywords, err := application.KeywordList(req.Keywords, "keywords")
+	if err != nil {
+		return CreateEntityResponse{}, err
+	}
+	var scope *string
+	if parentID := strings.TrimSpace(req.ParentID); parentID != "" {
+		scope = &parentID
+	}
 	now := s.now()
 	entity, err := graphdomain.NewEntity(graphdomain.Entity{
-		ID:                id.New(),
-		SiteID:            req.SiteID,
-		Name:              req.Name,
-		Kind:              graphdomain.Kind(req.Kind),
-		Intent:            req.Intent,
-		PrimaryKeyword:    req.PrimaryKeyword,
-		SecondaryKeywords: req.SecondaryKeywords,
-		Anchors:           anchorsOf(ctx, req.Anchors),
-		Source:            source,
-		CreatedAt:         now,
-		UpdatedAt:         now,
+		ID:        id.New(),
+		SiteID:    req.SiteID,
+		Name:      req.Name,
+		Kind:      graphdomain.Kind(req.Kind),
+		Intent:    req.Intent,
+		Keywords:  keywords,
+		Anchors:   requestedAnchors(ctx, req.Anchors),
+		ScopeID:   scope,
+		Source:    source,
+		CreatedAt: now,
+		UpdatedAt: now,
 	})
 	if err != nil {
 		return CreateEntityResponse{}, err
 	}
 
-	if doErr := s.uow.Do(ctx, func(c context.Context) error { return s.entities.Insert(c, entity) }); doErr != nil {
+	doErr := s.uow.Do(ctx, func(c context.Context) error {
+		if scope == nil {
+			return s.entities.Insert(c, entity)
+		}
+		parent, getErr := s.entities.Get(c, *scope)
+		if getErr != nil {
+			return getErr
+		}
+		if parent.SiteID != entity.SiteID {
+			return invalidField("the parent belongs to another site", "parentId")
+		}
+		if insertErr := s.entities.Insert(c, entity); insertErr != nil {
+			return insertErr
+		}
+		_, edgeErr := s.parentEdge(c, nil, entity.SiteID, entity.ID, parent.ID)
+		return edgeErr
+	})
+	if doErr != nil {
 		return CreateEntityResponse{}, doErr
 	}
 	if publishErr := s.changed(entity.SiteID); publishErr != nil {
@@ -62,6 +89,14 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 }
 
 func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (UpdateEntityResponse, error) {
+	var keywords keyword.List
+	if req.Keywords != nil {
+		listed, err := application.KeywordList(*req.Keywords, "keywords")
+		if err != nil {
+			return UpdateEntityResponse{}, err
+		}
+		keywords = listed
+	}
 	updated, err := s.rewriteEntity(ctx, req.ID, func(next *graphdomain.Entity) {
 		if req.Name != nil {
 			next.Name = *req.Name
@@ -72,11 +107,8 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 		if req.Intent != nil {
 			next.Intent = *req.Intent
 		}
-		if req.PrimaryKeyword != nil {
-			next.PrimaryKeyword = *req.PrimaryKeyword
-		}
-		if req.SecondaryKeywords != nil {
-			next.SecondaryKeywords = *req.SecondaryKeywords
+		if req.Keywords != nil {
+			next.Keywords = keywords
 		}
 	})
 	if err != nil {
@@ -87,7 +119,7 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 
 func (s *Service) SetAnchors(ctx context.Context, req SetAnchorsRequest) (SetAnchorsResponse, error) {
 	updated, err := s.rewriteEntity(ctx, req.EntityID, func(next *graphdomain.Entity) {
-		next.Anchors = anchorsOf(ctx, req.Anchors)
+		next.Anchors = requestedAnchors(ctx, req.Anchors)
 	})
 	if err != nil {
 		return SetAnchorsResponse{}, err
@@ -132,6 +164,9 @@ func (s *Service) DeleteEntity(ctx context.Context, req DeleteEntityRequest) (De
 			return getErr
 		}
 		siteID = current.SiteID
+		if settleErr := s.settleScopesWithout(c, siteID, req.ID); settleErr != nil {
+			return settleErr
+		}
 		return s.entities.Delete(c, req.ID)
 	})
 	if err != nil {

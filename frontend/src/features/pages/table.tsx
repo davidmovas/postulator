@@ -4,8 +4,8 @@ import { useEffect, useMemo } from "react";
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { usePages } from "../../data/hooks/pages.js";
+import { cycleSort } from "../../data/sorts.js";
 import type { Page } from "../../data/types.js";
-import { absoluteTime, relativeTime } from "../../domain/format.js";
 import {
     AccountTreeIcon,
     Button,
@@ -13,20 +13,17 @@ import {
     DenseTable,
     EmptyState,
     FilterAltIcon,
-    LinkOffIcon,
     SkeletonRows,
     SortableHeader,
-    StatusBadge,
-    SyncProblemIcon,
     TableCell,
     TableHead,
-    TableRow,
     UploadFileIcon,
     VirtualRows,
 } from "../../ui/index.js";
+import { PageStatusBadge } from "./badges.js";
+import { DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
 import type { EntityIndex } from "./entities.js";
-import { pageStatusLabel, statusTone } from "./labels.js";
-import { defaultQuery, filterOf, narrowed, nextSort } from "./params.js";
+import { defaultQuery, filterOf, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
 
 const columns = "minmax(96px,2.4fr) minmax(80px,2fr) 60px 84px minmax(80px,1.5fr) 36px 72px";
@@ -43,26 +40,7 @@ interface PageRowProps {
 
 function PageRow({ page, selected, entityName, onSelect, onOpen }: PageRowProps): ReactElement {
     return (
-        <TableRow
-            data-page-row={true}
-            data-page-id={page.id}
-            data-page-status={page.status}
-            interactive={true}
-            selected={selected}
-            tabIndex={0}
-            onClick={() => {
-                onSelect(page.id);
-            }}
-            onDoubleClick={() => {
-                onOpen(page.id);
-            }}
-            onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                    event.preventDefault();
-                    onOpen(page.id);
-                }
-            }}
-        >
+        <PageTableRow page={page} selected={selected} onSelect={onSelect} onOpen={onOpen}>
             <TableCell mono={true} title={page.path}>
                 {page.path}
             </TableCell>
@@ -71,30 +49,12 @@ function PageRow({ page, selected, entityName, onSelect, onOpen }: PageRowProps)
                 {page.wpType}
             </TableCell>
             <TableCell>
-                <StatusBadge tone={statusTone(page.status)}>{pageStatusLabel(page.status)}</StatusBadge>
+                <PageStatusBadge status={page.status} />
             </TableCell>
-            <TableCell muted={page.entityId === null}>
-                {page.entityId === null ? (
-                    <span className="flex min-w-0 items-center gap-1 text-ink-faint">
-                        <LinkOffIcon size={13} className="shrink-0" />
-                        <span className="truncate">{copy.pages.unmapped}</span>
-                    </span>
-                ) : (
-                    (entityName ?? copy.pages.mapped)
-                )}
-            </TableCell>
-            <TableCell>
-                {page.drift ? (
-                    <span className="flex items-center gap-1 text-warn" title={copy.pages.drift.title}>
-                        <SyncProblemIcon size={14} className="shrink-0" />
-                        <span className="sr-only">{copy.pages.drift.badge}</span>
-                    </span>
-                ) : null}
-            </TableCell>
-            <TableCell mono={true} muted={true} title={absoluteTime(page.lastSyncedAt)}>
-                {relativeTime(page.lastSyncedAt)}
-            </TableCell>
-        </TableRow>
+            <EntityCell entityId={page.entityId} entityName={entityName} />
+            <DriftCell drift={page.drift} />
+            <SyncedCell at={page.lastSyncedAt} />
+        </PageTableRow>
     );
 }
 
@@ -193,7 +153,7 @@ export function PageTable({
                     active={query.sort?.field === "path"}
                     direction={query.sort?.desc === true ? "desc" : "asc"}
                     onToggle={() => {
-                        onQueryChange({ ...query, sort: nextSort(query.sort, "path") });
+                        onQueryChange({ ...query, sort: cycleSort(query.sort, "path") });
                     }}
                 >
                     {copy.pages.columns.path}
@@ -219,7 +179,7 @@ export function PageTable({
                             page={page}
                             selected={page.id === selectedId}
                             entityName={
-                                page.entityId === null ? null : (index.byId.get(page.entityId)?.name ?? null)
+                                page.entityId === null ? null : (index.labels.get(page.entityId) ?? null)
                             }
                             onSelect={onSelect}
                             onOpen={onOpen}

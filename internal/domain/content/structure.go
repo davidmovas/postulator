@@ -1,17 +1,19 @@
 package content
 
 import (
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
 
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 const (
 	CodePrimaryMissingInH1   = "primary_missing_in_h1"
 	CodePrimaryMissingInLead = "primary_missing_in_first_paragraph"
-	CodeSecondaryMissing     = "secondary_keyword_missing"
+	CodeKeywordsMissing      = "keywords_missing"
 	CodeKeywordDensity       = "keyword_density_too_high"
 	CodeWordCount            = "word_count_out_of_range"
 	CodeSectionMissing       = "section_missing"
@@ -19,11 +21,11 @@ const (
 	CodeNoHeadings           = "no_headings"
 )
 
-func Structure(doc *Document, primary string, secondary []string, spec template.TemplateSpec) Report {
+func Structure(doc *Document, keywords keyword.List, spec template.TemplateSpec) Report {
 	report := Report{Items: make([]Finding, 0)}
 	words := doc.Words()
 
-	report.Items = append(report.Items, keywordFindings(doc, primary, secondary, spec, words)...)
+	report.Items = append(report.Items, keywordFindings(doc, keywords, spec, words)...)
 	report.Items = append(report.Items, headingFindings(doc, spec)...)
 	report.Items = append(report.Items, lengthFindings(spec, len(words))...)
 
@@ -31,9 +33,9 @@ func Structure(doc *Document, primary string, secondary []string, spec template.
 	return report
 }
 
-func keywordFindings(doc *Document, primary string, secondary []string, spec template.TemplateSpec, words []string) []Finding {
+func keywordFindings(doc *Document, keywords keyword.List, spec template.TemplateSpec, words []string) []Finding {
 	out := make([]Finding, 0)
-	primary = strings.TrimSpace(primary)
+	primary := keywords.Main()
 	if primary == "" {
 		return out
 	}
@@ -60,18 +62,13 @@ func keywordFindings(doc *Document, primary string, secondary []string, spec tem
 	}
 
 	text := doc.Text()
-	for _, keyword := range secondary {
-		trimmed := strings.TrimSpace(keyword)
-		if trimmed == "" {
-			continue
-		}
-		if _, _, found := findFold(text, trimmed); !found {
-			out = append(out, Finding{
-				Severity: SeverityWarn, Code: CodeSecondaryMissing,
-				Message: "the secondary keyword " + trimmed + " does not appear in the body",
-				Details: map[string]any{"keyword": trimmed},
-			})
-		}
+	if missing := missingKeywords(text, RequiredKeywords(keywords, spec.KeywordRules)); len(missing) > 0 {
+		out = append(out, Finding{
+			Severity: SeverityWarn, Code: CodeKeywordsMissing,
+			Message: "the body does not use " + strconv.Itoa(len(missing)) + " of the " + strconv.Itoa(len(keywords)) +
+				" keywords of the page: " + strings.Join(missing, ", "),
+			Details: map[string]any{"keywords": missing},
+		})
 	}
 
 	if spec.KeywordRules.MaxDensity > 0 && len(words) > 0 {
@@ -85,6 +82,16 @@ func keywordFindings(doc *Document, primary string, secondary []string, spec tem
 		}
 	}
 	return out
+}
+
+func missingKeywords(text string, required keyword.List) []string {
+	missing := make([]string, 0, len(required))
+	for _, item := range required {
+		if _, _, found := findFold(text, item.Text); !found {
+			missing = append(missing, item.Text)
+		}
+	}
+	return missing
 }
 
 func headingFindings(doc *Document, spec template.TemplateSpec) []Finding {

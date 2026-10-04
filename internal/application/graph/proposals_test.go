@@ -7,6 +7,7 @@ import (
 
 	appgraph "github.com/davidmovas/postulator/internal/application/graph"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -177,7 +178,7 @@ func TestProposeFromKeywordsProposesWithoutPages(t *testing.T) {
 	coffee := f.entity(t, "Coffee")
 
 	out, err := f.service.ProposeFromKeywords(t.Context(), appgraph.ProposeFromKeywordsRequest{
-		SiteID: f.siteID, Keywords: []string{"trail running shoes", " road running shoes ", "Trail Running Shoes"}, ParentEntityID: coffee.ID,
+		SiteID: f.siteID, Keywords: []string{"trail running shoes (900)", " road running shoes ", "Trail Running Shoes"}, ParentEntityID: coffee.ID,
 	})
 	if err != nil {
 		t.Fatalf("ProposeFromKeywords: %v", err)
@@ -189,16 +190,20 @@ func TestProposeFromKeywordsProposesWithoutPages(t *testing.T) {
 			t.Errorf("the prompt does not carry %q:\n%s", want, prompt)
 		}
 	}
-	if strings.Count(prompt, "running shoes") != 2 {
-		t.Errorf("a keyword given twice reached the model twice:\n%s", prompt)
+	if strings.Count(prompt, "running shoes") != 2 || strings.Contains(prompt, "900") {
+		t.Errorf("a keyword given twice reached the model twice, or its volume did:\n%s", prompt)
 	}
 
 	if len(out.Entities) != 2 || out.Skipped != 1 {
 		t.Fatalf("proposals = %+v, want the two given keywords and the invented one skipped", out)
 	}
 	trail := out.Entities[0]
-	if trail.PageID != "" || trail.Path != "" || trail.PrimaryKeyword != "trail running shoes" || trail.Parent != "Coffee" {
+	if trail.PageID != "" || trail.Path != "" || trail.Parent != "Coffee" {
 		t.Fatalf("the trail proposal = %+v", trail)
+	}
+	if len(trail.Keywords) != 2 || trail.Keywords[0].Text != "trail running shoes" || trail.Keywords[0].Volume == nil ||
+		*trail.Keywords[0].Volume != 900 || trail.Keywords[1].Text != "trail shoes" {
+		t.Fatalf("the trail keywords = %+v, want the given keyword with its volume first, then the one the model folded in", trail.Keywords)
 	}
 	if road := out.Entities[1]; road.Parent != "Coffee" || !slices.Equal(road.Related, []string{"Trail Running Shoes"}) {
 		t.Fatalf("the road proposal did not take the parent asked for: %+v", road)
@@ -227,8 +232,7 @@ func TestThePagesPromptCarriesTheKeywordsOfThePage(t *testing.T) {
 
 	f := newProposeFixture(t, &scriptedModel{replies: []string{proposal}}, fixedProfiles{})
 	keyed := f.page(t, "/coffee/", "Coffee")
-	keyed.PrimaryKeyword = "best coffee beans"
-	keyed.Keywords = []string{"arabica", "robusta"}
+	keyed.Keywords = keyword.Of("best coffee beans", "arabica", "robusta")
 	if err := f.pages.Update(t.Context(), keyed); err != nil {
 		t.Fatalf("update the page: %v", err)
 	}

@@ -13,26 +13,21 @@ import (
 )
 
 const (
-	CodePluginMissing     = "plugin_missing"
-	CodePluginOutdated    = "plugin_outdated"
+	codePluginMissing     = "plugin_missing"
+	codePluginOutdated    = "plugin_outdated"
 	CapabilityPreview     = "preview"
 	CapabilitySEOMetaRead = "seo_meta_read"
+	CapabilityRaw         = "raw"
 
-	FieldSEOTitle         = "title"
-	FieldSEODescription   = "description"
-	FieldSEOCanonical     = "canonical"
-	FieldSEOOGTitle       = "ogTitle"
-	FieldSEOOGDescription = "ogDescription"
+	fieldSEOTitle         = "title"
+	fieldSEODescription   = "description"
+	fieldSEOCanonical     = "canonical"
+	fieldSEOOGTitle       = "ogTitle"
+	fieldSEOOGDescription = "ogDescription"
 
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 )
-
-func SEOFields() []string {
-	return []string{
-		FieldSEOTitle, FieldSEODescription, FieldSEOCanonical, FieldSEOOGTitle, FieldSEOOGDescription,
-	}
-}
 
 type PreviewLink struct {
 	ExpiresAt time.Time
@@ -230,15 +225,15 @@ type seoStatePayload struct {
 
 func (m SEOMeta) field(name string) (string, bool) {
 	switch name {
-	case FieldSEOTitle:
+	case fieldSEOTitle:
 		return m.Title, true
-	case FieldSEODescription:
+	case fieldSEODescription:
 		return m.Description, true
-	case FieldSEOCanonical:
+	case fieldSEOCanonical:
 		return m.Canonical, true
-	case FieldSEOOGTitle:
+	case fieldSEOOGTitle:
 		return m.OGTitle, true
-	case FieldSEOOGDescription:
+	case fieldSEOOGDescription:
 		return m.OGDescription, true
 	default:
 		return "", false
@@ -247,21 +242,21 @@ func (m SEOMeta) field(name string) (string, bool) {
 
 func pluginMissing() error {
 	return errors.New(errors.Invalid, "the Postulator companion plugin is not installed on this site").
-		WithDetail("code", CodePluginMissing)
+		WithDetail("code", codePluginMissing)
 }
 
 func IsPluginMissing(err error) bool {
-	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == CodePluginMissing
+	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == codePluginMissing
 }
 
 func pluginOutdated(capability string) error {
 	return errors.New(errors.Invalid, "the Postulator companion plugin on this site is too old for this; update it").
-		WithDetail("code", CodePluginOutdated).
+		WithDetail("code", codePluginOutdated).
 		WithDetail("capability", capability)
 }
 
 func IsPluginOutdated(err error) bool {
-	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == CodePluginOutdated
+	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == codePluginOutdated
 }
 
 func (c *Client) Manifest(ctx context.Context) (Manifest, error) {
@@ -360,7 +355,24 @@ func (c *Client) ListContent(ctx context.Context, query ContentQuery) (ContentPa
 	return ContentPage{Items: items, NextCursor: payload.NextCursor}, nil
 }
 
-func (c *Client) SetSEOMeta(ctx context.Context, id int64, meta SEOMeta) (SEOResult, error) {
+func postRoute(itemType ItemType, id int64) error {
+	switch itemType {
+	case TypePage, TypePost, TypeProduct:
+		return nil
+	case TypeProductCategory:
+		return errors.New(errors.Invalid,
+			"a product category is a term, and the companion plugin's post routes would answer the post that shares its number").
+			WithDetail("type", string(itemType)).
+			WithDetail("id", id)
+	default:
+		return errors.New(errors.Invalid, "unknown WordPress content type").WithDetail("type", string(itemType))
+	}
+}
+
+func (c *Client) SetSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta) (SEOResult, error) {
+	if err := postRoute(itemType, id); err != nil {
+		return SEOResult{}, err
+	}
 	if err := c.requirePlugin(ctx); err != nil {
 		return SEOResult{}, err
 	}
@@ -391,7 +403,10 @@ func (c *Client) SetSEOMeta(ctx context.Context, id int64, meta SEOMeta) (SEORes
 	return SEOResult{Applied: payload.Applied, SEOPlugin: payload.SEOPlugin}, nil
 }
 
-func (c *Client) GetSEOMeta(ctx context.Context, id int64) (SEOMeta, error) {
+func (c *Client) GetSEOMeta(ctx context.Context, itemType ItemType, id int64) (SEOMeta, error) {
+	if err := postRoute(itemType, id); err != nil {
+		return SEOMeta{}, err
+	}
 	if err := c.requireCapability(ctx, CapabilitySEOMetaRead); err != nil {
 		return SEOMeta{}, err
 	}
@@ -412,7 +427,10 @@ func (c *Client) GetSEOMeta(ctx context.Context, id int64) (SEOMeta, error) {
 	return SEOMeta(payload), nil
 }
 
-func (c *Client) ReplaceSEOMeta(ctx context.Context, id int64, meta SEOMeta, fields []string) (SEOResult, error) {
+func (c *Client) ReplaceSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta, fields []string) (SEOResult, error) {
+	if err := postRoute(itemType, id); err != nil {
+		return SEOResult{}, err
+	}
 	if err := c.requirePlugin(ctx); err != nil {
 		return SEOResult{}, err
 	}
@@ -453,7 +471,10 @@ func (c *Client) ReplaceSEOMeta(ctx context.Context, id int64, meta SEOMeta, fie
 	return SEOResult{Applied: payload.Applied, SEOPlugin: payload.SEOPlugin}, nil
 }
 
-func (c *Client) GetRaw(ctx context.Context, id int64) (RawContent, error) {
+func (c *Client) GetRaw(ctx context.Context, itemType ItemType, id int64) (RawContent, error) {
+	if err := postRoute(itemType, id); err != nil {
+		return RawContent{}, err
+	}
 	if err := c.requirePlugin(ctx); err != nil {
 		return RawContent{}, err
 	}
@@ -466,6 +487,12 @@ func (c *Client) GetRaw(ctx context.Context, id int64) (RawContent, error) {
 	var payload rawPayload
 	if err := decodeJSON(body, &payload); err != nil {
 		return RawContent{}, err
+	}
+	if ItemType(payload.Type) != itemType {
+		return RawContent{}, errors.New(errors.NotFound, "the site holds a "+payload.Type+" under that number, not a "+string(itemType)).
+			WithDetail("id", id).
+			WithDetail("type", string(itemType)).
+			WithDetail("found", payload.Type)
 	}
 	if payload.ContentHash != ContentHash(payload.Content) {
 		return RawContent{}, errors.New(errors.External, "the site reported a content hash that does not match the content it returned").
@@ -480,7 +507,10 @@ func (c *Client) GetRaw(ctx context.Context, id int64) (RawContent, error) {
 	}, nil
 }
 
-func (c *Client) PutRaw(ctx context.Context, id int64, content, expectedHash string) (string, error) {
+func (c *Client) PutRaw(ctx context.Context, itemType ItemType, id int64, content, expectedHash string) (string, error) {
+	if err := postRoute(itemType, id); err != nil {
+		return "", err
+	}
 	if err := c.requirePlugin(ctx); err != nil {
 		return "", err
 	}
@@ -528,7 +558,10 @@ type previewPayload struct {
 	ExpiresAt string `json:"expiresAt"`
 }
 
-func (c *Client) PreviewLink(ctx context.Context, id int64) (PreviewLink, error) {
+func (c *Client) PreviewLink(ctx context.Context, itemType ItemType, id int64) (PreviewLink, error) {
+	if err := postRoute(itemType, id); err != nil {
+		return PreviewLink{}, err
+	}
 	if err := c.requireCapability(ctx, CapabilityPreview); err != nil {
 		return PreviewLink{}, err
 	}

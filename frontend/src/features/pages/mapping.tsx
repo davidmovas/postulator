@@ -19,8 +19,7 @@ import {
 } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
 import type { EntityIndex } from "./entities.js";
-import { formatScore, kindLabel } from "../graph/labels.js";
-import { entityIcon } from "./labels.js";
+import { entityIcon, formatScore, entityKindLabel } from "../graph/labels.js";
 
 const noEntity = "none";
 
@@ -51,7 +50,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
 
     const options: SelectOption<string>[] = [
         { value: noEntity, label: copy.pages.detail.noEntityOption },
-        ...index.entities.map((held) => ({ value: held.id, label: held.name })),
+        ...index.entities.map((held) => ({ value: held.id, label: index.labels.get(held.id) ?? held.name })),
     ];
 
     const changed = choice !== (page.entityId ?? noEntity);
@@ -81,7 +80,7 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                         <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm font-semibold text-ink">{entity.name}</span>
                             <span className="font-mono text-2xs text-ink-faint">
-                                {copy.pages.detail.entityMeta(kindLabel(entity.kind), formatScore(entity.score))}
+                                {copy.pages.detail.entityMeta(entityKindLabel(entity.kind), formatScore(entity.score))}
                             </span>
                         </div>
                     </div>

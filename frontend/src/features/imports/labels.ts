@@ -5,8 +5,10 @@ import {
     edgeKinds,
     exportFormats,
     importActions,
+    importColumnUses,
     importFields,
     importFindingCodes,
+    importRowTypes,
     isOneOf,
 } from "../../generated/vocab.js";
 import type { ImportField } from "../../generated/vocab.js";
@@ -16,8 +18,34 @@ export function fieldLabel(field: string): string {
     return isOneOf(importFields, field) ? copy.imports.fields[field] : field;
 }
 
+export interface ColumnFate {
+    header: string;
+    use: string;
+    field?: string;
+}
+
+export function columnUseLabel(column: ColumnFate): string {
+    if (column.use === "field") {
+        return fieldLabel(column.field ?? "");
+    }
+    return isOneOf(importColumnUses, column.use) ? copy.imports.columnUses[column.use] : column.use;
+}
+
 export function findingLabel(code: string): string {
     return isOneOf(importFindingCodes, code) ? copy.imports.findings[code] : code;
+}
+
+interface FindingSpot {
+    sheet?: string;
+    row: number;
+}
+
+export function findingPlace(finding: FindingSpot): string | null {
+    const sheet = finding.sheet ?? "";
+    if (sheet !== "") {
+        return copy.imports.preview.place(sheet, finding.row);
+    }
+    return finding.row > 0 ? copy.imports.preview.row(finding.row) : null;
 }
 
 export function actionLabel(action: string): string {
@@ -34,6 +62,31 @@ export function edgeKindLabel(kind: string): string {
 
 export function exportFormatLabel(format: string): string {
     return isOneOf(exportFormats, format) ? copy.imports.export.formats[format] : format;
+}
+
+export function rowTypeLabel(rowType: string): string {
+    return isOneOf(importRowTypes, rowType) ? copy.imports.rowTypes[rowType] : rowType;
+}
+
+export interface ProductRow {
+    wpType: string;
+    plannedPath?: string;
+    storeName?: string;
+    matchedBy?: string;
+}
+
+const matchedBy = copy.imports.preview.matchedBy as Readonly<Record<string, string>>;
+
+export function productNote(page: ProductRow): string | null {
+    if (page.wpType !== "product") {
+        return null;
+    }
+    const name = page.storeName ?? "";
+    if (name === "") {
+        return copy.imports.preview.waitingProduct;
+    }
+    const by = matchedBy[page.matchedBy ?? ""] ?? matchedBy["path"] ?? "";
+    return copy.imports.preview.storeProduct(name, by, page.plannedPath ?? "");
 }
 
 export function blocking(code: string): boolean {

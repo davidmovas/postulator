@@ -90,7 +90,7 @@ func (s *Service) execute(ctx context.Context, action domainagent.PendingAction)
 	}
 
 	if undelivered := s.resume(ctx, conversation, resumeText(action.Tool, encoded, failure)); undelivered != nil {
-		s.deps.Turns.Note(undelivered)
+		s.drop(undelivered)
 		failure = strings.TrimSpace(failure + " " + undeliveredNote)
 	}
 	if _, err = s.deps.Actions.Transition(ctx, action.ID, domainagent.ActionApproved, status, encoded,

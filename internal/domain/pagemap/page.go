@@ -1,11 +1,10 @@
 package pagemap
 
 import (
-	"slices"
 	"strings"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -25,6 +24,21 @@ func (t WPType) Valid() bool {
 	default:
 		return false
 	}
+}
+
+func (t WPType) Term() bool {
+	return t == WPProductCategory
+}
+
+func (t WPType) SameFamily(other WPType) bool {
+	if t == other {
+		return true
+	}
+	return t.core() && other.core()
+}
+
+func (t WPType) core() bool {
+	return t == WPPage || t == WPPost
 }
 
 type Status string
@@ -52,7 +66,7 @@ const (
 	OriginObserved  LinkOrigin = "observed"
 )
 
-func (o LinkOrigin) Valid() bool {
+func (o LinkOrigin) valid() bool {
 	switch o {
 	case OriginGenerated, OriginObserved:
 		return true
@@ -65,6 +79,7 @@ type Page struct {
 	ID              string
 	SiteID          string
 	Path            string
+	PlannedPath     string
 	Slug            string
 	ParentPageID    *string
 	WPType          WPType
@@ -74,8 +89,8 @@ type Page struct {
 	MetaTitle       string
 	MetaDescription string
 	Canonical       string
-	PrimaryKeyword  string
-	Keywords        []string
+	Keywords        keyword.List
+	Notes           []Note
 	Status          Status
 	EntityID        *string
 	TemplateID      *string
@@ -133,14 +148,31 @@ func NewPage(p Page) (Page, error) {
 	}
 	p.Path = path
 	p.Slug = Slug(path)
+	if p.PlannedPath, err = plannedPath(p.PlannedPath, path); err != nil {
+		return Page{}, err
+	}
 	p.Title = strings.TrimSpace(p.Title)
 	p.H1 = strings.TrimSpace(p.H1)
 	p.MetaTitle = strings.TrimSpace(p.MetaTitle)
 	p.MetaDescription = strings.TrimSpace(p.MetaDescription)
 	p.Canonical = strings.TrimSpace(p.Canonical)
-	p.PrimaryKeyword = strings.TrimSpace(p.PrimaryKeyword)
-	p.Keywords = graph.CleanKeywords(p.Keywords)
+	p.Keywords = keyword.New(p.Keywords)
+	p.Notes = NewNotes(p.Notes)
 	return p, nil
+}
+
+func plannedPath(raw, path string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+	planned, err := NormalizePath(raw)
+	if err != nil {
+		return "", err
+	}
+	if planned == path {
+		return "", nil
+	}
+	return planned, nil
 }
 
 func NewPageLink(l PageLink) (PageLink, error) {
@@ -157,7 +189,7 @@ func NewPageLink(l PageLink) (PageLink, error) {
 		return PageLink{}, invalid("target page id must not be empty when set", "toPageId")
 	case l.ToURL == "":
 		return PageLink{}, invalid("link needs a target url, whether or not it names a target page", "toUrl")
-	case !l.Origin.Valid():
+	case !l.Origin.valid():
 		return PageLink{}, invalid("link origin is not recognized", "origin")
 	}
 	return l, nil
@@ -168,15 +200,4 @@ func byPath(a, b Page) int {
 		return c
 	}
 	return strings.Compare(a.ID, b.ID)
-}
-
-func Unmapped(pages []Page) []Page {
-	out := make([]Page, 0, len(pages))
-	for i := range pages {
-		if pages[i].EntityID == nil {
-			out = append(out, pages[i])
-		}
-	}
-	slices.SortFunc(out, byPath)
-	return out
 }

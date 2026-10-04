@@ -3,31 +3,32 @@ package graph
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
 type Anchor struct {
-	Text   string  `json:"text" description:"The link text another page points here with"`
-	Source string  `json:"source,omitempty" enum:"user,ai" description:"Who wrote the anchor; leave it out and an anchor you propose is recorded as ai"`
-	Weight float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"How strongly to prefer this anchor over the others, between 0 and 1; leave it out for no preference"`
+	Text   string  `json:"text" description:"Link text"`
+	Source string  `json:"source,omitempty" enum:"user,ai" description:"Who wrote it; default ai"`
+	Weight float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"Preference over the others; omit for none"`
 }
 
 type Entity struct {
-	ID                string   `json:"id"`
-	SiteID            string   `json:"siteId"`
-	Name              string   `json:"name"`
-	Kind              string   `json:"kind"`
-	Intent            string   `json:"intent"`
-	PrimaryKeyword    string   `json:"primaryKeyword"`
-	SecondaryKeywords []string `json:"secondaryKeywords"`
-	Anchors           []Anchor `json:"anchors"`
-	CanonicalPageID   *string  `json:"canonicalPageId"`
-	Score             float64  `json:"score"`
-	Source            string   `json:"source"`
-	CreatedAt         dto.Time `json:"createdAt"`
-	UpdatedAt         dto.Time `json:"updatedAt"`
+	ID              string        `json:"id"`
+	SiteID          string        `json:"siteId"`
+	Name            string        `json:"name"`
+	Kind            string        `json:"kind"`
+	Intent          string        `json:"intent"`
+	Keywords        []dto.Keyword `json:"keywords"`
+	Anchors         []Anchor      `json:"anchors"`
+	ScopeEntityID   *string       `json:"scopeEntityId"`
+	CanonicalPageID *string       `json:"canonicalPageId"`
+	Score           float64       `json:"score"`
+	Source          string        `json:"source"`
+	CreatedAt       dto.Time      `json:"createdAt"`
+	UpdatedAt       dto.Time      `json:"updatedAt"`
 }
 
 type Edge struct {
@@ -53,32 +54,28 @@ type EntityPage struct {
 }
 
 func entityView(e graphdomain.Entity) Entity {
-	keywords := e.SecondaryKeywords
-	if keywords == nil {
-		keywords = []string{}
-	}
 	anchors := make([]Anchor, 0, len(e.Anchors))
 	for _, anchor := range e.Anchors {
 		anchors = append(anchors, Anchor{Text: anchor.Text, Source: string(anchor.Source), Weight: anchor.Weight})
 	}
 	return Entity{
-		ID:                e.ID,
-		SiteID:            e.SiteID,
-		Name:              e.Name,
-		Kind:              string(e.Kind),
-		Intent:            e.Intent,
-		PrimaryKeyword:    e.PrimaryKeyword,
-		SecondaryKeywords: keywords,
-		Anchors:           anchors,
-		CanonicalPageID:   e.CanonicalPageID,
-		Score:             e.Score,
-		Source:            string(e.Source),
-		CreatedAt:         dto.NewTime(e.CreatedAt),
-		UpdatedAt:         dto.NewTime(e.UpdatedAt),
+		ID:              e.ID,
+		SiteID:          e.SiteID,
+		Name:            e.Name,
+		Kind:            string(e.Kind),
+		Intent:          e.Intent,
+		Keywords:        application.KeywordViews(e.Keywords),
+		Anchors:         anchors,
+		ScopeEntityID:   e.ScopeID,
+		CanonicalPageID: e.CanonicalPageID,
+		Score:           e.Score,
+		Source:          string(e.Source),
+		CreatedAt:       dto.NewTime(e.CreatedAt),
+		UpdatedAt:       dto.NewTime(e.UpdatedAt),
 	}
 }
 
-func anchorsOf(ctx context.Context, anchors []Anchor) []graphdomain.Anchor {
+func requestedAnchors(ctx context.Context, anchors []Anchor) []graphdomain.Anchor {
 	fallback := anchorSourceOfActor(ctx)
 
 	out := make([]graphdomain.Anchor, 0, len(anchors))

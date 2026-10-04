@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -48,8 +49,11 @@ func TestNewPageNormalises(t *testing.T) {
 
 	p := page(pageA, "/Shop/Bags", nil)
 	p.Title = "  Bags  "
-	p.PrimaryKeyword = " leather bags "
-	p.Keywords = []string{" totes", "Totes", "", "clutches"}
+	p.Keywords = keyword.List{{Text: " totes"}, {Text: "Totes"}, {Text: ""}, {Text: "clutches"}, {Text: " leather bags ", Volume: new(700)}}
+	p.Notes = []pagemap.Note{
+		{Label: " Intent Owner ", Text: " GEO Commercial "}, {Label: "Notes", Text: "  "}, {Label: " ", Text: "no label"},
+		{Label: "intent owner", Text: "said twice"}, {Label: "Reason", Text: "one form of the product"},
+	}
 	got, err := pagemap.NewPage(p)
 	if err != nil {
 		t.Fatalf("NewPage: %v", err)
@@ -57,8 +61,27 @@ func TestNewPageNormalises(t *testing.T) {
 	if got.Path != "/shop/bags/" || got.Slug != "bags" || got.Title != "Bags" {
 		t.Errorf("NewPage = path %q slug %q title %q", got.Path, got.Slug, got.Title)
 	}
-	if got.PrimaryKeyword != "leather bags" || !slices.Equal(got.Keywords, []string{"totes", "clutches"}) {
-		t.Errorf("NewPage keywords = %q %v, want them trimmed and deduplicated", got.PrimaryKeyword, got.Keywords)
+	if !slices.Equal(got.Keywords.Texts(), []string{"leather bags", "totes", "clutches"}) {
+		t.Errorf("NewPage keywords = %v, want them trimmed, deduplicated and ordered by volume", got.Keywords.Texts())
+	}
+	wantNotes := []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Reason", Text: "one form of the product"}}
+	if !slices.Equal(got.Notes, wantNotes) {
+		t.Errorf("NewPage notes = %+v, want %+v", got.Notes, wantNotes)
+	}
+}
+
+func TestNewPageWithoutKeywordsOrNotesCarriesEmptyLists(t *testing.T) {
+	t.Parallel()
+
+	got, err := pagemap.NewPage(page(pageA, "/a/", nil))
+	if err != nil {
+		t.Fatalf("NewPage: %v", err)
+	}
+	if got.Keywords == nil || len(got.Keywords) != 0 {
+		t.Errorf("Keywords = %#v, want an empty list that is not nil", got.Keywords)
+	}
+	if got.Notes == nil || len(got.Notes) != 0 {
+		t.Errorf("Notes = %#v, want an empty list that is not nil", got.Notes)
 	}
 }
 
@@ -107,6 +130,11 @@ func TestNewPageLink(t *testing.T) {
 	if link.ToURL != "https://a/b/" || link.AnchorText != "bags" {
 		t.Errorf("NewPageLink did not trim: %+v", link)
 	}
+	observed := valid
+	observed.Origin = pagemap.OriginObserved
+	if _, err = pagemap.NewPageLink(observed); err != nil {
+		t.Fatalf("NewPageLink of an observed link: %v", err)
+	}
 
 	cases := []struct {
 		name   string
@@ -138,16 +166,6 @@ func TestNewPageLink(t *testing.T) {
 	}
 }
 
-func TestUnmapped(t *testing.T) {
-	t.Parallel()
-
-	pages := []pagemap.Page{page(pageC, "/c/", nil), page(pageA, "/a/", new(entA)), page(pageB, "/b/", nil)}
-	got := pagemap.Unmapped(pages)
-	if len(got) != 2 || got[0].Path != "/b/" || got[1].Path != "/c/" {
-		t.Errorf("Unmapped = %+v", got)
-	}
-}
-
 func TestEnums(t *testing.T) {
 	t.Parallel()
 
@@ -161,13 +179,45 @@ func TestEnums(t *testing.T) {
 			t.Errorf("%q must be valid", status)
 		}
 	}
-	if pagemap.WPType("x").Valid() || pagemap.Status("x").Valid() || pagemap.LinkOrigin("x").Valid() {
+	if pagemap.WPType("x").Valid() || pagemap.Status("x").Valid() {
 		t.Error("unknown enum values must be invalid")
-	}
-	if !pagemap.OriginGenerated.Valid() || !pagemap.OriginObserved.Valid() {
-		t.Error("origins must be valid")
 	}
 	if !pagemap.SortCreatedAt.Valid() || !pagemap.SortPath.Valid() || pagemap.Sort("x").Valid() {
 		t.Error("sort validity is wrong")
+	}
+}
+
+func TestATypeKnowsItsNumberSequenceAndItsFamily(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		left   pagemap.WPType
+		right  pagemap.WPType
+		term   bool
+		family bool
+	}{
+		{left: pagemap.WPPage, right: pagemap.WPPage, family: true},
+		{left: pagemap.WPPage, right: pagemap.WPPost, family: true},
+		{left: pagemap.WPPost, right: pagemap.WPProduct},
+		{left: pagemap.WPProduct, right: pagemap.WPProduct, family: true},
+		{left: pagemap.WPProduct, right: pagemap.WPProductCategory},
+		{left: pagemap.WPProductCategory, right: pagemap.WPProductCategory, term: true, family: true},
+		{left: pagemap.WPProductCategory, right: pagemap.WPPage, term: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.left)+" and "+string(tc.right), func(t *testing.T) {
+			t.Parallel()
+
+			if got := tc.left.Term(); got != tc.term {
+				t.Errorf("%s.Term() = %t, want %t", tc.left, got, tc.term)
+			}
+			if got := tc.left.SameFamily(tc.right); got != tc.family {
+				t.Errorf("%s.SameFamily(%s) = %t, want %t", tc.left, tc.right, got, tc.family)
+			}
+			if got := tc.right.SameFamily(tc.left); got != tc.family {
+				t.Errorf("the family is not symmetric for %s and %s", tc.left, tc.right)
+			}
+		})
 	}
 }

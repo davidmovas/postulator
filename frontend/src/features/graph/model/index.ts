@@ -1,4 +1,5 @@
 import type { Edge, Entity, EntityPage } from "../../../data/types.js";
+import { entityLabels } from "../../../domain/entities.js";
 
 export type NodeState = "mismatch" | "working" | "published" | "exists" | "planned" | "archived" | "noPage";
 
@@ -40,6 +41,7 @@ export interface GraphIndex {
     entities: readonly Entity[];
     edges: readonly Edge[];
     byId: ReadonlyMap<string, Entity>;
+    labels: ReadonlyMap<string, string>;
     edgeById: ReadonlyMap<string, Edge>;
     placementParent: ReadonlyMap<string, string>;
     placementProposed: ReadonlySet<string>;
@@ -293,6 +295,7 @@ export function buildGraphIndex(
         entities,
         edges,
         byId,
+        labels: entityLabels(entities),
         edgeById,
         placementParent,
         placementProposed,

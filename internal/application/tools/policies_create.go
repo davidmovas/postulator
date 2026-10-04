@@ -9,13 +9,13 @@ import (
 const policiesCreateName = "policies_create"
 
 type policiesCreateArgs struct {
-	Scope          string         `json:"scope,omitempty" enum:"global,site" description:"Whether the policy applies to every site or to one; leave it out for global"`
-	SiteID         *string        `json:"siteId,omitempty" description:"The site the policy belongs to, required when the scope is site"`
-	Name           string         `json:"name" description:"What to call the policy, two to four words"`
-	Rules          *linkRulesArgs `json:"rules,omitempty" description:"How many links a page may carry and which of them are owed; leave it out to ask nothing"`
-	ForbidExternal bool           `json:"forbidExternal,omitempty" description:"Refuse links that leave the site"`
-	ForbidSelf     bool           `json:"forbidSelf,omitempty" description:"Refuse a link from a page to itself"`
-	AnchorStrategy string         `json:"anchorStrategy,omitempty" enum:"prefer_user,rotate" description:"Whether to keep to the anchors a human wrote or to rotate through all of them; leave it out for prefer_user"`
+	Scope          string         `json:"scope,omitempty" enum:"global,site" description:"Default global"`
+	SiteID         *string        `json:"siteId,omitempty" description:"Required for site scope"`
+	Name           string         `json:"name" description:"Name, 2-4 words"`
+	Rules          *linkRulesArgs `json:"rules,omitempty" description:"Internal links owed and allowed"`
+	ForbidExternal bool           `json:"forbidExternal,omitempty" description:"Refuse external links"`
+	ForbidSelf     bool           `json:"forbidSelf,omitempty" description:"Refuse self links"`
+	AnchorStrategy string         `json:"anchorStrategy,omitempty" enum:"prefer_user,rotate" description:"Default prefer_user, human anchors first"`
 }
 
 func (a policiesCreateArgs) request() templates.CreatePolicyRequest {

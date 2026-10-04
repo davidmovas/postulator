@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -277,6 +278,48 @@ func TestSyncSiteAdoptsTheManifest(t *testing.T) {
 	}
 }
 
+func TestSyncSiteAsksTheStoreOnceAndRecordsWhatItFound(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		opts []wptest.Option
+		want site.Commerce
+	}{
+		{name: "a store the user may edit", want: site.CommerceReady},
+		{name: "no store", opts: []wptest.Option{wptest.WithoutCommerce()}, want: site.CommerceAbsent},
+		{name: "a user without product rights", opts: []wptest.Option{wptest.WithoutProductEdit()}, want: site.CommerceForbidden},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newSyncHarness(t, 1, tc.opts...)
+			seedSite(t, h)
+			h.all(t)
+
+			owner, err := sqlite.NewSiteRepo(h.store).Get(t.Context(), h.siteID)
+			if err != nil {
+				t.Fatalf("read the site: %v", err)
+			}
+			if owner.Commerce != tc.want {
+				t.Errorf("commerce = %q, want %q", owner.Commerce, tc.want)
+			}
+
+			asked := 0
+			for _, request := range h.server.Requests() {
+				if request.Path == "/wp-json/wp/v2/users/me" || request.Path == "/wp-json/wc/v3/products" {
+					asked++
+				}
+			}
+			if asked > 2 {
+				t.Errorf("the store was asked %d times over a sync of several batches, want it asked once", asked)
+			}
+		})
+	}
+}
+
 func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T) {
 	t.Parallel()
 
@@ -369,6 +412,196 @@ func TestSyncSiteKeepsThePlanAndRecordsWhatTheSiteHolds(t *testing.T) {
 	}
 	if found[0].Planned != planned.Path || found[0].Actual != "/e-bike-range/" {
 		t.Errorf("the mismatch = %+v", found[0])
+	}
+}
+
+func TestSyncSiteKeepsATermAndAPostThatShareANumberApart(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	page := h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "About", Slug: "about", Content: "<p>about</p>"})[0]
+	term := h.server.Seed(wptest.Item{Type: wptest.TypeProductCategory, Title: "Koffein", Slug: "koffein"})[0]
+	if page.ID != term.ID {
+		t.Fatalf("the page is %d and the term %d; the case needs the numbers to collide", page.ID, term.ID)
+	}
+
+	for pass := range 2 {
+		h.restart(t)
+		h.all(t)
+
+		about := h.byPath(t, "/about/")
+		category := h.byPath(t, "/product-category/koffein/")
+		if about.ID == category.ID {
+			t.Fatalf("pass %d merged the page and the category into one row", pass)
+		}
+		if about.WPType != pagemap.WPPage || about.WPID == nil || *about.WPID != page.ID {
+			t.Errorf("pass %d: the page row = %+v", pass, about)
+		}
+		if category.WPType != pagemap.WPProductCategory || category.WPID == nil || *category.WPID != term.ID {
+			t.Errorf("pass %d: the category row = %+v", pass, category)
+		}
+	}
+}
+
+func TestSyncSiteMergesAPulledItemOnlyIntoARowOfItsFamily(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Liquid", Slug: "liquid", Content: "<p>a page</p>"})
+
+	planned := pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: "/liquid/", Slug: "liquid", WPType: pagemap.WPProduct,
+		Title: "BPC-157 Liquid", Status: pagemap.StatusPlanned, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := h.pages.Insert(t.Context(), planned); err != nil {
+		t.Fatalf("insert the planned product: %v", err)
+	}
+
+	state := h.all(t)
+
+	stored, err := h.pages.Get(t.Context(), planned.ID)
+	if err != nil {
+		t.Fatalf("read the planned product: %v", err)
+	}
+	if stored.WPType != pagemap.WPProduct || stored.WPID != nil || stored.Title != planned.Title {
+		t.Fatalf("the planned product became %+v; a page on the site is not the product the file plans", stored)
+	}
+	if len(state.Findings) != 1 || state.Findings[0].Code != steps.CodePathTakenOnSite {
+		t.Fatalf("findings = %+v, want one %q", state.Findings, steps.CodePathTakenOnSite)
+	}
+	if state.Findings[0].Details["path"] != "/liquid/" {
+		t.Errorf("the finding = %+v", state.Findings[0])
+	}
+}
+
+func TestSyncSiteGivesAWaitingRowTheProductCreatedForIt(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	product := h.server.Seed(wptest.Item{
+		Type: wptest.TypeProduct, Title: "Liquid", Slug: "mak-liquid", Content: "<p>made by hand</p>", Status: "publish",
+	})[0]
+	waiting := func(path, h1 string) pagemap.Page {
+		return pagemap.Page{
+			ID: id.New(), SiteID: h.siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPProduct, H1: h1,
+			Keywords: keyword.Of("mak liquid"), Status: pagemap.StatusPlanned, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		}
+	}
+	claimed, other := waiting("/mak/mak-liquid/", "Mak Liquid"), waiting("/mak/gel/", "Mak Gel")
+	for _, row := range []pagemap.Page{claimed, other} {
+		if err := h.pages.Insert(t.Context(), row); err != nil {
+			t.Fatalf("insert the waiting row: %v", err)
+		}
+	}
+
+	h.all(t)
+
+	stored, err := h.pages.Get(t.Context(), claimed.ID)
+	if err != nil {
+		t.Fatalf("read the waiting row: %v", err)
+	}
+	if stored.WPID == nil || *stored.WPID != product.ID || stored.Path != "/product/mak-liquid/" ||
+		stored.PlannedPath != "/mak/mak-liquid/" || stored.Status != pagemap.StatusPublished {
+		t.Fatalf("the waiting row reads %+v, want it on the store's product at the store's address", stored)
+	}
+	if stored.H1 != "Mak Liquid" || !stored.Keywords.Equal(claimed.Keywords) || stored.Observed.Title != "Liquid" {
+		t.Errorf("the claimed row lost its plan or the store's name: %+v", stored)
+	}
+	all, err := h.pages.ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	products := 0
+	for i := range all {
+		if all[i].WPType == pagemap.WPProduct && all[i].WPID != nil {
+			products++
+		}
+	}
+	if products != 1 {
+		t.Errorf("the map holds %d store products, want the one row that waited for it", products)
+	}
+	left, err := h.pages.Get(t.Context(), other.ID)
+	if err != nil || left.WPID != nil || left.Path != "/mak/gel/" {
+		t.Errorf("the row nothing answers reads %+v (%v), want it still waiting", left, err)
+	}
+}
+
+func TestSyncSiteSettlesEveryParentFromThePathAboveIt(t *testing.T) {
+	t.Parallel()
+
+	row := func(siteID, path string, parent *string) pagemap.Page {
+		return pagemap.Page{
+			ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
+			Title: path, Status: pagemap.StatusPlanned, ParentPageID: parent,
+			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		}
+	}
+
+	cases := []struct {
+		name   string
+		seed   func(t *testing.T, h *syncHarness)
+		path   string
+		above  string
+		parent string
+	}{
+		{
+			name:   "a page under a page takes it",
+			seed:   seedSite,
+			path:   "/coffee/espresso/",
+			above:  "/coffee/",
+			parent: "/coffee/",
+		},
+		{
+			name: "a product under a page takes none",
+			seed: func(t *testing.T, h *syncHarness) {
+				t.Helper()
+				h.server.Seed(
+					wptest.Item{Type: wptest.TypePage, Title: "Product", Slug: "product", Content: "<p>the shop</p>"},
+					wptest.Item{Type: wptest.TypeProduct, Title: "Liquid", Slug: "liquid", Content: "<p>made by hand</p>", Status: "publish"},
+				)
+			},
+			path:  "/product/liquid/",
+			above: "/product/",
+		},
+		{
+			name: "a parent the path no longer names is let go",
+			seed: func(t *testing.T, h *syncHarness) {
+				t.Helper()
+				h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "About", Slug: "about", Content: "<p>about</p>"})
+				elsewhere := row(h.siteID, "/tea/", nil)
+				for _, planned := range []pagemap.Page{elsewhere, row(h.siteID, "/about/", &elsewhere.ID)} {
+					if err := h.pages.Insert(t.Context(), planned); err != nil {
+						t.Fatalf("insert %s: %v", planned.Path, err)
+					}
+				}
+			},
+			path: "/about/",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newSyncHarness(t, 0)
+			tc.seed(t, h)
+			h.all(t)
+
+			child := h.byPath(t, tc.path)
+			if tc.above != "" {
+				h.byPath(t, tc.above)
+			}
+			if tc.parent == "" {
+				if child.ParentPageID != nil {
+					t.Fatalf("%s sits under %s, want no parent", tc.path, *child.ParentPageID)
+				}
+				return
+			}
+			parent := h.byPath(t, tc.parent)
+			if child.ParentPageID == nil || *child.ParentPageID != parent.ID {
+				t.Fatalf("%s sits under %v, want %s", tc.path, child.ParentPageID, parent.ID)
+			}
+		})
 	}
 }
 

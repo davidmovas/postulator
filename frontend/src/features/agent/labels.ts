@@ -93,18 +93,3 @@ export function riskLabel(risk: string): string {
             return copy.agent.tools.read;
     }
 }
-
-export function actionStatusTone(status: string): Tone {
-    switch (status) {
-        case "executed":
-            return "ok";
-        case "approved":
-            return "info";
-        case "failed":
-            return "danger";
-        case "rejected":
-            return "muted";
-        default:
-            return "warn";
-    }
-}

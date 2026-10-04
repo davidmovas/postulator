@@ -92,6 +92,9 @@ func listUnder(prompt, marker string) []string {
 		}
 		entry, found := strings.CutPrefix(trimmed, "- ")
 		if !found {
+			entry, found = numbered(trimmed)
+		}
+		if !found {
 			continue
 		}
 		if entry = strings.TrimSpace(entry); entry != "" && entry != noneEntry {
@@ -99,6 +102,17 @@ func listUnder(prompt, marker string) []string {
 		}
 	}
 	return out
+}
+
+func numbered(line string) (string, bool) {
+	number, entry, found := strings.Cut(line, ". ")
+	if !found {
+		return "", false
+	}
+	if _, err := strconv.Atoi(number); err != nil {
+		return "", false
+	}
+	return entry, true
 }
 
 func isMarker(line string) bool {

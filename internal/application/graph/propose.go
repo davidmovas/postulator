@@ -7,21 +7,25 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 const (
-	NameProposeFromPages = "propose_from_pages"
-	NameProposeRelated   = "propose_related"
+	NameProposeFromPages = domainllm.StepProposeFromPages
+	NameProposeRelated   = domainllm.StepProposeRelated
 
 	PagesPerCall     = 40
 	proposalTokens   = 4096
 	relatedWeightMin = 0.05
+	proposalRole     = domainllm.RoleEditor
 )
 
 //go:embed prompts/*.tmpl
@@ -148,7 +152,7 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 			System:    system,
 			Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 			MaxTokens: proposalTokens,
-			Meta:      llm.CallMeta{Step: NameProposeFromPages},
+			Meta:      proposalCall(NameProposeFromPages),
 		})
 		if callErr != nil {
 			return PreviewFromPagesResponse{}, callErr
@@ -168,21 +172,27 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 				continue
 			}
 			response.Entities = append(response.Entities, ProposedEntity{
-				PageID:            page.ID,
-				Path:              page.Path,
-				Name:              name,
-				Kind:              string(kindOf(proposed.Kind)),
-				Intent:            strings.TrimSpace(proposed.Intent),
-				PrimaryKeyword:    strings.TrimSpace(proposed.PrimaryKeyword),
-				SecondaryKeywords: graphdomain.CleanKeywords(proposed.SecondaryKeywords),
-				Anchors:           graphdomain.CleanKeywords(proposed.Anchors),
-				Parent:            strings.TrimSpace(proposed.ParentPath),
-				Related:           graphdomain.CleanKeywords(proposed.RelatedPaths),
-				ExistingEntityID:  state.byName[fold(name)],
+				PageID:           page.ID,
+				Path:             page.Path,
+				Name:             name,
+				Kind:             string(kindOf(proposed.Kind)),
+				Intent:           strings.TrimSpace(proposed.Intent),
+				Keywords:         proposedKeywords(page.Keywords, proposed.PrimaryKeyword, proposed.SecondaryKeywords),
+				Anchors:          graphdomain.Distinct(proposed.Anchors),
+				Parent:           strings.TrimSpace(proposed.ParentPath),
+				Related:          graphdomain.Distinct(proposed.RelatedPaths),
+				ExistingEntityID: state.byName[graphdomain.Key(name)],
 			})
 		}
 	}
 	return response, nil
+}
+
+func proposedKeywords(own keyword.List, primary string, secondary []string) []dto.Keyword {
+	if len(own) > 0 {
+		return application.KeywordViews(own)
+	}
+	return application.KeywordViews(keyword.Of(append([]string{primary}, secondary...)...))
 }
 
 func chosenPages(pages []pagemap.Page, pageIDs []string, pathPrefix string) ([]pagemap.Page, error) {
@@ -261,11 +271,7 @@ func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest)
 
 	focus := ""
 	if entityID := strings.TrimSpace(req.EntityID); entityID != "" {
-		for i := range state.entities {
-			if state.entities[i].ID == entityID {
-				focus = state.entities[i].Name
-			}
-		}
+		focus = state.labels[entityID]
 		if focus == "" {
 			return ProposeRelatedResponse{}, errors.New(errors.NotFound, "entity not found").
 				WithDetail("entityId", entityID)
@@ -273,7 +279,7 @@ func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest)
 	}
 
 	system, user, err := prompts.Render(NameProposeRelated, relatedPrompt{
-		SiteName: owner.Name, Focus: focus, Entities: state.entities, Existing: pairsOf(state),
+		SiteName: owner.Name, Focus: focus, Entities: state.labeled(), Existing: pairsOf(state),
 	})
 	if err != nil {
 		return ProposeRelatedResponse{}, err
@@ -284,7 +290,7 @@ func (s *Service) ProposeRelated(ctx context.Context, req ProposeRelatedRequest)
 		System:    system,
 		Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 		MaxTokens: proposalTokens,
-		Meta:      llm.CallMeta{Step: NameProposeRelated},
+		Meta:      proposalCall(NameProposeRelated),
 	})
 	if err != nil {
 		return ProposeRelatedResponse{}, err
@@ -307,15 +313,28 @@ func (s *Service) model(ctx context.Context, siteID string) (domainllm.ModelRef,
 	if s.profiles == nil || s.llm == nil {
 		return domainllm.ModelRef{}, errors.New(errors.Invalid, "no model is wired for the graph proposals")
 	}
-	return s.profiles.Resolve(ctx, siteID, domainllm.RoleEditor, nil)
+	return s.profiles.Resolve(ctx, siteID, proposalRole, nil)
+}
+
+func proposalCall(step string) llm.CallMeta {
+	return llm.CallMeta{Step: step, Role: proposalRole}
 }
 
 type siteGraph struct {
 	entities []graphdomain.Entity
 	edges    []graphdomain.Edge
 	pages    []pagemap.Page
+	labels   map[string]string
 	byName   map[string]string
 	byPath   map[string]string
+}
+
+func (g siteGraph) labeled() []graphdomain.Entity {
+	out := slices.Clone(g.entities)
+	for i := range out {
+		out[i].Name = g.labels[out[i].ID]
+	}
+	return out
 }
 
 func (s *Service) snapshot(ctx context.Context, siteID string) (siteGraph, error) {
@@ -333,11 +352,11 @@ func (s *Service) snapshot(ctx context.Context, siteID string) (siteGraph, error
 	}
 
 	state := siteGraph{
-		entities: entities, edges: edges, pages: pages,
+		entities: entities, edges: edges, pages: pages, labels: graphdomain.Labels(entities),
 		byName: make(map[string]string, len(entities)), byPath: make(map[string]string, len(pages)),
 	}
 	for i := range entities {
-		state.byName[fold(entities[i].Name)] = entities[i].ID
+		state.byName[graphdomain.Key(state.labels[entities[i].ID])] = entities[i].ID
 	}
 	for i := range pages {
 		if pages[i].EntityID != nil {
@@ -361,7 +380,7 @@ func unmappedPages(pages []pagemap.Page) []pagemap.Page {
 func pagesPromptOf(siteName string, state siteGraph, batch []pagemap.Page) pagesPrompt {
 	known := make([]knownEntity, 0, len(state.entities))
 	for i := range state.entities {
-		entry := knownEntity{Name: state.entities[i].Name, Kind: string(state.entities[i].Kind)}
+		entry := knownEntity{Name: state.labels[state.entities[i].ID], Kind: string(state.entities[i].Kind)}
 		for path, entityID := range state.byPath {
 			if entityID == state.entities[i].ID {
 				entry.Path = path
@@ -375,7 +394,7 @@ func pagesPromptOf(siteName string, state siteGraph, batch []pagemap.Page) pages
 	for i := range batch {
 		lines = append(lines, pagePromptLine{
 			Path: batch[i].Path, Title: batch[i].Title, H1: batch[i].H1, MetaDescription: batch[i].MetaDescription,
-			PrimaryKeyword: batch[i].PrimaryKeyword, Keywords: strings.Join(batch[i].Keywords, ", "),
+			PrimaryKeyword: batch[i].Keywords.Main(), Keywords: strings.Join(batch[i].Keywords.Rest(), ", "),
 		})
 	}
 	return pagesPrompt{SiteName: siteName, Known: known, Pages: lines}
@@ -386,8 +405,8 @@ func (s *Service) applyRelated(ctx context.Context, siteID string, proposal rela
 	now := s.now()
 	return s.uow.Do(ctx, func(c context.Context) error {
 		for _, proposed := range proposal.Edges {
-			from, knownFrom := state.byName[fold(proposed.From)]
-			to, knownTo := state.byName[fold(proposed.To)]
+			from, knownFrom := state.byName[graphdomain.Key(proposed.From)]
+			to, knownTo := state.byName[graphdomain.Key(proposed.To)]
 			if !knownFrom || !knownTo || from == to {
 				out.Skipped++
 				continue
@@ -431,15 +450,10 @@ func connected(edges []graphdomain.Edge, candidate graphdomain.Edge) bool {
 }
 
 func pairsOf(state siteGraph) []relatedPair {
-	names := make(map[string]string, len(state.entities))
-	for i := range state.entities {
-		names[state.entities[i].ID] = state.entities[i].Name
-	}
-
 	pairs := make([]relatedPair, 0, len(state.edges))
 	for i := range state.edges {
 		pairs = append(pairs, relatedPair{
-			From: names[state.edges[i].FromEntityID], To: names[state.edges[i].ToEntityID],
+			From: state.labels[state.edges[i].FromEntityID], To: state.labels[state.edges[i].ToEntityID],
 		})
 	}
 	return pairs
@@ -484,8 +498,4 @@ func parentReason(path, parentPath string) string {
 
 func relatedReason(path, relatedPath string) string {
 	return path + " and " + relatedPath + " are sibling pages of one subject"
-}
-
-func fold(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
 }

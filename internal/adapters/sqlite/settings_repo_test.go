@@ -137,20 +137,3 @@ func TestSettingsRepoWritesInsideTheUnitOfWork(t *testing.T) {
 		t.Error("a rolled back write must not be visible")
 	}
 }
-
-func TestSettingsRepoStoresTheClockInstant(t *testing.T) {
-	t.Parallel()
-
-	repo, store := settingsRepo(t)
-	if err := repo.Set(t.Context(), "runs.workers", json.RawMessage(`2`)); err != nil {
-		t.Fatalf("Set: %v", err)
-	}
-
-	var updated string
-	if err := sqlite.ScanUpdatedAt(t.Context(), store, "runs.workers", &updated); err != nil {
-		t.Fatalf("read updated_at: %v", err)
-	}
-	if updated != "2026-09-17T08:30:00Z" {
-		t.Errorf("updated_at = %q, want %q", updated, "2026-09-17T08:30:00Z")
-	}
-}

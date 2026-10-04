@@ -3,19 +3,18 @@ package pages
 import "github.com/davidmovas/postulator/internal/kernel/dto"
 
 type CreateRequest struct {
-	SiteID          string   `json:"siteId"`
-	Path            string   `json:"path" description:"Where the page lives on the site, a leading and trailing slash, for example /supplements/creatine/"`
-	WPType          string   `json:"wpType,omitempty" enum:"page,post,product,product_cat" description:"What WordPress calls the record; leave it out for a page"`
-	Title           string   `json:"title,omitempty" description:"The title the page carries in WordPress; leave it out to plan the page without one"`
-	H1              string   `json:"h1,omitempty" description:"The heading the page opens with, left out to follow the title"`
-	MetaTitle       string   `json:"metaTitle,omitempty" description:"The SEO title, left out to follow the template"`
-	MetaDescription string   `json:"metaDescription,omitempty" description:"The SEO description, left out to follow the template"`
-	Canonical       string   `json:"canonical,omitempty" description:"The address this page should be indexed under, left out for its own"`
-	PrimaryKeyword  string   `json:"primaryKeyword,omitempty" description:"The phrase this page is written to rank for; leave it out to follow its entity"`
-	Keywords        []string `json:"keywords,omitempty" description:"Further phrases the page should cover; leave it out for none"`
-	Status          string   `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Where the page is in its life; leave it out and it is planned"`
-	EntityID        *string  `json:"entityId,omitempty" description:"The entity this page is about, exactly as a read tool returned its id"`
-	TemplateID      *string  `json:"templateId,omitempty" description:"The template that writes this page, left out to take the site default"`
+	SiteID          string        `json:"siteId"`
+	Path            string        `json:"path" description:"Site path with both slashes, e.g. /supplements/creatine/"`
+	WPType          string        `json:"wpType,omitempty" enum:"page,post,product,product_cat" description:"WordPress type; default page"`
+	Title           string        `json:"title,omitempty" description:"WordPress title"`
+	H1              string        `json:"h1,omitempty" description:"H1; default the title"`
+	MetaTitle       string        `json:"metaTitle,omitempty" description:"SEO title; default from the template"`
+	MetaDescription string        `json:"metaDescription,omitempty" description:"SEO description; default from the template"`
+	Canonical       string        `json:"canonical,omitempty" description:"Canonical URL; default its own"`
+	Keywords        []dto.Keyword `json:"keywords,omitempty" description:"Search phrases; default its entity's"`
+	Status          string        `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Default planned"`
+	EntityID        *string       `json:"entityId,omitempty" description:"Id of the entity it is about"`
+	TemplateID      *string       `json:"templateId,omitempty" description:"Template id; default the site's"`
 }
 
 type CreateResponse struct {
@@ -23,18 +22,17 @@ type CreateResponse struct {
 }
 
 type UpdateRequest struct {
-	ID              string   `json:"id" description:"The id of the page, exactly as a read tool returned it"`
-	Path            *string  `json:"path,omitempty" description:"The new path, left out to keep the current one"`
-	WPType          *string  `json:"wpType,omitempty" enum:"page,post,product,product_cat" description:"The new WordPress type, left out to keep the current one"`
-	Title           *string  `json:"title,omitempty" description:"The new title, left out to keep the current one"`
-	H1              *string  `json:"h1,omitempty" description:"The new heading, left out to keep the current one"`
-	MetaTitle       *string  `json:"metaTitle,omitempty" description:"The new SEO title, left out to keep the current one"`
-	MetaDescription *string  `json:"metaDescription,omitempty" description:"The new SEO description, left out to keep the current one"`
-	Canonical       *string  `json:"canonical,omitempty" description:"The new canonical address, left out to keep the current one"`
-	PrimaryKeyword  *string  `json:"primaryKeyword,omitempty" description:"The new primary keyword, left out to keep the current one"`
-	Keywords        []string `json:"keywords,omitempty" description:"The new list of further keywords, replacing the current one; left out to keep it"`
-	Status          *string  `json:"status,omitempty" enum:"planned,exists,published,archived" description:"The new status, left out to keep the current one"`
-	TemplateID      *string  `json:"templateId,omitempty" description:"The new template, left out to keep the current one"`
+	ID              string         `json:"id" description:"Page id"`
+	Path            *string        `json:"path,omitempty" description:"New path"`
+	WPType          *string        `json:"wpType,omitempty" enum:"page,post,product,product_cat" description:"New WordPress type"`
+	Title           *string        `json:"title,omitempty" description:"New title"`
+	H1              *string        `json:"h1,omitempty" description:"New H1"`
+	MetaTitle       *string        `json:"metaTitle,omitempty" description:"New SEO title"`
+	MetaDescription *string        `json:"metaDescription,omitempty" description:"New SEO description"`
+	Canonical       *string        `json:"canonical,omitempty" description:"New canonical URL"`
+	Keywords        *[]dto.Keyword `json:"keywords,omitempty" description:"Whole new keyword list; empty follows its entity"`
+	Status          *string        `json:"status,omitempty" enum:"planned,exists,published,archived" description:"New status"`
+	TemplateID      *string        `json:"templateId,omitempty" description:"New template id"`
 }
 
 type UpdateResponse struct {
@@ -42,14 +40,14 @@ type UpdateResponse struct {
 }
 
 type DeleteRequest struct {
-	ID     string `json:"id" description:"The id of the page to remove from the map, exactly as a read tool returned it"`
-	OnSite bool   `json:"onSite,omitempty" description:"Also move the page to the WordPress trash, where a human can still restore it"`
+	ID     string `json:"id" description:"Page id"`
+	OnSite bool   `json:"onSite,omitempty" description:"Also move it to the WordPress trash, still restorable"`
 }
 
 type DeleteResponse struct{}
 
 type GetRequest struct {
-	ID string `json:"id" description:"The id of the page, exactly as a read tool returned it"`
+	ID string `json:"id" description:"Page id"`
 }
 
 type GetResponse struct {
@@ -59,16 +57,17 @@ type GetResponse struct {
 
 type ListRequest struct {
 	dto.ListRequest
-	SiteID     string `json:"siteId"`
-	Status     string `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Keep only pages in this state"`
-	EntityID   string `json:"entityId,omitempty" description:"Keep only pages mapped to this entity"`
-	Unmapped   bool   `json:"unmapped,omitempty" description:"Keep only pages that carry no entity"`
-	PathPrefix string `json:"pathPrefix,omitempty" description:"Keep only pages whose path starts with this text"`
+	SiteID             string `json:"siteId"`
+	Status             string `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Only this state"`
+	EntityID           string `json:"entityId,omitempty" description:"Only pages of this entity"`
+	IncludeDescendants bool   `json:"includeDescendants,omitempty" description:"With entityId, also the entities below it"`
+	Unmapped           bool   `json:"unmapped,omitempty" description:"Only pages with no entity"`
+	PathPrefix         string `json:"pathPrefix,omitempty" description:"Only paths starting with this"`
 }
 
 type MapToEntityRequest struct {
-	PageID   string `json:"pageId" description:"The id of the page, exactly as a read tool returned it"`
-	EntityID string `json:"entityId" description:"The id of the entity the page is about, exactly as a read tool returned it"`
+	PageID   string `json:"pageId" description:"Page id"`
+	EntityID string `json:"entityId" description:"Id of the entity it is about"`
 }
 
 type MapToEntityResponse struct {
@@ -76,7 +75,7 @@ type MapToEntityResponse struct {
 }
 
 type UnmapRequest struct {
-	PageID string `json:"pageId" description:"The id of the page to detach from its entity, exactly as a read tool returned it"`
+	PageID string `json:"pageId" description:"Page id"`
 }
 
 type UnmapResponse struct {
@@ -84,8 +83,8 @@ type UnmapResponse struct {
 }
 
 type SetCanonicalRequest struct {
-	EntityID string `json:"entityId" description:"The id of the entity, exactly as a read tool returned it"`
-	PageID   string `json:"pageId" description:"The id of the page that becomes the entity's canonical one"`
+	EntityID string `json:"entityId" description:"Entity id"`
+	PageID   string `json:"pageId" description:"Id of the page that becomes canonical"`
 }
 
 type SetCanonicalResponse struct {
@@ -101,15 +100,15 @@ type TreeResponse struct {
 }
 
 type LinkInput struct {
-	ToPageID   *string `json:"toPageId,omitempty" description:"The id of the page this link points at, left out for a link that leaves the site"`
-	ToURL      string  `json:"toUrl" description:"The address the link points at"`
-	AnchorText string  `json:"anchorText" description:"The text the link is written as"`
-	Origin     string  `json:"origin,omitempty" enum:"generated,observed" description:"Whether Postulator wrote the link or read it off the live page; leave it out for generated"`
+	ToPageID   *string `json:"toPageId,omitempty" description:"Target page id; omit for an external link"`
+	ToURL      string  `json:"toUrl" description:"Link address"`
+	AnchorText string  `json:"anchorText" description:"Link text"`
+	Origin     string  `json:"origin,omitempty" enum:"generated,observed" description:"Default generated; observed is read off the live page"`
 }
 
 type ReplaceLinksRequest struct {
-	PageID string      `json:"pageId" description:"The id of the page whose links are replaced, exactly as a read tool returned it"`
-	Links  []LinkInput `json:"links,omitempty" description:"The whole new list of links, which replaces the current one; leave it out to clear every link the page carries"`
+	PageID string      `json:"pageId" description:"Page id"`
+	Links  []LinkInput `json:"links,omitempty" description:"Whole new list; omit to clear all"`
 }
 
 type ReplaceLinksResponse struct {
@@ -117,7 +116,7 @@ type ReplaceLinksResponse struct {
 }
 
 type PreviewLinkRequest struct {
-	PageID string `json:"pageId" description:"The id of the page to look at, exactly as a read tool returned it"`
+	PageID string `json:"pageId" description:"Page id"`
 }
 
 type PreviewLinkResponse struct {

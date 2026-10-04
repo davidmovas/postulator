@@ -53,7 +53,7 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
 
     const entityOptions: SelectOption<string>[] = [
         { value: anyEntity, label: copy.pages.filters.anyEntity },
-        ...index.entities.map((entity) => ({ value: entity.id, label: entity.name })),
+        ...index.entities.map((entity) => ({ value: entity.id, label: index.labels.get(entity.id) ?? entity.name })),
     ];
 
     return (
@@ -110,10 +110,23 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                         aria-label={copy.pages.filters.entity}
                         disabled={disabled || index.entities.length === 0}
                         onValueChange={(next) => {
-                            onChange({ ...query, entityId: next === anyEntity ? "" : next, unmapped: false });
+                            onChange({
+                                ...query,
+                                entityId: next === anyEntity ? "" : next,
+                                descendants: next === anyEntity ? false : query.descendants,
+                                unmapped: false,
+                            });
                         }}
                     />
                 </div>
+                <Checkbox
+                    checked={query.descendants}
+                    disabled={disabled || query.entityId === ""}
+                    label={copy.pages.filters.descendants}
+                    onChange={(event) => {
+                        onChange({ ...query, descendants: event.target.checked });
+                    }}
+                />
                 <div className="flex items-center justify-between gap-2">
                     <Checkbox
                         checked={query.unmapped}
@@ -124,6 +137,7 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                                 ...query,
                                 unmapped: event.target.checked,
                                 entityId: event.target.checked ? "" : query.entityId,
+                                descendants: event.target.checked ? false : query.descendants,
                             });
                         }}
                     />

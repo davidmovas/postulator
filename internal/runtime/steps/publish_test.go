@@ -1,7 +1,9 @@
 package steps_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -286,8 +288,8 @@ func TestPublishReportsWhatItCannotDo(t *testing.T) {
 			want: errors.Invalid,
 		},
 		{
-			name: "a product is not written here",
-			with: func(sc *run.StepContext) { sc.Page.WPType = pagemap.WPProduct },
+			name: "a product category is not written here",
+			with: func(sc *run.StepContext) { sc.Page.WPType = pagemap.WPProductCategory },
 			want: errors.Invalid,
 		},
 		{
@@ -620,5 +622,33 @@ func TestPublishRefusesADriftedPage(t *testing.T) {
 	}
 	if len(server.Items()) != 0 {
 		t.Fatalf("the site holds %d items, want none", len(server.Items()))
+	}
+}
+
+func TestPublishFilesAPageOrAPostUnderNoCategory(t *testing.T) {
+	t.Parallel()
+
+	for _, wpType := range []pagemap.WPType{pagemap.WPPage, pagemap.WPPost} {
+		t.Run(string(wpType), func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDeps(t)
+			sc := publishContext(t)
+			sc.Page.WPType = wpType
+
+			first := runPublish(t, deps, sc)
+			sc.Run.ID = "run-2"
+			sc.Page.WPID = &first.WPID
+			runPublish(t, deps, sc)
+
+			for _, request := range server.Requests() {
+				if strings.Contains(request.Path, "/categories") {
+					t.Errorf("the publish asked %s %s, want the site's categories left alone", request.Method, request.Path)
+				}
+				if request.Method != http.MethodGet && bytes.Contains(request.Body, []byte(`"categories"`)) {
+					t.Errorf("the publish sent categories: %s %s %s", request.Method, request.Path, request.Body)
+				}
+			}
+		})
 	}
 }

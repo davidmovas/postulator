@@ -20,11 +20,11 @@ import {
     SectionLabel,
     SkeletonRows,
     StatusBadge,
-    SyncProblemIcon,
     TaskAltIcon,
     VerifiedIcon,
 } from "../../ui/index.js";
-import { entityIcon, pageStatusLabel, statusTone } from "./labels.js";
+import { entityIcon } from "../graph/labels.js";
+import { DriftBadge, PageStatusBadge } from "./badges.js";
 
 const shownLinks = 6;
 
@@ -122,15 +122,11 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                         {page.title === "" ? copy.pages.untitled : page.title}
                     </p>
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusBadge tone={statusTone(page.status)}>{pageStatusLabel(page.status)}</StatusBadge>
+                        <PageStatusBadge status={page.status} />
                         <StatusBadge tone="muted" dot={false}>
                             {page.wpType}
                         </StatusBadge>
-                        {page.drift ? (
-                            <StatusBadge tone="warn" icon={SyncProblemIcon}>
-                                {copy.pages.drift.badge}
-                            </StatusBadge>
-                        ) : null}
+                        {page.drift ? <DriftBadge /> : null}
                     </div>
                 </div>
 

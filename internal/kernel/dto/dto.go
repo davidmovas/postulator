@@ -8,14 +8,21 @@ import (
 )
 
 const (
-	DefaultLimit = 50
-	MaxLimit     = 500
+	defaultLimit = 50
+	maxLimit     = 500
 )
 
 type Time time.Time
 
 func NewTime(t time.Time) Time {
 	return Time(t.UTC().Truncate(time.Second))
+}
+
+func TimeOf(at *time.Time) Time {
+	if at == nil {
+		return Time{}
+	}
+	return NewTime(*at)
 }
 
 func (t Time) Std() time.Time {
@@ -61,22 +68,23 @@ func (t *Time) UnmarshalJSON(raw []byte) error {
 }
 
 type Sort struct {
-	Field string `json:"field" description:"The field to order by; a cursor is issued for one order and refuses another"`
-	Desc  bool   `json:"desc,omitempty" description:"Order from the largest value down rather than up; leave it out to order upwards"`
+	Field string `json:"field" description:"Order field, fixed across pages"`
+	Desc  bool   `json:"desc,omitempty" description:"Descending"`
 }
 
 type ListRequest struct {
-	Cursor string `json:"cursor,omitempty" description:"The nextCursor a previous page returned; leave it out for the first page"`
-	Limit  int    `json:"limit,omitempty" description:"How many rows to return; leave it out for the default"`
-	Sort   *Sort  `json:"sort,omitempty" description:"How to order the rows; leave it out for the default order"`
+	Cursor string `json:"cursor,omitempty" description:"nextCursor of the previous page"`
+	Limit  int    `json:"limit,omitempty" description:"Page size, default 50, max 500"`
+	Sort   *Sort  `json:"sort,omitempty" description:"Row order"`
 }
 
-func (r ListRequest) Normalize() ListRequest {
+func PageSize(requested int) int {
 	switch {
-	case r.Limit <= 0:
-		r.Limit = DefaultLimit
-	case r.Limit > MaxLimit:
-		r.Limit = MaxLimit
+	case requested <= 0:
+		return defaultLimit
+	case requested > maxLimit:
+		return maxLimit
+	default:
+		return requested
 	}
-	return r
 }

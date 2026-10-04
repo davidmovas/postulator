@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -167,7 +168,7 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 	}
 	beans := reports.RequiredLink{
 		Relation: "down", TargetEntityID: f.entities["Beans"].ID, TargetEntityName: "Beans",
-		AnchorsAllowed: []string{}, Weight: 0.9, Depth: 1, BlockedReason: "no_canonical_page",
+		AnchorsAllowed: []string{}, Weight: 0.9, Depth: 1, BlockedReason: "no_page",
 		State: string(reports.LinkBlocked),
 	}
 	if !reflect.DeepEqual(blocked[2], beans) {
@@ -176,6 +177,44 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 
 	if tea := details["/tea/"]; len(tea.Required) != 0 || len(tea.Extra) != 0 || tea.TemplateID != "" {
 		t.Fatalf("an unmapped page = %+v", tea)
+	}
+}
+
+func TestTheAuditNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
+	t.Parallel()
+
+	f := auditFixture(t)
+	repo := sqlite.NewEntityRepo(f.store)
+	coffee, espresso := f.entities["Coffee"], f.entities["Espresso"]
+	if err := repo.SetScope(t.Context(), espresso.ID, &coffee.ID, sqlitetest.Stamp); err != nil {
+		t.Fatalf("put Espresso under Coffee: %v", err)
+	}
+	tea := f.entity(t, repo, "Tea", 0.1, nil)
+	if err := repo.Insert(t.Context(), graph.Entity{
+		ID: id.New(), SiteID: f.siteID, Name: "Espresso", Kind: graph.KindTopic, Keywords: keyword.Of("tea espresso"),
+		Source: graph.SourceUser, ScopeID: &tea.ID, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}); err != nil {
+		t.Fatalf("insert the other Espresso: %v", err)
+	}
+
+	whole, err := f.service.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("LinkAudit: %v", err)
+	}
+	for _, row := range whole.Pages {
+		if row.Path == "/coffee/espresso/" && row.EntityName != "Coffee Espresso" {
+			t.Fatalf("the page of the shared name is about %q, want Coffee Espresso", row.EntityName)
+		}
+	}
+
+	hub, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: f.pages["/coffee/"].ID})
+	if err != nil {
+		t.Fatalf("LinkAuditPage: %v", err)
+	}
+	for _, required := range hub.Required {
+		if required.TargetEntityID == espresso.ID && required.TargetEntityName != "Coffee Espresso" {
+			t.Fatalf("the hub owes a link to %q, want Coffee Espresso", required.TargetEntityName)
+		}
 	}
 }
 

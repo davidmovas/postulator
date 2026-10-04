@@ -55,7 +55,7 @@ func (s *Service) MoveEntity(ctx context.Context, req MoveEntityRequest) (MoveEn
 			}
 		}
 		answer = MoveEntityResponse{Edge: edgeView(edge), RemovedEdgeIDs: removed}
-		return nil
+		return s.settleScopesMovingTo(c, moved.SiteID, entityID, parentID)
 	})
 	if err != nil {
 		return MoveEntityResponse{}, err

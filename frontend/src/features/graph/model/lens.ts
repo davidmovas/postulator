@@ -5,10 +5,6 @@ export const lenses = ["all", "noPage", "proposed", "orphan", "ai"] as const;
 
 export type Lens = (typeof lenses)[number];
 
-export function isLens(value: string): value is Lens {
-    return (lenses as readonly string[]).includes(value);
-}
-
 function matchesLens(index: GraphIndex, lens: Lens, id: string): boolean {
     const flags = index.problems.get(id);
     switch (lens) {

@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	stderrors "errors"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +37,6 @@ type Turns struct {
 	running map[string]*turn
 	waiting map[string][]string
 	resume  func(conversationID, text string)
-	dropped []error
 	timeout func() time.Duration
 	closed  bool
 }
@@ -175,22 +173,6 @@ func (t *Turns) Close() {
 		cancel()
 	}
 	t.wg.Wait()
-}
-
-func (t *Turns) Note(err error) {
-	if err == nil {
-		return
-	}
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.dropped = append(t.dropped, err)
-}
-
-func (t *Turns) Dropped() []error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return slices.Clone(t.dropped)
 }
 
 func expired(ctx context.Context) bool {

@@ -220,7 +220,10 @@ type LLMUsagePayload struct {
 	ItemID           string  `json:"itemId"`
 	Provider         string  `json:"provider"`
 	Model            string  `json:"model"`
+	Tier             string  `json:"tier"`
 	PromptTokens     int     `json:"promptTokens"`
 	CompletionTokens int     `json:"completionTokens"`
+	ReasoningTokens  int     `json:"reasoningTokens"`
+	CacheWriteTokens int     `json:"cacheWriteTokens"`
 	USD              float64 `json:"usd"`
 }

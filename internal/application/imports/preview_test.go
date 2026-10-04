@@ -1,9 +1,12 @@
 package imports_test
 
 import (
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/importer"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/imports"
@@ -109,8 +112,8 @@ func TestPreviewReadsTheGraphWithoutWriting(t *testing.T) {
 	if !found || hosting.Action != string(imports.ActionCreate) || hosting.Kind != "topic" {
 		t.Fatalf("hosting = %+v", hosting)
 	}
-	if len(hosting.Keywords) != 2 || hosting.Keywords[0] != "hosting" || hosting.Keywords[1] != "servers" {
-		t.Fatalf("hosting keywords = %v", hosting.Keywords)
+	if len(hosting.Keywords) != 2 || hosting.Keywords[0].Text != "hosting" || hosting.Keywords[1].Text != "servers" {
+		t.Fatalf("hosting keywords = %+v, want the cell in its order", hosting.Keywords)
 	}
 	if len(report.Edges) != 3 {
 		t.Fatalf("edges = %+v", report.Edges)
@@ -377,6 +380,112 @@ func TestPreviewFallsBackOnUnknownVocabulary(t *testing.T) {
 	}
 }
 
+func TestPreviewReadsTheEntityLevelsTheClientWrites(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		cell string
+		want string
+	}{
+		{cell: "Category", want: "category"},
+		{cell: "Commercial Taxonomy", want: "category"},
+		{cell: "Compound/Product", want: "product"},
+		{cell: "compound", want: "product"},
+		{cell: "Product Owner", want: "product"},
+		{cell: "GEO", want: "custom"},
+		{cell: "Geographic Entity", want: "custom"},
+		{cell: "Root", want: "hub"},
+		{cell: "Pillar", want: "hub"},
+		{cell: "hub", want: "hub"},
+		{cell: "Topic", want: "topic"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.cell, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			report := h.preview(t, h.file(t, "levels.csv", "url,entity name,entity level\n/a/,Alpha,"+tc.cell+"\n"),
+				h.mapping(map[string]string{
+					string(importmap.FieldPath):       "url",
+					string(importmap.FieldEntity):     "entity name",
+					string(importmap.FieldEntityKind): "entity level",
+				}))
+			if alpha, _ := entity(report, "Alpha"); alpha.Kind != tc.want {
+				t.Fatalf("kind = %q, want %q", alpha.Kind, tc.want)
+			}
+			if len(findings(report.Warnings, imports.CodeUnknownEntityKind)) != 0 {
+				t.Fatalf("a level the client writes is reported unknown: %+v", report.Warnings)
+			}
+		})
+	}
+}
+
+func (h harness) workbook(t *testing.T, name string, table importmap.Table) string {
+	t.Helper()
+
+	path := filepath.Join(h.dir, name)
+	if err := importer.Write(path, table); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+	return path
+}
+
+func TestEveryFindingNamesItsSheet(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	path := h.workbook(t, "faults.xlsx", importmap.Table{
+		Headers: []string{"path", "entity", "parent", "wp type", "page type", "is entity"},
+		Rows: [][]string{
+			{"/a/b/c/", "", "", "", "", ""},
+			{"/x/", "", "", "gadget", "", ""},
+			{"/y/", "", "", "", "sprocket", ""},
+			{"/", "Home", "", "", "", ""},
+			{"/tech/", "", "", "", "", "no"},
+			{"/tech/child/", "", "", "", "", ""},
+			{"/loop-a/", "Loop A", "Loop B", "", "", ""},
+			{"/loop-b/", "Loop B", "Loop A", "", "", ""},
+		},
+	})
+	report := h.preview(t, path, h.detected(t, path))
+
+	rows := map[imports.FindingCode]int{
+		imports.CodeIntermediatePath: 0,
+		imports.CodeUnknownWPType:    3,
+		imports.CodeUnknownPageKind:  4,
+		imports.CodeRootPageSkipped:  5,
+		imports.CodeTechnicalParent:  6,
+		imports.CodeCycle:            0,
+	}
+	for code, row := range rows {
+		got := findings(slices.Concat(report.Errors, report.Warnings), code)
+		if len(got) == 0 {
+			t.Errorf("no %s finding in %+v", code, report)
+			continue
+		}
+		if got[0].Row != row {
+			t.Errorf("%s = %+v, want row %d", code, got[0], row)
+		}
+	}
+	for _, finding := range slices.Concat(report.Errors, report.Warnings) {
+		if finding.Sheet != "Sheet1" {
+			t.Errorf("%s names the sheet %q, want Sheet1: %+v", finding.Code, finding.Sheet, finding)
+		}
+	}
+
+	products := h.workbook(t, "products.xlsx", importmap.Table{
+		Headers: []string{"path", "h1"},
+		Rows:    [][]string{{"/mak/powder/", "Mak Powder"}},
+	})
+	mapping := h.detected(t, products)
+	mapping.Options.RowType = importmap.RowProducts
+	waiting := findings(h.preview(t, products, mapping).Warnings, imports.CodeProductNotInStore)
+	if len(waiting) != 1 || waiting[0].Sheet != "Sheet1" || waiting[0].Row != 2 {
+		t.Errorf("not-in-store findings = %+v, want row 2 of Sheet1", waiting)
+	}
+}
+
 func TestPreviewRefusesAMappingTheFileDoesNotCarry(t *testing.T) {
 	t.Parallel()
 
@@ -410,6 +519,7 @@ func TestTheFindingCodesDeclareWhichOnesBlockAnApply(t *testing.T) {
 		{code: imports.CodeUnknownEntityKind, blocking: false},
 		{code: imports.CodeUnknownPageKind, blocking: false},
 		{code: imports.CodeUnknownWPType, blocking: false},
+		{code: imports.CodeBadVolume, blocking: false},
 		{code: imports.FindingCode("invented"), blocking: false},
 	}
 

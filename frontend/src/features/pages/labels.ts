@@ -1,16 +1,8 @@
 import { copy } from "../../copy/index.js";
-import type { EntityKind, ItemStatus, LinkOrigin, PageStatus } from "../../generated/vocab.js";
-import { entityKinds, isOneOf, itemStatuses, linkOrigins, pageStatuses } from "../../generated/vocab.js";
+import type { LinkOrigin, PageStatus } from "../../generated/vocab.js";
+import { isOneOf, linkOrigins, pageStatuses } from "../../generated/vocab.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
-import {
-    BoltIcon,
-    CategoryIcon,
-    HubIcon,
-    Inventory2Icon,
-    StarShineIcon,
-    TopicIcon,
-    TravelExploreIcon,
-} from "../../ui/index.js";
+import { BoltIcon, TravelExploreIcon } from "../../ui/index.js";
 
 const statusTones: Readonly<Record<PageStatus, Tone>> = {
     planned: "info",
@@ -19,7 +11,7 @@ const statusTones: Readonly<Record<PageStatus, Tone>> = {
     archived: "muted",
 };
 
-export function statusTone(status: string): Tone {
+export function pageStatusTone(status: string): Tone {
     return isOneOf(pageStatuses, status) ? statusTones[status] : "muted";
 }
 
@@ -43,30 +35,4 @@ export function originTone(origin: string): Tone {
 
 export function originIcon(origin: string): IconComponent {
     return isOneOf(linkOrigins, origin) ? originIcons[origin] : TravelExploreIcon;
-}
-
-const entityIcons: Readonly<Record<EntityKind, IconComponent>> = {
-    hub: HubIcon,
-    product: Inventory2Icon,
-    topic: TopicIcon,
-    category: CategoryIcon,
-    custom: StarShineIcon,
-};
-
-export function entityIcon(kind: string): IconComponent {
-    return isOneOf(entityKinds, kind) ? entityIcons[kind] : StarShineIcon;
-}
-
-const itemStatusTones: Readonly<Record<ItemStatus, Tone>> = {
-    pending: "muted",
-    running: "info",
-    waiting: "info",
-    paused: "warn",
-    completed: "ok",
-    failed: "danger",
-    cancelled: "muted",
-};
-
-export function itemStatusTone(status: string): Tone {
-    return isOneOf(itemStatuses, status) ? itemStatusTones[status] : "muted";
 }

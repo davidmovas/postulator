@@ -5,14 +5,6 @@ type Result[T any] struct {
 	err   error
 }
 
-func Ok[T any](value T) Result[T] {
-	return Result[T]{value: value}
-}
-
-func Err[T any](err error) Result[T] {
-	return Result[T]{err: err}
-}
-
 func From[T any](value T, err error) Result[T] {
 	return Result[T]{value: value, err: err}
 }
@@ -25,7 +17,7 @@ func (r Result[T]) NotFound(replacement error) Result[T] {
 }
 
 func (r Result[T]) Conflict(replacement error) Result[T] {
-	if r.err != nil && IsConflict(r.err) {
+	if r.err != nil && isConflict(r.err) {
 		return Result[T]{err: replacement}
 	}
 	return r

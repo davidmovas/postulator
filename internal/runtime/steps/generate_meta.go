@@ -7,6 +7,7 @@ import (
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -42,6 +43,7 @@ type Meta struct {
 type metaPrompt struct {
 	Page      pagemap.Page
 	Entity    graph.Entity
+	Keywords  keyword.List
 	Spec      template.TemplateSpec
 	Draft     content.ContentDraft
 	SiteName  string
@@ -71,31 +73,26 @@ func GenerateMeta(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			ref, err := deps.Profiles.Resolve(ctx, sc.Run.SiteID, domainllm.RoleEditor, sc.Spec.ModelProfiles)
+			call, err := modelFor(ctx, deps, sc, NameGenerateMeta, domainllm.RoleEditor)
 			if err != nil {
 				return run.Result{}, err
 			}
 
 			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
-			system, user, err := render(NameGenerateMeta, metaPrompt{
-				Page: sc.Page, Entity: entity, Spec: sc.Spec, Draft: draft,
+			keywords := pagemap.Keywords(sc.Page, entity)
+			request, err := stepRequest(sc, call, metaPrompt{
+				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
 				SiteName:  owner.Name,
 				Canonical: canonical,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
-					PrimaryKeyword: entity.PrimaryKeyword, EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
+					PrimaryKeyword: keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
 				}),
-			})
+			}, metaTokens)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			answer, usage, err := port.Structured[metaAnswer](ctx, deps.LLM, port.Request{
-				Ref:       ref,
-				System:    system,
-				Messages:  []port.Message{{Role: port.RoleUser, Text: user}},
-				MaxTokens: metaTokens,
-				Meta:      callMeta(sc, NameGenerateMeta),
-			})
+			answer, usage, err := port.Structured[metaAnswer](ctx, deps.LLM, request)
 			if err != nil {
 				return run.Result{}, err
 			}

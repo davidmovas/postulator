@@ -153,23 +153,23 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	if _, err := client.ListContent(t.Context(), wp.ContentQuery{}); err != nil {
 		t.Fatalf("ListContent: %v", err)
 	}
-	if _, err := client.SetSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{Title: "x"}); err != nil {
+	if _, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{Title: "x"}); err != nil {
 		t.Fatalf("SetSEOMeta: %v", err)
 	}
-	if _, err := client.GetSEOMeta(t.Context(), seeded[0].ID); err != nil {
+	if _, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("GetSEOMeta: %v", err)
 	}
-	if _, err := client.ReplaceSEOMeta(t.Context(), seeded[0].ID, wp.SEOMeta{}, []string{"title"}); err != nil {
+	if _, err := client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, []string{"title"}); err != nil {
 		t.Fatalf("ReplaceSEOMeta: %v", err)
 	}
-	raw, err := client.GetRaw(t.Context(), seeded[0].ID)
+	raw, err := client.GetRaw(t.Context(), wp.TypePage, seeded[0].ID)
 	if err != nil {
 		t.Fatalf("GetRaw: %v", err)
 	}
-	if _, err = client.PutRaw(t.Context(), seeded[0].ID, "<p>y</p>", raw.ContentHash); err != nil {
+	if _, err = client.PutRaw(t.Context(), wp.TypePage, seeded[0].ID, "<p>y</p>", raw.ContentHash); err != nil {
 		t.Fatalf("PutRaw: %v", err)
 	}
-	if _, err = client.PreviewLink(t.Context(), seeded[0].ID); err != nil {
+	if _, err = client.PreviewLink(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("PreviewLink: %v", err)
 	}
 

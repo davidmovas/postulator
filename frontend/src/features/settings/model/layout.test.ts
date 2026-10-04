@@ -22,12 +22,27 @@ describe("the placement of every declared setting", () => {
     it("keeps the promised settings out of the advanced cards", () => {
         const open = (tab: (typeof settingsTabKeys)[number]): number =>
             tabLayout(tab, declared).plain.flatMap((section) => section.keys).length;
-        expect(open("models")).toBe(0);
+        expect(open("models")).toBe(11);
         expect(open("runs")).toBe(7);
         expect(open("agent")).toBe(2);
         expect(open("browser")).toBe(1);
         expect(open("security")).toBe(0);
         expect(open("about")).toBe(0);
+    });
+
+    it("opens the models tab on reasoning and speed, one role after another", () => {
+        const shaped = tabLayout("models", declared);
+        expect(shaped.plain.map((section) => section.id)).toEqual(["reasoning"]);
+        const keys = shaped.plain[0]?.keys ?? [];
+        expect(keys.slice(0, 2)).toEqual(["llm.effort.writer", "llm.tier.writer"]);
+        expect(keys.at(-1)).toBe("llm.flexPatience");
+    });
+
+    it("keeps the experimental tool loading among the advanced agent settings", () => {
+        const shaped = tabLayout("agent", declared);
+        const depth = shaped.advanced.find((section) => section.id === "agentDepth");
+        expect(depth?.keys).toContain("agent.toolLoading");
+        expect(shaped.plain.flatMap((section) => section.keys)).not.toContain("agent.toolLoading");
     });
 
     it("names no key the copy does not declare", () => {

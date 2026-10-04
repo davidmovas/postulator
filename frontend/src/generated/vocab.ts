@@ -4,6 +4,9 @@ export type SiteStatus = (typeof siteStatuses)[number];
 export const siteReaches = ["ok", "upgradeRequired", "unauthorized", "unreachable"] as const;
 export type SiteReach = (typeof siteReaches)[number];
 
+export const siteCommerces = ["", "absent", "forbidden", "ready"] as const;
+export type SiteCommerce = (typeof siteCommerces)[number];
+
 export const pageStatuses = ["planned", "exists", "published", "archived"] as const;
 export type PageStatus = (typeof pageStatuses)[number];
 
@@ -46,7 +49,7 @@ export type LinkClass = (typeof linkClasses)[number];
 
 export const offGraphLinkClasses: readonly LinkClass[] = ["self", "external", "unknown_internal"];
 
-export const linkBlockedReasons = ["no_canonical_page"] as const;
+export const linkBlockedReasons = ["no_canonical_page", "no_page"] as const;
 export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
 
 export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;
@@ -167,6 +170,12 @@ export type ModelRole = (typeof modelRoles)[number];
 export const reasoningEfforts = ["none", "low", "medium", "high", "xhigh"] as const;
 export type ReasoningEffort = (typeof reasoningEfforts)[number];
 
+export const serviceTiers = ["default", "flex"] as const;
+export type ServiceTier = (typeof serviceTiers)[number];
+
+export const spendPurposes = ["run", "chat", "title", "probe", "graph", "audit", "other"] as const;
+export type SpendPurpose = (typeof spendPurposes)[number];
+
 export const conversationModes = ["confirm", "autonomous"] as const;
 export type ConversationMode = (typeof conversationModes)[number];
 
@@ -199,8 +208,15 @@ export const importFields = [
     "meta_title",
     "meta_description",
     "wp_type",
+    "own_entity",
 ] as const;
 export type ImportField = (typeof importFields)[number];
+
+export const importColumnUses = ["field", "level", "note", "indent", "ignored"] as const;
+export type ImportColumnUse = (typeof importColumnUses)[number];
+
+export const importRowTypes = ["pages", "products", "kind"] as const;
+export type ImportRowType = (typeof importRowTypes)[number];
 
 export const importFindingCodes = [
     "bad_path",
@@ -216,6 +232,17 @@ export const importFindingCodes = [
     "unknown_page_kind",
     "unknown_wp_type",
     "root_page_skipped",
+    "bad_volume",
+    "unknown_own_entity",
+    "technical_parent",
+    "group_without_page",
+    "ambiguous_parent",
+    "ambiguous_entity",
+    "product_not_in_store",
+    "product_row_left",
+    "wp_type_kept",
+    "intermediate_level",
+    "scope_clash",
 ] as const;
 export type ImportFindingCode = (typeof importFindingCodes)[number];
 
@@ -225,6 +252,9 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
     "unknown_related",
     "self_edge",
     "cycle",
+    "ambiguous_parent",
+    "ambiguous_entity",
+    "scope_clash",
 ];
 
 export const importActions = ["create", "update", "skip"] as const;

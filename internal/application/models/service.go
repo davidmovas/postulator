@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const probeTokens = 16
@@ -35,6 +36,8 @@ type spendReader interface {
 	SumByRun(ctx context.Context, runID string) (llm.Spend, error)
 	SumByConversation(ctx context.Context, conversationID string) (llm.Spend, error)
 	SumAll(ctx context.Context) (llm.Spend, error)
+	Aggregate(ctx context.Context, q llm.SpendQuery) ([]llm.SpendSlice, error)
+	List(ctx context.Context, q llm.CallQuery, page paging.Request) (paging.List[llm.Call], error)
 }
 
 type prober interface {
@@ -101,9 +104,9 @@ func (s *Service) ProviderKeys(ctx context.Context, _ ProviderKeysRequest) (Prov
 	}
 
 	named := make([]string, 0, len(known))
-	for _, info := range known {
-		if !slices.Contains(named, info.Ref.Provider) {
-			named = append(named, info.Ref.Provider)
+	for i := range known {
+		if provider := known[i].Ref.Provider; !slices.Contains(named, provider) {
+			named = append(named, provider)
 		}
 	}
 	slices.Sort(named)
@@ -161,25 +164,30 @@ func (s *Service) ListModels(ctx context.Context, _ ListModelsRequest) (ListMode
 	}
 
 	out := make([]Model, 0, len(known))
-	for _, info := range known {
-		out = append(out, modelView(info))
+	for i := range known {
+		out = append(out, modelView(known[i]))
 	}
 	return ListModelsResponse{Models: out}, nil
 }
 
 func (s *Service) UpsertModel(ctx context.Context, req UpsertModelRequest) (UpsertModelResponse, error) {
 	info := llm.ModelInfo{
-		Ref:                llm.ModelRef{Provider: strings.TrimSpace(req.Provider), Model: strings.TrimSpace(req.Model)},
-		ContextTokens:      req.ContextTokens,
-		MaxOutputTokens:    req.MaxOutputTokens,
-		InputUSDPerM:       req.InputUSDPerM,
-		OutputUSDPerM:      req.OutputUSDPerM,
-		RPM:                req.RPM,
-		TPM:                req.TPM,
-		SupportsStructured: req.SupportsStructured,
-		SupportsImages:     req.SupportsImages,
-		Reasoning:          req.Reasoning,
-		ReasoningEffort:    llm.ReasoningEffort(strings.TrimSpace(req.ReasoningEffort)),
+		Ref:                    llm.ModelRef{Provider: strings.TrimSpace(req.Provider), Model: strings.TrimSpace(req.Model)},
+		ContextTokens:          req.ContextTokens,
+		MaxOutputTokens:        req.MaxOutputTokens,
+		InputUSDPerM:           req.InputUSDPerM,
+		CachedInputUSDPerM:     req.CachedInputUSDPerM,
+		CacheWriteUSDPerM:      req.CacheWriteUSDPerM,
+		OutputUSDPerM:          req.OutputUSDPerM,
+		FlexInputUSDPerM:       req.FlexInputUSDPerM,
+		FlexCachedInputUSDPerM: req.FlexCachedInputUSDPerM,
+		FlexCacheWriteUSDPerM:  req.FlexCacheWriteUSDPerM,
+		FlexOutputUSDPerM:      req.FlexOutputUSDPerM,
+		RPM:                    req.RPM,
+		TPM:                    req.TPM,
+		SupportsStructured:     req.SupportsStructured,
+		SupportsImages:         req.SupportsImages,
+		Reasoning:              req.Reasoning,
 	}
 	if err := info.Validate(); err != nil {
 		return UpsertModelResponse{}, err
@@ -270,7 +278,8 @@ func (s *Service) TestProvider(ctx context.Context, req TestProviderRequest) (Te
 		Ref:       ref,
 		Messages:  []port.Message{{Role: port.RoleUser, Text: "ping"}},
 		MaxTokens: probeTokens,
-		Meta:      port.CallMeta{Step: "test_provider"},
+		Effort:    llm.EffortNone,
+		Meta:      port.CallMeta{Step: llm.StepProbe},
 	})
 	if err != nil {
 		return TestProviderResponse{}, err

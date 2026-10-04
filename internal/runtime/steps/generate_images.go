@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -32,14 +33,6 @@ const (
 	imageStepTimeout  = 15 * time.Minute
 	imageOutputTokens = 1056
 )
-
-type ImageProvider interface {
-	Generate(ctx context.Context, prompt images.Prompt) (images.Image, error)
-}
-
-type ImageSource interface {
-	Pick(ctx context.Context, query images.Query) ([]images.Image, error)
-}
 
 type PlacedImage struct {
 	Role string `json:"role"`
@@ -213,7 +206,7 @@ func generated(ctx context.Context, deps Deps, sc *run.StepContext, entity graph
 			Step:    NameGenerateImages,
 			Subject: subject,
 			Context: sceneOf(sc.Spec, index),
-			Alt:     altOf(entity, subject),
+			Alt:     altOf(pagemap.Keywords(sc.Page, entity), subject),
 		})
 		if err != nil {
 			if stopped(ctx) {
@@ -239,9 +232,9 @@ func subjectOf(sc *run.StepContext, entity graph.Entity) string {
 	return sc.Page.Path
 }
 
-func altOf(entity graph.Entity, subject string) string {
-	if entity.PrimaryKeyword != "" {
-		return entity.PrimaryKeyword
+func altOf(keywords keyword.List, subject string) string {
+	if main := keywords.Main(); main != "" {
+		return main
 	}
 	return subject
 }

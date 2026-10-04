@@ -43,6 +43,24 @@ describe("sentencesOf", () => {
         expect(sentencesOf(draft, null)).toStrictEqual([]);
     });
 
+    it("says what a layer does to the product outputs", () => {
+        expect(
+            sentencesOf(draft, {
+                product: {
+                    shortDescription: { enabled: true, intent: "", targetWords: 40, primaryKeyword: false },
+                    specifications: [{ name: "Form", intent: "" }, { name: "Size", intent: "" }],
+                },
+            }),
+        ).toStrictEqual(["writes a short description of about 40 words and fills Form and Size"]);
+        expect(
+            sentencesOf(draft, {
+                product: { shortDescription: { enabled: false }, specifications: [] },
+            }),
+        ).toStrictEqual(["writes no product outputs beyond the description"]);
+        const outputs = draftFromJson({ ...base, product: { specifications: [{ name: "Form" }] } });
+        expect(sentencesOf(outputs, { product: null })).toStrictEqual(["drops the product outputs"]);
+    });
+
     it("says the site shortened the page", () => {
         expect(sentencesOf(draft, { length: { min: 600, max: 900 } })).toStrictEqual([
             "shortens the page to 600–900 words",
@@ -57,6 +75,23 @@ describe("sentencesOf", () => {
 
     it("reads a half-open length change", () => {
         expect(sentencesOf(draft, { length: { max: 900 } })).toStrictEqual(["caps the page at 900 words"]);
+    });
+
+    it("says how many of a page's keywords the body must use", () => {
+        expect(sentencesOf(draft, { keywordRules: { requiredKeywords: 3 } })).toStrictEqual([
+            "requires the first 3 keywords of a page in its body",
+        ]);
+        expect(sentencesOf(draft, { keywordRules: { requiredKeywords: 1 } })).toStrictEqual([
+            "requires the first keyword of a page in its body",
+        ]);
+        expect(sentencesOf(draft, { keywordRules: { requiredKeywords: 0 } })).toStrictEqual([
+            "offers the keywords of a page to the writer and requires none",
+        ]);
+
+        const counted = draftFromJson({ ...base, keywordRules: { primaryInTitle: true, requiredKeywords: 2 } });
+        expect(sentencesOf(counted, { keywordRules: { requiredKeywords: null } })).toStrictEqual([
+            "requires every keyword of a page in its body",
+        ]);
     });
 
     it("renders keyword and link rules as prose", () => {
@@ -128,9 +163,9 @@ describe("sentencesOf", () => {
     });
 
     it("reads a pinned and an unpinned role", () => {
-        expect(sentencesOf(draft, { modelProfiles: { writer: { provider: "anthropic", model: "opus" } } })).toStrictEqual(
-            ["uses anthropic opus for the writer"],
-        );
+        expect(
+            sentencesOf(draft, { modelProfiles: { writer: { provider: "openai", model: "gpt-5.6-sol" } } }),
+        ).toStrictEqual(["uses openai gpt-5.6-sol for the writer"]);
         const pinned = draftFromJson({ ...base, modelProfiles: { judge: { provider: "openai", model: "mini" } } });
         expect(sentencesOf(pinned, { modelProfiles: { judge: null } })).toStrictEqual([
             "lets the judge fall back to the site model",

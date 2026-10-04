@@ -3,15 +3,16 @@ package app_test
 import (
 	"encoding/json"
 	stderrors "errors"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
-	"sync"
 	"testing"
+	"time"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/openai/openaitest"
 	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -21,109 +22,37 @@ const (
 	probeModel = "gpt-5.6-luna"
 )
 
-type provider struct {
-	mu       sync.Mutex
-	headers  []string
-	paths    []string
-	requests []string
-	status   int
-	body     string
-}
-
-func (p *provider) serve() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		asked, readErr := io.ReadAll(r.Body)
-		if readErr != nil {
-			http.Error(w, readErr.Error(), http.StatusBadRequest)
-			return
-		}
-
-		p.mu.Lock()
-		p.headers = append(p.headers, r.Header.Get("Authorization"))
-		p.paths = append(p.paths, r.URL.Path)
-		p.requests = append(p.requests, string(asked))
-		status, body := p.status, p.body
-		p.mu.Unlock()
-
-		w.Header().Set("Content-Type", "application/json")
-		if status == 0 {
-			status = http.StatusOK
-		}
-		w.WriteHeader(status)
-		if body != "" {
-			write(w, body)
-			return
-		}
-		write(w, `{"id":"1","object":"chat.completion","model":"`+probeModel+`",`+
-			`"choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}],`+
-			`"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`)
-	})
-}
-
-func write(w http.ResponseWriter, body string) {
-	if _, err := w.Write([]byte(body)); err != nil {
-		panic(err)
-	}
-}
-
-func (p *provider) refuse(status int, message, code string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.status = status
-	encoded, err := json.Marshal(map[string]any{
-		"error": map[string]any{"message": message, "type": "invalid_request_error", "code": code},
-	})
-	if err != nil {
-		panic(err)
-	}
-	p.body = string(encoded)
-}
-
-func (p *provider) lastRequest() string {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if len(p.requests) == 0 {
-		return ""
-	}
-	return p.requests[len(p.requests)-1]
-}
-
-func (p *provider) seen() (headers, paths []string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return append([]string(nil), p.headers...), append([]string(nil), p.paths...)
-}
-
-func provided(t *testing.T) (*app.Core, *provider) {
+func provided(t *testing.T) (*app.Core, *openaitest.Server) {
 	t.Helper()
 
-	return providedFor(t, "openai", "llm.openai.baseUrl")
+	return providedWith(t, storedKey)
 }
 
-func providedFor(t *testing.T, named, baseKey string) (*app.Core, *provider) {
+func providedWith(t *testing.T, serverKey string) (*app.Core, *openaitest.Server) {
 	t.Helper()
 
-	fake := &provider{}
-	server := httptest.NewServer(fake.serve())
-	t.Cleanup(server.Close)
+	server := openaitest.New(t, openaitest.WithKey(serverKey))
 
 	home := t.TempDir()
-	core := openCore(t, app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home})
+	cfg := app.Config{DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home}
+	first := openCore(t, cfg)
+	if _, err := first.Models.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
+		Provider: "openai", APIKey: storedKey,
+	}); err != nil {
+		t.Fatalf("SetProviderKey: %v", err)
+	}
+	pointAt(t, first, "llm.openai.baseUrl", server.URL())
+	if err := first.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	core := openCore(t, cfg)
 	t.Cleanup(func() {
 		if closeErr := core.Close(); closeErr != nil {
 			t.Errorf("Close: %v", closeErr)
 		}
 	})
-
-	if _, err := core.Models.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
-		Provider: named, APIKey: storedKey,
-	}); err != nil {
-		t.Fatalf("SetProviderKey: %v", err)
-	}
-	pointAt(t, core, baseKey, server.URL+"/v1")
-	return core, fake
+	return core, server
 }
 
 func pointAt(t *testing.T, core *app.Core, key, base string) {
@@ -136,20 +65,26 @@ func pointAt(t *testing.T, core *app.Core, key, base string) {
 	if err = core.SettingsStore.Set(t.Context(), key, encoded); err != nil {
 		t.Fatalf("store the base url: %v", err)
 	}
+}
 
-	stored, err := core.SettingsStore.All(t.Context())
-	if err != nil {
-		t.Fatalf("read the settings: %v", err)
+func lastBody(t *testing.T, server *openaitest.Server) map[string]any {
+	t.Helper()
+
+	asked := server.Requests()
+	if len(asked) == 0 {
+		t.Fatal("the provider was never called")
 	}
-	if _, err = core.Declarations.Apply(core.Settings, stored); err != nil {
-		t.Fatalf("apply the settings: %v", err)
+	if asked[len(asked)-1].Body == nil {
+		t.Fatalf("the provider was sent %s, which is not a JSON object", asked[len(asked)-1].Raw)
 	}
+	return asked[len(asked)-1].Body
 }
 
 func TestTheStoredKeyReachesTheProviderByteForByte(t *testing.T) {
 	t.Parallel()
 
-	core, fake := provided(t)
+	core, server := provided(t)
+	server.Enqueue(openaitest.Text("pong").Reply())
 
 	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
 		Provider: "openai", Model: probeModel,
@@ -157,48 +92,44 @@ func TestTheStoredKeyReachesTheProviderByteForByte(t *testing.T) {
 		t.Fatalf("TestProvider: %v", err)
 	}
 
-	headers, paths := fake.seen()
-	if len(headers) == 0 {
-		t.Fatal("the provider was never called")
+	asked := server.Requests()
+	if len(asked) != 1 || !asked[0].Authorized {
+		t.Fatalf("the provider saw %d requests, authorized %v", len(asked), len(asked) == 1 && asked[0].Authorized)
 	}
-	if want := "Bearer " + storedKey; headers[0] != want {
-		t.Fatalf("Authorization = %q, want %q", headers[0], want)
+	if asked[0].Path != "/v1/responses" {
+		t.Fatalf("the client called %q, want the Responses API under the configured base url", asked[0].Path)
 	}
-	if paths[0] != "/v1/chat/completions" {
-		t.Fatalf("the client called %q, want the configured base url", paths[0])
+	if store, ok := asked[0].Body["store"].(bool); !ok || store {
+		t.Fatalf("store = %v, want false so nothing is kept on the provider's side", asked[0].Body["store"])
 	}
 }
 
 func TestAKeyChangeIsNotServedFromTheCache(t *testing.T) {
 	t.Parallel()
 
-	core, fake := provided(t)
+	const rotated = "sk-proj-RotatedRotatedRotatedRotatedRotatedRotatedRotated9999"
+	core, server := providedWith(t, rotated)
 
 	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
 		Provider: "openai", Model: probeModel,
-	}); err != nil {
-		t.Fatalf("TestProvider: %v", err)
+	}); !errors.IsCode(err, errors.Unauthorized) {
+		t.Fatalf("TestProvider with the old key = %v, want the provider to refuse it", err)
 	}
 
-	const rotated = "sk-proj-RotatedRotatedRotatedRotatedRotatedRotatedRotated9999"
 	if _, err := core.Models.SetProviderKey(t.Context(), models.SetProviderKeyRequest{
 		Provider: "openai", APIKey: rotated,
 	}); err != nil {
 		t.Fatalf("SetProviderKey: %v", err)
 	}
+	server.Enqueue(openaitest.Text("pong").Reply())
 
 	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
 		Provider: "openai", Model: probeModel,
 	}); err != nil {
 		t.Fatalf("TestProvider after the rotation: %v", err)
 	}
-
-	headers, _ := fake.seen()
-	if len(headers) < 2 {
-		t.Fatalf("the provider was called %d times, want two", len(headers))
-	}
-	if want := "Bearer " + rotated; headers[len(headers)-1] != want {
-		t.Fatalf("after the rotation the client still sent %q, want %q", headers[len(headers)-1], want)
+	if asked := server.Requests(); !asked[len(asked)-1].Authorized {
+		t.Fatal("after the rotation the client still sent the old key")
 	}
 }
 
@@ -208,8 +139,7 @@ func TestTheProviderRefusalTellsTheTruth(t *testing.T) {
 	cases := []struct {
 		name     string
 		status   int
-		message  string
-		code     string
+		fault    openaitest.Fault
 		want     errors.Code
 		sentence string
 		provider string
@@ -217,28 +147,45 @@ func TestTheProviderRefusalTellsTheTruth(t *testing.T) {
 		{
 			name:   "a rejected key",
 			status: http.StatusUnauthorized,
-			message: "Incorrect API key provided: sk-proj-AbC123_xyz-0000000000000000000000000000000000000000abcd. " +
-				"You can find your API key at https://platform.openai.com/account/api-keys.",
-			code: "invalid_api_key", want: errors.Unauthorized,
+			fault: openaitest.Fault{
+				Type: "invalid_request_error", Code: "invalid_api_key",
+				Message: "Incorrect API key provided: " + storedKey + ". " +
+					"You can find your API key at https://platform.openai.com/account/api-keys.",
+			},
+			want:     errors.Unauthorized,
 			sentence: "the model provider rejected the api key",
 			provider: "Incorrect API key provided: sk-…abcd. You can find your API key at " +
 				"https://platform.openai.com/account/api-keys.",
 		},
 		{
-			name:    "a key without access to the model",
-			status:  http.StatusForbidden,
-			message: "Project `proj_x` does not have access to model `gpt-6-astra`.",
-			code:    "model_not_found", want: errors.Unauthorized,
+			name:   "a key without access to the model",
+			status: http.StatusForbidden,
+			fault: openaitest.Fault{
+				Type: "invalid_request_error", Code: "model_not_found",
+				Message: "Project `proj_x` does not have access to model `gpt-6-astra`.",
+			},
+			want:     errors.Unauthorized,
 			sentence: "the key has no access to this model",
 			provider: "Project `proj_x` does not have access to model `gpt-6-astra`.",
 		},
 		{
-			name:    "an unknown model",
-			status:  http.StatusNotFound,
-			message: "The model `gpt-9` does not exist.",
-			code:    "model_not_found", want: errors.NotFound,
+			name:   "an unknown model",
+			status: http.StatusNotFound,
+			fault: openaitest.Fault{
+				Type: "invalid_request_error", Code: "model_not_found", Message: "The model `gpt-9` does not exist.",
+			},
+			want:     errors.NotFound,
 			sentence: "the model provider has no such model",
 			provider: "The model `gpt-9` does not exist.",
+		},
+		{
+			name:   "an account out of credit",
+			status: http.StatusTooManyRequests,
+			fault:  openaitest.Quota(),
+			want:   errors.NeedsHuman,
+			sentence: "the OpenAI account is out of credit or over its spending limit; " +
+				"add credits or raise the limit in the OpenAI billing settings, then try again",
+			provider: openaitest.Quota().Message,
 		},
 	}
 
@@ -246,8 +193,8 @@ func TestTheProviderRefusalTellsTheTruth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			core, fake := provided(t)
-			fake.refuse(tc.status, tc.message, tc.code)
+			core, server := provided(t)
+			server.Enqueue(openaitest.Failure(tc.status, tc.fault))
 
 			_, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
 				Provider: "openai", Model: probeModel,
@@ -257,7 +204,7 @@ func TestTheProviderRefusalTellsTheTruth(t *testing.T) {
 			}
 
 			var kernel *errors.Error
-			if !asKernelError(err, &kernel) {
+			if !stderrors.As(err, &kernel) {
 				t.Fatalf("the failure is %v, want a kernel error", err)
 			}
 			if kernel.Message != tc.sentence {
@@ -271,25 +218,21 @@ func TestTheProviderRefusalTellsTheTruth(t *testing.T) {
 			if told != tc.provider {
 				t.Errorf("providerMessage = %q, want %q", told, tc.provider)
 			}
-			if containsText(told, storedKey) {
+			if strings.Contains(told, storedKey) {
 				t.Errorf("providerMessage carries the whole key: %q", told)
+			}
+			if len(server.Requests()) != 1 {
+				t.Errorf("the provider was called %d times; a refusal like this is not retried", len(server.Requests()))
 			}
 		})
 	}
 }
 
-func asKernelError(err error, target **errors.Error) bool {
-	return stderrors.As(err, target)
-}
-
-func containsText(text, needle string) bool {
-	return strings.Contains(text, needle)
-}
-
 func TestTheProviderTestProbesTheCheapestModel(t *testing.T) {
 	t.Parallel()
 
-	core, fake := provided(t)
+	core, server := provided(t)
+	server.Enqueue(openaitest.Text("pong").Reply())
 
 	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{Provider: "openai"}); err != nil {
 		t.Fatalf("TestProvider without a model: %v", err)
@@ -313,12 +256,11 @@ func TestTheProviderTestProbesTheCheapestModel(t *testing.T) {
 		t.Fatal("the catalog carries no openai model")
 	}
 
-	_, paths := fake.seen()
-	if len(paths) != 1 {
-		t.Fatalf("the provider was called %d times, want once", len(paths))
+	if len(server.Requests()) != 1 {
+		t.Fatalf("the provider was called %d times, want once", len(server.Requests()))
 	}
-	if !containsText(fake.lastRequest(), cheapest) {
-		t.Fatalf("the probe did not name %q; it sent %s", cheapest, fake.lastRequest())
+	if asked := lastBody(t, server); asked["model"] != cheapest {
+		t.Fatalf("the probe named %v, want %q", asked["model"], cheapest)
 	}
 }
 
@@ -367,58 +309,65 @@ func TestEveryRoleHasADefaultOnAFreshInstall(t *testing.T) {
 	}
 }
 
-func TestTheRequestCarriesOnlyTheReasoningEffortTheCatalogNames(t *testing.T) {
+func kindOf(item map[string]any) string {
+	if kind, typed := item["type"].(string); typed && kind != "" {
+		return kind
+	}
+	if role, spoken := item["role"].(string); spoken {
+		return role
+	}
+	return ""
+}
+
+func effortOf(asked map[string]any) (string, bool) {
+	reasoning, ok := asked["reasoning"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+	effort, ok := reasoning["effort"].(string)
+	return effort, ok
+}
+
+func TestTheProviderTestPaysForNoReasoning(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name  string
-		model string
-		want  string
-	}{
-		{name: "the cheap model asks for little", model: "gpt-5.6-luna", want: "low"},
-		{name: "the mid tier asks for more", model: "gpt-5.6-terra", want: "medium"},
-		{name: "the flagship asks for more", model: "gpt-5.6-sol", want: "medium"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, model := range []string{"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"} {
+		t.Run(model, func(t *testing.T) {
 			t.Parallel()
 
-			core, fake := provided(t)
+			core, server := provided(t)
+			server.Enqueue(openaitest.Text("pong").Reply())
 			if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
-				Provider: "openai", Model: tc.model,
+				Provider: "openai", Model: model,
 			}); err != nil {
 				t.Fatalf("TestProvider: %v", err)
 			}
 
-			asked := decodeRequest(t, fake.lastRequest())
-			effort, carried := asked["reasoning_effort"]
-			if !carried {
-				t.Fatalf("the request carries no reasoning_effort, want %q: %s", tc.want, fake.lastRequest())
+			asked := lastBody(t, server)
+			if effort, carried := effortOf(asked); !carried || effort != "none" {
+				t.Fatalf("reasoning.effort = %q (carried %v), want none sent explicitly", effort, carried)
 			}
-			if effort != tc.want {
-				t.Fatalf("reasoning_effort = %v, want %q", effort, tc.want)
+			if ceiling, ok := asked["max_output_tokens"].(float64); !ok || ceiling > 64 {
+				t.Fatalf("max_output_tokens = %v, want a few tokens and no reasoning allowance", asked["max_output_tokens"])
 			}
-			if effort == "minimal" {
-				t.Fatal("the request carries gollem's minimal, which today's models refuse")
-			}
-			if _, verbose := asked["verbosity"]; verbose {
-				t.Fatalf("the request carries a verbosity nobody asked for: %s", fake.lastRequest())
+			if text, shaped := asked["text"].(map[string]any); shaped && text["verbosity"] != nil {
+				t.Fatalf("the request carries a verbosity nobody asked for: %v", text)
 			}
 		})
 	}
 }
 
-func TestAModelWithNoEffortSendsNoReasoningEffort(t *testing.T) {
+func TestAModelWithNoReasoningSendsNoEffort(t *testing.T) {
 	t.Parallel()
 
-	core, fake := provided(t)
+	core, server := provided(t)
 	if _, err := core.Models.UpsertModel(t.Context(), models.UpsertModelRequest{
 		Provider: "openai", Model: "gpt-plain", ContextTokens: 200000, MaxOutputTokens: 64000,
 		InputUSDPerM: 1, OutputUSDPerM: 2, RPM: 60, TPM: 120000,
 	}); err != nil {
 		t.Fatalf("UpsertModel: %v", err)
 	}
+	server.Enqueue(openaitest.Text("pong").Reply())
 
 	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
 		Provider: "openai", Model: "gpt-plain",
@@ -426,35 +375,12 @@ func TestAModelWithNoEffortSendsNoReasoningEffort(t *testing.T) {
 		t.Fatalf("TestProvider: %v", err)
 	}
 
-	asked := decodeRequest(t, fake.lastRequest())
-	if effort, carried := asked["reasoning_effort"]; carried {
-		t.Fatalf("the request carries reasoning_effort %v, want none at all: %s", effort, fake.lastRequest())
-	}
-	if _, verbose := asked["verbosity"]; verbose {
-		t.Fatalf("the request carries a verbosity nobody asked for: %s", fake.lastRequest())
+	if effort, carried := effortOf(lastBody(t, server)); carried {
+		t.Fatalf("the request carries reasoning.effort %q, want none at all", effort)
 	}
 }
 
-func TestTheGeminiCompatibleEndpointSendsNoReasoningEffort(t *testing.T) {
-	t.Parallel()
-
-	core, fake := providedFor(t, "gemini-openai", "llm.geminiOpenai.baseUrl")
-	if _, err := core.Models.TestProvider(t.Context(), models.TestProviderRequest{
-		Provider: "gemini-openai", Model: "gemini-2.5-flash-lite",
-	}); err != nil {
-		t.Fatalf("TestProvider: %v", err)
-	}
-
-	asked := decodeRequest(t, fake.lastRequest())
-	if effort, carried := asked["reasoning_effort"]; carried {
-		t.Fatalf("the gemini endpoint was sent reasoning_effort %v: %s", effort, fake.lastRequest())
-	}
-	if _, verbose := asked["verbosity"]; verbose {
-		t.Fatalf("the gemini endpoint was sent a verbosity: %s", fake.lastRequest())
-	}
-}
-
-func TestAnInvalidReasoningEffortIsRefused(t *testing.T) {
+func TestAModelOfARemovedProviderIsRefused(t *testing.T) {
 	t.Parallel()
 
 	home := t.TempDir()
@@ -466,24 +392,86 @@ func TestAnInvalidReasoningEffortIsRefused(t *testing.T) {
 	})
 
 	_, err := core.Models.UpsertModel(t.Context(), models.UpsertModelRequest{
-		Provider: "openai", Model: "gpt-odd", ContextTokens: 200000, MaxOutputTokens: 64000,
-		InputUSDPerM: 1, OutputUSDPerM: 2, RPM: 60, TPM: 120000, ReasoningEffort: "minimal",
+		Provider: "retired", Model: "old-model", ContextTokens: 200000, MaxOutputTokens: 64000,
+		InputUSDPerM: 1, OutputUSDPerM: 2, RPM: 60, TPM: 120000,
 	})
 	if !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("UpsertModel with minimal = %v, want INVALID", err)
+		t.Fatalf("UpsertModel of a removed provider = %v, want INVALID", err)
 	}
 }
 
-func decodeRequest(t *testing.T, body string) map[string]any {
-	t.Helper()
+func TestAChatTurnTalksToTheProviderWithItsToolsAndNothingStored(t *testing.T) {
+	t.Parallel()
 
-	if body == "" {
-		t.Fatal("the provider was never called")
+	core, server := provided(t)
+	server.Enqueue(
+		openaitest.Calls(openaitest.Call{ID: "call_sites", Name: "sites_list", Arguments: `{}`}).Stream(),
+		openaitest.Answer{Text: "You have no sites yet.", Chunks: []string{"You have ", "no sites yet."}}.Stream(),
+	)
+
+	opened, err := core.Agent.CreateConversation(t.Context(), agent.CreateConversationRequest{
+		Title: "Sites on file", Mode: "autonomous",
+	})
+	if err != nil {
+		t.Fatalf("CreateConversation: %v", err)
+	}
+	if _, err = core.Agent.Send(t.Context(), agent.SendRequest{
+		ConversationID: opened.Conversation.ID, Text: "Which sites do I have?",
+	}); err != nil {
+		t.Fatalf("Send: %v", err)
 	}
 
-	var asked map[string]any
-	if err := json.Unmarshal([]byte(body), &asked); err != nil {
-		t.Fatalf("read the request %s: %v", body, err)
+	answer := ""
+	deadline := time.Now().Add(15 * time.Second)
+	for answer == "" && time.Now().Before(deadline) {
+		listed, listErr := core.Agent.ListMessages(t.Context(), agent.ListMessagesRequest{ConversationID: opened.Conversation.ID})
+		if listErr != nil {
+			t.Fatalf("ListMessages: %v", listErr)
+		}
+		for _, message := range listed.Items {
+			if message.Role == "assistant" {
+				answer = message.Text
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
-	return asked
+	if answer != "You have no sites yet." {
+		t.Fatalf("the turn answered %q", answer)
+	}
+
+	asked := server.Requests()
+	if len(asked) != 2 {
+		t.Fatalf("the provider saw %d rounds, want a call and an answer", len(asked))
+	}
+	for index, request := range asked {
+		body := request.Body
+		if store, ok := body["store"].(bool); !ok || store || body["stream"] != true {
+			t.Fatalf("round %d asks with store %v and stream %v", index+1, body["store"], body["stream"])
+		}
+		if effort, carried := effortOf(body); !carried || effort != "none" {
+			t.Fatalf("round %d asks with effort %q, want none", index+1, effort)
+		}
+		if body["prompt_cache_key"] != "chat:autonomous" || body["service_tier"] != "default" {
+			t.Fatalf("round %d asks with %v on %v", index+1, body["prompt_cache_key"], body["service_tier"])
+		}
+		if tools, ok := body["tools"].([]any); !ok || len(tools) != len(core.Tools.Names()) {
+			t.Fatalf("round %d offers %d tools of %d", index+1, len(tools), len(core.Tools.Names()))
+		}
+	}
+
+	input, ok := asked[1].Body["input"].([]any)
+	if !ok {
+		t.Fatalf("the second round sent %s", asked[1].Raw)
+	}
+	kinds := make([]string, 0, len(input))
+	for _, raw := range input {
+		item, isItem := raw.(map[string]any)
+		if !isItem {
+			t.Fatalf("an input item is %v", raw)
+		}
+		kinds = append(kinds, kindOf(item))
+	}
+	if want := []string{"developer", "user", "function_call", "function_call_output"}; !slices.Equal(kinds, want) {
+		t.Fatalf("the second round sent %v, want %v", kinds, want)
+	}
 }

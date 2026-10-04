@@ -9,3 +9,10 @@ var batchSizeSetting = settings.Int("sync.batchSize", DefaultBatchSize, settings
 func BatchSize(values *settings.Values) int {
 	return batchSizeSetting.Get(values)
 }
+
+func batchSize(deps Deps) int {
+	if deps.BatchSize <= 0 {
+		return DefaultBatchSize
+	}
+	return deps.BatchSize
+}

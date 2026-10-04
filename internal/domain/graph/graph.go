@@ -25,6 +25,7 @@ type Graph struct {
 	related  map[string][]neighbor
 	ordered  []Entity
 	edges    []Edge
+	labels   map[string]string
 }
 
 func New(entities []Entity, edges []Edge) (Graph, error) {
@@ -52,6 +53,7 @@ func New(entities []Entity, edges []Edge) (Graph, error) {
 		g.ordered = append(g.ordered, *e)
 	}
 	slices.SortFunc(g.ordered, byName)
+	g.labels = Labels(g.ordered)
 
 	seen := make(map[string]struct{}, len(edges))
 	for i := range edges {
@@ -89,7 +91,7 @@ func New(entities []Entity, edges []Edge) (Graph, error) {
 }
 
 func byName(a, b Entity) int {
-	if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+	if c := strings.Compare(Key(a.Name), Key(b.Name)); c != 0 {
 		return c
 	}
 	return strings.Compare(a.ID, b.ID)
@@ -146,6 +148,25 @@ func (g Graph) Children(id string) []Entity {
 	return g.collect(g.children[id])
 }
 
+func (g Graph) Descendants(id string) []Entity {
+	seen := map[string]struct{}{id: {}}
+	out := make([]Entity, 0)
+	queue := []string{id}
+	for len(queue) > 0 {
+		from := queue[0]
+		queue = queue[1:]
+		for _, child := range g.children[from] {
+			if _, dup := seen[child]; dup {
+				continue
+			}
+			seen[child] = struct{}{}
+			out = append(out, g.entities[child])
+			queue = append(queue, child)
+		}
+	}
+	return out
+}
+
 func (g Graph) Related(id string, minWeight float64) []Neighbor {
 	out := make([]Neighbor, 0, len(g.related[id]))
 	for _, n := range g.related[id] {
@@ -163,21 +184,11 @@ func (g Graph) Related(id string, minWeight float64) []Neighbor {
 	return out
 }
 
-func (g Graph) Roots() []Entity {
-	out := make([]Entity, 0, len(g.ordered))
-	for i := range g.ordered {
-		if len(g.parents[g.ordered[i].ID]) == 0 {
-			out = append(out, g.ordered[i])
-		}
-	}
-	return out
-}
-
 func (g Graph) trail(cycle []string) string {
 	named := make([]string, 0, len(cycle))
 	for _, entityID := range cycle {
-		if entity, found := g.entities[entityID]; found && strings.TrimSpace(entity.Name) != "" {
-			named = append(named, entity.Name)
+		if label := g.Label(entityID); strings.TrimSpace(label) != "" {
+			named = append(named, label)
 			continue
 		}
 		named = append(named, entityID)

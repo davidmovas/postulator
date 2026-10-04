@@ -31,6 +31,8 @@ const (
 	ReasonRevertGone       = "the page is no longer on the site"
 	ReasonRevertNoNeighbor = "the neighbor is no longer on the site"
 	ReasonRevertNoBefore   = "the run kept no copy of the neighbor content it replaced"
+	ReasonRevertNoKind     = "nothing records whether the neighbor is a page, a post or a product, " +
+		"so the item that carries its number cannot be told apart from it"
 
 	ReasonRevertNoMeta = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
 		"plugin that can read it"
@@ -158,6 +160,9 @@ func undoPage(ctx context.Context, deps Deps, sc *run.StepContext, result *Rever
 	if work.published.Created {
 		return takeOffTheSite(ctx, deps, result, work)
 	}
+	if work.published.PreviousProduct != nil {
+		return putTheProductBack(ctx, deps, sc, result, work)
+	}
 	return putTheBodyBack(ctx, deps, sc, result, work)
 }
 
@@ -185,42 +190,67 @@ func takeOffTheSite(ctx context.Context, deps Deps, result *RevertResult, work r
 
 func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
 	work revertWork) (string, bool) {
-	if work.published.PreviousContent == "" {
-		return ReasonRevertNoBody, false
+	raw, reason, ok := bodyToRestore(ctx, work)
+	if !ok {
+		return reason, false
 	}
+	hash, reason, ok := writeBodyBack(ctx, work, raw)
+	if !ok {
+		return reason, false
+	}
+	return bodyRestored(ctx, deps, sc, result, work, hash, "the body the run replaced was written back")
+}
 
-	raw, err := work.client.GetRaw(ctx, work.published.WPID)
+func bodyToRestore(ctx context.Context, work revertWork) (wp.RawContent, string, bool) {
+	if work.published.PreviousContentHash == "" {
+		return wp.RawContent{}, ReasonRevertNoBody, false
+	}
+	raw, reason, ok := readRawBack(ctx, work)
+	if !ok {
+		return raw, reason, false
+	}
+	if raw.ContentHash != work.published.PreviousContentHash && raw.ContentHash != work.published.ContentHash {
+		return raw, editedSince(work.published.ContentHash, raw.ContentHash), false
+	}
+	return raw, "", true
+}
+
+func readRawBack(ctx context.Context, work revertWork) (wp.RawContent, string, bool) {
+	raw, err := work.client.GetRaw(ctx, onSiteType(work.page), work.published.WPID)
 	switch {
+	case err == nil:
+		return raw, "", true
 	case wp.IsPluginMissing(err):
-		return ReasonRevertNoPlugin, false
+		return raw, ReasonRevertNoPlugin, false
 	case errors.IsCode(err, errors.NotFound):
-		return ReasonRevertGone, false
-	case err != nil:
-		return err.Error(), false
-	}
-
-	hash := raw.ContentHash
-	restored := raw.ContentHash == work.published.PreviousContentHash
-	switch {
-	case restored:
-	case raw.ContentHash != work.published.ContentHash:
-		return editedSince(work.published.ContentHash, raw.ContentHash), false
+		return raw, ReasonRevertGone, false
 	default:
-		written, putErr := work.client.PutRaw(ctx, work.published.WPID, work.published.PreviousContent, raw.ContentHash)
-		if putErr != nil {
-			if errors.IsCode(putErr, errors.Conflict) {
-				return writtenUnderUs(raw.ContentHash), false
-			}
-			return putErr.Error(), false
-		}
-		hash = written
+		return raw, err.Error(), false
 	}
+}
 
+func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (hash, reason string, ok bool) {
+	if raw.ContentHash == work.published.PreviousContentHash {
+		return raw.ContentHash, "", true
+	}
+	written, err := work.client.PutRaw(ctx, onSiteType(work.page), work.published.WPID, work.published.PreviousContent, raw.ContentHash)
+	switch {
+	case err == nil:
+		return written, "", true
+	case errors.IsCode(err, errors.Conflict):
+		return "", writtenUnderUs(raw.ContentHash), false
+	default:
+		return "", err.Error(), false
+	}
+}
+
+func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult, work revertWork,
+	hash, detail string) (string, bool) {
 	if adoptErr := readopt(ctx, deps, sc, work.page, work.published.PreviousContent, hash); adoptErr != nil {
 		return adoptErr.Error(), false
 	}
 	result.Outcome = OutcomeRestored
-	result.Detail = "the body the run replaced was written back"
+	result.Detail = detail
 	if reason, back := putTheMetaBack(ctx, work); !back {
 		result.Findings = append(result.Findings, metaKept(work.page, work.published.SEOApplied, reason))
 	}
@@ -235,7 +265,7 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 		return ReasonRevertNoMeta, false
 	}
 
-	_, err := work.client.ReplaceSEOMeta(ctx, work.published.WPID, *work.published.PreviousMeta,
+	_, err := work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
 		work.published.SEOApplied)
 	switch {
 	case err == nil:
@@ -256,11 +286,20 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	if neighbor.Outcome != OutcomeLinked {
 		return "", true
 	}
-	if neighbor.Before.HTML == "" {
+	if neighbor.Before.Hash == "" {
 		return ReasonRevertNoBefore, false
 	}
 
-	raw, err := work.client.GetRaw(ctx, neighbor.WPID)
+	stored, known := neighborPage(ctx, deps, sc, neighbor.PageID)
+	itemType := wp.ItemType(neighbor.Type)
+	if itemType == "" && known {
+		itemType = onSiteType(stored)
+	}
+	if itemType == "" {
+		return ReasonRevertNoKind, false
+	}
+
+	raw, err := work.client.GetRaw(ctx, itemType, neighbor.WPID)
 	switch {
 	case wp.IsPluginMissing(err):
 		return ReasonRevertNoPlugin, false
@@ -270,7 +309,6 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 		return err.Error(), false
 	}
 
-	stored, known := neighborPage(ctx, deps, sc, neighbor.PageID)
 	hash := raw.ContentHash
 	switch {
 	case raw.ContentHash == neighbor.Before.Hash:
@@ -279,7 +317,7 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	case raw.ContentHash != stored.ContentHash:
 		return editedSince(stored.ContentHash, raw.ContentHash), false
 	default:
-		written, putErr := work.client.PutRaw(ctx, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash)
+		written, putErr := work.client.PutRaw(ctx, itemType, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash)
 		if putErr != nil {
 			if errors.IsCode(putErr, errors.Conflict) {
 				return writtenUnderUs(raw.ContentHash), false
@@ -351,15 +389,7 @@ func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.P
 	if err != nil {
 		return errors.Wrap(err, errors.Internal, "read the body the revert wrote back")
 	}
-
-	now := deps.now()
-	next := page
-	next.ContentHash = hash
-	next.Drift = false
-	next.LastSyncedAt = &now
-	next.UpdatedAt = now
-	links := observedOn(page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc.Links(), now)
-	return persist(ctx, deps, next, links)
+	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc, hash)
 }
 
 func metaKept(page pagemap.Page, applied []string, reason string) content.Finding {

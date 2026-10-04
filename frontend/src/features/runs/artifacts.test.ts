@@ -13,6 +13,7 @@ import {
     owedTargets,
     publishView,
     relinkView,
+    revertView,
     syncView,
     validationView,
     weigh,
@@ -227,6 +228,32 @@ describe("publishView", () => {
     it("leaves a missing id null rather than zero", () => {
         expect(publishView({ url: "" })?.wpId).toBeNull();
     });
+
+    it("says what a product edit changed beside the description, and nothing for a page", () => {
+        const view = publishView({
+            wpId: 9,
+            previousProduct: { shortWritten: true, added: ["Form", 3], imageId: 77, shortDescription: "<p>old</p>" },
+        });
+        expect(view?.product).toStrictEqual({ shortWritten: true, added: ["Form"], imageSet: true });
+        expect(publishView({ wpId: 9 })?.product).toBeNull();
+    });
+});
+
+describe("revertView", () => {
+    it("reads what the revert did to the page and its neighbours, and its findings", () => {
+        const view = revertView({
+            pageId: "p1",
+            path: "/a/",
+            outcome: "restored",
+            detail: "the content the run replaced was written back",
+            neighbors: [{ pageId: "p2", path: "/b/", outcome: "restored", detail: "unlinked", wpId: 3 }, 4],
+            findings: [{ severity: "warn", code: "revert_meta_kept", message: "kept" }],
+        });
+        expect(view?.outcome).toBe("restored");
+        expect(view?.neighbours).toStrictEqual([{ pageId: "p2", path: "/b/", outcome: "restored", detail: "unlinked" }]);
+        expect(view?.findings.map((finding) => finding.code)).toStrictEqual(["revert_meta_kept"]);
+        expect(revertView("nope")).toBeNull();
+    });
 });
 
 describe("the remaining artifact shapes", () => {
@@ -234,6 +261,19 @@ describe("the remaining artifact shapes", () => {
         const view = draftView({ title: "T", h1: "H", summary: "S", sections: [{ heading: "A", html: "<p/>" }, 7] });
         expect(view?.sections).toHaveLength(1);
         expect(view?.h1).toBe("H");
+        expect(view?.product).toBeNull();
+    });
+
+    it("reads the product outputs a draft carries", () => {
+        const view = draftView({
+            title: "T",
+            sections: [],
+            product: { shortDescription: "<p>Short</p>", specifications: [{ name: "Form", value: "Liquid" }, "x"] },
+        });
+        expect(view?.product).toStrictEqual({
+            shortDescription: "<p>Short</p>",
+            specifications: [{ name: "Form", value: "Liquid" }],
+        });
     });
 
     it("reads meta", () => {
@@ -275,6 +315,11 @@ describe("the remaining artifact shapes", () => {
 
     it("reads a sync result", () => {
         expect(syncView({ url: "u", status: "publish", links: 7 })?.links).toBe(7);
+        expect(
+            syncView({ findings: [{ severity: "warn", code: "plan_not_kept", message: "slug differs" }] })?.findings.map(
+                (finding) => finding.code,
+            ),
+        ).toStrictEqual(["plan_not_kept"]);
     });
 
     it("reads a final report", () => {

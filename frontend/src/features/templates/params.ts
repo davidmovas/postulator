@@ -1,11 +1,12 @@
+import { choiceParam, queryCodec, sortParam, textParam } from "../../data/params.js";
 import type { TemplateSort } from "../../data/sorts.js";
-import { isOneOf, templateSortFields } from "../../generated/vocab.js";
+import { templateSortFields } from "../../generated/vocab.js";
 
 export type TemplatesTab = "templates" | "policies";
 
-export type ScopeFilter = "all" | "global" | "site";
+const scopeFilters = ["all", "global", "site"] as const;
 
-const scopeFilters: readonly ScopeFilter[] = ["all", "global", "site"];
+export type ScopeFilter = (typeof scopeFilters)[number];
 
 export type SortChoice = "nameAsc" | "nameDesc" | "newest" | "oldest";
 
@@ -16,7 +17,24 @@ export interface TemplatesQuery {
     sort: TemplateSort | null;
 }
 
-export const defaultQuery: TemplatesQuery = { scope: "all", pageKind: "", search: "", sort: null };
+const codec = queryCodec<TemplatesQuery>({
+    scope: choiceParam("scope", scopeFilters, "all"),
+    pageKind: textParam("kind"),
+    search: textParam("q"),
+    sort: sortParam("sort", templateSortFields),
+});
+
+export const defaultQuery: TemplatesQuery = codec.defaults;
+
+export const readQuery = codec.read;
+
+export const writeQuery = codec.write;
+
+export const searchOf = codec.search;
+
+export function narrowed(query: TemplatesQuery): boolean {
+    return codec.carries(query, ["scope", "pageKind", "search"]);
+}
 
 export const sorts: Readonly<Record<SortChoice, TemplateSort>> = {
     nameAsc: { field: "name", desc: false },
@@ -33,68 +51,4 @@ export function sortChoice(sort: TemplateSort | null): SortChoice {
         return sort.desc ? "newest" : "oldest";
     }
     return sort.desc ? "nameDesc" : "nameAsc";
-}
-
-export function parseSort(raw: string | null): TemplateSort | null {
-    if (raw === null || raw === "") {
-        return null;
-    }
-    const separator = raw.lastIndexOf(":");
-    if (separator <= 0) {
-        return null;
-    }
-    const field = raw.slice(0, separator);
-    const direction = raw.slice(separator + 1);
-    if (!isOneOf(templateSortFields, field) || (direction !== "asc" && direction !== "desc")) {
-        return null;
-    }
-    return { field, desc: direction === "desc" };
-}
-
-export function formatSort(sort: TemplateSort | null): string {
-    return sort === null ? "" : `${sort.field}:${sort.desc ? "desc" : "asc"}`;
-}
-
-export function readQuery(params: URLSearchParams): TemplatesQuery {
-    const scope = params.get("scope") ?? "";
-    return {
-        scope: isOneOf(scopeFilters, scope) ? scope : defaultQuery.scope,
-        pageKind: params.get("kind") ?? "",
-        search: params.get("q") ?? "",
-        sort: parseSort(params.get("sort")),
-    };
-}
-
-export function writeQuery(query: TemplatesQuery): URLSearchParams {
-    const params = new URLSearchParams();
-    if (query.scope !== defaultQuery.scope) {
-        params.set("scope", query.scope);
-    }
-    if (query.pageKind !== "") {
-        params.set("kind", query.pageKind);
-    }
-    if (query.search !== "") {
-        params.set("q", query.search);
-    }
-    const sort = formatSort(query.sort);
-    if (sort !== "") {
-        params.set("sort", sort);
-    }
-    return params;
-}
-
-export function searchOf(query: TemplatesQuery): string {
-    const serialised = writeQuery(query).toString();
-    return serialised === "" ? "" : `?${serialised}`;
-}
-
-export function narrowed(query: TemplatesQuery): boolean {
-    return query.scope !== defaultQuery.scope || query.pageKind !== "" || query.search !== "";
-}
-
-export const actionParam = "action";
-export const actionNew = "new";
-
-export function wantsNew(params: URLSearchParams): boolean {
-    return params.get(actionParam) === actionNew;
 }

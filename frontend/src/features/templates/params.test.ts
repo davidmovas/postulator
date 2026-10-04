@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultQuery, narrowed, readQuery, searchOf, sortChoice, sorts, wantsNew, writeQuery } from "./params.js";
+import { defaultQuery, narrowed, readQuery, searchOf, sortChoice, sorts, writeQuery } from "./params.js";
 import type { TemplatesQuery } from "./params.js";
 
 describe("readQuery", () => {
@@ -47,16 +47,18 @@ describe("writeQuery", () => {
         expect(searchOf(query).startsWith("?")).toBe(true);
     });
 
+    it("writes every facet under its own key, in the order the address has always had", () => {
+        const query: TemplatesQuery = {
+            scope: "global",
+            pageKind: "hub",
+            search: "mug kiln",
+            sort: { field: "createdAt", desc: true },
+        };
+        expect(searchOf(query)).toBe("?scope=global&kind=hub&q=mug+kiln&sort=createdAt%3Adesc");
+    });
+
     it("never carries the action the palette sends", () => {
         expect(writeQuery(readQuery(new URLSearchParams("action=new&kind=guide"))).toString()).toBe("kind=guide");
-    });
-});
-
-describe("wantsNew", () => {
-    it("answers only for the action the palette sends", () => {
-        expect(wantsNew(new URLSearchParams("action=new"))).toBe(true);
-        expect(wantsNew(new URLSearchParams("action=edit"))).toBe(false);
-        expect(wantsNew(new URLSearchParams(""))).toBe(false);
     });
 });
 

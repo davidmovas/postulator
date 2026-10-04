@@ -2,10 +2,12 @@ package steps_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -79,6 +81,36 @@ func TestRepairHierarchyMovesAFlatPageWithoutRewritingIt(t *testing.T) {
 	}
 }
 
+func TestRepairHierarchyLeavesAPostWhereItsPermalinkPutsIt(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Slug: "coffee", Status: "publish"})
+	parentWP := parent[0].ID
+	post := server.Seed(wptest.Item{
+		Type: wptest.TypePost, Title: "Espresso", Slug: "espresso", Status: "publish", Content: flatBody,
+	})
+
+	stored := &pagemap.Page{}
+	deps.Pages = pageList{recorded: stored, items: []pagemap.Page{{
+		ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
+		Status: pagemap.StatusPublished, WPID: &parentWP,
+	}}}
+	sc := repairContext(t, post[0].ID)
+	sc.Page.WPType = pagemap.WPPost
+
+	result, err := steps.RepairHierarchy(deps).Run(t.Context(), sc)
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a repair of a post = %+v, %v; want it refused as invalid", result, err)
+	}
+	if kept, ok := server.Lookup(post[0].ID); !ok || kept.Parent != 0 || kept.Content != flatBody {
+		t.Fatalf("the post is %+v, want it left as it was", kept)
+	}
+	if stored.ID != "" {
+		t.Fatalf("the page map recorded %+v for a post the repair never moved", stored)
+	}
+}
+
 func TestRepairHierarchyWaitsForAParentThatIsNotThereYet(t *testing.T) {
 	t.Parallel()
 
@@ -94,6 +126,59 @@ func TestRepairHierarchyWaitsForAParentThatIsNotThereYet(t *testing.T) {
 	}
 	if moved, ok := server.Lookup(flat[0].ID); !ok || moved.Parent != 0 {
 		t.Fatalf("the page is %+v, want it left alone", moved)
+	}
+}
+
+func TestRepairHierarchyPreflightRefusesWhatNoParentHolds(t *testing.T) {
+	t.Parallel()
+
+	wpID := int64(12)
+	cases := []struct {
+		name string
+		page pagemap.Page
+		want []string
+	}{
+		{
+			name: "a page",
+			page: pagemap.Page{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, WPID: &wpID},
+			want: []string{},
+		},
+		{
+			name: "a post",
+			page: pagemap.Page{ID: "page-post", SiteID: "site", Path: "/coffee/espresso-at-home/", WPType: pagemap.WPPost, WPID: &wpID},
+			want: []string{steps.CodePostUnnested},
+		},
+		{
+			name: "a product",
+			page: pagemap.Page{ID: "page-product", SiteID: "site", Path: "/product/espresso-machine/", WPType: pagemap.WPProduct, WPID: &wpID},
+			want: []string{steps.CodeStorePlaced},
+		},
+		{
+			name: "a product category",
+			page: pagemap.Page{ID: "page-shelf", SiteID: "site", Path: "/product-category/machines/", WPType: pagemap.WPProductCategory, WPID: &wpID},
+			want: []string{steps.CodeStorePlaced},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			record, targets := preflightRun(run.RepairRecipe(), tc.page)
+			record.Kind = run.KindRepair
+			findings, err := steps.RepairHierarchy(unitDeps()).Preflight(t.Context(), record, targets)
+			if err != nil {
+				t.Fatalf("Preflight: %v", err)
+			}
+			if got := codesOf(findings); !slices.Equal(got, tc.want) {
+				t.Fatalf("findings = %+v, want %v", findings, tc.want)
+			}
+			for _, finding := range findings {
+				if finding.Severity != content.SeverityError || finding.Path != tc.page.Path {
+					t.Errorf("finding = %+v, want an error naming the page", finding)
+				}
+			}
+		})
 	}
 }
 

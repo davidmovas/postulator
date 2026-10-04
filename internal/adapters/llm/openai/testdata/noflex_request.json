@@ -1,0 +1,17 @@
+{
+  "model": "gpt-5.6-luna",
+  "instructions": "You edit pages.",
+  "input": [
+    {
+      "role": "user",
+      "content": "Tighten the page."
+    }
+  ],
+  "store": false,
+  "max_output_tokens": 2648,
+  "reasoning": {
+    "effort": "low"
+  },
+  "service_tier": "default",
+  "prompt_cache_key": "editor:site-1"
+}

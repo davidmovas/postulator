@@ -30,7 +30,7 @@ func clip(text string, limit int) string {
 func (s *Service) settle(ctx context.Context, conversationID, question, answer string) {
 	conversation, err := s.deps.Conversations.Get(ctx, conversationID)
 	if err != nil {
-		s.deps.Turns.Note(err)
+		s.drop(err)
 		return
 	}
 	if conversation.TitleSettled {
@@ -44,7 +44,7 @@ func (s *Service) settle(ctx context.Context, conversationID, question, answer s
 	conversation.UpdatedAt = s.now()
 
 	if err = s.deps.Conversations.Update(ctx, conversation); err != nil {
-		s.deps.Turns.Note(err)
+		s.drop(err)
 		return
 	}
 	s.emit(events.AgentTitled, events.AgentTitledPayload{
@@ -70,7 +70,10 @@ func (s *Service) suggestTitle(ctx context.Context, conversation domainagent.Con
 		System:    system,
 		Messages:  []llmport.Message{{Role: llmport.RoleUser, Text: user}},
 		MaxTokens: titleTokens,
-		Meta:      llmport.CallMeta{ConversationID: conversation.ID, Step: "title"},
+		Effort:    domainllm.EffortNone,
+		Meta: llmport.CallMeta{
+			ConversationID: conversation.ID, Step: domainllm.StepTitle, Role: domainllm.RoleTitler,
+		},
 	})
 	if err != nil {
 		return "", false

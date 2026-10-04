@@ -137,8 +137,8 @@ func TestCutAtRuneNeverSplitsACharacter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := CutAtRune(tc.text, tc.limit); got != tc.want {
-				t.Fatalf("CutAtRune = %q, want %q", got, tc.want)
+			if got := cutAtRune(tc.text, tc.limit); got != tc.want {
+				t.Fatalf("cutAtRune = %q, want %q", got, tc.want)
 			}
 		})
 	}

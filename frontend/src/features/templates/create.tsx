@@ -2,12 +2,12 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
+import { fieldErrorOf, validationErrorOf } from "../../data/errors.js";
 import { useCreateTemplate } from "../../data/hooks/templates.js";
 import type { Template } from "../../data/types.js";
 import type { SegmentedOption, SelectOption } from "../../ui/index.js";
 import { Banner, Button, Drawer, Field, Input, Segmented, Select } from "../../ui/index.js";
 import { blankDraft } from "./blank.js";
-import { fieldErrorOf, formErrorOf } from "./controls.js";
 import { pageKindLabel, scopeLabel } from "./labels.js";
 import { copyName } from "./naming.js";
 import { namesIn } from "./rows.js";
@@ -90,7 +90,7 @@ export function CreateTemplateDrawer({
     };
 
     const blocked = name.trim() === "" || pageKind.trim() === "" || (start === "copy" && source === null);
-    const formError = formErrorOf(create.error);
+    const formError = validationErrorOf(create.error);
 
     return (
         <Drawer

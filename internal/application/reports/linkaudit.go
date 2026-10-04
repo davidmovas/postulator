@@ -170,7 +170,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 	if page.EntityID != nil {
 		if entity, ok := state.entities[*page.EntityID]; ok {
 			detail.summary.EntityID = entity.ID
-			detail.summary.EntityName = entity.Name
+			detail.summary.EntityName = state.g.Label(entity.ID)
 		}
 	}
 	if skip != "" {
@@ -190,7 +190,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 	for _, target := range lc.Targets {
 		row := RequiredLink{
 			Relation: string(target.Relation), Required: target.Required,
-			TargetEntityID: target.EntityID, TargetEntityName: state.entities[target.EntityID].Name,
+			TargetEntityID: target.EntityID, TargetEntityName: state.g.Label(target.EntityID),
 			TargetPageID: target.PageID, TargetPath: target.URL,
 			AnchorsAllowed: slices.Clone(target.Anchors), Weight: target.Weight, Depth: target.Depth,
 		}
@@ -209,7 +209,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 	for _, blocked := range plan.Blocked {
 		detail.required = append(detail.required, RequiredLink{
 			Relation: string(blocked.Relation), Required: blocked.Required,
-			TargetEntityID: blocked.EntityID, TargetEntityName: state.entities[blocked.EntityID].Name,
+			TargetEntityID: blocked.EntityID, TargetEntityName: state.g.Label(blocked.EntityID),
 			AnchorsAllowed: []string{}, Weight: blocked.Weight, Depth: blocked.Depth,
 			BlockedReason: string(blocked.Reason), State: string(LinkBlocked),
 		})

@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { importFields } from "../../generated/vocab.js";
-import { assign, mappedFields, takenFrom, targetOf, unmappedHeaders, usable } from "./columns.js";
+import {
+    assign,
+    freeHeaders,
+    groupHeaders,
+    mappedFields,
+    takenFrom,
+    targetOf,
+    toggled,
+    unmappedHeaders,
+    usable,
+} from "./columns.js";
 
 const detected = { path: "URL", title: "Title", keywords: "Keywords" };
 
@@ -56,11 +66,55 @@ describe("what the mapping covers", () => {
         expect(unmappedHeaders(["URL", "Title", "Notes", ""], detected)).toEqual(["Notes"]);
     });
 
-    it("needs a path or an entity to be worth applying", () => {
+    it("needs a path, an entity, indent columns or group columns to be worth applying", () => {
         expect(usable({ path: "URL" })).toBe(true);
         expect(usable({ entity: "Cluster" })).toBe(true);
         expect(usable({ title: "Title" })).toBe(false);
         expect(usable(null)).toBe(false);
+        expect(usable({ title: "Title" }, [], ["Category"])).toBe(true);
+    });
+
+    it("offers as a group or a note only a column no field reads and the other list does not hold", () => {
+        expect(freeHeaders(["URL", "Category", "Notes", "", "Title"], detected, ["Notes"])).toEqual(["Category"]);
+    });
+
+    it.each([
+        {
+            name: "only the free headers the detector read as roots",
+            headers: ["URL", "Root Entity", "Category", "Subcategory", "Root", "Notes"],
+            elsewhere: [],
+            roots: ["Root Entity", "Root"],
+            want: ["Root Entity", "Root"],
+        },
+        {
+            name: "no root a note already holds",
+            headers: ["URL", "Root Entity", "Root"],
+            elsewhere: ["Root"],
+            roots: ["Root Entity", "Root"],
+            want: ["Root Entity"],
+        },
+        {
+            name: "no root a field reads",
+            headers: ["URL", "Title", "Root"],
+            elsewhere: [],
+            roots: ["Title", "Root"],
+            want: ["Root"],
+        },
+        {
+            name: "nothing for a sheet with no root header",
+            headers: ["URL", "Category", "Subcategory"],
+            elsewhere: [],
+            roots: [],
+            want: [],
+        },
+    ])("offers as a group column $name", ({ headers, elsewhere, roots, want }) => {
+        expect(groupHeaders(headers, detected, elsewhere, roots)).toEqual(want);
+    });
+
+    it("toggles a column in or out and keeps the order of the sheet", () => {
+        const headers = ["Root Entity", "Category", "Subcategory", "URL"];
+        expect(toggled(["Subcategory"], "Root Entity", headers)).toEqual(["Root Entity", "Subcategory"]);
+        expect(toggled(["Root Entity", "Subcategory"], "Root Entity", headers)).toEqual(["Subcategory"]);
     });
 
     it("remembers which targets the detector chose", () => {

@@ -162,25 +162,6 @@ func TestReaderPoolRefusesWrites(t *testing.T) {
 	}
 }
 
-func TestPath(t *testing.T) {
-	t.Parallel()
-
-	path := filepath.Join(t.TempDir(), "postulator.db")
-	store, err := Open(Config{Path: path})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	t.Cleanup(func() {
-		if closeErr := store.Close(); closeErr != nil {
-			t.Errorf("close: %v", closeErr)
-		}
-	})
-
-	if store.Path() != path {
-		t.Errorf("Path = %q, want %q", store.Path(), path)
-	}
-}
-
 func TestMigrateIsIdempotent(t *testing.T) {
 	t.Parallel()
 

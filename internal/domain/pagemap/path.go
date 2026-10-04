@@ -139,18 +139,6 @@ func (s Site) Resolve(href string) (path string, kind LinkKind) {
 	return normalized, LinkPath
 }
 
-func InternalPath(href, siteHost string) (path string, internal bool) {
-	resolved, kind := Site{Host: siteHost}.Resolve(href)
-	switch kind {
-	case LinkPath:
-		return resolved, true
-	case LinkSameDocument:
-		return "", true
-	default:
-		return "", false
-	}
-}
-
 const RootPath = "/"
 
 func ParentPath(path string) string {

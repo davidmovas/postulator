@@ -36,8 +36,8 @@ export function usePageIndex(siteId: string): PageIndex {
     return { byId, complete: !hasNextPage, loading: isPending };
 }
 
-export function pathOf(index: PageIndex, pageId: string): string {
-    const held = index.byId.get(pageId)?.path;
+export function targetPathOf(index: PageIndex, targetId: string): string {
+    const held = index.byId.get(targetId)?.path;
     if (held !== undefined) {
         return held;
     }

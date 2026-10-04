@@ -76,12 +76,17 @@ func (p *Profiles) Set(ctx context.Context, role llm.Role, ref llm.ModelRef) err
 	if !ref.Valid() {
 		return errors.New(errors.Invalid, "a model profile must name a provider and a model").WithDetail("role", string(role))
 	}
+	if !ref.Supported() {
+		return errors.New(errors.Invalid, "only an OpenAI model can take a job").
+			WithDetail("role", string(role)).
+			WithDetail("provider", ref.Provider)
+	}
 	return p.store.Set(ctx, role, ref, p.clock.Now().UTC().Truncate(time.Second))
 }
 
 func pick(profiles map[llm.Role]llm.ModelRef, role llm.Role) (llm.ModelRef, bool) {
 	ref, ok := profiles[role]
-	if !ok || !ref.Valid() {
+	if !ok || !ref.Supported() {
 		return llm.ModelRef{}, false
 	}
 	return ref, true

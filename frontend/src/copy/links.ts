@@ -78,6 +78,10 @@ export const links = {
         noMatch: "No page matches these filters",
         noMatchBody: "Widen the filters or reset them to see every page.",
     },
+    blockedReasons: {
+        no_canonical_page: "it has pages, but none is its canonical page",
+        no_page: "it has no page, so the links pass over it",
+    },
     panel: {
         title: "Page links",
         close: "Close the page",
@@ -87,7 +91,8 @@ export const links = {
         down: "Down, to the children",
         sibling: "Sideways, to related entities",
         blocked: "Blocked",
-        blockedHint: "These targets have no canonical page, so no link can be written to them.",
+        blockedHint:
+            "No link can be written to these targets yet. One with no page at all is passed over, and the pages above or below it are linked instead.",
         givePage: "Give it a page",
         extra: "Links the graph did not ask for",
         satisfied: "in place",

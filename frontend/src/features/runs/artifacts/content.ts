@@ -18,6 +18,12 @@ export function judgeView(held: unknown): JudgeView | null {
     return { score, issues: stringsAt(held, "issues"), suggestions: stringsAt(held, "suggestions") };
 }
 
+export interface ProductEditView {
+    shortWritten: boolean;
+    added: readonly string[];
+    imageSet: boolean;
+}
+
 export interface PublishView {
     url: string;
     status: string;
@@ -27,10 +33,20 @@ export interface PublishView {
     seoApplied: readonly string[];
     skipped: readonly string[];
     findings: readonly Finding[];
+    product: ProductEditView | null;
+}
+
+function productEditOf(held: unknown): ProductEditView | null {
+    if (record(held) === null) {
+        return null;
+    }
+    const image = numberAt(held, "imageId");
+    return { shortWritten: boolAt(held, "shortWritten"), added: stringsAt(held, "added"), imageSet: image !== null && image !== 0 };
 }
 
 export function publishView(held: unknown): PublishView | null {
-    if (record(held) === null) {
+    const root = record(held);
+    if (root === null) {
         return null;
     }
     return {
@@ -42,6 +58,46 @@ export function publishView(held: unknown): PublishView | null {
         seoApplied: stringsAt(held, "seoApplied"),
         skipped: stringsAt(held, "skipped"),
         findings: findingsAt(held, "findings"),
+        product: productEditOf(root["previousProduct"]),
+    };
+}
+
+export interface RevertNeighbourView {
+    pageId: string;
+    path: string;
+    outcome: string;
+    detail: string;
+}
+
+export interface RevertView {
+    path: string;
+    outcome: string;
+    detail: string;
+    neighbours: readonly RevertNeighbourView[];
+    findings: readonly Finding[];
+}
+
+export function revertView(held: unknown): RevertView | null {
+    if (record(held) === null) {
+        return null;
+    }
+    const neighbours: RevertNeighbourView[] = [];
+    for (const entry of listAt(held, "neighbors")) {
+        if (record(entry) !== null) {
+            neighbours.push({
+                pageId: stringAt(entry, "pageId"),
+                path: stringAt(entry, "path"),
+                outcome: stringAt(entry, "outcome"),
+                detail: stringAt(entry, "detail"),
+            });
+        }
+    }
+    return {
+        path: stringAt(held, "path"),
+        outcome: stringAt(held, "outcome"),
+        detail: stringAt(held, "detail"),
+        neighbours,
+        findings: findingsAt(held, "findings"),
     };
 }
 
@@ -50,15 +106,40 @@ export interface DraftSectionView {
     html: string;
 }
 
+export interface DraftSpecificationView {
+    name: string;
+    value: string;
+}
+
+export interface DraftProductView {
+    shortDescription: string;
+    specifications: readonly DraftSpecificationView[];
+}
+
 export interface DraftView {
     title: string;
     h1: string;
     summary: string;
     sections: readonly DraftSectionView[];
+    product: DraftProductView | null;
+}
+
+function draftProductOf(held: unknown): DraftProductView | null {
+    if (record(held) === null) {
+        return null;
+    }
+    const specifications: DraftSpecificationView[] = [];
+    for (const entry of listAt(held, "specifications")) {
+        if (record(entry) !== null) {
+            specifications.push({ name: stringAt(entry, "name"), value: stringAt(entry, "value") });
+        }
+    }
+    return { shortDescription: stringAt(held, "shortDescription"), specifications };
 }
 
 export function draftView(held: unknown): DraftView | null {
-    if (record(held) === null) {
+    const root = record(held);
+    if (root === null) {
         return null;
     }
     const sections: DraftSectionView[] = [];
@@ -72,6 +153,7 @@ export function draftView(held: unknown): DraftView | null {
         h1: stringAt(held, "h1"),
         summary: stringAt(held, "summary"),
         sections,
+        product: draftProductOf(root["product"]),
     };
 }
 
@@ -176,6 +258,7 @@ export interface SyncView {
     wpId: number | null;
     links: number | null;
     modifiedAt: string;
+    findings: readonly Finding[];
 }
 
 export function syncView(held: unknown): SyncView | null {
@@ -190,6 +273,7 @@ export function syncView(held: unknown): SyncView | null {
         wpId: numberAt(held, "wpId"),
         links: numberAt(held, "links"),
         modifiedAt: stringAt(held, "modifiedAt"),
+        findings: findingsAt(held, "findings"),
     };
 }
 

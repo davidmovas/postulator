@@ -1,3 +1,19 @@
+const effortLabels = {
+    none: "None",
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    xhigh: "Highest",
+};
+
+const tierLabels = {
+    standard: "Standard",
+    flex: "Flex, half price",
+};
+
+const flexHelp =
+    "Standard answers at once. Flex is half price but may take minutes longer, and a flex call that has not answered in time is sent again at the standard price.";
+
 export const settings = {
     title: "Settings",
     tabs: {
@@ -24,6 +40,7 @@ export const settings = {
         bytes: "bytes",
     },
     sections: {
+        reasoning: "Reasoning and speed",
         modelCalls: "Model calls",
         endpoints: "Endpoints",
         images: "Images",
@@ -67,6 +84,20 @@ export const settings = {
             high: "High",
             auto: "Let OpenAI choose",
         },
+        "llm.effort.writer": effortLabels,
+        "llm.effort.editor": effortLabels,
+        "llm.effort.linker": effortLabels,
+        "llm.effort.judge": effortLabels,
+        "llm.effort.titler": effortLabels,
+        "llm.tier.writer": tierLabels,
+        "llm.tier.editor": tierLabels,
+        "llm.tier.linker": tierLabels,
+        "llm.tier.judge": tierLabels,
+        "llm.tier.titler": tierLabels,
+        "agent.toolLoading": {
+            all: "All tools every round",
+            deferred: "Load tools on demand",
+        },
     },
     keys: {
         "agent.historyBudgetChars": {
@@ -84,6 +115,10 @@ export const settings = {
         "agent.maxToolResultBytes": {
             label: "Largest tool answer read",
             help: "A longer answer from a tool is cut before the agent reads it.",
+        },
+        "agent.toolLoading": {
+            label: "Tool loading",
+            help: "All tools every round is the default. Loading tools on demand sends fewer tokens per round; it stays experimental until it has been tested with your key.",
         },
         "agent.turnTimeout": {
             label: "Time limit for one answer",
@@ -109,25 +144,33 @@ export const settings = {
             label: "Largest spreadsheet accepted",
             help: "A spreadsheet with more rows than this is refused rather than half read.",
         },
-        "llm.anthropic.baseUrl": {
-            label: "Anthropic endpoint",
-            help: "An http or https address. Empty means Anthropic's own endpoint.",
+        "llm.effort.editor": {
+            label: "Reasoning when editing",
+            help: "How long the model thinks before it writes a page's search title and description or proposes entities for the graph. Low is usually enough; more costs more.",
         },
-        "llm.gemini.location": {
-            label: "Google Cloud region",
-            help: "The Vertex AI region, for example europe-west4.",
+        "llm.effort.judge": {
+            label: "Reasoning when judging quality",
+            help: "How long the model thinks before it scores a page. More reasoning judges more carefully and costs more.",
         },
-        "llm.gemini.projectId": {
-            label: "Google Cloud project",
-            help: "The project Vertex AI bills.",
+        "llm.effort.linker": {
+            label: "Reasoning when placing links",
+            help: "How long the model thinks before it writes a sentence that carries a link. Low is usually enough; more costs more.",
         },
-        "llm.geminiOpenai.baseUrl": {
-            label: "Gemini endpoint",
-            help: "An http or https address for the OpenAI-compatible Gemini surface.",
+        "llm.effort.titler": {
+            label: "Reasoning when titling a chat",
+            help: "How long the model thinks before it names a conversation. None is enough for a short title.",
+        },
+        "llm.effort.writer": {
+            label: "Reasoning when writing the body",
+            help: "How long the model thinks before it writes a page. More reasoning writes more carefully and costs more, because thinking is paid for like written text. None writes straight away.",
+        },
+        "llm.flexPatience": {
+            label: "Longest wait for a flex answer",
+            help: "How long a flex call may go unanswered before it is sent again at the standard price. Takes effect after a restart.",
         },
         "llm.openai.baseUrl": {
             label: "OpenAI endpoint",
-            help: "An http or https address. Empty means OpenAI's own endpoint.",
+            help: "An http or https address. Empty means OpenAI's own endpoint. Takes effect after a restart.",
         },
         "llm.recordReplayMode": {
             label: "Record and replay model calls",
@@ -137,9 +180,29 @@ export const settings = {
             label: "Retries after a failed call",
             help: "How many times a failed model call is tried again before the step fails.",
         },
+        "llm.tier.editor": {
+            label: "Speed when editing",
+            help: flexHelp,
+        },
+        "llm.tier.judge": {
+            label: "Speed when judging quality",
+            help: flexHelp,
+        },
+        "llm.tier.linker": {
+            label: "Speed when placing links",
+            help: flexHelp,
+        },
+        "llm.tier.titler": {
+            label: "Speed when titling a chat",
+            help: flexHelp,
+        },
+        "llm.tier.writer": {
+            label: "Speed when writing the body",
+            help: "Flex is half price but may take minutes longer to write a page. A flex call that has not answered in time is sent again at the standard price.",
+        },
         "llm.timeout": {
             label: "Time limit for one model call",
-            help: "A model call that takes longer than this is abandoned.",
+            help: "A model call that takes longer than this is abandoned. Takes effect after a restart.",
         },
         "runs.artifactRetentionDays": {
             label: "Keep drafts and images for",
@@ -201,9 +264,6 @@ export const settings = {
     models: {
         providers: {
             openai: "OpenAI",
-            anthropic: "Anthropic",
-            gemini: "Google Gemini",
-            "gemini-openai": "Gemini over the OpenAI API",
         },
         keys: {
             title: "Provider keys",
@@ -247,15 +307,15 @@ export const settings = {
             subtitle: (count: number) => `${count} models a role can be pointed at.`,
             close: "Done",
             model: "Model",
-            context: "Context",
-            maxOutput: "Max out",
-            inputPrice: "In $/M",
-            outputPrice: "Out $/M",
-            rpm: "RPM",
-            tpm: "TPM",
+            standardPrice: "Standard $/M",
+            standardOrder: "Dollars per million tokens: input · cached input · output",
+            flexPrice: "Flex $/M",
+            flexOrder: "Dollars per million tokens on the half-price flex tier: input · output",
+            noFlex: "None",
             structured: "JSON",
             images: "Images",
             reasoning: "Reasoning",
+            reasoningHint: "How long it thinks is chosen per job under Reasoning and speed.",
             add: "Add a model",
             edit: "Edit",
             disable: "Disable",
@@ -264,33 +324,125 @@ export const settings = {
             disableTitle: (model: string) => `Disable ${model}`,
             disableBody:
                 "The model stops being offered to every role. Bringing it back means adding it again with the same numbers.",
+            providerFixed: "OpenAI",
+            modelHint: "The name OpenAI answers to, such as gpt-5.6-terra.",
+            sections: {
+                standard: "Standard price, $ per million tokens",
+                flex: "Flex price, $ per million tokens",
+            },
+            standardHelp: "Leave cached input or cache write empty and they are charged as input.",
+            flexHelp: "Flex: half-price tier used for page writing; leave empty if the model has none.",
             field: {
                 provider: "Provider",
                 model: "Model",
                 contextTokens: "Context tokens",
                 maxOutputTokens: "Max output tokens",
-                inputUsdPerM: "Input $ per million",
-                outputUsdPerM: "Output $ per million",
                 rpm: "Requests per minute",
                 tpm: "Tokens per minute",
-                effort: "Reasoning effort",
-            },
-            effortHint: "How long the model may think before it answers. Its output budget is raised to match.",
-            effortDefault: "The provider decides",
-            effortLabels: {
-                none: "None",
-                low: "Low",
-                medium: "Medium",
-                high: "High",
-                xhigh: "Highest",
+                inputUsdPerM: "Input",
+                cachedInputUsdPerM: "Cached input",
+                cacheWriteUsdPerM: "Cache write",
+                outputUsdPerM: "Output",
+                flexInputUsdPerM: "Flex input",
+                flexCachedInputUsdPerM: "Flex cached input",
+                flexCacheWriteUsdPerM: "Flex cache write",
+                flexOutputUsdPerM: "Flex output",
             },
         },
         spend: {
             title: "Spent on models",
-            calls: (count: number) => (count === 1 ? "1 call" : `${count} calls`),
-            tokens: (total: string) => `${total} tokens`,
-            cached: (percent: number) => `${percent}% cached`,
-            cachedHint: "How much of what was sent to the models the providers served from their own cache, at a lower rate.",
+            range: "Period",
+            days: (days: number) => `${days} days`,
+            over: (days: number) => `in the last ${days} days`,
+            loading: "Adding up what the models cost",
+            calls: (count: number) => (count === 1 ? "1 call" : `${count.toLocaleString("en")} calls`),
+            failed: (count: number) => `${count.toLocaleString("en")} failed`,
+            nothing: (days: number) => `Nothing was spent on models in the last ${days} days.`,
+            nothingHint: "A run, the assistant or a provider test shows up here as soon as it calls a model.",
+            shares: {
+                cached: {
+                    label: "Cached",
+                    note: "of what was sent was read from the provider's cache, which costs less",
+                },
+                reasoning: {
+                    label: "Reasoning",
+                    note: "of what the models wrote was thinking, which is billed like written text",
+                },
+                flex: {
+                    label: "Flex",
+                    note: "of the money went to the half-price flex tier",
+                },
+            },
+            purposes: {
+                run: "Page runs",
+                chat: "Assistant",
+                title: "Titles",
+                probe: "Provider test",
+                graph: "Entity proposals",
+                audit: "Page audits",
+                other: "Other",
+            },
+            tiers: {
+                default: "Standard",
+                flex: "Flex",
+            },
+            byPurpose: {
+                title: "By purpose",
+                purpose: "Spent on",
+                calls: "Calls",
+                failed: "Failed",
+                spent: "Spent",
+                share: "Share",
+            },
+            byModel: {
+                title: "By model",
+                model: "Model",
+                tier: "Tier",
+                calls: "Calls",
+                input: "Input",
+                cached: "Cached",
+                output: "Output",
+                reasoning: "Reasoning",
+                spent: "Spent",
+                note: "Counted in tokens. Cached is the part of the input read from the cache; reasoning is the part of the output the model spent thinking.",
+            },
+            recent: {
+                title: "Recent calls",
+                when: "When",
+                what: "For",
+                model: "Model",
+                tier: "Tier",
+                tokens: "Tokens",
+                spent: "Spent",
+                loading: "Reading the latest calls",
+                empty: "No model has been called yet.",
+                failed: "Failed",
+                flow: (input: string, output: string) => `${input} in · ${output} out`,
+                inside: (cached: string, reasoning: string) =>
+                    `${cached} of the input came from the cache; ${reasoning} of the output was reasoning.`,
+                proposals: {
+                    propose_from_pages: "From pages",
+                    propose_from_keywords: "From keywords",
+                    propose_related: "Related entities",
+                },
+            },
+            failures: {
+                NOT_FOUND: "The provider has no such model. Choose another one for this job above.",
+                CONFLICT: "Something else changed first, so the answer was set aside.",
+                INVALID:
+                    "The provider refused the request as written: the prompt may not fit the model, or the answer ran out of room.",
+                UNAUTHORIZED:
+                    "The provider refused the key, or the key may not use this model. Set the key again under Provider keys.",
+                RATE_LIMITED: "The provider asked to slow down. Postulator waits and tries again on its own.",
+                BUDGET_EXCEEDED: "The run had reached its budget cap. Raise the cap to let it carry on.",
+                EXTERNAL: "The provider did not answer, or answered with an error of its own. Postulator tries again on its own.",
+                INTERNAL: "Something went wrong inside Postulator. The details are in errors.log.",
+                CANCELLED: "Stopped before the answer arrived, because the work was stopped or ran out of time.",
+                NEEDS_HUMAN:
+                    "The provider account is out of credit or over its spending limit. Add credit or raise the limit in the provider's billing settings, then try again.",
+                LOCKED: "Postulator was locked while the call was running.",
+            },
+            failedUnknown: "The call failed.",
         },
     },
     browser: {

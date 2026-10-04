@@ -112,6 +112,20 @@ func (d *Document) Render() (string, error) {
 	return builder.String(), nil
 }
 
+func (d *Document) RenderWithoutHeadingOne() (string, error) {
+	var builder strings.Builder
+	child := d.root.FirstChild
+	if child != nil && child.Type == html.ElementNode && child.Data == "h1" {
+		child = child.NextSibling
+	}
+	for ; child != nil; child = child.NextSibling {
+		if err := html.Render(&builder, child); err != nil {
+			return "", errors.Wrap(err, errors.Internal, "render the body back to html")
+		}
+	}
+	return builder.String(), nil
+}
+
 func (d *Document) Text() string {
 	return TextOf(d.root)
 }

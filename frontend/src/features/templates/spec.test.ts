@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { JsonObject } from "../../domain/merge-patch.js";
 import { stepNames } from "../../generated/vocab.js";
 import type { SpecDraft } from "./spec.js";
-import { draftFromJson, imageStep, moved, readyForImages, specJsonOf } from "./spec.js";
+import { draftFromJson, emptyProduct, imageStep, moved, readyForImages, specJsonOf } from "./spec.js";
 
 const hub: JsonObject = {
     sections: [
@@ -57,6 +57,35 @@ describe("template spec drafts", () => {
         expect(draft.profiles).toStrictEqual([]);
     });
 
+    it("reads how many keywords the body must use, and every one when the spec does not say", () => {
+        expect(draftFromJson(hub).requiredKeywords).toBeNull();
+
+        const counted = { ...hub, keywordRules: { primaryInTitle: true, maxDensity: 0.025, requiredKeywords: 3 } };
+        expect(draftFromJson(counted).requiredKeywords).toBe(3);
+
+        const none = { ...hub, keywordRules: { primaryInTitle: true, maxDensity: 0.025, requiredKeywords: 0 } };
+        expect(draftFromJson(none).requiredKeywords).toBe(0);
+    });
+
+    it("writes the keyword count only when the template sets one", () => {
+        const every = specJsonOf(draftFromJson(hub));
+        expect(every["keywordRules"]).toStrictEqual({
+            primaryInTitle: true,
+            primaryInH1: true,
+            primaryInFirstParagraph: true,
+            maxDensity: 0.025,
+        });
+
+        const counted = specJsonOf({ ...draftFromJson(hub), requiredKeywords: 2 });
+        expect(counted["keywordRules"]).toStrictEqual({
+            primaryInTitle: true,
+            primaryInH1: true,
+            primaryInFirstParagraph: true,
+            maxDensity: 0.025,
+            requiredKeywords: 2,
+        });
+    });
+
     it("lists the recipe in pipeline order with the declared steps switched on", () => {
         const draft = draftFromJson(hub);
         expect(draft.recipe.map((step) => step.name)).toStrictEqual([...stepNames]);
@@ -78,6 +107,38 @@ describe("template spec drafts", () => {
 
     it("rebuilds the same document it read", () => {
         expect(specJsonOf(draftFromJson(hub))).toStrictEqual(hub);
+    });
+
+    it("reads the product outputs, rebuilds them, and writes none where the spec had none", () => {
+        const product: JsonObject = {
+            shortDescription: { enabled: true, intent: "Say what it is", targetWords: 40, primaryKeyword: true },
+            specifications: [{ name: "Form", intent: "As the notes say" }],
+        };
+        const withProduct = { ...hub, product };
+        const draft = draftFromJson(withProduct);
+        expect(draft.product).toStrictEqual({
+            shortEnabled: true,
+            shortIntent: "Say what it is",
+            shortWords: 40,
+            shortKeyword: true,
+            specifications: [{ name: "Form", intent: "As the notes say" }],
+        });
+        expect(specJsonOf(draft)).toStrictEqual(withProduct);
+        expect(draftFromJson(hub).product).toBeNull();
+        expect("product" in specJsonOf(draftFromJson(hub))).toBe(false);
+    });
+
+    it("reads a product block that says only part of itself", () => {
+        const draft = draftFromJson({ ...hub, product: { specifications: [{ name: "Size" }, "not a row"] } });
+        expect(draft.product).toStrictEqual({
+            shortEnabled: false,
+            shortIntent: "",
+            shortWords: 0,
+            shortKeyword: false,
+            specifications: [{ name: "Size", intent: "" }],
+        });
+        expect(emptyProduct().shortEnabled).toBe(true);
+        expect(emptyProduct().specifications).toStrictEqual([]);
     });
 
     it("keeps the params a step carries when the step is switched off", () => {
@@ -118,8 +179,8 @@ describe("template spec drafts", () => {
             ...hub,
             modelProfiles: {
                 narrator: { provider: "openai", model: "gpt" },
-                editor: { provider: "anthropic", model: "sonnet" },
-                writer: { provider: "anthropic", model: "opus" },
+                editor: { provider: "openai", model: "gpt-5.6-luna" },
+                writer: { provider: "openai", model: "gpt-5.6-terra" },
             },
         });
         expect(draft.profiles.map((profile) => profile.role)).toStrictEqual(["writer", "editor", "narrator"]);

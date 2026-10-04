@@ -42,6 +42,7 @@ function keywordSentences(after: SpecDraft, held: JsonValue | undefined): string
         "primaryInH1",
         "primaryInFirstParagraph",
         "maxDensity",
+        "requiredKeywords",
     ])) {
         if (key === "primaryInTitle") {
             out.push(said.primaryInTitle(after.primaryInTitle));
@@ -49,6 +50,8 @@ function keywordSentences(after: SpecDraft, held: JsonValue | undefined): string
             out.push(said.primaryInH1(after.primaryInH1));
         } else if (key === "primaryInFirstParagraph") {
             out.push(said.primaryInFirstParagraph(after.primaryInFirstParagraph));
+        } else if (key === "requiredKeywords") {
+            out.push(said.requiredKeywords(after.requiredKeywords));
         } else {
             out.push(said.maxDensity(percent(after.maxDensity)));
         }
@@ -165,6 +168,22 @@ function paramSentences(base: SpecDraft, after: SpecDraft): string[] {
     return out;
 }
 
+function productSentences(after: SpecDraft): string[] {
+    const product = after.product;
+    if (product === null) {
+        return [said.productNone];
+    }
+    const parts: string[] = [];
+    if (product.shortEnabled) {
+        parts.push(product.shortWords > 0 ? said.productShortWords(product.shortWords) : said.productShort);
+    }
+    const names = product.specifications.map((row) => (row.name === "" ? copy.templates.product.unnamed : row.name));
+    if (names.length > 0) {
+        parts.push(said.productFills(joined(names)));
+    }
+    return parts.length === 0 ? [said.productNothing] : [parts.join(" and ")];
+}
+
 function sectionSentences(after: SpecDraft): string[] {
     if (after.sections.length === 0) {
         return [said.sectionsNone];
@@ -201,6 +220,8 @@ export function sentencesOf(base: SpecDraft, patch: JsonObject | null): string[]
             out.push(...profileSentences(after, held));
         } else if (key === "recipe") {
             out.push(...recipeSentences(base, after));
+        } else if (key === "product") {
+            out.push(...productSentences(after));
         } else {
             out.push(said.other(key));
         }

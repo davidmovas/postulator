@@ -4,7 +4,6 @@ import { useState } from "react";
 import { copy } from "../../../copy/index.js";
 import { useDisableModel, useModelCatalog } from "../../../data/hooks/models.js";
 import type { CatalogModel } from "../../../data/types.js";
-import { usd } from "../../../domain/format.js";
 import {
     AddIcon,
     Button,
@@ -22,7 +21,26 @@ import { ModelForm } from "./catalog-form.js";
 
 const said = copy.settings.models.catalog;
 
-type Pane = { kind: "list" } | { kind: "form"; editing: CatalogModel | null };
+const perMillion = new Intl.NumberFormat("en", { maximumFractionDigits: 3 });
+
+function rates(...prices: readonly number[]): string {
+    return prices.map((price) => perMillion.format(price)).join(" · ");
+}
+
+function offersFlex(model: CatalogModel): boolean {
+    return model.flexInputUsdPerM > 0;
+}
+
+function standardOf(model: CatalogModel): string {
+    const cached = model.cachedInputUsdPerM > 0 ? model.cachedInputUsdPerM : model.inputUsdPerM;
+    return rates(model.inputUsdPerM, cached, model.outputUsdPerM);
+}
+
+function flexOf(model: CatalogModel): string {
+    return offersFlex(model) ? rates(model.flexInputUsdPerM, model.flexOutputUsdPerM) : said.noFlex;
+}
+
+type Pane ={ kind: "list" } | { kind: "form"; editing: CatalogModel | null };
 
 export interface CatalogDrawerProps {
     onClose: () => void;
@@ -90,22 +108,26 @@ export function CatalogDrawer({ onClose }: CatalogDrawerProps): ReactElement {
                     />
                 </div>
             ) : (
-                <DenseTable columns="minmax(10rem,1fr) 4.5rem 4.5rem 4rem 7rem" label={said.title}>
+                <DenseTable columns="minmax(8rem,1fr) 9.5rem 6.5rem 3.5rem 7rem" label={said.title}>
                     <TableHead>
                         <TableCell>{said.model}</TableCell>
-                        <TableCell align="right">{said.inputPrice}</TableCell>
-                        <TableCell align="right">{said.outputPrice}</TableCell>
+                        <TableCell align="right" title={said.standardOrder}>
+                            {said.standardPrice}
+                        </TableCell>
+                        <TableCell align="right" title={said.flexOrder}>
+                            {said.flexPrice}
+                        </TableCell>
                         <TableCell align="right">{said.images}</TableCell>
                         <TableCell align="right">{copy.app.actions}</TableCell>
                     </TableHead>
                     {models.map((model) => (
                         <TableRow key={`${model.provider}/${model.model}`}>
-                            <TableCell mono={true}>{`${model.provider}/${model.model}`}</TableCell>
-                            <TableCell align="right" mono={true}>
-                                {usd(model.inputUsdPerM)}
+                            <TableCell mono={true}>{model.model}</TableCell>
+                            <TableCell align="right" mono={true} title={said.standardOrder}>
+                                {standardOf(model)}
                             </TableCell>
-                            <TableCell align="right" mono={true}>
-                                {usd(model.outputUsdPerM)}
+                            <TableCell align="right" mono={true} muted={!offersFlex(model)} title={said.flexOrder}>
+                                {flexOf(model)}
                             </TableCell>
                             <TableCell align="right">
                                 {model.supportsImages ? <CheckIcon size={14} /> : null}
@@ -144,7 +166,7 @@ export function CatalogDrawer({ onClose }: CatalogDrawerProps): ReactElement {
                         setDisabling(null);
                     }
                 }}
-                title={disabling === null ? "" : said.disableTitle(`${disabling.provider}/${disabling.model}`)}
+                title={disabling === null ? "" : said.disableTitle(disabling.model)}
                 description={said.disableBody}
                 confirmLabel={said.disable}
                 cancelLabel={copy.app.cancel}

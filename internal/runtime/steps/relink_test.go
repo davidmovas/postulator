@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -187,7 +188,7 @@ func TestRelinkNamesALinkItCouldNotPlace(t *testing.T) {
 		`<a href="/coffee/filter/">filter</a> range.</p>`
 	deps, server, _, wpID := relinkDeps(t, body)
 	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
-		ID: "filter", SiteID: "site", Name: "Filter", PrimaryKeyword: "filter",
+		ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 		Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
 		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 	})}
@@ -334,6 +335,67 @@ func TestRelinkSkipsWithoutThePlugin(t *testing.T) {
 	}
 }
 
+func TestRelinkLeavesAProductCategoryAndThePostThatSharesItsNumberAlone(t *testing.T) {
+	t.Parallel()
+
+	deps, server, _, wpID := relinkDeps(t, parentBody)
+	neighbors := relinkPages(wpID)
+	neighbors[0].WPType = pagemap.WPProductCategory
+	deps.Pages = pageList{items: neighbors}
+	server.ResetRequests()
+
+	relinked := runRelink(t, deps)
+	if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != steps.OutcomeSkipped {
+		t.Fatalf("relinked = %+v", relinked)
+	}
+	if relinked.Neighbors[0].Detail != steps.ReasonNeighborIsATerm {
+		t.Errorf("detail = %q, want %q", relinked.Neighbors[0].Detail, steps.ReasonNeighborIsATerm)
+	}
+	for _, request := range server.Requests() {
+		if strings.Contains(request.Path, "/raw") {
+			t.Errorf("the step asked %s %s of the post that shares the category's number", request.Method, request.Path)
+		}
+	}
+	if stored, _ := server.Lookup(wpID); stored.Content != parentBody {
+		t.Errorf("the page that shares the number holds %q", stored.Content)
+	}
+}
+
+func TestRelinkWritesTheLinkIntoANeighborProductsDescription(t *testing.T) {
+	t.Parallel()
+
+	const description = `<p>We roast every espresso blend we sell.</p>`
+	deps, server := imageDeps(t)
+	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Coffee", Content: description, RegularPrice: "12"})[0]
+	neighbors := relinkPages(product.ID)
+	neighbors[0].WPType = pagemap.WPProduct
+	deps.Links = &linkRecorder{}
+	deps.Pages = pageList{items: neighbors}
+
+	relinked := runRelink(t, deps)
+	if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != steps.OutcomeLinked ||
+		relinked.Neighbors[0].Type != string(pagemap.WPProduct) {
+		t.Fatalf("relinked = %+v, want the product's description linked", relinked)
+	}
+	stored, _ := server.Lookup(product.ID)
+	if !strings.Contains(stored.Content, `<a href="/coffee/espresso/">espresso</a>`) {
+		t.Errorf("the product holds %q", stored.Content)
+	}
+	if stored.Title != "Coffee" || stored.RegularPrice != "12" || stored.Status != "publish" {
+		t.Errorf("the relink moved the store's own fields: %+v", stored)
+	}
+}
+
+func TestRelinkRecordsWhatKindOfItemItWrote(t *testing.T) {
+	t.Parallel()
+
+	deps, _, _, _ := relinkDeps(t, parentBody)
+	relinked := runRelink(t, deps)
+	if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Type != string(pagemap.WPPage) {
+		t.Fatalf("relinked = %+v, want the neighbor's type recorded for the revert", relinked)
+	}
+}
+
 func TestRelinkAsksWhatTheNeighborsOwnRulesAllow(t *testing.T) {
 	t.Parallel()
 
@@ -408,7 +470,7 @@ func TestRelinkSpendsTheNeighborsOwnBudget(t *testing.T) {
 
 			deps, server, _, wpID := relinkDeps(t, body)
 			deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
-				ID: "filter", SiteID: "site", Name: "Filter", PrimaryKeyword: "filter",
+				ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 				Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
 				Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 			})}

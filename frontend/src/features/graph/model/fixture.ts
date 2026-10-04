@@ -9,6 +9,7 @@ export interface EntitySeed {
     source?: string;
     primaryKeyword?: string;
     secondaryKeywords?: string[];
+    scope?: string;
 }
 
 export function entity(seed: EntitySeed): Entity {
@@ -18,9 +19,9 @@ export function entity(seed: EntitySeed): Entity {
         name: seed.name,
         kind: seed.kind ?? "topic",
         intent: "",
-        primaryKeyword: seed.primaryKeyword ?? seed.name.toLowerCase(),
-        secondaryKeywords: seed.secondaryKeywords ?? [],
+        keywords: [seed.primaryKeyword ?? seed.name.toLowerCase(), ...(seed.secondaryKeywords ?? [])].map((text) => ({ text })),
         anchors: [{ text: seed.name, source: "user", weight: 1 }],
+        scopeEntityId: seed.scope ?? null,
         canonicalPageId: seed.page === false ? null : `page-${seed.id}`,
         score: seed.score ?? 0.5,
         source: seed.source ?? "user",

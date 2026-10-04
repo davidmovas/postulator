@@ -3,9 +3,12 @@ package agent_test
 import (
 	"context"
 	"encoding/json"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
@@ -112,20 +115,58 @@ func TestASecondMessageWaitsForTheTurnInFlight(t *testing.T) {
 	}
 }
 
-func TestADroppedEventIsNoted(t *testing.T) {
+type refusingDone struct {
+	bus *applicationtest.Recorder
+}
+
+func (r refusingDone) Publish(eventType events.Type, payload any) error {
+	if err := r.bus.Publish(eventType, payload); err != nil {
+		return err
+	}
+	if eventType == events.AgentDone {
+		return errors.New(errors.External, "no window is listening")
+	}
+	return nil
+}
+
+type droppedErrors struct {
+	mu   sync.Mutex
+	held []error
+}
+
+func (d *droppedErrors) add(err error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.held = append(d.held, err)
+}
+
+func (d *droppedErrors) codes() []errors.Code {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make([]errors.Code, 0, len(d.held))
+	for _, err := range d.held {
+		out = append(out, errors.CodeOf(err))
+	}
+	return out
+}
+
+func TestAnEventNoWindowTookReachesTheDroppedHook(t *testing.T) {
 	t.Parallel()
 
-	turns := agentapp.NewTurns(nil)
-	turns.Note(nil)
-	if len(turns.Dropped()) != 0 {
-		t.Fatal("nothing to note is noted as nothing")
-	}
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	bus := &applicationtest.Recorder{}
+	dropped := &droppedErrors{}
+	h := buildTuned(t, store, fake.New(), bus, func(deps *agentapp.Deps) {
+		deps.Publisher = refusingDone{bus: bus}
+		deps.Dropped = dropped.add
+	})
+	h.siteID = owner.ID
 
-	turns.Note(errors.New(errors.External, "no window is listening"))
-	if dropped := turns.Dropped(); len(dropped) != 1 {
-		t.Fatalf("the dropped events are %v", dropped)
-	}
-	turns.Close()
+	h.send(t, h.conversation(t, domainagent.ModeConfirm), "FAKE: hello")
+	waitFor(t, "the refused event to reach the hook", func() bool {
+		return slices.Contains(dropped.codes(), errors.External)
+	})
 }
 
 func TestAnActionThatMovedOnIsAConflict(t *testing.T) {

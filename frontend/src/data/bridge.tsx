@@ -86,6 +86,26 @@ function stepOnly(envelope: Envelope<EventType>): void {
     ingestLive(runIdOf(envelope), record(envelope));
 }
 
+function spendMoved(client: QueryClient, runId: string): void {
+    coalesce(
+        "spend",
+        () => {
+            invalidateAll(client, keys.models.spendRanges(), keys.models.callLists());
+        },
+        usageCoalesceMs,
+    );
+    if (runId === "") {
+        return;
+    }
+    coalesce(
+        `spend:${runId}`,
+        () => {
+            invalidate(client, keys.models.spendOfRun(runId));
+        },
+        usageCoalesceMs,
+    );
+}
+
 function handlersFor(client: QueryClient): Handlers {
     return {
         "run.queued": (envelope) => {
@@ -124,6 +144,7 @@ function handlersFor(client: QueryClient): Handlers {
         },
         "run.failed": (envelope) => {
             runLifecycle(client, envelope, keys.runs.itemsOf(runIdOf(envelope)));
+            spendMoved(client, runIdOf(envelope));
         },
         "run.budget_exceeded": (envelope) => {
             runLifecycle(client, envelope, keys.models.usageAll());
@@ -136,9 +157,11 @@ function handlersFor(client: QueryClient): Handlers {
         },
         "item.failed": (envelope) => {
             itemChanged(client, envelope, true);
+            spendMoved(client, runIdOf(envelope));
         },
         "item.needs_human": (envelope) => {
             itemChanged(client, envelope, true);
+            spendMoved(client, runIdOf(envelope));
         },
         "item.restarted": (envelope) => {
             itemChanged(client, envelope, true);
@@ -159,6 +182,7 @@ function handlersFor(client: QueryClient): Handlers {
                 },
                 usageCoalesceMs,
             );
+            spendMoved(client, runId);
         },
         "graph.changed": (envelope) => {
             const siteId = envelope.payload.siteId;
@@ -257,6 +281,7 @@ function handlersFor(client: QueryClient): Handlers {
                 keys.pages.root(),
                 keys.graph.root(),
             );
+            spendMoved(client, "");
         },
         "files.dropped": (envelope) => {
             publishDrop(envelope.payload.paths);

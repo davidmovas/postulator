@@ -20,7 +20,7 @@ import {
     TaskAltIcon,
 } from "../../ui/index.js";
 import { liveUrl } from "../pages/summary.js";
-import { kindLabel as entityKindLabel } from "../graph/labels.js";
+import { entityKindLabel } from "../graph/labels.js";
 import { reasonLabel, reasonTone } from "./labels.js";
 import type { CoverageRow } from "./model/site.js";
 

@@ -15,7 +15,8 @@ type CheckPluginRequest struct {
 }
 
 type CheckPluginResponse struct {
-	Plugin Plugin `json:"plugin"`
+	Plugin   Plugin `json:"plugin"`
+	Commerce string `json:"commerce"`
 }
 
 type PluginPackageRequest struct{}

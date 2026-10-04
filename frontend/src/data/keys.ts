@@ -6,6 +6,7 @@ import type {
     EdgeFilter,
     EntityFilter,
     MessageFilter,
+    ModelCallFilter,
     PageFilter,
     PendingActionFilter,
     PolicyFilter,
@@ -141,6 +142,13 @@ export const keys = {
         profiles: (siteId: string | undefined) => [scope, "models", "profiles", siteId ?? "global"] as const,
         usageAll: () => [scope, "models", "usage"] as const,
         usage: (usageScope: UsageScope) => [scope, "models", "usage", usageScope] as const,
+        spendAll: () => [scope, "models", "spend"] as const,
+        spendRanges: () => [scope, "models", "spend", "days"] as const,
+        spendOver: (days: number) => [scope, "models", "spend", "days", days] as const,
+        spendOfRun: (runId: string) => [scope, "models", "spend", "run", runId] as const,
+        callLists: () => [scope, "models", "calls"] as const,
+        calls: (filter: ModelCallFilter, limit?: number) =>
+            [scope, "models", "calls", filter, limitSegment(limit)] as const,
     },
     reports: {
         root: () => [scope, "reports"] as const,

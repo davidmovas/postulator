@@ -96,6 +96,23 @@ func (p *stubProfiles) Resolve(context.Context, string, llm.Role, map[llm.Role]l
 	return p.ref, p.err
 }
 
+type stubTuning struct {
+	efforts map[llm.Role]llm.ReasoningEffort
+	tiers   map[llm.Role]llm.ServiceTier
+}
+
+func newStubTuning() *stubTuning {
+	return &stubTuning{efforts: map[llm.Role]llm.ReasoningEffort{}, tiers: map[llm.Role]llm.ServiceTier{}}
+}
+
+func (s *stubTuning) Effort(role llm.Role) llm.ReasoningEffort {
+	return s.efforts[role]
+}
+
+func (s *stubTuning) Tier(role llm.Role) llm.ServiceTier {
+	return s.tiers[role]
+}
+
 type record struct {
 	payload   any
 	runID     string
@@ -139,6 +156,24 @@ func (r *recorder) payloads(eventType events.Type) []any {
 	return out
 }
 
+func (r *recorder) deliveredThrough(runID string, last int64) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	seen := make(map[int64]bool, len(r.rows))
+	for _, row := range r.rows {
+		if row.runID == runID {
+			seen[row.seq] = true
+		}
+	}
+	for seq := int64(1); seq <= last; seq++ {
+		if !seen[seq] {
+			return false
+		}
+	}
+	return true
+}
+
 func (r *recorder) count(eventType events.Type) int {
 	total := 0
 	for _, seen := range r.types() {
@@ -161,6 +196,7 @@ type harness struct {
 	keys        *stubKeys
 	catalog     *stubCatalog
 	profiles    *stubProfiles
+	tuning      *stubTuning
 	spend       *stubSpend
 	bus         *recorder
 	pages       []string
@@ -201,6 +237,7 @@ func newHarness(t *testing.T, targets int) *harness {
 		keys:     &stubKeys{},
 		catalog:  &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
 		profiles: &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
+		tuning:   newStubTuning(),
 		spend:    &stubSpend{},
 		bus:      &recorder{},
 		pages:    pages,
@@ -237,6 +274,7 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 		Spend:      h.spend,
 		Catalog:    h.catalog,
 		Profiles:   h.profiles,
+		Tuning:     h.tuning,
 		UnitOfWork: h.store,
 		Publisher:  h.bus,
 	}, registry, runtime.Config{
@@ -266,6 +304,7 @@ func (h *harness) waitForRun(t *testing.T, runID string, want run.Status) run.Ru
 		if err == nil {
 			last = record
 			if record.Status == want {
+				h.waitForDelivery(t, runID)
 				return record
 			}
 		}
@@ -274,6 +313,15 @@ func (h *harness) waitForRun(t *testing.T, runID string, want run.Status) run.Ru
 	t.Fatalf("timed out waiting for run %s to reach %s; it is %s (%q, %q)",
 		runID, want, last.Status, last.PauseReason, last.Error)
 	return last
+}
+
+func (h *harness) waitForDelivery(t *testing.T, runID string) {
+	t.Helper()
+
+	waitFor(t, "every event the run recorded to be delivered live", func() bool {
+		stored, err := h.log.List(t.Context(), runID, 0, 1000)
+		return err == nil && len(stored) > 0 && h.bus.deliveredThrough(runID, stored[len(stored)-1].Seq)
+	})
 }
 
 func waitFor(t *testing.T, what string, done func() bool) {

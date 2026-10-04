@@ -2,12 +2,14 @@ package sqlite_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -15,10 +17,12 @@ import (
 
 func fullEntity(siteID, name string, at time.Time) graph.Entity {
 	return graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Intent: "informational", PrimaryKeyword: name + " keyword",
-		SecondaryKeywords: []string{name + " one", name + " two"},
-		Anchors:           []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}, {Text: "best " + name, Source: graph.AnchorAI, Weight: 0.4}},
-		Score:             0.5, Source: graph.SourceImport, CreatedAt: at, UpdatedAt: at,
+		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Intent: "informational",
+		Keywords: keyword.New([]keyword.Keyword{
+			{Text: name + " keyword", Volume: new(12000)}, {Text: name + " one", Volume: new(0)}, {Text: name + " two"},
+		}),
+		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}, {Text: "best " + name, Source: graph.AnchorAI, Weight: 0.4}},
+		Score:   0.5, Source: graph.SourceImport, CreatedAt: at, UpdatedAt: at,
 	}
 }
 
@@ -60,7 +64,7 @@ func TestEntityRepoRoundTrip(t *testing.T) {
 
 	want.Name = "Running Shoes"
 	want.Anchors = []graph.Anchor{{Text: "running shoes", Source: graph.AnchorUser, Weight: 0.9}}
-	want.SecondaryKeywords = []string{}
+	want.Keywords = keyword.Of()
 	want.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
 	if err = repo.Update(t.Context(), want); err != nil {
 		t.Fatalf("Update: %v", err)
@@ -105,6 +109,121 @@ func TestEntityRepoRoundTrip(t *testing.T) {
 	}
 	if _, err = repo.Get(t.Context(), want.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("Get missing code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
+func TestEntityRepoKeepsANameUniqueUnderItsParent(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewEntityRepo(store)
+	insert := func(name string, scope *string) graph.Entity {
+		t.Helper()
+		record := fullEntity(owner.ID, name, sqlitetest.Stamp)
+		record.ScopeID = scope
+		if err := repo.Insert(t.Context(), record); err != nil {
+			t.Fatalf("Insert %s: %v", name, err)
+		}
+		return record
+	}
+
+	bpc := insert("BPC-157", nil)
+	tb := insert("TB-500", nil)
+	liquid := insert("Liquid", &bpc.ID)
+	insert("Liquid", &tb.ID)
+
+	got, err := repo.Get(t.Context(), liquid.ID)
+	if err != nil || got.ScopeID == nil || *got.ScopeID != bpc.ID {
+		t.Fatalf("Get = %+v, %v; want the scope kept", got, err)
+	}
+
+	twin := fullEntity(owner.ID, "liquid", sqlitetest.Stamp)
+	twin.ScopeID = &bpc.ID
+	err = repo.Insert(t.Context(), twin)
+	if !errors.IsCode(err, errors.Conflict) {
+		t.Fatalf("the same name twice under one parent = %v, want CONFLICT", err)
+	}
+	if !strings.Contains(err.Error(), "under the same parent") {
+		t.Fatalf("the conflict does not say where the name is taken: %v", err)
+	}
+
+	if err = repo.SetScope(t.Context(), liquid.ID, &tb.ID, sqlitetest.Stamp.Add(time.Minute)); !errors.IsCode(err, errors.Conflict) {
+		t.Fatalf("moving a name next to its twin = %v, want CONFLICT", err)
+	}
+	if err = repo.SetScope(t.Context(), liquid.ID, nil, sqlitetest.Stamp.Add(time.Minute)); err != nil {
+		t.Fatalf("SetScope to the top: %v", err)
+	}
+	if got, err = repo.Get(t.Context(), liquid.ID); err != nil || got.ScopeID != nil || !got.UpdatedAt.Equal(sqlitetest.Stamp.Add(time.Minute)) {
+		t.Fatalf("after SetScope = %+v, %v", got, err)
+	}
+	if err = repo.SetScope(t.Context(), "missing", nil, sqlitetest.Stamp); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("SetScope of a missing entity = %v, want NOT_FOUND", err)
+	}
+}
+
+func TestTheGraphKeyRefusesWhatTheStoreRefuses(t *testing.T) {
+	t.Parallel()
+
+	pairs := []struct {
+		name          string
+		first, second string
+	}{
+		{name: "the same letters in another case", first: "Liquid", second: "LIQUID"},
+		{name: "a name with spaces around it", first: "Liquid", second: "  liquid "},
+		{name: "two different names", first: "Liquid", second: "Powder"},
+		{name: "an accented capital", first: "Café", second: "CAFÉ"},
+		{name: "a sharp s and its capitals", first: "Straße", second: "STRASSE"},
+		{name: "the kelvin sign and a k", first: "K-Line", second: "k-line"},
+		{name: "a dotted capital i", first: "İzmir", second: "izmir"},
+		{name: "a doubled inner space", first: "Liquid Form", second: "Liquid  Form"},
+		{name: "an escaped ampersand", first: "Tools &amp; Kits", second: "Tools & Kits"},
+		{name: "digits and punctuation", first: "BPC-157", second: "bpc-157"},
+	}
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewEntityRepo(store)
+	for _, pair := range pairs {
+		t.Run(pair.name, func(t *testing.T) {
+			parent := fullEntity(owner.ID, "Parent "+id.New(), sqlitetest.Stamp)
+			if err := repo.Insert(t.Context(), parent); err != nil {
+				t.Fatalf("Insert the parent: %v", err)
+			}
+			wantRefused := graph.Key(pair.first) == graph.Key(pair.second)
+
+			names := make([]graph.Entity, 0, 2)
+			for _, name := range []string{pair.first, pair.second} {
+				record, err := graph.NewEntity(fullEntity(owner.ID, name, sqlitetest.Stamp))
+				if err != nil {
+					t.Fatalf("NewEntity %q: %v", name, err)
+				}
+				record.ScopeID = &parent.ID
+				names = append(names, record)
+			}
+			if err := repo.Insert(t.Context(), names[0]); err != nil {
+				t.Fatalf("Insert %q: %v", pair.first, err)
+			}
+			err := repo.Insert(t.Context(), names[1])
+			if refused := errors.IsCode(err, errors.Conflict); refused != wantRefused || (err != nil && !refused) {
+				t.Fatalf("a name %q next to %q = %v; graph.Key says refused %t", pair.second, pair.first, err, wantRefused)
+			}
+
+			anchored := fullEntity(owner.ID, "Anchored "+id.New(), sqlitetest.Stamp)
+			anchored.Anchors = []graph.Anchor{
+				{Text: pair.first, Source: graph.AnchorUser, Weight: 1}, {Text: pair.second, Source: graph.AnchorAI, Weight: 0.5},
+			}
+			if _, err = graph.NewEntity(anchored); errors.IsCode(err, errors.Invalid) != wantRefused {
+				t.Fatalf("NewEntity with the anchors %q and %q = %v; graph.Key says refused %t", pair.first, pair.second, err, wantRefused)
+			}
+			for i := range anchored.Anchors {
+				anchored.Anchors[i].Text = strings.TrimSpace(anchored.Anchors[i].Text)
+			}
+			err = repo.Insert(t.Context(), anchored)
+			if refused := errors.IsCode(err, errors.Conflict); refused != wantRefused || (err != nil && !refused) {
+				t.Fatalf("the stored anchors %q and %q = %v; graph.Key says refused %t", pair.first, pair.second, err, wantRefused)
+			}
+		})
 	}
 }
 

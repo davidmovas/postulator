@@ -21,13 +21,32 @@ const (
 	defaultAnswer      = "ok"
 )
 
+type options struct {
+	script Script
+}
+
+type Option func(*options)
+
+func WithScript(script Script) Option {
+	return func(o *options) { o.script = script }
+}
+
+func settle(opts []Option) options {
+	var chosen options
+	for _, opt := range opts {
+		opt(&chosen)
+	}
+	return chosen
+}
+
 type Client struct {
+	script   Script
 	requests []port.Request
 	mu       sync.Mutex
 }
 
-func New() *Client {
-	return &Client{}
+func New(opts ...Option) *Client {
+	return &Client{script: settle(opts).script}
 }
 
 func (c *Client) Requests() []port.Request {
@@ -40,12 +59,7 @@ func (c *Client) Complete(ctx context.Context, req port.Request) (port.Response,
 	if err := c.accept(ctx, req); err != nil {
 		return port.Response{}, err
 	}
-
-	text, reason, err := script(req)
-	if err != nil {
-		return port.Response{}, err
-	}
-	return port.Response{Text: text, Usage: usageOf(req, text), FinishReason: reason}, nil
+	return c.answer(req)
 }
 
 func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delta, error) {
@@ -53,17 +67,20 @@ func (c *Client) Stream(ctx context.Context, req port.Request) (<-chan port.Delt
 		return nil, err
 	}
 
-	text, _, err := script(req)
+	resp, err := c.answer(req)
 	if err != nil {
 		return nil, err
 	}
 
-	usage := usageOf(req, text)
-	out := make(chan port.Delta, len(text)+1)
-	for _, word := range chunks(text) {
-		out <- port.Delta{Text: word}
+	pieces := chunks(resp.Text)
+	out := make(chan port.Delta, len(pieces)+len(resp.Calls)+1)
+	for _, piece := range pieces {
+		out <- port.Delta{Text: piece}
 	}
-	out <- port.Delta{Done: true, Usage: &usage}
+	for i := range resp.Calls {
+		out <- port.Delta{Call: &resp.Calls[i]}
+	}
+	out <- port.Delta{Done: true, Usage: &resp.Usage, Finish: resp.FinishReason, Tier: resp.Tier}
 	close(out)
 	return out, nil
 }
@@ -80,6 +97,18 @@ func (c *Client) accept(ctx context.Context, req port.Request) error {
 	defer c.mu.Unlock()
 	c.requests = append(c.requests, req)
 	return nil
+}
+
+func (c *Client) answer(req port.Request) (port.Response, error) {
+	if len(req.Tools) > 0 {
+		return c.converse(req)
+	}
+
+	text, reason, err := script(req)
+	if err != nil {
+		return port.Response{}, err
+	}
+	return port.Response{Text: text, Usage: usageOf(req, tokens(text)), FinishReason: reason, Tier: served(req.Tier)}, nil
 }
 
 func script(req port.Request) (text string, reason port.FinishReason, err error) {
@@ -106,12 +135,25 @@ func script(req port.Request) (text string, reason port.FinishReason, err error)
 	return text, reason, nil
 }
 
-func usageOf(req port.Request, text string) llm.Usage {
+func served(asked llm.ServiceTier) llm.ServiceTier {
+	if asked == llm.TierFlex {
+		return llm.TierFlex
+	}
+	return llm.TierDefault
+}
+
+func usageOf(req port.Request, output int) llm.Usage {
 	input := tokens(req.System)
 	for _, message := range req.Messages {
-		input += tokens(message.Text)
+		switch {
+		case message.Call != nil:
+			input += tokens(message.Call.Name + string(message.Call.Args))
+		case message.Result != nil:
+			input += tokens(string(message.Result.Output))
+		default:
+			input += tokens(message.Text)
+		}
 	}
-	output := tokens(text)
 	return llm.Usage{Input: input, Output: output, Total: input + output}
 }
 

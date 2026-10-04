@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -183,12 +184,12 @@ func judgeDeps(client port.Client) steps.Deps {
 func unitEntities() []graph.Entity {
 	return []graph.Entity{
 		{
-			ID: "parent", SiteID: "site", Name: "Coffee", PrimaryKeyword: "coffee",
+			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
 			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
 		},
 		{
-			ID: "child", SiteID: "site", Name: "Espresso", PrimaryKeyword: "espresso",
+			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
 			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
 		},
@@ -612,6 +613,59 @@ func TestInsertLinksAndValidateReadTheirArtifacts(t *testing.T) {
 	}
 }
 
+func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		short string
+		held  bool
+	}{
+		{name: "a short description with the keyword", short: "<p>An espresso machine.</p>"},
+		{name: "a short description without it", short: "<p>A machine.</p>", held: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			body := []byte(`<h1>Machine</h1><h2>About</h2><p>Espresso is a kind of <a href="/coffee/">coffee</a>.</p>`)
+			draft, err := json.Marshal(content.ContentDraft{
+				Title: "Machine", H1: "Machine",
+				Sections: []content.DraftSection{{Heading: "About", HTML: "<p>Espresso.</p>"}},
+				Product:  &content.ProductDraft{ShortDescription: tc.short},
+			})
+			if err != nil {
+				t.Fatalf("encode the draft: %v", err)
+			}
+			sc := productContext(t, deps)
+			sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: body}
+			sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: draft}
+			sc.Spec.KeywordRules.PrimaryInH1 = true
+
+			result, err := steps.Validate(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("Validate: %v", err)
+			}
+			if held := result.Next == run.TransitionPause; held != tc.held {
+				t.Fatalf("held = %t (%s), want %t", held, result.Message, tc.held)
+			}
+
+			var decoded steps.ValidationReport
+			if err := json.Unmarshal(result.Artifacts[0].Blob, &decoded); err != nil {
+				t.Fatalf("decode the report: %v", err)
+			}
+			if hasFinding(decoded, content.CodePrimaryMissingInH1) || !hasFinding(decoded, content.CodePrimaryMissingInName) {
+				t.Errorf("findings = %+v, want the name named instead of an H1 error", decoded.Structure.Items)
+			}
+			if got := hasFinding(decoded, content.CodePrimaryMissingInShortDescription); got != tc.held {
+				t.Errorf("short description finding = %t, want %t", got, tc.held)
+			}
+		})
+	}
+}
+
 func TestValidateCarriesTheDraftAndRepairFindingsAndLetsThePlanWin(t *testing.T) {
 	t.Parallel()
 
@@ -945,6 +999,71 @@ func TestRepairLinksPutsTheKeywordInTheLeadAndTheAnchorWhereTheParentLinkMayGo(t
 	}
 }
 
+func TestRepairLinksOwesTheLeadTheMainKeywordOfThePage(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: `{"sentence":"Pulling espresso at home starts with the grind."}`}
+	deps.LLM = recorder
+	blob := linkContextBlob(t, deps)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{
+		run.ArtifactLinkContext: blob,
+		run.ArtifactBodyHTML:    []byte(`<h1>Espresso</h1><p>Espresso is a kind of <a href="/coffee/">coffee</a>.</p>`),
+	})
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{{Text: "moka pot"}, {Text: "espresso at home", Volume: new(800)}})
+
+	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("RepairLinks: %v", err)
+	}
+	if !strings.Contains(recorder.last, "espresso at home") {
+		t.Fatalf("the linker was not asked for the page's main keyword:\n%s", recorder.last)
+	}
+	if body := string(result.Artifacts[0].Blob); !strings.Contains(body, "Pulling espresso at home starts with the grind.") {
+		t.Fatalf("the sentence did not land in the body:\n%s", body)
+	}
+}
+
+func TestValidateGradesTheKeywordsOfThePage(t *testing.T) {
+	t.Parallel()
+
+	deps := onTheSite(unitDeps())
+	blob := linkContextBlob(t, deps)
+	body := []byte(`<h1>Espresso at home</h1><h2>About</h2><p>Espresso at home is a kind of <a href="/coffee/">coffee</a>.</p>`)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob, run.ArtifactBodyHTML: body})
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{
+		{Text: "moka pot"}, {Text: "espresso beans", Volume: new(300)}, {Text: "espresso at home", Volume: new(800)},
+	})
+
+	result, err := steps.Validate(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	var decoded steps.ValidationReport
+	if unmarshalErr := json.Unmarshal(result.Artifacts[0].Blob, &decoded); unmarshalErr != nil {
+		t.Fatalf("decode the report: %v", unmarshalErr)
+	}
+
+	missing := 0
+	for _, item := range decoded.Structure.Items {
+		if item.Code != content.CodeKeywordsMissing {
+			continue
+		}
+		missing++
+		if want := "the body does not use 2 of the 3 keywords of the page: espresso beans, moka pot"; item.Message != want {
+			t.Fatalf("message = %q, want %q", item.Message, want)
+		}
+	}
+	if missing != 1 {
+		t.Fatalf("the report carries %d findings about missing keywords, want one: %+v", missing, decoded.Structure.Items)
+	}
+	if decoded.Structure.HasErrors() {
+		t.Fatalf("missing keywords must not be errors: %+v", decoded.Structure.Items)
+	}
+}
+
 func TestRepairLinksOpensABodyWithoutAParagraph(t *testing.T) {
 	t.Parallel()
 
@@ -1092,7 +1211,7 @@ func TestWriterCeilingGrowsWithTheTemplateAndTheAttempt(t *testing.T) {
 		{name: "a long template asks for three tokens a word and a thousand more", spec: long, attempts: 0, want: 1800*3 + 1024},
 		{name: "a short template still gets room to answer", spec: short, attempts: 0, want: 4096},
 		{name: "the second attempt doubles the room", spec: long, attempts: 1, want: (1800*3 + 1024) * 2},
-		{name: "the room stops doubling after three attempts", spec: long, attempts: 7, want: (1800*3 + 1024) * 8},
+		{name: "the room doubles once and no more", spec: long, attempts: 7, want: (1800*3 + 1024) * 2},
 	} {
 		sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
 		sc.Spec = tc.spec
@@ -1117,6 +1236,100 @@ func TestTheModelStepsDeclareTheirOwnTimeouts(t *testing.T) {
 		if def.Timeout != 3*time.Minute {
 			t.Errorf("%s runs under %s, want three minutes", def.Name, def.Timeout)
 		}
+	}
+}
+
+type requestRecorder struct {
+	reply    string
+	requests []port.Request
+}
+
+func (r *requestRecorder) Complete(_ context.Context, req port.Request) (port.Response, error) {
+	r.requests = append(r.requests, req)
+	return port.Response{Text: r.reply, Usage: domainllm.Usage{Input: 1, Output: 2, Total: 3}}, nil
+}
+
+func (r *requestRecorder) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	return nil, errors.New(errors.Internal, "the unit stub does not stream")
+}
+
+func TestEveryModelStepAsksUnderItsOwnNameAndCeiling(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		def     func(steps.Deps) run.StepDef
+		reply   string
+		context func(*testing.T, steps.Deps) *run.StepContext
+	}{
+		{
+			name: steps.NameGenerateBody, def: steps.GenerateBody, reply: goodDraft,
+			context: func(t *testing.T, deps steps.Deps) *run.StepContext {
+				t.Helper()
+				return unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+			},
+		},
+		{
+			name: steps.NameGenerateMeta, def: steps.GenerateMeta,
+			reply: `{"title":"Espresso | Shop","description":"Pull a shot.","canonical":"https://shop.example.com/coffee/espresso/"}`,
+			context: func(t *testing.T, _ steps.Deps) *run.StepContext {
+				t.Helper()
+				return unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactDraft: []byte(goodDraft)})
+			},
+		},
+		{
+			name: steps.NameJudge, def: steps.Judge, reply: `{"score":0.9,"issues":[],"suggestions":[]}`,
+			context: func(t *testing.T, _ steps.Deps) *run.StepContext {
+				t.Helper()
+				return judgeContext(t)
+			},
+		},
+		{
+			name: steps.NameRepairLinks, def: steps.RepairLinks, reply: `{"sentence":"A sentence with no anchor at all."}`,
+			context: func(t *testing.T, _ steps.Deps) *run.StepContext {
+				t.Helper()
+				return unitContext(t, map[run.ArtifactKind][]byte{
+					run.ArtifactLinkContext: owingContext(t),
+					run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Our espresso starts with the coffee we roast.</p>"),
+				})
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			sc := tc.context(t, deps)
+			recorder := &requestRecorder{reply: tc.reply}
+			deps.LLM = recorder
+			deps.Content = appcontent.New(appcontent.Deps{Profiles: deps.Profiles, LLM: recorder})
+			def := tc.def(deps)
+
+			if _, err := def.Run(t.Context(), sc); err != nil {
+				t.Fatalf("%s: %v", tc.name, err)
+			}
+			if len(recorder.requests) == 0 {
+				t.Fatalf("%s asked the model nothing", tc.name)
+			}
+			for _, req := range recorder.requests {
+				if req.Meta.RunID != sc.Run.ID || req.Meta.ItemID != sc.Item.ID || req.Meta.Step != tc.name {
+					t.Fatalf("the call is booked as %+v, want run %s, item %s, step %s", req.Meta, sc.Run.ID, sc.Item.ID, tc.name)
+				}
+				if req.Meta.Role == "" || req.Meta.Role != def.Role {
+					t.Fatalf("the call is sent for the role %q, want the step's own %q", req.Meta.Role, def.Role)
+				}
+				if req.Ref.Model != "unit" || req.System == "" || len(req.Messages) != 1 ||
+					req.Messages[0].Role != port.RoleUser || req.Messages[0].Text == "" {
+					t.Fatalf("the request = %+v, want the resolved model, a system prompt and one user message", req)
+				}
+				ceiling := def.Price.OutputTokens
+				if (ceiling == 0 && req.MaxTokens <= 0) || (ceiling > 0 && req.MaxTokens != ceiling) {
+					t.Fatalf("the request asks for at most %d tokens, want the ceiling the step is priced at (%d)", req.MaxTokens, ceiling)
+				}
+			}
+		})
 	}
 }
 
@@ -1192,9 +1405,278 @@ func TestTheWriterPromptCarriesTheBrief(t *testing.T) {
 		"exactly as written",
 		"- espresso, in the first paragraph of section 1",
 		"- coffee, within the first 2 paragraphs of the page",
+		"Primary keyword: espresso",
+		"1) espresso\n",
 	} {
 		if !strings.Contains(recorder.last, want) {
 			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
 		}
+	}
+}
+
+func TestTheWriterPromptListsTheKeywordsOfThePageMostImportantFirst(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: goodDraft}
+	deps.LLM = recorder
+	blob := linkContextBlob(t, deps)
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
+	sc.Page.Keywords = keyword.New([]keyword.Keyword{
+		{Text: "moka pot"}, {Text: "espresso beans", Volume: new(300)}, {Text: "espresso at home", Volume: new(800)},
+	})
+	sc.Spec.KeywordRules.RequiredKeywords = new(2)
+
+	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	for _, want := range []string{
+		"Primary keyword: espresso at home",
+		"1) espresso at home (800 a month)\n",
+		"2) espresso beans (300 a month)\n",
+		"3) moka pot (optional)\n",
+		"Use every keyword that is not marked optional at least once",
+		"- espresso at home, in the first paragraph of section 1",
+	} {
+		if !strings.Contains(recorder.last, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+		}
+	}
+	for _, gone := range []string{"Secondary keywords", "Primary keyword: espresso\n"} {
+		if strings.Contains(recorder.last, gone) {
+			t.Fatalf("the prompt still carries %q:\n%s", gone, recorder.last)
+		}
+	}
+}
+
+func TestTheWriterPromptSaysWhenAPageHasNoKeywords(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	bare := unitEntities()
+	for i := range bare {
+		bare[i].Keywords = keyword.Of()
+	}
+	deps.Entities = entityList{items: bare}
+	recorder := &promptRecorder{reply: goodDraft}
+	deps.LLM = recorder
+	blob := linkContextBlob(t, deps)
+
+	if _, err := steps.GenerateBody(deps).Run(t.Context(), unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})); err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	if !strings.Contains(recorder.last, "KEYWORDS\nnone\n") {
+		t.Fatalf("the prompt does not say the page has no keywords:\n%s", recorder.last)
+	}
+	if strings.Contains(recorder.last, "in the first paragraph of section 1") {
+		t.Fatalf("a page without keywords owes no lead phrase:\n%s", recorder.last)
+	}
+}
+
+const productDraftReply = `{"title":"Espresso guide","h1":"Espresso guide","sections":[` +
+	`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"},` +
+	`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
+	`],"summary":"A short guide to espresso.",` +
+	`"shortDescription":"<p>An espresso machine for the home.</p>",` +
+	`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Size","value":""}]}`
+
+func productContext(t *testing.T, deps steps.Deps) *run.StepContext {
+	t.Helper()
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+	sc.Page.WPType = pagemap.WPProduct
+	sc.Page.Observed.Title = "Espresso Machine &amp; Grinder"
+	sc.Spec.Product = &template.Product{
+		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is", TargetWords: 30, PrimaryKeyword: true},
+		Specifications: []template.ProductSpecification{
+			{Name: "Form", Intent: "The form the notes state"}, {Name: "Size", Intent: "The size the notes state"},
+		},
+	}
+	return sc
+}
+
+func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: productDraftReply}
+	deps.LLM = recorder
+	sc := productContext(t, deps)
+
+	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	for _, want := range []string{
+		"writing body copy for a WooCommerce product",
+		"shortDescription and specifications",
+		"H1: Espresso Machine & Grinder (the product's name in the store",
+		"never state a price, a stock level or an SKU",
+		"Short description: write it in shortDescription as HTML paragraphs, about 30 words: Say what it is; it carries the primary keyword",
+		"- Form: The form the notes state\n",
+	} {
+		if !strings.Contains(recorder.last, want) {
+			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+		}
+	}
+
+	var draft content.ContentDraft
+	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil {
+		t.Fatalf("decode the draft: %v", err)
+	}
+	if draft.H1 != "Espresso Machine & Grinder" || draft.Product == nil {
+		t.Fatalf("draft = %+v", draft)
+	}
+	if draft.Product.ShortDescription != "<p>An espresso machine for the home.</p>" ||
+		len(draft.Product.Specifications) != 1 || draft.Product.Specifications[0].Value != "Countertop" {
+		t.Errorf("product draft = %+v", draft.Product)
+	}
+}
+
+func TestTheWriterOfAPageIsAskedNothingAboutProducts(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &promptRecorder{reply: goodDraft}
+	deps.LLM = recorder
+	sc := productContext(t, deps)
+	sc.Page.WPType = pagemap.WPPage
+
+	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	for _, gone := range []string{"WooCommerce", "PRODUCT\n", "shortDescription"} {
+		if strings.Contains(recorder.last, gone) {
+			t.Fatalf("a page's prompt carries %q:\n%s", gone, recorder.last)
+		}
+	}
+	var draft content.ContentDraft
+	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil || draft.Product != nil {
+		t.Fatalf("a page's draft = %+v, %v", draft.Product, err)
+	}
+}
+
+func TestTheWriterCeilingMakesRoomForAProductsShortDescription(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	recorder := &ceilingRecorder{reply: productDraftReply}
+	deps.LLM = recorder
+
+	sc := productContext(t, deps)
+	sc.Spec.Sections = []template.Section{{Heading: "About", TargetWords: 1800, Required: true}, {Heading: "Brewing"}}
+	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+		t.Fatalf("GenerateBody: %v", err)
+	}
+	if got, want := recorder.ceilings[len(recorder.ceilings)-1], (1800+30)*3+1024; got != want {
+		t.Errorf("ceiling = %d, want %d", got, want)
+	}
+}
+
+func TestTheWriterReadsTheNotesOfThePageAsContext(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		notes []pagemap.Note
+		want  []string
+		gone  []string
+	}{
+		{
+			name:  "a page with notes",
+			notes: []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
+			want:  []string{"NOTES\n", "- Intent Owner: Commercial\n", "- Notes: Sold as a 10 ml vial\n", "never copy"},
+		},
+		{name: "a page without notes", gone: []string{"NOTES\n"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			recorder := &promptRecorder{reply: goodDraft}
+			deps.LLM = recorder
+			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+			sc.Page.Notes = tc.notes
+
+			if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+				t.Fatalf("GenerateBody: %v", err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(recorder.last, want) {
+					t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+				}
+			}
+			for _, gone := range tc.gone {
+				if strings.Contains(recorder.last, gone) {
+					t.Fatalf("the prompt carries %q:\n%s", gone, recorder.last)
+				}
+			}
+		})
+	}
+}
+
+func sharedNameEntities() []graph.Entity {
+	entities := unitEntities()
+	entities[1].ScopeID = pointer("parent")
+	return append(entities,
+		graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+		graph.Entity{
+			ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+			ScopeID: pointer("tea"),
+		},
+	)
+}
+
+func TestAPromptNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		run  func(t *testing.T, deps steps.Deps) error
+		want []string
+	}{
+		{
+			name: "the writer",
+			run: func(t *testing.T, deps steps.Deps) error {
+				sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+				_, err := steps.GenerateBody(deps).Run(t.Context(), sc)
+				return err
+			},
+			want: []string{"Name: Coffee Espresso\n"},
+		},
+		{
+			name: "the meta writer and its title pattern",
+			run: func(t *testing.T, deps steps.Deps) error {
+				sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactDraft: []byte(goodDraft)})
+				sc.Spec.MetaRules = template.MetaRules{TitlePattern: "{entityName} | {siteName}", DescriptionMax: 155}
+				_, err := steps.GenerateMeta(deps).Run(t.Context(), sc)
+				return err
+			},
+			want: []string{"Name: Coffee Espresso\n", "The title follows this shape exactly: Coffee Espresso | "},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			deps.Entities = entityList{items: sharedNameEntities()}
+			recorder := &promptRecorder{reply: goodDraft}
+			deps.LLM = recorder
+
+			if err := tc.run(t, deps); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(recorder.last, want) {
+					t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+				}
+			}
+		})
 	}
 }

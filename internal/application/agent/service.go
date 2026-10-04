@@ -88,6 +88,7 @@ type Deps struct {
 	HistoryBudget     func() int
 	MaxToolResult     func() int
 	HistoryToolResult func() int
+	Dropped           func(err error)
 }
 
 type Service struct {
@@ -103,15 +104,21 @@ func New(deps Deps) *Service {
 	return service
 }
 
+func (s *Service) drop(err error) {
+	if err != nil && s.deps.Dropped != nil {
+		s.deps.Dropped(err)
+	}
+}
+
 func (s *Service) resumeQueued(conversationID, text string) {
 	ctx := context.WithoutCancel(context.Background())
 	conversation, err := s.deps.Conversations.Get(ctx, conversationID)
 	if err != nil {
-		s.deps.Turns.Note(err)
+		s.drop(err)
 		return
 	}
 	if _, err = s.turn(ctx, conversation, text); err != nil {
-		s.deps.Turns.Note(err)
+		s.drop(err)
 	}
 }
 

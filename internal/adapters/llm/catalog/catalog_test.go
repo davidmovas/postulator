@@ -53,17 +53,57 @@ func TestEmbeddedCatalogIsUsable(t *testing.T) {
 		t.Fatal("the embedded catalog is empty")
 	}
 
-	providers := map[string]bool{}
 	for _, info := range models {
-		providers[info.Ref.Provider] = true
+		if info.Ref.Provider != llm.ProviderOpenAI {
+			t.Errorf("the embedded catalog carries %s, which is not an OpenAI model", info.Ref)
+		}
 		if err = info.Validate(); err != nil {
 			t.Errorf("%s: %v", info.Ref, err)
 		}
 	}
-	for _, want := range []string{"openai", "anthropic", "gemini"} {
-		if !providers[want] {
-			t.Errorf("the embedded catalog carries no %s model", want)
-		}
+}
+
+func TestAnOverrideOfARemovedProviderIsNeverOffered(t *testing.T) {
+	t.Parallel()
+
+	retired := llm.ModelRef{Provider: "retired", Model: "old-model"}
+	cases := []struct {
+		name    string
+		enabled bool
+	}{
+		{name: "a model added under a removed provider", enabled: true},
+		{name: "a model switched off under a removed provider", enabled: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			built, repo := newCatalog(t)
+			before, err := built.List(t.Context())
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			if err = repo.Upsert(t.Context(), override(retired, tc.enabled, 3)); err != nil {
+				t.Fatalf("Upsert: %v", err)
+			}
+
+			after, err := built.List(t.Context())
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			if len(after) != len(before) {
+				t.Errorf("models = %d, want the %d the catalog offered before", len(after), len(before))
+			}
+			for _, info := range after {
+				if info.Ref.Provider != llm.ProviderOpenAI {
+					t.Errorf("the catalog offers %s", info.Ref)
+				}
+			}
+			if _, err = built.Lookup(t.Context(), retired); !errors.IsCode(err, errors.NotFound) {
+				t.Errorf("Lookup of the removed provider's model = %v, want %s", err, errors.NotFound)
+			}
+		})
 	}
 }
 
@@ -82,6 +122,73 @@ func TestEveryEmbeddedModelPricesACacheRead(t *testing.T) {
 		}
 		if info.CachedInputUSDPerM > info.InputUSDPerM {
 			t.Errorf("%s prices a cache read above a fresh token", info.Ref)
+		}
+	}
+}
+
+func TestTheOpenAIModelsPriceTheFlexTierAndTheCacheWrite(t *testing.T) {
+	t.Parallel()
+
+	built, _ := newCatalog(t)
+	cases := []struct {
+		model  string
+		input  float64
+		write  float64
+		flexIn float64
+		cached float64
+		flexWr float64
+		flexOt float64
+	}{
+		{model: "gpt-5.6-sol", input: 4.00, write: 5.00, flexIn: 2.00, cached: 0.20, flexWr: 2.50, flexOt: 10.00},
+		{model: "gpt-5.6-terra", input: 2.00, write: 2.50, flexIn: 1.00, cached: 0.10, flexWr: 1.25, flexOt: 6.00},
+		{model: "gpt-5.6-luna", input: 0.20, write: 0.25, flexIn: 0.10, cached: 0.01, flexWr: 0.125, flexOt: 0.60},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.model, func(t *testing.T) {
+			t.Parallel()
+
+			info, err := built.Lookup(t.Context(), llm.ModelRef{Provider: "openai", Model: tc.model})
+			if err != nil {
+				t.Fatalf("Lookup: %v", err)
+			}
+			if !info.OffersFlex() {
+				t.Fatalf("%s offers no flex tier", tc.model)
+			}
+			if info.InputUSDPerM != tc.input || info.CacheWriteUSDPerM != tc.write {
+				t.Errorf("%s prices input %v and a cache write %v, want %v and %v",
+					tc.model, info.InputUSDPerM, info.CacheWriteUSDPerM, tc.input, tc.write)
+			}
+			if info.FlexInputUSDPerM != tc.flexIn || info.FlexCachedInputUSDPerM != tc.cached ||
+				info.FlexCacheWriteUSDPerM != tc.flexWr || info.FlexOutputUSDPerM != tc.flexOt {
+				t.Errorf("%s prices flex at %v / %v / %v / %v, want %v / %v / %v / %v", tc.model,
+					info.FlexInputUSDPerM, info.FlexCachedInputUSDPerM, info.FlexCacheWriteUSDPerM, info.FlexOutputUSDPerM,
+					tc.flexIn, tc.cached, tc.flexWr, tc.flexOt)
+			}
+			if info.FlexInputUSDPerM*2 != info.InputUSDPerM || info.FlexOutputUSDPerM*2 != info.OutputUSDPerM {
+				t.Errorf("%s does not price flex at half the standard tier", tc.model)
+			}
+		})
+	}
+}
+
+func TestEveryEmbeddedCacheWriteCostsAQuarterMoreThanAFreshToken(t *testing.T) {
+	t.Parallel()
+
+	built, _ := newCatalog(t)
+	models, err := built.List(t.Context())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, info := range models {
+		if info.CacheWriteUSDPerM == 0 {
+			continue
+		}
+		if want := info.InputUSDPerM * 1.25; info.CacheWriteUSDPerM != want {
+			t.Errorf("%s prices a cache write at %v, want %v", info.Ref, info.CacheWriteUSDPerM, want)
+		}
+		if info.OffersFlex() && info.FlexCacheWriteUSDPerM != info.FlexInputUSDPerM*1.25 {
+			t.Errorf("%s prices a flex cache write at %v, want %v", info.Ref, info.FlexCacheWriteUSDPerM, info.FlexInputUSDPerM*1.25)
 		}
 	}
 }
@@ -179,6 +286,114 @@ func TestOverrides(t *testing.T) {
 	}
 }
 
+func TestAnOverrideTakesTheBasePriceForEveryPriceItLeftAtZero(t *testing.T) {
+	t.Parallel()
+
+	terra := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-terra"}
+	base := llm.ModelInfo{
+		InputUSDPerM: 2, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 12,
+		FlexInputUSDPerM: 1, FlexCachedInputUSDPerM: 0.1, FlexCacheWriteUSDPerM: 1.25, FlexOutputUSDPerM: 6,
+	}
+	prices := func(info llm.ModelInfo) llm.ModelInfo {
+		return llm.ModelInfo{
+			InputUSDPerM: info.InputUSDPerM, CachedInputUSDPerM: info.CachedInputUSDPerM,
+			CacheWriteUSDPerM: info.CacheWriteUSDPerM, OutputUSDPerM: info.OutputUSDPerM,
+			FlexInputUSDPerM: info.FlexInputUSDPerM, FlexCachedInputUSDPerM: info.FlexCachedInputUSDPerM,
+			FlexCacheWriteUSDPerM: info.FlexCacheWriteUSDPerM, FlexOutputUSDPerM: info.FlexOutputUSDPerM,
+		}
+	}
+
+	cases := []struct {
+		name  string
+		ref   llm.ModelRef
+		saved llm.ModelInfo
+		want  llm.ModelInfo
+	}{
+		{
+			name:  "a row saved before the flex and cache write prices existed",
+			ref:   terra,
+			saved: llm.ModelInfo{InputUSDPerM: 2, CachedInputUSDPerM: 0.2, OutputUSDPerM: 12},
+			want:  base,
+		},
+		{
+			name:  "a row saved without its cached price",
+			ref:   terra,
+			saved: llm.ModelInfo{InputUSDPerM: 2, OutputUSDPerM: 12},
+			want:  base,
+		},
+		{
+			name:  "a row with no price at all",
+			ref:   terra,
+			saved: llm.ModelInfo{},
+			want:  base,
+		},
+		{
+			name: "prices the row sets are its own",
+			ref:  terra,
+			saved: llm.ModelInfo{
+				InputUSDPerM: 3, CachedInputUSDPerM: 0.3, CacheWriteUSDPerM: 3.75, OutputUSDPerM: 15,
+				FlexInputUSDPerM: 1.5, FlexCachedInputUSDPerM: 0.15, FlexCacheWriteUSDPerM: 1.875, FlexOutputUSDPerM: 7.5,
+			},
+			want: llm.ModelInfo{
+				InputUSDPerM: 3, CachedInputUSDPerM: 0.3, CacheWriteUSDPerM: 3.75, OutputUSDPerM: 15,
+				FlexInputUSDPerM: 1.5, FlexCachedInputUSDPerM: 0.15, FlexCacheWriteUSDPerM: 1.875, FlexOutputUSDPerM: 7.5,
+			},
+		},
+		{
+			name:  "only the prices left at zero are filled",
+			ref:   terra,
+			saved: llm.ModelInfo{InputUSDPerM: 2.5, OutputUSDPerM: 14, FlexInputUSDPerM: 1.25, FlexOutputUSDPerM: 7},
+			want: llm.ModelInfo{
+				InputUSDPerM: 2.5, CachedInputUSDPerM: 0.2, CacheWriteUSDPerM: 2.5, OutputUSDPerM: 14,
+				FlexInputUSDPerM: 1.25, FlexCachedInputUSDPerM: 0.1, FlexCacheWriteUSDPerM: 1.25, FlexOutputUSDPerM: 7,
+			},
+		},
+		{
+			name:  "a model the embedded catalog does not carry keeps its zeros",
+			ref:   llm.ModelRef{Provider: "openai", Model: "gpt-house-blend"},
+			saved: llm.ModelInfo{InputUSDPerM: 2, OutputUSDPerM: 12},
+			want:  llm.ModelInfo{InputUSDPerM: 2, OutputUSDPerM: 12},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			built, repo := newCatalog(t)
+			stored := override(tc.ref, true, 0)
+			stored.Info.InputUSDPerM, stored.Info.CachedInputUSDPerM = tc.saved.InputUSDPerM, tc.saved.CachedInputUSDPerM
+			stored.Info.CacheWriteUSDPerM, stored.Info.OutputUSDPerM = tc.saved.CacheWriteUSDPerM, tc.saved.OutputUSDPerM
+			stored.Info.FlexInputUSDPerM, stored.Info.FlexCachedInputUSDPerM = tc.saved.FlexInputUSDPerM, tc.saved.FlexCachedInputUSDPerM
+			stored.Info.FlexCacheWriteUSDPerM, stored.Info.FlexOutputUSDPerM = tc.saved.FlexCacheWriteUSDPerM, tc.saved.FlexOutputUSDPerM
+			if err := repo.Upsert(t.Context(), stored); err != nil {
+				t.Fatalf("Upsert: %v", err)
+			}
+
+			info, err := built.Lookup(t.Context(), tc.ref)
+			if err != nil {
+				t.Fatalf("Lookup: %v", err)
+			}
+			if got := prices(info); got != tc.want {
+				t.Errorf("prices = %+v, want %+v", got, tc.want)
+			}
+			if info.MaxOutputTokens != stored.Info.MaxOutputTokens || info.RPM != stored.Info.RPM {
+				t.Errorf("info = %+v, want the override's limits kept", info)
+			}
+
+			listed, err := built.List(t.Context())
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			for _, model := range listed {
+				if model.Ref == tc.ref && prices(model) != tc.want {
+					t.Errorf("listed prices = %+v, want %+v", prices(model), tc.want)
+				}
+			}
+		})
+	}
+}
+
 func TestLookupRejectsAnUnknownModel(t *testing.T) {
 	t.Parallel()
 
@@ -188,30 +403,25 @@ func TestLookupRejectsAnUnknownModel(t *testing.T) {
 	}
 }
 
-func TestTheReasoningEffortSurvivesAnOverride(t *testing.T) {
+func TestAnOverrideKeepsWhetherTheModelReasons(t *testing.T) {
 	t.Parallel()
 
-	_, repo := newCatalog(t)
-	ref := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-luna"}
-	stored := override(ref, true, 1)
-	stored.Info.Reasoning = true
-	stored.Info.ReasoningEffort = llm.EffortHigh
+	for _, reasons := range []bool{true, false} {
+		built, repo := newCatalog(t)
+		ref := llm.ModelRef{Provider: "openai", Model: "gpt-5.6-luna"}
+		stored := override(ref, true, 1)
+		stored.Info.Reasoning = reasons
 
-	if err := repo.Upsert(t.Context(), stored); err != nil {
-		t.Fatalf("Upsert: %v", err)
-	}
+		if err := repo.Upsert(t.Context(), stored); err != nil {
+			t.Fatalf("Upsert: %v", err)
+		}
 
-	listed, err := repo.List(t.Context())
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(listed) != 1 {
-		t.Fatalf("listed %d overrides, want 1", len(listed))
-	}
-	if listed[0].Info.ReasoningEffort != llm.EffortHigh {
-		t.Errorf("reasoning effort = %q, want %q", listed[0].Info.ReasoningEffort, llm.EffortHigh)
-	}
-	if !listed[0].Info.Reasoning {
-		t.Error("the override forgot that the model reasons")
+		info, err := built.Lookup(t.Context(), ref)
+		if err != nil {
+			t.Fatalf("Lookup: %v", err)
+		}
+		if info.Reasoning != reasons {
+			t.Errorf("reasoning = %t, want the override's %t", info.Reasoning, reasons)
+		}
 	}
 }

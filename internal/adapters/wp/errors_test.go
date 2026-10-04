@@ -91,6 +91,38 @@ func TestClassifyCarriesTheWordPressCodeAndConflictHash(t *testing.T) {
 	}
 }
 
+func TestForbiddenTellsAMissingPermissionFromABadPassword(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   bool
+	}{
+		{name: "a user who may not create pages", status: http.StatusForbidden, body: `{"code":"rest_cannot_create"}`, want: true},
+		{name: "a user who may not edit products", status: http.StatusForbidden, body: `{"code":"woocommerce_rest_cannot_edit"}`, want: true},
+		{name: "a refused password", status: http.StatusUnauthorized, body: `{"code":"rest_not_logged_in"}`},
+		{name: "a refused request", status: http.StatusBadRequest, body: `{"code":"rest_invalid_param"}`},
+		{name: "a missing resource", status: http.StatusNotFound, body: `{"code":"rest_post_invalid_id"}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := classify(response(t, tc.status, nil), []byte(tc.body))
+			if got := Forbidden(err); got != tc.want {
+				t.Errorf("Forbidden = %t, want %t", got, tc.want)
+			}
+		})
+	}
+
+	if Forbidden(errors.New(errors.Unauthorized, "no status")) {
+		t.Error("an unauthorized error without a status is not a refused permission")
+	}
+}
+
 func TestClassifyAttachesRetryInformation(t *testing.T) {
 	t.Parallel()
 

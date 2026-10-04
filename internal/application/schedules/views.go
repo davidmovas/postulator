@@ -1,8 +1,6 @@
 package schedules
 
 import (
-	"time"
-
 	"github.com/davidmovas/postulator/internal/domain/schedule"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -45,7 +43,7 @@ func view(s schedule.Schedule) Schedule {
 		ID: s.ID, SiteID: s.SiteID, Name: s.Name, Cron: s.Cron, IntervalMinutes: minutes,
 		EntityID: s.Query.EntityID, Status: s.Query.Status, Limit: s.Query.Limit, TemplateID: s.TemplateID,
 		Steps: steps, PublishMode: string(s.PublishMode), MaxUSD: s.Budget.MaxUSD,
-		MaxTokens: s.Budget.MaxTokens, Enabled: s.Enabled, NextRunAt: timeOf(s.NextRunAt),
+		MaxTokens: s.Budget.MaxTokens, Enabled: s.Enabled, NextRunAt: dto.TimeOf(s.NextRunAt),
 		LastRunID: s.LastRunID, CreatedBy: string(s.CreatedBy), CreatedAt: dto.NewTime(s.CreatedAt),
 		UpdatedAt: dto.NewTime(s.UpdatedAt),
 	}
@@ -57,11 +55,4 @@ func recipeOf(steps []string) []template.StepSpec {
 		recipe = append(recipe, template.StepSpec{Name: step, Enabled: true})
 	}
 	return recipe
-}
-
-func timeOf(at *time.Time) dto.Time {
-	if at == nil {
-		return dto.Time{}
-	}
-	return dto.NewTime(*at)
 }

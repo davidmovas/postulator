@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
-import type { Page, PageTreeNode, ProposedEntity } from "../../../data/types.js";
+import type { PageTreeNode, ProposedEntity } from "../../../data/types.js";
+import { aPage } from "../../../testing/pages.js";
 import { buildGraphIndex } from "../model/index.js";
 
 interface Calls {
@@ -14,40 +15,16 @@ interface Calls {
 const calls: Calls = { previewed: [], keyworded: [], applied: [] };
 
 const proposals: ProposedEntity[] = [
-    { pageId: "mugs", path: "/shop/mugs/", name: "Mugs", kind: "category", primaryKeyword: "mugs", parent: "/shop/" },
-    { pageId: "travel", path: "/shop/mugs/travel/", name: "Travel Mugs", kind: "topic", primaryKeyword: "travel mugs", parent: "/shop/mugs/" },
+    { pageId: "mugs", path: "/shop/mugs/", name: "Mugs", kind: "category", keywords: [{ text: "mugs" }], parent: "/shop/" },
+    {
+        pageId: "travel",
+        path: "/shop/mugs/travel/",
+        name: "Travel Mugs",
+        kind: "topic",
+        keywords: [{ text: "travel mugs" }],
+        parent: "/shop/mugs/",
+    },
 ];
-
-function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
-    return {
-        id,
-        siteId: "s1",
-        path,
-        slug: "",
-        parentPageId: null,
-        wpType: "page",
-        wpId: null,
-        title: `Title ${id}`,
-        h1: "",
-        metaTitle: "",
-        metaDescription: "",
-        canonical: "",
-        primaryKeyword: "",
-        keywords: [],
-        status: "planned",
-        entityId: null,
-        templateId: null,
-        contentHash: "",
-        observed: { link: "", slug: "", status: "", title: "", h1: "" },
-        mismatches: [],
-        wpModifiedAt: null,
-        lastSyncedAt: null,
-        drift: false,
-        createdAt: "2026-09-24T09:00:00Z",
-        updatedAt: "2026-09-24T09:00:00Z",
-        ...overrides,
-    };
-}
 
 const roots: PageTreeNode[] = [
     {

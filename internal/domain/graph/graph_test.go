@@ -49,6 +49,29 @@ func diamond(t *testing.T, extra ...graph.Edge) graph.Graph {
 	return g
 }
 
+func TestDescendantsAreEveryEntityBelowOnce(t *testing.T) {
+	t.Parallel()
+
+	g := diamond(t)
+	cases := []struct {
+		id   string
+		want []string
+	}{
+		{id: entA, want: []string{"bravo", "Charlie", "delta"}},
+		{id: entB, want: []string{"delta"}},
+		{id: entD, want: []string{}},
+		{id: entE, want: []string{}},
+		{id: "missing", want: []string{}},
+	}
+	for _, tc := range cases {
+		got := names(g.Descendants(tc.id))
+		slices.SortFunc(got, func(a, b string) int { return strings.Compare(strings.ToLower(a), strings.ToLower(b)) })
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("Descendants(%s) = %v, want %v", tc.id, got, tc.want)
+		}
+	}
+}
+
 func TestParentsIsBreadthFirstAndDeduplicated(t *testing.T) {
 	t.Parallel()
 
@@ -87,7 +110,7 @@ func TestParentsShortcutMovesTheAncestorToTheNearestLevel(t *testing.T) {
 	}
 }
 
-func TestChildrenRootsAndRelated(t *testing.T) {
+func TestChildrenAndRelated(t *testing.T) {
 	t.Parallel()
 
 	g := diamond(t, related("r1", entB, entC, 0.9, graph.StatusApproved), related("r2", entB, entE, 0.2, graph.StatusApproved), related("r3", entA, entB, 0.95, graph.StatusProposed))
@@ -97,9 +120,6 @@ func TestChildrenRootsAndRelated(t *testing.T) {
 	}
 	if got := names(g.Children(entD)); len(got) != 0 {
 		t.Errorf("Children(D) = %v, want none", got)
-	}
-	if got := names(g.Roots()); !slices.Equal(got, []string{"Alpha", "Echo"}) {
-		t.Errorf("Roots = %v", got)
 	}
 
 	neighbors := g.Related(entB, 0)
@@ -218,7 +238,7 @@ func TestEmptyGraph(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if len(g.Entities()) != 0 || len(g.Roots()) != 0 || g.ValidateAcyclic() != nil {
+	if len(g.Entities()) != 0 || len(g.Edges()) != 0 || g.ValidateAcyclic() != nil {
 		t.Error("an empty graph is valid and has nothing in it")
 	}
 }

@@ -1,8 +1,9 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../../copy/index.js";
+import { fieldErrorOf } from "../../../data/errors.js";
 import { cx, IconButton, Input, RestartAltIcon, Select, Switch } from "../../../ui/index.js";
-import { fieldErrorOf, NumberInput } from "../controls.js";
+import { NumberInput } from "../controls.js";
 import { ruleBlocks } from "../rules-blocks.js";
 import type { Rule, RuleBlock } from "../rules-model.js";
 import type { SpecDraft } from "../spec.js";

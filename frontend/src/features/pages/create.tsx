@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { react } from "../../data/errors.js";
+import { fieldErrorOf, validationErrorOf } from "../../data/errors.js";
 import { useCreatePage } from "../../data/hooks/pages.js";
 import { copy } from "../../copy/index.js";
 import { pageStatuses, pageWpTypes } from "../../generated/vocab.js";
@@ -19,25 +19,6 @@ const statusOptions: readonly SelectOption<string>[] = pageStatuses.map((value) 
     value,
     label: pageStatusLabel(value),
 }));
-
-function fieldErrorOf(thrown: unknown, field: string): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    if (reaction.kind === "field" && reaction.field === field) {
-        return reaction.message;
-    }
-    return null;
-}
-
-function formErrorOf(thrown: unknown): string | null {
-    if (thrown === null || thrown === undefined) {
-        return null;
-    }
-    const reaction = react(thrown);
-    return reaction.kind === "form" ? reaction.message : null;
-}
 
 export interface PlanPageDialogProps {
     open: boolean;
@@ -81,7 +62,7 @@ export function PlanPageDialog({
 
     const entityOptions: SelectOption<string>[] = [
         { value: noEntity, label: copy.pages.create.noEntity },
-        ...index.entities.map((entity) => ({ value: entity.id, label: entity.name })),
+        ...index.entities.map((entity) => ({ value: entity.id, label: index.labels.get(entity.id) ?? entity.name })),
     ];
 
     const submit = (): void => {
@@ -199,8 +180,8 @@ export function PlanPageDialog({
                         />
                     )}
                 </Field>
-                {formErrorOf(create.error) === null ? null : (
-                    <p className="text-xs text-danger">{formErrorOf(create.error)}</p>
+                {validationErrorOf(create.error) === null ? null : (
+                    <p className="text-xs text-danger">{validationErrorOf(create.error)}</p>
                 )}
                 <ConflictNotice thrown={create.error} siteId={siteId} search={search} />
             </div>

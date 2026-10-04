@@ -2,9 +2,9 @@ package imports
 
 type InspectRequest struct {
 	SiteID   string   `json:"siteId"`
-	Path     string   `json:"path" description:"The absolute path of the .xlsx or .csv file on this machine"`
-	Sheets   []string `json:"sheets,omitempty" description:"Which sheets of the workbook to read; leave it out to read every one"`
-	NoHeader bool     `json:"noHeader,omitempty" description:"The sheet carries no header row, so every column is addressed by its spreadsheet letter; leave it out for a sheet whose first row names the columns"`
+	Path     string   `json:"path" description:"Absolute path of the .xlsx or .csv file"`
+	Sheets   []string `json:"sheets,omitempty" description:"Sheets to sample; default the first. Every sheet is listed"`
+	NoHeader bool     `json:"noHeader,omitempty" description:"No header row: columns go by letter"`
 }
 
 type InspectResponse struct {
@@ -16,10 +16,16 @@ type InspectResponse struct {
 	Saved    []Mapping  `json:"saved"`
 }
 
-type PreviewRequest struct {
-	SiteID  string  `json:"siteId"`
-	Path    string  `json:"path"`
+type SheetMapping struct {
+	Sheet   string  `json:"sheet"`
 	Mapping Mapping `json:"mapping"`
+}
+
+type PreviewRequest struct {
+	SiteID  string         `json:"siteId"`
+	Path    string         `json:"path"`
+	Mapping Mapping        `json:"mapping"`
+	Sheets  []SheetMapping `json:"sheets,omitempty"`
 }
 
 type PreviewResponse struct {
@@ -31,10 +37,15 @@ type ApplyOptions struct {
 }
 
 type ApplyRequest struct {
-	SiteID  string       `json:"siteId"`
-	Path    string       `json:"path"`
-	Mapping Mapping      `json:"mapping"`
-	Options ApplyOptions `json:"options"`
+	SiteID  string         `json:"siteId"`
+	Path    string         `json:"path"`
+	Mapping Mapping        `json:"mapping"`
+	Sheets  []SheetMapping `json:"sheets,omitempty"`
+	Options ApplyOptions   `json:"options"`
+}
+
+func (r ApplyRequest) preview() PreviewRequest {
+	return PreviewRequest{SiteID: r.SiteID, Path: r.Path, Mapping: r.Mapping, Sheets: r.Sheets}
 }
 
 type ApplyResponse struct {
@@ -44,8 +55,8 @@ type ApplyResponse struct {
 
 type ExportRequest struct {
 	SiteID string `json:"siteId"`
-	Path   string `json:"path" description:"The absolute path on this machine to write the file to"`
-	Format string `json:"format,omitempty" enum:"xlsx,csv" description:"Which format to write; leave it out to take it from the file extension"`
+	Path   string `json:"path" description:"Absolute path to write"`
+	Format string `json:"format,omitempty" enum:"xlsx,csv" description:"Default from the file extension"`
 }
 
 type ExportResponse struct {
@@ -72,7 +83,7 @@ type ListMappingsResponse struct {
 }
 
 type DeleteMappingRequest struct {
-	ID string `json:"id" description:"The id of the saved mapping to remove, exactly as imports_list_mappings returned it"`
+	ID string `json:"id" description:"Saved mapping id"`
 }
 
 type DeleteMappingResponse struct{}

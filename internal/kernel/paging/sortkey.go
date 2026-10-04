@@ -5,69 +5,44 @@ import (
 	"time"
 )
 
-type SortKind uint8
+type sortKind uint8
 
 const (
-	Text SortKind = iota
-	UUID
-	Enum
-	Int
-	Float
-	Bool
-	Time
+	sortText sortKind = iota
+	sortInt
+	sortTime
 )
 
 type SortKey[T any] struct {
 	Value  func(T) any
 	Field  string
 	Column string
-	Kind   SortKind
+	kind   sortKind
 }
 
-func newSortKey[T any](kind SortKind, field, column string, value func(T) any) SortKey[T] {
-	return SortKey[T]{Kind: kind, Field: field, Column: column, Value: value}
+func newSortKey[T any](kind sortKind, field, column string, value func(T) any) SortKey[T] {
+	return SortKey[T]{kind: kind, Field: field, Column: column, Value: value}
 }
 
 func TextKey[T any](field, column string, value func(T) any) SortKey[T] {
-	return newSortKey(Text, field, column, value)
-}
-
-func UUIDKey[T any](field, column string, value func(T) any) SortKey[T] {
-	return newSortKey(UUID, field, column, value)
-}
-
-func EnumKey[T any](field, column string, value func(T) any) SortKey[T] {
-	return newSortKey(Enum, field, column, value)
+	return newSortKey(sortText, field, column, value)
 }
 
 func IntKey[T any](field, column string, value func(T) any) SortKey[T] {
-	return newSortKey(Int, field, column, value)
-}
-
-func FloatKey[T any](field, column string, value func(T) any) SortKey[T] {
-	return newSortKey(Float, field, column, value)
-}
-
-func BoolKey[T any](field, column string, value func(T) any) SortKey[T] {
-	return newSortKey(Bool, field, column, value)
+	return newSortKey(sortInt, field, column, value)
 }
 
 func TimeKey[T any](field, column string, value func(T) any) SortKey[T] {
-	return newSortKey(Time, field, column, value)
+	return newSortKey(sortTime, field, column, value)
 }
 
 func (s SortKey[T]) literal(raw any) (any, bool) {
-	switch s.Kind {
-	case Text, UUID, Enum:
+	switch s.kind {
+	case sortText:
 		return coerceString(raw)
-	case Int:
+	case sortInt:
 		return coerceInt(raw)
-	case Float:
-		return coerceFloat(raw)
-	case Bool:
-		value, ok := raw.(bool)
-		return value, ok
-	case Time:
+	case sortTime:
 		return coerceTime(raw)
 	default:
 		return nil, false
@@ -97,29 +72,6 @@ func coerceInt(raw any) (any, bool) {
 		return int64(value), true
 	case json.Number:
 		parsed, err := value.Int64()
-		if err != nil {
-			return nil, false
-		}
-		return parsed, true
-	default:
-		return nil, false
-	}
-}
-
-func coerceFloat(raw any) (any, bool) {
-	switch value := raw.(type) {
-	case float32:
-		return float64(value), true
-	case float64:
-		return value, true
-	case int:
-		return float64(value), true
-	case int32:
-		return float64(value), true
-	case int64:
-		return float64(value), true
-	case json.Number:
-		parsed, err := value.Float64()
 		if err != nil {
 			return nil, false
 		}

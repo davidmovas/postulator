@@ -8,7 +8,6 @@ import {
     mapPageToEntity,
     pageTree,
     previewLink,
-    replacePageLinks,
     setCanonicalPage,
     unmapPage,
     updatePage,
@@ -86,16 +85,6 @@ export function useSetCanonicalPage() {
             void client.invalidateQueries({ queryKey: keys.pages.detail(answered.page.id) });
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.graph.root() });
-        },
-    });
-}
-
-export function useReplacePageLinks() {
-    const client = useQueryClient();
-    return useMutation({
-        mutationFn: (request: Parameters<typeof replacePageLinks>[0]) => replacePageLinks(request),
-        onSuccess: (_answered, request) => {
-            void client.invalidateQueries({ queryKey: keys.pages.detail(request.pageId) });
         },
     });
 }

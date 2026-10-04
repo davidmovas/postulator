@@ -15,6 +15,13 @@ const (
 	MaxHistoryToolResultBytes     = 65536
 )
 
+type ToolLoading string
+
+const (
+	ToolsEveryRound ToolLoading = "all"
+	ToolsOnDemand   ToolLoading = "deferred"
+)
+
 var (
 	loopLimitSetting     = settings.Int("agent.loopLimit", DefaultLoopLimit, settings.IntRange(1, 64))
 	historyBudgetSetting = settings.Int("agent.historyBudgetChars", DefaultHistoryBudgetChars, settings.IntRange(2000, 400000))
@@ -22,7 +29,13 @@ var (
 	historyResultSetting = settings.Int("agent.historyToolResultBytes", DefaultHistoryToolResultBytes,
 		settings.IntRange(MinHistoryToolResultBytes, MaxHistoryToolResultBytes))
 	turnTimeoutSetting = settings.Duration("agent.turnTimeout", DefaultTurnTimeout, settings.DurationRange(time.Minute, 2*time.Hour))
+	toolLoadingSetting = settings.Enum("agent.toolLoading", string(ToolsEveryRound),
+		[]string{string(ToolsEveryRound), string(ToolsOnDemand)})
 )
+
+func ToolLoadingOf(values *settings.Values) ToolLoading {
+	return ToolLoading(toolLoadingSetting.Get(values))
+}
 
 func TurnTimeout(values *settings.Values) time.Duration {
 	return turnTimeoutSetting.Get(values)

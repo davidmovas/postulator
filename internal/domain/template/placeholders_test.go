@@ -1,7 +1,9 @@
 package template_test
 
 import (
+	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -123,5 +125,47 @@ func TestExpandedSpecFillsHeadingsIntentsPinnedPhrasesAndTheTitlePattern(t *test
 	}
 	if spec.Sections[0].Heading != "Why {primaryKeyword} matter" || spec.Sections[0].KeywordRules.Include[0] != "{primaryKeyword} guide" {
 		t.Fatalf("the source spec was changed in place: %+v", spec.Sections[0])
+	}
+}
+
+func TestExpandedSpecFillsTheProductOutputsOnACopy(t *testing.T) {
+	t.Parallel()
+
+	spec := validSpec()
+	spec.Product = &template.Product{
+		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say why {entityName} sells"},
+		Specifications: []template.ProductSpecification{
+			{Name: "Form", Intent: "The form {entityName} comes in"},
+		},
+	}
+
+	expanded := spec.Expanded(template.Vars{EntityName: "BPC-157 Liquid"})
+
+	if expanded.Product == spec.Product {
+		t.Fatal("the expanded spec shares the product block with its source")
+	}
+	if expanded.Product.ShortDescription.Intent != "Say why BPC-157 Liquid sells" ||
+		expanded.Product.Specifications[0].Intent != "The form BPC-157 Liquid comes in" {
+		t.Fatalf("product = %+v", expanded.Product)
+	}
+	if spec.Product.ShortDescription.Intent != "Say why {entityName} sells" ||
+		spec.Product.Specifications[0].Intent != "The form {entityName} comes in" {
+		t.Fatalf("the source product block was changed in place: %+v", spec.Product)
+	}
+
+	if bare := validSpec().Expanded(template.Vars{}); bare.Product != nil {
+		t.Errorf("a spec without a product block gained one: %+v", bare.Product)
+	}
+}
+
+func TestASpecWithoutAProductBlockEncodesAsBefore(t *testing.T) {
+	t.Parallel()
+
+	encoded, err := json.Marshal(validSpec())
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if strings.Contains(string(encoded), `"product"`) {
+		t.Errorf("a spec without products encodes a product key: %s", encoded)
 	}
 }

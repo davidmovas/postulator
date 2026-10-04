@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -165,14 +166,20 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 79000
+	schemaCeilingBytes = 63200
 	charactersPerToken = 4
+	widestLogged       = 8
 )
 
 type sentTool struct {
 	Name        string      `json:"name"`
 	Description string      `json:"description"`
 	Parameters  *llm.Schema `json:"parameters"`
+}
+
+type measuredTool struct {
+	name  string
+	bytes int
 }
 
 func schemaBytes(t *testing.T, tool tools.Tool) int {
@@ -187,27 +194,81 @@ func schemaBytes(t *testing.T, tool tools.Tool) int {
 	return len(encoded)
 }
 
+func widestOf(measured []measuredTool) string {
+	sorted := slices.Clone(measured)
+	slices.SortStableFunc(sorted, func(a, b measuredTool) int { return b.bytes - a.bytes })
+
+	named := make([]string, 0, widestLogged)
+	for _, tool := range sorted[:min(widestLogged, len(sorted))] {
+		named = append(named, tool.name+" "+strconv.Itoa(tool.bytes))
+	}
+	return strings.Join(named, ", ")
+}
+
 func TestTheToolSchemasFitTheirCeiling(t *testing.T) {
 	t.Parallel()
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
 
-	total, widest, name := 0, 0, ""
+	total := 0
+	measured := make([]measuredTool, 0, len(built))
 	for _, tool := range built {
-		measured := schemaBytes(t, tool)
-		total += measured
-		if measured > widest {
-			widest, name = measured, tool.Def.Name
-		}
+		size := schemaBytes(t, tool)
+		total += size
+		measured = append(measured, measuredTool{name: tool.Def.Name, bytes: size})
 	}
 
-	t.Logf("%d tools, %d bytes of schema, about %d tokens; the widest is %s at %d bytes",
-		len(built), total, total/charactersPerToken, name, widest)
+	t.Logf("%d tools, %d bytes of schema, about %d tokens; the widest: %s",
+		len(built), total, total/charactersPerToken, widestOf(measured))
 
 	if total > schemaCeilingBytes {
 		t.Fatalf("the tool schemas grew to %d bytes, over the %d this build allows; "+
 			"every round of every turn resends all of it", total, schemaCeilingBytes)
+	}
+}
+
+type sentGroup struct {
+	Type        string `json:"type"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+func TestADeferredRoundSendsTheOrientingToolsWholeAndOnlyTheNamesOfTheGroups(t *testing.T) {
+	t.Parallel()
+
+	registry := newRegistry(&actionRecorder{}, &busRecorder{})
+	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
+
+	every, eager, whole := 0, 0, 0
+	named := map[string]bool{}
+	headers := []sentGroup{{Type: "tool_search"}}
+	for _, tool := range built {
+		size := schemaBytes(t, tool)
+		every += size
+		group, deferred := tools.OnDemand(tool.Def.Name)
+		if !deferred {
+			eager += size
+			whole++
+			continue
+		}
+		if !named[group.Name] {
+			named[group.Name] = true
+			headers = append(headers, sentGroup{Type: "namespace", Name: group.Name, Description: group.Description})
+		}
+	}
+	encoded, err := json.Marshal(headers)
+	if err != nil {
+		t.Fatalf("encode the group headers: %v", err)
+	}
+
+	payload := eager + len(encoded)
+	t.Logf("loading tools on demand sends %d tools whole and %d groups, %d bytes, about %d tokens, before any "+
+		"search; every tool at once is %d bytes", whole, len(named), payload, payload/charactersPerToken, every)
+
+	if whole == 0 || len(named) == 0 || payload >= every {
+		t.Fatalf("a deferred round sends %d tools whole in %d groups for %d bytes of %d, want fewer bytes than every tool",
+			whole, len(named), payload, every)
 	}
 }
 

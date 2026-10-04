@@ -58,6 +58,13 @@ describe("editorPreviewUrl", () => {
     it("points WordPress at the draft by its id so a logged-in editor sees it", () => {
         expect(editorPreviewUrl("https://clay.example.com", "page", 42)).toBe("https://clay.example.com/?page_id=42&preview=true");
         expect(editorPreviewUrl("https://clay.example.com/", "post", 7)).toBe("https://clay.example.com/?p=7&preview=true");
+        expect(editorPreviewUrl("https://clay.example.com", "product", 9)).toBe(
+            "https://clay.example.com/?post_type=product&p=9&preview=true",
+        );
+    });
+
+    it("answers nothing for a product category, which has no draft to show", () => {
+        expect(editorPreviewUrl("https://clay.example.com", "product_cat", 3)).toBeNull();
     });
 
     it("answers nothing without an id or an address", () => {

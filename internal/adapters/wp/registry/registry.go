@@ -162,14 +162,26 @@ func messageOf(err error) string {
 	return err.Error()
 }
 
-func (r *Registry) Probe(ctx context.Context, record site.Site) (site.PluginState, error) {
+func (r *Registry) Probe(ctx context.Context, record site.Site) (site.Extensions, error) {
 	client, err := r.Client(ctx, record.ID)
 	if err != nil {
-		return site.PluginState{}, err
+		return site.Extensions{}, err
 	}
 
 	client.InvalidateManifest()
 
+	plugin, err := pluginOf(ctx, client)
+	if err != nil {
+		return site.Extensions{}, err
+	}
+	commerce, err := client.CommerceOr(ctx, wp.Commerce(record.Commerce))
+	if err != nil {
+		return site.Extensions{}, err
+	}
+	return site.Extensions{Plugin: plugin, Commerce: site.Commerce(commerce)}, nil
+}
+
+func pluginOf(ctx context.Context, client *wp.Client) (site.PluginState, error) {
 	capabilities, err := client.Capabilities(ctx)
 	if err != nil {
 		if wp.IsPluginMissing(err) {

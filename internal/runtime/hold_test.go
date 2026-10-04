@@ -325,6 +325,17 @@ func TestAChildQueuedBehindItsParentWaitsWhenTheParentStopsAndGoesOnOnceItIsRege
 	if calls.get(parent.Path) != 2 || calls.get(child.Path) != 1 || calls.get(grandchild.Path) != 1 {
 		t.Fatalf("the steps ran %d, %d and %d times", calls.get(parent.Path), calls.get(child.Path), calls.get(grandchild.Path))
 	}
+	started := map[string]int{}
+	for _, payload := range harness.bus.payloads(events.ItemStarted) {
+		if announced, ok := payload.(events.ItemStartedPayload); ok {
+			started[announced.ItemID]++
+		}
+	}
+	for _, page := range family {
+		if item := itemOf(t, harness, queued.ID, page.ID); started[item.ID] != 1 {
+			t.Fatalf("%s announced its start %d times, want once whether or not it waited first", page.Path, started[item.ID])
+		}
+	}
 	assertGapless(t, harness, queued.ID)
 }
 

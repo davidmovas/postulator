@@ -9,7 +9,7 @@ import (
 const templatesResolveForPageName = "templates_resolve_for_page"
 
 type templatesResolveForPageArgs struct {
-	PageID string `json:"pageId" description:"The id of the page whose template is wanted, exactly as a read tool returned it"`
+	PageID string `json:"pageId" description:"Page id"`
 }
 
 func templatesResolveForPage(deps Deps) Tool {

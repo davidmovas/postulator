@@ -15,13 +15,13 @@ import {
 } from "../../ui/index.js";
 import type { RunSort } from "../../data/sorts.js";
 import {
-    kindLabel,
     pauseReasonShort,
     pauseReasonText,
     pauseReasonTone,
-    statusIcon,
-    statusLabel,
-    statusTone,
+    runKindLabel,
+    runStatusIcon,
+    runStatusLabel,
+    runStatusTone,
 } from "./labels.js";
 import { spanMs } from "./span.js";
 import { statusPaused } from "./statuses.js";
@@ -60,14 +60,14 @@ function RunRow({ run, now, selected, onOpen }: RunRowProps): ReactElement {
                 }
             }}
         >
-            <TableCell>{kindLabel(run.kind)}</TableCell>
+            <TableCell>{runKindLabel(run.kind)}</TableCell>
             <TableCell>
                 <span
                     className="flex min-w-0 items-center gap-1"
                     title={paused ? pauseReasonText(run.pauseReason) : undefined}
                 >
-                    <StatusBadge tone={statusTone(run.status)} icon={statusIcon(run.status)}>
-                        {statusLabel(run.status)}
+                    <StatusBadge tone={runStatusTone(run.status)} icon={runStatusIcon(run.status)}>
+                        {runStatusLabel(run.status)}
                     </StatusBadge>
                     {paused ? (
                         <StatusBadge

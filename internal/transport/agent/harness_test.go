@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gollem-dev/gollem"
 	"go.uber.org/zap/zaptest"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
@@ -34,15 +34,6 @@ const (
 	pollTimeout  = 10 * time.Second
 )
 
-type staticFactory struct {
-	client gollem.LLMClient
-	err    error
-}
-
-func (f staticFactory) NewForTools(context.Context, domainllm.ModelRef) (gollem.LLMClient, error) {
-	return f.client, f.err
-}
-
 type chatProfiles struct {
 	err error
 }
@@ -56,7 +47,7 @@ func (p chatProfiles) Resolve(context.Context, string, domainllm.Role, map[domai
 
 type stubPreview struct{}
 
-func (stubPreview) IssuePreview(context.Context, string, int64) (pages.IssuedPreview, error) {
+func (stubPreview) IssuePreview(context.Context, string, int64, string) (pages.IssuedPreview, error) {
 	return pages.IssuedPreview{}, errors.New(errors.Invalid, "no site in this test issues a preview").
 		WithDetail("code", "plugin_missing")
 }
@@ -76,13 +67,15 @@ type scriptedTitler struct {
 	text  string
 	err   error
 	calls int
+	asked llmport.Request
 }
 
-func (s *scriptedTitler) Complete(_ context.Context, _ llmport.Request) (llmport.Response, error) {
+func (s *scriptedTitler) Complete(_ context.Context, req llmport.Request) (llmport.Response, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.calls++
+	s.asked = req
 	if s.err != nil {
 		return llmport.Response{}, s.err
 	}
@@ -104,9 +97,16 @@ func (s *scriptedTitler) attempts() int {
 	return s.calls
 }
 
+func (s *scriptedTitler) lastAsked() llmport.Request {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.asked
+}
+
 type harness struct {
 	store    *sqlite.Store
-	model    *fake.Gollem
+	model    *fake.Client
 	titler   *scriptedTitler
 	service  *agentapp.Service
 	bus      *applicationtest.Recorder
@@ -121,7 +121,7 @@ func newHarness(t *testing.T) *harness {
 
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
-	model := fake.NewGollem()
+	model := fake.New()
 	bus := &applicationtest.Recorder{}
 
 	built := build(t, store, model, bus)
@@ -131,14 +131,26 @@ func newHarness(t *testing.T) *harness {
 
 type tuning func(*agentapp.Deps)
 
-func build(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicationtest.Recorder,
+type wiring struct {
+	provider llmport.Client
+	outer    func(next llmport.Client) llmport.Client
+}
+
+func build(t *testing.T, store *sqlite.Store, model *fake.Client, bus *applicationtest.Recorder,
 	allowed ...string) *harness {
 	t.Helper()
 
 	return buildTuned(t, store, model, bus, nil, allowed...)
 }
 
-func buildTuned(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *applicationtest.Recorder,
+func buildTuned(t *testing.T, store *sqlite.Store, model *fake.Client, bus *applicationtest.Recorder,
+	tune tuning, allowed ...string) *harness {
+	t.Helper()
+
+	return buildWired(t, store, model, wiring{}, bus, tune, allowed...)
+}
+
+func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wiring, bus *applicationtest.Recorder,
 	tune tuning, allowed ...string) *harness {
 	t.Helper()
 
@@ -154,8 +166,11 @@ func buildTuned(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *appl
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
 		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, bus, now)
 	registered := tools.New(tools.Deps{
-		Sites:     sites.New(siteRepo, nil, store, nil, bus, now),
-		Pages:     pages.New(pageRepo, linkRepo, entityRepo, siteRepo, store, bus, now, stubPreview{}),
+		Sites: sites.New(siteRepo, nil, store, nil, bus, now),
+		Pages: pages.New(pages.Deps{
+			Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
+			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+		}),
 		Templates: templateService,
 		Reports: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
@@ -167,15 +182,22 @@ func buildTuned(t *testing.T, store *sqlite.Store, model *fake.Gollem, bus *appl
 		Clock:     now,
 	})
 
+	var provider llmport.Client = model
+	if wired.provider != nil {
+		provider = wired.provider
+	}
+	var client llmport.Client = ledger.New(provider, callRepo, fixedCatalog{}, bus, now)
+	if wired.outer != nil {
+		client = wired.outer(client)
+	}
 	runner := agentrunner.New(agentrunner.Deps{
-		Factory:  staticFactory{client: model},
+		Client:   client,
 		Registry: registered,
 		History:  sqlite.NewConversationHistoryRepo(store),
-		Calls:    callRepo,
 		Catalog:  fixedCatalog{},
 		Clock:    now,
 		Logger:   zaptest.NewLogger(t),
-	}, agentrunner.Config{})
+	})
 
 	titler := &scriptedTitler{text: "Scripted chat name"}
 

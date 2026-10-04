@@ -60,20 +60,7 @@ func (r *ConversationRepo) List(ctx context.Context, q agent.ConversationQuery, 
 		builder = builder.Where(squirrel.Eq{"site_id": q.SiteID})
 	}
 
-	keyset := conversationKeyset(q.Desc)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[agent.Conversation]{}, err
-	}
-	query, args, err := buildQuery(keyed, "conversations")
-	if err != nil {
-		return paging.List[agent.Conversation]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanConversation, "list the conversations")
-	if err != nil {
-		return paging.List[agent.Conversation]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, conversationKeyset(q.Desc), page, scanConversation, "conversations")
 }
 
 func conversationKeyset(desc bool) paging.Keyset[agent.Conversation] {

@@ -88,7 +88,6 @@ func (p *providerKeyFake) ProviderKeys(context.Context, models.ProviderKeysReque
 		return answer[models.ProviderKeysResponse](p.mode)
 	}
 	return models.ProviderKeysResponse{Providers: []models.ProviderKey{
-		{Provider: "anthropic"},
 		{Provider: "openai", Configured: p.written != ""},
 	}}, nil
 }
@@ -273,7 +272,7 @@ func TestSettingsServiceReportsAndRevokesProviderKeysWithoutTheirValues(t *testi
 	if marshalErr != nil {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
-	if string(encoded) != `{"providers":[{"provider":"anthropic","configured":false},{"provider":"openai","configured":true}]}` {
+	if string(encoded) != `{"providers":[{"provider":"openai","configured":true}]}` {
 		t.Fatalf("ProviderKeys = %s, want booleans alone", encoded)
 	}
 
@@ -290,7 +289,7 @@ func TestSettingsServiceReportsAndRevokesProviderKeysWithoutTheirValues(t *testi
 	if err != nil {
 		t.Fatalf("ProviderKeys: %v", err)
 	}
-	if reported.Providers[1].Configured {
+	if len(reported.Providers) != 1 || reported.Providers[0].Configured {
 		t.Fatalf("ProviderKeys = %+v, want openai unconfigured after the revoke", reported.Providers)
 	}
 }

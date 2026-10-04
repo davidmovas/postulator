@@ -16,13 +16,18 @@ import (
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/runtime/steps"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
 
@@ -59,8 +64,8 @@ func seeded(t *testing.T) *app.Core {
 	if tuned.Seed == nil {
 		t.Fatal("an empty home must be seeded")
 	}
-	if tuned.Config.Provider == nil || tuned.Config.AgentProvider == nil {
-		t.Fatal("the harness must compose over both fakes")
+	if tuned.Config.Provider == nil {
+		t.Fatal("the harness must compose over the scripted provider")
 	}
 	if tuned.Config.DatabasePath != filepath.Join(home, "postulator.db") {
 		t.Fatalf("DatabasePath = %q, want it under %q", tuned.Config.DatabasePath, home)
@@ -98,11 +103,11 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 43 {
-		t.Errorf("entities = %d, want 43", len(loaded.Entities))
+	if len(loaded.Entities) != 44 {
+		t.Errorf("entities = %d, want 44", len(loaded.Entities))
 	}
-	if len(loaded.Edges) != 47 {
-		t.Errorf("edges = %d, want 47", len(loaded.Edges))
+	if len(loaded.Edges) != 48 {
+		t.Errorf("edges = %d, want 48", len(loaded.Edges))
 	}
 
 	proposed := 0
@@ -146,11 +151,11 @@ func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 		cursor = string(page.Next)
 	}
 
-	if total != 64 {
-		t.Errorf("pages = %d, want 64", total)
+	if total != 65 {
+		t.Errorf("pages = %d, want 65", total)
 	}
-	if mapped != 46 {
-		t.Errorf("mapped pages = %d, want 46", mapped)
+	if mapped != 47 {
+		t.Errorf("mapped pages = %d, want 47", mapped)
 	}
 }
 
@@ -392,8 +397,8 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 43 {
-		t.Fatalf("entities after the restart = %d, want the forty-three that were seeded", len(loaded.Entities))
+	if len(loaded.Entities) != 44 {
+		t.Fatalf("entities after the restart = %d, want the forty-four that were seeded", len(loaded.Entities))
 	}
 }
 
@@ -586,6 +591,51 @@ func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
 	}
 	if page.Page.Path != "/espresso-machines/under-500/" {
 		t.Fatalf("the pending action names %s, want the under-500 page", page.Page.Path)
+	}
+}
+
+func TestTheHarnessSeedsAProductTheStoreLetsARunEdit(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	if listed.Items[0].Commerce != "ready" {
+		t.Errorf("the seeded site's store reads %q, want ready", listed.Items[0].Commerce)
+	}
+
+	mapped, err := allPages(t.Context(), core, listed.Items[0].ID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	productID := ""
+	for i := range mapped {
+		if mapped[i].Path == productPath && mapped[i].WPType == "product" && mapped[i].EntityID != nil {
+			productID = mapped[i].ID
+		}
+	}
+	if productID == "" {
+		t.Fatalf("no mapped product at %s", productPath)
+	}
+
+	report, err := core.Reports.PageReport(t.Context(), reports.PageReportRequest{PageID: productID})
+	if err != nil {
+		t.Fatalf("PageReport: %v", err)
+	}
+	if report.Status != string(run.StatusCompleted) || len(report.Product) == 0 {
+		t.Fatalf("the product's last run is %q with outputs %s, want a completed run that wrote them", report.Status, report.Product)
+	}
+	var published struct {
+		PreviousProduct *struct {
+			Added []string `json:"added"`
+		} `json:"previousProduct"`
+	}
+	if err = json.Unmarshal(report.Publish, &published); err != nil || published.PreviousProduct == nil {
+		t.Fatalf("the publish result %s keeps no snapshot of the product (%v)", report.Publish, err)
+	}
+	if len(published.PreviousProduct.Added) != 1 || published.PreviousProduct.Added[0] != "Form" {
+		t.Errorf("the run filled %v, want the one empty attribute the template names", published.PreviousProduct.Added)
 	}
 }
 
@@ -952,6 +1002,80 @@ func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 	}
 	if len(after) != len(before) {
 		t.Errorf("the map went from %d to %d pages", len(before), len(after))
+	}
+}
+
+func TestTheHarnessRecordsSpendWorthReading(t *testing.T) {
+	core := seeded(t)
+
+	month, err := core.Models.SpendReport(t.Context(), models.SpendReportRequest{Days: 30})
+	if err != nil {
+		t.Fatalf("SpendReport: %v", err)
+	}
+	purposes := make(map[string]bool, len(month.Slices))
+	for index := range month.Slices {
+		purposes[month.Slices[index].Purpose] = true
+	}
+	for _, want := range []llm.Purpose{
+		llm.PurposeRun, llm.PurposeChat, llm.PurposeTitle, llm.PurposeGraph, llm.PurposeAudit, llm.PurposeProbe,
+	} {
+		if !purposes[string(want)] {
+			t.Errorf("the month's spend has no %s slice; it has %v", want, purposes)
+		}
+	}
+	if month.Totals.FlexShare <= 0 || month.Totals.ReasoningShare <= 0 || month.Totals.CachedShare <= 0 {
+		t.Errorf("the month's shares are flex %.2f, reasoning %.2f, cached %.2f; want every one above zero",
+			month.Totals.FlexShare, month.Totals.ReasoningShare, month.Totals.CachedShare)
+	}
+
+	week, err := core.Models.SpendReport(t.Context(), models.SpendReportRequest{Days: 7})
+	if err != nil {
+		t.Fatalf("SpendReport: %v", err)
+	}
+	if week.Totals.USD >= month.Totals.USD {
+		t.Errorf("the week spent %.4f and the month %.4f; want older writer calls the week leaves out",
+			week.Totals.USD, month.Totals.USD)
+	}
+
+	calls, err := core.Models.ListCalls(t.Context(), models.ListCallsRequest{ListRequest: dto.ListRequest{Limit: 100}})
+	if err != nil {
+		t.Fatalf("ListCalls: %v", err)
+	}
+	if len(calls.Items) <= 25 {
+		t.Errorf("recent calls = %d, want more than one page of 25", len(calls.Items))
+	}
+	failed := make(map[string]bool)
+	for index := range calls.Items {
+		if calls.Items[index].Status == string(llm.CallError) {
+			failed[calls.Items[index].ErrorCode] = true
+		}
+	}
+	for _, want := range []errors.Code{errors.NeedsHuman, errors.RateLimited, errors.Unauthorized} {
+		if !failed[string(want)] {
+			t.Errorf("no recent call failed with %s; the failures are %v", want, failed)
+		}
+	}
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	finished, err := finishedRunItems(t.Context(), core, listed.Items[0].ID)
+	if err != nil {
+		t.Fatalf("find the finished run: %v", err)
+	}
+	byStep, err := core.Models.SpendReport(t.Context(), models.SpendReportRequest{RunID: finished.runID})
+	if err != nil {
+		t.Fatalf("SpendReport of the run: %v", err)
+	}
+	stepped := make(map[string]bool, len(byStep.Slices))
+	for index := range byStep.Slices {
+		stepped[byStep.Slices[index].Step] = true
+	}
+	for _, want := range []string{steps.NameGenerateBody, steps.NameGenerateMeta, steps.NameJudge, steps.NameRepairLinks} {
+		if !stepped[want] {
+			t.Errorf("the finished run spent nothing on %s; its steps are %v", want, stepped)
+		}
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -45,7 +46,7 @@ func relinkPageDeps(t *testing.T, body string, opts ...wptest.Option) (steps.Dep
 
 func withGrandparent(deps steps.Deps, wpID int64) steps.Deps {
 	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
-		ID: "grand", SiteID: "site", Name: "Drinks", PrimaryKeyword: "drinks",
+		ID: "grand", SiteID: "site", Name: "Drinks", Keywords: keyword.Of("drinks"),
 		Anchors: []graph.Anchor{{Text: "drinks", Source: graph.AnchorUser, Weight: 1}},
 		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-grand"),
 	})}
@@ -142,6 +143,28 @@ func TestRelinkPagePlacesTheLinksTheGraphAsksThePageFor(t *testing.T) {
 	}
 	if result.Next == run.TransitionPause {
 		t.Fatal("a relink that did its work must not hold the item")
+	}
+}
+
+func TestRelinkPagePlacesTheLinksInAProductsDescription(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Espresso Machine", Content: espressoBody})[0]
+	pages := relinkPagePages(product.ID)
+	pages[1].WPType = pagemap.WPProduct
+	deps.Links = &linkRecorder{}
+	deps.Pages = pageList{items: pages}
+	sc := relinkPageContext(t, deps, product.ID)
+	sc.Page.WPType = pagemap.WPProduct
+
+	relinked, published, _ := runRelinkPage(t, deps, sc)
+	if relinked.Linked != 1 || published.WPID != product.ID || published.PreviousContent != espressoBody {
+		t.Fatalf("relinked = %+v, published = %+v", relinked, published)
+	}
+	if stored, _ := server.Lookup(product.ID); !strings.Contains(stored.Content, `<a href="/coffee/">coffee</a>`) ||
+		stored.Title != "Espresso Machine" {
+		t.Errorf("the product holds %+v", stored)
 	}
 }
 
@@ -333,6 +356,66 @@ func TestRelinkPageStandsDownWithoutThePlugin(t *testing.T) {
 	stored, ok := server.Lookup(wpID)
 	if !ok || stored.Content != espressoBody {
 		t.Fatalf("the page was written without the plugin: %q", stored.Content)
+	}
+}
+
+func TestBothRelinksStandDownOnABodyTheyCannotRead(t *testing.T) {
+	t.Parallel()
+
+	const elsewhere = 1000
+
+	cases := []struct {
+		name     string
+		opts     []wptest.Option
+		gone     bool
+		neighbor string
+		page     string
+	}{
+		{
+			name: "without the plugin", opts: []wptest.Option{wptest.WithoutPlugin()},
+			neighbor: steps.ReasonNoPlugin, page: steps.ReasonNoPlugin,
+		},
+		{
+			name: "gone from the site", gone: true,
+			neighbor: steps.ReasonNeighborGone, page: steps.ReasonPageGone,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name+", the neighbors", func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkDeps(t, parentBody, tc.opts...)
+			if tc.gone {
+				deps.Pages = pageList{items: relinkPages(wpID + elsewhere)}
+			}
+			relinked := runRelink(t, deps)
+			if relinked.Skipped != 1 || len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Detail != tc.neighbor {
+				t.Fatalf("relinked = %+v, want the neighbor skipped for %q", relinked, tc.neighbor)
+			}
+			if stored, ok := server.Lookup(wpID); !ok || stored.Content != parentBody {
+				t.Fatalf("the neighbor was written although its body could not be read: %+v", stored)
+			}
+		})
+		t.Run(tc.name+", the page", func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, _, wpID := relinkPageDeps(t, espressoBody, tc.opts...)
+			target := wpID
+			if tc.gone {
+				target += elsewhere
+			}
+			relinked, _, result := runRelinkPage(t, deps, relinkPageContext(t, deps, target))
+			if relinked.Skipped != 1 || len(relinked.Findings) != 1 || relinked.Findings[0].Details["reason"] != tc.page {
+				t.Fatalf("relinked = %+v, want the page stood down for %q", relinked, tc.page)
+			}
+			if result.Next == run.TransitionPause {
+				t.Fatalf("a body that cannot be read held the item: %s", result.Message)
+			}
+			if stored, ok := server.Lookup(wpID); !ok || stored.Content != espressoBody {
+				t.Fatalf("the page was written although its body could not be read: %+v", stored)
+			}
+		})
 	}
 }
 

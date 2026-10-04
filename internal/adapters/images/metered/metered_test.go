@@ -38,7 +38,7 @@ func (c *calls) Insert(_ context.Context, call llm.Call) error {
 type prices struct{}
 
 func (prices) Lookup(context.Context, llm.ModelRef) (llm.ModelInfo, error) {
-	return llm.ModelInfo{InputUSDPerM: 8, CachedInputUSDPerM: 1.25, OutputUSDPerM: 30}, nil
+	return llm.ModelInfo{InputUSDPerM: 8, CachedInputUSDPerM: 1.25, CacheWriteUSDPerM: 10, OutputUSDPerM: 30}, nil
 }
 
 type bus struct {
@@ -78,6 +78,15 @@ func TestEveryImageIsACallInTheLedger(t *testing.T) {
 			heard:  1,
 		},
 		{
+			name: "a cache write is priced and announced",
+			inner: drawing{image: images.Image{Usage: llm.Usage{
+				Input: 2_000_000, CacheWrite: 1_000_000, Output: 1_000_000, Total: 3_000_000,
+			}}},
+			status: llm.CallOK,
+			usd:    48,
+			heard:  1,
+		},
+		{
 			name:   "a refused image is a failed call",
 			inner:  drawing{err: errors.New(errors.RateLimited, "slow down")},
 			status: llm.CallError,
@@ -114,8 +123,19 @@ func TestEveryImageIsACallInTheLedger(t *testing.T) {
 			if !row.CreatedAt.Equal(stamp) || row.ID == "" {
 				t.Fatalf("the call = %+v", row)
 			}
+			if row.Tier != llm.TierDefault {
+				t.Fatalf("the call was served at %q, want the default tier an image is drawn at", row.Tier)
+			}
 			if len(heard.published) != tc.heard {
 				t.Fatalf("llm.usage was published %d times, want %d", len(heard.published), tc.heard)
+			}
+			for _, payload := range heard.published {
+				usage := tc.inner.image.Usage
+				if payload.Tier != string(llm.TierDefault) || payload.PromptTokens != usage.Input ||
+					payload.CompletionTokens != usage.Output || payload.CacheWriteTokens != usage.CacheWrite ||
+					payload.ReasoningTokens != usage.Reasoning || payload.USD != tc.usd {
+					t.Fatalf("llm.usage = %+v, want the call's tier, tokens and cost", payload)
+				}
 			}
 		})
 	}

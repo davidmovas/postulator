@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { formatScore } from "../graph/labels.js";
-import { kindLabel as runKindLabel, statusLabel as runStatusLabel } from "../runs/labels.js";
+import { runKindLabel, runStatusLabel } from "../runs/labels.js";
 import type { EntityScore } from "../../data/types.js";
 import { tokens, usd } from "../../domain/format.js";
 import {

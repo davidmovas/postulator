@@ -8,10 +8,29 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
+
+func phraseTexts(brief content.Brief) []string {
+	out := make([]string, 0, len(brief.Phrases))
+	for i := range brief.Phrases {
+		out = append(out, brief.Phrases[i].Text)
+	}
+	return out
+}
+
+func requiredHeadings(brief content.Brief) []string {
+	out := make([]string, 0, len(brief.Sections))
+	for i := range brief.Sections {
+		if brief.Sections[i].Required {
+			out = append(out, brief.Sections[i].Heading)
+		}
+	}
+	return out
+}
 
 func guideBrief(page pagemap.Page) content.Brief {
 	spec := template.TemplateSpec{
@@ -22,7 +41,7 @@ func guideBrief(page pagemap.Page) content.Brief {
 		},
 		KeywordRules: template.KeywordRules{PrimaryInTitle: true, PrimaryInH1: true, PrimaryInFirstParagraph: true},
 	}
-	entity := graph.Entity{Name: "Espresso", PrimaryKeyword: "espresso"}
+	entity := graph.Entity{Name: "Espresso", Keywords: keyword.Of("espresso")}
 	lc := content.LinkContext{Targets: []content.LinkTarget{
 		{URL: "/coffee/", Anchors: []string{"coffee"}, Relation: content.RelationUp, Required: true},
 		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
@@ -61,7 +80,7 @@ func TestNewBriefTakesThePlanFirstAndListsWhatThePageOwes(t *testing.T) {
 	if len(brief.Sections) != 3 || brief.Sections[0].Slot != 1 || brief.Sections[2].Slot != 3 || !brief.Sections[0].PrimaryInHeading {
 		t.Fatalf("sections = %+v", brief.Sections)
 	}
-	if got := brief.PhraseTexts(); len(got) != 3 || got[0] != "espresso" || got[1] != "coffee" || got[2] != "filter coffee" {
+	if got := phraseTexts(brief); len(got) != 3 || got[0] != "espresso" || got[1] != "coffee" || got[2] != "filter coffee" {
 		t.Fatalf("phrases = %v, want the lead keyword, the parent anchor and the sibling anchor", got)
 	}
 	if !brief.Phrases[0].Lead || brief.Phrases[1].Lead || brief.Phrases[2].Lead {
@@ -70,13 +89,86 @@ func TestNewBriefTakesThePlanFirstAndListsWhatThePageOwes(t *testing.T) {
 	if brief.Phrases[0].Within != 0 || brief.Phrases[1].Within != 2 || brief.Phrases[2].Within != 0 {
 		t.Fatalf("phrases = %+v, want the parent anchor within the first two paragraphs and the others unbounded", brief.Phrases)
 	}
-	if got := brief.RequiredHeadings(); len(got) != 2 || got[1] != "Brewing" {
+	if got := requiredHeadings(brief); len(got) != 2 || got[1] != "Brewing" {
 		t.Fatalf("required headings = %v", got)
 	}
 
 	bare := guideBrief(pagemap.Page{})
 	if bare.PlannedTitle || bare.PlannedH1 {
 		t.Fatalf("a page without a plan claims one: %+v", bare)
+	}
+}
+
+func TestNewBriefListsTheKeywordsOfThePageMostImportantFirst(t *testing.T) {
+	t.Parallel()
+
+	spec := template.TemplateSpec{KeywordRules: template.KeywordRules{PrimaryInFirstParagraph: true}}
+	entity := graph.Entity{Name: "BPC-157", Keywords: keyword.Of("bpc 157", "bpc dosage")}
+	brief := func(page pagemap.Page, owner graph.Entity) content.Brief {
+		return content.NewBrief(spec, template.LinkRules{}, page, owner, content.LinkContext{})
+	}
+
+	own := brief(pagemap.Page{Keywords: keyword.New([]keyword.Keyword{
+		{Text: "liquid bpc"}, {Text: "bpc 157 liquid", Volume: new(900)},
+	})}, entity)
+	if own.PrimaryKeyword != "bpc 157 liquid" {
+		t.Fatalf("primary keyword = %q, want the highest volume of the page's own keywords", own.PrimaryKeyword)
+	}
+	if len(own.Keywords) != 2 {
+		t.Fatalf("keywords = %+v, want the two the page carries and none of its entity's", own.Keywords)
+	}
+	first, second := own.Keywords[0], own.Keywords[1]
+	if first.Rank != 1 || first.Text != "bpc 157 liquid" || first.Volume == nil || *first.Volume != 900 || !first.Required {
+		t.Fatalf("first keyword = %+v", first)
+	}
+	if second.Rank != 2 || second.Text != "liquid bpc" || second.Volume != nil || !second.Required {
+		t.Fatalf("second keyword = %+v", second)
+	}
+	if got := phraseTexts(own); len(got) != 1 || got[0] != "bpc 157 liquid" || !own.Phrases[0].Lead {
+		t.Fatalf("phrases = %+v, want the page's main keyword to open the page", own.Phrases)
+	}
+
+	follows := brief(pagemap.Page{}, entity)
+	if follows.PrimaryKeyword != "bpc 157" || len(follows.Keywords) != 2 || follows.Keywords[1].Text != "bpc dosage" {
+		t.Fatalf("a page without keywords must follow its entity: %q %+v", follows.PrimaryKeyword, follows.Keywords)
+	}
+
+	bare := brief(pagemap.Page{}, graph.Entity{Name: "About"})
+	if bare.PrimaryKeyword != "" || bare.Keywords == nil || len(bare.Keywords) != 0 || len(bare.Phrases) != 0 {
+		t.Fatalf("a page without any keyword owes none: %+v", bare)
+	}
+}
+
+func TestNewBriefMarksTheKeywordsTheTemplateRequires(t *testing.T) {
+	t.Parallel()
+
+	page := pagemap.Page{Keywords: keyword.Of("bpc 157", "buy bpc 157", "bpc 157 dosage")}
+
+	cases := []struct {
+		name     string
+		required *int
+		want     []bool
+	}{
+		{name: "a template that does not say requires them all", required: nil, want: []bool{true, true, true}},
+		{name: "the first two", required: new(2), want: []bool{true, true, false}},
+		{name: "none", required: new(0), want: []bool{false, false, false}},
+		{name: "more than the page carries", required: new(9), want: []bool{true, true, true}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := template.TemplateSpec{KeywordRules: template.KeywordRules{RequiredKeywords: tc.required}}
+			brief := content.NewBrief(spec, template.LinkRules{}, page, graph.Entity{}, content.LinkContext{})
+			got := make([]bool, 0, len(brief.Keywords))
+			for _, item := range brief.Keywords {
+				got = append(got, item.Required)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("required = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -89,7 +181,7 @@ func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
 		{URL: "/coffee/espresso/lungo/", Relation: content.RelationDown},
 		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
 	}}
-	entity := graph.Entity{Name: "Espresso", PrimaryKeyword: "espresso"}
+	entity := graph.Entity{Name: "Espresso", Keywords: keyword.Of("espresso")}
 
 	cases := []struct {
 		name     string
@@ -120,7 +212,7 @@ func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
 			t.Parallel()
 
 			brief := content.NewBrief(template.TemplateSpec{}, tc.rules, pagemap.Page{}, entity, lc)
-			if got := brief.PhraseTexts(); !slices.Equal(got, tc.phrases) {
+			if got := phraseTexts(brief); !slices.Equal(got, tc.phrases) {
 				t.Fatalf("phrases = %v, want %v", got, tc.phrases)
 			}
 			if !slices.Equal(brief.Children, tc.children) {

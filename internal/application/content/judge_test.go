@@ -8,7 +8,9 @@ import (
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -109,7 +111,7 @@ type rawStub struct {
 	err  error
 }
 
-func (r rawStub) RawContent(context.Context, string, int64) (string, error) {
+func (r rawStub) RawContent(context.Context, string, int64, string) (string, error) {
 	return r.body, r.err
 }
 
@@ -156,12 +158,12 @@ func pages() []pagemap.Page {
 func entities() []graph.Entity {
 	return []graph.Entity{
 		{
-			ID: "parent", SiteID: "site", Name: "Coffee", PrimaryKeyword: "coffee", Kind: graph.KindTopic,
+			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"), Kind: graph.KindTopic,
 			Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
 		},
 		{
-			ID: "child", SiteID: "site", Name: "Espresso", PrimaryKeyword: "espresso", Kind: graph.KindTopic,
+			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"), Kind: graph.KindTopic,
 			Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
 		},
@@ -220,6 +222,99 @@ func TestJudgeAuditsTheLivePage(t *testing.T) {
 	}
 	if !strings.Contains(model.last.System, "RUBRIC") {
 		t.Error("the system prompt does not carry the rubric")
+	}
+}
+
+func TestTheJudgeBooksEveryCallUnderItsStepAndRole(t *testing.T) {
+	t.Parallel()
+
+	inRun := port.CallMeta{RunID: "run", ItemID: "item", Step: appcontent.NameJudge}
+	cases := []struct {
+		name  string
+		judge func(*appcontent.Service) error
+		want  port.CallMeta
+	}{
+		{
+			name: "an audit on demand is booked as the judge's own step",
+			judge: func(service *appcontent.Service) error {
+				_, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"})
+				return err
+			},
+			want: port.CallMeta{Step: domainllm.StepJudge, Role: domainllm.RoleJudge},
+		},
+		{
+			name: "an assessment inside a run keeps the run's booking",
+			judge: func(service *appcontent.Service) error {
+				_, err := service.Assess(t.Context(), appcontent.AssessRequest{
+					SiteID: "site", Page: pages()[1], Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
+					Call: inRun,
+				})
+				return err
+			},
+			want: port.CallMeta{RunID: "run", ItemID: "item", Step: appcontent.NameJudge, Role: domainllm.RoleJudge},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+			if err := tc.judge(newService(model, nil)); err != nil {
+				t.Fatalf("the judge failed: %v", err)
+			}
+			if model.last.Meta != tc.want {
+				t.Fatalf("the call is booked as %+v, want %+v", model.last.Meta, tc.want)
+			}
+		})
+	}
+}
+
+func TestJudgeAuditsAProductUnderTheNameTheStoreShows(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+	service := newService(model, func(deps *appcontent.Deps) {
+		listed := pages()
+		listed[1].WPType = pagemap.WPProduct
+		listed[1].Observed.Title = "Espresso &amp; Crema"
+		deps.Pages = pageStub{items: listed}
+		deps.Raw = rawStub{body: "<h2>About</h2><p>Espresso is a way to make coffee.</p>"}
+	})
+
+	if _, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	prompt := model.last.Messages[len(model.last.Messages)-1].Text
+	if !strings.Contains(prompt, "<h1>Espresso &amp; Crema</h1><h2>About</h2>") {
+		t.Errorf("the judge does not see the product's name as its h1:\n%s", prompt)
+	}
+	if !strings.Contains(model.last.System, "one WooCommerce product") {
+		t.Errorf("the judge is not told it grades a product:\n%s", model.last.System)
+	}
+}
+
+func TestAssessShowsTheJudgeTheProductOutputs(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+	page := pages()[1]
+	page.WPType = pagemap.WPProduct
+	_, err := newService(model, nil).Assess(t.Context(), appcontent.AssessRequest{
+		SiteID: "site", Page: page, Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
+		Product: &contentdomain.ProductDraft{
+			ShortDescription: "<p>A strong shot.</p>",
+			Specifications:   []contentdomain.Specification{{Name: "Form", Value: "Beans"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	prompt := model.last.Messages[len(model.last.Messages)-1].Text
+	for _, want := range []string{"PRODUCT\n", "Short description: <p>A strong shot.</p>", "- Form: Beans"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("the prompt lacks %q:\n%s", want, prompt)
+		}
 	}
 }
 
@@ -369,6 +464,59 @@ func TestJudgeReadsThePageOnDemandWithoutASnippet(t *testing.T) {
 	}
 	if strings.Contains(model.last.Messages[0].Text, "SNIPPET") {
 		t.Error("a page without a stored snippet must not offer one to the judge")
+	}
+}
+
+func TestTheJudgeIsToldTheKeywordsThePageIsWrittenFor(t *testing.T) {
+	t.Parallel()
+
+	keyed := &llmStub{reply: `{"score":0.5}`}
+	service := newService(keyed, func(d *appcontent.Deps) {
+		own := pages()
+		own[1].Keywords = keyword.New([]keyword.Keyword{{Text: "moka pot"}, {Text: "espresso at home", Volume: new(800)}})
+		d.Pages = pageStub{items: own}
+	})
+	if _, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	for _, want := range []string{
+		"Primary keyword: espresso at home", "Keywords, the most searched first: espresso at home, moka pot",
+	} {
+		if !strings.Contains(keyed.last.Messages[0].Text, want) {
+			t.Errorf("the prompt lacks %q:\n%s", want, keyed.last.Messages[0].Text)
+		}
+	}
+
+	plain := &llmStub{reply: `{"score":0.5}`}
+	if _, err := newService(plain, nil).Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	if !strings.Contains(plain.last.Messages[0].Text, "Primary keyword: espresso\n") {
+		t.Errorf("a page without keywords must be judged on those of its entity:\n%s", plain.last.Messages[0].Text)
+	}
+}
+
+func TestTheJudgeNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.5}`}
+	service := newService(model, func(d *appcontent.Deps) {
+		shared := entities()
+		shared[1].ScopeID = pointer("parent")
+		shared = append(shared,
+			graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+			graph.Entity{
+				ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+				ScopeID: pointer("tea"),
+			},
+		)
+		d.Entities = entityStub{items: shared}
+	})
+	if _, err := service.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	if !strings.Contains(model.last.Messages[0].Text, "Topic: Coffee Espresso\n") {
+		t.Fatalf("the judge is not told which Espresso the page is about:\n%s", model.last.Messages[0].Text)
 	}
 }
 

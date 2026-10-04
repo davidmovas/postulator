@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	siteColumns = `id, name, base_url, username, secret_ref, status, allow_insecure, plugin_installed, plugin_version, plugin_capabilities, plugin_seo, default_template_id, default_link_policy_id, model_profiles, created_at, updated_at`
-	insertSite  = `INSERT INTO sites (` + siteColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateSite  = `UPDATE sites SET name = ?, base_url = ?, username = ?, status = ?, allow_insecure = ?, plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, default_template_id = ?, default_link_policy_id = ?, model_profiles = ?, updated_at = ? WHERE id = ?`
+	siteColumns = `id, name, base_url, username, secret_ref, status, allow_insecure, plugin_installed, plugin_version, plugin_capabilities, plugin_seo, commerce, default_template_id, default_link_policy_id, model_profiles, created_at, updated_at`
+	insertSite  = `INSERT INTO sites (` + siteColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateSite  = `UPDATE sites SET name = ?, base_url = ?, username = ?, status = ?, allow_insecure = ?, plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, default_template_id = ?, default_link_policy_id = ?, model_profiles = ?, updated_at = ? WHERE id = ?`
 	deleteSite  = `DELETE FROM sites WHERE id = ?`
 	selectSite  = `SELECT ` + siteColumns + ` FROM sites WHERE id = ?`
 )
@@ -69,7 +69,7 @@ func (r *SiteRepo) Insert(ctx context.Context, s site.Site) error {
 	}
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertSite, []any{
 		s.ID, s.Name, s.BaseURL, s.Username, s.SecretRef, string(s.Status), boolInt(s.AllowInsecure),
-		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin,
+		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin, string(s.Commerce),
 		nullString(s.Defaults.TemplateID), nullString(s.Defaults.LinkPolicyID), encoded.profiles,
 		formatTime(s.CreatedAt), formatTime(s.UpdatedAt),
 	}, siteConflict(s.ID), "insert the site")
@@ -83,7 +83,7 @@ func (r *SiteRepo) Update(ctx context.Context, s site.Site) error {
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateSite, []any{
 		s.Name, s.BaseURL, s.Username, string(s.Status), boolInt(s.AllowInsecure),
-		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin,
+		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin, string(s.Commerce),
 		nullString(s.Defaults.TemplateID), nullString(s.Defaults.LinkPolicyID), encoded.profiles,
 		formatTime(s.UpdatedAt), s.ID,
 	}, nil, "update the site")
@@ -118,37 +118,26 @@ func (r *SiteRepo) List(ctx context.Context, q site.Query, page paging.Request) 
 		builder = builder.Where(squirrel.Eq{"status": string(*q.Status)})
 	}
 
-	keyset := siteKeyset(q)
-	keyed, err := keyset.Apply(builder, page)
-	if err != nil {
-		return paging.List[site.Site]{}, err
-	}
-	query, args, err := buildQuery(keyed, "sites")
-	if err != nil {
-		return paging.List[site.Site]{}, err
-	}
-	rows, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanSite, "list the sites")
-	if err != nil {
-		return paging.List[site.Site]{}, err
-	}
-	return keyset.Cut(rows, page)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, siteKeyset(q), page, scanSite, "sites")
 }
 
 func scanSite(rows *sql.Rows) (site.Site, error) {
 	var (
 		s                              site.Site
-		status                         string
+		status, commerce               string
 		allowInsecure, pluginInstalled int64
 		capabilities, profiles         string
 		templateID, policyID           sql.NullString
 		createdAt, updatedAt           string
 	)
 	if err := rows.Scan(&s.ID, &s.Name, &s.BaseURL, &s.Username, &s.SecretRef, &status, &allowInsecure, &pluginInstalled,
-		&s.Plugin.Version, &capabilities, &s.Plugin.SEOPlugin, &templateID, &policyID, &profiles, &createdAt, &updatedAt); err != nil {
+		&s.Plugin.Version, &capabilities, &s.Plugin.SEOPlugin, &commerce, &templateID, &policyID, &profiles,
+		&createdAt, &updatedAt); err != nil {
 		return site.Site{}, err
 	}
 
 	s.Status = site.Status(status)
+	s.Commerce = site.Commerce(commerce)
 	s.AllowInsecure = allowInsecure == 1
 	s.Plugin.Installed = pluginInstalled == 1
 	s.Defaults.TemplateID = optString(templateID)
