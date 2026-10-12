@@ -2464,3 +2464,24 @@ None of it had been released.
   above.
 - **The third of the rewrite's three keys**: `category.Key` goes with the records; `graph.Key` and
   a keyword's own lowercase remain.
+
+## 2026-10-12 — the companion plugin runs on PHP 7.4
+
+The client's host runs PHP 7.4.33, and WordPress refused to install the plugin because its header
+asked for 8.1. The sources used nothing newer than PHP 7.1 (scalar and nullable types, `void`,
+namespaced array constants, `random_bytes`), so the 8.1 was a declared floor and not a used one,
+and only the header moves: `Requires PHP: 7.4`. WordPress ≥ 6.4 stays.
+
+- **The plugin stays 1.2.0.** The contract in `wp-plugin/openapi.yaml`, the manifest, the
+  capabilities and the behaviour are unchanged; only the install requirement drops, and no site
+  carries a 1.2.0 with the other header, since the client's install was refused. The sources are
+  those of `v2.3.0` but for that one header line.
+- **The lint runs on the floor.** `task plugin:lint` runs `php -l` on PHP 7.4, the compose
+  `phplint` service on `php:7.4.33-cli` and the CI plugin job on `setup-php` 7.4, so the plugin
+  takes no syntax newer than 7.4. Nothing in `wp-plugin` calls a function newer than 7.4 either,
+  which `php -l` cannot see: `str_contains`, `str_starts_with`, `str_ends_with`,
+  `array_is_list`, `match`, `?->`, named arguments, union or `mixed` types, enums and `readonly`
+  stay out.
+- **The released app hands out the old header.** v2.4.0 embeds the plugin through
+  `wp-plugin/embed.go`, so its Sites panel serves the 8.1 zip until the next release; the client
+  got the 7.4 zip by hand.

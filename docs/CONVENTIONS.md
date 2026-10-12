@@ -252,5 +252,6 @@ profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l
 `task lint:e2e` refuses to start while another golangci-lint runs ("parallel golangci-lint is
 running"): run it alone, or run its line from `Taskfile.yml` by hand with
 `--allow-parallel-runners`.
-`task plugin:lint` uses the pinned image's `php` on Windows and a local `php` on CI,
-which also packages the plugin and never starts the stack.
+`task plugin:lint` runs `php -l` on PHP 7.4, the plugin's floor: the compose `phplint` service's
+`php:7.4.33-cli` on Windows and `setup-php` 7.4 on CI, which also packages the plugin and never
+starts the stack.

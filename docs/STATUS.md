@@ -44,7 +44,9 @@ the same day on his word. The reasoning is under the four sections of those date
   row's Root group. The Catalog's products, which no Root names, sit under its Shop page by the URL
   tree.
 - **The companion plugin stays 1.2.0**: the 1.3.0 that filed pages under categories never shipped,
-  and the plugin's sources are those of `v2.3.0` again.
+  and the plugin's sources are those of `v2.3.0` again. Since 2026-10-12 it requires PHP 7.4, the
+  client's host, instead of 8.1; the released app's Sites panel still hands out the 8.1 header
+  until the next release.
 - **A workbook imports in one go**: one preview and one apply over the chosen sheets in the
   workbook's order, a tab per sheet, every finding naming its sheet, a scope clash caught in the
   preview, and a saved mapping or the sheet's own headers resolved before use, which is what makes

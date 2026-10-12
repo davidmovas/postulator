@@ -218,7 +218,7 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` **1.2.0** (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
+`wp-plugin/postulator-companion` **1.2.0** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies) serves
 `/wp-json/postulator/v1` and advertises `bulk seo_meta seo_meta_read content_hash raw
 preview`; every permission callback requires `edit_posts`, and the password must belong to an
 **administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not

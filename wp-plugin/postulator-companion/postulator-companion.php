@@ -3,7 +3,7 @@
  * Plugin Name: Postulator Companion
  * Version: 1.2.0
  * Requires at least: 6.4
- * Requires PHP: 8.1
+ * Requires PHP: 7.4
  */
 
 namespace Postulator\Companion;

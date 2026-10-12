@@ -125,6 +125,11 @@ jobs:
       - name: Install Task
         run: go install github.com/go-task/task/v3/cmd/task@${{ env.TASK_VERSION }}
 
+      - name: Set up PHP 7.4, the plugin's floor
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+
       - name: Show the PHP version
         run: php -v
 

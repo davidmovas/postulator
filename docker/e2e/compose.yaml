@@ -69,7 +69,7 @@ services:
       - ../../bin:/dist:ro
 
   phplint:
-    image: wordpress:7.0.1-php8.3-apache
+    image: php:7.4.33-cli
     profiles:
       - tools
     entrypoint: ["/bin/sh"]
