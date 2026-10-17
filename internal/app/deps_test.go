@@ -21,6 +21,8 @@ const (
 	pagingPackage   = "internal/kernel/paging"
 	agentTree       = "internal/transport/agent"
 	providerTree    = "internal/adapters/llm/openai"
+	fakeSiteTree    = "internal/adapters/wp/wptest"
+	siteClient      = "internal/adapters/wp"
 )
 
 const squirrel = "github.com/Masterminds/squirrel"
@@ -185,6 +187,16 @@ func TestTheAgentTalksToTheModelOnlyThroughThePort(t *testing.T) {
 		if ownPackage(dep, providerTree) {
 			t.Errorf("%s depends on %s; the agent asks the llm port and the composition root picks the provider",
 				agentTree, dep)
+		}
+	}
+}
+
+func TestTheFakeSiteIsIndependentOfTheClient(t *testing.T) {
+	t.Parallel()
+
+	for _, dep := range transitiveDeps(t, fakeSiteTree) {
+		if dep == modulePath+"/"+siteClient {
+			t.Errorf("%s depends on %s; the fake is a second, independent implementation of the contract", fakeSiteTree, dep)
 		}
 	}
 }
