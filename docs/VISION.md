@@ -61,8 +61,10 @@ rows and half-written pages behind.
   does not get written. Every other link type is counted, not owed.
 - **No markers.** Nothing we write carries a class, an attribute or a comment of ours; we remember
   our blocks by their hashes.
-- **Zero footprint.** Nothing on a client's site names or identifies this program: not the plugin,
-  its namespace or its keys, not the User-Agent, not a media file, not the HTML.
+- **Zero footprint.** Nothing a visitor receives names or identifies this program: not the public
+  HTML, not the content we write, not a media file's name, title, alt or caption, not what the
+  companion plugin emits on the front end, not the User-Agent. The plugin, its REST namespace and
+  its protected keys are seen only by the site's owner and keep their names.
 - **Secrets stay local**: DPAPI-protected master key, AES-GCM columns, full-database encryption,
   optional master password. Nothing sensitive reaches a log, an artifact or a plain column.
 - **Budgeted.** Every model call is priced and recorded. A run carries a hard cap and pauses

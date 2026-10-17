@@ -2686,3 +2686,78 @@ name and meta prefix; whether a product category term may be a parent and the re
 carry the client's class names; whether the writer may rewrite the client's own paragraphs (a
 per-type-and-field switch, off by default, is proposed); the User-Agent (the plugin's neutral name
 and version is proposed); and that the owner's sandbox on 8089 stays bare.
+
+## 2026-10-17 — the owner's answers to stage 0's questions
+
+The owner answered the seven questions stage 0 left open, and two more the stage 1a plan put to
+the owner the same day. Two answers change the record above: the companion plugin keeps its name,
+and the zero-footprint ruling shrinks to what a visitor receives.
+
+### The answers
+
+1. **Creating a planned page may set status, parent and slug, once.** Only the creation call
+   sends them, and the publish artifact records what it sent; an update never does. The client's
+   pages almost all exist already, empty of content, and the workbooks carry no slug or URL for
+   them, so creation is the rare path and editing an existing page the main one.
+2. **The page type lives on the page.** An entity reads its canonical page's type; `topic` and
+   `custom` map to Entity.
+3. **The companion plugin keeps its name.** No rename and no Content Bridge: the folder
+   `postulator-companion`, the namespace `postulator/v1`, the zip name, the text domain and the
+   meta and option prefixes all stay. Having our plugin installed on a client's site is fine; the
+   footprint ruling was only ever about traces in what a visitor receives.
+4. **A product category term page may be a parent, and the replica fixture may carry the
+   client's class names.**
+5. **The writer does not rewrite the client's own paragraphs by default.** A switch per page type
+   and field, off by default; a run may switch it on for chosen pages, with the user's
+   confirmation.
+6. **The User-Agent is neutral and has a per-site override.** The default names neither the
+   program nor the plugin. The override exists because CDNs and security plugins block unknown
+   agents, and reading the render must not die on those sites.
+7. **The owner's sandbox on 8089 stays the owner's.** It is never wiped or provisioned
+   implicitly; explicit tasks provision it as either stand, replica or vanilla, so patterns can
+   be tested by hand. The e2e suites still refuse 8089.
+8. **No activation hook** (asked at the 1a plan). Its one job was the rename's migration of the
+   old keys, and WordPress never fires an activation hook when a zip is uploaded over an
+   installed plugin, which is how the client updates; a hook with nothing to do would be a stub.
+9. **Uninstall removes the plugin's bookkeeping and keeps the SEO values** (asked at the 1a
+   plan). The term clock and the preview tokens and expiries go; the `_postulator_seo_*` title,
+   description, canonical and OG values a site without an SEO plugin keeps through the plugin
+   stay, being the client's content, so a client who deletes the plugin and uploads it again, as
+   people do instead of uploading over it, loses nothing.
+
+### The zero-footprint ruling, narrowed
+
+Nothing that reaches a visitor may name or identify the program:
+
+- the HTML of any public page;
+- content we write: classes, attributes, `data-*`, comments;
+- media file names, titles, alts and captions;
+- anything the plugin emits on the front end: markup, `wp_head` output, HTTP headers, generator
+  tags, publicly reachable query-var behaviour;
+- the HTTP User-Agent of our requests.
+
+The REST namespace, the plugin's name and admin UI, protected meta keys and options are allowed.
+The footprint tests cover exactly this scope.
+
+### What it amends in the 2026-10-17 record
+
+- **Decision 15, zero footprint**: narrowed to the list above. The REST namespace, the plugin's
+  name, slug, folder, text domain and header, option names, protected meta keys, transients, cron
+  hooks and the application password's name leave its scope. The preview query var
+  `postulator_preview` stays inside it, a visitor being able to reach it, and becomes neutral.
+- **Decision 16, the plugin strengthened and renamed**: strengthened, not renamed. Its version
+  moves to 1.4.0; 1.3.0, which named the categories build that never shipped, is not reused. Its
+  uninstall removes what answer 9 says, not everything it stored. The Sites panel finds an
+  outdated plugin by the manifest's version and capabilities, not by its namespace, and says to
+  upload the new zip over the old one, which WordPress offers as "Replace current with
+  uploaded".
+- **The rename under "Decided without asking"**: the Content Bridge proposal (`content-bridge`,
+  `content-bridge/v1`, `ContentBridge`, `_cbr_*`, 2.0.0) and the activation hook that copied the
+  old keys and deactivated the old plugin are withdrawn. The `Update URI` header stays, so
+  wordpress.org never offers a plugin of the same slug as an update.
+- **The old plugin by namespace**: part 16.9's "the Go client recognises `postulator/v1` as the
+  old plugin" is replaced by the version and capability check, and `TestTheOldPluginIsRecognised`
+  by a version check test.
+- **How the design settles what the record and the code disagree on**: the creation of a planned
+  page and a product category as a parent are settled by answers 1 and 4.
+- **Open with the owner**: closed.
