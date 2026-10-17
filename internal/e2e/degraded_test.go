@@ -491,13 +491,23 @@ func assertCorePull(t *testing.T, core *app.Core, siteID string, stored map[stri
 		t.Fatalf("%s hangs off %v, want the row of %s", child.Path, child.ParentPageID, parent.Path)
 	}
 
-	links := linksOf(t, core.Pages, stored[newsPath].ID)
+	links := rawLinksOf(t, core, stored[newsPath].ID)
 	if len(links) != 1 || links[0].ToURL != "/menu/" {
-		t.Fatalf("%s carries the links %+v, want the one to /menu/", newsPath, links)
+		t.Fatalf("%s carries the raw links %+v, want the one to /menu/", newsPath, links)
 	}
 	if links[0].ToPageID == nil || *links[0].ToPageID != parent.ID {
 		t.Fatalf("the link of %s resolved to %v, want the row of /menu/", newsPath, links[0].ToPageID)
 	}
+}
+
+func rawLinksOf(t *testing.T, core *app.Core, pageID string) []pagemap.PageLink {
+	t.Helper()
+
+	model, err := core.Observe.Page(t.Context(), pageID)
+	if err != nil {
+		t.Fatalf("read the model of %s: %v", pageID, err)
+	}
+	return slices.DeleteFunc(model.Links, func(link pagemap.PageLink) bool { return link.Source != pagemap.SourceRaw })
 }
 
 func assertNothingUnseenWasArchived(t *testing.T, stored map[string]pages.Page) {
