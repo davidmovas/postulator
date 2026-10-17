@@ -63,6 +63,7 @@ type Server struct {
 	postTypes     []PostType
 	taxonomies    []Taxonomy
 	reading       reading
+	storePages    StorePages
 	nextID        int64
 	nextTermID    int64
 	previewSeq    int64
@@ -76,7 +77,9 @@ type Server struct {
 	brokenExpiry  bool
 	noNamespaces  bool
 	noSettings    bool
-	mu            sync.Mutex
+
+	noStoreSettings bool
+	mu              sync.Mutex
 }
 
 type Option func(*Server)
@@ -185,6 +188,7 @@ func (s *Server) handler() http.Handler {
 	s.routeCategories(mux)
 	s.routeMedia(mux)
 	s.routeWoo(mux)
+	s.routeStore(mux)
 	s.routePlugin(mux)
 
 	public := http.NewServeMux()

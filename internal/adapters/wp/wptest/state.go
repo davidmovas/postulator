@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	TypePage            = "page"
-	TypePost            = "post"
-	TypeProduct         = "product"
-	TypeProductCategory = "product_cat"
+	TypePage             = "page"
+	TypePost             = "post"
+	TypeProduct          = "product"
+	TypeProductCategory  = "product_cat"
+	TypeProductVariation = "product_variation"
 
 	maxPathDepth = 10
 )
@@ -44,16 +45,22 @@ type Item struct {
 	Template       string
 	ProductType    string
 	RegularPrice   string
+	SalePrice      string
 	SKU            string
+	StockStatus    string
+	StockQuantity  *int64
 	Categories     []int64
 	Tags           []int64
 	Attributes     []Attribute
+	Choices        []Choice
+	MetaData       []MetaEntry
 	Terms          []Term
 	Images         []int64
 	ID             int64
 	Parent         int64
 	MenuOrder      int
 	FeaturedMedia  int64
+	ManageStock    bool
 }
 
 type Category struct {
@@ -188,7 +195,7 @@ func (s *Server) add(item Item) Item {
 	if item.Type == "" {
 		item.Type = TypePage
 	}
-	if !hierarchical(item.Type) {
+	if !hierarchical(item.Type) && item.Type != TypeProductVariation {
 		item.Parent = 0
 	}
 	if item.Status == "" {

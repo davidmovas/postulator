@@ -2,8 +2,10 @@ package wp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -34,6 +36,18 @@ type ProductImage struct {
 	ID  int64
 }
 
+type ProductCategory struct {
+	Name string
+	Slug string
+	ID   int64
+}
+
+type MetaEntry struct {
+	Key   string
+	Value json.RawMessage
+	ID    int64
+}
+
 type Product struct {
 	Modified         time.Time
 	Name             string
@@ -43,9 +57,19 @@ type Product struct {
 	Status           string
 	Description      string
 	ShortDescription string
+	Price            string
+	RegularPrice     string
+	SalePrice        string
+	SKU              string
+	StockStatus      string
+	StockQuantity    *int64
 	Attributes       []ProductAttribute
 	Images           []ProductImage
+	Categories       []ProductCategory
+	MetaData         []MetaEntry
+	VariationIDs     []int64
 	ID               int64
+	ManageStock      bool
 }
 
 type UpdateProduct struct {
@@ -111,9 +135,19 @@ type productPayload struct {
 	Status           string                    `json:"status"`
 	Description      string                    `json:"description"`
 	ShortDescription string                    `json:"short_description"`
+	Price            string                    `json:"price"`
+	RegularPrice     string                    `json:"regular_price"`
+	SalePrice        string                    `json:"sale_price"`
+	SKU              string                    `json:"sku"`
+	StockStatus      string                    `json:"stock_status"`
 	DateModifiedGMT  string                    `json:"date_modified_gmt"`
+	StockQuantity    quantity                  `json:"stock_quantity"`
+	ManageStock      stockManagement           `json:"manage_stock"`
 	Attributes       []productAttributePayload `json:"attributes"`
 	Images           []productImagePayload     `json:"images"`
+	Categories       []productCategoryPayload  `json:"categories"`
+	MetaData         []metaEntryPayload        `json:"meta_data"`
+	Variations       []int64                   `json:"variations"`
 	ID               int64                     `json:"id"`
 }
 
@@ -139,6 +173,11 @@ func (p productPayload) product() Product {
 		images = append(images, ProductImage(image))
 	}
 
+	categories := make([]ProductCategory, 0, len(p.Categories))
+	for _, category := range p.Categories {
+		categories = append(categories, ProductCategory(category))
+	}
+
 	return Product{
 		ID:               p.ID,
 		Name:             p.Name,
@@ -148,8 +187,18 @@ func (p productPayload) product() Product {
 		Status:           p.Status,
 		Description:      p.Description,
 		ShortDescription: p.ShortDescription,
+		Price:            p.Price,
+		RegularPrice:     p.RegularPrice,
+		SalePrice:        p.SalePrice,
+		SKU:              p.SKU,
+		StockStatus:      p.StockStatus,
+		StockQuantity:    p.StockQuantity.value,
+		ManageStock:      bool(p.ManageStock),
 		Attributes:       attributes,
 		Images:           images,
+		Categories:       categories,
+		MetaData:         metaEntries(p.MetaData),
+		VariationIDs:     slices.Clone(p.Variations),
 		Modified:         parseWPTime(p.DateModifiedGMT),
 	}
 }

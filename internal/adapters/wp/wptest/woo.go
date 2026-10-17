@@ -5,6 +5,7 @@ import (
 	"html"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 )
 
@@ -114,6 +115,9 @@ func (s *Server) handleWooList(w http.ResponseWriter, r *http.Request, itemType 
 
 	s.mu.Lock()
 	matched := s.filter(itemType, query)
+	if productType := query.Get("type"); itemType == TypeProduct && productType != "" {
+		matched = slices.DeleteFunc(matched, func(stored *Item) bool { return stored.ProductType != productType })
+	}
 	total := len(matched)
 	totalPages := (total + perPage - 1) / perPage
 
@@ -230,7 +234,14 @@ func (s *Server) productPayload(stored *Item, edit bool) map[string]any {
 		"status":            stored.Status,
 		"description":       rendered(stored.Content, edit),
 		"short_description": rendered(stored.Excerpt, edit),
+		"price":             priceOf(stored),
 		"regular_price":     stored.RegularPrice,
+		"sale_price":        stored.SalePrice,
+		"stock_status":      stockStatusOf(stored),
+		"manage_stock":      stored.ManageStock,
+		"stock_quantity":    stored.StockQuantity,
+		"meta_data":         metaDataPayload(stored.MetaData),
+		"variations":        s.variationIDs(stored.ID),
 		"sku":               stored.SKU,
 		"menu_order":        stored.MenuOrder,
 		"date_modified_gmt": stored.Modified.UTC().Format(wpTimeLayout),
