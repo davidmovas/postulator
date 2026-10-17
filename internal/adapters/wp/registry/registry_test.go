@@ -358,6 +358,54 @@ func TestTestConnectionFallsBackToTheStoredPassword(t *testing.T) {
 	}
 }
 
+func TestTestConnectionSendsTheSavedSitesUserAgent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		saved bool
+		want  string
+	}{
+		{name: "a saved site sends its own agent", saved: true, want: "Agent/1"},
+		{name: "a site not yet saved sends the default", want: wp.DefaultUserAgent},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			store := newSites(server)
+			store.record.Settings.UserAgent = "Agent/1"
+			held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+
+			candidate := site.Candidate{
+				BaseURL: store.record.BaseURL, Username: store.record.Username, Password: wptest.DefaultPassword, AllowInsecure: true,
+			}
+			if tc.saved {
+				candidate.SiteID = siteID
+			}
+			server.ResetRequests()
+			reached, err := held.TestConnection(t.Context(), candidate)
+			if err != nil {
+				t.Fatalf("TestConnection: %v", err)
+			}
+			if reached.Reach != site.ReachOK {
+				t.Fatalf("reachability = %+v", reached)
+			}
+			requests := server.Requests()
+			if len(requests) == 0 {
+				t.Fatal("no request reached the site")
+			}
+			for _, recorded := range requests {
+				if got := recorded.Header.Get("User-Agent"); got != tc.want {
+					t.Errorf("%s %s User-Agent = %q, want %q", recorded.Method, recorded.Path, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
 func TestTestConnectionReportsWhatItCannotDo(t *testing.T) {
 	t.Parallel()
 

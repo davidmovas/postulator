@@ -101,12 +101,16 @@ func (r *Registry) TestConnection(ctx context.Context, candidate site.Candidate)
 		return site.Reachability{Reach: site.ReachUnauthorized, Message: messageNoPassword}, nil
 	}
 
+	options, err := r.optionsFor(ctx, candidate)
+	if err != nil {
+		return site.Reachability{}, err
+	}
 	client, err := wp.New(wp.Config{
 		BaseURL:       candidate.BaseURL,
 		Username:      candidate.Username,
 		AppPassword:   password,
 		AllowInsecure: candidate.AllowInsecure,
-	}, r.options...)
+	}, options...)
 	if err != nil {
 		return site.Reachability{}, err
 	}
@@ -116,6 +120,20 @@ func (r *Registry) TestConnection(ctx context.Context, candidate site.Candidate)
 		return classifyProbeFailure(err)
 	}
 	return reachabilityOf(result), nil
+}
+
+func (r *Registry) optionsFor(ctx context.Context, candidate site.Candidate) ([]wp.Option, error) {
+	if candidate.SiteID == "" {
+		return r.options, nil
+	}
+	record, err := r.sites.Get(ctx, candidate.SiteID)
+	if err != nil {
+		if errors.IsCode(err, errors.NotFound) {
+			return r.options, nil
+		}
+		return nil, err
+	}
+	return append(slices.Clone(r.options), wp.WithUserAgent(record.Settings.UserAgent)), nil
 }
 
 func (r *Registry) credential(ctx context.Context, candidate site.Candidate) (password string, held bool, err error) {
