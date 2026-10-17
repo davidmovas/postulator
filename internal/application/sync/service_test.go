@@ -58,10 +58,12 @@ type prober struct {
 	state    site.PluginState
 	err      error
 	commerce site.Commerce
+	required string
+	outdated bool
 }
 
 func (p prober) Probe(context.Context, site.Site) (site.Extensions, error) {
-	return site.Extensions{Plugin: p.state, Commerce: p.commerce}, p.err
+	return site.Extensions{Plugin: p.state, Commerce: p.commerce, PluginRequired: p.required, PluginOutdated: p.outdated}, p.err
 }
 
 type packer struct {
@@ -164,6 +166,23 @@ func TestCheckPluginStoresWhatItFound(t *testing.T) {
 	}
 	if len(store.written) != 1 || !store.written[0].Plugin.Installed || store.written[0].Commerce != site.CommerceReady {
 		t.Fatalf("the site was written as %+v", store.written)
+	}
+}
+
+func TestCheckPluginSaysThePluginIsOutdated(t *testing.T) {
+	t.Parallel()
+
+	store := newSites()
+	service := newService(store, &queue{}, prober{state: site.PluginState{
+		Installed: true, Version: "1.2.0", Capabilities: []string{"bulk"}, SEOPlugin: "none",
+	}, required: "1.4.0", outdated: true}, packer{})
+
+	resp, err := service.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("CheckPlugin: %v", err)
+	}
+	if !resp.Plugin.Outdated || resp.Plugin.RequiredVersion != "1.4.0" || resp.Plugin.Version != "1.2.0" {
+		t.Errorf("plugin = %+v, want version 1.2.0 outdated against 1.4.0", resp.Plugin)
 	}
 }
 

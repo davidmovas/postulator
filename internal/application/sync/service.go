@@ -108,7 +108,7 @@ func (s *Service) CheckPlugin(ctx context.Context, req CheckPluginRequest) (Chec
 	if updateErr := s.sites.Update(ctx, next); updateErr != nil {
 		return CheckPluginResponse{}, updateErr
 	}
-	return CheckPluginResponse{Plugin: pluginView(found.Plugin), Commerce: string(found.Commerce)}, nil
+	return CheckPluginResponse{Plugin: pluginView(found), Commerce: string(found.Commerce)}, nil
 }
 
 func (s *Service) PluginPackage(_ context.Context, _ PluginPackageRequest) (PluginPackageResponse, error) {

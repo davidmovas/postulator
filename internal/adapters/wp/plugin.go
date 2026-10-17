@@ -27,7 +27,11 @@ const (
 
 	defaultContentLimit = 100
 	maxContentLimit     = 500
+
+	PluginVersion = "1.2.0"
 )
+
+var requiredCapabilities = []string{"bulk", "seo_meta", CapabilitySEOMetaRead, "content_hash", CapabilityRaw, CapabilityPreview}
 
 type PreviewLink struct {
 	ExpiresAt time.Time
@@ -52,6 +56,45 @@ type Capabilities struct {
 
 func (c Capabilities) Has(name string) bool {
 	return slices.Contains(c.Names, name)
+}
+
+func (c Capabilities) Missing() []string {
+	var missing []string
+	for _, name := range requiredCapabilities {
+		if !c.Has(name) {
+			missing = append(missing, name)
+		}
+	}
+	return missing
+}
+
+func (c Capabilities) Outdated() bool {
+	return versionBelow(c.Version, PluginVersion) || len(c.Missing()) > 0
+}
+
+func versionBelow(version, floor string) bool {
+	have, readable := versionNumbers(version)
+	if !readable {
+		return true
+	}
+	need, _ := versionNumbers(floor)
+	return slices.Compare(have, need) < 0
+}
+
+func versionNumbers(version string) ([]int, bool) {
+	parts := strings.Split(strings.TrimSpace(version), ".")
+	if len(parts) != 3 {
+		return nil, false
+	}
+	numbers := make([]int, 0, len(parts))
+	for _, part := range parts {
+		number, err := strconv.Atoi(part)
+		if err != nil || number < 0 {
+			return nil, false
+		}
+		numbers = append(numbers, number)
+	}
+	return numbers, true
 }
 
 type ContentQuery struct {
@@ -249,10 +292,13 @@ func IsPluginMissing(err error) bool {
 	return errors.IsCode(err, errors.Invalid) && detailString(err, "code") == codePluginMissing
 }
 
-func pluginOutdated(capability string) error {
-	return errors.New(errors.Invalid, "the Postulator companion plugin on this site is too old for this; update it").
+func pluginOutdated(capability string, found Capabilities) error {
+	return errors.New(errors.Invalid,
+		"the companion plugin on this site is too old for this: upload the new zip over the old one, and WordPress offers to replace the current version with the uploaded one").
 		WithDetail("code", codePluginOutdated).
-		WithDetail("capability", capability)
+		WithDetail("capability", capability).
+		WithDetail("version", found.Version).
+		WithDetail("required", PluginVersion)
 }
 
 func IsPluginOutdated(err error) bool {
@@ -324,7 +370,7 @@ func (c *Client) requireCapability(ctx context.Context, name string) error {
 		return err
 	}
 	if !capabilities.Has(name) {
-		return pluginOutdated(name)
+		return pluginOutdated(name, capabilities)
 	}
 	return nil
 }

@@ -135,10 +135,15 @@ func TestProbeReadsTheManifest(t *testing.T) {
 		name      string
 		opts      []wptest.Option
 		installed bool
+		outdated  bool
 		seo       string
 		commerce  site.Commerce
 	}{
 		{name: "the plugin answers", installed: true, seo: "yoast", commerce: site.CommerceReady},
+		{
+			name: "an older plugin", opts: []wptest.Option{wptest.WithPluginVersion("0.9.0")},
+			installed: true, outdated: true, seo: "yoast", commerce: site.CommerceReady,
+		},
 		{name: "the plugin is absent", opts: []wptest.Option{wptest.WithoutPlugin()}, commerce: site.CommerceReady},
 		{
 			name: "a site without a store", opts: []wptest.Option{wptest.WithoutCommerce()},
@@ -164,6 +169,9 @@ func TestProbeReadsTheManifest(t *testing.T) {
 			}
 			if found.Commerce != tc.commerce {
 				t.Errorf("commerce = %q, want %q", found.Commerce, tc.commerce)
+			}
+			if found.PluginOutdated != tc.outdated || found.PluginRequired != wp.PluginVersion {
+				t.Errorf("outdated = %t, required = %q, want %t and %q", found.PluginOutdated, found.PluginRequired, tc.outdated, wp.PluginVersion)
 			}
 			state := found.Plugin
 			if state.Installed != tc.installed || state.SEOPlugin != tc.seo {

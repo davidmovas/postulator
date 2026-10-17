@@ -61,6 +61,10 @@ export const sites = {
         installed: (version: string) => (version === "" ? "Installed" : `Installed, version ${version}`),
         missingTitle: (name: string) => `The companion plugin is not installed on ${name}`,
         missingBody: "Products stay invisible to a sync, SEO meta is read-only and neighbour links are never repaired.",
+        outdatedTitle: (version: string, required: string) =>
+            `The companion plugin is out of date: version ${version === "" ? "unknown" : version} is installed and ${required} is needed`,
+        outdatedBody:
+            "Save the plugin zip, then in WordPress open Plugins, Add New Plugin, Upload Plugin and upload it over the old one. WordPress offers Replace current with uploaded; choose it, and the plugin keeps its settings and the site's data.",
         recheck: "Check again",
         download: "Save the plugin zip",
         saved: (path: string) => `Companion plugin written to ${path}`,

@@ -91,11 +91,12 @@ func (s *Server) handleManifest(w http.ResponseWriter, _ *http.Request) {
 
 	s.mu.Lock()
 	plugin := s.seoPlugin
+	version := s.pluginVersion
 	capabilities := slices.Clone(s.capabilities)
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, map[string]any{
-		"version":      "1.2.0",
+		"version":      version,
 		"capabilities": capabilities,
 		"seoPlugin":    plugin,
 		"wpVersion":    "6.9.1",

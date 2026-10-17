@@ -59,6 +59,7 @@ type Server struct {
 	seoPlugin     string
 	redirect      Redirect
 	pendingEdit   *edit
+	pluginVersion string
 	capabilities  []string
 	postTypes     []PostType
 	taxonomies    []Taxonomy
@@ -123,6 +124,10 @@ func WithCapabilities(names ...string) Option {
 	return func(s *Server) { s.capabilities = slices.Clone(names) }
 }
 
+func WithPluginVersion(version string) Option {
+	return func(s *Server) { s.pluginVersion = version }
+}
+
 func WithoutNamespaces() Option {
 	return func(s *Server) { s.noNamespaces = true }
 }
@@ -143,16 +148,17 @@ func New(t TB, opts ...Option) *Server {
 	t.Helper()
 
 	server := &Server{
-		t:            t,
-		items:        make(map[int64]*Item),
-		terms:        make(map[int64]*Item),
-		categories:   make(map[int64]*Category),
-		uploads:      make(map[int64]*upload),
-		clock:        startInstant.Add(-time.Second),
-		user:         DefaultUser,
-		password:     DefaultPassword,
-		seoPlugin:    "yoast",
-		capabilities: []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"},
+		t:             t,
+		items:         make(map[int64]*Item),
+		terms:         make(map[int64]*Item),
+		categories:    make(map[int64]*Category),
+		uploads:       make(map[int64]*upload),
+		clock:         startInstant.Add(-time.Second),
+		user:          DefaultUser,
+		password:      DefaultPassword,
+		seoPlugin:     "yoast",
+		pluginVersion: "1.2.0",
+		capabilities:  []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"},
 	}
 	for _, opt := range opts {
 		opt(server)

@@ -170,7 +170,7 @@ func (r *Registry) Probe(ctx context.Context, record site.Site) (site.Extensions
 
 	client.InvalidateManifest()
 
-	plugin, err := pluginOf(ctx, client)
+	plugin, outdated, err := pluginOf(ctx, client)
 	if err != nil {
 		return site.Extensions{}, err
 	}
@@ -178,16 +178,21 @@ func (r *Registry) Probe(ctx context.Context, record site.Site) (site.Extensions
 	if err != nil {
 		return site.Extensions{}, err
 	}
-	return site.Extensions{Plugin: plugin, Commerce: site.Commerce(commerce)}, nil
+	return site.Extensions{
+		Plugin:         plugin,
+		Commerce:       site.Commerce(commerce),
+		PluginRequired: wp.PluginVersion,
+		PluginOutdated: outdated,
+	}, nil
 }
 
-func pluginOf(ctx context.Context, client *wp.Client) (site.PluginState, error) {
+func pluginOf(ctx context.Context, client *wp.Client) (state site.PluginState, outdated bool, err error) {
 	capabilities, err := client.Capabilities(ctx)
 	if err != nil {
 		if wp.IsPluginMissing(err) {
-			return site.PluginState{Capabilities: []string{}}, nil
+			return site.PluginState{Capabilities: []string{}}, false, nil
 		}
-		return site.PluginState{}, err
+		return site.PluginState{}, false, err
 	}
 
 	return site.PluginState{
@@ -195,5 +200,5 @@ func pluginOf(ctx context.Context, client *wp.Client) (site.PluginState, error) 
 		Version:      capabilities.Version,
 		Capabilities: capabilities.Names,
 		SEOPlugin:    capabilities.SEOPlugin,
-	}, nil
+	}, capabilities.Outdated(), nil
 }

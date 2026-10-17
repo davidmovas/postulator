@@ -56,8 +56,10 @@ func (c Commerce) Valid() bool {
 }
 
 type Extensions struct {
-	Plugin   PluginState
-	Commerce Commerce
+	Plugin         PluginState
+	Commerce       Commerce
+	PluginRequired string
+	PluginOutdated bool
 }
 
 type Defaults struct {

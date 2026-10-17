@@ -1,6 +1,42 @@
 import { describe, expect, it } from "vitest";
 
-import { capabilityLabel, seoPluginLabel, storeBanner } from "./plugin.js";
+import { capabilityLabel, pluginBanner, seoPluginLabel, storeBanner } from "./plugin.js";
+
+const current = {
+    installed: true,
+    outdated: false,
+    version: "1.4.0",
+    requiredVersion: "1.4.0",
+    capabilities: ["bulk", "raw"],
+    seoPlugin: "rankmath",
+};
+
+describe("what the panel says about the companion plugin", () => {
+    it("names a current plugin's version, capabilities and SEO plugin, and offers no zip", () => {
+        const banner = pluginBanner(current, "Shop");
+        expect(banner.tone).toBe("ok");
+        expect(banner.title).toContain("1.4.0");
+        expect(banner.body).toContain("bulk writes");
+        expect(banner.body).toContain("Rank Math");
+        expect(banner.offersZip).toBe(false);
+    });
+
+    it("names an outdated plugin, the version it needs and how to replace it, and offers the zip", () => {
+        const banner = pluginBanner({ ...current, outdated: true, version: "1.2.0" }, "Shop");
+        expect(banner.tone).toBe("warn");
+        expect(banner.title).toContain("1.2.0");
+        expect(banner.title).toContain("1.4.0");
+        expect(banner.body).toContain("Replace current with uploaded");
+        expect(banner.offersZip).toBe(true);
+    });
+
+    it("says a missing plugin is missing on the site it names, and offers the zip", () => {
+        const banner = pluginBanner({ ...current, installed: false, capabilities: [] }, "Shop");
+        expect(banner.tone).toBe("warn");
+        expect(banner.title).toContain("Shop");
+        expect(banner.offersZip).toBe(true);
+    });
+});
 
 describe("what the companion plugin reports, in words", () => {
     it("names every capability the plugin manifest can carry", () => {
