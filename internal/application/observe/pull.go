@@ -148,7 +148,7 @@ func fromProduct(product Product, install pagemap.Site) (item, bool) {
 	}
 	return item{
 		WPID: product.ID, Type: pagemap.WPProduct, Path: path, URL: product.Permalink, Slug: product.Slug, Status: product.Status,
-		Title: product.Name, ContentHash: field.Hash(product.Description), Content: product.Description, HasContent: true,
-		Terms: product.Categories, Modified: product.Modified,
+		Title: product.Name, Excerpt: product.ShortDescription, ContentHash: field.Hash(product.Description),
+		Content: product.Description, HasContent: true, Terms: product.Categories, Modified: product.Modified,
 	}, true
 }

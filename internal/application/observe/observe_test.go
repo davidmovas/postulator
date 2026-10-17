@@ -68,7 +68,7 @@ func newScenario(t *testing.T) *scenario {
 				observe.SEOMeta{Title: "TB-500 | Peptide Store", Description: "Buy TB-500."}),
 			contentItem(shopID, "page", "/shop/", "Shop", ""),
 			contentItem(accountID, "page", "/account/", "Account", accountRaw),
-			contentItem(productID, "product", "/product/bpc-157-peptide/", "BPC-157 Peptide", "<p>BPC-157 is a pentadecapeptide.</p>"),
+			withExcerpt(contentItem(productID, "product", "/product/bpc-157-peptide/", "BPC-157 Peptide", "<p>BPC-157 is a pentadecapeptide.</p>"), "<p>Lyophilized BPC-157.</p>"),
 			termItem(pepcatTermID, "/product-category/peptides/", "Peptides", 0),
 			termItem(healingTermID, "/product-category/peptides/healing-peptides/", "Healing Peptides", pepcatTermID),
 		},
@@ -145,6 +145,11 @@ func withLinks(item observe.ContentItem, links ...observe.ContentLink) observe.C
 
 func withMeta(item observe.ContentItem, meta observe.SEOMeta) observe.ContentItem {
 	item.Meta = meta
+	return item
+}
+
+func withExcerpt(item observe.ContentItem, excerpt string) observe.ContentItem {
+	item.Excerpt = excerpt
 	return item
 }
 
@@ -575,14 +580,20 @@ func TestProductsFillFieldsAndFactsAndVariationsStayUnderTheirProduct(t *testing
 	if err := json.Unmarshal([]byte(s.fieldOf(t, product.ID, field.Instance(field.Variation, "12")).Current), &facts); err != nil || facts.SKU != "BPC157-10MG" || facts.Price != "69" || facts.ManageStock != "parent" {
 		t.Errorf("variation 12 facts = %+v (%v)", facts, err)
 	}
-	for _, page := range s.stores.pages {
-		if page.WPID != nil && (*page.WPID == variationAID || *page.WPID == variationBID) {
+	for id := range s.stores.pages {
+		if page := s.stores.pages[id]; page.WPID != nil && (*page.WPID == variationAID || *page.WPID == variationBID) {
 			t.Errorf("a variation became a page: %+v", page)
 		}
 	}
 	terms := s.stores.terms[product.ID]
 	if len(terms) != 1 || terms[0].Slug != "healing-peptides" {
 		t.Errorf("without the plugin's terms the store's categories are the terms, got %+v", terms)
+	}
+	if excerpt := s.fieldOf(t, product.ID, field.Excerpt); excerpt.Current != "<p>Lyophilized BPC-157.</p>" {
+		t.Errorf("a product's excerpt is its short description, got %+v", excerpt)
+	}
+	if changed := s.openFindings(finding.FieldChangedOnSite); len(changed) != 0 {
+		t.Errorf("a first observation raised %d field changes: %+v", len(changed), changed)
 	}
 }
 
