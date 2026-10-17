@@ -174,10 +174,19 @@ function content_list( \WP_REST_Request $request ) {
 	);
 }
 
+function content_post_types(): array {
+	$types = get_post_types( array( 'public' => true ), 'names' );
+	unset( $types['attachment'] );
+	return array_values( $types );
+}
+
 function editable_post( \WP_REST_Request $request ) {
 	$post = get_post( (int) $request['id'] );
 	if ( ! $post instanceof \WP_Post || in_array( $post->post_status, array( 'auto-draft', 'trash' ), true ) ) {
 		return not_found( 'no post with that id' );
+	}
+	if ( ! in_array( $post->post_type, content_post_types(), true ) ) {
+		return not_found( 'no content post with that id' );
 	}
 	if ( ! current_user_can( 'edit_post', $post->ID ) ) {
 		return forbidden( 'editing this post is not allowed' );

@@ -120,6 +120,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "expected hash property", snippet: "\n        expectedHash:\n"},
 		{name: "anchor property", snippet: "\n        anchor:\n"},
 		{name: "href property", snippet: "\n        href:\n"},
+		{name: "content posts only", snippet: "The id of a content post, a post of a public post type other than an\n        attachment"},
 		{name: "href classification", snippet: "classified as\n            pagemap.Site.Resolve classifies it"},
 		{name: "href host and port", snippet: "its host and port equal the site's host and port"},
 		{name: "preview link schema", snippet: "\n    PreviewLink:\n"},

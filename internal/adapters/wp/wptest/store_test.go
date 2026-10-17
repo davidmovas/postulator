@@ -107,6 +107,22 @@ func TestVariationsAreListedUnderTheirProduct(t *testing.T) {
 	}
 }
 
+func TestThePostRoutesRefuseAVariation(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	product, variations := seedVariable(t, server)
+
+	response, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content/"+itoa(variations[0].ID)+"/raw", nil, true)
+	if response.StatusCode != http.StatusNotFound {
+		t.Errorf("a variation's raw = %d: %s, want 404", response.StatusCode, payload)
+	}
+	response, payload = call(t, server, http.MethodGet, "/wp-json/postulator/v1/content/"+itoa(product.ID)+"/raw", nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("its product's raw = %d: %s, want 200", response.StatusCode, payload)
+	}
+}
+
 func TestTheStoreSettingsAnswerThePageIDs(t *testing.T) {
 	t.Parallel()
 

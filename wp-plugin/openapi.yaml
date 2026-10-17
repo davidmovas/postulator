@@ -241,7 +241,12 @@ components:
       name: id
       in: path
       required: true
-      description: WordPress post, page, product or product category id.
+      description: >-
+        The id of a content post, a post of a public post type other than an
+        attachment, or a product category id where a route says so. On the
+        post routes any other post (a variation, a reusable block, a
+        navigation menu, a template, an attachment) answers 404 with the code
+        not_found, as a term id does.
       schema:
         type: integer
         format: int64

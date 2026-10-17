@@ -416,7 +416,7 @@ func (s *Server) contentItem(stored *Item) map[string]any {
 
 func (s *Server) editablePost(id int64) (*Item, bool) {
 	stored, found := s.items[id]
-	if !found || stored.Status == "trash" {
+	if !found || stored.Status == "trash" || stored.Type == TypeProductVariation {
 		return nil, false
 	}
 	return stored, true
