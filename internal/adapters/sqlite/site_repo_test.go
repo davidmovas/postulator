@@ -16,10 +16,19 @@ import (
 )
 
 func fullSite(name string, at time.Time) site.Site {
+	started := at.Add(-time.Hour)
+	settings := site.DefaultSettings()
+	settings.LinkURLForm = site.URLFormRelative
+	settings.UserAgent = "Mozilla/5.0 (compatible; Reader)"
+	settings.Observe = site.ObserveSettings{RenderConcurrency: 8, FullWalkEvery: 5}
+	settings.Builders = []site.BuilderRule{{Name: "house", DataAttributes: []string{"data-house"}, ClassPrefixes: []string{"house-"}, ShortcodePrefixes: []string{}}}
+	settings.Technical = site.TechnicalPages{Front: 2, Shop: 7, Cart: 8, Checkout: 9}
+	settings.Observation = site.ObservationState{LastStartedAt: &started, LastFullWalkAt: &started, SinceFullWalk: 3}
 	record := site.Site{
 		ID: id.New(), Name: name, BaseURL: "https://" + name + ".example.com", Username: "editor", Status: site.StatusPaused, AllowInsecure: true,
 		Plugin:    site.PluginState{Installed: true, Version: "1.2.0", Capabilities: []string{"bulk", "seo_meta"}, SEOPlugin: "yoast"},
 		Defaults:  site.Defaults{ModelProfiles: map[llm.Role]llm.ModelRef{llm.RoleWriter: {Provider: "openai", Model: "gpt"}}},
+		Settings:  settings,
 		CreatedAt: at, UpdatedAt: at,
 	}
 	record.SecretRef = site.SecretRef(record.ID)
@@ -67,6 +76,8 @@ func TestSiteRepoRoundTrip(t *testing.T) {
 
 	want.Name = "Shop Two"
 	want.Status = site.StatusActive
+	want.Settings.LinkURLForm = site.URLFormAbsolute
+	want.Settings.Observation.SinceFullWalk = 4
 	templateID := "t1"
 	want.Defaults.TemplateID = &templateID
 	want.UpdatedAt = sqlitetest.Stamp.Add(time.Hour)
@@ -177,6 +188,32 @@ func TestSiteRepoListPagesForwardAndBackward(t *testing.T) {
 
 	if _, err = repo.List(t.Context(), site.Query{Sort: site.SortName}, paging.Request{After: first.Next, Limit: 2}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a cursor from another sort must be INVALID, got %v", err)
+	}
+}
+
+func TestSiteRepoReadsTheSettingsNormalized(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	repo := sqlite.NewSiteRepo(store)
+	record := fullSite("bare", sqlitetest.Stamp)
+	record.Settings = site.Settings{UserAgent: "Kept/1.0"}
+	if err := repo.Insert(t.Context(), record); err != nil {
+		t.Fatalf("Insert with sparse settings: %v", err)
+	}
+	want := site.DefaultSettings()
+	want.UserAgent = "Kept/1.0"
+	got, err := repo.Get(t.Context(), record.ID)
+	if err != nil || !reflect.DeepEqual(got.Settings, want) {
+		t.Fatalf("the sparse settings read back as %+v, %v\nwant %+v", got.Settings, err, want)
+	}
+
+	record.Settings = site.Settings{}
+	if err = repo.Update(t.Context(), record); err != nil {
+		t.Fatalf("Update with empty settings: %v", err)
+	}
+	if got, err = repo.Get(t.Context(), record.ID); err != nil || !reflect.DeepEqual(got.Settings, site.DefaultSettings()) {
+		t.Fatalf("the empty settings read back as %+v, %v\nwant the defaults", got.Settings, err)
 	}
 }
 

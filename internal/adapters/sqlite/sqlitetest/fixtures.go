@@ -27,6 +27,7 @@ func Site(t testing.TB, store *sqlite.Store, name string) site.Site {
 		Status:    site.StatusActive,
 		Plugin:    site.PluginState{Capabilities: []string{}},
 		Defaults:  site.Defaults{ModelProfiles: map[llm.Role]llm.ModelRef{}},
+		Settings:  site.DefaultSettings(),
 		CreatedAt: Stamp,
 		UpdatedAt: Stamp,
 	}
