@@ -283,8 +283,11 @@ func TestCheckPluginReprobesASiteThatGainedThePlugin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CheckPlugin after the plugin was installed: %v", err)
 	}
-	if !present.Plugin.Installed || present.Plugin.Version != "1.2.0" {
+	if !present.Plugin.Installed || present.Plugin.Version != wp.PluginVersion {
 		t.Fatalf("plugin = %+v, want the companion reported as installed", present.Plugin)
+	}
+	if present.Plugin.Outdated || present.Plugin.RequiredVersion != wp.PluginVersion {
+		t.Errorf("plugin = %+v, want a current plugin measured against %s", present.Plugin, wp.PluginVersion)
 	}
 	if !slices.Contains(present.Plugin.Capabilities, "bulk") ||
 		!slices.Contains(present.Plugin.Capabilities, "seo_meta") {
