@@ -470,7 +470,7 @@ func TestEveryKindRecipeIsRunnableByTheRealRegistry(t *testing.T) {
 		t.Fatalf("register the steps: %v", err)
 	}
 
-	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync, run.KindRevert} {
+	for _, kind := range []run.Kind{run.KindRelink, run.KindSync, run.KindRevert} {
 		recipe, owns := kind.Recipe()
 		if !owns {
 			t.Fatalf("%s owns no recipe", kind)
@@ -530,13 +530,13 @@ func TestARelinkRunPlacesTheLinksWithoutWritingThePageAgain(t *testing.T) {
 	}
 }
 
-func TestARelinkRunAndARepairRunCostNothing(t *testing.T) {
+func TestARelinkRunAndASyncRunCostNothing(t *testing.T) {
 	t.Parallel()
 
 	p := newPipeline(t)
 	engine := p.start(t)
 
-	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync} {
+	for _, kind := range []run.Kind{run.KindRelink, run.KindSync} {
 		recipe, _ := kind.Recipe()
 		estimate, err := engine.EstimateRun(t.Context(), run.Run{
 			SiteID: p.siteID, Kind: kind, Targets: []string{p.pageID}, Recipe: recipe,

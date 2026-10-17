@@ -15,24 +15,23 @@ type placement struct {
 }
 
 func parentFor(ctx context.Context, deps Deps, page pagemap.Page) (placement, error) {
-	if !hierarchical(page) {
+	if !hierarchical(page) || page.WPID != nil {
 		return placement{}, nil
 	}
 	return parentOf(ctx, deps, page)
 }
 
 func parentOf(ctx context.Context, deps Deps, page pagemap.Page) (placement, error) {
-	wanted := pagemap.ParentPath(page.Path)
-	if wanted == "" || wanted == "/" {
-		return placement{}, nil
-	}
-
 	if page.ParentPageID == nil {
+		above := pagemap.ParentPath(page.Path)
+		if above == "" || above == pagemap.RootPath {
+			return placement{}, nil
+		}
 		return placement{}, errors.New(errors.Invalid,
-			"the page map holds no page at "+wanted+", so "+page.Path+" has no parent to sit under").
+			"the page map holds no page at "+above+", so "+page.Path+" has no parent to sit under").
 			WithDetail("pageId", page.ID).
 			WithDetail("path", page.Path).
-			WithDetail("parentPath", wanted)
+			WithDetail("parentPath", above)
 	}
 
 	parent, err := deps.Pages.Get(ctx, *page.ParentPageID)
@@ -46,13 +45,8 @@ func parentOf(ctx context.Context, deps Deps, page pagemap.Page) (placement, err
 		}
 		return placement{}, err
 	}
-	if parent.Path != wanted {
-		return placement{}, errors.New(errors.Invalid,
-			"the page is linked to "+parent.Path+" while its path asks for "+wanted).
-			WithDetail("pageId", page.ID).
-			WithDetail("path", page.Path).
-			WithDetail("parentPath", wanted).
-			WithDetail("linkedPath", parent.Path)
+	if parent.Path == pagemap.RootPath {
+		return placement{}, nil
 	}
 	if parent.WPID == nil {
 		return placement{path: parent.Path, pending: true}, nil

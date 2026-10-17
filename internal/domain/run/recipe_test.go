@@ -31,10 +31,7 @@ func TestAKindThatOwnsARecipeHandsItOut(t *testing.T) {
 			name: "relink", kind: run.KindRelink, owned: true,
 			want: []string{"resolve_context", "relink_page", "sync_back", "report"},
 		},
-		{
-			name: "repair", kind: run.KindRepair, owned: true,
-			want: []string{"repair_hierarchy", "sync_back", "report"},
-		},
+		{name: "repair", kind: run.KindRepair},
 		{name: "sync", kind: run.KindSync, owned: true, want: []string{"sync_site"}},
 		{name: "revert", kind: run.KindRevert, owned: true, want: []string{"revert"}},
 		{name: "generate", kind: run.KindGenerate},
@@ -85,8 +82,8 @@ func TestAStepBelongsToATemplateRecipeOrToAKindNeverBoth(t *testing.T) {
 	t.Parallel()
 
 	perKind := run.PerKindStepNames()
-	if len(perKind) != 4 {
-		t.Fatalf("PerKindStepNames() = %v, want the four steps a kind recipe owns", perKind)
+	if len(perKind) != 3 {
+		t.Fatalf("PerKindStepNames() = %v, want the three steps a kind recipe owns", perKind)
 	}
 
 	for _, name := range perKind {
@@ -115,7 +112,7 @@ func TestEveryPerKindStepIsNamedByExactlyOneKind(t *testing.T) {
 		run.KindRepair, run.KindRevert, run.KindCustom,
 	}
 
-	for _, step := range []string{"repair_hierarchy", "sync_site", "relink_page", "revert"} {
+	for _, step := range []string{"sync_site", "relink_page", "revert"} {
 		owners := make([]run.Kind, 0, 1)
 		for _, kind := range kinds {
 			recipe, owned := kind.Recipe()

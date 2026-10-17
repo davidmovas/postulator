@@ -126,6 +126,9 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if recordErr := record(ctx, deps, sc, written, result); recordErr != nil {
 		return run.Result{}, recordErr
 	}
+	if recordErr := recordWritten(ctx, deps, sc, sc.Page.ID, rendered, written.Title, seo.applied); recordErr != nil {
+		return run.Result{}, recordErr
+	}
 	return publishedAs(result, verb(found)+" "+sc.Page.Path+" as "+strconv.FormatInt(written.ID, 10))
 }
 
@@ -138,6 +141,7 @@ type writeRequest struct {
 	parent   int64
 	featured int64
 	found    bool
+	created  bool
 }
 
 func itemRequest(sc *run.StepContext, draft content.ContentDraft, rendered string, parent, featured int64) writeRequest {
@@ -149,6 +153,7 @@ func itemRequest(sc *run.StepContext, draft content.ContentDraft, rendered strin
 
 func writeItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, sc *run.StepContext,
 	asked writeRequest) (wp.Item, []pagemap.Mismatch, error) {
+	asked.created = !asked.found
 	written, err := upsert(ctx, client, itemType, asked)
 	if err != nil {
 		return wp.Item{}, nil, err
@@ -179,12 +184,7 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 		return client.CreateItem(ctx, itemType, in)
 	}
 
-	in := wp.UpdateItem{
-		Title: &req.title, Content: &req.content, Slug: &req.slug, Status: &req.status,
-	}
-	if itemType == wp.TypePage {
-		in.Parent = &req.parent
-	}
+	in := wp.UpdateItem{Title: &req.title, Content: &req.content, Status: &req.status}
 	if req.featured != 0 {
 		in.FeaturedMedia = &req.featured
 	}
@@ -193,12 +193,17 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 
 func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap.Mismatch {
 	checked := sc.Page
-	checked.Slug = asked.slug
 	checked.Title = asked.title
 	checked.H1 = ""
 	checked.Status = statusOf(sc.Run.PublishMode)
 	checked.Observed = observedOf(written)
+	if !asked.created {
+		checked.Slug = ""
+		checked.Observed.Link = ""
+		return checked.Mismatches()
+	}
 
+	checked.Slug = asked.slug
 	found := checked.Mismatches()
 	if hierarchical(sc.Page) && written.Parent != asked.parent {
 		found = append(found, pagemap.Mismatch{

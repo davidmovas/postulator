@@ -77,7 +77,7 @@ export const runKinds = [
 ] as const;
 export type RunKind = (typeof runKinds)[number];
 
-export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "repair", "revert"];
+export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "revert"];
 
 export const runStatuses = [
     "pending",
@@ -146,7 +146,7 @@ export const stepNames = [
 ] as const;
 export type StepName = (typeof stepNames)[number];
 
-export const perKindStepNames = ["repair_hierarchy", "sync_site", "relink_page", "revert"] as const;
+export const perKindStepNames = ["sync_site", "relink_page", "revert"] as const;
 export type PerKindStepName = (typeof perKindStepNames)[number];
 
 export const retryBlockedReasons = ["inputs_expired"] as const;

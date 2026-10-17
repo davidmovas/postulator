@@ -20,7 +20,6 @@ export const runs = {
         report: "Report",
     },
     perKindSteps: {
-        repair_hierarchy: "Move under the parent",
         sync_site: "Sync the site",
         relink_page: "Place the links",
         revert: "Put it back",
@@ -271,7 +270,7 @@ export const runs = {
             audit: "Runs the page steps you choose without a recipe of its own.",
             sync: "Reads the whole site back into the page map. The pages it names are ignored.",
             import: "Runs the page steps you choose without a recipe of its own.",
-            repair: "Moves each page under the parent its path asks for, without rewriting it. No model is called.",
+            repair: "No model is called. The hierarchy is read from the site and never written, so a repair can no longer be started; a relink fixes the links.",
             revert: "A revert is started from the run it undoes, on that run's page.",
             custom: "Runs exactly the steps of the template, whatever they are.",
         },

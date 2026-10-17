@@ -30,7 +30,6 @@ func all(deps Deps) []run.StepDef {
 		RelinkNeighbors(deps),
 		SyncBack(deps),
 		Report(deps),
-		RepairHierarchy(deps),
 		SyncSite(deps),
 		RelinkPage(deps),
 		Revert(deps),

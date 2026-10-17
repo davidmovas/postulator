@@ -169,7 +169,7 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	}
 
 	h.restart(t)
-	h.all(t)
+	h.fullWalk(t)
 
 	stored, err := h.links.ListForPage(t.Context(), espresso.ID)
 	if err != nil {
@@ -186,7 +186,7 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	}
 }
 
-func TestSyncSiteResolvesARelativeHrefAgainstTheInstallBase(t *testing.T) {
+func TestSyncSiteResolvesARelativeHrefAgainstTheDocument(t *testing.T) {
 	t.Parallel()
 
 	h := newSyncHarness(t, 0, wptest.WithoutPlugin())
@@ -206,7 +206,7 @@ func TestSyncSiteResolvesARelativeHrefAgainstTheInstallBase(t *testing.T) {
 	if len(stored) != 1 {
 		t.Fatalf("the page carries %d links, want the one relative href: %+v", len(stored), stored)
 	}
-	if stored[0].ToURL != "/blog/espresso/" {
-		t.Fatalf("the relative href resolved to %q, want it joined to the install base", stored[0].ToURL)
+	if stored[0].ToURL != "/coffee/espresso/" {
+		t.Fatalf("the relative href resolved to %q, want it under the page as a browser reads it", stored[0].ToURL)
 	}
 }

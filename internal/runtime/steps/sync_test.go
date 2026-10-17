@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -43,15 +44,18 @@ func (b *busRecorder) seen() []events.Type {
 }
 
 type syncHarness struct {
-	store  *sqlite.Store
-	server *wptest.Server
-	deps   steps.Deps
-	bus    *busRecorder
-	clock  *clock.Fake
-	pages  *sqlite.PageRepo
-	links  *sqlite.PageLinkRepo
-	siteID string
-	check  run.Checkpoint
+	store      *sqlite.Store
+	server     *wptest.Server
+	deps       steps.Deps
+	bus        *busRecorder
+	clock      *clock.Fake
+	pages      *sqlite.PageRepo
+	links      *sqlite.PageLinkRepo
+	identities *sqlite.PageIdentityRepo
+	findings   *sqlite.FindingRepo
+	siteID     string
+	check      run.Checkpoint
+	params     map[string]any
 }
 
 func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness {
@@ -75,14 +79,24 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 	siteRepo := sqlite.NewSiteRepo(store)
 	pageRepo := sqlite.NewPageRepo(store)
 	linkRepo := sqlite.NewPageLinkRepo(store)
+	identityRepo := sqlite.NewPageIdentityRepo(store)
+	bodyRepo := sqlite.NewPageBodyRepo(store)
+	fieldRepo := sqlite.NewPageFieldRepo(store)
+	findingRepo := sqlite.NewFindingRepo(store)
+	observer := observe.New(observe.Deps{
+		Sites: siteRepo, Pages: pageRepo, Identity: identityRepo, Fields: fieldRepo, Bodies: bodyRepo,
+		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: findingRepo,
+		UnitOfWork: store, Publisher: bus, Clock: fake,
+	})
 
 	return &syncHarness{
 		store: store, server: server, bus: bus, clock: fake,
-		pages: pageRepo, links: linkRepo, siteID: owner.ID, check: run.NewCheckpoint(),
+		pages: pageRepo, links: linkRepo, identities: identityRepo, findings: findingRepo,
+		siteID: owner.ID, check: run.NewCheckpoint(), params: map[string]any{},
 		deps: steps.Deps{
 			Pages: pageRepo, Links: linkRepo, Sites: siteRepo, SiteWriter: siteRepo,
-			WordPress: oneClient{client: syncClient(t, server)}, UnitOfWork: store, Publisher: bus,
-			Clock: fake, BatchSize: batch,
+			WordPress: oneClient{client: syncClient(t, server)}, Observe: observer, Bodies: bodyRepo, Fields: fieldRepo,
+			UnitOfWork: store, Publisher: bus, Clock: fake, BatchSize: batch,
 		},
 	}
 }
@@ -93,7 +107,7 @@ func (h *syncHarness) once(t *testing.T) (steps.SiteSyncResult, run.Result) {
 	sc := &run.StepContext{
 		Run:       run.Run{ID: "run", SiteID: h.siteID, Kind: run.KindSync},
 		Item:      run.Item{ID: "item", RunID: "run", SiteID: h.siteID, TargetID: h.siteID},
-		Params:    map[string]any{},
+		Params:    h.params,
 		Artifacts: map[run.ArtifactKind]run.Artifact{},
 		Check:     h.check.Clone(),
 	}
@@ -114,7 +128,7 @@ func (h *syncHarness) once(t *testing.T) (steps.SiteSyncResult, run.Result) {
 func (h *syncHarness) all(t *testing.T) steps.SiteSyncResult {
 	t.Helper()
 
-	for range 20 {
+	for range 80 {
 		state, _ := h.once(t)
 		if state.Done {
 			return state
@@ -122,6 +136,14 @@ func (h *syncHarness) all(t *testing.T) steps.SiteSyncResult {
 	}
 	t.Fatal("the sync never finished")
 	return steps.SiteSyncResult{}
+}
+
+func (h *syncHarness) fullWalk(t *testing.T) steps.SiteSyncResult {
+	t.Helper()
+
+	h.params = map[string]any{steps.ParamFullWalk: true}
+	defer func() { h.params = map[string]any{} }()
+	return h.all(t)
 }
 
 func syncClient(t *testing.T, server *wptest.Server) *wp.Client {
@@ -189,8 +211,8 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 		opts   []wptest.Option
 		source string
 	}{
-		{name: "with the plugin", source: steps.SourcePlugin},
-		{name: "without the plugin", opts: []wptest.Option{wptest.WithoutPlugin()}, source: steps.SourceCore},
+		{name: "with the plugin", source: observe.SourcePlugin},
+		{name: "without the plugin", opts: []wptest.Option{wptest.WithoutPlugin()}, source: observe.SourceCore},
 	}
 
 	for _, tc := range cases {
@@ -213,8 +235,8 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 				t.Fatalf("the child page is %+v; a page we never wrote carries no hash of ours", child)
 			}
 			parent := h.byPath(t, "/coffee/")
-			if child.ParentPageID == nil || *child.ParentPageID != parent.ID {
-				t.Fatalf("the child page is %+v, want the parent %s", child, parent.ID)
+			if child.ParentPageID == nil || *child.ParentPageID != parent.ID || child.ParentReason != pagemap.ParentWP {
+				t.Fatalf("the child page is %+v, want the parent %s by wp_parent", child, parent.ID)
 			}
 			if draft := h.byPath(t, "/coffee/filter/"); draft.Status != pagemap.StatusExists {
 				t.Fatalf("the draft page is %+v", draft)
@@ -224,12 +246,19 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 			if err != nil {
 				t.Fatalf("list the links: %v", err)
 			}
-			if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != parent.ID {
+			if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != parent.ID || links[0].Source != pagemap.SourceRaw {
 				t.Fatalf("the links of the child are %+v", links)
 			}
 
 			if seen := h.bus.seen(); len(seen) != 1 || seen[0] != events.PagesChanged {
 				t.Fatalf("the bus saw %v", h.bus.seen())
+			}
+			identities, err := h.identities.ListBySite(t.Context(), h.siteID)
+			if err != nil || len(identities) != 3 {
+				t.Fatalf("identities = %d (%v), want one per page", len(identities), err)
+			}
+			if state.Summary == nil || state.Summary.Observed != 3 || state.Stage != string(observe.StageDone) {
+				t.Fatalf("the finished sync reports %+v", state)
 			}
 		})
 	}
@@ -246,7 +275,7 @@ func TestSyncSiteRebuildsTheDraftPathsCoreRESTWillNotGive(t *testing.T) {
 	)
 
 	state := h.all(t)
-	if state.Source != steps.SourceCore || state.Created != 3 {
+	if state.Source != observe.SourceCore || state.Created != 3 {
 		t.Fatalf("state = %+v, want three pages created through core", state)
 	}
 
@@ -309,12 +338,12 @@ func TestSyncSiteAsksTheStoreOnceAndRecordsWhatItFound(t *testing.T) {
 
 			asked := 0
 			for _, request := range h.server.Requests() {
-				if request.Path == "/wp-json/wp/v2/users/me" || request.Path == "/wp-json/wc/v3/products" {
+				if request.Path == "/wp-json/wp/v2/users/me" {
 					asked++
 				}
 			}
-			if asked > 2 {
-				t.Errorf("the store was asked %d times over a sync of several batches, want it asked once", asked)
+			if asked > 1 {
+				t.Errorf("the store was probed %d times over a sync of several batches, want it probed once", asked)
 			}
 		})
 	}
@@ -352,9 +381,9 @@ func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T)
 
 	h.clock.Advance(time.Minute)
 	h.restart(t)
-	state := h.all(t)
+	state := h.fullWalk(t)
 
-	if state.Drifted != 1 || state.Archived != 1 {
+	if state.Archived != 1 {
 		t.Fatalf("state = %+v", state)
 	}
 	drifted := h.byPath(t, "/coffee/espresso/")
@@ -466,8 +495,8 @@ func TestSyncSiteMergesAPulledItemOnlyIntoARowOfItsFamily(t *testing.T) {
 	if stored.WPType != pagemap.WPProduct || stored.WPID != nil || stored.Title != planned.Title {
 		t.Fatalf("the planned product became %+v; a page on the site is not the product the file plans", stored)
 	}
-	if len(state.Findings) != 1 || state.Findings[0].Code != steps.CodePathTakenOnSite {
-		t.Fatalf("findings = %+v, want one %q", state.Findings, steps.CodePathTakenOnSite)
+	if len(state.Findings) != 1 || state.Findings[0].Code != observe.CodePathTakenOnSite {
+		t.Fatalf("findings = %+v, want one %q", state.Findings, observe.CodePathTakenOnSite)
 	}
 	if state.Findings[0].Details["path"] != "/liquid/" {
 		t.Errorf("the finding = %+v", state.Findings[0])
@@ -526,7 +555,7 @@ func TestSyncSiteGivesAWaitingRowTheProductCreatedForIt(t *testing.T) {
 	}
 }
 
-func TestSyncSiteSettlesEveryParentFromThePathAboveIt(t *testing.T) {
+func TestSyncSiteDerivesEveryParentFromTheSite(t *testing.T) {
 	t.Parallel()
 
 	row := func(siteID, path string, parent *string) pagemap.Page {
@@ -621,35 +650,22 @@ func TestSyncSiteAdoptsAPageItHasNeverSeen(t *testing.T) {
 	}
 }
 
-func TestSyncSiteRestartsWhenTheCursorSourceChanges(t *testing.T) {
-	t.Parallel()
-
-	h := newSyncHarness(t, 1, wptest.WithoutPlugin())
-	seedSite(t, h)
-	if err := run.Set(h.check, "sync", steps.SiteSyncResult{
-		Source: steps.SourcePlugin, Cursor: "a plugin cursor", Batches: 4, Pulled: 9,
-	}); err != nil {
-		t.Fatalf("plant the plugin checkpoint: %v", err)
-	}
-
-	state, _ := h.once(t)
-	if state.Source != steps.SourceCore || state.Batches != 1 || state.Pulled != 1 {
-		t.Fatalf("state = %+v; a cursor issued by the other source restarts the pull", state)
-	}
-	if state.StartedAt.IsZero() {
-		t.Fatalf("the restarted pull needs its own window: %+v", state)
-	}
-}
-
-func TestSyncSiteResumesFromItsCursor(t *testing.T) {
+func TestSyncSiteResumesFromItsCheckpoint(t *testing.T) {
 	t.Parallel()
 
 	h := newSyncHarness(t, 2)
 	seedSite(t, h)
 
-	first, result := h.once(t)
-	if first.Done || first.Cursor == "" || first.Pulled != 2 {
-		t.Fatalf("the first batch = %+v", first)
+	var first steps.SiteSyncResult
+	var result run.Result
+	for range 10 {
+		first, result = h.once(t)
+		if first.Pulled > 0 {
+			break
+		}
+	}
+	if first.Done || first.Pulled != 2 || first.Stage != string(observe.StageContent) {
+		t.Fatalf("the first content batch = %+v", first)
 	}
 	if result.Next != run.TransitionWait {
 		t.Fatalf("the first batch asked for %q, want a wait", result.Next)
@@ -657,7 +673,7 @@ func TestSyncSiteResumesFromItsCursor(t *testing.T) {
 
 	h.reconnect(t)
 	state := h.all(t)
-	if !state.Done || state.Pulled != 3 || state.Batches < 2 {
+	if !state.Done || state.Pulled != 3 || state.Batches < 3 {
 		t.Fatalf("state = %+v", state)
 	}
 	if seen := h.bus.seen(); len(seen) != 1 {
@@ -717,7 +733,7 @@ func TestSyncSiteRefusesAnUnreadableCursor(t *testing.T) {
 	seedSite(t, h)
 
 	broken := run.NewCheckpoint()
-	if err := run.Set(broken, "sync", steps.SiteSyncResult{Source: steps.SourceCore, Cursor: "{{{"}); err != nil {
+	if err := run.Set(broken, "sync", map[string]any{"state": "nonsense", "batches": "many"}); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
 	h.check = broken
@@ -728,8 +744,8 @@ func TestSyncSiteRefusesAnUnreadableCursor(t *testing.T) {
 		Artifacts: map[run.ArtifactKind]run.Artifact{},
 		Check:     broken,
 	}
-	if _, err := steps.SyncSite(h.deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Invalid, err)
+	if _, err := steps.SyncSite(h.deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Internal) {
+		t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), errors.Internal, err)
 	}
 }
 
@@ -751,10 +767,10 @@ func TestBatchSizeCarriesItsDefaultAndItsSetting(t *testing.T) {
 	}
 }
 
-func TestSyncSiteLeavesTypesTheCorePullNeverSaw(t *testing.T) {
+func TestSyncSiteLeavesTypesTheWalkNeverCovered(t *testing.T) {
 	t.Parallel()
 
-	h := newSyncHarness(t, 0, wptest.WithoutPlugin())
+	h := newSyncHarness(t, 0, wptest.WithoutPlugin(), wptest.WithoutCommerce())
 	seedSite(t, h)
 
 	product := int64(4242)
@@ -768,9 +784,9 @@ func TestSyncSiteLeavesTypesTheCorePullNeverSaw(t *testing.T) {
 	}
 
 	h.clock.Advance(time.Minute)
-	state := h.all(t)
+	state := h.fullWalk(t)
 	if state.Archived != 0 {
-		t.Fatalf("state = %+v, want a core pull to leave a product alone", state)
+		t.Fatalf("state = %+v, want a walk without a store to leave a product alone", state)
 	}
 	if kept := h.byPath(t, "/shop/grinder/"); kept.Status != pagemap.StatusPublished {
 		t.Fatalf("the product page is %+v", kept)
@@ -791,8 +807,9 @@ func TestSyncSiteArchivesNothingUntilThePullIsComplete(t *testing.T) {
 
 	h.clock.Advance(time.Minute)
 	h.restart(t)
+	h.params = map[string]any{steps.ParamFullWalk: true}
 
-	for range 20 {
+	for range 80 {
 		state, _ := h.once(t)
 		if !state.Done {
 			if state.Archived != 0 {

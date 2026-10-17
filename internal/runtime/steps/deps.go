@@ -9,7 +9,9 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -53,6 +55,14 @@ type siteClients interface {
 
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
+}
+
+type bodyRecorder interface {
+	Record(ctx context.Context, pageID, raw string, at time.Time) error
+}
+
+type fieldRecorder interface {
+	Record(ctx context.Context, pageID string, key field.Key, value, runID string, at time.Time) error
 }
 
 type templateReader interface {
@@ -101,6 +111,9 @@ type Deps struct {
 	ImageProvider ImageProvider
 	ImageModel    *domainllm.ModelRef
 	ImageSources  map[template.ImageSource]ImageSource
+	Observe       *observe.Service
+	Bodies        bodyRecorder
+	Fields        fieldRecorder
 	UnitOfWork    unitOfWork
 	Publisher     application.Publisher
 	Clock         clock.Clock

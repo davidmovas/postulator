@@ -337,6 +337,9 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 	outcome.Anchor = anchor
 	outcome.Sentence = sentence
 	outcome.Before = NeighborBefore{Hash: body.raw.ContentHash, HTML: body.raw.Content}
+	if recordErr := recordBody(ctx, deps, neighbor.ID, updated); recordErr != nil {
+		return NeighborResult{}, recordErr
+	}
 	if adoptErr := adopt(ctx, deps, neighbor, n.index, n.site, body.doc, hash); adoptErr != nil {
 		return NeighborResult{}, adoptErr
 	}

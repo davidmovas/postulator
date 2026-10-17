@@ -19,13 +19,17 @@ const (
 	StepReport          StepName = "report"
 )
 
+const (
+	ParamRenderRescan = "renderRescan"
+	ParamFullWalk     = "full"
+)
+
 type PerKindStepName string
 
 const (
-	StepRepairHierarchy PerKindStepName = "repair_hierarchy"
-	StepSyncSite        PerKindStepName = "sync_site"
-	StepRelinkPage      PerKindStepName = "relink_page"
-	StepRevert          PerKindStepName = "revert"
+	StepSyncSite   PerKindStepName = "sync_site"
+	StepRelinkPage PerKindStepName = "relink_page"
+	StepRevert     PerKindStepName = "revert"
 )
 
 var stepNames = []StepName{
@@ -35,7 +39,7 @@ var stepNames = []StepName{
 }
 
 var perKindSteps = []PerKindStepName{
-	StepRepairHierarchy, StepSyncSite, StepRelinkPage, StepRevert,
+	StepSyncSite, StepRelinkPage, StepRevert,
 }
 
 func StepNames() []StepName {

@@ -112,6 +112,28 @@ func TestSyncSiteQueuesASiteScopedRun(t *testing.T) {
 	}
 }
 
+func TestSyncSiteCarriesTheWalkOptionsToTheStep(t *testing.T) {
+	t.Parallel()
+
+	q := &queue{}
+	service := newService(newSites(), q, prober{}, packer{})
+
+	if _, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: siteID}); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	if q.queued.Recipe[0].Params != nil {
+		t.Fatalf("a plain sync carries params: %+v", q.queued.Recipe[0].Params)
+	}
+
+	if _, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: siteID, Full: true, RenderRescan: true}); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	params := q.queued.Recipe[0].Params
+	if params[run.ParamFullWalk] != true || params[run.ParamRenderRescan] != true {
+		t.Fatalf("the step params = %+v, want the full walk and the render rescan asked for", params)
+	}
+}
+
 func TestSyncSiteReportsWhatItCannotDo(t *testing.T) {
 	t.Parallel()
 

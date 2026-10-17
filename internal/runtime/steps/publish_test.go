@@ -449,7 +449,7 @@ func TestPublishRefusesADanglingParent(t *testing.T) {
 	}
 }
 
-func TestPublishMovesAFlatPageRatherThanDuplicatingIt(t *testing.T) {
+func TestPublishUpdatesAFlatPageWhereItStands(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
@@ -466,15 +466,50 @@ func TestPublishMovesAFlatPageRatherThanDuplicatingIt(t *testing.T) {
 
 	published := runPublish(t, deps, sc)
 	if published.Created || published.WPID != flat[0].ID {
-		t.Fatalf("publish = %+v, want the flat page %d moved rather than a second one made",
+		t.Fatalf("publish = %+v, want the flat page %d written rather than a second one made",
 			published, flat[0].ID)
 	}
 	if len(server.Items()) != 2 {
 		t.Fatalf("the site holds %d items, want the parent and the one page", len(server.Items()))
 	}
 	stored, ok := server.Lookup(published.WPID)
-	if !ok || stored.Parent != wpID {
-		t.Fatalf("the moved page is %+v, want it under %d", stored, wpID)
+	if !ok || stored.Parent != 0 || stored.Slug != "espresso" {
+		t.Fatalf("the updated page is %+v, want it left where it stands: the parent and the slug are never written to an existing page", stored)
+	}
+	if len(published.Mismatches) != 0 {
+		t.Errorf("mismatches = %+v, want none: an update asks for no address", published.Mismatches)
+	}
+}
+
+func TestPublishSendsNeitherSlugNorParentToAnExistingPage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	ours := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Old", Slug: "other", Status: "publish"})
+
+	sc := publishContext(t)
+	sc.Page.WPID = &ours[0].ID
+
+	published := runPublish(t, deps, sc)
+	if published.Created || published.WPID != ours[0].ID {
+		t.Fatalf("publish = %+v, want the existing page updated", published)
+	}
+	for _, request := range server.Requests() {
+		if request.Method != http.MethodPost || !strings.Contains(request.Path, "/wp-json/wp/v2/pages/") {
+			continue
+		}
+		var body map[string]any
+		if err := json.Unmarshal(request.Body, &body); err != nil {
+			t.Fatalf("decode the update: %v", err)
+		}
+		for _, denied := range []string{"slug", "parent"} {
+			if _, sent := body[denied]; sent {
+				t.Errorf("the update sent %q: %s", denied, request.Body)
+			}
+		}
+	}
+	if stored, ok := server.Lookup(ours[0].ID); !ok || stored.Slug != "other" {
+		t.Fatalf("the page's slug changed: %+v", stored)
 	}
 }
 
@@ -501,28 +536,6 @@ func TestPublishRecordsWhatTheSiteReportedBack(t *testing.T) {
 	}
 	if len(published.Mismatches) != 0 {
 		t.Errorf("mismatches = %+v, want none: the site agreed", published.Mismatches)
-	}
-}
-
-func TestPublishStopsWhenWordPressRenamesATakenSlug(t *testing.T) {
-	t.Parallel()
-
-	deps, server := imageDeps(t)
-	server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "publish"})
-	ours := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "other", Status: "publish"})
-
-	sc := publishContext(t)
-	sc.Page.WPID = &ours[0].ID
-
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
-	if err != nil {
-		t.Fatalf("Publish: %v", err)
-	}
-	if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
-		t.Fatalf("Publish onto a taken slug = %q / %q, want a pause for a human", result.Next, result.Reason)
-	}
-	if !strings.Contains(result.Message, "espresso-2") {
-		t.Errorf("the pause message %q does not name the slug the site chose", result.Message)
 	}
 }
 

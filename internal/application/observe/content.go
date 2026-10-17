@@ -219,6 +219,11 @@ func (a *absorber) body(ctx context.Context, page pagemap.Page, it item) error {
 		return err
 	}
 	if found && current.Hash == it.ContentHash {
+		if a.state.Full {
+			if err := a.rawLinks(ctx, page, block.Parse(current.Raw)); err != nil {
+				return err
+			}
+		}
 		return a.bodyFinding(ctx, page, current, base)
 	}
 

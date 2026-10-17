@@ -183,6 +183,9 @@ func writeRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *ru
 		return run.Result{}, err
 	}
 	work.published.ContentHash = hash
+	if recordErr := recordBody(ctx, deps, sc.Page.ID, linked); recordErr != nil {
+		return run.Result{}, recordErr
+	}
 
 	owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 	if err != nil {

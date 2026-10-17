@@ -26,6 +26,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/models"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
@@ -126,6 +127,7 @@ type kit struct {
 	Engine          *runtime.Engine
 	Runs            *runs.Service
 	Sync            *sync.Service
+	Observe         *observe.Service
 	Reports         *reports.Service
 	WordPress       *registry.Registry
 	Tools           *tools.Registry
@@ -231,6 +233,7 @@ func (c *Core) assemble(ctx context.Context, store *sqlite.Store, key []byte) (k
 		Engine:          running.engine,
 		Runs:            services.runs,
 		Sync:            services.sync,
+		Observe:         running.observe,
 		Reports:         services.reports,
 		WordPress:       writing.wordpress,
 		Tools:           assistant.tools,

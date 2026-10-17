@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -194,6 +195,16 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 
 	if recordErr := recordProduct(ctx, deps, sc, written, hash); recordErr != nil {
 		return run.Result{}, recordErr
+	}
+	if recordErr := recordBody(ctx, deps, sc.Page.ID, description); recordErr != nil {
+		return run.Result{}, recordErr
+	}
+	for key, value := range map[field.Key]string{
+		field.ProductDescription: description, field.ProductShortDescription: written.ShortDescription,
+	} {
+		if recordErr := recordField(ctx, deps, sc, sc.Page.ID, key, value); recordErr != nil {
+			return run.Result{}, recordErr
+		}
 	}
 	return publishedAs(result, "updated the product "+sc.Page.Path+" as "+strconv.FormatInt(held.ID, 10))
 }

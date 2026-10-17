@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
-	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 )
@@ -16,30 +15,35 @@ import (
 const (
 	NameSyncSite = string(run.StepSyncSite)
 
-	CapabilityBulk = "bulk"
-
-	SourcePlugin = "plugin"
-	SourceCore   = "core"
-
-	CodePathTakenOnSite = "path_taken_on_site"
+	ParamRenderRescan = run.ParamRenderRescan
+	ParamFullWalk     = run.ParamFullWalk
 
 	checkpointSync = "sync"
 
 	syncStepTimeout = 10 * time.Minute
 )
 
+type syncCheckpoint struct {
+	State   observe.State `json:"state"`
+	Batches int           `json:"batches"`
+}
+
 type SiteSyncResult struct {
-	StartedAt time.Time         `json:"startedAt"`
-	Source    string            `json:"source"`
-	Cursor    string            `json:"cursor"`
-	Findings  []content.Finding `json:"findings,omitempty"`
-	Batches   int               `json:"batches"`
-	Pulled    int               `json:"pulled"`
-	Created   int               `json:"created"`
-	Updated   int               `json:"updated"`
-	Drifted   int               `json:"drifted"`
-	Archived  int               `json:"archived"`
-	Done      bool              `json:"done"`
+	StartedAt   time.Time         `json:"startedAt"`
+	Source      string            `json:"source"`
+	Stage       string            `json:"stage"`
+	Findings    []content.Finding `json:"findings,omitempty"`
+	Summary     *observe.Summary  `json:"summary,omitempty"`
+	Batches     int               `json:"batches"`
+	Pulled      int               `json:"pulled"`
+	Created     int               `json:"created"`
+	Updated     int               `json:"updated"`
+	Products    int               `json:"products"`
+	Rendered    int               `json:"rendered"`
+	Unreachable int               `json:"unreachable"`
+	Archived    int               `json:"archived"`
+	Full        bool              `json:"full"`
+	Done        bool              `json:"done"`
 }
 
 func SyncSite(deps Deps) run.StepDef {
@@ -48,7 +52,7 @@ func SyncSite(deps Deps) run.StepDef {
 		Retry:   run.RetryPolicy{Max: 3},
 		Timeout: syncStepTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
-			held, _, err := run.Get[SiteSyncResult](sc.Check, checkpointSync)
+			held, found, err := run.Get[syncCheckpoint](sc.Check, checkpointSync)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -61,100 +65,92 @@ func SyncSite(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			state, err := batchState(ctx, deps, client, owner, held)
-			if err != nil {
-				return run.Result{}, err
-			}
-			batch, next, err := pull(ctx, client, state, batchSize(deps), pagemap.NewSite(owner.BaseURL))
-			if err != nil {
-				return run.Result{}, err
-			}
-			if reconcileErr := reconcile(ctx, deps, owner, batch, &state); reconcileErr != nil {
-				return run.Result{}, reconcileErr
-			}
-			state.advance(len(batch), next)
-			if state.Done {
-				if finishErr := finishSync(ctx, deps, owner.ID, &state); finishErr != nil {
-					return run.Result{}, finishErr
+			if !found || held.State.Stage == "" {
+				if owner, err = adoptExtensions(ctx, deps, client, owner); err != nil {
+					return run.Result{}, err
 				}
+				readers, readersErr := observeReaders(ctx, client, owner)
+				if readersErr != nil {
+					return run.Result{}, readersErr
+				}
+				state, beginErr := deps.Observe.Begin(ctx, owner.ID, readers, optionsOf(sc))
+				if beginErr != nil {
+					return run.Result{}, beginErr
+				}
+				held = syncCheckpoint{State: state}
 			}
-			return syncResult(deps, owner, state)
+			readers, err := observeReaders(ctx, client, owner)
+			if err != nil {
+				return run.Result{}, err
+			}
+			if held.State, err = deps.Observe.Step(ctx, held.State, readers, batchSize(deps)); err != nil {
+				return run.Result{}, err
+			}
+			held.Batches++
+			return syncResult(ctx, deps, owner, held)
 		},
 	}
 }
 
-func batchState(ctx context.Context, deps Deps, client *wp.Client, owner site.Site,
-	state SiteSyncResult) (SiteSyncResult, error) {
-	bulk, err := adoptExtensions(ctx, deps, client, owner, state.Batches == 0)
-	if err != nil {
-		return SiteSyncResult{}, err
-	}
-
-	source := SourceCore
-	if bulk {
-		source = SourcePlugin
-	}
-	if state.Source != "" && state.Source != source {
-		state = SiteSyncResult{}
-	}
-	state.Source = source
-	if state.StartedAt.IsZero() {
-		state.StartedAt = deps.now()
-	}
-	return state, nil
+func optionsOf(sc *run.StepContext) observe.Options {
+	return observe.Options{RenderRescan: sc.BoolParam(ParamRenderRescan), Full: sc.BoolParam(ParamFullWalk)}
 }
 
-func (s *SiteSyncResult) advance(pulled int, next string) {
-	s.Batches++
-	s.Pulled += pulled
-	s.Cursor = next
-	s.Done = next == ""
-}
-
-func finishSync(ctx context.Context, deps Deps, siteID string, state *SiteSyncResult) error {
-	if err := archiveAbsent(ctx, deps, siteID, state); err != nil {
-		return err
-	}
-	if err := linkParents(ctx, deps, siteID); err != nil {
-		return err
-	}
-	if err := resolveLinks(ctx, deps, siteID); err != nil {
-		return err
-	}
-	return announcePages(deps, siteID)
-}
-
-func syncResult(deps Deps, owner site.Site, state SiteSyncResult) (run.Result, error) {
+func syncResult(ctx context.Context, deps Deps, owner site.Site, held syncCheckpoint) (run.Result, error) {
 	checkpoint := run.NewCheckpoint()
-	if err := run.Set(checkpoint, checkpointSync, state); err != nil {
+	if err := run.Set(checkpoint, checkpointSync, held); err != nil {
 		return run.Result{}, err
 	}
 
-	blob, err := encode(state, "site sync result")
+	state := held.State
+	report := SiteSyncResult{
+		StartedAt: state.StartedAt, Source: state.Source, Stage: string(state.Stage), Findings: state.Findings,
+		Batches: held.Batches, Pulled: state.Counts.Pulled, Created: state.Counts.Created, Updated: state.Counts.Updated,
+		Products: state.Counts.Products, Rendered: state.Counts.Rendered, Unreachable: state.Counts.Unreachable,
+		Archived: state.Counts.Archived, Full: state.Full, Done: state.Done(),
+	}
+	message := "observed " + strconv.Itoa(state.Counts.Pulled) + " items of " + owner.Name + " through the " + state.Source +
+		" (" + string(state.Stage) + ")"
+	if report.Done {
+		summary, err := deps.Observe.Summary(ctx, owner.ID)
+		if err != nil {
+			return run.Result{}, err
+		}
+		report.Summary = &summary
+		message = "observed " + strconv.Itoa(summary.Observed) + " pages of " + owner.Name + ": " +
+			strconv.Itoa(summary.Rendered) + " rendered, " + strconv.Itoa(summary.TrailsResolved) + " trails resolved, " +
+			strconv.Itoa(openFindings(summary)) + " open findings"
+	}
+
+	blob, err := encode(report, "site sync result")
 	if err != nil {
 		return run.Result{}, err
 	}
-
 	result := run.Result{
 		Artifacts:  []run.Artifact{{Kind: run.ArtifactSyncResult, Blob: blob}},
 		Checkpoint: checkpoint,
-		Message: "pulled " + strconv.Itoa(state.Pulled) + " items from " + owner.Name +
-			" through the " + state.Source,
+		Message:    message,
 	}
-	if !state.Done {
+	if !report.Done {
 		result.Next = run.TransitionWait
 		result.WakeAt = deps.now()
 	}
 	return result, nil
 }
 
-func adoptExtensions(ctx context.Context, deps Deps, client *wp.Client, owner site.Site, withStore bool) (bool, error) {
+func openFindings(summary observe.Summary) int {
+	total := 0
+	for _, count := range summary.Findings {
+		total += count
+	}
+	return total
+}
+
+func adoptExtensions(ctx context.Context, deps Deps, client *wp.Client, owner site.Site) (site.Site, error) {
 	plugin := site.PluginState{Capabilities: []string{}}
-	bulk := false
 	capabilities, err := client.Capabilities(ctx)
 	switch {
 	case err == nil:
-		bulk = capabilities.Has(CapabilityBulk)
 		plugin = site.PluginState{
 			Installed:    true,
 			Version:      capabilities.Version,
@@ -162,26 +158,27 @@ func adoptExtensions(ctx context.Context, deps Deps, client *wp.Client, owner si
 			SEOPlugin:    capabilities.SEOPlugin,
 		}
 	case !wp.IsPluginMissing(err):
-		return false, err
+		return site.Site{}, err
 	}
 
-	commerce := owner.Commerce
-	if withStore {
-		found, storeErr := client.CommerceOr(ctx, wp.Commerce(owner.Commerce))
-		if storeErr != nil {
-			return false, storeErr
-		}
-		commerce = site.Commerce(found)
+	found, err := client.CommerceOr(ctx, wp.Commerce(owner.Commerce))
+	if err != nil {
+		return site.Site{}, err
 	}
+	commerce := site.Commerce(found)
 
 	if deps.SiteWriter == nil || (samePlugin(owner.Plugin, plugin) && commerce == owner.Commerce) {
-		return bulk, nil
+		owner.Plugin, owner.Commerce = plugin, commerce
+		return owner, nil
 	}
 	next := owner
 	next.Plugin = plugin
 	next.Commerce = commerce
 	next.UpdatedAt = deps.now()
-	return bulk, deps.SiteWriter.Update(ctx, next)
+	if err := deps.SiteWriter.Update(ctx, next); err != nil {
+		return site.Site{}, err
+	}
+	return next, nil
 }
 
 func samePlugin(current, next site.PluginState) bool {
@@ -195,11 +192,4 @@ func samePlugin(current, next site.PluginState) bool {
 		}
 	}
 	return true
-}
-
-func announcePages(deps Deps, siteID string) error {
-	if deps.Publisher == nil {
-		return nil
-	}
-	return deps.Publisher.Publish(events.PagesChanged, events.PagesChangedPayload{SiteID: siteID})
 }

@@ -34,6 +34,15 @@ type SyncResult struct {
 	Links       int                `json:"links"`
 }
 
+func headingOne(doc *content.Document) string {
+	for _, heading := range doc.Headings() {
+		if heading.Data == "h1" {
+			return content.TextOf(heading)
+		}
+	}
+	return ""
+}
+
 func SyncBack(deps Deps) run.StepDef {
 	return run.StepDef{
 		Name:      NameSyncBack,
@@ -87,6 +96,11 @@ func SyncBack(deps Deps) run.StepDef {
 			now := deps.now()
 			index := pagemap.NewIndex(pages)
 			links := observedOn(sc.Page, index, pagemap.NewSite(owner.BaseURL), doc.Links(), now)
+			if deps.Bodies != nil {
+				if recordErr := deps.Bodies.Record(ctx, sc.Page.ID, body, now); recordErr != nil {
+					return run.Result{}, recordErr
+				}
+			}
 
 			next := sc.Page
 			next.WPID = &item.ID
