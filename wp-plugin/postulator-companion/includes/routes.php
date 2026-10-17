@@ -81,6 +81,16 @@ function register_routes(): void {
 
 	register_rest_route(
 		NAMESPACE_PATH,
+		'/terms/(?P<id>\d+)',
+		array(
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => __NAMESPACE__ . '\\terms_get',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
 		'/content/(?P<id>\d+)/preview',
 		array(
 			'methods'             => \WP_REST_Server::CREATABLE,
@@ -339,6 +349,21 @@ function meta_get( \WP_REST_Request $request ) {
 		array(
 			'id'   => (int) $post->ID,
 			'meta' => (object) $values,
+		),
+		200
+	);
+}
+
+function terms_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	return new \WP_REST_Response(
+		array(
+			'id'    => (int) $post->ID,
+			'terms' => post_terms( $post ),
 		),
 		200
 	);

@@ -1,6 +1,7 @@
 package wptest
 
 import (
+	"cmp"
 	"net/http"
 	"slices"
 	"strconv"
@@ -8,6 +9,49 @@ import (
 )
 
 const maxMetaKeys = 50
+
+func termsPayload(terms []Term) []map[string]any {
+	ordered := slices.Clone(terms)
+	slices.SortFunc(ordered, func(a, b Term) int {
+		return cmp.Or(cmp.Compare(a.Taxonomy, b.Taxonomy), cmp.Compare(a.ID, b.ID))
+	})
+	payload := make([]map[string]any, 0, len(ordered))
+	for _, held := range ordered {
+		payload = append(payload, map[string]any{
+			"taxonomy": held.Taxonomy,
+			"id":       held.ID,
+			"name":     held.Name,
+			"slug":     held.Slug,
+			"parent":   held.Parent,
+		})
+	}
+	return payload
+}
+
+func (s *Server) handleTerms(w http.ResponseWriter, r *http.Request) {
+	if s.pluginMissing(w) {
+		return
+	}
+	id, ok := pathID(r)
+	if !ok {
+		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
+		return
+	}
+
+	s.mu.Lock()
+	stored, found := s.editablePost(id)
+	var terms []map[string]any
+	if found {
+		terms = termsPayload(stored.Terms)
+	}
+	s.mu.Unlock()
+
+	if !found {
+		s.fail(w, http.StatusNotFound, "not_found", "No content with that id exists.")
+		return
+	}
+	s.respond(w, http.StatusOK, map[string]any{"id": id, "terms": terms})
+}
 
 func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	if s.pluginMissing(w) {

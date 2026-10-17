@@ -60,6 +60,7 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 		"/content/{id}/preview":  {"post"},
 		"/content/{id}/rendered": {"get"},
 		"/meta/{id}":             {"get"},
+		"/terms/{id}":            {"get"},
 	}
 
 	routes := documentedRoutes(t)
@@ -134,6 +135,9 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "meta deny rule", snippet: "is_protected_meta says it is protected"},
 		{name: "meta refusal code", snippet: "meta_key_denied"},
 		{name: "meta key ceiling", snippet: "too_many_keys"},
+		{name: "term schema", snippet: "\n    Term:\n"},
+		{name: "post terms schema", snippet: "\n    PostTerms:\n"},
+		{name: "terms capability", snippet: "\n              - terms\n"},
 		{name: "expires at property", snippet: "\n        expiresAt:\n"},
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
@@ -190,6 +194,9 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	}
 	if _, err = client.GetMeta(t.Context(), wp.TypePage, seeded[0].ID, []string{"color"}); err != nil {
 		t.Fatalf("GetMeta: %v", err)
+	}
+	if _, err = client.GetTerms(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
+		t.Fatalf("GetTerms: %v", err)
 	}
 
 	documented := documentedRoutes(t)

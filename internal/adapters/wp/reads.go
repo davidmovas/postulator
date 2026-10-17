@@ -16,6 +16,7 @@ import (
 const (
 	CapabilityRendered = "rendered"
 	CapabilityMeta     = "meta"
+	CapabilityTerms    = "terms"
 
 	maxMetaKeys = 50
 )
@@ -62,6 +63,44 @@ func (c *Client) GetRendered(ctx context.Context, itemType ItemType, id int64) (
 			WithDetail("id", payload.ID)
 	}
 	return Rendered{ID: payload.ID, Type: ItemType(payload.Type), Content: payload.Content, ContentHash: payload.ContentHash}, nil
+}
+
+type termPayload struct {
+	Taxonomy string `json:"taxonomy"`
+	Name     string `json:"name"`
+	Slug     string `json:"slug"`
+	ID       int64  `json:"id"`
+	Parent   int64  `json:"parent"`
+}
+
+func termsOf(payload []termPayload) []Term {
+	terms := make([]Term, 0, len(payload))
+	for _, held := range payload {
+		terms = append(terms, Term(held))
+	}
+	return terms
+}
+
+func (c *Client) GetTerms(ctx context.Context, itemType ItemType, id int64) ([]Term, error) {
+	if err := postRoute(itemType, id); err != nil {
+		return nil, err
+	}
+	if err := c.requireCapability(ctx, CapabilityTerms); err != nil {
+		return nil, err
+	}
+
+	_, body, err := c.do(ctx, request{method: http.MethodGet, namespace: pluginNamespace, path: resourcePath("/terms", id)})
+	if err != nil {
+		return nil, err
+	}
+
+	var payload struct {
+		Terms []termPayload `json:"terms"`
+	}
+	if err := decodeJSON(body, &payload); err != nil {
+		return nil, err
+	}
+	return termsOf(payload.Terms), nil
 }
 
 func metaKeys(keys []string) ([]string, error) {

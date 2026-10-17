@@ -100,6 +100,40 @@ function filtered_content( \WP_Post $post ): string {
 	return $content;
 }
 
+function post_terms( \WP_Post $post ): array {
+	$taxonomies = get_object_taxonomies( (string) $post->post_type, 'names' );
+	if ( empty( $taxonomies ) ) {
+		return array();
+	}
+
+	$found = wp_get_object_terms( (int) $post->ID, $taxonomies );
+	if ( is_wp_error( $found ) || ! is_array( $found ) ) {
+		return array();
+	}
+
+	$terms = array();
+	foreach ( $found as $term ) {
+		if ( ! $term instanceof \WP_Term ) {
+			continue;
+		}
+		$terms[] = array(
+			'taxonomy' => (string) $term->taxonomy,
+			'id'       => (int) $term->term_id,
+			'name'     => (string) $term->name,
+			'slug'     => (string) $term->slug,
+			'parent'   => (int) $term->parent,
+		);
+	}
+	usort(
+		$terms,
+		function ( array $a, array $b ): int {
+			$by_taxonomy = strcmp( $a['taxonomy'], $b['taxonomy'] );
+			return 0 !== $by_taxonomy ? $by_taxonomy : $a['id'] <=> $b['id'];
+		}
+	);
+	return $terms;
+}
+
 function first_h1( string $rendered ): string {
 	$document = load_dom( $rendered );
 	if ( null !== $document ) {

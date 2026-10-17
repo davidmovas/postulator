@@ -264,6 +264,33 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /terms/{id}:
+    get:
+      operationId: getTerms
+      summary: List every term of every taxonomy the post's type carries.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. The
+        taxonomies are every one registered for the post's type, the custom
+        ones a site adds and the store's internal ones (product_type,
+        product_visibility) included, whether or not they show in core REST.
+        The terms are ordered by taxonomy, then by term id. Advertised as the
+        capability terms from plugin version 1.4.0; an older plugin answers
+        404 with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: The post's terms, an empty list when it carries none.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostTerms"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /content/{id}/preview:
     post:
       operationId: createPreviewLink
@@ -416,7 +443,7 @@ components:
           type: array
           description: >-
             For version 1.4.0 this is exactly bulk, seo_meta, seo_meta_read,
-            content_hash, raw, preview, rendered and meta, in that order; 1.2.0
+            content_hash, raw, preview, rendered, meta and terms, in that order; 1.2.0
             listed the first six and 1.3.0 was never released. A 1.1.0 plugin lists
             the same list without seo_meta_read and serves no read of the SEO
             meta; a 1.0.0 plugin lists neither that nor preview.
@@ -431,6 +458,7 @@ components:
               - preview
               - rendered
               - meta
+              - terms
         seoPlugin:
           type: string
           enum:
@@ -669,6 +697,41 @@ components:
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"
+    Term:
+      type: object
+      required:
+        - taxonomy
+        - id
+        - name
+        - slug
+        - parent
+      properties:
+        taxonomy:
+          type: string
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        slug:
+          type: string
+        parent:
+          type: integer
+          format: int64
+          description: The parent term's id, 0 at the top of a hierarchical taxonomy or in a flat one.
+    PostTerms:
+      type: object
+      required:
+        - id
+        - terms
+      properties:
+        id:
+          type: integer
+          format: int64
+        terms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Term"
     MetaValues:
       type: object
       required:
