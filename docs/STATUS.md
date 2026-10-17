@@ -6,9 +6,27 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
 **Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02,
 2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
-run is under **The gate**.
+run is under **The gate**. **The site-model redesign is underway**: stage 0 landed on 2026-10-17
+and stage 1 is next, once the owner answers the open questions in `DECISIONS.md`.
 
 ## Where we are
+
+**2026-10-17, stage 0 of the site-model redesign**: an audit, the contract and a design, no code.
+The client's sites exist and are edited, never rewritten, so Postulator becomes one structured
+model of a site (every page of every type: identity, fields, a body of blocks, the regions of its
+render, typed links, JSON-LD, a page type, a derived read-only hierarchy) filled by four providers
+behind a field registry, with the writer's context pack as the spine. The decision record and its
+reasoning are under **2026-10-17** in `DECISIONS.md`, the design is part 16 of the binding spec, and
+the four stages (observe read-only with the renamed plugin and two docker stands; page types, field
+scopes and the context pack; editing as blocks and fields with revert; reconciliation, findings and
+the tools over the model) are in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`. The
+audit found what the stages undo: every sync walks the whole site, the WordPress parent is read and
+dropped, the render is never kept, links carry no type or region, `publish` sends slug, status and
+parent on every write, the writer sees a fraction of the context pack, every request names the
+program in its User-Agent, and no custom post type or taxonomy can be observed. Seven questions wait
+for the owner (the creation of a planned page, the type on the page, the plugin's name, a term page
+as a parent and the replica fixture, rewriting the client's paragraphs, the User-Agent, the
+sandbox).
 
 **2026-10-03 and 04** answers the client's $10 of OpenAI spend that bought little, imports a
 whole workbook at once, and reads again the code that had been rewritten many times; the
@@ -32,8 +50,8 @@ the same day on his word. The reasoning is under the four sections of those date
 - **The agent runs on the same chain as the runs**, with a ledger row per attempt and its own
   `responses/1` history: a conversation from before keeps its transcript and the model forgets
   it. Its tool schemas went from 85,991 to 63,183 bytes a round; loading tools on demand
-  (`agent.toolLoading: deferred`, 6,506 bytes a round) is built and off until a funded key has
-  tried it.
+  (`agent.toolLoading: deferred`, 6,421 bytes a round as the registry test logs it today) is built
+  and off until a funded key has tried it.
 - **WordPress categories were built and removed the same day.** Records of their own
   (`categories`, `category_terms`, `pages.category_id`, migrations 0039 to 0041, after a first
   model as a flag on an entity that 0042 and 0043 undid) filed pages, posts and products under the
@@ -274,6 +292,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stage 0 done, stage 1 next |
 
 ## Known gaps
 
@@ -346,24 +365,34 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
   SQLite DSN, which `Lock()` cannot zero; `export.opener.complete` would call a valid archive
   truncated if the tar stream were an exact multiple of `FrameSize`; `task package` is not
   byte reproducible, `BUILD_DATE` being `now`.
+- **Found by the 2026-10-17 audit, fixed by the stages that touch them:** the import's
+  `Options.AnchorSeparator` description says comma while the default is `|` (`imports/views.go:61`
+  against `importmap/mapping.go:12`); the plugin's `normalize.php` compares a host without its port
+  while `pagemap.Site.Resolve` compares with it, so a site on a non-default port classifies a link
+  differently on the two sides; `Sanitize` lets a class or id the model emits through.
 
 ## Next steps
 
-1. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
+1. **Stage 1 of the site model**, once the owner has answered the seven questions under
+   **2026-10-17** in `DECISIONS.md`: the plugin renamed and strengthened for reads with the two
+   docker stands (1a), the page model, its migrations and the observation (1b), the screens (1c), as
+   `docs/superpowers/plans/2026-10-17-phase-14-site-model.md` lays them out; each sub-stage writes
+   its task plan at its start.
+2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
    probe's open tests and the seven checks under **Known gaps**, and only then a decision on
    `agent.toolLoading`.
-2. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
+3. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
    E2E_PLUGIN=1 E2E_WOO=1`, after `task sandbox:reset` if it still carries plugin 1.3.0 and its
    terms): import `samples/client-sheets.xlsx` as one workbook and check each sheet's tab, the
    Groups segment, that Category and Subcategory read ignored, and the Groups sheet's deeper rows
    under their URL parent inside Peptides; sync; run a page under TB-500 › Liquid; create a product
    by hand in WooCommerce under a category of the client's own, import the variation sheet in
    products mode, run it and see its categories untouched; revert both.
-3. **The client's own sites**: what a real model writes into the attributes, and whether a page
+4. **The client's own sites**: what a real model writes into the attributes, and whether a page
    builder hides the description, which `product_description_hidden` will say.
-4. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
+5. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
    minor version.
-5. The residue above: the denied tool row's decision, the four narrow-width UI items,
+6. The residue above: the denied tool row's decision, the four narrow-width UI items,
    `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared value.
