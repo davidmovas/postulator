@@ -291,10 +291,11 @@ func (c *Client) Manifest(ctx context.Context) (Manifest, error) {
 
 func (c *Client) InvalidateManifest() {
 	c.manifestMu.Lock()
-	defer c.manifestMu.Unlock()
-
 	c.manifest = nil
 	c.manifestGone = false
+	c.manifestMu.Unlock()
+
+	c.forgetTypes()
 }
 
 func (c *Client) Capabilities(ctx context.Context) (Capabilities, error) {

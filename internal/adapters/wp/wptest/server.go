@@ -60,6 +60,9 @@ type Server struct {
 	redirect      Redirect
 	pendingEdit   *edit
 	capabilities  []string
+	postTypes     []PostType
+	taxonomies    []Taxonomy
+	reading       reading
 	nextID        int64
 	nextTermID    int64
 	previewSeq    int64
@@ -72,6 +75,7 @@ type Server struct {
 	brokenHash    bool
 	brokenExpiry  bool
 	noNamespaces  bool
+	noSettings    bool
 	mu            sync.Mutex
 }
 
@@ -177,6 +181,7 @@ func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+rootPath, s.handleRoot)
 	s.routeCore(mux)
+	s.routeTypes(mux)
 	s.routeCategories(mux)
 	s.routeMedia(mux)
 	s.routeWoo(mux)

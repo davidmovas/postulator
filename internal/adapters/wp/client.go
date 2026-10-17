@@ -56,6 +56,9 @@ type Client struct {
 	manifestMu   sync.Mutex
 	manifest     *Manifest
 	manifestGone bool
+
+	typesMu sync.Mutex
+	types   []PostType
 }
 
 func New(cfg Config, opts ...Option) (*Client, error) {

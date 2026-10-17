@@ -48,6 +48,7 @@ type Item struct {
 	Categories     []int64
 	Tags           []int64
 	Attributes     []Attribute
+	Terms          []Term
 	Images         []int64
 	ID             int64
 	Parent         int64

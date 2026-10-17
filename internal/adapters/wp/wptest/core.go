@@ -104,7 +104,7 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request, itemType str
 	end := min(start+perPage, total)
 	payload := make([]map[string]any, 0, end-start)
 	for _, stored := range matched[start:end] {
-		payload = append(payload, narrowFields(s.itemPayload(stored), query.Get("_fields")))
+		payload = append(payload, narrowFields(s.withEmbed(s.itemPayload(stored), stored, query), query.Get("_fields")))
 	}
 	s.mu.Unlock()
 
@@ -124,7 +124,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request, itemType stri
 	stored, found := s.items[id]
 	var payload map[string]any
 	if found && stored.Type == itemType {
-		payload = s.itemPayload(stored)
+		payload = s.withEmbed(s.itemPayload(stored), stored, r.URL.Query())
 	}
 	s.mu.Unlock()
 

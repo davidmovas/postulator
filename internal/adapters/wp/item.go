@@ -25,19 +25,25 @@ const (
 	TypePost            ItemType = "post"
 	TypeProduct         ItemType = "product"
 	TypeProductCategory ItemType = "product_cat"
+
+	typeProductVariation ItemType = "product_variation"
+	typeAttachment       ItemType = "attachment"
 )
 
-func (t ItemType) route() (namespace, path string, err error) {
+func (t ItemType) fixedRoute() (path string, decided bool, err error) {
 	switch t {
 	case TypePage:
-		return coreNamespace, "/pages", nil
+		return "/pages", true, nil
 	case TypePost:
-		return coreNamespace, "/posts", nil
-	case TypeProduct, TypeProductCategory:
-		return "", "", errors.New(errors.Invalid, "a shop's products and categories are read through the store methods").
+		return "/posts", true, nil
+	case TypeProduct, TypeProductCategory, typeProductVariation:
+		return "", true, errors.New(errors.Invalid, "a shop's products, variations and categories are read through the store methods").
+			WithDetail("type", string(t))
+	case typeAttachment:
+		return "", true, errors.New(errors.Invalid, "media is read through the media methods").
 			WithDetail("type", string(t))
 	default:
-		return "", "", errors.New(errors.Invalid, "unknown WordPress content type").WithDetail("type", string(t))
+		return "", false, nil
 	}
 }
 
@@ -58,6 +64,7 @@ type Item struct {
 	Template      string
 	Categories    []int64
 	Tags          []int64
+	Terms         []Term
 	ID            int64
 	Parent        int64
 	FeaturedMedia int64
@@ -81,6 +88,7 @@ type ListQuery struct {
 	Fields        []string
 	Page          int
 	PerPage       int
+	EmbedTerms    bool
 }
 
 func pageNumber(value int) int {
@@ -126,8 +134,15 @@ func (q ListQuery) values() url.Values {
 	if len(q.Status) > 0 {
 		query.Set("status", strings.Join(q.Status, ","))
 	}
+	if q.EmbedTerms {
+		query.Set("_embed", "wp:term")
+	}
 	if len(q.Fields) > 0 {
-		query.Set("_fields", strings.Join(withID(q.Fields), ","))
+		fields := withID(q.Fields)
+		if q.EmbedTerms {
+			fields = slices.Concat(fields, []string{"_links", "_embedded"})
+		}
+		query.Set("_fields", strings.Join(fields, ","))
 	}
 	return query
 }
@@ -185,6 +200,7 @@ type itemPayload struct {
 	ModifiedGMT   string       `json:"modified_gmt"`
 	Categories    []int64      `json:"categories"`
 	Tags          []int64      `json:"tags"`
+	Embedded      embedded     `json:"_embedded"`
 	ID            int64        `json:"id"`
 	Parent        int64        `json:"parent"`
 	FeaturedMedia int64        `json:"featured_media"`
@@ -209,6 +225,7 @@ func (p itemPayload) item(fallback ItemType) Item {
 		Template:      p.Template,
 		Categories:    p.Categories,
 		Tags:          p.Tags,
+		Terms:         embeddedTerms(p.Embedded.Terms),
 		Parent:        p.Parent,
 		FeaturedMedia: p.FeaturedMedia,
 		MenuOrder:     p.MenuOrder,
