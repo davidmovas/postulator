@@ -422,7 +422,7 @@ func (s *Server) contentItem(stored *Item) map[string]any {
 			"description": stored.Meta[keys["description"]],
 			"canonical":   stored.Meta[keys["canonical"]],
 		},
-		"links":   s.internalLinks(stored.Content),
+		"links":   s.internalLinks(stored),
 		"excerpt": stored.Excerpt,
 		"terms":   termsPayload(stored.Terms),
 	}
@@ -462,11 +462,11 @@ func headingOne(stored *Item) string {
 	return strings.TrimSpace(tagPattern.ReplaceAllString(match[1], ""))
 }
 
-func (s *Server) internalLinks(content string) []map[string]any {
-	host := hostOf(s.http.URL)
+func (s *Server) internalLinks(stored *Item) []map[string]any {
+	host, document := hostOf(s.http.URL), normalisePath(s.itemPath(stored))
 	links := make([]map[string]any, 0)
-	for _, match := range linkPattern.FindAllStringSubmatch(content, -1) {
-		target, ok := internalTarget(host, match[1])
+	for _, match := range linkPattern.FindAllStringSubmatch(stored.Content, -1) {
+		target, ok := internalTarget(host, document, match[1])
 		if !ok {
 			continue
 		}
@@ -486,7 +486,7 @@ func hostOf(rawURL string) string {
 	return parsed.Host
 }
 
-func internalTarget(host, href string) (string, bool) {
+func internalTarget(host, document, href string) (string, bool) {
 	trimmed := strings.TrimSpace(href)
 	if trimmed == "" {
 		return "", false
@@ -507,12 +507,22 @@ func internalTarget(host, href string) (string, bool) {
 	if target == "" && parsed.Host == "" {
 		return "", false
 	}
+	if target != "" && target[0] != '/' {
+		target = documentBase(document) + target
+	}
 	for segment := range strings.SplitSeq(target, "/") {
 		if segment == "." || segment == ".." {
 			return "", false
 		}
 	}
 	return normalisePath(target), true
+}
+
+func documentBase(document string) string {
+	if !strings.HasPrefix(document, "/") {
+		return "/"
+	}
+	return document[:strings.LastIndex(document, "/")+1]
 }
 
 func normalisePath(value string) string {

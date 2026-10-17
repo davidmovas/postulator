@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Postulator companion plugin
-  version: 1.4.0
+  version: 1.4.1
   summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
   description: >-
     Every route lives under the WordPress REST namespace postulator/v1 and is
@@ -636,11 +636,12 @@ components:
             when its host and port equal the site's host and port as
             written, compared in lowercase, with no www stripping and with
             the scheme ignored; a relative href is internal and resolves
-            against the parent of the page's path. The path is escaped as
-            Go's url.EscapedPath escapes it, then lowercased in ASCII, with
-            repeated slashes collapsed and a trailing slash. An href with an
-            invalid escape, a dot segment or a control character is not
-            listed, and neither are external links.
+            against the page's URL as a browser does: its path up to the
+            last slash. The path is escaped as Go's url.EscapedPath escapes
+            it, then lowercased in ASCII, with repeated slashes collapsed
+            and a trailing slash. An href with an invalid escape, a dot
+            segment or a control character is not listed, and neither are
+            external links.
           examples:
             - /koffein/
         anchor:

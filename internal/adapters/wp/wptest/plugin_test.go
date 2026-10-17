@@ -34,7 +34,7 @@ func TestTheManifestReportsTheFrozenCapabilities(t *testing.T) {
 	decode(t, payload, &manifest)
 
 	want := []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms", "settings"}
-	if manifest.Version != "1.4.0" || len(manifest.Capabilities) != len(want) {
+	if manifest.Version != "1.4.1" || len(manifest.Capabilities) != len(want) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	for index, capability := range want {
@@ -96,7 +96,7 @@ func TestContentCarriesPathsHashesHeadingsAndInternalLinks(t *testing.T) {
 		Type:    wptest.TypePage,
 		Title:   "Powder",
 		Parent:  parent.ID,
-		Content: `<h1>Powder</h1><p>Koffein ist ein Alkaloid.</p><p><a href="/Koffein//">Koffein</a> and <a href="https://example.com/x">away</a> and <a href="mailto:a@b.c">mail</a></p>`,
+		Content: `<h1>Powder</h1><p>Koffein ist ein Alkaloid.</p><p><a href="/Koffein//">Koffein</a> and <a href="https://example.com/x">away</a> and <a href="mailto:a@b.c">mail</a> and <a href="dosage/">Dosage</a></p>`,
 	})
 
 	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content?types=page", nil, true)
@@ -134,11 +134,14 @@ func TestContentCarriesPathsHashesHeadingsAndInternalLinks(t *testing.T) {
 	if len(child.Modified) < 20 || child.Modified[len(child.Modified)-1] != 'Z' {
 		t.Errorf("modified = %q, want RFC3339 with a UTC offset", child.Modified)
 	}
-	if len(child.Links) != 1 {
-		t.Fatalf("links = %+v, want only the internal one", child.Links)
+	if len(child.Links) != 2 {
+		t.Fatalf("links = %+v, want only the two internal ones", child.Links)
 	}
 	if child.Links[0].Href != "/koffein/" || child.Links[0].Anchor != "Koffein" {
 		t.Errorf("link = %+v, want a collapsed and slash-wrapped path", child.Links[0])
+	}
+	if child.Links[1].Href != "/koffein/powder/dosage/" || child.Links[1].Anchor != "Dosage" {
+		t.Errorf("link = %+v, want the relative href resolved under the page as a browser does", child.Links[1])
 	}
 }
 

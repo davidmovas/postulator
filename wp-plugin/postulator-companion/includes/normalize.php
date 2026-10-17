@@ -38,13 +38,13 @@ function url_to_path( string $url ): string {
 	return normalize_path( is_string( $path ) ? $path : '/' );
 }
 
-function parent_path( string $path ): string {
-	$trimmed = rtrim( $path, '/' );
-	$cut     = strrpos( $trimmed, '/' );
-	if ( false === $cut ) {
+function href_base( string $url ): string {
+	$path = wp_parse_url( $url, PHP_URL_PATH );
+	if ( ! is_string( $path ) || '' === $path || '/' !== $path[0] ) {
 		return '/';
 	}
-	return normalize_path( substr( $trimmed, 0, $cut + 1 ) );
+	$escaped = escaped_path( substr( $path, 0, (int) strrpos( $path, '/' ) + 1 ) );
+	return null === $escaped ? '/' : $escaped;
 }
 
 function escaped_path( string $raw ): ?string {

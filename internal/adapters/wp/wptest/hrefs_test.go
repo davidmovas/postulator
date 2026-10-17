@@ -17,10 +17,10 @@ func TestTheFakeClassifiesTheSharedHrefTable(t *testing.T) {
 	var table struct {
 		Cases []struct {
 			Site     string `json:"site"`
+			Document string `json:"document"`
 			Href     string `json:"href"`
 			Kind     string `json:"kind"`
 			Path     string `json:"path"`
-			Relative bool   `json:"relative"`
 		} `json:"cases"`
 	}
 	if err := json.Unmarshal(raw, &table); err != nil {
@@ -28,15 +28,19 @@ func TestTheFakeClassifiesTheSharedHrefTable(t *testing.T) {
 	}
 
 	for _, tc := range table.Cases {
-		t.Run(tc.Site+" "+tc.Href, func(t *testing.T) {
+		document := tc.Document
+		if document == "" {
+			document = "/"
+		}
+		t.Run(tc.Site+" "+document+" "+tc.Href, func(t *testing.T) {
 			t.Parallel()
 
-			path, listed := internalTarget(hostOf(tc.Site), tc.Href)
+			path, listed := internalTarget(hostOf(tc.Site), document, tc.Href)
 			if listed != (tc.Kind == "path") {
-				t.Fatalf("internalTarget(%q) listed = %t, want the kind %s", tc.Href, listed, tc.Kind)
+				t.Fatalf("internalTarget(%q, %q) listed = %t, want the kind %s", document, tc.Href, listed, tc.Kind)
 			}
-			if listed && !tc.Relative && path != tc.Path {
-				t.Errorf("internalTarget(%q) = %q, want %q", tc.Href, path, tc.Path)
+			if listed && path != tc.Path {
+				t.Errorf("internalTarget(%q, %q) = %q, want %q", document, tc.Href, path, tc.Path)
 			}
 		})
 	}

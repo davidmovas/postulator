@@ -15,7 +15,6 @@ type hrefCase struct {
 	Href     string `json:"href"`
 	Kind     string `json:"kind"`
 	Path     string `json:"path"`
-	Relative bool   `json:"relative"`
 }
 
 func hrefTable(t *testing.T) []hrefCase {
@@ -52,7 +51,7 @@ func TestResolveAnswersTheSharedHrefTable(t *testing.T) {
 			if string(kind) != tc.Kind {
 				t.Fatalf("Resolve(%q) kind = %s, want %s", tc.Href, kind, tc.Kind)
 			}
-			if tc.Kind == string(pagemap.LinkPath) && !tc.Relative && path != tc.Path {
+			if tc.Kind == string(pagemap.LinkPath) && path != tc.Path {
 				t.Errorf("Resolve(%q) path = %q, want %q", tc.Href, path, tc.Path)
 			}
 		})

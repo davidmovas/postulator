@@ -42,13 +42,18 @@ func TestTheSameHrefIsClassifiedAlikeOnBothSides(t *testing.T) {
 		"?page=2",
 		"mailto:shop@example.test",
 		"ftp://" + host + ":" + port + "/files/",
+		"a/",
 	}
 	var content strings.Builder
 	for index, href := range hrefs {
 		fmt.Fprintf(&content, "<p><a href=\"%s\">anchor %d</a></p>\n", href, index)
 	}
-	id := createPage(t, c, pageSpec{title: "Href table", slug: uniqueSlug("hrefs"), content: content.String()})
+	parent := createPage(t, c, pageSpec{title: "Href parent", slug: uniqueSlug("href-parent")})
+	id := createPage(t, c, pageSpec{title: "Href table", slug: uniqueSlug("hrefs"), content: content.String(), parent: parent})
 	item := findItem(t, c, "page", id)
+	if strings.Count(strings.Trim(item.Path, "/"), "/") != 1 {
+		t.Fatalf("the href page sits at %s, want one level under its parent", item.Path)
+	}
 
 	listed := make([]string, 0, len(item.Links))
 	for _, found := range item.Links {
@@ -57,7 +62,7 @@ func TestTheSameHrefIsClassifiedAlikeOnBothSides(t *testing.T) {
 	site := pagemap.NewSite(env.baseURL)
 	var want []string
 	for _, href := range hrefs {
-		path, kind := site.Resolve(href)
+		path, kind := site.ResolveAt(item.Path, href)
 		if kind == pagemap.LinkPath {
 			want = append(want, path)
 		}
@@ -65,6 +70,14 @@ func TestTheSameHrefIsClassifiedAlikeOnBothSides(t *testing.T) {
 	slices.Sort(listed)
 	slices.Sort(want)
 	if !slices.Equal(listed, want) {
-		t.Errorf("on %s the plugin lists %v, Site.Resolve says %v", env.baseURL, listed, want)
+		t.Errorf("on %s the plugin lists %v, Site.ResolveAt(%s) says %v", env.baseURL, listed, item.Path, want)
+	}
+
+	relative, kind := site.ResolveAt(item.Path, "a/")
+	if kind != pagemap.LinkPath || relative != item.Path+"a/" {
+		t.Fatalf("Site.ResolveAt(%s, a/) = %s %s, want the path under the page", item.Path, relative, kind)
+	}
+	if !slices.Contains(listed, relative) {
+		t.Errorf("on %s the plugin does not list the relative anchor at %s: %v", env.baseURL, relative, listed)
 	}
 }

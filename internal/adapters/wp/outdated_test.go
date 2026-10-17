@@ -23,6 +23,8 @@ func TestAnOutdatedPluginIsNamedByVersionAndCapabilities(t *testing.T) {
 		outdated     bool
 	}{
 		{name: "the version the client needs with every capability", version: wp.PluginVersion, capabilities: currentCapabilities},
+		{name: "the contract this client needs", version: "1.4.1", capabilities: currentCapabilities},
+		{name: "the contract before a relative href followed the document", version: "1.4.0", capabilities: currentCapabilities, outdated: true},
 		{name: "a newer version", version: "99.0.0", capabilities: currentCapabilities},
 		{name: "a minor number past ten", version: "1.10.0", capabilities: currentCapabilities},
 		{name: "an older version", version: "0.9.0", capabilities: currentCapabilities, outdated: true},

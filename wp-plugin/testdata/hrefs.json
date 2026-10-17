@@ -33,13 +33,18 @@
     {"site": "http://example.test:8087", "href": "tel:+100", "kind": "external"},
     {"site": "http://example.test:8087", "href": "javascript:void(0)", "kind": "external"},
     {"site": "http://example.test:8087", "href": "ftp://example.test:8087/a/", "kind": "external"},
-    {"site": "http://example.test:8087", "href": "a/", "kind": "path", "relative": true},
+    {"site": "http://example.test:8087", "document": "/x/y/", "href": "a/", "kind": "path", "path": "/x/y/a/"},
+    {"site": "http://example.test:8087", "document": "/x/y", "href": "a/", "kind": "path", "path": "/x/a/"},
+    {"site": "http://example.test:8087", "document": "/x/y/", "href": "a/b", "kind": "path", "path": "/x/y/a/b/"},
+    {"site": "http://example.test:8087", "document": "/x/y/", "href": "../z/", "kind": "unresolved"},
+    {"site": "http://example.test:8087", "document": "/x/y/", "href": "./a/", "kind": "unresolved"},
+    {"site": "http://example.test:8087", "document": "/x/y/", "href": "?page=2", "kind": "same_document"},
     {"site": "https://example.test/blog", "href": "/blog/a/", "kind": "path", "path": "/blog/a/"},
     {"site": "https://example.test/blog", "href": "https://example.test/blog/", "kind": "path", "path": "/blog/"},
     {"site": "https://example.test/blog", "href": "HTTPS://Example.Test/Blog/A/", "kind": "path", "path": "/blog/a/"},
     {"site": "https://example.test/blog", "href": "https://example.test:443/blog/", "kind": "external"},
     {"site": "https://example.test/blog", "href": "https://www.example.test/blog/", "kind": "external"},
     {"site": "https://example.test/blog", "href": "//example.test/blog/a/", "kind": "path", "path": "/blog/a/"},
-    {"site": "https://example.test/blog", "href": "a/", "kind": "path", "relative": true}
+    {"site": "https://example.test/blog", "document": "/blog/x/", "href": "a/", "kind": "path", "path": "/blog/x/a/"}
   ]
 }

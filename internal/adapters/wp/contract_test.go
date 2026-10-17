@@ -127,6 +127,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "content posts only", snippet: "The id of a content post, a post of a public post type other than an\n        attachment"},
 		{name: "href classification", snippet: "classified as\n            pagemap.Site.Resolve classifies it"},
 		{name: "href host and port", snippet: "its host and port equal the site's host and port"},
+		{name: "relative href against the document", snippet: "a relative href is internal and resolves\n            against the page's URL as a browser does: its path up to the\n            last slash."},
 		{name: "preview link schema", snippet: "\n    PreviewLink:\n"},
 		{name: "rendered content schema", snippet: "\n    RenderedContent:\n"},
 		{name: "rendered capability", snippet: "\n              - rendered\n"},
@@ -151,7 +152,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
 		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
-		{name: "plugin version", snippet: "\n  version: 1.4.0\n"},
+		{name: "plugin version", snippet: "\n  version: 1.4.1\n"},
 	}
 
 	document := contractDocument(t)

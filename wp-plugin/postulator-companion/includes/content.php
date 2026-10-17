@@ -224,9 +224,9 @@ function query_posts_page( array $types, string $since_gmt, ?array $cursor, int 
 	return is_array( $rows ) ? $rows : array();
 }
 
-function permalink_path( \WP_Post $post ): string {
+function permalink_url( \WP_Post $post ): string {
 	if ( ! in_array( $post->post_status, array( 'draft', 'pending', 'auto-draft', 'future' ), true ) ) {
-		return url_to_path( (string) get_permalink( $post ) );
+		return (string) get_permalink( $post );
 	}
 
 	$publishable              = clone $post;
@@ -244,12 +244,13 @@ function permalink_path( \WP_Post $post ): string {
 		(int) $publishable->post_parent
 	);
 
-	return url_to_path( (string) get_permalink( $publishable ) );
+	return (string) get_permalink( $publishable );
 }
 
 function post_item( \WP_Post $post ): array {
-	$path    = permalink_path( $post );
-	$content = (string) $post->post_content;
+	$permalink = permalink_url( $post );
+	$path      = url_to_path( $permalink );
+	$content   = (string) $post->post_content;
 
 	return array(
 		'id'          => (int) $post->ID,
@@ -264,7 +265,7 @@ function post_item( \WP_Post $post ): array {
 		'h1'          => first_h1( rendered_content( $post ) ),
 		'excerpt'     => (string) $post->post_excerpt,
 		'meta'        => read_post_seo( (int) $post->ID ),
-		'links'       => extract_links( $content, parent_path( $path ) ),
+		'links'       => extract_links( $content, href_base( $permalink ) ),
 		'terms'       => post_terms( $post ),
 	);
 }
