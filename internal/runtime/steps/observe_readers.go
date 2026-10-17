@@ -3,7 +3,6 @@ package steps
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/observe"
@@ -120,7 +119,7 @@ func (r storeReader) ListProducts(ctx context.Context, query observe.ProductQuer
 			ID: product.ID, Permalink: product.Permalink, Slug: product.Slug, Status: product.Status, Name: product.Name, Type: product.Type,
 			Description: product.Description, ShortDescription: product.ShortDescription, Price: product.Price,
 			RegularPrice: product.RegularPrice, SalePrice: product.SalePrice, SKU: product.SKU, StockStatus: product.StockStatus,
-			StockQuantity: product.StockQuantity, ManageStock: fmt.Sprint(product.ManageStock), Attributes: encoded,
+			StockQuantity: product.StockQuantity, ManageStock: string(product.ManageStock), Attributes: encoded,
 			Categories: categories, VariationIDs: product.VariationIDs, Modified: product.Modified,
 		})
 	}
@@ -146,7 +145,7 @@ func (r storeReader) ListVariations(ctx context.Context, productID int64, page i
 		out.Items = append(out.Items, observe.Variation{
 			ID: variation.ID, ParentID: variation.ParentID, Description: variation.Description, Status: variation.Status,
 			SKU: variation.SKU, Price: variation.Price, RegularPrice: variation.RegularPrice, SalePrice: variation.SalePrice,
-			StockStatus: variation.StockStatus, StockQuantity: variation.StockQuantity, ManageStock: fmt.Sprint(variation.ManageStock),
+			StockStatus: variation.StockStatus, StockQuantity: variation.StockQuantity, ManageStock: string(variation.ManageStock),
 			Attributes: encoded, Modified: variation.Modified,
 		})
 	}
