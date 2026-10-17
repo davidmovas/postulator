@@ -45,12 +45,200 @@ Five input classes the spec implies and the stage tests must pin, most likely to
 - **Reuses.** `wp.Client`, `do.go`, `errors.go`, `Visit`, `media.go`, `probe.go`, the e2e harness shape. **Rewrites.** Nothing.
 - **Exit.** `wp/e2e` green on both stands (`TestManifestDescribesTheSite` with the new capabilities, `TestRenderedContentCarriesTheInjectedBreadcrumbOnTheReplica`, `TestTermsListEveryTaxonomy` with the `entity` taxonomy on the replica, `TestSettingsNameTheTechnicalPages`, `TestMetaReadsOnlyTheKeysAsked`, `TestProductsListWithVariationsAndSKU`, `TestTheSameHrefIsClassifiedAlikeOnBothSides`, `TestTheFrontEndNamesNothingOfTheProgram`); `TestAnOutdatedPluginIsNamedByVersionAndCapabilities` in place of a test by namespace; `plugin_footprint_test.go`, `footprint_test.go` and `sitespecific_test.go` green; `task plugin:lint` and `task plugin:test` on 7.4; the contract test pins `openapi.yaml`. Owner sees: the Sites panel naming an outdated plugin, with the instruction to upload the new zip over it and the zip to save.
 
+#### 1a tasks
+
+Execution: `superpowers:executing-plans`, with two Opus subagents at most. Lefthook typechecks the whole package of each staged file, so only one writer works in an untagged Go package at a time; every commit names its paths and never uses `git add -A`. Edits go through Write and Edit, never a shell.
+
+**Decided at the plan** (recorded in `DECISIONS.md` at the 1a close):
+- **Plugin 1.4.0**, contract additive. `/content` still defaults to `page,post,product,product_cat`, so a released app keeps working; `types` also takes every public post type except `attachment`, and every public taxonomy whose name no public post type uses.
+- **Default User-Agent** `Mozilla/5.0`.
+- **`normalize.php` follows `Site.Resolve` on classification**: the host with its port, case-folded; the path escaped as `EscapedPath` does, then lowercased; an invalid escape, a dot segment or a control character drops the link. A relative href keeps PHP's base (the page's parent): both sides differ from RFC 3986 there, and 1b resolves render links against the document URL.
+- **`/rendered` filters inside a singular main query.**
+- **`/meta` refuses an `is_protected_meta` key** and takes at most 50 keys.
+- **`/terms` covers every taxonomy of the post's type**, internal ones included.
+- **Core and store settings**: a refusal on `/wp/v2/settings` (needs `manage_options`) or on `wc/v3/settings` (needs `manage_woocommerce`) is a `Forbidden` error the caller reads as unknown.
+- **Products and variations stay on the store route.**
+- **Compose defaults to the vanilla stand's project and port.**
+
+**Slice recipe** (1a.5 to 1a.10, each one commit):
+1. The e2e test, red on the vanilla stand (`task e2e:test STAND=vanilla -- -run <name>`).
+2. The wptest unit test, red.
+3. The client unit test, red.
+4. `openapi.yaml`: the path, the schema and the capability enum entry. The contract test's `want` map and snippets gain them: red, then green.
+5. wptest, then the client. Each new capability joins `wp.requiredCapabilities`, wptest's default capabilities and the PHP `CAPABILITIES`.
+6. PHP; `task plugin:deploy STAND=vanilla` and `STAND=replica`; the e2e green on both.
+7. `task plugin:lint`, then `go test ./internal/adapters/wp/...`, then commit.
+
+The client-level checks against a stand live in `internal/adapters/wp/e2e/wpclient_test.go`, which drives a real `wp.Client` (`newWPClient(t) *wp.Client` from the env file).
+
+##### 1a.1 — the two stands and the sandbox tasks (agent S)
+- **Files.**
+  - Modify `docker/e2e/compose.yaml`: `name: postulator-test-vanilla`, `${WP_PORT:-8088}`, `STAND` passed to bootstrap. Modify `docker/e2e/bootstrap.sh`: shared steps, then `stands/$STAND/provision.sh`. Test mode writes `.env.$STAND` (neutral site title, admin user and seeds `koffein`/`powder`); sandbox mode keeps `postulator` and `.env.sandbox`.
+  - Create `docker/e2e/stands/vanilla/provision.sh`: a pinned default block theme, nested pages, a variable product with two SKU'd variations.
+  - Create `docker/e2e/stands/replica/{provision.sh,site-behaviour.php,products.csv}`: Classic Editor, Blocksy and Rank Math pinned, Rank Math's breadcrumbs on. The mu-plugin is copied into `mu-plugins`:
+    - it registers `entity` on `product` as a snippet would (public, no `show_in_rest`);
+    - a hub page is one whose slug matches a `product_cat` or `entity` term;
+    - on `the_content`, guarded by `is_singular() && in_the_loop() && is_main_query()`, it puts a `nav aria-label="Breadcrumb"` before the content (`hub-breadcrumbs`), with a trail along the category chain and one crumb that resolves to no page;
+    - after the content it adds a `section` (`entity-auto-products`) with an `h2` and product cards;
+    - in `wp_head` it prints BreadcrumbList, ItemList and CollectionPage JSON-LD for hubs.
+
+    Hubs: one with an empty raw, one whose raw is a lone shortcode. Pages are flat. `products.csv` holds variable products and their variations, imported through `wp eval` and `WC_Product_CSV_Importer`.
+  - Modify `Taskfile.yml`:
+    - `STAND` (default `vanilla`) maps to `{8088, postulator-test-vanilla}` or `{8087, postulator-test-replica}`;
+    - `e2e:up|down|reset|test|full|full:noplugin STAND=`, with `-- <args>` passed to `go test`;
+    - `e2e:both`;
+    - `plugin:deploy STAND=` (zip, then `wp plugin install --force --activate`);
+    - `plugin:test` (Windows through `phplint`, linux native);
+    - `sandbox:provision STAND=` (8089, `postulator-e2e`, explicit and idempotent, never `-v`).
+  - Modify `.github/workflows/ci.yml` (the plugin job runs `task plugin:test`) and `.gitignore` (`docker/e2e/.env.*`).
+  - Modify `internal/adapters/wp/e2e/harness_test.go`:
+    - `environment` gains `stand`, `project` and `plugin`;
+    - `envPath` reads `POSTULATOR_E2E_ENV`, else `docker/e2e/.env.$E2E_STAND`, else `.env.vanilla`;
+    - `skipWithoutPlugin` fails when `plugin` is true;
+    - adds `wpCLI(t, env, args...) string` through `docker compose -p <project> run --rm --no-deps -T --entrypoint wp bootstrap`.
+  - Create `internal/adapters/wp/e2e/stands_test.go`: `type standFacts struct` and `func standOf(t *testing.T, env environment) standFacts`, holding the slugs and ids each later task asserts on (hub pages, product, variable product and SKUs, category chain, `entity` term) and the per-stand facts (SEO plugin, breadcrumb in content, `entity` present, `entity` embedded, nested pages, front page).
+  - Modify `preview_test.go` (`expirePreview` through `wpCLI`), `commerce_test.go`, `raw_test.go`, `seometa_test.go`, `internal/e2e/harness_test.go` (the env file per stand) and `internal/e2e/degraded_test.go` (seed names).
+  - Docs: CLAUDE.md's docker footgun and `docs/CONVENTIONS.md`'s "Docker end-to-end" become three projects.
+- **Produces.** `.env.<stand>` keys `E2E_STAND E2E_PROJECT E2E_WP_URL E2E_WP_USER E2E_WP_APP_PASSWORD E2E_SEO E2E_WOO E2E_PLUGIN`; `wpCLI`; `standOf`; `task plugin:deploy`.
+- **Steps.**
+  1. `standOf` and the env discovery, so the suite fails without a stand.
+  2. Compose and bootstrap for vanilla; `task e2e:up STAND=vanilla`; `task e2e:test STAND=vanilla` green.
+  3. The replica; `task e2e:up STAND=replica`; `task e2e:test STAND=replica` green, with expectations moved into `standFacts` wherever a stand differs.
+  4. `task e2e:full STAND=vanilla` and `e2e:full:noplugin` green.
+  5. `sandbox:provision` proven on a scratch project (never on 8089).
+  6. Commit `build(e2e): …` and `test(e2e): …`.
+
+##### 1a.2 — a neutral User-Agent
+- **Files.** `internal/adapters/wp/{option,client,do}.go`; tests `useragent_test.go`, `footprint_test.go`.
+- **Interfaces.** `const DefaultUserAgent = "Mozilla/5.0"`; `func WithUserAgent(agent string) Option` (an empty agent keeps the default); `Client.userAgent`.
+- **Tests.**
+  - `TestTheDefaultUserAgentNamesNeitherTheProgramNorThePlugin`: the recorded `User-Agent` equals `DefaultUserAgent` and, lowercased, holds neither `postulator` nor `companion`.
+  - `TestAUserAgentOverrideReachesEveryRequest`: `WithUserAgent("Agent/1")` reaches `Capabilities`, `ListItems` and an anonymous `Visit`.
+  - `TestNothingTheClientSendsNamesTheProgram` drives every client method through wptest with neutral credentials. No recorded header, query value or body, and no `Upload.Filename`, `Title` or `Alt`, holds `postulator` in any case. Paths are exempt.
+- Commit `feat(wp): a neutral User-Agent with an override`.
+
+##### 1a.3 — one href table for both sides (review focus 4)
+- **Files.**
+  - Create `wp-plugin/testdata/hrefs.json` (`{"cases":[{"site","href","kind","path","relative"}]}`, with `kind` one of `path|same_document|external|unresolved`) and `wp-plugin/tests/normalize.php` (global shims for `ABSPATH`, `home_url` and `wp_parse_url`; it exits 1 naming each case that fails).
+  - Create `internal/domain/pagemap/hrefs_test.go` and `internal/adapters/wp/wptest/hrefs_test.go`.
+  - Modify `wp-plugin/postulator-companion/includes/normalize.php`: `site_authority()` replaces `site_host()`, `escaped_path()` and dot segments go in, and `internal_href_to_path` compares the authority. Modify `wptest/plugin.go` (`internalTarget`), `openapi.yaml` (`ContentLink.href`) and `contract_test.go`.
+  - Create `internal/adapters/wp/e2e/hrefs_test.go`.
+- **Cases.** The same host and port; another port; host case; `:80` written out; protocol-relative; a subdirectory base; root-relative and relative hrefs; raw UTF-8 and percent-encoded paths in both cases; an invalid escape; `..`; a control character; `#x`, `?q`, the empty href; `mailto:`, `tel:`, `javascript:`.
+- **Tests.**
+  - `TestResolveAnswersTheSharedHrefTable`: `pagemap.NewSite(site).Resolve(href)` gives `kind`, and the path whenever `relative` is false.
+  - `TestTheFakeClassifiesTheSharedHrefTable`: wptest lists the link iff the kind is `path`, at the same path.
+  - `normalize.php` on 7.4: the same rule as the fake.
+  - `TestTheSameHrefIsClassifiedAlikeOnBothSides` (after 1a.1) puts a published page with one anchor per template (`{origin}`, the other stand's port, …) on each stand. The plugin's `/content` links equal `Site.Resolve(env.baseURL)` for every case.
+- Commit `fix(plugin): normalize.php classifies an href as Site.Resolve does`.
+
+##### 1a.4 — core reads
+- **Files.** `internal/adapters/wp/{item,items,types}.go` (`types.go` new); `wptest/{core,state,server}.go`; tests `types_test.go`, `items_test.go`, `wptest/core_test.go`; e2e `core_test.go`, `wpclient_test.go`.
+- **Interfaces.**
+  - `type PostType struct{ Slug, Name, RestBase, RestNamespace string; Taxonomies []string; Hierarchical, Viewable bool }`; `func (c *Client) PostTypes(ctx context.Context) ([]PostType, error)` (cached like the manifest, reset by `InvalidateManifest`).
+  - `ListItems` and `GetItem` route any type whose `rest_namespace` is `wp/v2` by its `rest_base`. `product` and `product_variation` are refused before any request; writes stay on pages and posts.
+  - `ListQuery.EmbedTerms bool` sends `_embed=wp:term` and adds `_links,_embedded` to `_fields`. `Item.Terms []Term`, with `type Term struct{ Taxonomy, Name, Slug string; ID, Parent int64 }` (`Parent` is 0 from an embed).
+  - `type SiteSettings struct{ ShowOnFront string; FrontPageID, PostsPageID int64 }`; `func (c *Client) SiteSettings(ctx context.Context) (SiteSettings, error)` (a refusal is `Forbidden`).
+  - wptest: `Item.Terms []Term`; `WithPostType(PostType)`, `WithTaxonomy(Taxonomy{Name, RestBase string; ObjectTypes []string; ShowInREST bool})`, `WithoutSettingsAccess()`.
+- **Tests.**
+  - `TestPostTypesNameTheRestBaseOfEveryType`.
+  - `TestACustomTypeIsListedByItsRestBase`.
+  - `TestTheStoreTypesStayOnTheStoreRoute`.
+  - `TestEmbeddedTermsArriveWithTheItem`: only `show_in_rest` taxonomies.
+  - `TestSiteSettingsNameTheFrontAndPostsPages`.
+  - `TestARefusedSettingsReadIsForbidden`.
+  - e2e `TestCoreReadsTypesSettingsAndEmbeddedTerms`: the types include page, post and product; on the replica `entity` is absent from the embed (`standFacts.entityEmbedded`); `show_on_front` matches the stand.
+- Commit `feat(wp): post types, routing by rest_base, embedded terms and the site settings`.
+
+##### 1a.5 — 1.4.0, the outdated plugin and the Sites panel
+- **Files.**
+  - `wp-plugin/postulator-companion/postulator-companion.php`: `Version: 1.4.0`, `Update URI: false`, `VERSION`, `PREVIEW_QUERY_VAR = 'preview_token'`.
+  - `openapi.yaml` (`info.version`, the preview var), `contract_test.go`.
+  - `internal/adapters/wp/plugin.go`: `const PluginVersion = "1.4.0"`, `requiredCapabilities`, `func (c Capabilities) Missing() []string`, `func (c Capabilities) Outdated() bool` (an unreadable version counts as outdated). `pluginOutdated` carries `version`, `required` and the instruction.
+  - `wptest/{server,plugin}.go`: `WithPluginVersion(string)`, the preview var.
+  - `internal/domain/site/site.go`: `Extensions` gains `PluginOutdated bool` and `PluginRequired string`, both transient.
+  - `internal/adapters/wp/registry/registry.go` (`pluginOf`).
+  - `internal/application/sync/{views,service}.go`: `Plugin` gains `outdated` and `requiredVersion`.
+  - `frontend/src/features/sites/{plugin-panel.tsx,plugin.ts}`, `frontend/src/copy/sites.ts` (`outdatedTitle`, `outdatedBody`, the four new capability labels).
+  - Fixtures holding `postulator_preview`: `application/pages/preview_test.go`, `application/browser/browser_test.go`, `wp/plugin_test.go`, `wptest/plugin_test.go`, e2e `preview_test.go`.
+- **Tests.**
+  - `TestAnOutdatedPluginIsNamedByVersionAndCapabilities`, a table: `1.2.0` with six capabilities → outdated, naming what is missing; `1.4.0` with all → current; `1.4.0` missing one → outdated; `2.0.0` → current; `x` → outdated.
+  - `TestProbeNamesAnOutdatedPlugin` (registry).
+  - `TestCheckPluginSaysThePluginIsOutdated` (sync).
+  - A panel vitest: an outdated plugin shows the update instruction and the zip button.
+  - e2e `TestManifestDescribesTheSite`: 1.4.0 on both stands.
+- Commit `feat(plugin): 1.4.0, a neutral preview var and an outdated plugin named in the Sites panel`.
+
+##### 1a.6 — `GET /content/{id}/rendered`
+- **Interfaces.** PHP `rendered_get` answers `{id,type,content,contentHash}`. `filtered_content(WP_Post)` runs `the_content` over `post_content` inside a one-post `WP_Query` set as `wp_query` and `wp_the_query`, after `the_post()`, then restores the globals. Go: `CapabilityRendered = "rendered"`; `type Rendered struct{ Type ItemType; Content, ContentHash string; ID int64 }`; `func (c *Client) GetRendered(ctx context.Context, itemType ItemType, id int64) (Rendered, error)` (the hash is checked as `GetRaw` checks it). wptest: `Item.Filtered string`, the raw when empty.
+- **Tests.** e2e `TestRenderedContentCarriesTheInjectedBreadcrumbOnTheReplica`: the replica's hubs carry the `nav` with `aria-label="Breadcrumb"` and the section's `h2`; a vanilla page carries its `<p>` and no `nav`; 401, 404 and the hash. Units `TestGetRenderedReadsTheFilteredContent` and `TestGetRenderedRefusesAPluginWithoutTheCapability`.
+
+##### 1a.7 — `GET /meta/{id}?keys=`
+- **Interfaces.**
+  - PHP `meta_get`: at most 50 keys. A protected key answers 400 `meta_key_denied` (`data.keys`), and an empty list `invalid_param`. The answer is `{id, meta:{key:value|null}}`, with values as stored.
+  - Go: `CapabilityMeta = "meta"`; `func (c *Client) GetMeta(ctx context.Context, itemType ItemType, id int64, keys []string) (map[string]json.RawMessage, error)`. An absent key is left out; an empty list or more than 50 keys is refused before any request.
+  - wptest: a key is protected when it starts with `_`.
+- **Tests.** e2e `TestMetaReadsOnlyTheKeysAsked`: through `wpCLI`, `color`, `size` and `_secret` are set on a page. Asking `color` answers only `color`; `_secret` and a product's `_price` are refused; 51 keys are refused; an anonymous call gets 401.
+
+##### 1a.8 — `GET /terms/{id}`
+- **Interfaces.** PHP `terms_get` answers `{id, terms:[{taxonomy,id,name,slug,parent}]}` over `get_object_taxonomies($post->post_type)`, ordered by taxonomy then id. Go: `CapabilityTerms = "terms"`; `func (c *Client) GetTerms(ctx context.Context, itemType ItemType, id int64) ([]Term, error)`.
+- **Tests.** e2e `TestTermsListEveryTaxonomy`: a product carries `product_cat` with its parent and `product_type` on both stands, and `entity` on the replica only; a post carries `category` and `post_tag`.
+
+##### 1a.9 — `GET /settings`
+- **Interfaces.** PHP `settings_get` answers `{showOnFront, pages:{front,posts,privacy,shop,cart,checkout,account,terms}}`, with 0 for none and `wc_get_page_id` used only when WooCommerce is loaded. Go: `CapabilitySettings = "settings"`; `type TechnicalPages struct{ Front, Posts, Privacy, Shop, Cart, Checkout, Account, Terms int64 }`; `type PluginSettings struct{ ShowOnFront string; Pages TechnicalPages }`; `func (c *Client) PluginSettings(ctx context.Context) (PluginSettings, error)`.
+- **Tests.** e2e `TestSettingsNameTheTechnicalPages`: privacy, shop, cart, checkout and account are non-zero, the shop's page has the slug `shop`, and the front page matches `standFacts`.
+
+##### 1a.10 — `/content` with excerpt, terms and every public type
+- **Interfaces.** PHP: the items gain `excerpt` and `terms` (a term item answers `''` and `[]`). `parse_types` accepts the public post types and taxonomies, and the default stays as it was. The term phase reads `tt.taxonomy IN (…)`, and `touch_term` covers every public taxonomy. The manifest gains `postTypes` and `taxonomies`. Go: `ContentItem` gains `Excerpt` and `Terms`; `Manifest` and `Capabilities` gain `PostTypes` and `Taxonomies`; `postRoute` accepts an advertised post type, refuses a taxonomy, and keeps the closed set when the manifest lists no types.
+- **Tests.** e2e `TestContentCarriesExcerptTermsAndEveryPublicType`: a post's excerpt and terms are listed; `types=entity` lists the replica's terms; `types=product` carries `entity` on the replica; an unknown type answers 400; the default listing holds no `entity` item.
+
+##### 1a.11 — store reads (agent W, after 1a.10 is committed)
+- **Files.** `internal/adapters/wp/woo.go`, `woo_test.go`, `wptest/woo.go`, `wptest/woo_test.go`, e2e `store_test.go`.
+- **Interfaces.**
+  - `Product` gains `Price, RegularPrice, SalePrice, SKU, StockStatus string; ManageStock bool; StockQuantity *int64; Categories []ProductCategory; MetaData []MetaEntry; VariationIDs []int64`.
+  - `type ProductCategory struct{ Name, Slug string; ID int64 }`; `type MetaEntry struct{ Key string; Value json.RawMessage; ID int64 }`.
+  - `type Variation struct{ Modified time.Time; Description, Permalink, Status, SKU, Price, RegularPrice, SalePrice, StockStatus string; Attributes []VariationAttribute; MetaData []MetaEntry; StockQuantity *int64; ID, ParentID int64; ManageStock bool }`; `type VariationAttribute struct{ Name, Option string; ID int64 }`.
+  - `type ProductQuery struct{ ModifiedAfter *time.Time; Status, Type string; Page, PerPage int }`; `func (c *Client) ListProducts(ctx context.Context, query ProductQuery) (Page[Product], error)`; `func (c *Client) ListVariations(ctx context.Context, productID int64, page, perPage int) (Page[Variation], error)`.
+  - `type StorePages struct{ Shop, Cart, Checkout, Account, Terms int64 }`; `func (c *Client) StoreSettings(ctx context.Context) (StorePages, error)` reads `settings/products/woocommerce_shop_page_id` and `settings/advanced`; a refusal is `Forbidden`.
+  - `UpdateProduct` is unchanged.
+- **Tests.**
+  - `TestListProductsWalksTheStoreWithItsFacts`.
+  - `TestListVariationsCarriesSKUPriceStockAndAttributes`.
+  - `TestStoreSettingsNameTheShopPages`.
+  - `TestTheStoreFactsAreNeverSent`: an update payload holds none of price, SKU, stock or categories.
+  - e2e `TestProductsListWithVariationsAndSKU` and `TestStoreSettingsNameTheShopPages` on both stands.
+- Commit `feat(wp): the store's products, variations and pages, read only`.
+
+##### 1a.12 — uninstall
+- **Files.** Create `wp-plugin/postulator-companion/uninstall.php`. It exits unless `WP_UNINSTALL_PLUGIN` is defined, then calls `delete_metadata` for every object on `_postulator_modified` (term), `_postulator_preview_hash` and `_postulator_preview_expires` (post). It keeps `_postulator_seo_*`. Create e2e `uninstall_test.go`.
+- **Tests.** `TestUninstallRemovesTheBookkeepingAndKeepsTheSEOMeta` sets a preview link, a term stamp and SEO meta (the none keys on vanilla, Rank Math's on the replica), then runs `wpCLI plugin uninstall postulator-companion --deactivate`. The bookkeeping must be gone and the SEO meta still there. An unconditional `t.Cleanup` reinstalls from `/dist`.
+- Commit `feat(plugin): uninstall removes the bookkeeping and keeps the SEO values`.
+
+##### 1a.13 — footprint and site-specific scans
+- **Files.**
+  - Create `wp-plugin/plugin_footprint_test.go` (package `wpplugin_test`): every line of the plugin tree naming `postulator` in any case must consist of the header's `Plugin Name: Postulator Companion`, `namespace Postulator\Companion;`, `'postulator/v1'` and `'_postulator_…'` keys only.
+  - Create e2e `footprint_test.go`.
+  - Create `internal/app/sitespecific_test.go`. Its needles are the `class` tokens of `docker/e2e/stands/replica/site-behaviour.php` and the theme and plugin slugs that `stands/replica/provision.sh` installs; the scan covers `internal/`, `cmd/` and `wp-plugin/`, excluding `testdata/`. The CSS-selector rule lands with `domain/render` in 1b.
+  - Modify `internal/app/deps_test.go`: `TestTheFakeSiteIsIndependentOfTheClient` (wptest's transitive dependencies exclude `internal/adapters/wp`).
+- **Tests.** `TestThePluginNamesTheProgramOnlyWhereTheAdminSeesIt`; e2e `TestTheFrontEndNamesNothingOfTheProgram`: anonymous reads of `/`, a published page, a product, a product category, a 404, a draft's preview link, `/feed/` and `/wp-sitemap.xml`, whose bodies and headers must not hold `postulator`; `TestNothingSiteSpecificLivesInTheSources`; the deps test.
+- Commit `test: the visitor-facing footprint, the site-specific scan and the fake's independence`.
+
+##### 1a.14 — the gate
+- Run the whole Verification list of the session plan:
+  - wp/e2e on both stands, and `e2e:full` and `noplugin` on vanilla;
+  - `plugin:lint` and `plugin:test`;
+  - `task build`, `go vet` (plus `-tags e2e`), `golangci-lint run`, `task lint:e2e` alone;
+  - `go test -race -count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...` and `go run ./cmd/covergate`;
+  - the comment check, `gofmt -l .`;
+  - `npm run typecheck`, `npm run test:run`, `task ui:lint`.
+- Update `STATUS.md` (1a done, 1b next, the client methods waiting for their 1b callers), `ARCHITECTURE.md`'s plugin section, and `DECISIONS.md` (the decisions above).
+- Commit `docs: stage 1a's gate is green`.
+
 ### 1b — the model, the migrations, the observation
 
 - **Touches.** `internal/domain/pagemap` (`Page` fields, `DeriveParent`, `MatchRow` read side), `internal/domain/field` (catalog, `Denied`), `internal/domain/block` (`Parse`, `Serialize`, hashes), `internal/domain/render` (`Extract`), `internal/application/observe` (readers, stages), `internal/runtime/steps/sync_*.go` (stages inside `sync_site`, `since`, the full-walk rule), `internal/runtime/steps/{publish,publish_parent,repair_hierarchy,preflight}.go`, `internal/application/runs/start.go`, `internal/domain/run/recipes.go`, `internal/adapters/sqlite/migrations/0045…` (identity, terms, fields, bodies, blocks written, renders, typed links rebuild, findings, `sites.settings`, the `pages` columns and the `wp_type` rebuild), the repositories, `internal/transport/wails/vocabgen`, `internal/e2e/*`.
 - **Migrations.** One concern each, every down restoring exactly: 0045 `page_identity`; 0046 `page_terms`; 0047 `page_fields`; 0048 `page_bodies` + `page_blocks_written`; 0049 `page_renders`; 0050 `page_links` rebuilt with type, region, source, position, ours (a table rebuild, the data copied as `contextual`/`raw`); 0051 `findings`; 0052 `sites.settings`; 0053 `pages` gains `page_type_id`, `parent_reason`, `technical_reason`, `read_only_reason` (plain columns, no FK); 0054 the `pages.wp_type` CHECK rebuild. The old `pages` columns stay.
 - **Behaviour.** `repair_hierarchy` deleted and `RepairRecipe` gone; `publish` sends no slug and no parent on an update, `compare` reads the identity snapshot, `start.parentOf` accepts a derived parent; the one creation call of a planned page keeps sending status, parent and slug (the owner's answer 1).
-- **Wiring 1a leaves to 1b.** The per-site User-Agent override in `sites.settings` (0052) reaches the registry's `wp.WithUserAgent`; the transient outdated flag on `site.Extensions` becomes the `plugin_outdated` finding; the client methods 1a adds (`GetRendered`, `GetMeta`, `GetTerms`, `PluginSettings`, `PostTypes`, `SiteSettings`, `ListProducts`, `ListVariations`, `StoreSettings`) get their callers in the observation.
+- **Wiring 1a leaves to 1b.** The per-site User-Agent override in `sites.settings` (0052) reaches the registry's `wp.WithUserAgent`; the transient outdated flag on `site.Extensions` becomes the `plugin_outdated` finding; the client methods 1a adds (`GetRendered`, `GetMeta`, `GetTerms`, `PluginSettings`, `PostTypes`, `SiteSettings`, `ListProducts`, `ListVariations`, `StoreSettings`) get their callers in the observation; `sitespecific_test.go` gains the CSS-selector rule over `domain/render`; the render extraction resolves a relative href against the document URL.
 - **Reuses.** `content.Document`, `shown.go`'s word compare, `pagemap.Site`, `Index`, `BuildTree`, `sync_archive`, the run engine and the checkpoint pattern of `sync_site`. **Rewrites.** `sync_reconcile.go` (findings, not silent merge), `sync_settle.go` (derivation with reasons), `page_link_repo.go`.
 - **Exit.** Unit: block parser goldens (classic with blank lines, classic with `<p>` runs and `<br>` lines, block-editor with attributes, shortcode-only); extraction goldens from both stands' saved renders (an empty-raw hub, a shortcode-only page, a texturised paragraph, a page with two BreadcrumbLists); `DeriveParent` table over self-last, Home-first, unresolved-crumb, two-lists-in-a-nav, term-parent; `field.Denied` enumerated; `publish` update sends no slug or parent for a page whose observed slug differs from its path; round trip of every migration. E2E on both stands: `TestTheSiteIsObservedIntoTheModel` (every published page has identity, fields, body and render rows; the parent reason per the stand table; regions typed per the table; shop, cart and checkout technical; a second observation is incremental and changes nothing; a generate run of a planned child still waits for its parent and publishes). Owner sees: nothing new on screen yet; the model fills behind the Pages screen.
 
