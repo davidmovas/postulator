@@ -46,13 +46,20 @@ func (s *Service) store(ctx context.Context, state *State, readers Readers, batc
 	}
 	rows := rowsOf(pages)
 	a := &absorber{service: s, state: state, readers: readers, owner: owner, install: install, rows: rows, tracked: tracked, now: s.now()}
+	variations := make(map[int64][]Variation, len(products))
+	for id := range products {
+		if _, known := rows.byWPID[keyOf(pagemap.WPProduct, id)]; !known {
+			continue
+		}
+		listed, listErr := a.variations(ctx, id)
+		if listErr != nil {
+			return false, listErr
+		}
+		variations[id] = listed
+	}
 	err = s.inUnit(ctx, func(c context.Context) error {
-		for id := range products {
-			page, known := rows.byWPID[keyOf(pagemap.WPProduct, id)]
-			if !known {
-				continue
-			}
-			if facetsErr := a.productFields(c, page, products[id]); facetsErr != nil {
+		for id := range variations {
+			if facetsErr := a.productFields(c, rows.byWPID[keyOf(pagemap.WPProduct, id)], products[id], variations[id]); facetsErr != nil {
 				return facetsErr
 			}
 			state.Counts.Products++
@@ -65,7 +72,21 @@ func (s *Service) store(ctx context.Context, state *State, readers Readers, batc
 	return !listed.HasMore, nil
 }
 
-func (a *absorber) productFields(ctx context.Context, page pagemap.Page, product Product) error {
+func (a *absorber) variations(ctx context.Context, productID int64) ([]Variation, error) {
+	out := make([]Variation, 0)
+	for number := 1; ; number++ {
+		page, err := a.readers.Store.ListVariations(ctx, productID, number)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, page.Items...)
+		if !page.HasMore {
+			return out, nil
+		}
+	}
+}
+
+func (a *absorber) productFields(ctx context.Context, page pagemap.Page, product Product, variations []Variation) error {
 	values := []field.Value{
 		field.NewValue(page.ID, field.ProductDescription, product.Description, a.now),
 		field.NewValue(page.ID, field.ProductShortDescription, product.ShortDescription, a.now),
@@ -78,30 +99,21 @@ func (a *absorber) productFields(ctx context.Context, page pagemap.Page, product
 		field.NewValue(page.ID, field.ManageStock, product.ManageStock, a.now),
 		field.NewValue(page.ID, field.Attributes, string(product.Attributes), a.now),
 	}
-	for number := 1; ; number++ {
-		variations, err := a.readers.Store.ListVariations(ctx, product.ID, number)
-		if err != nil {
-			return err
+	for i := range variations {
+		variation := variations[i]
+		instance := strconv.FormatInt(variation.ID, 10)
+		facts, marshalErr := json.Marshal(variationFacts{
+			SKU: variation.SKU, Price: variation.Price, RegularPrice: variation.RegularPrice, SalePrice: variation.SalePrice,
+			StockStatus: variation.StockStatus, StockQuantity: quantity(variation.StockQuantity), ManageStock: variation.ManageStock,
+			Status: variation.Status, Attributes: variation.Attributes,
+		})
+		if marshalErr != nil {
+			return marshalErr
 		}
-		for i := range variations.Items {
-			variation := variations.Items[i]
-			instance := strconv.FormatInt(variation.ID, 10)
-			facts, marshalErr := json.Marshal(variationFacts{
-				SKU: variation.SKU, Price: variation.Price, RegularPrice: variation.RegularPrice, SalePrice: variation.SalePrice,
-				StockStatus: variation.StockStatus, StockQuantity: quantity(variation.StockQuantity), ManageStock: variation.ManageStock,
-				Status: variation.Status, Attributes: variation.Attributes,
-			})
-			if marshalErr != nil {
-				return marshalErr
-			}
-			values = append(values,
-				field.NewValue(page.ID, field.Instance(field.VariationDescription, instance), variation.Description, a.now),
-				field.NewValue(page.ID, field.Instance(field.Variation, instance), string(facts), a.now),
-			)
-		}
-		if !variations.HasMore {
-			break
-		}
+		values = append(values,
+			field.NewValue(page.ID, field.Instance(field.VariationDescription, instance), variation.Description, a.now),
+			field.NewValue(page.ID, field.Instance(field.Variation, instance), string(facts), a.now),
+		)
 	}
 	if err := a.observeFields(ctx, page, values); err != nil {
 		return err

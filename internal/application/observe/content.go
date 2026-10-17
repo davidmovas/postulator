@@ -63,23 +63,14 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 	a := &absorber{
 		service: s, state: state, readers: readers, owner: owner, install: install, rows: rowsOf(pages), tracked: tracked, now: s.now(),
 	}
-	items = resolveDraftPaths(items, a.rows.byWPID)
+	batch, err := a.prepare(ctx, resolveDraftPaths(items, a.rows.byWPID))
+	if err != nil {
+		return err
+	}
 
 	err = s.inUnit(ctx, func(c context.Context) error {
-		waiting := waitingProducts(a.rows.byPath)
-		for i := range items {
-			current, known, foreign := match(items[i], a.rows)
-			if foreign {
-				a.findings = append(a.findings, pathTaken(items[i], current))
-				continue
-			}
-			if !known && items[i].Type == pagemap.WPProduct && waiting > 0 {
-				current, known = pagemap.ClaimProduct(storeCandidate(items[i]), slices.Collect(maps.Values(a.rows.byPath)))
-				if known {
-					waiting--
-				}
-			}
-			if keepErr := a.keep(c, items[i], current, known); keepErr != nil {
+		for i := range batch {
+			if keepErr := a.keep(c, batch[i]); keepErr != nil {
 				return keepErr
 			}
 		}
@@ -92,37 +83,84 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 	return nil
 }
 
-func (a *absorber) keep(ctx context.Context, it item, current pagemap.Page, known bool) error {
-	next, _ := merge(current, known, it, a.state.SiteID, a.now)
-	if known && current.Path != next.Path {
-		delete(a.rows.byPath, current.Path)
+type prepared struct {
+	it      item
+	current pagemap.Page
+	next    pagemap.Page
+	terms   []pagemap.Term
+	body    bodyRead
+	known   bool
+}
+
+type bodyRead struct {
+	current block.Snapshot
+	base    block.Snapshot
+	raw     string
+	hash    string
+	stored  bool
+	fetched bool
+}
+
+func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error) {
+	batch := make([]prepared, 0, len(items))
+	waiting := waitingProducts(a.rows.byPath)
+	for i := range items {
+		current, known, foreign := match(items[i], a.rows)
+		if foreign {
+			a.findings = append(a.findings, pathTaken(items[i], current))
+			continue
+		}
+		if !known && items[i].Type == pagemap.WPProduct && waiting > 0 {
+			current, known = pagemap.ClaimProduct(storeCandidate(items[i]), slices.Collect(maps.Values(a.rows.byPath)))
+			if known {
+				waiting--
+			}
+		}
+		next, _ := merge(current, known, items[i], a.state.SiteID, a.now)
+		if known && current.Path != next.Path {
+			delete(a.rows.byPath, current.Path)
+		}
+		a.rows.remember(next)
+
+		terms, err := a.readTerms(ctx, items[i])
+		if err != nil {
+			return nil, err
+		}
+		body, err := a.readBody(ctx, next, items[i])
+		if err != nil {
+			return nil, err
+		}
+		batch = append(batch, prepared{it: items[i], current: current, next: next, terms: terms, body: body, known: known})
 	}
-	if known {
-		if err := a.service.deps.Pages.Update(ctx, next); err != nil {
+	return batch, nil
+}
+
+func (a *absorber) keep(ctx context.Context, p prepared) error {
+	if p.known {
+		if err := a.service.deps.Pages.Update(ctx, p.next); err != nil {
 			return err
 		}
 		a.state.Counts.Updated++
 	} else {
-		if err := a.service.deps.Pages.Insert(ctx, next); err != nil {
+		if err := a.service.deps.Pages.Insert(ctx, p.next); err != nil {
 			return err
 		}
 		a.state.Counts.Created++
 	}
-	a.rows.remember(next)
 
-	if err := a.identity(ctx, next, it); err != nil {
+	if err := a.identity(ctx, p.next, p.it); err != nil {
 		return err
 	}
-	if err := a.terms(ctx, next, it); err != nil {
+	if err := a.terms(ctx, p.next, p.it, p.terms); err != nil {
 		return err
 	}
-	if err := a.fields(ctx, next, it); err != nil {
+	if err := a.fields(ctx, p.next, p.it); err != nil {
 		return err
 	}
-	if err := a.body(ctx, next, it); err != nil {
+	if err := a.body(ctx, p.next, p.it, p.body); err != nil {
 		return err
 	}
-	return a.plan(ctx, current, known, next, it)
+	return a.plan(ctx, p.current, p.known, p.next, p.it)
 }
 
 func (a *absorber) identity(ctx context.Context, page pagemap.Page, it item) error {
@@ -140,20 +178,24 @@ func (a *absorber) identity(ctx context.Context, page pagemap.Page, it item) err
 	return a.service.deps.Identity.Put(ctx, identity)
 }
 
-func (a *absorber) terms(ctx context.Context, page pagemap.Page, it item) error {
-	if it.mappedType().Term() {
-		return nil
-	}
+func (a *absorber) readTerms(ctx context.Context, it item) ([]pagemap.Term, error) {
 	terms := it.Terms
-	if a.readers.plugin(capabilityTerms) {
+	if !it.mappedType().Term() && a.readers.plugin(capabilityTerms) {
 		listed, err := a.readers.Plugin.GetTerms(ctx, string(it.mappedType()), it.WPID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		terms = listed
 	}
 	if terms == nil {
 		terms = []pagemap.Term{}
+	}
+	return terms, nil
+}
+
+func (a *absorber) terms(ctx context.Context, page pagemap.Page, it item, terms []pagemap.Term) error {
+	if it.mappedType().Term() {
+		return nil
 	}
 	return a.service.deps.Identity.ReplaceTerms(ctx, page.ID, terms)
 }
@@ -210,59 +252,60 @@ func (a *absorber) observeFields(ctx context.Context, page pagemap.Page, values 
 	return nil
 }
 
-func (a *absorber) body(ctx context.Context, page pagemap.Page, it item) error {
+func (a *absorber) readBody(ctx context.Context, page pagemap.Page, it item) (bodyRead, error) {
 	if it.mappedType().Term() {
-		return nil
+		return bodyRead{}, nil
 	}
 	current, base, found, err := a.service.deps.Bodies.Get(ctx, page.ID)
 	if err != nil {
-		return err
+		return bodyRead{}, err
 	}
 	if found && current.Hash == it.ContentHash {
+		return bodyRead{current: current, base: base, stored: true}, nil
+	}
+	switch {
+	case it.HasContent:
+		return bodyRead{raw: it.Content, hash: it.ContentHash, fetched: true}, nil
+	case a.readers.plugin(capabilityRaw):
+		read, readErr := a.readers.Plugin.GetRaw(ctx, string(it.mappedType()), it.WPID)
+		if readErr != nil {
+			return bodyRead{}, readErr
+		}
+		return bodyRead{raw: read.Content, hash: read.Hash, fetched: true}, nil
+	default:
+		return bodyRead{}, nil
+	}
+}
+
+func (a *absorber) body(ctx context.Context, page pagemap.Page, it item, read bodyRead) error {
+	switch {
+	case it.mappedType().Term():
+		return nil
+	case read.stored:
 		if a.state.Full {
-			if err := a.rawLinks(ctx, page, block.Parse(current.Raw)); err != nil {
+			if err := a.rawLinks(ctx, page, block.Parse(read.current.Raw)); err != nil {
 				return err
 			}
 		}
-		return a.bodyFinding(ctx, page, current, base)
-	}
-
-	raw, hash, ok, err := a.rawOf(ctx, it)
-	if err != nil {
-		return err
-	}
-	if !ok {
+		return a.bodyFinding(ctx, page, read.current, read.base)
+	case !read.fetched:
 		return a.linksFromItem(ctx, page, it)
 	}
-	body := block.Parse(raw)
+
+	body := block.Parse(read.raw)
 	if err := a.service.deps.Bodies.Observe(ctx, block.Snapshot{
-		PageID: page.ID, Side: block.Current, Raw: raw, Hash: hash, Kind: body.Kind, ObservedAt: a.now,
+		PageID: page.ID, Side: block.Current, Raw: read.raw, Hash: read.hash, Kind: body.Kind, ObservedAt: a.now,
 	}); err != nil {
 		return err
 	}
 	if err := a.rawLinks(ctx, page, body); err != nil {
 		return err
 	}
-	current, base, _, err = a.service.deps.Bodies.Get(ctx, page.ID)
+	current, base, _, err := a.service.deps.Bodies.Get(ctx, page.ID)
 	if err != nil {
 		return err
 	}
 	return a.bodyFinding(ctx, page, current, base)
-}
-
-func (a *absorber) rawOf(ctx context.Context, it item) (raw, hash string, ok bool, err error) {
-	switch {
-	case it.HasContent:
-		return it.Content, it.ContentHash, true, nil
-	case a.readers.plugin(capabilityRaw):
-		read, readErr := a.readers.Plugin.GetRaw(ctx, string(it.mappedType()), it.WPID)
-		if readErr != nil {
-			return "", "", false, readErr
-		}
-		return read.Content, read.Hash, true, nil
-	default:
-		return "", "", false, nil
-	}
 }
 
 func (a *absorber) bodyFinding(ctx context.Context, page pagemap.Page, current, base block.Snapshot) error {

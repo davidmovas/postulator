@@ -112,6 +112,7 @@ func newScenario(t *testing.T) *scenario {
 		pages: site.TechnicalPages{Shop: shopID},
 	}
 	s.visitor = &visitorFake{pages: map[string]observe.Visit{}, failed: map[string]bool{}}
+	s.plugin.guard, s.core.guard, s.store.guard, s.visitor.guard = s.stores.guard, s.stores.guard, s.stores.guard, s.stores.guard
 	s.readers = observe.Readers{
 		Core: s.core, Store: s.store, Plugin: s.plugin, Render: s.visitor,
 		Manifest: observe.Manifest{
@@ -407,6 +408,27 @@ func difference(before, after modelSnapshot) string {
 	}
 	return report("counts", []int{len(before.pages), len(before.fields), len(before.bodies), len(before.links), len(before.findings)},
 		[]int{len(after.pages), len(after.fields), len(after.bodies), len(after.links), len(after.findings)})
+}
+
+func TestTheObservationReadsTheSiteOutsideItsWriteUnit(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+
+	s.run(t, observe.Options{})
+	s.plugin.raws[tb500ID] = rawOf("Edited on the site.")
+	s.touch(tb500ID, start.Add(30*time.Minute))
+	for i := range s.plugin.items {
+		if s.plugin.items[i].ID == tb500ID {
+			s.plugin.items[i].ContentHash = block.BodyHash("Edited on the site.")
+		}
+	}
+	s.clock.Set(start.Add(time.Hour))
+	s.run(t, observe.Options{})
+
+	if reads := s.stores.guard.inUnit(); reads != 0 {
+		t.Fatalf("%d reads of the site happened inside the write unit, which holds the one SQLite writer for their whole duration", reads)
+	}
 }
 
 func TestEveryNthObservationWalksFully(t *testing.T) {

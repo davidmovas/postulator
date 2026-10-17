@@ -19,8 +19,50 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
+type unitGuard struct {
+	mu          sync.Mutex
+	open        bool
+	readsInUnit int
+}
+
+func (g *unitGuard) enter() {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.open = true
+}
+
+func (g *unitGuard) leave() {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.open = false
+}
+
+func (g *unitGuard) read() {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.open {
+		g.readsInUnit++
+	}
+}
+
+func (g *unitGuard) inUnit() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.readsInUnit
+}
+
 type stores struct {
 	mu         sync.Mutex
+	guard      *unitGuard
 	sites      map[string]site.Site
 	pages      map[string]pagemap.Page
 	identities map[string]pagemap.Identity
@@ -36,6 +78,7 @@ type stores struct {
 
 func newStores(owner site.Site) *stores {
 	return &stores{
+		guard:      &unitGuard{},
 		sites:      map[string]site.Site{owner.ID: owner},
 		pages:      map[string]pagemap.Page{},
 		identities: map[string]pagemap.Identity{},
@@ -396,9 +439,11 @@ func (f findingStore) ListForPage(_ context.Context, pageID string) ([]finding.F
 	return out, nil
 }
 
-type unit struct{}
+type unit struct{ guard *unitGuard }
 
-func (unit) Do(ctx context.Context, fn func(context.Context) error) error {
+func (u unit) Do(ctx context.Context, fn func(context.Context) error) error {
+	u.guard.enter()
+	defer u.guard.leave()
 	return fn(ctx)
 }
 
@@ -414,12 +459,13 @@ func (b bus) Publish(eventType events.Type, _ any) error {
 func (s *stores) deps(clk clock.Clock) observe.Deps {
 	return observe.Deps{
 		Sites: s, Pages: pageStore{s}, Identity: identityStore{s}, Fields: fieldStore{s}, Bodies: bodyStore{s},
-		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, UnitOfWork: unit{}, Publisher: bus{s}, Clock: clk,
+		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, UnitOfWork: unit{s.guard}, Publisher: bus{s}, Clock: clk,
 	}
 }
 
 type pluginFake struct {
 	mu       sync.Mutex
+	guard    *unitGuard
 	items    []observe.ContentItem
 	raws     map[int64]observe.Raw
 	rendered map[int64]observe.Rendered
@@ -431,6 +477,7 @@ type pluginFake struct {
 }
 
 func (p *pluginFake) ListContent(_ context.Context, q observe.ContentQuery) (observe.ContentPage, error) {
+	p.guard.read()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.queries = append(p.queries, q)
@@ -465,6 +512,7 @@ func (p *pluginFake) ListContent(_ context.Context, q observe.ContentQuery) (obs
 }
 
 func (p *pluginFake) GetRaw(_ context.Context, _ string, id int64) (observe.Raw, error) {
+	p.guard.read()
 	raw, ok := p.raws[id]
 	if !ok {
 		return observe.Raw{}, errors.New(errors.NotFound, "no raw")
@@ -473,6 +521,7 @@ func (p *pluginFake) GetRaw(_ context.Context, _ string, id int64) (observe.Raw,
 }
 
 func (p *pluginFake) GetRendered(_ context.Context, _ string, id int64) (observe.Rendered, error) {
+	p.guard.read()
 	rendered, ok := p.rendered[id]
 	if !ok {
 		return observe.Rendered{}, errors.New(errors.NotFound, "no rendered")
@@ -481,18 +530,22 @@ func (p *pluginFake) GetRendered(_ context.Context, _ string, id int64) (observe
 }
 
 func (p *pluginFake) GetSEOMeta(_ context.Context, _ string, id int64) (observe.SEOMeta, error) {
+	p.guard.read()
 	return p.meta[id], nil
 }
 
 func (p *pluginFake) GetTerms(_ context.Context, _ string, id int64) ([]pagemap.Term, error) {
+	p.guard.read()
 	return p.terms[id], nil
 }
 
 func (p *pluginFake) Settings(_ context.Context) (site.TechnicalPages, error) {
+	p.guard.read()
 	return p.pages, nil
 }
 
 func (p *pluginFake) PreviewLink(_ context.Context, _ string, id int64) (string, error) {
+	p.guard.read()
 	link, ok := p.previews[id]
 	if !ok {
 		return "", errors.New(errors.NotFound, "no preview")
@@ -501,16 +554,19 @@ func (p *pluginFake) PreviewLink(_ context.Context, _ string, id int64) (string,
 }
 
 type coreFake struct {
+	guard    *unitGuard
 	types    []observe.PostType
 	items    map[string][]observe.Item
 	settings observe.SiteSettings
 }
 
 func (c *coreFake) PostTypes(_ context.Context) ([]observe.PostType, error) {
+	c.guard.read()
 	return c.types, nil
 }
 
 func (c *coreFake) ListItems(_ context.Context, postType string, q observe.ItemQuery) (observe.ItemPage, error) {
+	c.guard.read()
 	items := c.items[postType]
 	perPage := q.PerPage
 	if perPage <= 0 {
@@ -525,10 +581,12 @@ func (c *coreFake) ListItems(_ context.Context, postType string, q observe.ItemQ
 }
 
 func (c *coreFake) SiteSettings(_ context.Context) (observe.SiteSettings, error) {
+	c.guard.read()
 	return c.settings, nil
 }
 
 type storeFake struct {
+	guard      *unitGuard
 	products   []observe.Product
 	variations map[int64][]observe.Variation
 	pages      site.TechnicalPages
@@ -536,6 +594,7 @@ type storeFake struct {
 }
 
 func (s *storeFake) ListProducts(_ context.Context, q observe.ProductQuery) (observe.ProductPage, error) {
+	s.guard.read()
 	s.queries = append(s.queries, q)
 	matching := make([]observe.Product, 0)
 	for i := range s.products {
@@ -557,6 +616,7 @@ func (s *storeFake) ListProducts(_ context.Context, q observe.ProductQuery) (obs
 }
 
 func (s *storeFake) ListVariations(_ context.Context, productID int64, page int) (observe.VariationPage, error) {
+	s.guard.read()
 	if page > 1 {
 		return observe.VariationPage{}, nil
 	}
@@ -564,11 +624,13 @@ func (s *storeFake) ListVariations(_ context.Context, productID int64, page int)
 }
 
 func (s *storeFake) StorePages(_ context.Context) (site.TechnicalPages, error) {
+	s.guard.read()
 	return s.pages, nil
 }
 
 type visitorFake struct {
 	mu       sync.Mutex
+	guard    *unitGuard
 	pages    map[string]observe.Visit
 	failed   map[string]bool
 	visits   []string
@@ -578,6 +640,7 @@ type visitorFake struct {
 }
 
 func (v *visitorFake) Visit(_ context.Context, url string) (observe.Visit, error) {
+	v.guard.read()
 	v.mu.Lock()
 	v.visits = append(v.visits, url)
 	v.active++
