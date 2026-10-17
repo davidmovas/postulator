@@ -29,6 +29,9 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	if err != nil {
 		return err
 	}
+	if m.bodies, err = s.currentBodies(ctx, state.SiteID); err != nil {
+		return err
+	}
 	tracked, err := s.findings(ctx, state.SiteID, deriveCodes...)
 	if err != nil {
 		return err

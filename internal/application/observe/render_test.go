@@ -318,6 +318,26 @@ func TestAFailedFilteredRenderIsUnreachableNotAWrongRoot(t *testing.T) {
 	}
 }
 
+func TestARenderBatchReadsOnlyTheBodiesItNeeds(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+
+	state := s.run(t, observe.Options{})
+	if state.Counts.Rendered != 9 {
+		t.Fatalf("rendered %d, want every published page over several batches of three", state.Counts.Rendered)
+	}
+	if lists := s.stores.bodyListings(); lists != 1 {
+		t.Fatalf("the walk listed every body of the site %d times, want once for the derivation; a render batch reads its own targets' bodies", lists)
+	}
+
+	s.clock.Set(start.Add(time.Hour))
+	s.run(t, observe.Options{})
+	if lists := s.stores.bodyListings(); lists != 2 {
+		t.Fatalf("an incremental walk listed every body %d times in total, want one more", lists)
+	}
+}
+
 func TestRendersRunAFewAtATime(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

@@ -74,6 +74,13 @@ type stores struct {
 	links      map[string]map[pagemap.LinkSource][]pagemap.PageLink
 	findings   map[string]finding.Finding
 	published  []events.Type
+	bodyLists  int
+}
+
+func (s *stores) bodyListings() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.bodyLists
 }
 
 func newStores(owner site.Site) *stores {
@@ -277,6 +284,7 @@ func (b bodyStore) Get(_ context.Context, pageID string) (current, base block.Sn
 func (b bodyStore) ListBySite(_ context.Context, siteID string) ([]block.Snapshot, error) {
 	b.s.mu.Lock()
 	defer b.s.mu.Unlock()
+	b.s.bodyLists++
 	out := make([]block.Snapshot, 0)
 	for pageID, sides := range b.s.bodies {
 		if b.s.pages[pageID].SiteID != siteID {

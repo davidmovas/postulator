@@ -53,13 +53,9 @@ func (s *Service) model(ctx context.Context, siteID string) (siteModel, error) {
 	if err != nil {
 		return siteModel{}, err
 	}
-	bodies, err := s.deps.Bodies.ListBySite(ctx, siteID)
-	if err != nil {
-		return siteModel{}, err
-	}
 	m := siteModel{
 		pages: pages, identities: make(map[string]pagemap.Identity, len(identities)),
-		renders: make(map[string]render.Record, len(renders)), bodies: make(map[string]block.Snapshot), index: pagemap.NewIndex(pages),
+		renders: make(map[string]render.Record, len(renders)), bodies: map[string]block.Snapshot{}, index: pagemap.NewIndex(pages),
 	}
 	for i := range identities {
 		m.identities[identities[i].PageID] = identities[i]
@@ -67,13 +63,22 @@ func (s *Service) model(ctx context.Context, siteID string) (siteModel, error) {
 	for i := range renders {
 		m.renders[renders[i].PageID] = renders[i]
 	}
-	for i := range bodies {
-		if bodies[i].Side == block.Current {
-			m.bodies[bodies[i].PageID] = bodies[i]
-		}
-	}
 	slices.SortFunc(m.pages, func(a, b pagemap.Page) int { return strings.Compare(a.ID, b.ID) })
 	return m, nil
+}
+
+func (s *Service) currentBodies(ctx context.Context, siteID string) (map[string]block.Snapshot, error) {
+	bodies, err := s.deps.Bodies.ListBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	current := make(map[string]block.Snapshot, len(bodies)/2)
+	for i := range bodies {
+		if bodies[i].Side == block.Current {
+			current[bodies[i].PageID] = bodies[i]
+		}
+	}
+	return current, nil
 }
 
 func (s *Service) render(ctx context.Context, state *State, readers Readers, batch int) (bool, error) {
@@ -103,14 +108,21 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 		}
 		state.RenderAfter = page.ID
 		identity, observed := m.identities[page.ID]
-		if !observed || (state.Full && archive(page, identity, state, readers)) || !s.needsRender(state, page, identity, m) {
+		if !observed || (state.Full && archive(page, identity, state, readers)) {
+			continue
+		}
+		raw, stale, err := s.candidate(ctx, state, page, identity, m)
+		if err != nil {
+			return false, err
+		}
+		if !stale {
 			continue
 		}
 		url, ok := s.renderURL(ctx, readers, page, identity)
 		if !ok {
 			continue
 		}
-		targets = append(targets, renderTarget{page: page, identity: identity, url: url, raw: m.bodies[page.ID].Raw})
+		targets = append(targets, renderTarget{page: page, identity: identity, url: url, raw: raw})
 	}
 	if len(targets) == 0 {
 		return exhausted, nil
@@ -123,19 +135,17 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 	return exhausted, nil
 }
 
-func (s *Service) needsRender(state *State, page pagemap.Page, identity pagemap.Identity, m siteModel) bool {
-	if state.Full || state.Rescan {
-		return true
-	}
+func (s *Service) candidate(ctx context.Context, state *State, page pagemap.Page, identity pagemap.Identity, m siteModel) (raw string, stale bool, err error) {
 	record, rendered := m.renders[page.ID]
-	if !rendered {
-		return true
+	stale = state.Full || state.Rescan || !rendered || (identity.ModifiedGMT != nil && identity.ModifiedGMT.After(record.ExtractedAt))
+	current, _, hasBody, err := s.deps.Bodies.Get(ctx, page.ID)
+	if err != nil {
+		return "", false, err
 	}
-	if identity.ModifiedGMT != nil && identity.ModifiedGMT.After(record.ExtractedAt) {
-		return true
+	if !stale && hasBody && current.ObservedAt.After(record.ExtractedAt) {
+		stale = true
 	}
-	body, hasBody := m.bodies[page.ID]
-	return hasBody && body.ObservedAt.After(record.ExtractedAt)
+	return current.Raw, stale, nil
 }
 
 func (s *Service) renderURL(ctx context.Context, readers Readers, page pagemap.Page, identity pagemap.Identity) (address string, ok bool) {
