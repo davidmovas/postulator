@@ -15,6 +15,8 @@ type manifest struct {
 	SEOPlugin    string   `json:"seoPlugin"`
 	WPVersion    string   `json:"wpVersion"`
 	Site         string   `json:"site"`
+	PostTypes    []string `json:"postTypes"`
+	Taxonomies   []string `json:"taxonomies"`
 }
 
 func readManifest(t *testing.T, c *client) manifest {

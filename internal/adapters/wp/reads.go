@@ -37,7 +37,7 @@ type renderedPayload struct {
 }
 
 func (c *Client) GetRendered(ctx context.Context, itemType ItemType, id int64) (Rendered, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return Rendered{}, err
 	}
 	if err := c.requireCapability(ctx, CapabilityRendered); err != nil {
@@ -130,7 +130,7 @@ func termsOf(payload []termPayload) []Term {
 }
 
 func (c *Client) GetTerms(ctx context.Context, itemType ItemType, id int64) ([]Term, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return nil, err
 	}
 	if err := c.requireCapability(ctx, CapabilityTerms); err != nil {
@@ -175,7 +175,7 @@ func metaKeys(keys []string) ([]string, error) {
 }
 
 func (c *Client) GetMeta(ctx context.Context, itemType ItemType, id int64, keys []string) (map[string]json.RawMessage, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return nil, err
 	}
 	asked, err := metaKeys(keys)

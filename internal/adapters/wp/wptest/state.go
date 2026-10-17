@@ -113,12 +113,15 @@ func hierarchical(itemType string) bool {
 	return itemType == TypePage || itemType == TypeProductCategory
 }
 
-func term(itemType string) bool {
-	return itemType == TypeProductCategory
+func (s *Server) term(itemType string) bool {
+	if itemType == TypeProductCategory {
+		return true
+	}
+	return slices.ContainsFunc(s.taxonomies, func(taxonomy Taxonomy) bool { return taxonomy.Name == itemType })
 }
 
 func (s *Server) storeOf(itemType string) (store map[int64]*Item, order []int64) {
-	if term(itemType) {
+	if s.term(itemType) {
 		return s.terms, s.termOrder
 	}
 	return s.items, s.order
@@ -210,7 +213,7 @@ func (s *Server) add(item Item) Item {
 	}
 
 	sequence := &s.nextID
-	if term(item.Type) {
+	if s.term(item.Type) {
 		sequence = &s.nextTermID
 	}
 	if item.ID <= 0 {
@@ -230,7 +233,7 @@ func (s *Server) add(item Item) Item {
 	}
 
 	stored := item
-	if term(item.Type) {
+	if s.term(item.Type) {
 		s.terms[item.ID] = &stored
 		s.termOrder = append(s.termOrder, item.ID)
 		return stored

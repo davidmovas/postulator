@@ -115,6 +115,8 @@ function manifest(): \WP_REST_Response {
 		array(
 			'version'      => VERSION,
 			'capabilities' => CAPABILITIES,
+			'postTypes'    => content_post_types(),
+			'taxonomies'   => content_taxonomies(),
 			'seoPlugin'    => detect_plugin(),
 			'wpVersion'    => (string) get_bloginfo( 'version' ),
 			'site'         => (string) home_url(),
@@ -129,8 +131,9 @@ function parse_types( string $types ) {
 	}
 
 	$requested = array_values( array_filter( array_map( 'trim', explode( ',', $types ) ), 'strlen' ) );
+	$listable  = array_merge( TYPES, content_post_types(), content_taxonomies() );
 	foreach ( $requested as $type ) {
-		if ( ! in_array( $type, TYPES, true ) ) {
+		if ( ! in_array( $type, $listable, true ) ) {
 			return invalid( 'invalid_type', 'unknown content type: ' . $type );
 		}
 	}
@@ -217,7 +220,25 @@ function content_list( \WP_REST_Request $request ) {
 function content_post_types(): array {
 	$types = get_post_types( array( 'public' => true ), 'names' );
 	unset( $types['attachment'] );
-	return array_values( $types );
+	$types = array_values( $types );
+	sort( $types );
+	return $types;
+}
+
+function content_taxonomies(): array {
+	$posts      = content_post_types();
+	$taxonomies = array();
+	foreach ( get_taxonomies( array( 'public' => true ), 'names' ) as $taxonomy ) {
+		if ( ! in_array( $taxonomy, $posts, true ) ) {
+			$taxonomies[] = (string) $taxonomy;
+		}
+	}
+	sort( $taxonomies );
+	return $taxonomies;
+}
+
+function term_families(): array {
+	return array_values( array_unique( array_merge( TERM_TYPES, content_taxonomies() ) ) );
 }
 
 function editable_post( \WP_REST_Request $request ) {

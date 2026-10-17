@@ -45,18 +45,20 @@ type itemMeta struct {
 }
 
 type contentItem struct {
-	ID          int      `json:"id"`
-	Type        string   `json:"type"`
-	Slug        string   `json:"slug"`
-	Path        string   `json:"path"`
-	Parent      int      `json:"parent"`
-	Status      string   `json:"status"`
-	Modified    string   `json:"modified"`
-	ContentHash string   `json:"contentHash"`
-	Title       string   `json:"title"`
-	H1          string   `json:"h1"`
-	Meta        itemMeta `json:"meta"`
-	Links       []link   `json:"links"`
+	ID          int         `json:"id"`
+	Type        string      `json:"type"`
+	Slug        string      `json:"slug"`
+	Path        string      `json:"path"`
+	Parent      int         `json:"parent"`
+	Status      string      `json:"status"`
+	Modified    string      `json:"modified"`
+	ContentHash string      `json:"contentHash"`
+	Title       string      `json:"title"`
+	H1          string      `json:"h1"`
+	Excerpt     string      `json:"excerpt"`
+	Meta        itemMeta    `json:"meta"`
+	Links       []link      `json:"links"`
+	Terms       []termEntry `json:"terms"`
 }
 
 type contentPage struct {

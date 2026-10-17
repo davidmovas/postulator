@@ -46,14 +46,18 @@ type Manifest struct {
 	WPVersion    string
 	Site         string
 	Capabilities []string
+	PostTypes    []string
+	Taxonomies   []string
 }
 
 type Capabilities struct {
-	Version   string
-	SEOPlugin string
-	WPVersion string
-	Site      string
-	Names     []string
+	Version    string
+	SEOPlugin  string
+	WPVersion  string
+	Site       string
+	Names      []string
+	PostTypes  []string
+	Taxonomies []string
 }
 
 func (c Capabilities) Has(name string) bool {
@@ -156,8 +160,10 @@ type ContentItem struct {
 	ContentHash string
 	Title       string
 	H1          string
+	Excerpt     string
 	Meta        ContentMeta
 	Links       []ContentLink
+	Terms       []Term
 	ID          int64
 	Parent      int64
 }
@@ -193,6 +199,8 @@ type manifestPayload struct {
 	WPVersion    string   `json:"wpVersion"`
 	Site         string   `json:"site"`
 	Capabilities []string `json:"capabilities"`
+	PostTypes    []string `json:"postTypes"`
+	Taxonomies   []string `json:"taxonomies"`
 }
 
 type contentMetaPayload struct {
@@ -215,8 +223,10 @@ type contentItemPayload struct {
 	ContentHash string               `json:"contentHash"`
 	Title       string               `json:"title"`
 	H1          string               `json:"h1"`
+	Excerpt     string               `json:"excerpt"`
 	Meta        contentMetaPayload   `json:"meta"`
 	Links       []contentLinkPayload `json:"links"`
+	Terms       []termPayload        `json:"terms"`
 	ID          int64                `json:"id"`
 	Parent      int64                `json:"parent"`
 }
@@ -238,8 +248,10 @@ func (p contentItemPayload) contentItem() ContentItem {
 		ContentHash: p.ContentHash,
 		Title:       p.Title,
 		H1:          p.H1,
+		Excerpt:     p.Excerpt,
 		Meta:        ContentMeta{Title: p.Meta.Title, Description: p.Meta.Description, Canonical: p.Meta.Canonical},
 		Links:       links,
+		Terms:       termsOf(p.Terms),
 	}
 }
 
@@ -353,11 +365,13 @@ func (c *Client) Capabilities(ctx context.Context) (Capabilities, error) {
 	}
 
 	return Capabilities{
-		Version:   manifest.Version,
-		SEOPlugin: manifest.SEOPlugin,
-		WPVersion: manifest.WPVersion,
-		Site:      manifest.Site,
-		Names:     manifest.Capabilities,
+		Version:    manifest.Version,
+		SEOPlugin:  manifest.SEOPlugin,
+		WPVersion:  manifest.WPVersion,
+		Site:       manifest.Site,
+		Names:      manifest.Capabilities,
+		PostTypes:  manifest.PostTypes,
+		Taxonomies: manifest.Taxonomies,
 	}, nil
 }
 
@@ -404,22 +418,37 @@ func (c *Client) ListContent(ctx context.Context, query ContentQuery) (ContentPa
 	return ContentPage{Items: items, NextCursor: payload.NextCursor}, nil
 }
 
-func postRoute(itemType ItemType, id int64) error {
+func termRefused(itemType ItemType, id int64) error {
+	return errors.New(errors.Invalid,
+		"a taxonomy term is no post, and the companion plugin's post routes would answer the post that shares its number").
+		WithDetail("type", string(itemType)).
+		WithDetail("id", id)
+}
+
+func (c *Client) contentPost(ctx context.Context, itemType ItemType, id int64) error {
 	switch itemType {
 	case TypePage, TypePost, TypeProduct:
 		return nil
 	case TypeProductCategory:
-		return errors.New(errors.Invalid,
-			"a product category is a term, and the companion plugin's post routes would answer the post that shares its number").
-			WithDetail("type", string(itemType)).
-			WithDetail("id", id)
+		return termRefused(itemType, id)
+	}
+
+	manifest, err := c.Manifest(ctx)
+	if err != nil {
+		return err
+	}
+	switch {
+	case slices.Contains(manifest.Taxonomies, string(itemType)):
+		return termRefused(itemType, id)
+	case slices.Contains(manifest.PostTypes, string(itemType)):
+		return nil
 	default:
-		return errors.New(errors.Invalid, "unknown WordPress content type").WithDetail("type", string(itemType))
+		return errors.New(errors.Invalid, "the site names no content post type of that name").WithDetail("type", string(itemType))
 	}
 }
 
 func (c *Client) SetSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta) (SEOResult, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return SEOResult{}, err
 	}
 	if err := c.requirePlugin(ctx); err != nil {
@@ -453,7 +482,7 @@ func (c *Client) SetSEOMeta(ctx context.Context, itemType ItemType, id int64, me
 }
 
 func (c *Client) GetSEOMeta(ctx context.Context, itemType ItemType, id int64) (SEOMeta, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return SEOMeta{}, err
 	}
 	if err := c.requireCapability(ctx, CapabilitySEOMetaRead); err != nil {
@@ -477,7 +506,7 @@ func (c *Client) GetSEOMeta(ctx context.Context, itemType ItemType, id int64) (S
 }
 
 func (c *Client) ReplaceSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta, fields []string) (SEOResult, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return SEOResult{}, err
 	}
 	if err := c.requirePlugin(ctx); err != nil {
@@ -521,7 +550,7 @@ func (c *Client) ReplaceSEOMeta(ctx context.Context, itemType ItemType, id int64
 }
 
 func (c *Client) GetRaw(ctx context.Context, itemType ItemType, id int64) (RawContent, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return RawContent{}, err
 	}
 	if err := c.requirePlugin(ctx); err != nil {
@@ -557,7 +586,7 @@ func (c *Client) GetRaw(ctx context.Context, itemType ItemType, id int64) (RawCo
 }
 
 func (c *Client) PutRaw(ctx context.Context, itemType ItemType, id int64, content, expectedHash string) (string, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return "", err
 	}
 	if err := c.requirePlugin(ctx); err != nil {
@@ -608,7 +637,7 @@ type previewPayload struct {
 }
 
 func (c *Client) PreviewLink(ctx context.Context, itemType ItemType, id int64) (PreviewLink, error) {
-	if err := postRoute(itemType, id); err != nil {
+	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return PreviewLink{}, err
 	}
 	if err := c.requireCapability(ctx, CapabilityPreview); err != nil {

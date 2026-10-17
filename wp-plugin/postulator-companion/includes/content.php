@@ -21,7 +21,7 @@ function now_rfc3339(): string {
 }
 
 function touch_term( int $term_id, int $term_taxonomy_id, string $taxonomy ): void {
-	if ( ! in_array( $taxonomy, TERM_TYPES, true ) ) {
+	if ( ! in_array( $taxonomy, term_families(), true ) ) {
 		return;
 	}
 	update_term_meta( $term_id, TERM_MODIFIED_KEY, now_rfc3339() );
@@ -106,23 +106,24 @@ function post_terms( \WP_Post $post ): array {
 		return array();
 	}
 
-	$found = wp_get_object_terms( (int) $post->ID, $taxonomies );
-	if ( is_wp_error( $found ) || ! is_array( $found ) ) {
-		return array();
-	}
-
 	$terms = array();
-	foreach ( $found as $term ) {
-		if ( ! $term instanceof \WP_Term ) {
+	foreach ( $taxonomies as $taxonomy ) {
+		$held = get_the_terms( $post, $taxonomy );
+		if ( ! is_array( $held ) ) {
 			continue;
 		}
-		$terms[] = array(
-			'taxonomy' => (string) $term->taxonomy,
-			'id'       => (int) $term->term_id,
-			'name'     => (string) $term->name,
-			'slug'     => (string) $term->slug,
-			'parent'   => (int) $term->parent,
-		);
+		foreach ( $held as $term ) {
+			if ( ! $term instanceof \WP_Term ) {
+				continue;
+			}
+			$terms[] = array(
+				'taxonomy' => (string) $term->taxonomy,
+				'id'       => (int) $term->term_id,
+				'name'     => (string) $term->name,
+				'slug'     => (string) $term->slug,
+				'parent'   => (int) $term->parent,
+			);
+		}
 	}
 	usort(
 		$terms,
@@ -261,18 +262,21 @@ function post_item( \WP_Post $post ): array {
 		'contentHash' => content_hash( $content ),
 		'title'       => (string) $post->post_title,
 		'h1'          => first_h1( rendered_content( $post ) ),
+		'excerpt'     => (string) $post->post_excerpt,
 		'meta'        => read_post_seo( (int) $post->ID ),
 		'links'       => extract_links( $content, parent_path( $path ) ),
+		'terms'       => post_terms( $post ),
 	);
 }
 
-function query_terms_page( string $since_gmt, ?array $cursor, int $limit ): array {
+function query_terms_page( array $taxonomies, string $since_gmt, ?array $cursor, int $limit ): array {
 	global $wpdb;
 
-	$sql  = "SELECT t.term_id AS term_id FROM {$wpdb->term_taxonomy} tt
+	$placeholders = implode( ', ', array_fill( 0, count( $taxonomies ), '%s' ) );
+	$sql          = "SELECT t.term_id AS term_id FROM {$wpdb->term_taxonomy} tt
 		INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
-		WHERE tt.taxonomy = %s";
-	$args = array( 'product_cat' );
+		WHERE tt.taxonomy IN ( {$placeholders} )";
+	$args         = $taxonomies;
 
 	if ( null !== $cursor && isset( $cursor['i'] ) ) {
 		$sql   .= ' AND t.term_id > %d';
@@ -317,14 +321,17 @@ function term_item( \WP_Term $term, string $modified ): array {
 		'contentHash' => content_hash( $description ),
 		'title'       => (string) $term->name,
 		'h1'          => '',
+		'excerpt'     => '',
 		'meta'        => read_term_seo( $term ),
 		'links'       => array(),
+		'terms'       => array(),
 	);
 }
 
 function collect( array $types, string $since_gmt, ?array $cursor, int $limit ): array {
-	$post_types = array_values( array_diff( $types, TERM_TYPES ) );
-	$term_types = array_values( array_intersect( $types, TERM_TYPES ) );
+	$families   = term_families();
+	$post_types = array_values( array_diff( $types, $families ) );
+	$term_types = array_values( array_intersect( $types, $families ) );
 
 	$items = array();
 	$phase = null !== $cursor ? (string) $cursor['p'] : ( empty( $post_types ) ? 'term' : 'post' );
@@ -332,6 +339,9 @@ function collect( array $types, string $since_gmt, ?array $cursor, int $limit ):
 
 	if ( 'post' === $phase ) {
 		$rows = empty( $post_types ) ? array() : query_posts_page( $post_types, $since_gmt, $state, $limit );
+		if ( ! empty( $rows ) ) {
+			update_object_term_cache( array_map( 'intval', array_column( $rows, 'ID' ) ), $post_types );
+		}
 		foreach ( $rows as $row ) {
 			$post = get_post( (int) $row['ID'] );
 			if ( $post instanceof \WP_Post ) {
@@ -359,7 +369,7 @@ function collect( array $types, string $since_gmt, ?array $cursor, int $limit ):
 		return array( 'items' => $items, 'nextCursor' => null );
 	}
 
-	$page = query_terms_page( $since_gmt, $state, $remaining );
+	$page = query_terms_page( $term_types, $since_gmt, $state, $remaining );
 	foreach ( $page['rows'] as $row ) {
 		$term = get_term( (int) $row['term_id'] );
 		if ( $term instanceof \WP_Term ) {

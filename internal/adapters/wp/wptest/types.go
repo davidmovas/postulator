@@ -90,6 +90,29 @@ func (s *Server) builtinTaxonomies() []Taxonomy {
 	return taxonomies
 }
 
+func (s *Server) contentTypes() []string {
+	var names []string
+	for _, postType := range append(s.builtinTypes(), s.postTypes...) {
+		if postType.Slug != "attachment" {
+			names = append(names, postType.Slug)
+		}
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
+func (s *Server) contentTaxonomies() []string {
+	posts := s.contentTypes()
+	var names []string
+	for _, taxonomy := range append(s.builtinTaxonomies(), s.taxonomies...) {
+		if !slices.Contains(posts, taxonomy.Name) {
+			names = append(names, taxonomy.Name)
+		}
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
 func (s *Server) routeTypes(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+coreNamespace+"/types", s.handleTypes)
 	mux.HandleFunc("GET "+coreNamespace+"/settings", s.handleSettings)

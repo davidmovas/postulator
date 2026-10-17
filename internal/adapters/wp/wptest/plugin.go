@@ -97,9 +97,12 @@ func (s *Server) handleManifest(w http.ResponseWriter, _ *http.Request) {
 	plugin := s.seoPlugin
 	version := s.pluginVersion
 	capabilities := slices.Clone(s.capabilities)
+	postTypes, taxonomies := s.contentTypes(), s.contentTaxonomies()
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, map[string]any{
+		"postTypes":    postTypes,
+		"taxonomies":   taxonomies,
 		"version":      version,
 		"capabilities": capabilities,
 		"seoPlugin":    plugin,
@@ -118,6 +121,15 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 	if len(types) == 0 {
 		types = []string{TypePage, TypePost, TypeProduct, TypeProductCategory}
 	}
+	s.mu.Lock()
+	listable := append(append(s.contentTypes(), s.contentTaxonomies()...), TypeProduct, TypeProductCategory)
+	s.mu.Unlock()
+	for _, asked := range types {
+		if !slices.Contains(listable, asked) {
+			s.fail(w, http.StatusBadRequest, "invalid_type", "unknown content type: "+asked)
+			return
+		}
+	}
 
 	after, ok := decodeCursor(query.Get("cursor"))
 	if !ok {
@@ -127,8 +139,9 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 
 	since := parseQueryTime(query.Get("since"))
 	limit := contentLimit(query.Get("limit"))
-	wantsTerms := slices.Contains(types, TypeProductCategory)
-	postTypes := slices.DeleteFunc(slices.Clone(types), term)
+	termTypes := slices.DeleteFunc(slices.Clone(types), func(asked string) bool { return !s.term(asked) })
+	wantsTerms := len(termTypes) > 0
+	postTypes := slices.DeleteFunc(slices.Clone(types), s.term)
 
 	phase := after.Phase
 	if phase == "" {
@@ -164,7 +177,7 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scanned := s.termsAfter(after.ID, remaining)
+	scanned := s.termsAfter(termTypes, after.ID, remaining)
 	for _, stored := range scanned {
 		if !since.IsZero() && !stored.Modified.After(since) {
 			continue
@@ -204,13 +217,13 @@ func (s *Server) postsAfter(types []string, since time.Time, after cursor) []*It
 	return matched
 }
 
-func (s *Server) termsAfter(after int64, limit int) []*Item {
+func (s *Server) termsAfter(taxonomies []string, after int64, limit int) []*Item {
 	ids := slices.Clone(s.termOrder)
 	slices.Sort(ids)
 
 	scanned := make([]*Item, 0, limit)
 	for _, id := range ids {
-		if id <= after {
+		if id <= after || !slices.Contains(taxonomies, s.terms[id].Type) {
 			continue
 		}
 		if len(scanned) == limit {
@@ -409,11 +422,15 @@ func (s *Server) contentItem(stored *Item) map[string]any {
 			"description": stored.Meta[keys["description"]],
 			"canonical":   stored.Meta[keys["canonical"]],
 		},
-		"links": s.internalLinks(stored.Content),
+		"links":   s.internalLinks(stored.Content),
+		"excerpt": stored.Excerpt,
+		"terms":   termsPayload(stored.Terms),
 	}
-	if term(stored.Type) {
+	if s.term(stored.Type) {
 		item["h1"] = ""
 		item["links"] = []map[string]any{}
+		item["excerpt"] = ""
+		item["terms"] = []map[string]any{}
 	}
 	return item
 }

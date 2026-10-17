@@ -3,6 +3,7 @@ package wptest_test
 import (
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
@@ -134,6 +135,79 @@ func TestTheEmbedCarriesTheTermsOfRestTaxonomiesOnly(t *testing.T) {
 				t.Errorf("term = %+v", got)
 			}
 		})
+	}
+}
+
+func TestTheManifestNamesTheContentTypesAndTaxonomies(t *testing.T) {
+	t.Parallel()
+
+	response, payload := call(t, recipeSite(t), http.MethodGet, "/wp-json/postulator/v1/manifest", nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d: %s", response.StatusCode, payload)
+	}
+	var got struct {
+		PostTypes  []string `json:"postTypes"`
+		Taxonomies []string `json:"taxonomies"`
+	}
+	decode(t, payload, &got)
+	if want := []string{"page", "post", "product", "recipe"}; !slices.Equal(got.PostTypes, want) {
+		t.Errorf("postTypes = %v, want %v", got.PostTypes, want)
+	}
+	if want := []string{"category", "cuisine", "post_tag", "product_cat", "product_tag", "secret"}; !slices.Equal(got.Taxonomies, want) {
+		t.Errorf("taxonomies = %v, want %v", got.Taxonomies, want)
+	}
+}
+
+func TestTheContentListingCarriesExcerptTermsAndEveryPublicType(t *testing.T) {
+	t.Parallel()
+
+	server := recipeSite(t)
+	recipe := server.Seed(wptest.Item{Type: "recipe", Title: "Soup", Excerpt: "Hot soup.", Terms: []wptest.Term{
+		{Taxonomy: "cuisine", Name: "Thai", Slug: "thai", ID: 7},
+	}})[0]
+	cuisine := server.Seed(wptest.Item{Type: "cuisine", Title: "Thai", Slug: "thai"})[0]
+	server.Seed(wptest.Item{Type: wptest.TypePage, Title: "About"})
+
+	type listed struct {
+		Type    string `json:"type"`
+		Slug    string `json:"slug"`
+		Excerpt string `json:"excerpt"`
+		Terms   []struct {
+			Taxonomy string `json:"taxonomy"`
+			ID       int64  `json:"id"`
+		} `json:"terms"`
+		ID int64 `json:"id"`
+	}
+	read := func(query string) []listed {
+		t.Helper()
+		response, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content"+query, nil, true)
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("%s: status = %d: %s", query, response.StatusCode, payload)
+		}
+		var page struct {
+			Items []listed `json:"items"`
+		}
+		decode(t, payload, &page)
+		return page.Items
+	}
+
+	recipes := read("?types=recipe")
+	if len(recipes) != 1 || recipes[0].ID != recipe.ID || recipes[0].Excerpt != "Hot soup." || len(recipes[0].Terms) != 1 || recipes[0].Terms[0].ID != 7 {
+		t.Errorf("types=recipe lists %+v", recipes)
+	}
+	terms := read("?types=cuisine")
+	if len(terms) != 1 || terms[0].ID != cuisine.ID || terms[0].Type != "cuisine" || terms[0].Terms == nil || len(terms[0].Terms) != 0 {
+		t.Errorf("types=cuisine lists %+v", terms)
+	}
+	for _, item := range read("") {
+		if item.Type == "recipe" || item.Type == "cuisine" {
+			t.Errorf("the default listing holds the %s %s", item.Type, item.Slug)
+		}
+	}
+
+	response, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content?types=wp_block", nil, true)
+	if response.StatusCode != http.StatusBadRequest || !strings.Contains(string(payload), "invalid_type") {
+		t.Errorf("types=wp_block answers %d %s, want invalid_type", response.StatusCode, payload)
 	}
 }
 

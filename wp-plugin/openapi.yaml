@@ -62,7 +62,12 @@ paths:
         - name: types
           in: query
           required: false
-          description: Comma separated content types; all four are listed when absent.
+          description: >-
+            Comma separated content types: any name in the manifest's postTypes
+            or taxonomies, besides page, post, product and product_cat, which
+            are always accepted. Those four are listed when absent, as before
+            1.4.0, so a client that asks for nothing sees no new type. Any
+            other name answers 400 with the code invalid_type.
           schema:
             type: string
             default: page,post,product,product_cat
@@ -495,6 +500,21 @@ components:
           type: string
           examples:
             - 6.9.1
+        postTypes:
+          type: array
+          description: >-
+            The content post types, every public post type but attachment,
+            sorted; absent before 1.4.0. The post routes answer a post of
+            these types only.
+          items:
+            type: string
+        taxonomies:
+          type: array
+          description: >-
+            Every public taxonomy whose name no content post type also uses,
+            sorted; absent before 1.4.0. Each is a term family /content lists.
+          items:
+            type: string
         site:
           type: string
           format: uri
@@ -533,13 +553,21 @@ components:
           format: int64
         type:
           type: string
-          enum:
-            - page
-            - post
-            - product
-            - product_cat
+          description: >-
+            The post type of a content post, or the taxonomy of a term: page,
+            post, product, product_cat or any other name the manifest lists.
         slug:
           type: string
+        excerpt:
+          type: string
+          description: The raw post_excerpt; the empty string for a term.
+        terms:
+          type: array
+          description: >-
+            Every term of every taxonomy the post's type carries, as GET
+            /terms/{id} answers them; an empty list for a term.
+          items:
+            $ref: "#/components/schemas/Term"
         path:
           type: string
           description: >-
@@ -712,11 +740,8 @@ components:
         type:
           type: string
           description: >-
-            A taxonomy term never appears here; the raw routes are post-only.
-          enum:
-            - page
-            - post
-            - product
+            The post type of the content post; a taxonomy term never appears
+            here, the raw routes being post-only.
         content:
           type: string
           description: The stored post_content, unmodified.
