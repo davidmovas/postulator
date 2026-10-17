@@ -246,6 +246,10 @@ var blockElements = []string{
 	"section", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
 }
 
+func IsBlockElement(name string) bool {
+	return slices.Contains(blockElements, name)
+}
+
 func TextOf(node *html.Node) string {
 	var builder strings.Builder
 
