@@ -31,7 +31,7 @@ func (r *linkRecorder) ListForPage(_ context.Context, pageID string) ([]pagemap.
 	return r.byPage[pageID], nil
 }
 
-func (r *linkRecorder) ReplaceForPage(_ context.Context, pageID string, links []pagemap.PageLink) error {
+func (r *linkRecorder) ReplaceForPage(_ context.Context, pageID string, _ pagemap.LinkSource, links []pagemap.PageLink) error {
 	if r.err != nil {
 		return r.err
 	}

@@ -56,7 +56,7 @@ func (s *Service) ReplaceLinks(ctx context.Context, req ReplaceLinksRequest) (Re
 			links = append(links, link)
 		}
 
-		if replaceErr := s.links.ReplaceForPage(c, page.ID, links); replaceErr != nil {
+		if replaceErr := s.links.ReplaceForPage(c, page.ID, pagemap.SourceRaw, links); replaceErr != nil {
 			return replaceErr
 		}
 		stored = links

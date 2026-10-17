@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	pageColumns       = `id, site_id, path, planned_path, slug, parent_page_id, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, keywords, notes, status, entity_id, template_id, content_hash, wp_link, wp_slug, wp_status, wp_title, wp_h1, wp_modified_at, last_synced_at, drift, created_at, updated_at`
-	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, slug = ?, parent_page_id = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
+	pageColumns       = `id, site_id, path, planned_path, slug, parent_page_id, parent_reason, page_type_id, technical_reason, read_only_reason, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, keywords, notes, status, entity_id, template_id, content_hash, wp_link, wp_slug, wp_status, wp_title, wp_h1, wp_modified_at, last_synced_at, drift, created_at, updated_at`
+	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, slug = ?, parent_page_id = ?, parent_reason = ?, page_type_id = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
 	deletePage        = `DELETE FROM pages WHERE id = ?`
 	selectPage        = `SELECT ` + pageColumns + ` FROM pages WHERE id = ?`
 	selectPagesBySite = `SELECT ` + pageColumns + ` FROM pages WHERE site_id = ? ORDER BY path, id`
@@ -53,7 +53,8 @@ func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
 		return err
 	}
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertPage, []any{
-		p.ID, p.SiteID, p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID), string(p.WPType), nullInt(p.WPID),
+		p.ID, p.SiteID, p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID),
+		storedParentReason(p.ParentReason), nullString(p.PageTypeID), string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, keywords, notes, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
@@ -67,7 +68,8 @@ func (r *PageRepo) Update(ctx context.Context, p pagemap.Page) error {
 		return err
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updatePage, []any{
-		p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID), string(p.WPType), nullInt(p.WPID),
+		p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID),
+		storedParentReason(p.ParentReason), nullString(p.PageTypeID), string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, keywords, notes, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.UpdatedAt), p.ID,
@@ -122,10 +124,21 @@ func (r *PageRepo) List(ctx context.Context, q pagemap.Query, page paging.Reques
 	return selectKeyed(ctx, r.store.execFrom(ctx), builder, pageKeyset(q), page, scanPage, "pages")
 }
 
+func storedParentReason(reason pagemap.ParentReason) string {
+	if reason == "" {
+		return string(pagemap.ParentNone)
+	}
+	return string(reason)
+}
+
 func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 	var (
 		p                              pagemap.Page
 		parentID, entityID, templateID sql.NullString
+		pageTypeID                     sql.NullString
+		parentReason                   string
+		technicalReason                string
+		readOnlyReason                 string
 		wpType, status                 string
 		wpID                           sql.NullInt64
 		wpModifiedAt, lastSyncedAt     sql.NullString
@@ -133,7 +146,8 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		createdAt, updatedAt           string
 		keywords, notes                string
 	)
-	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.PlannedPath, &p.Slug, &parentID, &wpType, &wpID, &p.Title, &p.H1, &p.MetaTitle, &p.MetaDescription, &p.Canonical,
+	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.PlannedPath, &p.Slug, &parentID, &parentReason, &pageTypeID, &technicalReason, &readOnlyReason,
+		&wpType, &wpID, &p.Title, &p.H1, &p.MetaTitle, &p.MetaDescription, &p.Canonical,
 		&keywords, &notes, &status, &entityID, &templateID, &p.ContentHash, &p.Observed.Link, &p.Observed.Slug, &p.Observed.Status,
 		&p.Observed.Title, &p.Observed.H1, &wpModifiedAt, &lastSyncedAt, &drift, &createdAt, &updatedAt); err != nil {
 		return pagemap.Page{}, err
@@ -144,6 +158,10 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 	}
 	p.Notes = pagemap.NewNotes(stored)
 	p.ParentPageID = optString(parentID)
+	p.ParentReason = pagemap.ParentReason(parentReason)
+	p.PageTypeID = optString(pageTypeID)
+	p.TechnicalReason = pagemap.TechnicalReason(technicalReason)
+	p.ReadOnlyReason = pagemap.ReadOnlyReason(readOnlyReason)
 	p.WPType = pagemap.WPType(wpType)
 	p.WPID = optInt(wpID)
 	p.Status = pagemap.Status(status)

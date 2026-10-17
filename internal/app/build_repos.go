@@ -22,6 +22,8 @@ type repos struct {
 	edges         *sqlite.EdgeRepo
 	pages         *sqlite.PageRepo
 	links         *sqlite.PageLinkRepo
+	identities    *sqlite.PageIdentityRepo
+	bodies        *sqlite.PageBodyRepo
 	templates     *sqlite.TemplateRepo
 	policies      *sqlite.LinkPolicyRepo
 	overrides     *sqlite.ModelCatalogRepo
@@ -71,6 +73,8 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		edges:         sqlite.NewEdgeRepo(store),
 		pages:         sqlite.NewPageRepo(store),
 		links:         sqlite.NewPageLinkRepo(store),
+		identities:    sqlite.NewPageIdentityRepo(store),
+		bodies:        sqlite.NewPageBodyRepo(store),
 		templates:     sqlite.NewTemplateRepo(store),
 		policies:      sqlite.NewLinkPolicyRepo(store),
 		overrides:     sqlite.NewModelCatalogRepo(store),

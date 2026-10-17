@@ -61,12 +61,30 @@ func resolveLinks(ctx context.Context, deps Deps, siteID string) error {
 
 	return deps.inUnit(ctx, func(c context.Context) error {
 		for pageID, links := range pending {
-			if replaceErr := deps.Links.ReplaceForPage(c, pageID, links); replaceErr != nil {
+			if replaceErr := replaceEachSource(c, deps, pageID, links); replaceErr != nil {
 				return replaceErr
 			}
 		}
 		return nil
 	})
+}
+
+func replaceEachSource(ctx context.Context, deps Deps, pageID string, links []pagemap.PageLink) error {
+	for _, source := range []pagemap.LinkSource{pagemap.SourceRaw, pagemap.SourceRender} {
+		var ofSource []pagemap.PageLink
+		for i := range links {
+			if links[i].Source == source {
+				ofSource = append(ofSource, links[i])
+			}
+		}
+		if len(ofSource) == 0 {
+			continue
+		}
+		if err := deps.Links.ReplaceForPage(ctx, pageID, source, ofSource); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func resolveInto(links []pagemap.PageLink, index pagemap.Index) bool {

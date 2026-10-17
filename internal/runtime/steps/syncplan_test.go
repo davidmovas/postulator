@@ -153,7 +153,7 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	espresso := h.byPath(t, "/coffee/espresso/")
 	coffee := h.byPath(t, "/coffee/")
 	gone := "/coffee/gone/"
-	if err := h.links.ReplaceForPage(t.Context(), espresso.ID, []pagemap.PageLink{
+	if err := h.links.ReplaceForPage(t.Context(), espresso.ID, pagemap.SourceRaw, []pagemap.PageLink{
 		{
 			ID: id.New(), SiteID: h.siteID, FromPageID: espresso.ID, ToPageID: &coffee.ID, ToURL: coffee.Path,
 			AnchorText: "coffee", Origin: pagemap.OriginGenerated, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,

@@ -24,7 +24,7 @@ type pageStore interface {
 }
 
 type linkStore interface {
-	ReplaceForPage(ctx context.Context, pageID string, links []pagemap.PageLink) error
+	ReplaceForPage(ctx context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error
 	ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 }
 

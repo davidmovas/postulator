@@ -28,7 +28,7 @@ func (f *fixture) storedLink(from pagemap.Page, toPageID *string, toURL, anchor 
 func (f *fixture) replaceLinks(t *testing.T, from pagemap.Page, links ...pagemap.PageLink) {
 	t.Helper()
 
-	if err := sqlite.NewPageLinkRepo(f.store).ReplaceForPage(t.Context(), from.ID, links); err != nil {
+	if err := sqlite.NewPageLinkRepo(f.store).ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, links); err != nil {
 		t.Fatalf("replace the links of %s: %v", from.Path, err)
 	}
 }

@@ -17,8 +17,10 @@ import (
 func fullPage(siteID, path string, at time.Time) pagemap.Page {
 	wpID := int64(42)
 	modified := at.Add(-time.Hour)
+	pageType := "page-type-guide"
 	return pagemap.Page{
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPost, WPID: &wpID,
+		ParentReason: pagemap.ParentJSONLD, PageTypeID: &pageType, TechnicalReason: pagemap.TechnicalShop, ReadOnlyReason: pagemap.ReadOnlyBuilder("elementor"),
 		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description", Canonical: "https://shop.example.com" + path,
 		Keywords: keyword.New([]keyword.Keyword{{Text: "title keyword", Volume: new(5400)}, {Text: "one", Volume: new(0)}, {Text: "two"}}),
 		Notes:    []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
@@ -81,6 +83,10 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	want.Title = "Renamed"
 	want.Status = pagemap.StatusPublished
 	want.WPID = nil
+	want.ParentReason = pagemap.ParentWorkbook
+	want.PageTypeID = nil
+	want.TechnicalReason = pagemap.TechnicalNone
+	want.ReadOnlyReason = pagemap.ReadOnlyTerm
 	want.LastSyncedAt = nil
 	want.Drift = false
 	want.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
@@ -110,6 +116,37 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	}
 	if _, err = repo.Get(t.Context(), parent.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("Get missing code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
+func TestPageRepoReadsNoParentReasonAsNone(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageRepo(store)
+
+	for _, reason := range []pagemap.ParentReason{"", pagemap.ParentNone} {
+		record := fullPage(owner.ID, "/reason-"+string(reason)+"/", sqlitetest.Stamp)
+		record.ParentReason = reason
+		if err := repo.Insert(t.Context(), record); err != nil {
+			t.Fatalf("Insert with the reason %q: %v", reason, err)
+		}
+		got, err := repo.Get(t.Context(), record.ID)
+		if err != nil || got.ParentReason != pagemap.ParentNone {
+			t.Errorf("the reason %q reads back as %q, %v; want %q", reason, got.ParentReason, err, pagemap.ParentNone)
+		}
+		record.ParentReason = pagemap.ParentURL
+		if err = repo.Update(t.Context(), record); err != nil {
+			t.Fatalf("Update to a reason: %v", err)
+		}
+		record.ParentReason = reason
+		if err = repo.Update(t.Context(), record); err != nil {
+			t.Fatalf("Update back to the reason %q: %v", reason, err)
+		}
+		if got, err = repo.Get(t.Context(), record.ID); err != nil || got.ParentReason != pagemap.ParentNone {
+			t.Errorf("the reason %q updated reads back as %q, %v; want %q", reason, got.ParentReason, err, pagemap.ParentNone)
+		}
 	}
 }
 

@@ -14,7 +14,7 @@ func persist(ctx context.Context, deps Deps, page pagemap.Page, links []pagemap.
 		if err := deps.Pages.Update(c, page); err != nil {
 			return err
 		}
-		return deps.Links.ReplaceForPage(c, page.ID, links)
+		return deps.Links.ReplaceForPage(c, page.ID, pagemap.SourceRaw, links)
 	})
 }
 

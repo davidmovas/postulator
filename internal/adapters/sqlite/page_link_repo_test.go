@@ -33,7 +33,7 @@ func TestPageLinkRepoReplaceForPage(t *testing.T) {
 		{ID: id.New(), SiteID: owner.ID, FromPageID: from.ID, ToURL: "https://elsewhere.example.com/", AnchorText: "elsewhere", Origin: pagemap.OriginObserved,
 			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, ObservedAt: sqlitetest.Stamp.Add(time.Second)},
 	}
-	if err = repo.ReplaceForPage(t.Context(), from.ID, links); err != nil {
+	if err = repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, links); err != nil {
 		t.Fatalf("ReplaceForPage: %v", err)
 	}
 	got, err := repo.ListForPage(t.Context(), from.ID)
@@ -45,7 +45,7 @@ func TestPageLinkRepoReplaceForPage(t *testing.T) {
 	}
 
 	replacement := []pagemap.PageLink{links[1]}
-	if err = repo.ReplaceForPage(t.Context(), from.ID, replacement); err != nil {
+	if err = repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, replacement); err != nil {
 		t.Fatalf("ReplaceForPage again: %v", err)
 	}
 	got, err = repo.ListForPage(t.Context(), from.ID)
@@ -53,7 +53,7 @@ func TestPageLinkRepoReplaceForPage(t *testing.T) {
 		t.Errorf("after replacement = %+v, %v", got, err)
 	}
 
-	if err = repo.ReplaceForPage(t.Context(), from.ID, nil); err != nil {
+	if err = repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, nil); err != nil {
 		t.Fatalf("ReplaceForPage with nothing: %v", err)
 	}
 	got, err = repo.ListForPage(t.Context(), from.ID)
@@ -63,13 +63,79 @@ func TestPageLinkRepoReplaceForPage(t *testing.T) {
 
 	foreign := links[0]
 	foreign.FromPageID = to.ID
-	if err = repo.ReplaceForPage(t.Context(), from.ID, []pagemap.PageLink{foreign}); !errors.IsCode(err, errors.Invalid) {
+	if err = repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, []pagemap.PageLink{foreign}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a link from another page code = %q, want INVALID", errors.CodeOf(err))
 	}
 	dangling := links[0]
 	unknown := "no-such-page"
 	dangling.ToPageID = &unknown
-	if err = repo.ReplaceForPage(t.Context(), from.ID, []pagemap.PageLink{dangling}); !errors.IsCode(err, errors.Invalid) {
+	if err = repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, []pagemap.PageLink{dangling}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a link to an unknown page code = %q, want INVALID", errors.CodeOf(err))
+	}
+	if got, err = repo.ListForPage(t.Context(), from.ID); err != nil || len(got) != 0 {
+		t.Errorf("a refused replace left %+v, %v", got, err)
+	}
+}
+
+func TestPageLinkRepoReplacesOneSourceAndKeepsTheOther(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	from := sqlitetest.Page(t, store, owner.ID, "/tb-500/")
+	hub := sqlitetest.Page(t, store, owner.ID, "/peptides/")
+	repo := sqlite.NewPageLinkRepo(store)
+
+	link := func(anchor string, kind pagemap.LinkType, region string, source pagemap.LinkSource, at time.Duration) pagemap.PageLink {
+		return pagemap.PageLink{
+			ID: id.New(), SiteID: owner.ID, FromPageID: from.ID, ToPageID: &hub.ID, ToURL: "/peptides/", AnchorText: anchor,
+			Origin: pagemap.OriginObserved, Type: kind, Region: region, Source: source, ObservedAt: sqlitetest.Stamp.Add(at),
+		}
+	}
+	raw := []pagemap.PageLink{link("peptides", pagemap.LinkContextual, "content", pagemap.SourceRaw, 0)}
+	rendered := []pagemap.PageLink{
+		link("Peptides", pagemap.LinkBreadcrumb, "breadcrumb", pagemap.SourceRender, time.Second),
+		link("All peptides", pagemap.LinkNavigation, "header", pagemap.SourceRender, 2*time.Second),
+	}
+
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, raw); err != nil {
+		t.Fatalf("replace the raw links: %v", err)
+	}
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRender, rendered); err != nil {
+		t.Fatalf("replace the render links: %v", err)
+	}
+	both := append(append([]pagemap.PageLink{}, raw...), rendered...)
+	if got, err := repo.ListForPage(t.Context(), from.ID); err != nil || !reflect.DeepEqual(got, both) {
+		t.Fatalf("ListForPage = %+v, %v\nwant %+v", got, err, both)
+	}
+	if got, err := repo.ListBySite(t.Context(), owner.ID); err != nil || len(got) != len(both) {
+		t.Fatalf("ListBySite = %d links, %v; want %d", len(got), err, len(both))
+	}
+
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, nil); err != nil {
+		t.Fatalf("clear the raw links: %v", err)
+	}
+	if got, err := repo.ListForPage(t.Context(), from.ID); err != nil || !reflect.DeepEqual(got, rendered) {
+		t.Fatalf("clearing the raw links left %+v, %v\nwant the render links %+v", got, err, rendered)
+	}
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, raw); err != nil {
+		t.Fatalf("restore the raw links: %v", err)
+	}
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRender, rendered[:1]); err != nil {
+		t.Fatalf("replace the render links with fewer: %v", err)
+	}
+	kept := []pagemap.PageLink{raw[0], rendered[0]}
+	if got, err := repo.ListForPage(t.Context(), from.ID); err != nil || !reflect.DeepEqual(got, kept) {
+		t.Fatalf("ListForPage = %+v, %v\nwant %+v", got, err, kept)
+	}
+
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, rendered); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("render links replaced as raw code = %q, want INVALID", errors.CodeOf(err))
+	}
+	if err := repo.ReplaceForPage(t.Context(), from.ID, "html", nil); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a source the model does not name code = %q, want INVALID", errors.CodeOf(err))
+	}
+	if got, err := repo.ListForPage(t.Context(), from.ID); err != nil || !reflect.DeepEqual(got, kept) {
+		t.Errorf("a refused replace changed the links to %+v, %v", got, err)
 	}
 }

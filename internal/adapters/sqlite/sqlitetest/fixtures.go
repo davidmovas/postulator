@@ -55,7 +55,7 @@ func Page(t testing.TB, store *sqlite.Store, siteID, path string) pagemap.Page {
 	t.Helper()
 
 	record := pagemap.Page{
-		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
+		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage, ParentReason: pagemap.ParentNone,
 		Title: path, H1: path, Keywords: keyword.Of(), Notes: []pagemap.Note{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}
 	if err := sqlite.NewPageRepo(store).Insert(t.Context(), record); err != nil {

@@ -11,7 +11,7 @@ import (
 const (
 	linkColumns        = `id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, region, source, position, ours, observed_at`
 	insertLink         = `INSERT INTO page_links (` + linkColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	deleteLinksForPage = `DELETE FROM page_links WHERE from_page_id = ?`
+	deleteLinksForPage = `DELETE FROM page_links WHERE from_page_id = ? AND source = ?`
 	selectLinksForPage = `SELECT ` + linkColumns + ` FROM page_links WHERE from_page_id = ? ORDER BY observed_at, id`
 	selectLinksBySite  = `SELECT ` + linkColumns + ` FROM page_links WHERE site_id = ? ORDER BY from_page_id, id`
 )
@@ -24,26 +24,35 @@ func NewPageLinkRepo(store *Store) *PageLinkRepo {
 	return &PageLinkRepo{store: store}
 }
 
-func (r *PageLinkRepo) ReplaceForPage(ctx context.Context, pageID string, links []pagemap.PageLink) error {
+func (r *PageLinkRepo) ReplaceForPage(ctx context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error {
+	if !source.Valid() {
+		return errors.New(errors.Invalid, "link source is not recognized").WithDetail("source", string(source))
+	}
 	for i := range links {
 		if links[i].FromPageID != pageID {
 			return errors.New(errors.Invalid, "every link must start from the page being replaced").
 				WithDetail("pageId", pageID).WithDetail("linkId", links[i].ID)
 		}
-	}
-	if _, err := execWrite(ctx, r.store.writeFrom(ctx), deleteLinksForPage, []any{pageID}, nil, "clear the page links"); err != nil {
-		return err
-	}
-	for i := range links {
-		link := &links[i]
-		if _, err := execWrite(ctx, r.store.writeFrom(ctx), insertLink, []any{
-			link.ID, link.SiteID, link.FromPageID, nullString(link.ToPageID), link.ToURL, link.AnchorText, string(link.Origin),
-			string(link.Type), link.Region, string(link.Source), nullPosition(link.Position), boolInt(link.Ours), formatTime(link.ObservedAt),
-		}, nil, "insert a page link"); err != nil {
-			return err
+		if links[i].Source != source {
+			return errors.New(errors.Invalid, "every link must come from the source being replaced").
+				WithDetail("source", string(source)).WithDetail("linkId", links[i].ID)
 		}
 	}
-	return nil
+	return r.store.Do(ctx, func(c context.Context) error {
+		if _, err := execWrite(c, r.store.writeFrom(c), deleteLinksForPage, []any{pageID, string(source)}, nil, "clear the page links"); err != nil {
+			return err
+		}
+		for i := range links {
+			link := &links[i]
+			if _, err := execWrite(c, r.store.writeFrom(c), insertLink, []any{
+				link.ID, link.SiteID, link.FromPageID, nullString(link.ToPageID), link.ToURL, link.AnchorText, string(link.Origin),
+				string(link.Type), link.Region, string(link.Source), nullPosition(link.Position), boolInt(link.Ours), formatTime(link.ObservedAt),
+			}, nil, "insert a page link"); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *PageLinkRepo) ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error) {

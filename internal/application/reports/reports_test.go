@@ -168,7 +168,7 @@ func (f *fixture) link(t *testing.T, repo *sqlite.PageLinkRepo, from pagemap.Pag
 		AnchorText: target.Title, Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
 		ObservedAt: sqlitetest.Stamp,
 	}
-	if err := repo.ReplaceForPage(t.Context(), from.ID, []pagemap.PageLink{link}); err != nil {
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, []pagemap.PageLink{link}); err != nil {
 		t.Fatalf("insert the link: %v", err)
 	}
 }

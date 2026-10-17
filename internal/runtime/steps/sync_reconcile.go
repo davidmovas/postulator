@@ -122,7 +122,7 @@ func (r reconciler) keep(ctx context.Context, item pulledItem, current pagemap.P
 	if err != nil {
 		return err
 	}
-	return r.deps.Links.ReplaceForPage(ctx, next.ID, pulledLinks(next, r.rows.byPath, item.Links, r.now, ours))
+	return r.deps.Links.ReplaceForPage(ctx, next.ID, pagemap.SourceRaw, pulledLinks(next, r.rows.byPath, item.Links, r.now, ours))
 }
 
 func resolveDraftPaths(batch []pulledItem, byWPID map[siteKey]pagemap.Page) []pulledItem {
