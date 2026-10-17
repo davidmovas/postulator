@@ -58,9 +58,9 @@ func TestCoreReadsTypesSettingsAndEmbeddedTerms(t *testing.T) {
 		t.Errorf("show_on_front = %q, want %q", settings.ShowOnFront, stand.frontPage)
 	}
 	if stand.frontPage == "page" {
-		front, err := site.GetItem(ctx, wp.TypePage, settings.FrontPageID)
-		if err != nil || front.Slug != stand.frontPageSlug {
-			t.Errorf("the front page = %+v (%v), want the slug %s", front, err, stand.frontPageSlug)
+		front, frontErr := site.GetItem(ctx, wp.TypePage, settings.FrontPageID)
+		if frontErr != nil || front.Slug != stand.frontPageSlug {
+			t.Errorf("the front page = %+v (%v), want the slug %s", front, frontErr, stand.frontPageSlug)
 		}
 	}
 
@@ -71,7 +71,9 @@ func TestCoreReadsTypesSettingsAndEmbeddedTerms(t *testing.T) {
 	c.expect(t, http.MethodPost, "/wp-json/wp/v2/posts", map[string]any{
 		"title": "Embedded terms", "slug": slug, "status": "publish", "content": "<p>x</p>", "categories": []int{1},
 	}, http.StatusCreated, &created)
-	t.Cleanup(func() { c.request(t, http.MethodDelete, fmt.Sprintf("/wp-json/wp/v2/posts/%d?force=true", created.ID), nil) })
+	t.Cleanup(func() {
+		c.request(t, http.MethodDelete, fmt.Sprintf("/wp-json/wp/v2/posts/%d?force=true", created.ID), nil)
+	})
 
 	page, err := site.ListItems(ctx, wp.TypePost, wp.ListQuery{Slug: slug, EmbedTerms: true, Fields: []string{"slug"}})
 	if err != nil {
@@ -155,9 +157,9 @@ func findProduct(t *testing.T, site *wp.Client, productType, slug string) wp.Pro
 		if err != nil {
 			t.Fatalf("ListProducts: %v", err)
 		}
-		for _, product := range page.Items {
-			if product.Slug == slug {
-				return product
+		for index := range page.Items {
+			if page.Items[index].Slug == slug {
+				return page.Items[index]
 			}
 		}
 		if !page.HasMore {
