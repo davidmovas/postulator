@@ -51,8 +51,8 @@ func TestSEOMetaReadsBackEveryFieldAWriteLeft(t *testing.T) {
 		empty.OGTitle != "" || empty.OGDescription != "" {
 		t.Fatalf("a page that carries no SEO meta reads as %+v", empty)
 	}
-	if empty.SEOPlugin != env.seo {
-		t.Errorf("seoPlugin = %q, want %q", empty.SEOPlugin, env.seo)
+	if want := standOf(t, env).seoPlugin; empty.SEOPlugin != want {
+		t.Errorf("seoPlugin = %q, want %q", empty.SEOPlugin, want)
 	}
 
 	written := map[string]string{
@@ -115,7 +115,7 @@ func TestSEOMetaReadRejectsAnUnknownIDAndATerm(t *testing.T) {
 	}
 
 	requireWoo(t, env)
-	term := findBySlug(t, c, "product_cat", "postulator-koffein")
+	term := findBySlug(t, c, "product_cat", standOf(t, env).category)
 
 	status, body = c.request(t, http.MethodGet,
 		fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", term.ID), nil)
@@ -144,8 +144,8 @@ func TestSEOMetaRoundTripsAndRenders(t *testing.T) {
 	slug := uniqueSlug("seo")
 	id := createPage(t, c, pageSpec{title: "SEO", slug: slug, content: "<h1>SEO</h1><p>body</p>"})
 
-	title := "Postulator SEO title " + slug
-	description := "Postulator SEO description " + slug
+	title := "Shop SEO title " + slug
+	description := "Shop SEO description " + slug
 	canonical := env.baseURL + "/" + slug + "/"
 
 	result := writeSEO(t, c, id, map[string]string{
@@ -160,8 +160,8 @@ func TestSEOMetaRoundTripsAndRenders(t *testing.T) {
 	if !slices.Equal(result.Applied, want) {
 		t.Errorf("applied = %v, want %v", result.Applied, want)
 	}
-	if result.SEOPlugin != env.seo {
-		t.Errorf("seoPlugin = %q, want %q", result.SEOPlugin, env.seo)
+	if want := standOf(t, env).seoPlugin; result.SEOPlugin != want {
+		t.Errorf("seoPlugin = %q, want %q", result.SEOPlugin, want)
 	}
 
 	item := findItem(t, c, "page", id)
@@ -240,7 +240,7 @@ func TestSEOMetaRejectsATermID(t *testing.T) {
 	c, env := newClient(t)
 	requireWoo(t, env)
 
-	term := findBySlug(t, c, "product_cat", "postulator-koffein")
+	term := findBySlug(t, c, "product_cat", standOf(t, env).category)
 
 	status, body := c.request(t, http.MethodPut, fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", term.ID), map[string]string{"title": "x"})
 	if status != http.StatusNotFound {

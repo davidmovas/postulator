@@ -181,7 +181,7 @@ func TestRawRejectsATermID(t *testing.T) {
 	c, env := newClient(t)
 	requireWoo(t, env)
 
-	term := findBySlug(t, c, "product_cat", "postulator-koffein")
+	term := findBySlug(t, c, "product_cat", standOf(t, env).category)
 
 	for _, method := range []string{http.MethodGet, http.MethodPut} {
 		t.Run(method, func(t *testing.T) {

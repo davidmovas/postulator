@@ -43,8 +43,8 @@ const (
 
 	newsPath = "/menu-news/"
 
-	productPath      = "/product/postulator-powder/"
-	productTermPath  = "/product-category/postulator-koffein/"
+	productPath      = "/product/powder/"
+	productTermPath  = "/product-category/koffein/"
 	vanishedPagePath = "/menu/gone/"
 )
 

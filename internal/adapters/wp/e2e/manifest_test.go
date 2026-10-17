@@ -37,8 +37,8 @@ func TestManifestDescribesTheSite(t *testing.T) {
 	if !slices.Equal(got.Capabilities, want) {
 		t.Errorf("capabilities = %v, want %v", got.Capabilities, want)
 	}
-	if got.SEOPlugin != env.seo {
-		t.Errorf("seoPlugin = %q, want %q", got.SEOPlugin, env.seo)
+	if want := standOf(t, env).seoPlugin; got.SEOPlugin != want {
+		t.Errorf("seoPlugin = %q, want %q", got.SEOPlugin, want)
 	}
 	if !regexp.MustCompile(`^\d+\.\d+`).MatchString(got.WPVersion) {
 		t.Errorf("wpVersion = %q, want a major.minor version", got.WPVersion)
