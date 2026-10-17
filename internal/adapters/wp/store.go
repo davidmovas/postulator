@@ -29,9 +29,9 @@ type Variation struct {
 	StockQuantity *int64
 	Attributes    []VariationAttribute
 	MetaData      []MetaEntry
+	ManageStock   StockManagement
 	ID            int64
 	ParentID      int64
-	ManageStock   bool
 }
 
 type ProductQuery struct {
@@ -79,7 +79,7 @@ type variationPayload struct {
 	StockStatus     string                      `json:"stock_status"`
 	DateModifiedGMT string                      `json:"date_modified_gmt"`
 	StockQuantity   quantity                    `json:"stock_quantity"`
-	ManageStock     stockManagement             `json:"manage_stock"`
+	ManageStock     StockManagement             `json:"manage_stock"`
 	Attributes      []variationAttributePayload `json:"attributes"`
 	MetaData        []metaEntryPayload          `json:"meta_data"`
 	ID              int64                       `json:"id"`
@@ -124,20 +124,32 @@ func (q *quantity) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type stockManagement bool
+type StockManagement string
 
-func (m *stockManagement) UnmarshalJSON(data []byte) error {
+const (
+	StockManaged         StockManagement = "true"
+	StockNotManaged      StockManagement = "false"
+	StockManagedByParent StockManagement = "parent"
+)
+
+func (m *StockManagement) UnmarshalJSON(data []byte) error {
 	var raw any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	*m = StockNotManaged
 	switch typed := raw.(type) {
 	case bool:
-		*m = stockManagement(typed)
+		if typed {
+			*m = StockManaged
+		}
 	case string:
-		*m = typed == "parent" || typed == "yes" || typed == "true"
-	default:
-		*m = false
+		switch typed {
+		case string(StockManagedByParent):
+			*m = StockManagedByParent
+		case string(StockManaged), "yes":
+			*m = StockManaged
+		}
 	}
 	return nil
 }
@@ -167,7 +179,7 @@ func (p variationPayload) variation() Variation {
 		SalePrice:     p.SalePrice,
 		StockStatus:   p.StockStatus,
 		StockQuantity: p.StockQuantity.value,
-		ManageStock:   bool(p.ManageStock),
+		ManageStock:   p.ManageStock,
 		Attributes:    attributes,
 		MetaData:      metaEntries(p.MetaData),
 		Modified:      parseWPTime(p.DateModifiedGMT),

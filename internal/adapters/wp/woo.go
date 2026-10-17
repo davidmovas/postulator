@@ -68,8 +68,8 @@ type Product struct {
 	Categories       []ProductCategory
 	MetaData         []MetaEntry
 	VariationIDs     []int64
+	ManageStock      StockManagement
 	ID               int64
-	ManageStock      bool
 }
 
 type UpdateProduct struct {
@@ -142,7 +142,7 @@ type productPayload struct {
 	StockStatus      string                    `json:"stock_status"`
 	DateModifiedGMT  string                    `json:"date_modified_gmt"`
 	StockQuantity    quantity                  `json:"stock_quantity"`
-	ManageStock      stockManagement           `json:"manage_stock"`
+	ManageStock      StockManagement           `json:"manage_stock"`
 	Attributes       []productAttributePayload `json:"attributes"`
 	Images           []productImagePayload     `json:"images"`
 	Categories       []productCategoryPayload  `json:"categories"`
@@ -193,7 +193,7 @@ func (p productPayload) product() Product {
 		SKU:              p.SKU,
 		StockStatus:      p.StockStatus,
 		StockQuantity:    p.StockQuantity.value,
-		ManageStock:      bool(p.ManageStock),
+		ManageStock:      p.ManageStock,
 		Attributes:       attributes,
 		Images:           images,
 		Categories:       categories,

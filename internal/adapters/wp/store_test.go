@@ -70,8 +70,8 @@ func TestListProductsWalksTheStoreWithItsFacts(t *testing.T) {
 	if variable.Price != "15.00" || variable.RegularPrice != "19.90" || variable.SalePrice != "15.00" {
 		t.Errorf("prices = %q %q %q", variable.Price, variable.RegularPrice, variable.SalePrice)
 	}
-	if variable.StockStatus != "instock" || !variable.ManageStock || variable.StockQuantity == nil || *variable.StockQuantity != 12 {
-		t.Errorf("stock = %q %t %v", variable.StockStatus, variable.ManageStock, variable.StockQuantity)
+	if variable.StockStatus != "instock" || variable.ManageStock != wp.StockManaged || variable.StockQuantity == nil || *variable.StockQuantity != 12 {
+		t.Errorf("stock = %q %q %v", variable.StockStatus, variable.ManageStock, variable.StockQuantity)
 	}
 	if want := []wp.ProductCategory{{ID: store.category.ID, Name: "Peptides", Slug: "peptides"}}; !slices.Equal(variable.Categories, want) {
 		t.Errorf("categories = %+v, want %+v", variable.Categories, want)
@@ -82,7 +82,7 @@ func TestListProductsWalksTheStoreWithItsFacts(t *testing.T) {
 	if want := []int64{store.variations[0].ID, store.variations[1].ID}; !slices.Equal(variable.VariationIDs, want) {
 		t.Errorf("variations = %v, want %v", variable.VariationIDs, want)
 	}
-	if simple := first.Items[0]; simple.Price != "9.50" || simple.StockQuantity != nil || simple.ManageStock || simple.StockStatus != "outofstock" {
+	if simple := first.Items[0]; simple.Price != "9.50" || simple.StockQuantity != nil || simple.ManageStock != wp.StockNotManaged || simple.StockStatus != "outofstock" {
 		t.Errorf("simple = %+v", simple)
 	}
 
@@ -152,8 +152,8 @@ func TestListVariationsCarriesSKUPriceStockAndAttributes(t *testing.T) {
 	if want := []wp.VariationAttribute{{ID: 3, Name: "Size", Option: "5 mg"}}; !slices.Equal(five.Attributes, want) {
 		t.Errorf("attributes = %+v, want %+v", five.Attributes, want)
 	}
-	if !five.ManageStock {
-		t.Error("a variation whose parent manages the stock must read as managed")
+	if five.ManageStock != wp.StockManagedByParent {
+		t.Errorf("manage stock = %q, want a variation whose parent manages the stock to say parent", five.ManageStock)
 	}
 	if ten.Price != "25.00" || ten.RegularPrice != "29.90" || ten.SalePrice != "25.00" || ten.StockStatus != "onbackorder" {
 		t.Errorf("ten = %+v", ten)
@@ -161,6 +161,77 @@ func TestListVariationsCarriesSKUPriceStockAndAttributes(t *testing.T) {
 
 	if _, err := client.ListVariations(t.Context(), store.simple.ID+1000, 1, 10); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("an unknown product = %v, want NotFound", err)
+	}
+}
+
+func TestAVariationManagedByItsParentDecodes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		parent    bool
+		own       bool
+		product   wp.StockManagement
+		variation wp.StockManagement
+	}{
+		{name: "the parent manages the stock", parent: true, product: wp.StockManaged, variation: wp.StockManagedByParent},
+		{name: "the variation manages its own", parent: true, own: true, product: wp.StockManaged, variation: wp.StockManaged},
+		{name: "only the variation manages", own: true, product: wp.StockNotManaged, variation: wp.StockManaged},
+		{name: "nobody manages the stock", product: wp.StockNotManaged, variation: wp.StockNotManaged},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "BPC-157", ProductType: "variable", ManageStock: tc.parent})[0]
+			server.Seed(wptest.Item{Type: wptest.TypeProductVariation, Parent: product.ID, SKU: "BPC157-5", ManageStock: tc.own})
+			client := newClient(t, server)
+
+			products, err := client.ListProducts(t.Context(), wp.ProductQuery{})
+			if err != nil {
+				t.Fatalf("ListProducts: %v", err)
+			}
+			if len(products.Items) != 1 || products.Items[0].ManageStock != tc.product {
+				t.Errorf("product manage stock = %+v, want %q", products.Items, tc.product)
+			}
+			variations, err := client.ListVariations(t.Context(), product.ID, 1, 0)
+			if err != nil {
+				t.Fatalf("ListVariations: %v", err)
+			}
+			if len(variations.Items) != 1 || variations.Items[0].ManageStock != tc.variation {
+				t.Errorf("variation manage stock = %+v, want %q", variations.Items, tc.variation)
+			}
+		})
+	}
+}
+
+func TestStockManagementDecodesEveryShapeWooCommerceSends(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		raw  string
+		want wp.StockManagement
+	}{
+		{raw: `true`, want: wp.StockManaged},
+		{raw: `false`, want: wp.StockNotManaged},
+		{raw: `"parent"`, want: wp.StockManagedByParent},
+		{raw: `"yes"`, want: wp.StockManaged},
+		{raw: `"no"`, want: wp.StockNotManaged},
+		{raw: `null`, want: wp.StockNotManaged},
+	}
+	for _, tc := range cases {
+		t.Run(tc.raw, func(t *testing.T) {
+			t.Parallel()
+
+			var got wp.StockManagement
+			if err := json.Unmarshal([]byte(tc.raw), &got); err != nil {
+				t.Fatalf("Unmarshal(%s): %v", tc.raw, err)
+			}
+			if got != tc.want {
+				t.Errorf("Unmarshal(%s) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
 	}
 }
 

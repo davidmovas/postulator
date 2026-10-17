@@ -56,12 +56,18 @@ type Item struct {
 	Choices        []Choice
 	MetaData       []MetaEntry
 	Terms          []Term
+	Crumbs         []Crumb
 	Images         []int64
 	ID             int64
 	Parent         int64
 	MenuOrder      int
 	FeaturedMedia  int64
 	ManageStock    bool
+}
+
+type Crumb struct {
+	Name string
+	Path string
 }
 
 type Category struct {

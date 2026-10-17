@@ -199,7 +199,7 @@ func (s *Server) handler() http.Handler {
 
 	public := http.NewServeMux()
 	s.routeStorefront(public)
-	public.Handle("/", s.redirectRoot(s.injectFaults(s.authenticate(mux))))
+	public.Handle("/", s.publicOr(s.redirectRoot(s.injectFaults(s.authenticate(mux)))))
 	return s.record(public)
 }
 
