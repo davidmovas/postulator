@@ -24,7 +24,7 @@ const (
 var stamp = time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
 
 func page(id, path string, entityID *string) pagemap.Page {
-	return pagemap.Page{ID: id, SiteID: siteA, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: entityID, CreatedAt: stamp, UpdatedAt: stamp}
+	return pagemap.Page{ID: id, SiteID: siteA, Path: path, WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: entityID, CreatedAt: stamp, UpdatedAt: stamp}
 }
 
 func ptr(s string) *string {
@@ -96,7 +96,7 @@ func TestNewPageRejects(t *testing.T) {
 		{name: "no id", mutate: func(p *pagemap.Page) { p.ID = "" }, field: "id"},
 		{name: "no site", mutate: func(p *pagemap.Page) { p.SiteID = "" }, field: "siteId"},
 		{name: "bad path", mutate: func(p *pagemap.Page) { p.Path = "/a b/" }, field: "path"},
-		{name: "unknown wp type", mutate: func(p *pagemap.Page) { p.WPType = "widget" }, field: "wpType"},
+		{name: "unknown wp type", mutate: func(p *pagemap.Page) { p.WPType = "Widget Type" }, field: "wpType"},
 		{name: "unknown status", mutate: func(p *pagemap.Page) { p.Status = "lost" }, field: "status"},
 		{name: "own parent", mutate: func(p *pagemap.Page) { p.ParentPageID = new(p.ID) }, field: "parentPageId"},
 		{name: "empty entity", mutate: func(p *pagemap.Page) { p.EntityID = new("") }, field: "entityId"},
@@ -122,7 +122,10 @@ func TestNewPageRejects(t *testing.T) {
 func TestNewPageLink(t *testing.T) {
 	t.Parallel()
 
-	valid := pagemap.PageLink{ID: "l1", SiteID: siteA, FromPageID: pageA, ToPageID: new(pageB), ToURL: " https://a/b/ ", AnchorText: " bags ", Origin: pagemap.OriginGenerated, ObservedAt: stamp}
+	valid := pagemap.PageLink{
+		ID: "l1", SiteID: siteA, FromPageID: pageA, ToPageID: new(pageB), ToURL: " https://a/b/ ", AnchorText: " bags ",
+		Origin: pagemap.OriginGenerated, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, ObservedAt: stamp,
+	}
 	link, err := pagemap.NewPageLink(valid)
 	if err != nil {
 		t.Fatalf("NewPageLink: %v", err)
@@ -179,7 +182,7 @@ func TestEnums(t *testing.T) {
 			t.Errorf("%q must be valid", status)
 		}
 	}
-	if pagemap.WPType("x").Valid() || pagemap.Status("x").Valid() {
+	if pagemap.WPType("X y").Valid() || pagemap.Status("x").Valid() {
 		t.Error("unknown enum values must be invalid")
 	}
 	if !pagemap.SortCreatedAt.Valid() || !pagemap.SortPath.Valid() || pagemap.Sort("x").Valid() {

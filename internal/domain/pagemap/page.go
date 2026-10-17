@@ -1,6 +1,7 @@
 package pagemap
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,13 +18,10 @@ const (
 	WPProductCategory WPType = "product_cat"
 )
 
+var wpTypePattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
+
 func (t WPType) Valid() bool {
-	switch t {
-	case WPPage, WPPost, WPProduct, WPProductCategory:
-		return true
-	default:
-		return false
-	}
+	return wpTypePattern.MatchString(string(t))
 }
 
 func (t WPType) Term() bool {
@@ -38,7 +36,7 @@ func (t WPType) SameFamily(other WPType) bool {
 }
 
 func (t WPType) core() bool {
-	return t == WPPage || t == WPPost
+	return !t.Term() && t != WPProduct
 }
 
 type Status string
@@ -82,6 +80,10 @@ type Page struct {
 	PlannedPath     string
 	Slug            string
 	ParentPageID    *string
+	ParentReason    ParentReason
+	PageTypeID      *string
+	TechnicalReason TechnicalReason
+	ReadOnlyReason  ReadOnlyReason
 	WPType          WPType
 	WPID            *int64
 	Title           string
@@ -103,6 +105,36 @@ type Page struct {
 	UpdatedAt       time.Time
 }
 
+type LinkType string
+
+const (
+	LinkBreadcrumb LinkType = "breadcrumb"
+	LinkListing    LinkType = "listing"
+	LinkNavigation LinkType = "navigation"
+	LinkContextual LinkType = "contextual"
+	LinkUnknown    LinkType = "unknown"
+)
+
+func (t LinkType) Valid() bool {
+	switch t {
+	case LinkBreadcrumb, LinkListing, LinkNavigation, LinkContextual, LinkUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+type LinkSource string
+
+const (
+	SourceRaw    LinkSource = "raw"
+	SourceRender LinkSource = "render"
+)
+
+func (s LinkSource) Valid() bool {
+	return s == SourceRaw || s == SourceRender
+}
+
 type PageLink struct {
 	ID         string
 	SiteID     string
@@ -111,6 +143,11 @@ type PageLink struct {
 	ToURL      string
 	AnchorText string
 	Origin     LinkOrigin
+	Type       LinkType
+	Region     string
+	Source     LinkSource
+	Position   *int
+	Ours       bool
 	ObservedAt time.Time
 }
 
@@ -140,6 +177,17 @@ func NewPage(p Page) (Page, error) {
 		return Page{}, invalid("entity id must not be empty when set", "entityId")
 	case emptyRef(p.TemplateID):
 		return Page{}, invalid("template id must not be empty when set", "templateId")
+	case emptyRef(p.PageTypeID):
+		return Page{}, invalid("page type id must not be empty when set", "pageTypeId")
+	case p.ParentReason != "" && !p.ParentReason.Valid():
+		return Page{}, invalid("parent reason is not recognized", "parentReason")
+	case !p.TechnicalReason.Valid():
+		return Page{}, invalid("technical reason is not recognized", "technicalReason")
+	case !p.ReadOnlyReason.Valid():
+		return Page{}, invalid("read-only reason is not recognized", "readOnlyReason")
+	}
+	if p.ParentReason == "" {
+		p.ParentReason = ParentNone
 	}
 
 	path, err := NormalizePath(p.Path)
@@ -147,7 +195,10 @@ func NewPage(p Page) (Page, error) {
 		return Page{}, err
 	}
 	p.Path = path
-	p.Slug = Slug(path)
+	p.Slug = strings.TrimSpace(p.Slug)
+	if p.Slug == "" {
+		p.Slug = Slug(path)
+	}
 	if p.PlannedPath, err = plannedPath(p.PlannedPath, path); err != nil {
 		return Page{}, err
 	}
@@ -191,6 +242,10 @@ func NewPageLink(l PageLink) (PageLink, error) {
 		return PageLink{}, invalid("link needs a target url, whether or not it names a target page", "toUrl")
 	case !l.Origin.valid():
 		return PageLink{}, invalid("link origin is not recognized", "origin")
+	case !l.Type.Valid():
+		return PageLink{}, invalid("link type is not recognized", "type")
+	case !l.Source.Valid():
+		return PageLink{}, invalid("link source is not recognized", "source")
 	}
 	return l, nil
 }

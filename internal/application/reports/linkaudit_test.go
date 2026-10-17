@@ -20,7 +20,7 @@ import (
 func (f *fixture) storedLink(from pagemap.Page, toPageID *string, toURL, anchor string, order int) pagemap.PageLink {
 	return pagemap.PageLink{
 		ID: id.New(), SiteID: f.siteID, FromPageID: from.ID, ToPageID: toPageID, ToURL: toURL,
-		AnchorText: anchor, Origin: pagemap.OriginObserved,
+		AnchorText: anchor, Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
 		ObservedAt: sqlitetest.Stamp.Add(time.Duration(order) * time.Second),
 	}
 }

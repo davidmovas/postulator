@@ -45,7 +45,7 @@ func (p Page) Mismatches() []Mismatch {
 	if p.Observed.Link != "" {
 		found = differ(found, FieldPath, p.Path, p.Observed.Path())
 	}
-	if p.Observed.Slug != "" {
+	if p.Slug != "" && p.Observed.Slug != "" {
 		found = differ(found, FieldSlug, p.Slug, p.Observed.Slug)
 	}
 	found = p.statusMismatch(found)

@@ -11,6 +11,7 @@ import (
 
 type hrefCase struct {
 	Site     string `json:"site"`
+	Document string `json:"document"`
 	Href     string `json:"href"`
 	Kind     string `json:"kind"`
 	Path     string `json:"path"`
@@ -43,7 +44,11 @@ func TestResolveAnswersTheSharedHrefTable(t *testing.T) {
 		t.Run(tc.Site+" "+tc.Href, func(t *testing.T) {
 			t.Parallel()
 
-			path, kind := pagemap.NewSite(tc.Site).Resolve(tc.Href)
+			site := pagemap.NewSite(tc.Site)
+			path, kind := site.Resolve(tc.Href)
+			if tc.Document != "" {
+				path, kind = site.ResolveAt(tc.Document, tc.Href)
+			}
 			if string(kind) != tc.Kind {
 				t.Fatalf("Resolve(%q) kind = %s, want %s", tc.Href, kind, tc.Kind)
 			}

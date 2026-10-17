@@ -316,7 +316,8 @@ func pulledLinks(page pagemap.Page, byPath map[string]pagemap.Page, links []wp.C
 		}
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path,
-			AnchorText: links[i].Anchor, Origin: origin, ObservedAt: at,
+			AnchorText: links[i].Anchor, Origin: origin, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+			Ours: origin == pagemap.OriginGenerated, ObservedAt: at,
 		}
 		if target, ok := byPath[path]; ok {
 			link.ToPageID = &target.ID

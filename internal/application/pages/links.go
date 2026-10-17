@@ -45,6 +45,9 @@ func (s *Service) ReplaceLinks(ctx context.Context, req ReplaceLinksRequest) (Re
 				ToURL:      input.ToURL,
 				AnchorText: input.AnchorText,
 				Origin:     origin,
+				Type:       pagemap.LinkContextual,
+				Source:     pagemap.SourceRaw,
+				Ours:       origin == pagemap.OriginGenerated,
 				ObservedAt: now,
 			})
 			if linkErr != nil {

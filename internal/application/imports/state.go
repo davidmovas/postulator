@@ -20,6 +20,7 @@ type siteState struct {
 	byPath    map[string]pagemap.Page
 	byPlanned map[string]pagemap.Page
 	edgeKeys  map[string]struct{}
+	types     map[pagemap.WPType]struct{}
 }
 
 func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page) siteState {
@@ -29,12 +30,16 @@ func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pa
 		byPath:    make(map[string]pagemap.Page, len(pages)),
 		byPlanned: make(map[string]pagemap.Page),
 		edgeKeys:  make(map[string]struct{}, len(edges)),
+		types: map[pagemap.WPType]struct{}{
+			pagemap.WPPage: {}, pagemap.WPPost: {}, pagemap.WPProduct: {}, pagemap.WPProductCategory: {},
+		},
 	}
 	for i := range entities {
 		state.byName[graph.Key(entities[i].Name)] = append(state.byName[graph.Key(entities[i].Name)], entities[i])
 	}
 	for i := range pages {
 		state.byPath[pages[i].Path] = pages[i]
+		state.types[pages[i].WPType] = struct{}{}
 		if pages[i].PlannedPath != "" {
 			state.byPlanned[pages[i].PlannedPath] = pages[i]
 		}
@@ -43,6 +48,19 @@ func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pa
 		state.edgeKeys[edgeKey(edges[i])] = struct{}{}
 	}
 	return state
+}
+
+func (s *siteState) knows(wpType pagemap.WPType) bool {
+	_, known := s.types[wpType]
+	return known
+}
+
+func resolveTypes(sheet *drafts, state *siteState) {
+	for _, draft := range sheet.pages {
+		if cell := draft.cellType(); cell != "" && !state.knows(cell) {
+			draft.typeUnknown = true
+		}
+	}
 }
 
 func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {

@@ -105,6 +105,7 @@ func (s *Service) plan(ctx context.Context, state siteState, read *sheetRead, no
 	rows := readRows(read.binding, read.table, &p)
 	sheet := pagesOf(rows, &p)
 	state.byPlanned = maps.Clone(state.byPlanned)
+	resolveTypes(sheet, &state)
 	typeRows(sheet, rows, read.mapping.Options.RowType, &state)
 	matchProducts(sheet, &state, &p)
 	fillGaps(sheet, &state, &p)

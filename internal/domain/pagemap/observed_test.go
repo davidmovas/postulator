@@ -12,6 +12,7 @@ func TestMismatchesComparesThePlanWithTheSite(t *testing.T) {
 
 	planned := func() pagemap.Page {
 		p := page(pageA, "/components/batteries/e-bike-range/", nil)
+		p.Slug = "e-bike-range"
 		p.Title = "How Far Can an E-Bike Go?"
 		p.H1 = "How Far Can an E-Bike Go?"
 		p.Status = pagemap.StatusPublished

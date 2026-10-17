@@ -6,6 +6,8 @@ type Index struct {
 	byID     map[string]Page
 	byPath   map[string]Page
 	byEntity map[string][]Page
+	byPostID map[int64]Page
+	byTermID map[int64]Page
 	pages    []Page
 }
 
@@ -17,6 +19,8 @@ func NewIndex(pages []Page) Index {
 		byID:     make(map[string]Page, len(sorted)),
 		byPath:   make(map[string]Page, len(sorted)),
 		byEntity: make(map[string][]Page),
+		byPostID: make(map[int64]Page),
+		byTermID: make(map[int64]Page),
 		pages:    sorted,
 	}
 	for i := range sorted {
@@ -26,8 +30,24 @@ func NewIndex(pages []Page) Index {
 		if p.EntityID != nil {
 			index.byEntity[*p.EntityID] = append(index.byEntity[*p.EntityID], *p)
 		}
+		switch {
+		case p.WPID == nil:
+		case p.WPType.Term():
+			index.byTermID[*p.WPID] = *p
+		default:
+			index.byPostID[*p.WPID] = *p
+		}
 	}
 	return index
+}
+
+func (i Index) ByWordPressID(family WPType, id int64) (page Page, found bool) {
+	if family.Term() {
+		page, found = i.byTermID[id]
+		return page, found
+	}
+	page, found = i.byPostID[id]
+	return page, found
 }
 
 func (i Index) ByID(id string) (page Page, found bool) {

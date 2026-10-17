@@ -156,11 +156,13 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	if err := h.links.ReplaceForPage(t.Context(), espresso.ID, []pagemap.PageLink{
 		{
 			ID: id.New(), SiteID: h.siteID, FromPageID: espresso.ID, ToPageID: &coffee.ID, ToURL: coffee.Path,
-			AnchorText: "coffee", Origin: pagemap.OriginGenerated, ObservedAt: sqlitetest.Stamp,
+			AnchorText: "coffee", Origin: pagemap.OriginGenerated, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+			Ours: true, ObservedAt: sqlitetest.Stamp,
 		},
 		{
 			ID: id.New(), SiteID: h.siteID, FromPageID: espresso.ID, ToURL: gone,
-			AnchorText: "gone", Origin: pagemap.OriginGenerated, ObservedAt: sqlitetest.Stamp,
+			AnchorText: "gone", Origin: pagemap.OriginGenerated, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+			Ours: true, ObservedAt: sqlitetest.Stamp,
 		},
 	}); err != nil {
 		t.Fatalf("record the generated links: %v", err)

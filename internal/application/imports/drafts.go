@@ -12,24 +12,25 @@ import (
 )
 
 type pageDraft struct {
-	path       string
-	title      string
-	h1         string
-	metaTitle  string
-	metaDesc   string
-	wpType     string
-	pageKind   string
-	entity     string
-	keywords   keyword.List
-	notes      []pagemap.Note
-	own        ownership
-	modeType   pagemap.WPType
-	matchedBy  pagemap.MatchedBy
-	rows       []int
-	unit       int
-	generated  bool
-	entityOnly bool
-	at         importmap.Origin
+	path        string
+	title       string
+	h1          string
+	metaTitle   string
+	metaDesc    string
+	wpType      string
+	pageKind    string
+	entity      string
+	keywords    keyword.List
+	notes       []pagemap.Note
+	own         ownership
+	modeType    pagemap.WPType
+	matchedBy   pagemap.MatchedBy
+	rows        []int
+	unit        int
+	generated   bool
+	entityOnly  bool
+	typeUnknown bool
+	at          importmap.Origin
 }
 
 func (p *pageDraft) kind() string {
@@ -38,7 +39,7 @@ func (p *pageDraft) kind() string {
 
 func (p *pageDraft) cellType() pagemap.WPType {
 	wpType := pagemap.WPType(strings.ToLower(strings.TrimSpace(p.wpType)))
-	if !wpType.Valid() {
+	if p.typeUnknown || !wpType.Valid() {
 		return ""
 	}
 	return wpType
