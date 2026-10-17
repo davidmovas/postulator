@@ -158,7 +158,7 @@ func New(t TB, opts ...Option) *Server {
 		password:      DefaultPassword,
 		seoPlugin:     "yoast",
 		pluginVersion: "1.4.0",
-		capabilities:  []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms"},
+		capabilities:  []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms", "settings"},
 	}
 	for _, opt := range opts {
 		opt(server)

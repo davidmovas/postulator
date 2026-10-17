@@ -35,6 +35,7 @@ type reading struct {
 	showOnFront string
 	frontPage   int64
 	postsPage   int64
+	privacyPage int64
 }
 
 func WithPostType(postType PostType) Option {
@@ -53,7 +54,14 @@ func (s *Server) SetReading(showOnFront string, frontPage, postsPage int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.reading = reading{showOnFront: showOnFront, frontPage: frontPage, postsPage: postsPage}
+	s.reading.showOnFront, s.reading.frontPage, s.reading.postsPage = showOnFront, frontPage, postsPage
+}
+
+func (s *Server) SetPrivacyPage(id int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.reading.privacyPage = id
 }
 
 func (s *Server) builtinTypes() []PostType {

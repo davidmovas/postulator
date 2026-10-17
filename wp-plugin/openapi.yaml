@@ -264,6 +264,31 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /settings:
+    get:
+      operationId: getSettings
+      summary: Name the technical pages WordPress and WooCommerce keep.
+      description: >-
+        The reading setting and the page ids WordPress and the store name: the
+        static front page and the posts page when show_on_front is page, 0
+        otherwise; the privacy policy page; the store's shop, cart, checkout,
+        account and terms pages when WooCommerce is loaded, 0 otherwise or
+        when the store names none. One call answers what core REST spreads
+        over the settings routes and what it does not expose at all, the
+        privacy page among it. Advertised as the capability settings from
+        plugin version 1.4.0; an older plugin answers 404 with the code
+        rest_no_route.
+      responses:
+        "200":
+          description: The technical pages.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TechnicalPages"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /terms/{id}:
     get:
       operationId: getTerms
@@ -443,7 +468,7 @@ components:
           type: array
           description: >-
             For version 1.4.0 this is exactly bulk, seo_meta, seo_meta_read,
-            content_hash, raw, preview, rendered, meta and terms, in that order; 1.2.0
+            content_hash, raw, preview, rendered, meta, terms and settings, in that order; 1.2.0
             listed the first six and 1.3.0 was never released. A 1.1.0 plugin lists
             the same list without seo_meta_read and serves no read of the SEO
             meta; a 1.0.0 plugin lists neither that nor preview.
@@ -459,6 +484,7 @@ components:
               - rendered
               - meta
               - terms
+              - settings
         seoPlugin:
           type: string
           enum:
@@ -697,6 +723,53 @@ components:
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"
+    TechnicalPages:
+      type: object
+      required:
+        - showOnFront
+        - pages
+      properties:
+        showOnFront:
+          type: string
+          enum:
+            - page
+            - posts
+        pages:
+          type: object
+          required:
+            - front
+            - posts
+            - privacy
+            - shop
+            - cart
+            - checkout
+            - account
+            - terms
+          properties:
+            front:
+              type: integer
+              format: int64
+            posts:
+              type: integer
+              format: int64
+            privacy:
+              type: integer
+              format: int64
+            shop:
+              type: integer
+              format: int64
+            cart:
+              type: integer
+              format: int64
+            checkout:
+              type: integer
+              format: int64
+            account:
+              type: integer
+              format: int64
+            terms:
+              type: integer
+              format: int64
     Term:
       type: object
       required:

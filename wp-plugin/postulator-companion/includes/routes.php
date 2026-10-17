@@ -81,6 +81,16 @@ function register_routes(): void {
 
 	register_rest_route(
 		NAMESPACE_PATH,
+		'/settings',
+		array(
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => __NAMESPACE__ . '\\settings_get',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
 		'/terms/(?P<id>\d+)',
 		array(
 			'methods'             => \WP_REST_Server::READABLE,
@@ -349,6 +359,40 @@ function meta_get( \WP_REST_Request $request ) {
 		array(
 			'id'   => (int) $post->ID,
 			'meta' => (object) $values,
+		),
+		200
+	);
+}
+
+function settings_get(): \WP_REST_Response {
+	$show_on_front = 'page' === get_option( 'show_on_front' ) ? 'page' : 'posts';
+	$pages         = array(
+		'front'    => 'page' === $show_on_front ? (int) get_option( 'page_on_front', 0 ) : 0,
+		'posts'    => 'page' === $show_on_front ? (int) get_option( 'page_for_posts', 0 ) : 0,
+		'privacy'  => (int) get_option( 'wp_page_for_privacy_policy', 0 ),
+		'shop'     => 0,
+		'cart'     => 0,
+		'checkout' => 0,
+		'account'  => 0,
+		'terms'    => 0,
+	);
+	if ( function_exists( 'wc_get_page_id' ) ) {
+		$store = array(
+			'shop'     => 'shop',
+			'cart'     => 'cart',
+			'checkout' => 'checkout',
+			'account'  => 'myaccount',
+			'terms'    => 'terms',
+		);
+		foreach ( $store as $field => $name ) {
+			$pages[ $field ] = max( 0, (int) wc_get_page_id( $name ) );
+		}
+	}
+
+	return new \WP_REST_Response(
+		array(
+			'showOnFront' => $show_on_front,
+			'pages'       => $pages,
 		),
 		200
 	);

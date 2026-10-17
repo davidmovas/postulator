@@ -17,6 +17,7 @@ const (
 	CapabilityRendered = "rendered"
 	CapabilityMeta     = "meta"
 	CapabilityTerms    = "terms"
+	CapabilitySettings = "settings"
 
 	maxMetaKeys = 50
 )
@@ -63,6 +64,53 @@ func (c *Client) GetRendered(ctx context.Context, itemType ItemType, id int64) (
 			WithDetail("id", payload.ID)
 	}
 	return Rendered{ID: payload.ID, Type: ItemType(payload.Type), Content: payload.Content, ContentHash: payload.ContentHash}, nil
+}
+
+type TechnicalPages struct {
+	Front    int64
+	Posts    int64
+	Privacy  int64
+	Shop     int64
+	Cart     int64
+	Checkout int64
+	Account  int64
+	Terms    int64
+}
+
+type PluginSettings struct {
+	ShowOnFront string
+	Pages       TechnicalPages
+}
+
+type pluginSettingsPayload struct {
+	ShowOnFront string `json:"showOnFront"`
+	Pages       struct {
+		Front    int64 `json:"front"`
+		Posts    int64 `json:"posts"`
+		Privacy  int64 `json:"privacy"`
+		Shop     int64 `json:"shop"`
+		Cart     int64 `json:"cart"`
+		Checkout int64 `json:"checkout"`
+		Account  int64 `json:"account"`
+		Terms    int64 `json:"terms"`
+	} `json:"pages"`
+}
+
+func (c *Client) PluginSettings(ctx context.Context) (PluginSettings, error) {
+	if err := c.requireCapability(ctx, CapabilitySettings); err != nil {
+		return PluginSettings{}, err
+	}
+
+	_, body, err := c.do(ctx, request{method: http.MethodGet, namespace: pluginNamespace, path: "/settings"})
+	if err != nil {
+		return PluginSettings{}, err
+	}
+
+	var payload pluginSettingsPayload
+	if err := decodeJSON(body, &payload); err != nil {
+		return PluginSettings{}, err
+	}
+	return PluginSettings{ShowOnFront: payload.ShowOnFront, Pages: TechnicalPages(payload.Pages)}, nil
 }
 
 type termPayload struct {

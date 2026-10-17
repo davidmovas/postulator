@@ -10,6 +10,39 @@ import (
 
 const maxMetaKeys = 50
 
+func (s *Server) handlePluginSettings(w http.ResponseWriter, _ *http.Request) {
+	if s.pluginMissing(w) {
+		return
+	}
+
+	s.mu.Lock()
+	current, store, absent := s.reading, s.storePages, s.noCommerce
+	s.mu.Unlock()
+
+	if current.showOnFront == "" {
+		current.showOnFront = "posts"
+	}
+	if current.showOnFront != "page" {
+		current.frontPage, current.postsPage = 0, 0
+	}
+	if absent {
+		store = StorePages{}
+	}
+	s.respond(w, http.StatusOK, map[string]any{
+		"showOnFront": current.showOnFront,
+		"pages": map[string]int64{
+			"front":    current.frontPage,
+			"posts":    current.postsPage,
+			"privacy":  current.privacyPage,
+			"shop":     store.Shop,
+			"cart":     store.Cart,
+			"checkout": store.Checkout,
+			"account":  store.Account,
+			"terms":    store.Terms,
+		},
+	})
+}
+
 func termsPayload(terms []Term) []map[string]any {
 	ordered := slices.Clone(terms)
 	slices.SortFunc(ordered, func(a, b Term) int {

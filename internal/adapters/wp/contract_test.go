@@ -61,6 +61,7 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 		"/content/{id}/rendered": {"get"},
 		"/meta/{id}":             {"get"},
 		"/terms/{id}":            {"get"},
+		"/settings":              {"get"},
 	}
 
 	routes := documentedRoutes(t)
@@ -138,6 +139,9 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "term schema", snippet: "\n    Term:\n"},
 		{name: "post terms schema", snippet: "\n    PostTerms:\n"},
 		{name: "terms capability", snippet: "\n              - terms\n"},
+		{name: "technical pages schema", snippet: "\n    TechnicalPages:\n"},
+		{name: "settings capability", snippet: "\n              - settings\n"},
+		{name: "privacy page", snippet: "\n            privacy:\n"},
 		{name: "expires at property", snippet: "\n        expiresAt:\n"},
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
@@ -197,6 +201,9 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	}
 	if _, err = client.GetTerms(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("GetTerms: %v", err)
+	}
+	if _, err = client.PluginSettings(t.Context()); err != nil {
+		t.Fatalf("PluginSettings: %v", err)
 	}
 
 	documented := documentedRoutes(t)
