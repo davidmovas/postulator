@@ -326,7 +326,7 @@ func TestUpdate(t *testing.T) {
 	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: child.ID, Path: ptr("/blog/")}); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("moving onto a taken path code = %q, want CONFLICT", errors.CodeOf(err))
 	}
-	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: child.ID, WPType: ptr("widget")}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: child.ID, WPType: ptr("not a type")}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("bad wp type code = %q, want INVALID", errors.CodeOf(err))
 	}
 	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: "missing", Title: ptr("x")}); !errors.IsCode(err, errors.NotFound) {

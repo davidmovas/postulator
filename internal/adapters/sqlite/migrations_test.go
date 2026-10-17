@@ -3,13 +3,14 @@ package sqlite
 import (
 	"database/sql"
 	stderrors "errors"
+	"fmt"
 	"io/fs"
 	"slices"
 	"strings"
 	"testing"
 )
 
-const latestMigration = 44
+const latestMigration = 54
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -56,6 +57,16 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0042_drop_entity_terms.sql",
 		"0043_drop_entity_site_category.sql",
 		"0044_drop_categories.sql",
+		"0045_pages_wp_type_open.sql",
+		"0046_pages_model_columns.sql",
+		"0047_page_identity.sql",
+		"0048_page_terms.sql",
+		"0049_page_fields.sql",
+		"0050_page_bodies.sql",
+		"0051_page_renders.sql",
+		"0052_page_links_typed.sql",
+		"0053_findings.sql",
+		"0054_site_settings.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -100,7 +111,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders", "findings", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)
@@ -396,10 +407,47 @@ func storeAt(t *testing.T, version int64) *Store {
 	if err != nil {
 		t.Fatalf("provider: %v", err)
 	}
-	if _, err = provider.DownTo(t.Context(), version); err != nil {
-		t.Fatalf("down to %d: %v", version, err)
+	if _, err = provider.DownTo(t.Context(), 0); err != nil {
+		t.Fatalf("down to 0: %v", err)
+	}
+	if _, err = provider.UpTo(t.Context(), version); err != nil {
+		t.Fatalf("up to %d: %v", version, err)
 	}
 	return store
+}
+
+func rowsOf(t *testing.T, store *Store, query string, args ...any) []string {
+	t.Helper()
+
+	rows, err := store.writer.QueryContext(t.Context(), query, args...)
+	if err != nil {
+		t.Fatalf("%s: %v", query, err)
+	}
+	defer rows.Close()
+	columns, err := rows.Columns()
+	if err != nil {
+		t.Fatalf("the columns of %s: %v", query, err)
+	}
+	var out []string
+	for rows.Next() {
+		values := make([]any, len(columns))
+		targets := make([]any, len(columns))
+		for i := range values {
+			targets[i] = &values[i]
+		}
+		if scanErr := rows.Scan(targets...); scanErr != nil {
+			t.Fatalf("scan %s: %v", query, scanErr)
+		}
+		cells := make([]string, len(values))
+		for i, value := range values {
+			cells[i] = fmt.Sprint(value)
+		}
+		out = append(out, strings.Join(cells, " | "))
+	}
+	if rowsErr := rows.Err(); rowsErr != nil {
+		t.Fatalf("%s: %v", query, rowsErr)
+	}
+	return out
 }
 
 func TestEntityTermsAreDroppedAndADownBringsThemBackAsMigration34MadeThem(t *testing.T) {
@@ -893,6 +941,465 @@ func TestCategoriesAreDroppedAndADownBringsThemBackAsMigrations39To41MadeThem(t 
 	}
 }
 
+func TestPagesRebuildKeepsEveryRowAndItsReferences(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 44)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) error {
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if execErr := exec(query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	count := func(query string) int {
+		t.Helper()
+		var n int
+		if scanErr := store.writer.QueryRowContext(t.Context(), query).Scan(&n); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return n
+	}
+	const at = "2026-10-17T09:00:00Z"
+
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	must(`INSERT INTO templates (id, scope, site_id, name, page_kind, version, spec, created_at, updated_at) VALUES ('t1', 'global', NULL, 'Hub', 'hub', 1, '{}', ?, ?)`, at, at)
+	must(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Peptides', 'hub', 'import', ?, ?)`, at, at)
+	must(`INSERT INTO pages (id, site_id, path, slug, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, status, entity_id, template_id, content_hash, wp_modified_at, last_synced_at, drift, created_at, updated_at, wp_link, wp_slug, wp_status, wp_title, wp_h1, keywords, notes, planned_path)
+		VALUES ('pg1', 's1', '/peptides/', 'peptides', 'page', 7, 'Peptides', 'All peptides', 'Peptides | Shop', 'Every peptide', 'https://shop/peptides/', 'published', 'e1', 't1', 'abc', ?, ?, 1, ?, ?, 'https://shop/peptides/', 'peptides', 'publish', 'Peptides', 'All peptides', '[{"text":"peptides"}]', '[{"label":"Notes","text":"kept"}]', 'https://shop/peptides/')`,
+		at, at, at, at)
+	must(`INSERT INTO pages (id, site_id, path, slug, parent_page_id, wp_type, wp_id, status, created_at, updated_at) VALUES ('pg2', 's1', '/peptides/bpc-157/', 'bpc-157', 'pg1', 'product_cat', 12, 'exists', ?, ?)`, at, at)
+	must(`UPDATE entities SET canonical_page_id = 'pg1' WHERE id = 'e1'`)
+	must(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, observed_at) VALUES ('l1', 's1', 'pg2', 'pg1', '/peptides/', 'peptides', 'generated', ?)`, at)
+	must(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o1', 't1', 'page', NULL, 'pg1', '{}', ?, ?)`, at, at)
+
+	snapshot := func() []string {
+		t.Helper()
+		var out []string
+		for _, table := range []string{"pages", "page_links", "entities", "template_overrides"} {
+			out = append(out, rowsOf(t, store, `SELECT '`+table+`', * FROM `+table+` ORDER BY id`)...)
+		}
+		return append(out, rowsOf(t, store, `SELECT name, sql FROM sqlite_schema WHERE type = 'index' AND tbl_name = 'pages' AND sql IS NOT NULL ORDER BY name`)...)
+	}
+	wantReferences := []string{
+		"entities | canonical_page_id | SET NULL",
+		"page_links | from_page_id | CASCADE",
+		"page_links | to_page_id | SET NULL",
+		"pages | parent_page_id | SET NULL",
+		"template_overrides | page_id | CASCADE",
+	}
+	requireIntact := func(when string, want []string) {
+		t.Helper()
+		if got := snapshot(); !slices.Equal(got, want) {
+			t.Fatalf("after %s the rows and indexes are\n%s\nwant\n%s", when, strings.Join(got, "\n"), strings.Join(want, "\n"))
+		}
+		references := rowsOf(t, store, `SELECT m.name, f."from", f.on_delete FROM sqlite_schema AS m, pragma_foreign_key_list(m.name) AS f WHERE m.type = 'table' AND f."table" = 'pages' ORDER BY m.name, f."from"`)
+		if !slices.Equal(references, wantReferences) {
+			t.Fatalf("after %s the references into pages are\n%s\nwant\n%s", when, strings.Join(references, "\n"), strings.Join(wantReferences, "\n"))
+		}
+		if dangling := rowsOf(t, store, `PRAGMA foreign_key_check`); len(dangling) != 0 {
+			t.Fatalf("after %s a reference dangles: %v", when, dangling)
+		}
+	}
+
+	before := snapshot()
+	requireIntact("the seed", before)
+
+	if _, err = provider.UpTo(t.Context(), 45); err != nil {
+		t.Fatalf("up to 45: %v", err)
+	}
+	requireIntact("the rebuild", before)
+	for _, step := range []struct {
+		why, id, path, wpType string
+		ok                    bool
+	}{
+		{why: "a post type the old check refused", id: "pg3", path: "/events/launch/", wpType: "event", ok: true},
+		{why: "an empty post type", id: "pg4", path: "/blank/", wpType: ""},
+	} {
+		err = exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES (?, 's1', ?, 'x', ?, 'exists', ?, ?)`, step.id, step.path, step.wpType, at, at)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	if _, err = provider.DownTo(t.Context(), 44); err != nil {
+		t.Fatalf("down to 44 with a page of an open type: %v", err)
+	}
+	requireIntact("the down", before)
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	must(`DELETE FROM pages WHERE id = 'pg1'`)
+	for _, check := range []struct {
+		why, query string
+		want       int
+	}{
+		{why: "the child's parent is cleared", query: `SELECT count(*) FROM pages WHERE id = 'pg2' AND parent_page_id IS NULL`, want: 1},
+		{why: "the link's target is cleared", query: `SELECT count(*) FROM page_links WHERE id = 'l1' AND to_page_id IS NULL`, want: 1},
+		{why: "the entity's canonical page is cleared", query: `SELECT count(*) FROM entities WHERE id = 'e1' AND canonical_page_id IS NULL`, want: 1},
+		{why: "the page's override is deleted", query: `SELECT count(*) FROM template_overrides WHERE id = 'o1'`, want: 0},
+	} {
+		if got := count(check.query); got != check.want {
+			t.Fatalf("after a page delete, not so: %s", check.why)
+		}
+	}
+	must(`DELETE FROM pages WHERE id = 'pg2'`)
+	if got := count(`SELECT count(*) FROM page_links`); got != 0 {
+		t.Fatalf("page_links after its source page is deleted = %d, want none", got)
+	}
+}
+
+func TestADownRestoresThePagesCheck(t *testing.T) {
+	t.Parallel()
+
+	made := storeAt(t, 44)
+	tables := []string{"pages", "page_links", "sites"}
+	want := make(map[string][]string, len(tables))
+	for _, table := range tables {
+		want[table] = schemaOf(t, made, table)
+	}
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) error {
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr
+	}
+	const at = "2026-10-17T09:00:00Z"
+	page := `INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES (?, 's1', ?, 'x', ?, 'exists', ?, ?)`
+
+	if err = exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at); err != nil {
+		t.Fatalf("site: %v", err)
+	}
+	for _, row := range [][3]string{{"pg1", "/news/", "post"}, {"pg2", "/events/launch/", "event"}} {
+		if err = exec(page, row[0], row[1], row[2], at, at); err != nil {
+			t.Fatalf("page %s: %v", row[0], err)
+		}
+	}
+
+	if _, err = provider.DownTo(t.Context(), 44); err != nil {
+		t.Fatalf("down to 44 with a page of a type the old check refuses: %v", err)
+	}
+	for _, table := range tables {
+		if got := schemaOf(t, store, table); !slices.Equal(got, want[table]) {
+			t.Fatalf("the down migrations left %s as\n%s\nwant it as migration 44 left it\n%s", table, strings.Join(got, "\n"), strings.Join(want[table], "\n"))
+		}
+	}
+	if got := rowsOf(t, store, `SELECT id FROM pages ORDER BY id`); !slices.Equal(got, []string{"pg1"}) {
+		t.Fatalf("the down kept the pages %v, want the post alone", got)
+	}
+	if err = exec(page, "pg3", "/events/other/", "event", at, at); err == nil {
+		t.Fatal("the restored check accepted a post type it never named")
+	}
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestPageLinksRebuildCopiesOldLinksAsContextualRawLinks(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 51)
+	want := schemaOf(t, store, "page_links")
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) error {
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if execErr := exec(query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-17T09:00:00Z"
+	const oldColumns = `SELECT id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, observed_at FROM page_links ORDER BY id`
+
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/a/', 'a', 'page', 'exists', ?, ?)`, at, at)
+	must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg2', 's1', '/b/', 'b', 'page', 'exists', ?, ?)`, at, at)
+	must(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, observed_at) VALUES ('l1', 's1', 'pg1', 'pg2', '/b/', 'b', 'generated', ?)`, at)
+	must(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, observed_at) VALUES ('l2', 's1', 'pg2', NULL, 'https://elsewhere/', 'elsewhere', 'observed', ?)`, at)
+	old := rowsOf(t, store, oldColumns)
+
+	if _, err = provider.UpTo(t.Context(), 52); err != nil {
+		t.Fatalf("up to 52: %v", err)
+	}
+	if got := rowsOf(t, store, oldColumns); !slices.Equal(got, old) {
+		t.Fatalf("the rebuild changed the old columns to\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(old, "\n"))
+	}
+	typed := []string{
+		"l1 | contextual |  | raw | <nil> | 1",
+		"l2 | contextual |  | raw | <nil> | 0",
+	}
+	if got := rowsOf(t, store, `SELECT id, type, region, source, position, ours FROM page_links ORDER BY id`); !slices.Equal(got, typed) {
+		t.Fatalf("the old links were typed as\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(typed, "\n"))
+	}
+	indexes := []string{"page_links_from", "page_links_from_source", "page_links_site", "page_links_to"}
+	if got := rowsOf(t, store, `SELECT name FROM pragma_index_list('page_links') WHERE origin = 'c' ORDER BY name`); !slices.Equal(got, indexes) {
+		t.Fatalf("page_links carries the indexes %v, want %v", got, indexes)
+	}
+	if got := rowsOf(t, store, `SELECT name FROM pragma_index_info('page_links_from_source') ORDER BY seqno`); !slices.Equal(got, []string{"from_page_id", "source"}) {
+		t.Fatalf("page_links_from_source covers %v, want the source page and the source", got)
+	}
+
+	insert := `INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, region, source, position, ours, observed_at) VALUES (?, 's1', 'pg1', NULL, '/c/', 'c', 'observed', ?, ?, ?, ?, ?, ?)`
+	for _, step := range []struct {
+		why, id, kind, region, source string
+		position, ours                any
+		ok                            bool
+	}{
+		{why: "a breadcrumb read from the render", id: "l3", kind: "breadcrumb", region: "breadcrumb", source: "render", position: -1, ours: 0, ok: true},
+		{why: "a contextual link we wrote", id: "l4", kind: "contextual", source: "raw", position: 2, ours: 1, ok: true},
+		{why: "a listing link", id: "l5", kind: "listing", region: "listing", source: "render", ours: 0, ok: true},
+		{why: "a navigation link", id: "l6", kind: "navigation", region: "header", source: "render", ours: 0, ok: true},
+		{why: "a link of no known region", id: "l7", kind: "unknown", source: "render", ours: 0, ok: true},
+		{why: "a type the model does not name", id: "l8", kind: "footer", source: "render", ours: 0},
+		{why: "a source the model does not name", id: "l9", kind: "contextual", source: "html", ours: 0},
+		{why: "an ours that is neither", id: "l10", kind: "contextual", source: "raw", ours: 2},
+		{why: "no ours at all", id: "l11", kind: "contextual", source: "raw"},
+	} {
+		err = exec(insert, step.id, step.kind, step.region, step.source, step.position, step.ours, at)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	kept := rowsOf(t, store, oldColumns)
+	if _, err = provider.DownTo(t.Context(), 51); err != nil {
+		t.Fatalf("down to 51: %v", err)
+	}
+	if got := schemaOf(t, store, "page_links"); !slices.Equal(got, want) {
+		t.Fatalf("the down left page_links as\n%s\nwant it as migration 9 made it\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if got := rowsOf(t, store, oldColumns); !slices.Equal(got, kept) {
+		t.Fatalf("the down kept the links\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(kept, "\n"))
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestFindingsSubjectIsUniquePerSite(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	exec := func(query string, args ...any) error {
+		_, err := store.writer.ExecContext(t.Context(), query, args...)
+		return err
+	}
+	count := func(query string) int {
+		t.Helper()
+		var n int
+		if err := store.reader.QueryRowContext(t.Context(), query).Scan(&n); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		return n
+	}
+	const at = "2026-10-17T09:00:00Z"
+
+	for _, setup := range []string{
+		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
+		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s2', 'Other', 'https://other', 'site:s2:wp_password', 'active', ?, ?)`,
+		`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Peptides', 'hub', 'import', ?, ?)`,
+		`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/peptides/', 'peptides', 'page', 'exists', ?, ?)`,
+	} {
+		if err := exec(setup, at, at); err != nil {
+			t.Fatalf("%s: %v", setup, err)
+		}
+	}
+
+	for _, step := range []struct {
+		why, id, siteID, code, key string
+		pageID, entityID           any
+		severity, status           string
+		ok                         bool
+	}{
+		{why: "a finding on a page", id: "f1", siteID: "s1", code: "parent_unresolved", key: "page:pg1:crumb:/x/", pageID: "pg1", severity: "warning", status: "open", ok: true},
+		{why: "the same subject under another code", id: "f2", siteID: "s1", code: "parent_differs", key: "page:pg1:crumb:/x/", pageID: "pg1", severity: "warning", status: "open", ok: true},
+		{why: "the same code and subject on another site", id: "f3", siteID: "s2", code: "parent_unresolved", key: "page:pg1:crumb:/x/", severity: "warning", status: "open", ok: true},
+		{why: "a resolved finding on an entity", id: "f4", siteID: "s1", code: "page_title_differs", key: "entity:e1", entityID: "e1", severity: "info", status: "resolved", ok: true},
+		{why: "a dismissed finding on the site", id: "f5", siteID: "s1", code: "plugin_outdated", key: "site", severity: "error", status: "dismissed", ok: true},
+		{why: "the same code and subject twice on one site", id: "f6", siteID: "s1", code: "parent_unresolved", key: "page:pg1:crumb:/x/", pageID: "pg1", severity: "warning", status: "open"},
+		{why: "a severity the record does not name", id: "f7", siteID: "s1", code: "render_unreachable", key: "page:pg1", pageID: "pg1", severity: "fatal", status: "open"},
+		{why: "a status the record does not name", id: "f8", siteID: "s1", code: "render_unreachable", key: "page:pg1", pageID: "pg1", severity: "warning", status: "closed"},
+		{why: "a page that does not exist", id: "f9", siteID: "s1", code: "render_unreachable", key: "page:missing", pageID: "missing", severity: "warning", status: "open"},
+		{why: "an entity that does not exist", id: "f10", siteID: "s1", code: "parent_differs", key: "entity:missing", entityID: "missing", severity: "warning", status: "open"},
+		{why: "a site that does not exist", id: "f11", siteID: "s9", code: "plugin_outdated", key: "site", severity: "error", status: "open"},
+	} {
+		err := exec(`INSERT INTO findings (id, site_id, page_id, entity_id, code, severity, subject_key, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			step.id, step.siteID, step.pageID, step.entityID, step.code, step.severity, step.key, step.status, at, at)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	if got := rowsOf(t, store, `SELECT subject, options, resolution, resolved_by FROM findings WHERE id = 'f1'`); !slices.Equal(got, []string{"{} | [] |  | "}) {
+		t.Fatalf("a finding's defaults = %v, want an empty subject, no options and no resolution", got)
+	}
+	for _, index := range []struct {
+		name    string
+		columns []string
+	}{
+		{name: "findings_site_status", columns: []string{"site_id", "status", "created_at", "id"}},
+		{name: "findings_page", columns: []string{"page_id"}},
+	} {
+		if got := rowsOf(t, store, `SELECT name FROM pragma_index_info(?) ORDER BY seqno`, index.name); !slices.Equal(got, index.columns) {
+			t.Fatalf("the index %s covers %v, want %v", index.name, got, index.columns)
+		}
+	}
+
+	if err := exec(`DELETE FROM pages WHERE id = 'pg1'`); err != nil {
+		t.Fatalf("delete the page: %v", err)
+	}
+	if got := count(`SELECT count(*) FROM findings`); got != 3 {
+		t.Fatalf("findings after a page delete = %d, want the 3 not on the page", got)
+	}
+	if err := exec(`DELETE FROM entities WHERE id = 'e1'`); err != nil {
+		t.Fatalf("delete the entity: %v", err)
+	}
+	if got := count(`SELECT count(*) FROM findings`); got != 2 {
+		t.Fatalf("findings after an entity delete = %d, want the site's and the other site's", got)
+	}
+	if err := exec(`DELETE FROM sites WHERE id = 's1'`); err != nil {
+		t.Fatalf("delete the site: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id FROM findings`); !slices.Equal(got, []string{"f3"}) {
+		t.Fatalf("findings after a site delete = %v, want the other site's alone", got)
+	}
+}
+
+func TestPageModelSchema(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	exec := func(query string, args ...any) error {
+		_, err := store.writer.ExecContext(t.Context(), query, args...)
+		return err
+	}
+	const at = "2026-10-17T09:00:00Z"
+
+	for _, setup := range []string{
+		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
+		`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/tb-500/', 'tb-500', 'product', 'exists', ?, ?)`,
+	} {
+		if err := exec(setup, at, at); err != nil {
+			t.Fatalf("%s: %v", setup, err)
+		}
+	}
+
+	if got := rowsOf(t, store, `SELECT page_type_id, parent_reason, technical_reason, read_only_reason FROM pages WHERE id = 'pg1'`); !slices.Equal(got, []string{"<nil> | none |  | "}) {
+		t.Fatalf("a page's model defaults = %v, want no page type, no parent reason, not technical and writable", got)
+	}
+	if got := rowsOf(t, store, `SELECT settings FROM sites WHERE id = 's1'`); !slices.Equal(got, []string{"{}"}) {
+		t.Fatalf("a site's settings default = %v, want an empty object", got)
+	}
+
+	for _, step := range []struct {
+		why, query string
+		args       []any
+		ok         bool
+	}{
+		{why: "a page type", query: `UPDATE pages SET page_type_id = 'pt1' WHERE id = 'pg1'`, ok: true},
+		{why: "a parent reason the model does not name", query: `UPDATE pages SET parent_reason = 'guess' WHERE id = 'pg1'`},
+		{why: "no parent reason at all", query: `UPDATE pages SET parent_reason = NULL WHERE id = 'pg1'`},
+		{why: "a technical reason the model does not name", query: `UPDATE pages SET technical_reason = 'homepage' WHERE id = 'pg1'`},
+		{why: "no technical reason at all", query: `UPDATE pages SET technical_reason = NULL WHERE id = 'pg1'`},
+		{why: "a page a builder owns", query: `UPDATE pages SET read_only_reason = 'builder:elementor' WHERE id = 'pg1'`, ok: true},
+		{why: "a site's settings", query: `UPDATE sites SET settings = '{"linkUrlForm":"auto"}' WHERE id = 's1'`, ok: true},
+		{why: "no settings at all", query: `UPDATE sites SET settings = NULL WHERE id = 's1'`},
+		{why: "an identity", query: `INSERT INTO page_identity (page_id, url, status, wp_type, wp_parent_id, modified_gmt, observed_at) VALUES ('pg1', 'https://shop/tb-500/', 'publish', 'product', NULL, ?, ?)`, args: []any{at, at}, ok: true},
+		{why: "a second identity for the page", query: `INSERT INTO page_identity (page_id, url, status, wp_type, observed_at) VALUES ('pg1', 'https://shop/tb-500/', 'publish', 'product', ?)`, args: []any{at}},
+		{why: "an identity of no page", query: `INSERT INTO page_identity (page_id, url, status, wp_type, observed_at) VALUES ('missing', 'https://shop/x/', 'publish', 'page', ?)`, args: []any{at}},
+		{why: "a term", query: `INSERT INTO page_terms (page_id, taxonomy, term_id, name, slug) VALUES ('pg1', 'product_cat', 5, 'Peptides', 'peptides')`, ok: true},
+		{why: "the same term id in another taxonomy", query: `INSERT INTO page_terms (page_id, taxonomy, term_id, name, slug, parent_term_id) VALUES ('pg1', 'product_tag', 5, 'Healing', 'healing', 0)`, ok: true},
+		{why: "the same term twice", query: `INSERT INTO page_terms (page_id, taxonomy, term_id, name, slug) VALUES ('pg1', 'product_cat', 5, 'Peptides', 'peptides')`},
+		{why: "a field", query: `INSERT INTO page_fields (page_id, field_key, current_value, current_hash, base_value, base_hash, observed_at, written_at, written_run_id) VALUES ('pg1', 'title', 'TB-500', 'h', 'TB-500', 'h', ?, ?, 'r1')`, args: []any{at, at}, ok: true},
+		{why: "an instanced field with its defaults", query: `INSERT INTO page_fields (page_id, field_key, observed_at) VALUES ('pg1', 'variation_description:42', ?)`, args: []any{at}, ok: true},
+		{why: "the same field twice", query: `INSERT INTO page_fields (page_id, field_key, observed_at) VALUES ('pg1', 'title', ?)`, args: []any{at}},
+		{why: "the current body", query: `INSERT INTO page_bodies (page_id, side, raw, hash, kind, observed_at) VALUES ('pg1', 'current', '<p>x</p>', 'h', 'classic', ?)`, args: []any{at}, ok: true},
+		{why: "the base body", query: `INSERT INTO page_bodies (page_id, side, raw, hash, kind, observed_at) VALUES ('pg1', 'base', '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->', 'h', 'blocks', ?)`, args: []any{at}, ok: true},
+		{why: "a side the model does not name", query: `INSERT INTO page_bodies (page_id, side, raw, hash, kind, observed_at) VALUES ('pg1', 'draft', '', 'h', 'classic', ?)`, args: []any{at}},
+		{why: "a body kind the model does not name", query: `INSERT INTO page_bodies (page_id, side, raw, hash, kind, observed_at) VALUES ('pg1', 'current', '', 'h', 'html', ?)`, args: []any{at}},
+		{why: "a written block", query: `INSERT INTO page_blocks_written (page_id, block_hash, run_id, written_at) VALUES ('pg1', 'b1', 'r1', ?)`, args: []any{at}, ok: true},
+		{why: "the same block written twice", query: `INSERT INTO page_blocks_written (page_id, block_hash, run_id, written_at) VALUES ('pg1', 'b1', 'r2', ?)`, args: []any{at}},
+		{why: "a render", query: `INSERT INTO page_renders (page_id, render_hash, content_root, extracted_at) VALUES ('pg1', 'h', 'found', ?)`, args: []any{at}, ok: true},
+		{why: "a second render for the page", query: `INSERT INTO page_renders (page_id, render_hash, content_root, extracted_at) VALUES ('pg1', 'h', 'not_found', ?)`, args: []any{at}},
+		{why: "a root state the model does not name", query: `UPDATE page_renders SET content_root = 'missing' WHERE page_id = 'pg1'`},
+	} {
+		err := exec(step.query, step.args...)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	for _, accepted := range []struct {
+		query  string
+		values []string
+	}{
+		{query: `UPDATE pages SET parent_reason = ? WHERE id = 'pg1'`, values: []string{"jsonld_breadcrumb", "aria_breadcrumb", "wp_parent", "url", "workbook", "none"}},
+		{query: `UPDATE pages SET technical_reason = ? WHERE id = 'pg1'`, values: []string{"front_page", "posts_page", "privacy", "shop", "cart", "checkout", "account", "terms", "shortcode", "noindex", "workbook", "manual", ""}},
+		{query: `UPDATE page_renders SET content_root = ? WHERE page_id = 'pg1'`, values: []string{"found", "empty_raw", "dynamic_only", "not_found"}},
+	} {
+		for _, value := range accepted.values {
+			if err := exec(accepted.query, value); err != nil {
+				t.Fatalf("%s with %q: %v", accepted.query, value, err)
+			}
+		}
+	}
+
+	for _, check := range []struct {
+		why, query string
+		want       []string
+	}{
+		{why: "a term's parent defaults to none", query: `SELECT parent_term_id FROM page_terms WHERE taxonomy = 'product_cat'`, want: []string{"0"}},
+		{why: "a field starts empty on both sides", query: `SELECT current_value, current_hash, base_value, base_hash, written_at, written_run_id FROM page_fields WHERE field_key = 'variation_description:42'`, want: []string{" |  |  |  | <nil> | <nil>"}},
+		{why: "a render starts with no regions, trail, headings or counts", query: `SELECT regions, jsonld, trail, headings, word_count_content, word_count_generated, builder, url_form, robots FROM page_renders`, want: []string{"[] | {} | [] | [] | 0 | 0 |  |  | "}},
+		{why: "pages are found by their page type", query: `SELECT name FROM pragma_index_info('pages_page_type')`, want: []string{"page_type_id"}},
+		{why: "terms are found by taxonomy and term", query: `SELECT name FROM pragma_index_info('page_terms_taxonomy_term') ORDER BY seqno`, want: []string{"taxonomy", "term_id"}},
+	} {
+		if got := rowsOf(t, store, check.query); !slices.Equal(got, check.want) {
+			t.Fatalf("%s: got %v, want %v", check.why, got, check.want)
+		}
+	}
+
+	if err := exec(`DELETE FROM pages WHERE id = 'pg1'`); err != nil {
+		t.Fatalf("delete the page: %v", err)
+	}
+	for _, table := range []string{"page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders"} {
+		if got := rowsOf(t, store, `SELECT count(*) FROM `+table); !slices.Equal(got, []string{"0"}) {
+			t.Fatalf("%s after its page is deleted = %v, want none", table, got)
+		}
+	}
+}
+
 func TestSpendColumns(t *testing.T) {
 	t.Parallel()
 
@@ -1110,8 +1617,8 @@ func TestSchemaCascades(t *testing.T) {
 	exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, entity_id, template_id, created_at, updated_at) VALUES ('pg1', 's1', '/shoes/', 'shoes', 'page', 'planned', 'e1', 't1', ?, ?)`, at, at)
 	exec(`INSERT INTO pages (id, site_id, path, slug, parent_page_id, wp_type, status, entity_id, created_at, updated_at) VALUES ('pg2', 's1', '/shoes/boots/', 'boots', 'pg1', 'page', 'planned', 'e2', ?, ?)`, at, at)
 	exec(`UPDATE entities SET canonical_page_id = 'pg1' WHERE id = 'e1'`)
-	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, observed_at) VALUES ('l1', 's1', 'pg2', 'pg1', '/shoes/', 'shoes', 'generated', ?)`, at)
-	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, observed_at) VALUES ('l2', 's1', 'pg1', 'pg2', '/shoes/boots/', 'boots', 'generated', ?)`, at)
+	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, source, ours, observed_at) VALUES ('l1', 's1', 'pg2', 'pg1', '/shoes/', 'shoes', 'generated', 'contextual', 'raw', 1, ?)`, at)
+	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, source, ours, observed_at) VALUES ('l2', 's1', 'pg1', 'pg2', '/shoes/boots/', 'boots', 'generated', 'contextual', 'raw', 1, ?)`, at)
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o1', 't1', 'site', 's1', NULL, '{}', ?, ?)`, at, at)
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o2', 't1', 'page', NULL, 'pg1', '{}', ?, ?)`, at, at)
 

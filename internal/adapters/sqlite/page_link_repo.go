@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	linkColumns        = `id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, observed_at`
-	insertLink         = `INSERT INTO page_links (` + linkColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	linkColumns        = `id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, region, source, position, ours, observed_at`
+	insertLink         = `INSERT INTO page_links (` + linkColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	deleteLinksForPage = `DELETE FROM page_links WHERE from_page_id = ?`
 	selectLinksForPage = `SELECT ` + linkColumns + ` FROM page_links WHERE from_page_id = ? ORDER BY observed_at, id`
 	selectLinksBySite  = `SELECT ` + linkColumns + ` FROM page_links WHERE site_id = ? ORDER BY from_page_id, id`
@@ -37,7 +37,8 @@ func (r *PageLinkRepo) ReplaceForPage(ctx context.Context, pageID string, links 
 	for i := range links {
 		link := &links[i]
 		if _, err := execWrite(ctx, r.store.writeFrom(ctx), insertLink, []any{
-			link.ID, link.SiteID, link.FromPageID, nullString(link.ToPageID), link.ToURL, link.AnchorText, string(link.Origin), formatTime(link.ObservedAt),
+			link.ID, link.SiteID, link.FromPageID, nullString(link.ToPageID), link.ToURL, link.AnchorText, string(link.Origin),
+			string(link.Type), link.Region, string(link.Source), nullPosition(link.Position), boolInt(link.Ours), formatTime(link.ObservedAt),
 		}, nil, "insert a page link"); err != nil {
 			return err
 		}
@@ -58,17 +59,41 @@ func scanPageLink(rows *sql.Rows) (pagemap.PageLink, error) {
 		l          pagemap.PageLink
 		toPageID   sql.NullString
 		origin     string
+		linkType   string
+		source     string
+		position   sql.NullInt64
+		ours       int64
 		observedAt string
 	)
-	if err := rows.Scan(&l.ID, &l.SiteID, &l.FromPageID, &toPageID, &l.ToURL, &l.AnchorText, &origin, &observedAt); err != nil {
+	if err := rows.Scan(&l.ID, &l.SiteID, &l.FromPageID, &toPageID, &l.ToURL, &l.AnchorText, &origin,
+		&linkType, &l.Region, &source, &position, &ours, &observedAt); err != nil {
 		return pagemap.PageLink{}, err
 	}
 	l.ToPageID = optString(toPageID)
 	l.Origin = pagemap.LinkOrigin(origin)
+	l.Type = pagemap.LinkType(linkType)
+	l.Source = pagemap.LinkSource(source)
+	l.Position = optPosition(position)
+	l.Ours = ours == 1
 
 	var err error
 	if l.ObservedAt, err = parseTime(observedAt); err != nil {
 		return pagemap.PageLink{}, err
 	}
 	return l, nil
+}
+
+func nullPosition(position *int) any {
+	if position == nil {
+		return nil
+	}
+	return int64(*position)
+}
+
+func optPosition(raw sql.NullInt64) *int {
+	if !raw.Valid {
+		return nil
+	}
+	value := int(raw.Int64)
+	return &value
 }
