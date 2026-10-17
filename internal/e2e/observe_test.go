@@ -101,7 +101,7 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 
 	summary, err := core.Observe.Summary(t.Context(), siteID)
 	if err != nil {
-		t.Fatalf("summarise the model: %v", err)
+		t.Fatalf("summarize the model: %v", err)
 	}
 	t.Logf("observed %d of %d pages on %s: %d rendered, roots %v, %d trails resolved, %d listings, links %v, technical %v, findings %v",
 		summary.Observed, summary.Pages, live.env.stand, summary.Rendered, summary.Roots, summary.TrailsResolved, summary.Listings,
@@ -206,7 +206,7 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 	awaitRun(t, core.Runs, again.RunID)
 	after, err := core.Observe.Summary(t.Context(), siteID)
 	if err != nil {
-		t.Fatalf("summarise the model again: %v", err)
+		t.Fatalf("summarize the model again: %v", err)
 	}
 	if after.Pages != summary.Pages || after.Observed != summary.Observed || after.Rendered != summary.Rendered ||
 		after.TrailsResolved != summary.TrailsResolved || after.Listings != summary.Listings {
