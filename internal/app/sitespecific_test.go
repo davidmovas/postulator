@@ -20,9 +20,9 @@ var (
 func clientNames(t *testing.T, root string) []string {
 	t.Helper()
 
-	behaviour, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(replicaStand), "site-behaviour.php"))
+	muPlugin, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(replicaStand), "site-behaviour.php"))
 	if err != nil {
-		t.Fatalf("read the replica's site behaviour: %v", err)
+		t.Fatalf("read the replica's mu-plugin: %v", err)
 	}
 	provision, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(replicaStand), "provision.sh"))
 	if err != nil {
@@ -30,7 +30,7 @@ func clientNames(t *testing.T, root string) []string {
 	}
 
 	var names []string
-	for _, match := range fixtureClass.FindAllStringSubmatch(string(behaviour), -1) {
+	for _, match := range fixtureClass.FindAllStringSubmatch(string(muPlugin), -1) {
 		names = append(names, strings.Fields(match[1])...)
 	}
 	for _, match := range fixtureTheme.FindAllStringSubmatch(string(provision), -1) {
@@ -74,8 +74,11 @@ func TestNothingSiteSpecificLivesInTheSources(t *testing.T) {
 			}
 			for name, pattern := range patterns {
 				if pattern.Match(body) {
-					relative, _ := filepath.Rel(root, path)
-					t.Errorf("%s names %q, which belongs to the client's site and lives only in %s", filepath.ToSlash(relative), name, replicaStand)
+					shown, relErr := filepath.Rel(root, path)
+					if relErr != nil {
+						shown = path
+					}
+					t.Errorf("%s names %q, which belongs to the client's site and lives only in %s", filepath.ToSlash(shown), name, replicaStand)
 				}
 			}
 			return nil
