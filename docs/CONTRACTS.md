@@ -359,7 +359,14 @@ null, and no site call is made; it is `preview` for any other page on the site, 
 hour-long signed link the companion plugin issued and rotates on every call. A page without a
 WordPress id answers `INVALID` with `details.field = wpId`, an archived one with `details.field =
 status`. A site that cannot issue a link answers `INVALID` with `details.code` set to
-`plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`.
+`plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`,
+`details.version` (the installed one) and `details.required` (what the client needs).
+
+`SyncService.CheckPlugin{siteId}` answers `{plugin, commerce}`; `plugin` is `{installed, version,
+requiredVersion, outdated, capabilities, seoPlugin}`. `outdated` is true when the manifest's
+version is below `requiredVersion` (1.4.0 since 2026-10-17) or a capability the client needs is
+missing, and the Sites panel then says to upload the new zip over the old one, which WordPress
+offers as "Replace current with uploaded". The verdict is the probe's and is never stored.
 
 ## Products
 

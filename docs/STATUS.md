@@ -6,10 +6,42 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
 **Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02,
 2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
-run is under **The gate**. **The site-model redesign is underway**: stage 0 landed on 2026-10-17
-and stage 1 is next, once the owner answers the open questions in `DECISIONS.md`.
+run is under **The gate**. **The site-model redesign is underway**: stage 0 and the owner's
+answers landed on 2026-10-17, **stage 1a (the plugin's reads, its client and the two stands) is
+done**, and stage 1b is next.
 
 ## Where we are
+
+**2026-10-17, stage 1a of the site model.** The reasoning is under **the owner's answers** and
+**stage 1a** in `DECISIONS.md`.
+
+- **The companion plugin keeps its name and moves to 1.4.0.** It gains:
+  - `GET /content/{id}/rendered`, the content as `the_content` filters it inside a singular main
+    query;
+  - `GET /meta/{id}?keys=`, which reads only the keys asked and refuses a protected one;
+  - `GET /terms/{id}`, every taxonomy a post carries;
+  - `GET /settings`, the technical pages;
+  - on `/content`: `excerpt`, `terms` and every public type and taxonomy, the default still the
+    four types;
+  - a neutral `preview_token`, a noindex preview under Rank Math and Yoast, post routes that
+    answer content posts only, and an `uninstall.php` that keeps the SEO values.
+- **`normalize.php` classifies an href as `Site.Resolve` does**, the host with its port, which one
+  table proves on both sides.
+- **The client** sends a neutral `Mozilla/5.0` (with `wp.WithUserAgent`) and reads the post
+  types, routing by `rest_base`, the embedded terms and the site settings. It reads every new
+  plugin route, and the store's products, variations and pages as read-only facts.
+  `Capabilities.Outdated` names a plugin below 1.4.0 or missing a capability, and the Sites panel
+  says to upload the new zip over it.
+- **The two stands.**
+  - Vanilla runs on 8088: Twenty Twenty-Five, the block editor, nested pages.
+  - The replica of the client's first site runs on 8087: Classic Editor, Blocksy and Rank Math,
+    a mu-plugin injecting a breadcrumb nav and a product grid into the content with its JSON-LD,
+    hubs with an empty or a shortcode-only raw, flat pages, and variable products from a CSV.
+  - `task sandbox:provision STAND=` makes the owner's sandbox either stand on command.
+- **New client methods waiting for callers.** `GetRendered`, `GetMeta`, `GetTerms`,
+  `PluginSettings`, `PostTypes`, `SiteSettings`, `ListProducts`, `ListVariations` and
+  `StoreSettings` have no production caller yet. 1b's observation is their caller; they are
+  meant, not dead.
 
 **2026-10-17, stage 0 of the site-model redesign**: an audit, the contract and a design, no code.
 The client's sites exist and are edited, never rewritten, so Postulator becomes one structured
@@ -17,16 +49,15 @@ model of a site (every page of every type: identity, fields, a body of blocks, t
 render, typed links, JSON-LD, a page type, a derived read-only hierarchy) filled by four providers
 behind a field registry, with the writer's context pack as the spine. The decision record and its
 reasoning are under **2026-10-17** in `DECISIONS.md`, the design is part 16 of the binding spec, and
-the four stages (observe read-only with the renamed plugin and two docker stands; page types, field
+the four stages (observe read-only with the strengthened plugin and two docker stands; page types, field
 scopes and the context pack; editing as blocks and fields with revert; reconciliation, findings and
 the tools over the model) are in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`. The
 audit found what the stages undo: every sync walks the whole site, the WordPress parent is read and
 dropped, the render is never kept, links carry no type or region, `publish` sends slug, status and
 parent on every write, the writer sees a fraction of the context pack, every request names the
-program in its User-Agent, and no custom post type or taxonomy can be observed. Seven questions wait
-for the owner (the creation of a planned page, the type on the page, the plugin's name, a term page
-as a parent and the replica fixture, rewriting the client's paragraphs, the User-Agent, the
-sandbox).
+program in its User-Agent, and no custom post type or taxonomy can be observed. The owner answered
+the seven questions the same day (under **the owner's answers** in `DECISIONS.md`): the plugin
+keeps its name and the footprint ruling covers only what a visitor receives.
 
 **2026-10-03 and 04** answers the client's $10 of OpenAI spend that bought little, imports a
 whole workbook at once, and reads again the code that had been rewritten many times; the
@@ -186,6 +217,27 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
+**2026-10-17, on Windows, whole, at the close of stage 1a, at `66a7d58`.**
+- **Static checks:** `gofmt -l .` silent; the comment check passes; `go vet ./...` and
+  `go vet -tags e2e` are clean; `golangci-lint run` and `task lint:e2e` (run alone) report 0
+  issues.
+- **The Go suite:** `go test -race -count=1 -p 2 -covermode=atomic` is green in five groups
+  (kernel+domain, adapters, application, runtime, transport+app+cmd+wp-plugin+frontend), the
+  profiles merged into `coverage.out`. `go run ./cmd/covergate`: **domain+application 87.87% of
+  9166** (gate 80%), **total 88.49% of 22606** (gate 70%).
+- **The build and the frontend:** `task build` is green and leaves no generated diff;
+  `npm run typecheck` is clean; **1512 vitest tests in 143 files**; `task ui:lint` is green
+  (377 s).
+- **The plugin:** `task plugin:lint` covers 10 files and `task plugin:test` agrees on 41 cases,
+  both on PHP 7.4.
+- **The stands:**
+  - `task e2e:test` on vanilla passes 58 tests;
+  - on the replica it passes 57, with `TestSEOMetaEscapesRenderedHead` skipped because it runs
+    only without an SEO plugin;
+  - `task e2e:full` is green on both stands, and `e2e:full:noplugin` on vanilla.
+- **Counts:** migrations end at **0044**; **93 tools**; plugin **1.4.0**.
+- **Not run:** a live OpenAI call with a funded key, and the `E2E_SEO=yoast` pass.
+
 **2026-10-04, on Windows, whole, after the categories came out, at `2b74b4a`.** `gofmt -l .`
 silent, the comment check, `golangci-lint run` and `task lint:e2e` 0 issues, `go vet -tags e2e`
 and `-tags uiharness` clean; `go test -race -count=1 -p 2 -covermode=atomic` green over every
@@ -257,8 +309,12 @@ task package · plugin:zip         the NSIS installer and the plugin archive, in
 task ui:run · walk · shot · reset the harness window, seeded, DevTools on 9222
 task ui:lint                      lint and tests behind the uiharness build tag
 task lint:e2e                     the build-tagged sources golangci-lint run skips
-task e2e:up · test · full · full:noplugin · down     the suites' WordPress on 8088
+task e2e:up · test · full · full:noplugin · down STAND=vanilla|replica   8088 or 8087; -- <args> to go test
+task e2e:both                     both stands up and their suites, one after the other
+task plugin:deploy STAND=         the zip reinstalled over the plugin on a running stand
+task plugin:test                  wp-plugin/tests on PHP 7.4 (the href table)
 task sandbox:up · down · reset    the owner's WordPress on 8089, bare unless E2E_PLUGIN=1
+task sandbox:provision STAND=     the owner's sandbox made a stand, on that command only
 go test -race -count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...
 go run ./cmd/covergate            the coverage gates on that profile
 $(go env GOPATH)/bin/golangci-lint.exe run
@@ -292,7 +348,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stage 0 done, stage 1 next |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stage 0 and 1a done, 1b next |
 
 ## Known gaps
 
@@ -367,17 +423,26 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
   byte reproducible, `BUILD_DATE` being `now`.
 - **Found by the 2026-10-17 audit, fixed by the stages that touch them:** the import's
   `Options.AnchorSeparator` description says comma while the default is `|` (`imports/views.go:61`
-  against `importmap/mapping.go:12`); the plugin's `normalize.php` compares a host without its port
-  while `pagemap.Site.Resolve` compares with it, so a site on a non-default port classifies a link
-  differently on the two sides; `Sanitize` lets a class or id the model emits through.
+  against `importmap/mapping.go:12`); `Sanitize` lets a class or id the model emits through. The
+  port mismatch between `normalize.php` and `Site.Resolve` was fixed in 1a.
+- **A relative href resolves differently on the two sides**: the plugin uses the page's parent and
+  `Site.Resolve` the site base, while a browser uses the document URL. Classic and block content
+  rarely carries one, and 1b's render extraction resolves against the document URL.
+- **`TestTheServerTakesAnAddress` in `wptest` can flake** under a parallel `go test`, because it
+  reserves an ephemeral port, releases it and binds it again; another process took the port once
+  during 1a. It passes alone.
 
 ## Next steps
 
-1. **Stage 1 of the site model**, once the owner has answered the seven questions under
-   **2026-10-17** in `DECISIONS.md`: the plugin renamed and strengthened for reads with the two
-   docker stands (1a), the page model, its migrations and the observation (1b), the screens (1c), as
-   `docs/superpowers/plans/2026-10-17-phase-14-site-model.md` lays them out; each sub-stage writes
-   its task plan at its start.
+1. **Stage 1b of the site model**: the page model, its migrations 0045 to 0054 and the
+   observation inside `sync_site`, as `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`
+   lays it out, its task list written at its start. 1b wires what 1a left by design:
+   - the per-site User-Agent override (`sites.settings`, 0052) into `wp.WithUserAgent`;
+   - the outdated verdict into the `plugin_outdated` finding;
+   - the new client methods into the observation's readers;
+   - the site-specific scan's CSS-selector rule over `domain/render`.
+
+   Then 1c, the screens.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the

@@ -88,9 +88,12 @@ canonical page, so a run's validation and the Linking screen bind "self" to the 
 
 There is one answer to where an href points, and it is `pagemap.Site{Scheme, Host, Base}`,
 built once per site from its `BaseURL`. `Site.Resolve` answers a normalised site path and a
-kind (`path`, `same_document`, `external`, `unresolved`) by mirroring the companion plugin's
-`internal_href_to_path` rule by rule, so what the plugin records and what the domain judges
-cannot drift. `content.LinkContext` carries that site and every classifier — insertion,
+kind (`path`, `same_document`, `external`, `unresolved`), and the companion plugin's
+`internal_href_to_path` follows it: the host with its port, the path escaped as `EscapedPath` and
+lowercased, a dot segment or an invalid escape dropped. One table, `wp-plugin/testdata/hrefs.json`,
+is answered by both and by the fake, so what the plugin records and what the domain judges
+cannot drift; only a relative href differs, the plugin resolving it against the page's parent and
+the domain against the site base. `content.LinkContext` carries that site and every classifier — insertion,
 compliance, the audit and the link counter — resolves through it.
 
 ## Run engine
@@ -218,21 +221,31 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` **1.2.0** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies) serves
-`/wp-json/postulator/v1` and advertises `bulk seo_meta seo_meta_read content_hash raw
-preview`; every permission callback requires `edit_posts`, and the password must belong to an
+`wp-plugin/postulator-companion` **1.4.0** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies, `Update URI`
+so wordpress.org never offers a plugin of the same slug) serves `/wp-json/postulator/v1` and
+advertises `bulk seo_meta seo_meta_read content_hash raw preview rendered meta terms settings`;
+every permission callback requires `edit_posts`, and the password must belong to an
 **administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not
-name is refused from the cached manifest before any request, so a site still on 1.1.0 answers
-`plugin_outdated` for the SEO read rather than a 404.
+name is refused from the cached manifest before any request, so a site on an older plugin answers
+`plugin_outdated` rather than a 404, and `wp.Capabilities.Outdated` names a plugin below 1.4.0 or
+missing a capability for the Sites panel. The post routes answer a content post only, a post of
+a public post type other than an attachment; a variation, a reusable block, a navigation menu or
+a template answers 404. `uninstall.php` deletes the term clock and the preview tokens and keeps
+the `_postulator_seo_*` values; there is no activation hook, an upload over the installed plugin
+never firing one.
 
 | Route | Purpose |
 |---|---|
-| `GET /manifest` | version, capabilities, detected SEO plugin, WP version, site URL |
-| `GET /content` | keyset page over posts then `product_cat` terms: hash, links, h1, meta |
+| `GET /manifest` | version, capabilities, detected SEO plugin, WP version, site URL, the content post types and public taxonomies (since 1.4.0) |
+| `GET /content` | keyset page over posts then terms: hash, links, h1, meta, excerpt and terms; `types` takes any listed post type or taxonomy and defaults to the four it always listed |
+| `GET /content/{id}/rendered` | `the_content` over the raw inside a singular main query, theme-free, and its hash (since 1.4.0) |
+| `GET /meta/{id}?keys=` | at most 50 keys asked, `is_protected_meta` keys refused with `meta_key_denied` (since 1.4.0) |
+| `GET /terms/{id}` | every term of every taxonomy the post's type carries, custom and internal ones included (since 1.4.0) |
+| `GET /settings` | the front, posts and privacy pages and the store's shop, cart, checkout, account and terms pages (since 1.4.0) |
 | `PUT /seo-meta/{id}` | writes the SEO fields present in the body, deleting a key given an empty value; posts only |
 | `GET /seo-meta/{id}` | the five SEO fields the post holds and the detected SEO plugin, behind the `seo_meta_read` capability; posts only (since 1.2.0) |
 | `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256; the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash |
-| `POST /content/{id}/preview` | an hour-long link that renders a draft through the theme; the token is kept only as its sha256, and `posts_results` flips that one post to `publish` for that request, uncached and noindex (since 1.1.0) |
+| `POST /content/{id}/preview` | an hour-long link that renders a draft through the theme; the token is kept only as its sha256 and carried in `preview_token` (since 1.4.0), and `posts_results` flips that one post to `publish` for that request, uncached and noindex under core, Rank Math and Yoast alike (since 1.1.0) |
 
 | Field | Yoast | Rank Math | none |
 |---|---|---|---|

@@ -2761,3 +2761,70 @@ The footprint tests cover exactly this scope.
 - **How the design settles what the record and the code disagree on**: the creation of a planned
   page and a product category as a parent are settled by answers 1 and 4.
 - **Open with the owner**: closed.
+
+## 2026-10-17 — stage 1a: the plugin's reads, its client and the two stands
+
+Stage 1a of the site model strengthened the companion plugin for reads, taught the client and the
+fake every new read, and built the two docker stands the suites now run on. Nothing new is
+written to a site.
+
+### What landed
+
+- **Plugin 1.4.0**. It adds `GET /content/{id}/rendered`, `GET /meta/{id}?keys=`,
+  `GET /terms/{id}` and `GET /settings`. `/content` gains `excerpt`, `terms` and every public type
+  and taxonomy. The manifest names `postTypes` and `taxonomies`. The preview query var is
+  `preview_token`. `uninstall.php` removes the bookkeeping, and the plugin carries an
+  `Update URI` header.
+- **The client**. A neutral User-Agent with `wp.WithUserAgent`; `PostTypes`, routing by
+  `rest_base`, `_embed` terms and `SiteSettings`; `GetRendered`, `GetMeta`, `GetTerms` and
+  `PluginSettings`; `ListProducts`, `ListVariations` and `StoreSettings`. `wp.Product` carries the
+  store's facts read-only, and `Capabilities.Outdated` names an old plugin.
+- **The Sites panel** names an outdated plugin with the update instruction and hands out the zip.
+- **The vanilla and replica stands** run under `STAND`, and the owner's sandbox is provisioned as
+  either stand only by `task sandbox:provision`.
+
+### Decided without asking
+
+- **1.4.0, an additive contract.** `/content` still defaults to page, post, product and
+  product_cat, so a released app that asks for nothing meets no new type. `types` takes any
+  content post type and any public taxonomy the manifest names. 1.3.0 is never reused.
+- **The User-Agent is a plain `Mozilla/5.0`.** `Mozilla/5.0 (compatible)` is the crawler token
+  some firewalls rate-limit.
+- **An outdated plugin is the probe's verdict, never stored.** It travels on `site.Extensions`
+  and in `CheckPlugin`'s view, and 1b makes it the `plugin_outdated` finding.
+- **`normalize.php` follows `Site.Resolve` on classification.** That covers the host with its
+  port, the escaped and lowercased path, and refusing a dot segment, an invalid escape and a
+  control character. A relative href keeps PHP's base, the page's parent, against the domain's
+  site base: both differ from RFC 3986's document base, and 1b's render extraction resolves
+  against the document URL. `wp-plugin/testdata/hrefs.json` pins both sides and the fake.
+- **`/rendered` runs `the_content` inside a one-post main query, after `the_post()`.** A snippet
+  guarded by `is_singular`, `in_the_loop` or `is_main_query` then injects as it does for a
+  visitor, which a plain `apply_filters` in a REST request would miss.
+- **`/meta` refuses the whole read with `meta_key_denied`** when `is_protected_meta` protects a key,
+  and takes at most 50 keys. **`/terms`** covers every taxonomy of the post's type, the internal
+  ones included.
+- **A refused read of `/wp/v2/settings`** (it needs `manage_options`) or of `wc/v3/settings` (it
+  needs `manage_woocommerce`) is a `Forbidden` error the caller reads as unknown. Products,
+  variations and media keep their own methods, though `/wp/v2/types` lists them.
+- **The post routes serve content posts only**: a post of a public post type other than an
+  attachment. The replica's builder found that a reusable block, a navigation menu, a template or
+  a variation was answered by id, and that a raw PUT wrote into the navigation post WordPress
+  creates. They now answer 404.
+- **A preview filters Rank Math's and Yoast's robots output too.** Rank Math replaces core's
+  `wp_robots`, so a preview under it printed `index, follow` until the replica proved otherwise.
+- **The stands start term ids at 100000**, so a term id is never a post id and the term-id
+  refusals mean what they say.
+
+### Deviations from the request
+
+- **No activation hook**, by the owner's answer at the plan; uninstall keeps the SEO values, by
+  the same.
+- **The old-plugin test is a unit test against the fake**, not an e2e one: no stand carries an
+  old plugin to recognise. It is `TestAnOutdatedPluginIsNamedByVersionAndCapabilities`.
+- **One agent built the stands; I wrote the store reads myself.** A second agent writing in the
+  same Go packages would have broken the other's commits through lefthook's lint.
+- **1.4.0 landed in two commits.** The outdated mechanism came first with the floor at 1.2.0, then
+  the version, so no commit claimed a version the plugin did not have.
+- **The site-specific scan reads its needles from the replica fixture**, so the test names no
+  class, and Blocksy's `ct-container` is covered by the theme's slug. Its CSS-selector rule waits
+  for `domain/render` in 1b.
