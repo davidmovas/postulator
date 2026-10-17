@@ -28,7 +28,7 @@ const (
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 
-	PluginVersion = "1.2.0"
+	PluginVersion = "1.4.0"
 )
 
 var requiredCapabilities = []string{"bulk", "seo_meta", CapabilitySEOMetaRead, "content_hash", CapabilityRaw, CapabilityPreview}

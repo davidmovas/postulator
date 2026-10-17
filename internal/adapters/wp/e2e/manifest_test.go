@@ -30,8 +30,8 @@ func TestManifestDescribesTheSite(t *testing.T) {
 
 	got := readManifest(t, c)
 
-	if got.Version != "1.2.0" {
-		t.Errorf("version = %q, want 1.2.0", got.Version)
+	if got.Version != "1.4.0" {
+		t.Errorf("version = %q, want 1.4.0", got.Version)
 	}
 	want := []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"}
 	if !slices.Equal(got.Capabilities, want) {

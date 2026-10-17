@@ -622,7 +622,7 @@ func (s *Server) previewURL(stored *Item, token string) string {
 	}
 	query := parsed.Query()
 	query.Set("preview", "true")
-	query.Set("postulator_preview", token)
+	query.Set("preview_token", token)
 	parsed.RawQuery = query.Encode()
 	return parsed.String()
 }

@@ -106,7 +106,7 @@ func TestOpenReportsALaunchThatFailed(t *testing.T) {
 func TestOpenNeverNamesTheLinkItWasGiven(t *testing.T) {
 	t.Parallel()
 
-	const secret = "https://example.test/?postulator_preview=abc123secrettoken"
+	const secret = "https://example.test/?preview_token=abc123secrettoken"
 
 	cases := []struct {
 		name    string

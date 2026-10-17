@@ -34,7 +34,7 @@ func TestTheManifestReportsTheFrozenCapabilities(t *testing.T) {
 	decode(t, payload, &manifest)
 
 	want := []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"}
-	if manifest.Version != "1.2.0" || len(manifest.Capabilities) != len(want) {
+	if manifest.Version != "1.4.0" || len(manifest.Capabilities) != len(want) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	for index, capability := range want {
@@ -587,7 +587,7 @@ func tokenIn(t *testing.T, link string) (token string, query url.Values) {
 	if err != nil {
 		t.Fatalf("parse %s: %v", link, err)
 	}
-	return parsed.Query().Get("postulator_preview"), parsed.Query()
+	return parsed.Query().Get("preview_token"), parsed.Query()
 }
 
 func TestTheManifestCanNameFewerCapabilities(t *testing.T) {

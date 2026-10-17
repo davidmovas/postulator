@@ -124,10 +124,10 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "href host and port", snippet: "its host and port equal the site's host and port"},
 		{name: "preview link schema", snippet: "\n    PreviewLink:\n"},
 		{name: "expires at property", snippet: "\n        expiresAt:\n"},
-		{name: "preview query argument", snippet: "postulator_preview"},
+		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
 		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
-		{name: "plugin version", snippet: "\n  version: 1.2.0\n"},
+		{name: "plugin version", snippet: "\n  version: 1.4.0\n"},
 	}
 
 	document := contractDocument(t)

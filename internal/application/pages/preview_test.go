@@ -187,7 +187,7 @@ func TestPreviewLinkOfADraftIsIssuedByTheSite(t *testing.T) {
 	t.Parallel()
 
 	expires := time.Date(2026, time.September, 18, 10, 0, 0, 0, time.UTC)
-	issuer := &recordingIssuer{answer: pages.IssuedPreview{URL: "https://shop.example.com/?page_id=43&postulator_preview=abc", ExpiresAt: expires}}
+	issuer := &recordingIssuer{answer: pages.IssuedPreview{URL: "https://shop.example.com/?page_id=43&preview_token=abc", ExpiresAt: expires}}
 	h := newPreviewHarness(t, issuer)
 	draft := h.placed(t, "/draft/", pagemap.StatusExists, 43)
 	h.recorder.Reset()

@@ -29,7 +29,7 @@ func TestCapabilitiesAreFetchedOnceAndCached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Capabilities: %v", err)
 	}
-	if first.SEOPlugin != "rankmath" || first.Version != "1.2.0" || first.Site != server.URL() {
+	if first.SEOPlugin != "rankmath" || first.Version != wp.PluginVersion || first.Site != server.URL() {
 		t.Errorf("capabilities = %+v", first)
 	}
 	if !first.Has("raw") || !first.Has("seo_meta") || !first.Has(wp.CapabilityPreview) || first.Has("telepathy") {
@@ -494,7 +494,7 @@ func TestPreviewLinkIssuesTheURLAndTheExpiry(t *testing.T) {
 		t.Fatalf("parse %s: %v", link.URL, err)
 	}
 	if !strings.HasPrefix(link.URL, server.URL()) || parsed.Query().Get("preview") != "true" ||
-		parsed.Query().Get("postulator_preview") == "" {
+		parsed.Query().Get("preview_token") == "" {
 		t.Errorf("url = %q", link.URL)
 	}
 	stored, _ := server.Lookup(draft.ID)

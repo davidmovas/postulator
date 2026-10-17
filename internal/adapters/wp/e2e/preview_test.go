@@ -39,7 +39,7 @@ func tokenOf(t *testing.T, link string) string {
 	if err != nil {
 		t.Fatalf("parse %s: %v", link, err)
 	}
-	return parsed.Query().Get("postulator_preview")
+	return parsed.Query().Get("preview_token")
 }
 
 func withToken(t *testing.T, link, token string) string {
@@ -50,7 +50,7 @@ func withToken(t *testing.T, link, token string) string {
 		t.Fatalf("parse %s: %v", link, err)
 	}
 	query := parsed.Query()
-	query.Set("postulator_preview", token)
+	query.Set("preview_token", token)
 	parsed.RawQuery = query.Encode()
 	return parsed.String()
 }
@@ -140,7 +140,7 @@ func TestPreviewLinkRefusesADraftThatWasNeverIssued(t *testing.T) {
 
 	id := createPage(t, c, pageSpec{title: "Never", slug: uniqueSlug("never"), content: "<p>x</p>", status: "draft"})
 
-	target := fmt.Sprintf("%s/?page_id=%d&preview=true&postulator_preview=%s", env.baseURL, id, strings.Repeat("a", 32))
+	target := fmt.Sprintf("%s/?page_id=%d&preview=true&preview_token=%s", env.baseURL, id, strings.Repeat("a", 32))
 	if status, _, _ := c.anonymous(t, target); status != http.StatusNotFound {
 		t.Fatalf("a token for a draft that was never issued: status %d, want 404", status)
 	}

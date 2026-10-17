@@ -61,12 +61,25 @@ function preview_headers(): void {
 		header( 'X-Robots-Tag: noindex, nofollow', true );
 	}
 	add_filter( 'wp_robots', 'wp_robots_no_robots' );
+	add_filter( 'rank_math/frontend/robots', __NAMESPACE__ . '\\preview_robots_directives' );
+	add_filter( 'wpseo_robots', __NAMESPACE__ . '\\preview_robots_text' );
 	add_filter( 'redirect_canonical', '__return_false' );
 	add_filter( 'comments_open', '__return_false' );
 	add_filter( 'pings_open', '__return_false' );
 	if ( ! defined( 'DONOTCACHEPAGE' ) ) {
 		define( 'DONOTCACHEPAGE', true );
 	}
+}
+
+function preview_robots_directives( $robots ): array {
+	return array(
+		'index'  => 'noindex',
+		'follow' => 'nofollow',
+	);
+}
+
+function preview_robots_text( $robots ): string {
+	return 'noindex, nofollow';
 }
 
 function issue_preview( \WP_Post $post ) {
