@@ -4,9 +4,19 @@ namespace Postulator\Companion;
 
 defined( 'ABSPATH' ) || exit;
 
-function site_host(): string {
-	$host = wp_parse_url( home_url(), PHP_URL_HOST );
-	return is_string( $host ) ? strtolower( $host ) : '';
+function site_authority(): string {
+	if ( 1 !== preg_match( '#^[A-Za-z][A-Za-z0-9+.\-]*://([^/?\#]*)#', (string) home_url(), $matches ) ) {
+		return '';
+	}
+	return host_of_authority( $matches[1] );
+}
+
+function host_of_authority( string $authority ): string {
+	$at = strrpos( $authority, '@' );
+	if ( false !== $at ) {
+		$authority = substr( $authority, $at + 1 );
+	}
+	return strtolower( $authority );
 }
 
 function normalize_path( string $path ): string {
@@ -37,34 +47,86 @@ function parent_path( string $path ): string {
 	return normalize_path( substr( $trimmed, 0, $cut + 1 ) );
 }
 
-function internal_href_to_path( string $href, string $base ): string {
-	$href = trim( $href );
-	if ( '' === $href || '#' === $href[0] ) {
-		return '';
+function escaped_path( string $raw ): ?string {
+	if ( 1 === preg_match( '/%(?![0-9A-Fa-f]{2})/', $raw ) ) {
+		return null;
 	}
+	if ( 1 === preg_match( "#^[A-Za-z0-9\\-._~!$&'()*+,;=:@\\[\\]/%]*\\z#", $raw ) ) {
+		return $raw;
+	}
+	return (string) preg_replace_callback(
+		"#[^A-Za-z0-9\\-._~$&+,/:;=@]#",
+		function ( array $matches ): string {
+			return '%' . strtoupper( bin2hex( $matches[0] ) );
+		},
+		rawurldecode( $raw )
+	);
+}
 
-	$parts = wp_parse_url( $href );
-	if ( ! is_array( $parts ) ) {
-		return '';
-	}
-	if ( isset( $parts['scheme'] ) && ! in_array( strtolower( $parts['scheme'] ), array( 'http', 'https' ), true ) ) {
-		return '';
-	}
-	if ( isset( $parts['host'] ) && strtolower( $parts['host'] ) !== site_host() ) {
-		return '';
-	}
-
-	$path = isset( $parts['path'] ) ? $parts['path'] : '';
-	if ( '' === $path ) {
-		return isset( $parts['host'] ) ? '/' : '';
-	}
-	if ( '/' !== $path[0] ) {
-		if ( isset( $parts['host'] ) ) {
+function href_path( string $escaped ): string {
+	$segments = array();
+	foreach ( explode( '/', $escaped ) as $segment ) {
+		if ( '' === $segment ) {
+			continue;
+		}
+		if ( '.' === $segment || '..' === $segment ) {
 			return '';
 		}
-		$path = $base . $path;
+		$segments[] = strtolower( $segment );
 	}
-	return normalize_path( $path );
+	if ( empty( $segments ) ) {
+		return '/';
+	}
+	return '/' . implode( '/', $segments ) . '/';
+}
+
+function internal_href_to_path( string $href, string $base ): string {
+	$href = trim( $href );
+	if ( '' === $href || '#' === $href[0] || '?' === $href[0] ) {
+		return '';
+	}
+	if ( 1 === preg_match( '/[\x00-\x1f\x7f]/', $href ) ) {
+		return '';
+	}
+
+	$rest       = substr( $href, 0, strcspn( $href, '#' ) );
+	$has_scheme = false;
+	if ( 1 === preg_match( '#^([A-Za-z][A-Za-z0-9+.\-]*):(.*)\z#s', $rest, $matches ) ) {
+		if ( ! in_array( strtolower( $matches[1] ), array( 'http', 'https' ), true ) ) {
+			return '';
+		}
+		$has_scheme = true;
+		$rest       = $matches[2];
+	}
+	$rest = substr( $rest, 0, strcspn( $rest, '?' ) );
+
+	$has_host = false;
+	if ( 0 === strpos( $rest, '//' ) && ( $has_scheme || 0 !== strpos( $rest, '///' ) ) ) {
+		$length = strcspn( $rest, '/', 2 );
+		if ( host_of_authority( substr( $rest, 2, $length ) ) !== site_authority() ) {
+			return '';
+		}
+		$has_host = true;
+		$rest     = (string) substr( $rest, 2 + $length );
+	} elseif ( $has_scheme && ( '' === $rest || '/' !== $rest[0] ) ) {
+		return '';
+	}
+
+	if ( '' === $rest ) {
+		return $has_host ? '/' : '';
+	}
+
+	$escaped = escaped_path( $rest );
+	if ( null === $escaped ) {
+		return '';
+	}
+	if ( '/' !== $escaped[0] ) {
+		if ( $has_host ) {
+			return '';
+		}
+		$escaped = $base . $escaped;
+	}
+	return href_path( $escaped );
 }
 
 function collapse_text( string $text ): string {

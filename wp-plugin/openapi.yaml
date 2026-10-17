@@ -469,11 +469,16 @@ components:
         href:
           type: string
           description: >-
-            Site relative path of an internal anchor, normalised by the same
-            rules as path, including the ASCII lowercasing. A link counts as
-            internal when its host equals the site host exactly, compared in
-            lowercase, with no www stripping and with the scheme ignored; a
-            relative href is always internal. External links are not listed.
+            Site relative path of an internal anchor, classified as
+            pagemap.Site.Resolve classifies it. A link counts as internal
+            when its host and port equal the site's host and port as
+            written, compared in lowercase, with no www stripping and with
+            the scheme ignored; a relative href is internal and resolves
+            against the parent of the page's path. The path is escaped as
+            Go's url.EscapedPath escapes it, then lowercased in ASCII, with
+            repeated slashes collapsed and a trailing slash. An href with an
+            invalid escape, a dot segment or a control character is not
+            listed, and neither are external links.
           examples:
             - /koffein/
         anchor:

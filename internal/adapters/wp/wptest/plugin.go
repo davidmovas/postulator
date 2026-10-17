@@ -485,6 +485,11 @@ func internalTarget(host, href string) (string, bool) {
 	if target == "" && parsed.Host == "" {
 		return "", false
 	}
+	for segment := range strings.SplitSeq(target, "/") {
+		if segment == "." || segment == ".." {
+			return "", false
+		}
+	}
 	return normalisePath(target), true
 }
 
