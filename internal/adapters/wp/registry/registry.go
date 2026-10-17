@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	stderrors "errors"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,15 @@ type entry struct {
 	client  *wp.Client
 	stamp   time.Time
 	baseURL string
+	agent   string
+}
+
+func entryOf(client *wp.Client, record *site.Site) entry {
+	return entry{client: client, stamp: record.UpdatedAt, baseURL: record.BaseURL, agent: record.Settings.UserAgent}
+}
+
+func (e *entry) serves(record *site.Site) bool {
+	return e.stamp.Equal(record.UpdatedAt) && e.baseURL == record.BaseURL && e.agent == record.Settings.UserAgent
 }
 
 type Registry struct {
@@ -47,7 +57,7 @@ func (r *Registry) Client(ctx context.Context, siteID string) (*wp.Client, error
 	r.mu.Lock()
 	held, ok := r.cached[siteID]
 	r.mu.Unlock()
-	if ok && held.stamp.Equal(record.UpdatedAt) && held.baseURL == record.BaseURL {
+	if ok && held.serves(&record) {
 		return held.client, nil
 	}
 
@@ -65,13 +75,13 @@ func (r *Registry) Client(ctx context.Context, siteID string) (*wp.Client, error
 		Username:      record.Username,
 		AppPassword:   password,
 		AllowInsecure: record.AllowInsecure,
-	}, r.options...)
+	}, append(slices.Clone(r.options), wp.WithUserAgent(record.Settings.UserAgent))...)
 	if err != nil {
 		return nil, err
 	}
 
 	r.mu.Lock()
-	r.cached[siteID] = entry{client: client, stamp: record.UpdatedAt, baseURL: record.BaseURL}
+	r.cached[siteID] = entryOf(client, &record)
 	r.mu.Unlock()
 	return client, nil
 }

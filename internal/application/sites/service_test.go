@@ -390,6 +390,88 @@ func TestUpdateAppliesOnlyTheGivenFields(t *testing.T) {
 	}
 }
 
+func TestSettingsRoundTripThroughTheSitesService(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	created, err := h.service.Create(t.Context(), sites.CreateRequest{Name: "Shop", BaseURL: "https://shop.example.com"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if fresh := created.Site.Settings; fresh.LinkURLForm != site.URLFormAuto || fresh.Observe.RenderConcurrency != 4 ||
+		fresh.Observe.FullWalkEvery != 10 || len(fresh.Builders) == 0 {
+		t.Fatalf("a new site's settings = %+v, want the defaults", fresh)
+	}
+
+	repo := sqlite.NewSiteRepo(h.store)
+	stored, err := repo.Get(t.Context(), created.Site.ID)
+	if err != nil {
+		t.Fatalf("Get the stored site: %v", err)
+	}
+	observedAt := time.Date(2026, time.October, 17, 8, 0, 0, 0, time.UTC)
+	stored.Settings.Observation = site.ObservationState{LastStartedAt: &observedAt, SinceFullWalk: 3}
+	stored.Settings.Technical = site.TechnicalPages{Front: 7}
+	if err = repo.Update(t.Context(), stored); err != nil {
+		t.Fatalf("record an observation: %v", err)
+	}
+
+	if _, err = h.service.Update(t.Context(), sites.UpdateRequest{ID: created.Site.ID, Settings: &site.Settings{
+		UserAgent:   " Agent/1 ",
+		Observe:     site.ObserveSettings{RenderConcurrency: 2},
+		Technical:   site.TechnicalPages{Front: 1},
+		Observation: site.ObservationState{SinceFullWalk: 99},
+	}}); err != nil {
+		t.Fatalf("Update the settings: %v", err)
+	}
+
+	read, err := h.service.Get(t.Context(), sites.GetRequest{ID: created.Site.ID})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	got := read.Site.Settings
+	if got.UserAgent != "Agent/1" || got.Observe.RenderConcurrency != 2 || got.Observe.FullWalkEvery != 10 ||
+		got.LinkURLForm != site.URLFormAuto || len(got.Builders) == 0 || len(got.TechnicalShortcodes) == 0 {
+		t.Errorf("settings read back = %+v", got)
+	}
+	if got.Observation.SinceFullWalk != 3 || got.Observation.LastStartedAt == nil ||
+		!got.Observation.LastStartedAt.Equal(observedAt) || got.Technical.Front != 7 {
+		t.Errorf("an update replaced the observation's bookkeeping: %+v, %+v", got.Observation, got.Technical)
+	}
+
+	encoded, err := json.Marshal(read)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	for _, key := range []string{`"settings":{"linkUrlForm":"auto","userAgent":"Agent/1"`, `"renderConcurrency":2`, `"fullWalkEvery":10`} {
+		if !strings.Contains(string(encoded), key) {
+			t.Errorf("view lacks %s: %s", key, encoded)
+		}
+	}
+
+	refusals := []struct {
+		name     string
+		settings site.Settings
+	}{
+		{name: "a link form it does not know", settings: site.Settings{LinkURLForm: "sometimes"}},
+		{name: "a concurrency over the ceiling", settings: site.Settings{Observe: site.ObserveSettings{RenderConcurrency: 17}}},
+		{name: "a negative concurrency", settings: site.Settings{Observe: site.ObserveSettings{RenderConcurrency: -1}}},
+		{name: "a negative cadence", settings: site.Settings{Observe: site.ObserveSettings{FullWalkEvery: -1}}},
+	}
+
+	for _, tc := range refusals {
+		t.Run(tc.name, func(t *testing.T) {
+			_, updateErr := h.service.Update(t.Context(), sites.UpdateRequest{ID: created.Site.ID, Settings: &tc.settings})
+			if !errors.IsCode(updateErr, errors.Invalid) {
+				t.Fatalf("code = %q, want INVALID (err %v)", errors.CodeOf(updateErr), updateErr)
+			}
+			after, getErr := h.service.Get(t.Context(), sites.GetRequest{ID: created.Site.ID})
+			if getErr != nil || after.Site.Settings.UserAgent != "Agent/1" || after.Site.Settings.Observe.RenderConcurrency != 2 {
+				t.Fatalf("a refused update changed the settings: %+v, %v", after.Site.Settings, getErr)
+			}
+		})
+	}
+}
+
 func TestDeleteCascadesAndRemovesTheSecret(t *testing.T) {
 	t.Parallel()
 

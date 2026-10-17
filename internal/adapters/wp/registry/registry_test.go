@@ -75,6 +75,83 @@ func TestClientIsBuiltOnceAndRebuiltOnChange(t *testing.T) {
 	}
 }
 
+func assertAgent(t *testing.T, held *registry.Registry, server *wptest.Server, want string) *wp.Client {
+	t.Helper()
+
+	client, err := held.Client(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("Client: %v", err)
+	}
+	server.ResetRequests()
+	if _, err = client.Probe(t.Context()); err != nil {
+		t.Fatalf("Probe: %v", err)
+	}
+	requests := server.Requests()
+	if len(requests) == 0 {
+		t.Fatal("no request reached the site")
+	}
+	for _, recorded := range requests {
+		if got := recorded.Header.Get("User-Agent"); got != want {
+			t.Errorf("%s %s User-Agent = %q, want %q", recorded.Method, recorded.Path, got, want)
+		}
+	}
+	return client
+}
+
+func TestASiteUserAgentOverrideReachesItsClient(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		agent string
+		want  string
+	}{
+		{name: "a site that names its agent", agent: "Agent/1", want: "Agent/1"},
+		{name: "a site that names none", want: wp.DefaultUserAgent},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			store := newSites(server)
+			store.record.Settings.UserAgent = tc.agent
+			held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+
+			assertAgent(t, held, server, tc.want)
+		})
+	}
+
+	changes := []struct {
+		name  string
+		stamp bool
+	}{
+		{name: "a changed agent under a new stamp rebuilds the client", stamp: true},
+		{name: "a changed agent under the same stamp rebuilds the client"},
+	}
+
+	for _, tc := range changes {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			store := newSites(server)
+			store.record.Settings.UserAgent = "Agent/1"
+			held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+
+			first := assertAgent(t, held, server, "Agent/1")
+			store.record.Settings.UserAgent = "Agent/2"
+			if tc.stamp {
+				store.record.UpdatedAt = store.record.UpdatedAt.Add(1)
+			}
+			if second := assertAgent(t, held, server, "Agent/2"); second == first {
+				t.Fatal("the registry kept a client whose agent changed")
+			}
+		})
+	}
+}
+
 func TestClientReportsWhatItCannotDo(t *testing.T) {
 	t.Parallel()
 

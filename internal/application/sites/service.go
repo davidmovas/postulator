@@ -162,7 +162,23 @@ func apply(current *site.Site, req *UpdateRequest) (site.Site, error) {
 			ModelProfiles: profilesOf(req.Defaults.ModelProfiles),
 		}
 	}
+	if req.Settings != nil {
+		next.Settings = settingsOver(&current.Settings, req.Settings)
+	}
 	return next, nil
+}
+
+func settingsOver(stored, asked *site.Settings) site.Settings {
+	return site.Settings{
+		LinkURLForm:         asked.LinkURLForm,
+		UserAgent:           strings.TrimSpace(asked.UserAgent),
+		Observe:             asked.Observe,
+		Builders:            asked.Builders,
+		TechnicalShortcodes: asked.TechnicalShortcodes,
+		TechnicalBlocks:     asked.TechnicalBlocks,
+		Technical:           stored.Technical,
+		Observation:         stored.Observation,
+	}.Normalized()
 }
 
 func (s *Service) rotate(ctx context.Context, ref, password string) error {

@@ -1,6 +1,9 @@
 package sites
 
-import "github.com/davidmovas/postulator/internal/kernel/dto"
+import (
+	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
+)
 
 type CreateRequest struct {
 	Name          string `json:"name" description:"Name inside Postulator"`
@@ -15,14 +18,15 @@ type CreateResponse struct {
 }
 
 type UpdateRequest struct {
-	ID            string    `json:"id" description:"Site id"`
-	Name          *string   `json:"name,omitempty" description:"New name"`
-	BaseURL       *string   `json:"baseUrl,omitempty" description:"New site URL"`
-	Username      *string   `json:"username,omitempty" description:"New administrator login"`
-	Password      *string   `json:"password,omitempty" description:"New application password"`
-	AllowInsecure *bool     `json:"allowInsecure,omitempty" description:"Accept an untrusted certificate, local sites only"`
-	Status        *string   `json:"status,omitempty" enum:"active,paused,error" description:"New status"`
-	Defaults      *Defaults `json:"defaults,omitempty" description:"New fallback template and policy"`
+	ID            string         `json:"id" description:"Site id"`
+	Name          *string        `json:"name,omitempty" description:"New name"`
+	BaseURL       *string        `json:"baseUrl,omitempty" description:"New site URL"`
+	Username      *string        `json:"username,omitempty" description:"New administrator login"`
+	Password      *string        `json:"password,omitempty" description:"New application password"`
+	AllowInsecure *bool          `json:"allowInsecure,omitempty" description:"Accept an untrusted certificate, local sites only"`
+	Status        *string        `json:"status,omitempty" enum:"active,paused,error" description:"New status"`
+	Defaults      *Defaults      `json:"defaults,omitempty" description:"New fallback template and policy"`
+	Settings      *site.Settings `json:"settings,omitempty" description:"New per-site settings; the observation's own bookkeeping is kept"`
 }
 
 type UpdateResponse struct {
