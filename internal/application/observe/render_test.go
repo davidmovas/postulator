@@ -3,6 +3,7 @@ package observe_test
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -227,6 +228,96 @@ func TestAFailedVisitIsAFindingNotAFailure(t *testing.T) {
 	}
 }
 
+func TestAnArchivedPageIsNeitherVisitedNorLeftUnreachable(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	bpcURL := baseURL + "/bpc-157/"
+	s.visitor.failed[bpcURL] = true
+
+	s.run(t, observe.Options{})
+	bpc := s.pageAt(t, "/bpc-157/")
+	if f, ok := s.finding(finding.RenderUnreachable, finding.SubjectPage(bpc.ID)); !ok || f.Status != finding.Open {
+		t.Fatalf("render_unreachable before the deletion = %+v %t", f, ok)
+	}
+	visitsBefore := len(s.visitor.visits)
+
+	s.plugin.items = slices.DeleteFunc(s.plugin.items, func(item observe.ContentItem) bool { return item.ID == bpcID })
+	delete(s.plugin.raws, bpcID)
+	s.clock.Set(start.Add(time.Hour))
+	state := s.run(t, observe.Options{Full: true})
+	if got := s.pageAt(t, "/bpc-157/"); got.Status != pagemap.StatusArchived {
+		t.Fatalf("a page the site no longer holds is %s, want it archived", got.Status)
+	}
+	if state.Counts.Unreachable != 0 || slices.Contains(s.visitor.visits[visitsBefore:], bpcURL) {
+		t.Errorf("the walk that archived the page still visited it: unreachable %d visits %v", state.Counts.Unreachable, s.visitor.visits[visitsBefore:])
+	}
+	if f, _ := s.finding(finding.RenderUnreachable, finding.SubjectPage(bpc.ID)); f.Status != finding.Resolved {
+		t.Errorf("an archived page's render_unreachable is %s, want it resolved", f.Status)
+	}
+
+	s.clock.Set(start.Add(2 * time.Hour))
+	s.run(t, observe.Options{RenderRescan: true})
+	if slices.Contains(s.visitor.visits[visitsBefore:], bpcURL) {
+		t.Errorf("a rescan visited an archived page: %v", s.visitor.visits[visitsBefore:])
+	}
+	if f, _ := s.finding(finding.RenderUnreachable, finding.SubjectPage(bpc.ID)); f.Status != finding.Resolved {
+		t.Errorf("render_unreachable came back for an archived page: %s", f.Status)
+	}
+}
+
+func TestADismissedUnreachableFindingStaysDismissedWhileTheCauseIsTheSame(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	s.visitor.failed[baseURL+"/bpc-157/"] = true
+
+	s.run(t, observe.Options{})
+	bpc := s.pageAt(t, "/bpc-157/")
+	key := findingKey(siteID, finding.RenderUnreachable, finding.SubjectPage(bpc.ID))
+	s.stores.mu.Lock()
+	dismissed := s.stores.findings[key]
+	dismissed.Status = finding.Dismissed
+	s.stores.findings[key] = dismissed
+	s.stores.mu.Unlock()
+	if strings.Contains(string(dismissed.Subject), "?_=") || strings.Contains(string(dismissed.Subject), "error") {
+		t.Fatalf("the subject carries the transport's text, which changes on every visit: %s", dismissed.Subject)
+	}
+
+	s.clock.Set(start.Add(time.Hour))
+	s.run(t, observe.Options{RenderRescan: true})
+	if f, _ := s.finding(finding.RenderUnreachable, finding.SubjectPage(bpc.ID)); f.Status != finding.Dismissed {
+		t.Errorf("a dismissed finding whose cause did not change is %s", f.Status)
+	}
+}
+
+func TestAFailedFilteredRenderIsUnreachableNotAWrongRoot(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+
+	s.run(t, observe.Options{})
+	tb500 := s.pageAt(t, "/tb-500/")
+	before := s.stores.renders[tb500.ID]
+	if before.Root != render.RootFound {
+		t.Fatalf("tb-500's root before the failure = %s", before.Root)
+	}
+
+	delete(s.plugin.rendered, tb500ID)
+	s.touch(tb500ID, start.Add(30*time.Minute))
+	s.clock.Set(start.Add(time.Hour))
+	state := s.run(t, observe.Options{})
+	if state.Counts.Unreachable != 1 {
+		t.Errorf("a plugin that cannot render the content counts %d unreachable, want 1", state.Counts.Unreachable)
+	}
+	if f, ok := s.finding(finding.RenderUnreachable, finding.SubjectPage(tb500.ID)); !ok || f.Status != finding.Open {
+		t.Errorf("render_unreachable = %+v %t, want it open while the filtered content cannot be read", f, ok)
+	}
+	if after := s.stores.renders[tb500.ID]; !after.ExtractedAt.Equal(before.ExtractedAt) || after.Root != before.Root {
+		t.Errorf("the render row moved on a failed read: before %s at %s, after %s at %s", before.Root, before.ExtractedAt, after.Root, after.ExtractedAt)
+	}
+}
+
 func TestRendersRunAFewAtATime(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
@@ -276,6 +367,7 @@ func TestADraftIsRenderedThroughThePreviewLink(t *testing.T) {
 	draft.Status = "draft"
 	s.plugin.items = append(s.plugin.items, draft)
 	s.plugin.raws[70] = rawOf("<p>Not yet.</p>")
+	s.plugin.rendered[70] = observe.Rendered{Content: "<h1>Draft</h1><p>Not yet.</p>"}
 	s.plugin.previews[70] = baseURL + "/?p=70&preview_token=abc"
 	s.visitor.pages[baseURL+"/?p=70&preview_token=abc"] = observe.Visit{Status: 200, Body: publicPage{title: "Draft", path: "/draft-page/", content: "<p>Not yet.</p>"}.html()}
 

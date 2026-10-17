@@ -16,6 +16,7 @@ type timeStamp = time.Time
 
 var deriveCodes = []finding.Code{
 	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentDiffers, finding.URLFormMixed,
+	finding.RenderUnreachable,
 }
 
 func (s *Service) derive(ctx context.Context, state *State, readers Readers) error {
@@ -67,14 +68,18 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	if err := s.urlForm(ctx, tracked, m); err != nil {
 		return err
 	}
-	if state.Full {
-		for i := range m.pages {
-			page := m.pages[i]
-			if archive(page, m.identities[page.ID], state, readers) {
-				page.Status = pagemap.StatusArchived
-				changed[page.ID] = page
-				state.Counts.Archived++
-			}
+	for i := range m.pages {
+		page := m.pages[i]
+		if state.Full && archive(page, m.identities[page.ID], state, readers) {
+			page.Status = pagemap.StatusArchived
+			changed[page.ID] = page
+			state.Counts.Archived++
+		}
+		if page.Status != pagemap.StatusArchived {
+			continue
+		}
+		if err := tracked.clear(ctx, finding.RenderUnreachable, finding.SubjectPage(page.ID)); err != nil {
+			return err
 		}
 	}
 

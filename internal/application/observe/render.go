@@ -94,7 +94,7 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 	exhausted := true
 	for i := range m.pages {
 		page := m.pages[i]
-		if page.ID <= state.RenderAfter || page.WPID == nil {
+		if page.ID <= state.RenderAfter || page.WPID == nil || page.Status == pagemap.StatusArchived {
 			continue
 		}
 		if len(targets) == batch {
@@ -103,7 +103,7 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 		}
 		state.RenderAfter = page.ID
 		identity, observed := m.identities[page.ID]
-		if !observed || !s.needsRender(state, page, identity, m) {
+		if !observed || (state.Full && archive(page, identity, state, readers)) || !s.needsRender(state, page, identity, m) {
 			continue
 		}
 		url, ok := s.renderURL(ctx, readers, page, identity)
@@ -197,9 +197,12 @@ func (s *Service) fetchOne(ctx context.Context, readers Readers, install pagemap
 
 	filtered := ""
 	if readers.plugin(capabilityRendered) && !target.page.WPType.Term() {
-		if rendered, renderErr := readers.Plugin.GetRendered(ctx, string(target.page.WPType), *target.page.WPID); renderErr == nil {
-			filtered = rendered.Content
+		rendered, renderErr := readers.Plugin.GetRendered(ctx, string(target.page.WPType), *target.page.WPID)
+		if renderErr != nil {
+			outcome.err = renderErr
+			return outcome
 		}
+		filtered = rendered.Content
 	}
 	extraction, err := render.Extract(render.Input{
 		Public: visit.Body, Filtered: filtered, Body: block.Parse(target.raw), Site: install, Document: target.page.Path,
@@ -222,7 +225,7 @@ func (s *Service) keepRenders(ctx context.Context, state *State, m siteModel, ou
 			if outcomes[i].err != nil {
 				state.Counts.Unreachable++
 				if raiseErr := tracked.raise(c, finding.RenderUnreachable, &page.ID, subject, map[string]any{
-					"url": outcomes[i].target.url, "status": outcomes[i].status, "error": outcomes[i].err.Error(),
+					"path": page.Path, "status": outcomes[i].status,
 				}); raiseErr != nil {
 					return raiseErr
 				}

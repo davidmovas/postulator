@@ -568,12 +568,13 @@ func (s *storeFake) StorePages(_ context.Context) (site.TechnicalPages, error) {
 }
 
 type visitorFake struct {
-	mu     sync.Mutex
-	pages  map[string]observe.Visit
-	failed map[string]bool
-	visits []string
-	active int
-	peak   int
+	mu       sync.Mutex
+	pages    map[string]observe.Visit
+	failed   map[string]bool
+	visits   []string
+	active   int
+	peak     int
+	failures int
 }
 
 func (v *visitorFake) Visit(_ context.Context, url string) (observe.Visit, error) {
@@ -589,7 +590,8 @@ func (v *visitorFake) Visit(_ context.Context, url string) (observe.Visit, error
 	defer v.mu.Unlock()
 	v.active--
 	if v.failed[url] {
-		return observe.Visit{}, errors.New(errors.External, "the site did not answer")
+		v.failures++
+		return observe.Visit{}, errors.New(errors.External, "the site did not answer "+url+"?_="+strconv.Itoa(v.failures))
 	}
 	visit, ok := v.pages[url]
 	if !ok {
