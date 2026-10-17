@@ -14,10 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-const (
-	userAgent    = "Postulator/2"
-	maxBodyBytes = 32 << 20
-)
+const maxBodyBytes = 32 << 20
 
 type request struct {
 	header       http.Header
@@ -110,7 +107,7 @@ func (c *Client) send(ctx context.Context, client *http.Client, req request, tar
 		accept = contentTypeJSON
 	}
 	httpReq.Header.Set("Accept", accept)
-	httpReq.Header.Set("User-Agent", userAgent)
+	httpReq.Header.Set("User-Agent", c.userAgent)
 	if req.contentType != "" {
 		httpReq.Header.Set("Content-Type", req.contentType)
 	}
