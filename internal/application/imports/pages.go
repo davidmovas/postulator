@@ -130,11 +130,15 @@ func (b *builder) createPage(draft *pageDraft, templateID, entityID *string) err
 	if wpType == pagemap.WPProduct {
 		title = draft.title
 	}
+	technical := pagemap.TechnicalNone
+	if draft.technical() {
+		technical = pagemap.TechnicalWorkbook
+	}
 	page, err := pagemap.NewPage(pagemap.Page{
 		ID: id.New(), SiteID: b.state.siteID, Path: draft.path, WPType: wpType,
 		Title: title, H1: draft.h1, MetaTitle: draft.metaTitle, MetaDescription: draft.metaDesc,
 		Keywords: draft.keywords, Notes: draft.notes, Status: pagemap.StatusPlanned, EntityID: entityID,
-		TemplateID: templateID, CreatedAt: b.now, UpdatedAt: b.now,
+		TemplateID: templateID, TechnicalReason: technical, CreatedAt: b.now, UpdatedAt: b.now,
 	})
 	if err != nil {
 		return err
@@ -272,6 +276,9 @@ func (b *builder) linkParents() {
 	for i := range b.p.pages {
 		if planned := &b.p.pages[i].page; planned.ParentPageID == nil {
 			planned.ParentPageID = index.PathParentID(*planned)
+			if planned.ParentPageID != nil {
+				planned.ParentReason = pagemap.ParentWorkbook
+			}
 		}
 	}
 }
