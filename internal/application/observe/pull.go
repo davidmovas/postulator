@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -116,7 +116,7 @@ func fromCore(pulled Item, postType string, install pagemap.Site) (item, bool) {
 	converted := item{
 		WPID: pulled.ID, ParentWPID: pulled.Parent, Type: pagemap.WPType(postType), Path: path, URL: pulled.Link,
 		Slug: pulled.Slug, Status: pulled.Status, Title: pulled.Title, Excerpt: pulled.Excerpt,
-		ContentHash: field.Hash(pulled.Content), Content: pulled.Content, HasContent: true, Terms: pulled.Terms, Modified: pulled.Modified,
+		ContentHash: block.BodyHash(pulled.Content), Content: pulled.Content, HasContent: true, Terms: pulled.Terms, Modified: pulled.Modified,
 	}
 	if doc, err := content.Parse(pulled.Content); err == nil {
 		converted.H1 = headingOne(doc)
@@ -148,7 +148,7 @@ func fromProduct(product Product, install pagemap.Site) (item, bool) {
 	}
 	return item{
 		WPID: product.ID, Type: pagemap.WPProduct, Path: path, URL: product.Permalink, Slug: product.Slug, Status: product.Status,
-		Title: product.Name, Excerpt: product.ShortDescription, ContentHash: field.Hash(product.Description),
+		Title: product.Name, Excerpt: product.ShortDescription, ContentHash: block.BodyHash(product.Description),
 		Content: product.Description, HasContent: true, Terms: product.Categories, Modified: product.Modified,
 	}, true
 }

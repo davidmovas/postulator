@@ -14,7 +14,31 @@ import (
 )
 
 func snapshotOf(pageID string, side block.Side, raw string, at time.Time) block.Snapshot {
-	return block.Snapshot{PageID: pageID, Side: side, Raw: raw, Hash: block.Hash(raw), Kind: block.Parse(raw).Kind, ObservedAt: at}
+	return block.Snapshot{PageID: pageID, Side: side, Raw: raw, Hash: block.BodyHash(raw), Kind: block.Parse(raw).Kind, ObservedAt: at}
+}
+
+func TestPageBodyRepoRecordHashesTheBytesTheSiteHashes(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	page := sqlitetest.Page(t, store, owner.ID, "/tb-500/")
+	repo := sqlite.NewPageBodyRepo(store)
+
+	ours := "\r\n<p>Ours, with the line endings the editor left.</p>\r\n"
+	if err := repo.Record(t.Context(), page.ID, ours, sqlitetest.Stamp); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	if err := repo.Observe(t.Context(), snapshotOf(page.ID, block.Current, ours, sqlitetest.Stamp.Add(time.Hour))); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	current, base, found, err := repo.Get(t.Context(), page.ID)
+	if err != nil || !found {
+		t.Fatalf("Get = found %t, %v", found, err)
+	}
+	if current.Hash != base.Hash || current.Hash != block.BodyHash(ours) {
+		t.Fatalf("current %q base %q, want both the site's hash %q of the bytes we wrote", current.Hash, base.Hash, block.BodyHash(ours))
+	}
 }
 
 func TestPageBodyRepoObserveKeepsTheBase(t *testing.T) {

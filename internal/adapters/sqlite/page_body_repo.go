@@ -41,7 +41,7 @@ func (r *PageBodyRepo) Observe(ctx context.Context, snapshot block.Snapshot) err
 }
 
 func (r *PageBodyRepo) Record(ctx context.Context, pageID, raw string, at time.Time) error {
-	snapshot := block.Snapshot{PageID: pageID, Raw: raw, Hash: block.Hash(raw), Kind: block.Parse(raw).Kind, ObservedAt: at}
+	snapshot := block.Snapshot{PageID: pageID, Raw: raw, Hash: block.BodyHash(raw), Kind: block.Parse(raw).Kind, ObservedAt: at}
 	return r.store.Do(ctx, func(c context.Context) error {
 		if err := r.write(c, upsertBody, snapshot, block.Current, "record the written body"); err != nil {
 			return err

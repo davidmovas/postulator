@@ -127,7 +127,7 @@ func newScenario(t *testing.T) *scenario {
 func contentItem(id int64, wpType, path, title, raw string) observe.ContentItem {
 	return observe.ContentItem{
 		ID: id, Type: wpType, Path: path, Slug: pagemap.Slug(path), Status: "publish", Title: title,
-		ContentHash: field.Hash(raw), Modified: earlier,
+		ContentHash: block.BodyHash(raw), Modified: earlier,
 	}
 }
 
@@ -154,7 +154,7 @@ func withExcerpt(item observe.ContentItem, excerpt string) observe.ContentItem {
 }
 
 func rawOf(content string) observe.Raw {
-	return observe.Raw{Content: content, Hash: field.Hash(content)}
+	return observe.Raw{Content: content, Hash: block.BodyHash(content)}
 }
 
 func (s *scenario) run(t *testing.T, opts observe.Options) observe.State {
@@ -602,8 +602,8 @@ func TestOurOwnWriteRaisesNoFinding(t *testing.T) {
 	s := newScenario(t)
 	tb := s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished})
 	s.stores.bodies["tb"] = map[block.Side]block.Snapshot{
-		block.Current: {PageID: "tb", Side: block.Current, Raw: tb500Raw, Hash: field.Hash(tb500Raw), Kind: block.Classic, ObservedAt: earlier},
-		block.Base:    {PageID: "tb", Side: block.Base, Raw: tb500Raw, Hash: field.Hash(tb500Raw), Kind: block.Classic, ObservedAt: earlier},
+		block.Current: {PageID: "tb", Side: block.Current, Raw: tb500Raw, Hash: block.BodyHash(tb500Raw), Kind: block.Classic, ObservedAt: earlier},
+		block.Base:    {PageID: "tb", Side: block.Base, Raw: tb500Raw, Hash: block.BodyHash(tb500Raw), Kind: block.Classic, ObservedAt: earlier},
 	}
 
 	s.run(t, observe.Options{})
@@ -615,7 +615,7 @@ func TestOurOwnWriteRaisesNoFinding(t *testing.T) {
 	s.plugin.raws[tb500ID] = rawOf(edited)
 	for i := range s.plugin.items {
 		if s.plugin.items[i].ID == tb500ID {
-			s.plugin.items[i].ContentHash = field.Hash(edited)
+			s.plugin.items[i].ContentHash = block.BodyHash(edited)
 			s.plugin.items[i].Modified = start.Add(time.Minute)
 		}
 	}
@@ -633,7 +633,7 @@ func TestOurOwnWriteRaisesNoFinding(t *testing.T) {
 	s.plugin.raws[tb500ID] = rawOf(tb500Raw)
 	for i := range s.plugin.items {
 		if s.plugin.items[i].ID == tb500ID {
-			s.plugin.items[i].ContentHash = field.Hash(tb500Raw)
+			s.plugin.items[i].ContentHash = block.BodyHash(tb500Raw)
 			s.plugin.items[i].Modified = start.Add(2 * time.Hour)
 		}
 	}

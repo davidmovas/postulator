@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -56,6 +57,7 @@ type syncHarness struct {
 	identities *sqlite.PageIdentityRepo
 	findings   *sqlite.FindingRepo
 	fields     *sqlite.PageFieldRepo
+	bodies     *sqlite.PageBodyRepo
 	siteID     string
 	check      run.Checkpoint
 	params     map[string]any
@@ -94,7 +96,7 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 
 	return &syncHarness{
 		store: store, server: server, bus: bus, clock: fake,
-		pages: pageRepo, links: linkRepo, identities: identityRepo, findings: findingRepo, fields: fieldRepo,
+		pages: pageRepo, links: linkRepo, identities: identityRepo, findings: findingRepo, fields: fieldRepo, bodies: bodyRepo,
 		siteID: owner.ID, check: run.NewCheckpoint(), params: map[string]any{},
 		deps: steps.Deps{
 			Pages: pageRepo, Links: linkRepo, Sites: siteRepo, SiteWriter: siteRepo,
@@ -613,6 +615,55 @@ func TestSyncSiteReadsTheStockManagementAsTheStoreSendsIt(t *testing.T) {
 		if fact.ManageStock != string(want) {
 			t.Errorf("variation %d manages stock %q, want %q", variations[i].ID, fact.ManageStock, want)
 		}
+	}
+}
+
+func TestSyncSiteRaisesNothingOverAProductWithoutADescription(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	h.server.Seed(wptest.Item{
+		Type: wptest.TypeProduct, Title: "Plain", Slug: "plain", Status: "publish", RegularPrice: "9.90", SKU: "PLAIN",
+	})
+
+	h.all(t)
+	h.restart(t)
+	h.fullWalk(t)
+
+	changed, err := h.findings.OpenBySite(t.Context(), h.siteID, finding.BodyChangedOnSite)
+	if err != nil {
+		t.Fatalf("list the findings: %v", err)
+	}
+	if len(changed) != 0 {
+		t.Fatalf("a product the client never described raised %+v", changed)
+	}
+}
+
+func TestSyncSiteRaisesNothingOverABodyWeWrote(t *testing.T) {
+	t.Parallel()
+
+	ours := "\r\n<p>Ours, with the line endings the editor left.</p>\r\n"
+	h := newSyncHarness(t, 0)
+	h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Ours", Slug: "ours", Content: ours, Status: "publish"})
+	h.all(t)
+
+	page := h.byPath(t, "/ours/")
+	if err := h.deps.Bodies.Record(t.Context(), page.ID, ours, h.clock.Now()); err != nil {
+		t.Fatalf("record our write: %v", err)
+	}
+	h.restart(t)
+	h.fullWalk(t)
+
+	changed, err := h.findings.OpenBySite(t.Context(), h.siteID, finding.BodyChangedOnSite)
+	if err != nil {
+		t.Fatalf("list the findings: %v", err)
+	}
+	if len(changed) != 0 {
+		t.Fatalf("the body we wrote raised %+v", changed)
+	}
+	current, base, _, err := h.bodies.Get(t.Context(), page.ID)
+	if err != nil || current.Hash != base.Hash {
+		t.Fatalf("current %q base %q (%v), want one hash for the body we wrote", current.Hash, base.Hash, err)
 	}
 }
 

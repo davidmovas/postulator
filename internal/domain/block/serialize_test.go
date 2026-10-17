@@ -81,3 +81,20 @@ func TestHashIsStableAcrossLineEndingsAndOuterWhitespace(t *testing.T) {
 		t.Error("two blocks with different text share a hash")
 	}
 }
+
+func TestBodyHashIsTheSitesHashOfTheExactBytes(t *testing.T) {
+	t.Parallel()
+
+	if block.BodyHash("<p>a</p>\r\n") == block.BodyHash("<p>a</p>\n") {
+		t.Error("a CRLF does not change the body hash, so a body the site holds with CRLF would never match")
+	}
+	if block.BodyHash(" <p>a</p>") == block.BodyHash("<p>a</p>") {
+		t.Error("outer whitespace does not change the body hash")
+	}
+	if got := block.BodyHash(""); got != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" {
+		t.Errorf("the body hash of an empty body is %q, want sha256 of nothing as the site answers it", got)
+	}
+	if len(block.BodyHash("x")) != 64 {
+		t.Errorf("the body hash is not hex sha256: %q", block.BodyHash("x"))
+	}
+}

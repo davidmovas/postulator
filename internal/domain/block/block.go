@@ -50,6 +50,11 @@ func Hash(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func BodyHash(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
+
 func (b Block) Text() string {
 	if b.Dynamic || b.Kind == Shortcode {
 		return ""
