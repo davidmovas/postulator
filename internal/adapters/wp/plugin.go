@@ -31,7 +31,9 @@ const (
 	PluginVersion = "1.4.0"
 )
 
-var requiredCapabilities = []string{"bulk", "seo_meta", CapabilitySEOMetaRead, "content_hash", CapabilityRaw, CapabilityPreview}
+var requiredCapabilities = []string{
+	"bulk", "seo_meta", CapabilitySEOMetaRead, "content_hash", CapabilityRaw, CapabilityPreview, CapabilityRendered,
+}
 
 type PreviewLink struct {
 	ExpiresAt time.Time

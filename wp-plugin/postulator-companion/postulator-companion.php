@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 const VERSION             = '1.4.0';
 const NAMESPACE_PATH      = 'postulator/v1';
-const CAPABILITIES        = array( 'bulk', 'seo_meta', 'seo_meta_read', 'content_hash', 'raw', 'preview' );
+const CAPABILITIES        = array( 'bulk', 'seo_meta', 'seo_meta_read', 'content_hash', 'raw', 'preview', 'rendered' );
 const TYPES               = array( 'page', 'post', 'product', 'product_cat' );
 const TERM_TYPES          = array( 'product_cat' );
 const DEFAULT_LIMIT       = 100;

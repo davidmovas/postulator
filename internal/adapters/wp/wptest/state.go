@@ -39,6 +39,7 @@ type Item struct {
 	Title          string
 	H1             string
 	Content        string
+	Filtered       string
 	Excerpt        string
 	Slug           string
 	Status         string

@@ -63,6 +63,43 @@ function rendered_content( \WP_Post $post ): string {
 	return $rendered;
 }
 
+function filtered_content( \WP_Post $post ): string {
+	$saved_query = isset( $GLOBALS['wp_query'] ) ? $GLOBALS['wp_query'] : null;
+	$saved_main  = isset( $GLOBALS['wp_the_query'] ) ? $GLOBALS['wp_the_query'] : null;
+	$saved_post  = isset( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
+
+	$query_args = array(
+		'post_type'           => (string) $post->post_type,
+		'post_status'         => 'any',
+		'posts_per_page'      => 1,
+		'no_found_rows'       => true,
+		'ignore_sticky_posts' => true,
+	);
+	if ( 'page' === $post->post_type ) {
+		$query_args['page_id'] = (int) $post->ID;
+	} else {
+		$query_args['p'] = (int) $post->ID;
+	}
+
+	$query                   = new \WP_Query( $query_args );
+	$GLOBALS['wp_query']     = $query;
+	$GLOBALS['wp_the_query'] = $query;
+
+	$content = '';
+	if ( $query->have_posts() ) {
+		$query->the_post();
+		$content = (string) apply_filters( 'the_content', $post->post_content );
+	}
+
+	$GLOBALS['wp_query']     = $saved_query;
+	$GLOBALS['wp_the_query'] = $saved_main;
+	$GLOBALS['post']         = $saved_post;
+	if ( $saved_post instanceof \WP_Post ) {
+		setup_postdata( $saved_post );
+	}
+	return $content;
+}
+
 function first_h1( string $rendered ): string {
 	$document = load_dom( $rendered );
 	if ( null !== $document ) {

@@ -194,6 +194,35 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /content/{id}/rendered:
+    get:
+      operationId: getRenderedContent
+      summary: Read a post's content as the front end filters it, without the theme.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. The
+        stored post_content runs through the_content inside a singular main
+        query for the post, after the_post(), so whatever a shortcode, a block
+        or a snippet adds to the content area on the front end is here, the
+        snippets that check is_singular, in_the_loop or is_main_query
+        included, while the theme's header, footer and sidebars are not. The
+        hash is the sha256 of the answered content. Advertised as the
+        capability rendered from plugin version 1.4.0; an older plugin answers
+        404 with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: The filtered content and its hash.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderedContent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /content/{id}/preview:
     post:
       operationId: createPreviewLink
@@ -346,8 +375,8 @@ components:
           type: array
           description: >-
             For version 1.4.0 this is exactly bulk, seo_meta, seo_meta_read,
-            content_hash, raw and preview, in that order, the same list as
-            1.2.0; 1.3.0 was never released. A 1.1.0 plugin lists
+            content_hash, raw, preview and rendered, in that order; 1.2.0
+            listed the first six and 1.3.0 was never released. A 1.1.0 plugin lists
             the same list without seo_meta_read and serves no read of the SEO
             meta; a 1.0.0 plugin lists neither that nor preview.
           items:
@@ -359,6 +388,7 @@ components:
               - content_hash
               - raw
               - preview
+              - rendered
         seoPlugin:
           type: string
           enum:
@@ -594,6 +624,26 @@ components:
         content:
           type: string
           description: The stored post_content, unmodified.
+        contentHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+    RenderedContent:
+      type: object
+      required:
+        - id
+        - type
+        - content
+        - contentHash
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          description: The post type of the content post.
+        content:
+          type: string
+          description: The post_content after the_content, theme-free.
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"

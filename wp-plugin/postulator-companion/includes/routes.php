@@ -61,6 +61,16 @@ function register_routes(): void {
 
 	register_rest_route(
 		NAMESPACE_PATH,
+		'/content/(?P<id>\d+)/rendered',
+		array(
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => __NAMESPACE__ . '\\rendered_get',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
 		'/content/(?P<id>\d+)/preview',
 		array(
 			'methods'             => \WP_REST_Server::CREATABLE,
@@ -247,6 +257,24 @@ function raw_get( \WP_REST_Request $request ) {
 	}
 
 	$content = (string) $post->post_content;
+	return new \WP_REST_Response(
+		array(
+			'id'          => (int) $post->ID,
+			'type'        => (string) $post->post_type,
+			'content'     => $content,
+			'contentHash' => content_hash( $content ),
+		),
+		200
+	);
+}
+
+function rendered_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$content = filtered_content( $post );
 	return new \WP_REST_Response(
 		array(
 			'id'          => (int) $post->ID,

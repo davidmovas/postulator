@@ -53,11 +53,12 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 	t.Parallel()
 
 	want := map[string][]string{
-		"/manifest":             {"get"},
-		"/content":              {"get"},
-		"/seo-meta/{id}":        {"get", "put"},
-		"/content/{id}/raw":     {"get", "put"},
-		"/content/{id}/preview": {"post"},
+		"/manifest":              {"get"},
+		"/content":               {"get"},
+		"/seo-meta/{id}":         {"get", "put"},
+		"/content/{id}/raw":      {"get", "put"},
+		"/content/{id}/preview":  {"post"},
+		"/content/{id}/rendered": {"get"},
 	}
 
 	routes := documentedRoutes(t)
@@ -124,6 +125,9 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "href classification", snippet: "classified as\n            pagemap.Site.Resolve classifies it"},
 		{name: "href host and port", snippet: "its host and port equal the site's host and port"},
 		{name: "preview link schema", snippet: "\n    PreviewLink:\n"},
+		{name: "rendered content schema", snippet: "\n    RenderedContent:\n"},
+		{name: "rendered capability", snippet: "\n              - rendered\n"},
+		{name: "rendered inside a singular main query", snippet: "runs through the_content inside a singular main"},
 		{name: "expires at property", snippet: "\n        expiresAt:\n"},
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
@@ -174,6 +178,9 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	}
 	if _, err = client.PreviewLink(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("PreviewLink: %v", err)
+	}
+	if _, err = client.GetRendered(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
+		t.Fatalf("GetRendered: %v", err)
 	}
 
 	documented := documentedRoutes(t)
