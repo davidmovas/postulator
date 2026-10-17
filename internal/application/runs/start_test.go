@@ -45,7 +45,6 @@ func TestAKindWithARecipeOfItsOwnNeverTakesTheTemplates(t *testing.T) {
 			name: "relink", kind: run.KindRelink,
 			want: []string{"resolve_context", "relink_page", "sync_back", "report"},
 		},
-		{name: "repair", kind: run.KindRepair, want: []string{"repair_hierarchy", "sync_back", "report"}},
 		{name: "sync", kind: run.KindSync, want: []string{"sync_site"}},
 	}
 
@@ -89,6 +88,26 @@ func TestARecipeThatDisagreesWithTheKindIsRefused(t *testing.T) {
 	})
 	if !slices.Equal(got, enabledNames(run.RelinkRecipe())) {
 		t.Fatalf("the kind's own recipe was refused: %v", got)
+	}
+}
+
+func TestARepairRunCanNoLongerBeStarted(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+
+	_, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{fixture.pages[0]}, Kind: string(run.KindRepair),
+	})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Start of a repair = %v, want invalid", err)
+	}
+	if !strings.Contains(err.Error(), "never written") || !strings.Contains(err.Error(), "relink") {
+		t.Fatalf("the refusal does not say why and what to start instead: %v", err)
+	}
+	if fixture.engine.queued.SiteID != "" {
+		t.Fatalf("a repair reached the engine: %+v", fixture.engine.queued)
 	}
 }
 
@@ -147,7 +166,7 @@ func TestAStepThatBelongsToAKindIsRefusedInAPageRecipe(t *testing.T) {
 			fixture.specs.siteID = fixture.siteID
 			fixture.specs.spec = template.TemplateSpec{Recipe: []template.StepSpec{
 				{Name: "resolve_context", Enabled: true},
-				{Name: "repair_hierarchy", Enabled: true},
+				{Name: "relink_page", Enabled: true},
 				{Name: "generate_body", Enabled: true},
 			}}
 
@@ -163,7 +182,7 @@ func TestAStepThatBelongsToAKindIsRefusedInAPageRecipe(t *testing.T) {
 			if !errors.IsCode(err, errors.Invalid) {
 				t.Fatalf("Start = %v, want invalid", err)
 			}
-			if !strings.Contains(err.Error(), "repair_hierarchy") || !strings.Contains(err.Error(), "repair") {
+			if !strings.Contains(err.Error(), "relink_page") || !strings.Contains(err.Error(), "relink") {
 				t.Fatalf("the refusal does not name the step and the kind that owns it: %v", err)
 			}
 		})
@@ -207,7 +226,6 @@ func TestARunOverAPageMappedToNothingIsRefusedBeforeItIsQueued(t *testing.T) {
 	}{
 		{name: "generate", kind: run.KindGenerate},
 		{name: "relink", kind: run.KindRelink},
-		{name: "repair", kind: run.KindRepair},
 		{name: "audit", kind: run.KindAudit},
 		{name: "custom", kind: run.KindCustom},
 	}

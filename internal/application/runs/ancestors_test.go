@@ -170,14 +170,6 @@ func TestStartRefusesAnAncestorItCannotWrite(t *testing.T) {
 			links: []chain{{id: "cargo", path: "/bikes/cargo/", mapped: true}},
 			names: "/bikes/",
 		},
-		{
-			name: "the link disagrees with the path",
-			links: []chain{
-				{id: "trikes", path: "/trikes/", mapped: true},
-				{id: "cargo", path: "/bikes/cargo/", parent: "trikes", mapped: true},
-			},
-			names: "/trikes/",
-		},
 	}
 
 	for _, tc := range cases {
@@ -202,6 +194,43 @@ func TestStartRefusesAnAncestorItCannotWrite(t *testing.T) {
 				t.Fatalf("a run whose parent cannot be written reached the engine: %+v", fixture.engine.queued)
 			}
 		})
+	}
+}
+
+func TestStartFollowsTheDerivedParentNotThePath(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "peptides", path: "/peptides/", mapped: true},
+		chain{id: "bpc", path: "/bpc-157/", parent: "peptides", mapped: true},
+	)
+
+	resp, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"bpc"}})
+	if err != nil {
+		t.Fatalf("Start: %v; a flat URL under a breadcrumb parent is the client's site", err)
+	}
+	want := []runs.AddedPage{{PageID: "peptides", Path: "/peptides/", NeededBy: "/bpc-157/"}}
+	if !slices.Equal(resp.Added, want) {
+		t.Fatalf("Added = %+v, want the derived parent %+v", resp.Added, want)
+	}
+	if got := fixture.engine.queued.Targets; !slices.Equal(got, []string{"bpc", "peptides"}) {
+		t.Fatalf("the run targets %v, want the page and its derived parent", got)
+	}
+}
+
+func TestStartLeavesAPageOnTheSiteWithoutAParentAlone(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(chain{id: "setup", path: "/guide/setup/", wpID: onSite(), mapped: true})
+
+	resp, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"setup"}})
+	if err != nil {
+		t.Fatalf("Start: %v; a page already on the site needs no parent to sit under", err)
+	}
+	if len(resp.Added) != 0 {
+		t.Fatalf("Added = %+v, want nothing", resp.Added)
 	}
 }
 

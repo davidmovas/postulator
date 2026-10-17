@@ -267,29 +267,27 @@ func (s *Service) ancestors(ctx context.Context, siteID string, targets []string
 }
 
 func (s *Service) parentOf(ctx context.Context, child pagemap.Page) (pagemap.Page, bool, error) {
-	wanted := pagemap.ParentPath(child.Path)
-	if wanted == "" || wanted == "/" || child.WPType.StoreAddressed() {
+	if child.WPType.StoreAddressed() {
 		return pagemap.Page{}, false, nil
 	}
-
-	missing := invalid("the page map holds no page at "+wanted+", so "+child.Path+
-		" has no parent to sit under; add "+wanted+" to the page map first", "pageIds").
-		WithDetail("parentPath", wanted).WithDetail("path", child.Path)
+	above := pagemap.ParentPath(child.Path)
 	if child.ParentPageID == nil {
-		return pagemap.Page{}, false, missing
+		if above == "" || above == pagemap.RootPath || child.WPID != nil {
+			return pagemap.Page{}, false, nil
+		}
+		return pagemap.Page{}, false, invalid("the page map holds no page at "+above+", so "+child.Path+
+			" has no parent to sit under; add "+above+" to the page map first", "pageIds").
+			WithDetail("parentPath", above).WithDetail("path", child.Path)
 	}
 
 	parent, err := s.pages.Get(ctx, *child.ParentPageID)
 	if errors.IsCode(err, errors.NotFound) {
-		return pagemap.Page{}, false, missing
+		return pagemap.Page{}, false, invalid("the parent of "+child.Path+" is no longer in the page map; "+
+			"observe the site or fix the link on the Pages screen first", "pageIds").
+			WithDetail("path", child.Path)
 	}
 	if err != nil {
 		return pagemap.Page{}, false, err
-	}
-	if parent.Path != wanted {
-		return pagemap.Page{}, false, invalid(child.Path+" is linked to "+parent.Path+" while its path asks for "+
-			wanted+"; fix the link on the Pages screen first", "pageIds").
-			WithDetail("parentPath", wanted).WithDetail("linkedPath", parent.Path).WithDetail("path", child.Path)
 	}
 	return parent, true, nil
 }
@@ -321,6 +319,10 @@ func (s *Service) mapped(ctx context.Context, targets []string) error {
 func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]template.StepSpec, error) {
 	if kind == run.KindRevert {
 		return nil, invalid("a revert is started from the run it undoes, not from a list of pages", "kind")
+	}
+	if kind == run.KindRepair {
+		return nil, invalid("a repair run can no longer be started: the hierarchy is read from the site and never written, "+
+			"so there is nothing to repair; start a relink run to fix the links", "kind")
 	}
 
 	own, owns := kind.Recipe()
