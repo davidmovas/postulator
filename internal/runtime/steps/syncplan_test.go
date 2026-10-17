@@ -171,12 +171,9 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	h.restart(t)
 	h.fullWalk(t)
 
-	stored, err := h.links.ListForPage(t.Context(), espresso.ID)
-	if err != nil {
-		t.Fatalf("list the links: %v", err)
-	}
+	stored := h.rawLinks(t, espresso.ID)
 	if len(stored) != 1 {
-		t.Fatalf("the page carries %d links, want only the one the site still holds: %+v", len(stored), stored)
+		t.Fatalf("the page carries %d raw links, want only the one the site still holds: %+v", len(stored), stored)
 	}
 	if stored[0].ToURL != coffee.Path {
 		t.Fatalf("the kept link points at %q", stored[0].ToURL)
@@ -199,12 +196,9 @@ func TestSyncSiteResolvesARelativeHrefAgainstTheDocument(t *testing.T) {
 	h.all(t)
 
 	coffee := h.byPath(t, "/coffee/")
-	stored, err := h.links.ListForPage(t.Context(), coffee.ID)
-	if err != nil {
-		t.Fatalf("list the links: %v", err)
-	}
+	stored := h.rawLinks(t, coffee.ID)
 	if len(stored) != 1 {
-		t.Fatalf("the page carries %d links, want the one relative href: %+v", len(stored), stored)
+		t.Fatalf("the page carries %d raw links, want the one relative href: %+v", len(stored), stored)
 	}
 	if stored[0].ToURL != "/coffee/espresso/" {
 		t.Fatalf("the relative href resolved to %q, want it under the page as a browser reads it", stored[0].ToURL)

@@ -3,6 +3,7 @@ package steps_test
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -53,6 +55,7 @@ type syncHarness struct {
 	links      *sqlite.PageLinkRepo
 	identities *sqlite.PageIdentityRepo
 	findings   *sqlite.FindingRepo
+	fields     *sqlite.PageFieldRepo
 	siteID     string
 	check      run.Checkpoint
 	params     map[string]any
@@ -91,7 +94,7 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 
 	return &syncHarness{
 		store: store, server: server, bus: bus, clock: fake,
-		pages: pageRepo, links: linkRepo, identities: identityRepo, findings: findingRepo,
+		pages: pageRepo, links: linkRepo, identities: identityRepo, findings: findingRepo, fields: fieldRepo,
 		siteID: owner.ID, check: run.NewCheckpoint(), params: map[string]any{},
 		deps: steps.Deps{
 			Pages: pageRepo, Links: linkRepo, Sites: siteRepo, SiteWriter: siteRepo,
@@ -184,6 +187,16 @@ func (h *syncHarness) byPath(t *testing.T, path string) pagemap.Page {
 	return page
 }
 
+func (h *syncHarness) rawLinks(t *testing.T, pageID string) []pagemap.PageLink {
+	t.Helper()
+
+	stored, err := h.links.ListForPage(t.Context(), pageID)
+	if err != nil {
+		t.Fatalf("list the links: %v", err)
+	}
+	return slices.DeleteFunc(stored, func(link pagemap.PageLink) bool { return link.Source != pagemap.SourceRaw })
+}
+
 func seedSite(t *testing.T, h *syncHarness) {
 	t.Helper()
 
@@ -242,12 +255,9 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 				t.Fatalf("the draft page is %+v", draft)
 			}
 
-			links, err := h.links.ListForPage(t.Context(), child.ID)
-			if err != nil {
-				t.Fatalf("list the links: %v", err)
-			}
-			if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != parent.ID || links[0].Source != pagemap.SourceRaw {
-				t.Fatalf("the links of the child are %+v", links)
+			links := h.rawLinks(t, child.ID)
+			if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != parent.ID {
+				t.Fatalf("the raw links of the child are %+v", links)
 			}
 
 			if seen := h.bus.seen(); len(seen) != 1 || seen[0] != events.PagesChanged {
@@ -555,6 +565,57 @@ func TestSyncSiteGivesAWaitingRowTheProductCreatedForIt(t *testing.T) {
 	}
 }
 
+func TestSyncSiteReadsTheStockManagementAsTheStoreSendsIt(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	product := h.server.Seed(wptest.Item{
+		Type: wptest.TypeProduct, Title: "BPC-157", Slug: "bpc-157", ProductType: "variable", Status: "publish",
+		RegularPrice: "19.90", SKU: "BPC157", StockStatus: "instock", ManageStock: true,
+	})[0]
+	variations := h.server.Seed(
+		wptest.Item{Type: wptest.TypeProductVariation, Parent: product.ID, SKU: "BPC157-5", RegularPrice: "19.90", Choices: []wptest.Choice{{ID: 3, Name: "Size", Option: "5 mg"}}},
+		wptest.Item{Type: wptest.TypeProductVariation, Parent: product.ID, SKU: "BPC157-10", RegularPrice: "29.90", ManageStock: true, Choices: []wptest.Choice{{ID: 3, Name: "Size", Option: "10 mg"}}},
+	)
+
+	h.all(t)
+
+	all, err := h.pages.ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	at := slices.IndexFunc(all, func(p pagemap.Page) bool { return p.WPID != nil && *p.WPID == product.ID })
+	if at < 0 {
+		t.Fatalf("the store's product is not in the map: %+v", all)
+	}
+	values, err := h.fields.ListForPage(t.Context(), all[at].ID)
+	if err != nil {
+		t.Fatalf("list the product's fields: %v", err)
+	}
+	current := func(key field.Key) string {
+		i := slices.IndexFunc(values, func(v field.Value) bool { return v.Key == key })
+		if i < 0 {
+			t.Fatalf("the product carries no %s field: %+v", key, values)
+		}
+		return values[i].Current
+	}
+	if got := current(field.ManageStock); got != string(wp.StockManaged) {
+		t.Errorf("manage_stock = %q, want %q", got, wp.StockManaged)
+	}
+	for i, want := range []wp.StockManagement{wp.StockManagedByParent, wp.StockManaged} {
+		var fact struct {
+			ManageStock string `json:"manageStock"`
+		}
+		raw := current(field.Instance(field.Variation, strconv.FormatInt(variations[i].ID, 10)))
+		if err := json.Unmarshal([]byte(raw), &fact); err != nil {
+			t.Fatalf("decode the variation fact %s: %v", raw, err)
+		}
+		if fact.ManageStock != string(want) {
+			t.Errorf("variation %d manages stock %q, want %q", variations[i].ID, fact.ManageStock, want)
+		}
+	}
+}
+
 func TestSyncSiteDerivesEveryParentFromTheSite(t *testing.T) {
 	t.Parallel()
 
@@ -717,10 +778,7 @@ func TestSyncSiteResolvesALinkWhoseTargetArrivesLater(t *testing.T) {
 
 	child := h.byPath(t, "/espresso/")
 	parent := h.byPath(t, "/coffee/")
-	links, err := h.links.ListForPage(t.Context(), child.ID)
-	if err != nil {
-		t.Fatalf("list the links: %v", err)
-	}
+	links := h.rawLinks(t, child.ID)
 	if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != parent.ID {
 		t.Fatalf("the links of the child are %+v, want the target resolved after the second batch", links)
 	}
