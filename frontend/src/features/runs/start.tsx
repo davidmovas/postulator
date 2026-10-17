@@ -13,7 +13,7 @@ import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../
 import { publishModeLabel, runKindLabel } from "./labels.js";
 import { StartCaps, StartPrice } from "./start-price.js";
 import { TargetTree } from "./start-tree.js";
-import { kindGenerate, kindRevert } from "./statuses.js";
+import { kindGenerate, kindRepair, kindRevert } from "./statuses.js";
 
 const drawerWidth = 688;
 const templateAuto = "";
@@ -60,7 +60,7 @@ export function blockingFindings(estimate: GradedFindings | null): number {
     return (estimate.findings ?? []).filter((finding) => finding.severity === "error").length;
 }
 
-export const startableKinds: readonly string[] = runKinds.filter((kind) => kind !== kindRevert);
+export const startableKinds: readonly string[] = runKinds.filter((kind) => kind !== kindRevert && kind !== kindRepair);
 
 export interface StartRefusal {
     targets: string | null;

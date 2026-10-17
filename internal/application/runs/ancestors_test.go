@@ -219,6 +219,24 @@ func TestStartFollowsTheDerivedParentNotThePath(t *testing.T) {
 	}
 }
 
+func TestStartNeverMakesTheFrontPageAParent(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "home", path: "/", mapped: true},
+		chain{id: "semax", path: "/semax/", parent: "home", mapped: true},
+	)
+
+	resp, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"semax"}})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if len(resp.Added) != 0 || !slices.Equal(fixture.engine.queued.Targets, []string{"semax"}) {
+		t.Fatalf("Added = %+v, targets %v; the front page is never written first as a parent", resp.Added, fixture.engine.queued.Targets)
+	}
+}
+
 func TestStartLeavesAPageOnTheSiteWithoutAParentAlone(t *testing.T) {
 	t.Parallel()
 

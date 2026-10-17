@@ -31,6 +31,7 @@ export const retryInputsExpired: RetryBlockedReason = "inputs_expired";
 
 export const kindGenerate: RunKind = "generate";
 export const kindRevert: RunKind = "revert";
+export const kindRepair: RunKind = "repair";
 
 export const stepPublish: StepName = "publish";
 export const stepValidate: StepName = "validate";

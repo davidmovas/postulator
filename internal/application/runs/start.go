@@ -289,6 +289,9 @@ func (s *Service) parentOf(ctx context.Context, child pagemap.Page) (pagemap.Pag
 	if err != nil {
 		return pagemap.Page{}, false, err
 	}
+	if parent.Path == pagemap.RootPath {
+		return pagemap.Page{}, false, nil
+	}
 	return parent, true, nil
 }
 
@@ -358,7 +361,7 @@ func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]templ
 }
 
 func ownerOf(step string) string {
-	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync, run.KindRevert} {
+	for _, kind := range []run.Kind{run.KindRelink, run.KindSync, run.KindRevert} {
 		own, _ := kind.Recipe()
 		if slices.Contains(stepsOf(own), step) {
 			return string(kind)

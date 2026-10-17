@@ -21,9 +21,10 @@ describe("what the drawer says a kind does", () => {
         expect(kindDoes("teleport")).toBe("");
     });
 
-    it("offers every kind but a revert, which starts from the run it undoes", () => {
+    it("offers every kind but a revert, which starts from the run it undoes, and a repair, which nothing writes any more", () => {
         expect(startableKinds).not.toContain("revert");
-        expect(startableKinds).toHaveLength(runKinds.length - 1);
+        expect(startableKinds).not.toContain("repair");
+        expect(startableKinds).toHaveLength(runKinds.length - 2);
     });
 
     it("tells a relink apart from a generate", () => {
