@@ -223,6 +223,47 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /meta/{id}:
+    get:
+      operationId: getMeta
+      summary: Read the post meta values of the keys asked, and nothing else.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found, and
+        the user must be allowed edit_post on the post. Only the keys named in
+        keys are read, at most 50 of them. A key is never read when
+        is_protected_meta says it is protected, which covers every key that
+        starts with an underscore, the store's own keys and the SEO plugins'
+        underscored keys among them: such a request answers 400 with the code
+        meta_key_denied and data.keys naming the refused keys, and reads
+        nothing. A key the post does not carry answers null. Advertised as the
+        capability meta from plugin version 1.4.0; an older plugin answers 404
+        with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+        - name: keys
+          in: query
+          required: true
+          description: >-
+            Comma-separated meta keys, at most 50 once trimmed and
+            deduplicated. More answer 400 too_many_keys, none answers 400
+            invalid_param.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The value of every key asked, null for a key the post does not carry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaValues"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /content/{id}/preview:
     post:
       operationId: createPreviewLink
@@ -375,7 +416,7 @@ components:
           type: array
           description: >-
             For version 1.4.0 this is exactly bulk, seo_meta, seo_meta_read,
-            content_hash, raw, preview and rendered, in that order; 1.2.0
+            content_hash, raw, preview, rendered and meta, in that order; 1.2.0
             listed the first six and 1.3.0 was never released. A 1.1.0 plugin lists
             the same list without seo_meta_read and serves no read of the SEO
             meta; a 1.0.0 plugin lists neither that nor preview.
@@ -389,6 +430,7 @@ components:
               - raw
               - preview
               - rendered
+              - meta
         seoPlugin:
           type: string
           enum:
@@ -627,6 +669,22 @@ components:
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"
+    MetaValues:
+      type: object
+      required:
+        - id
+        - meta
+      properties:
+        id:
+          type: integer
+          format: int64
+        meta:
+          type: object
+          description: >-
+            Each key asked, with the value get_post_meta answers for it as a
+            single value, a string or the unserialized structure, or null when
+            the post carries no such key.
+          additionalProperties: true
     RenderedContent:
       type: object
       required:

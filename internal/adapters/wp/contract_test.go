@@ -59,6 +59,7 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 		"/content/{id}/raw":      {"get", "put"},
 		"/content/{id}/preview":  {"post"},
 		"/content/{id}/rendered": {"get"},
+		"/meta/{id}":             {"get"},
 	}
 
 	routes := documentedRoutes(t)
@@ -128,6 +129,11 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "rendered content schema", snippet: "\n    RenderedContent:\n"},
 		{name: "rendered capability", snippet: "\n              - rendered\n"},
 		{name: "rendered inside a singular main query", snippet: "runs through the_content inside a singular main"},
+		{name: "meta values schema", snippet: "\n    MetaValues:\n"},
+		{name: "meta capability", snippet: "\n              - meta\n"},
+		{name: "meta deny rule", snippet: "is_protected_meta says it is protected"},
+		{name: "meta refusal code", snippet: "meta_key_denied"},
+		{name: "meta key ceiling", snippet: "too_many_keys"},
 		{name: "expires at property", snippet: "\n        expiresAt:\n"},
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
@@ -181,6 +187,9 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	}
 	if _, err = client.GetRendered(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("GetRendered: %v", err)
+	}
+	if _, err = client.GetMeta(t.Context(), wp.TypePage, seeded[0].ID, []string{"color"}); err != nil {
+		t.Fatalf("GetMeta: %v", err)
 	}
 
 	documented := documentedRoutes(t)

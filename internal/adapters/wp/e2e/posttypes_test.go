@@ -33,6 +33,7 @@ func TestThePostRoutesServeContentTypesOnly(t *testing.T) {
 	}{
 		{method: http.MethodGet, path: rawPath(block.ID)},
 		{method: http.MethodGet, path: renderedPath(block.ID)},
+		{method: http.MethodGet, path: metaPath(block.ID, "color")},
 		{method: http.MethodPut, path: rawPath(block.ID), body: map[string]any{"content": "<p>Taken.</p>"}},
 		{method: http.MethodGet, path: fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", block.ID)},
 		{method: http.MethodPut, path: fmt.Sprintf("/wp-json/postulator/v1/seo-meta/%d", block.ID), body: map[string]any{"title": "Taken"}},

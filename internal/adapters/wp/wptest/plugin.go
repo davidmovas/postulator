@@ -72,6 +72,7 @@ func (s *Server) routePlugin(mux *http.ServeMux) {
 	mux.HandleFunc("PUT "+pluginNamespace+"/content/{id}/raw", s.handleRawPut)
 	mux.HandleFunc("POST "+pluginNamespace+"/content/{id}/preview", s.handlePreview)
 	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/rendered", s.handleRendered)
+	mux.HandleFunc("GET "+pluginNamespace+"/meta/{id}", s.handleMeta)
 }
 
 func (s *Server) pluginMissing(w http.ResponseWriter) bool {

@@ -71,6 +71,16 @@ function register_routes(): void {
 
 	register_rest_route(
 		NAMESPACE_PATH,
+		'/meta/(?P<id>\d+)',
+		array(
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => __NAMESPACE__ . '\\meta_get',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
 		'/content/(?P<id>\d+)/preview',
 		array(
 			'methods'             => \WP_REST_Server::CREATABLE,
@@ -281,6 +291,54 @@ function rendered_get( \WP_REST_Request $request ) {
 			'type'        => (string) $post->post_type,
 			'content'     => $content,
 			'contentHash' => content_hash( $content ),
+		),
+		200
+	);
+}
+
+function meta_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$raw = text_param( $request, 'keys' );
+	if ( is_wp_error( $raw ) ) {
+		return $raw;
+	}
+	$keys = array_values( array_unique( array_filter( array_map( 'trim', explode( ',', $raw ) ), 'strlen' ) ) );
+	if ( empty( $keys ) ) {
+		return invalid( 'invalid_param', 'keys must name at least one meta key' );
+	}
+	if ( count( $keys ) > MAX_META_KEYS ) {
+		return invalid( 'too_many_keys', 'keys names more than ' . MAX_META_KEYS . ' meta keys' );
+	}
+
+	$denied = array();
+	foreach ( $keys as $key ) {
+		if ( is_protected_meta( $key, 'post' ) ) {
+			$denied[] = $key;
+		}
+	}
+	if ( ! empty( $denied ) ) {
+		return new \WP_Error(
+			'meta_key_denied',
+			'a protected meta key is never read: ' . implode( ', ', $denied ),
+			array(
+				'status' => 400,
+				'keys'   => $denied,
+			)
+		);
+	}
+
+	$values = array();
+	foreach ( $keys as $key ) {
+		$values[ $key ] = metadata_exists( 'post', (int) $post->ID, $key ) ? get_post_meta( (int) $post->ID, $key, true ) : null;
+	}
+	return new \WP_REST_Response(
+		array(
+			'id'   => (int) $post->ID,
+			'meta' => (object) $values,
 		),
 		200
 	);

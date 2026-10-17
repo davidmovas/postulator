@@ -32,7 +32,7 @@ const (
 )
 
 var requiredCapabilities = []string{
-	"bulk", "seo_meta", CapabilitySEOMetaRead, "content_hash", CapabilityRaw, CapabilityPreview, CapabilityRendered,
+	"bulk", "seo_meta", CapabilitySEOMetaRead, "content_hash", CapabilityRaw, CapabilityPreview, CapabilityRendered, CapabilityMeta,
 }
 
 type PreviewLink struct {

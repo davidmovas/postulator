@@ -62,6 +62,7 @@ func TestNothingTheClientSendsNamesTheProgram(t *testing.T) {
 		}},
 		{name: "PreviewLink", call: func() error { _, err := client.PreviewLink(ctx, wp.TypePage, draft.ID); return err }},
 		{name: "GetRendered", call: func() error { _, err := client.GetRendered(ctx, wp.TypePage, page.ID); return err }},
+		{name: "GetMeta", call: func() error { _, err := client.GetMeta(ctx, wp.TypePage, page.ID, []string{"color"}); return err }},
 		{name: "UploadMedia", call: func() error {
 			_, err := client.UploadMedia(ctx, wp.Media{Filename: "coffee-beans.png", ContentType: "image/png", Bytes: []byte("\x89PNG"), Alt: "Roasted beans", Title: "Beans"})
 			return err

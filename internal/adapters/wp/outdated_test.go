@@ -9,7 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 )
 
-var currentCapabilities = []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered"}
+var currentCapabilities = []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta"}
 
 func TestAnOutdatedPluginIsNamedByVersionAndCapabilities(t *testing.T) {
 	t.Parallel()
