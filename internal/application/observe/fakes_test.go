@@ -1,0 +1,603 @@
+package observe_test
+
+import (
+	"context"
+	"slices"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
+)
+
+type stores struct {
+	mu         sync.Mutex
+	sites      map[string]site.Site
+	pages      map[string]pagemap.Page
+	identities map[string]pagemap.Identity
+	terms      map[string][]pagemap.Term
+	fields     map[string]map[field.Key]field.Value
+	bodies     map[string]map[block.Side]block.Snapshot
+	written    map[string][]block.Written
+	renders    map[string]render.Record
+	links      map[string]map[pagemap.LinkSource][]pagemap.PageLink
+	findings   map[string]finding.Finding
+	published  []events.Type
+}
+
+func newStores(owner site.Site) *stores {
+	return &stores{
+		sites:      map[string]site.Site{owner.ID: owner},
+		pages:      map[string]pagemap.Page{},
+		identities: map[string]pagemap.Identity{},
+		terms:      map[string][]pagemap.Term{},
+		fields:     map[string]map[field.Key]field.Value{},
+		bodies:     map[string]map[block.Side]block.Snapshot{},
+		written:    map[string][]block.Written{},
+		renders:    map[string]render.Record{},
+		links:      map[string]map[pagemap.LinkSource][]pagemap.PageLink{},
+		findings:   map[string]finding.Finding{},
+	}
+}
+
+func (s *stores) Get(_ context.Context, id string) (site.Site, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	owner, ok := s.sites[id]
+	if !ok {
+		return site.Site{}, errors.New(errors.NotFound, "no such site")
+	}
+	return owner, nil
+}
+
+func (s *stores) Update(_ context.Context, owner site.Site) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sites[owner.ID] = owner
+	return nil
+}
+
+type pageStore struct{ s *stores }
+
+func (p pageStore) ListBySite(_ context.Context, siteID string) ([]pagemap.Page, error) {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	out := make([]pagemap.Page, 0, len(p.s.pages))
+	for id := range p.s.pages {
+		if p.s.pages[id].SiteID == siteID {
+			out = append(out, p.s.pages[id])
+		}
+	}
+	return out, nil
+}
+
+func (p pageStore) Get(_ context.Context, id string) (pagemap.Page, error) {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	page, ok := p.s.pages[id]
+	if !ok {
+		return pagemap.Page{}, errors.New(errors.NotFound, "no such page")
+	}
+	return page, nil
+}
+
+func (p pageStore) Insert(_ context.Context, page pagemap.Page) error {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	for id := range p.s.pages {
+		if p.s.pages[id].SiteID == page.SiteID && p.s.pages[id].Path == page.Path {
+			return errors.New(errors.Conflict, "path taken")
+		}
+	}
+	p.s.pages[page.ID] = page
+	return nil
+}
+
+func (p pageStore) Update(_ context.Context, page pagemap.Page) error {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	if _, ok := p.s.pages[page.ID]; !ok {
+		return errors.New(errors.NotFound, "no such page")
+	}
+	p.s.pages[page.ID] = page
+	return nil
+}
+
+type identityStore struct{ s *stores }
+
+func (i identityStore) Put(_ context.Context, identity pagemap.Identity) error {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	i.s.identities[identity.PageID] = identity
+	return nil
+}
+
+func (i identityStore) ListBySite(_ context.Context, siteID string) ([]pagemap.Identity, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	out := make([]pagemap.Identity, 0)
+	for pageID := range i.s.identities {
+		if i.s.pages[pageID].SiteID == siteID {
+			out = append(out, i.s.identities[pageID])
+		}
+	}
+	return out, nil
+}
+
+func (i identityStore) ReplaceTerms(_ context.Context, pageID string, terms []pagemap.Term) error {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	i.s.terms[pageID] = terms
+	return nil
+}
+
+func (i identityStore) ListTerms(_ context.Context, pageID string) ([]pagemap.Term, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	return i.s.terms[pageID], nil
+}
+
+type fieldStore struct{ s *stores }
+
+func (f fieldStore) Observe(_ context.Context, pageID string, values []field.Value) error {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	if f.s.fields[pageID] == nil {
+		f.s.fields[pageID] = map[field.Key]field.Value{}
+	}
+	for i := range values {
+		value := values[i]
+		kept, exists := f.s.fields[pageID][value.Key]
+		if exists {
+			value.Base, value.BaseHash = kept.Base, kept.BaseHash
+			value.WrittenAt, value.WrittenRunID = kept.WrittenAt, kept.WrittenRunID
+		}
+		f.s.fields[pageID][value.Key] = value
+	}
+	return nil
+}
+
+func (f fieldStore) Agree(_ context.Context, pageID string, key field.Key, at time.Time) error {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	value, ok := f.s.fields[pageID][key]
+	if !ok {
+		return errors.New(errors.NotFound, "no such field")
+	}
+	value.Base, value.BaseHash, value.ObservedAt = value.Current, value.CurrentHash, at
+	f.s.fields[pageID][key] = value
+	return nil
+}
+
+func (f fieldStore) ListForPage(_ context.Context, pageID string) ([]field.Value, error) {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	out := make([]field.Value, 0, len(f.s.fields[pageID]))
+	for key := range f.s.fields[pageID] {
+		out = append(out, f.s.fields[pageID][key])
+	}
+	return out, nil
+}
+
+func (f fieldStore) ListBySite(_ context.Context, siteID string) (map[string][]field.Value, error) {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	out := make(map[string][]field.Value)
+	for pageID, values := range f.s.fields {
+		if f.s.pages[pageID].SiteID != siteID {
+			continue
+		}
+		for key := range values {
+			out[pageID] = append(out[pageID], values[key])
+		}
+	}
+	return out, nil
+}
+
+type bodyStore struct{ s *stores }
+
+func (b bodyStore) Observe(_ context.Context, snapshot block.Snapshot) error {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	if b.s.bodies[snapshot.PageID] == nil {
+		b.s.bodies[snapshot.PageID] = map[block.Side]block.Snapshot{}
+	}
+	snapshot.Side = block.Current
+	b.s.bodies[snapshot.PageID][block.Current] = snapshot
+	if _, hasBase := b.s.bodies[snapshot.PageID][block.Base]; !hasBase {
+		base := snapshot
+		base.Side = block.Base
+		b.s.bodies[snapshot.PageID][block.Base] = base
+	}
+	return nil
+}
+
+func (b bodyStore) Get(_ context.Context, pageID string) (current, base block.Snapshot, found bool, err error) {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	sides, ok := b.s.bodies[pageID]
+	if !ok {
+		return block.Snapshot{}, block.Snapshot{}, false, nil
+	}
+	return sides[block.Current], sides[block.Base], true, nil
+}
+
+func (b bodyStore) ListBySite(_ context.Context, siteID string) ([]block.Snapshot, error) {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	out := make([]block.Snapshot, 0)
+	for pageID, sides := range b.s.bodies {
+		if b.s.pages[pageID].SiteID != siteID {
+			continue
+		}
+		for side := range sides {
+			out = append(out, sides[side])
+		}
+	}
+	return out, nil
+}
+
+func (b bodyStore) ListWritten(_ context.Context, pageID string) ([]block.Written, error) {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	return b.s.written[pageID], nil
+}
+
+type renderStore struct{ s *stores }
+
+func (r renderStore) Put(_ context.Context, record render.Record) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.renders[record.PageID] = record
+	return nil
+}
+
+func (r renderStore) Get(_ context.Context, pageID string) (render.Record, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	record, ok := r.s.renders[pageID]
+	if !ok {
+		return render.Record{}, errors.New(errors.NotFound, "no render")
+	}
+	return record, nil
+}
+
+func (r renderStore) ListBySite(_ context.Context, siteID string) ([]render.Record, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	out := make([]render.Record, 0)
+	for pageID := range r.s.renders {
+		if r.s.pages[pageID].SiteID == siteID {
+			out = append(out, r.s.renders[pageID])
+		}
+	}
+	return out, nil
+}
+
+type linkStore struct{ s *stores }
+
+func (l linkStore) ReplaceForPage(_ context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error {
+	l.s.mu.Lock()
+	defer l.s.mu.Unlock()
+	if l.s.links[pageID] == nil {
+		l.s.links[pageID] = map[pagemap.LinkSource][]pagemap.PageLink{}
+	}
+	l.s.links[pageID][source] = links
+	return nil
+}
+
+func (l linkStore) ListForPage(_ context.Context, pageID string) ([]pagemap.PageLink, error) {
+	l.s.mu.Lock()
+	defer l.s.mu.Unlock()
+	out := make([]pagemap.PageLink, 0)
+	for _, source := range []pagemap.LinkSource{pagemap.SourceRaw, pagemap.SourceRender} {
+		out = append(out, l.s.links[pageID][source]...)
+	}
+	return out, nil
+}
+
+func (l linkStore) ListBySite(_ context.Context, siteID string) ([]pagemap.PageLink, error) {
+	l.s.mu.Lock()
+	defer l.s.mu.Unlock()
+	out := make([]pagemap.PageLink, 0)
+	for pageID, sources := range l.s.links {
+		if l.s.pages[pageID].SiteID != siteID {
+			continue
+		}
+		for _, source := range []pagemap.LinkSource{pagemap.SourceRaw, pagemap.SourceRender} {
+			out = append(out, sources[source]...)
+		}
+	}
+	return out, nil
+}
+
+type findingStore struct{ s *stores }
+
+func findingKey(siteID string, code finding.Code, subject string) string {
+	return siteID + "|" + string(code) + "|" + subject
+}
+
+func (f findingStore) Upsert(_ context.Context, record finding.Finding) error {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	key := findingKey(record.SiteID, record.Code, record.SubjectKey)
+	kept, exists := f.s.findings[key]
+	switch {
+	case !exists:
+		record.Status = finding.Open
+	case kept.Status == finding.Dismissed && string(kept.Subject) == string(record.Subject):
+		return nil
+	default:
+		record.ID = kept.ID
+		record.CreatedAt = kept.CreatedAt
+		record.Status = finding.Open
+		record.Resolution, record.ResolvedBy = "", ""
+	}
+	f.s.findings[key] = record
+	return nil
+}
+
+func (f findingStore) Clear(_ context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	key := findingKey(siteID, code, subjectKey)
+	kept, exists := f.s.findings[key]
+	if !exists || kept.Status != finding.Open {
+		return nil
+	}
+	kept.Status = finding.Resolved
+	kept.ResolvedBy, kept.Resolution, kept.UpdatedAt = resolvedBy, resolution, at
+	f.s.findings[key] = kept
+	return nil
+}
+
+func (f findingStore) OpenBySite(_ context.Context, siteID string, code finding.Code) ([]finding.Finding, error) {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	out := make([]finding.Finding, 0)
+	for key := range f.s.findings {
+		if record := f.s.findings[key]; record.SiteID == siteID && record.Code == code && record.Status == finding.Open {
+			out = append(out, record)
+		}
+	}
+	return out, nil
+}
+
+func (f findingStore) ListBySite(_ context.Context, siteID string, status finding.Status) ([]finding.Finding, error) {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	out := make([]finding.Finding, 0)
+	for key := range f.s.findings {
+		if record := f.s.findings[key]; record.SiteID == siteID && (status == "" || record.Status == status) {
+			out = append(out, record)
+		}
+	}
+	return out, nil
+}
+
+func (f findingStore) ListForPage(_ context.Context, pageID string) ([]finding.Finding, error) {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	out := make([]finding.Finding, 0)
+	for key := range f.s.findings {
+		if record := f.s.findings[key]; record.PageID != nil && *record.PageID == pageID {
+			out = append(out, record)
+		}
+	}
+	return out, nil
+}
+
+type unit struct{}
+
+func (unit) Do(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+type bus struct{ s *stores }
+
+func (b bus) Publish(eventType events.Type, _ any) error {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	b.s.published = append(b.s.published, eventType)
+	return nil
+}
+
+func (s *stores) deps(clk clock.Clock) observe.Deps {
+	return observe.Deps{
+		Sites: s, Pages: pageStore{s}, Identity: identityStore{s}, Fields: fieldStore{s}, Bodies: bodyStore{s},
+		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, UnitOfWork: unit{}, Publisher: bus{s}, Clock: clk,
+	}
+}
+
+type pluginFake struct {
+	mu       sync.Mutex
+	items    []observe.ContentItem
+	raws     map[int64]observe.Raw
+	rendered map[int64]observe.Rendered
+	meta     map[int64]observe.SEOMeta
+	terms    map[int64][]pagemap.Term
+	pages    site.TechnicalPages
+	previews map[int64]string
+	queries  []observe.ContentQuery
+}
+
+func (p *pluginFake) ListContent(_ context.Context, q observe.ContentQuery) (observe.ContentPage, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.queries = append(p.queries, q)
+	matching := make([]observe.ContentItem, 0)
+	for i := range p.items {
+		if !contains(q.Types, p.items[i].Type) {
+			continue
+		}
+		if q.Since != nil && !p.items[i].Modified.After(*q.Since) {
+			continue
+		}
+		matching = append(matching, p.items[i])
+	}
+	start := 0
+	if q.Cursor != "" {
+		parsed, err := strconv.Atoi(q.Cursor)
+		if err != nil {
+			return observe.ContentPage{}, err
+		}
+		start = parsed
+	}
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	end := min(start+limit, len(matching))
+	page := observe.ContentPage{Items: matching[start:end]}
+	if end < len(matching) {
+		page.NextCursor = strconv.Itoa(end)
+	}
+	return page, nil
+}
+
+func (p *pluginFake) GetRaw(_ context.Context, _ string, id int64) (observe.Raw, error) {
+	raw, ok := p.raws[id]
+	if !ok {
+		return observe.Raw{}, errors.New(errors.NotFound, "no raw")
+	}
+	return raw, nil
+}
+
+func (p *pluginFake) GetRendered(_ context.Context, _ string, id int64) (observe.Rendered, error) {
+	rendered, ok := p.rendered[id]
+	if !ok {
+		return observe.Rendered{}, errors.New(errors.NotFound, "no rendered")
+	}
+	return rendered, nil
+}
+
+func (p *pluginFake) GetSEOMeta(_ context.Context, _ string, id int64) (observe.SEOMeta, error) {
+	return p.meta[id], nil
+}
+
+func (p *pluginFake) GetTerms(_ context.Context, _ string, id int64) ([]pagemap.Term, error) {
+	return p.terms[id], nil
+}
+
+func (p *pluginFake) Settings(_ context.Context) (site.TechnicalPages, error) {
+	return p.pages, nil
+}
+
+func (p *pluginFake) PreviewLink(_ context.Context, _ string, id int64) (string, error) {
+	link, ok := p.previews[id]
+	if !ok {
+		return "", errors.New(errors.NotFound, "no preview")
+	}
+	return link, nil
+}
+
+type coreFake struct {
+	types    []observe.PostType
+	items    map[string][]observe.Item
+	settings observe.SiteSettings
+}
+
+func (c *coreFake) PostTypes(_ context.Context) ([]observe.PostType, error) {
+	return c.types, nil
+}
+
+func (c *coreFake) ListItems(_ context.Context, postType string, q observe.ItemQuery) (observe.ItemPage, error) {
+	items := c.items[postType]
+	perPage := q.PerPage
+	if perPage <= 0 {
+		perPage = 100
+	}
+	start := (q.Page - 1) * perPage
+	if start >= len(items) {
+		return observe.ItemPage{}, nil
+	}
+	end := min(start+perPage, len(items))
+	return observe.ItemPage{Items: items[start:end], HasMore: end < len(items)}, nil
+}
+
+func (c *coreFake) SiteSettings(_ context.Context) (observe.SiteSettings, error) {
+	return c.settings, nil
+}
+
+type storeFake struct {
+	products   []observe.Product
+	variations map[int64][]observe.Variation
+	pages      site.TechnicalPages
+	queries    []observe.ProductQuery
+}
+
+func (s *storeFake) ListProducts(_ context.Context, q observe.ProductQuery) (observe.ProductPage, error) {
+	s.queries = append(s.queries, q)
+	matching := make([]observe.Product, 0)
+	for i := range s.products {
+		if q.ModifiedAfter != nil && !s.products[i].Modified.After(*q.ModifiedAfter) {
+			continue
+		}
+		matching = append(matching, s.products[i])
+	}
+	perPage := q.PerPage
+	if perPage <= 0 {
+		perPage = 100
+	}
+	start := (q.Page - 1) * perPage
+	if start >= len(matching) {
+		return observe.ProductPage{}, nil
+	}
+	end := min(start+perPage, len(matching))
+	return observe.ProductPage{Items: matching[start:end], HasMore: end < len(matching)}, nil
+}
+
+func (s *storeFake) ListVariations(_ context.Context, productID int64, page int) (observe.VariationPage, error) {
+	if page > 1 {
+		return observe.VariationPage{}, nil
+	}
+	return observe.VariationPage{Items: s.variations[productID]}, nil
+}
+
+func (s *storeFake) StorePages(_ context.Context) (site.TechnicalPages, error) {
+	return s.pages, nil
+}
+
+type visitorFake struct {
+	mu     sync.Mutex
+	pages  map[string]observe.Visit
+	failed map[string]bool
+	visits []string
+	active int
+	peak   int
+}
+
+func (v *visitorFake) Visit(_ context.Context, url string) (observe.Visit, error) {
+	v.mu.Lock()
+	v.visits = append(v.visits, url)
+	v.active++
+	if v.active > v.peak {
+		v.peak = v.active
+	}
+	v.mu.Unlock()
+	time.Sleep(2 * time.Millisecond)
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.active--
+	if v.failed[url] {
+		return observe.Visit{}, errors.New(errors.External, "the site did not answer")
+	}
+	visit, ok := v.pages[url]
+	if !ok {
+		return observe.Visit{Status: 404, Body: "<html><body><h1>Not found</h1></body></html>"}, nil
+	}
+	return visit, nil
+}
+
+func contains(list []string, value string) bool {
+	return slices.Contains(list, value)
+}
