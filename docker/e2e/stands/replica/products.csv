@@ -1,0 +1,9 @@
+Type,SKU,Name,Published,Visibility in catalog,Short description,Description,In stock?,Regular price,Categories,Parent,Entity,Attribute 1 name,Attribute 1 value(s),Attribute 1 visible,Attribute 1 global,Attribute 1 default
+variable,BPC157,BPC-157 Peptide,1,visible,<p>Lyophilized BPC-157 in a sealed vial.</p>,<p>BPC-157 is a pentadecapeptide studied for tissue repair.</p><p>Each vial is sealed under nitrogen.</p>,1,,Peptides > Healing Peptides,,BPC-157,Strength,"5 mg, 10 mg",1,1,5 mg
+variation,BPC157-5MG,BPC-157 Peptide - 5 mg,1,visible,,,1,39.00,,BPC157,,Strength,5 mg,,1,
+variation,BPC157-10MG,BPC-157 Peptide - 10 mg,1,visible,,,1,69.00,,BPC157,,Strength,10 mg,,1,
+simple,BPC157-SPRAY,BPC-157 Nasal Spray,1,visible,<p>A metered nasal spray.</p>,<p>BPC-157 in a metered nasal spray for research use.</p>,1,29.00,Peptides > Healing Peptides,,BPC-157,,,,,
+variable,TB500,TB-500 Peptide,1,visible,<p>Lyophilized TB-500 in a sealed vial.</p>,<p>TB-500 is a synthetic fragment of thymosin beta-4.</p>,1,,Peptides > Healing Peptides,,TB-500,Strength,"2 mg, 5 mg",1,1,2 mg
+variation,TB500-2MG,TB-500 Peptide - 2 mg,1,visible,,,1,45.00,,TB500,,Strength,2 mg,,1,
+variation,TB500-5MG,TB-500 Peptide - 5 mg,1,visible,,,1,89.00,,TB500,,Strength,5 mg,,1,
+simple,BACWATER,Bacteriostatic Water,1,visible,<p>Sterile water with benzyl alcohol.</p>,"<p>Reconstitute any of our <a href=""/peptides/"">Peptides</a> with it.</p>",1,9.00,Peptides,,,,,,,

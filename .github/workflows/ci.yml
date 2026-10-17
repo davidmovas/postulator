@@ -136,6 +136,9 @@ jobs:
       - name: Lint the plugin
         run: task plugin:lint
 
+      - name: Test the plugin
+        run: task plugin:test
+
       - name: Package the plugin
         run: task plugin:zip
 

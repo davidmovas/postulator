@@ -1,4 +1,4 @@
-name: postulator-e2e
+name: postulator-test-vanilla
 
 services:
   db:
@@ -22,7 +22,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${WP_PORT:-8089}:80"
+      - "127.0.0.1:${WP_PORT:-8088}:80"
     environment:
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_NAME: wordpress
@@ -54,14 +54,17 @@ services:
       WORDPRESS_DB_USER: wordpress
       WORDPRESS_DB_PASSWORD: wordpress
       WP_ENVIRONMENT_TYPE: local
-      E2E_MODE: ${E2E_MODE:-sandbox}
-      E2E_SITE_URL: http://localhost:${WP_PORT:-8089}
-      E2E_ADMIN_USER: ${E2E_ADMIN_USER:-postulator}
-      E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-postulator@example.test}
-      E2E_ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-postulator-admin}
-      E2E_SEO: ${E2E_SEO:-none}
+      STAND: ${STAND:-vanilla}
+      E2E_MODE: ${E2E_MODE:-test}
+      E2E_PROJECT: ${E2E_PROJECT:-postulator-test-vanilla}
+      E2E_PROVISION: ${E2E_PROVISION:-0}
+      E2E_SITE_URL: http://localhost:${WP_PORT:-8088}
+      E2E_ADMIN_USER: ${E2E_ADMIN_USER:-}
+      E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-}
+      E2E_ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-}
+      E2E_SEO: ${E2E_SEO:-}
       E2E_WOO: ${E2E_WOO:-1}
-      E2E_PLUGIN: ${E2E_PLUGIN:-1}
+      E2E_PLUGIN: ${E2E_PLUGIN:-}
     entrypoint: ["/bin/sh", "/e2e/bootstrap.sh"]
     volumes:
       - wp:/var/www/html

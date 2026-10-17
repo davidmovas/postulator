@@ -1,28 +1,90 @@
 #!/bin/sh
 set -eu
 
-MODE="${E2E_MODE:-sandbox}"
-SITE_URL="${E2E_SITE_URL:-http://localhost:8089}"
-ADMIN_USER="${E2E_ADMIN_USER:-postulator}"
-ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-postulator@example.test}"
-ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-postulator-admin}"
-SEO="${E2E_SEO:-none}"
+STAND="${STAND:-vanilla}"
+MODE="${E2E_MODE:-test}"
+PROJECT="${E2E_PROJECT:-postulator-test-vanilla}"
+PROVISION="${E2E_PROVISION:-0}"
+SITE_URL="${E2E_SITE_URL:-http://localhost:8088}"
 WOO="${E2E_WOO:-1}"
-PLUGIN="${E2E_PLUGIN:-1}"
 PLUGIN_ZIP="/dist/postulator-companion.zip"
+STAND_DIR="/e2e/stands/$STAND"
+WP_ROOT="/var/www/html"
+WOOCOMMERCE_VERSION="11.1.2"
+YOAST_VERSION="28.7"
+RANKMATH_VERSION="1.0.280"
 
-case "$MODE" in
-	sandbox)
-		OUT="/e2e/.env.sandbox"
+case "$STAND" in
+	vanilla)
+		TITLE="Vanilla Store"
+		STAND_SEO="none"
 		;;
-	test)
-		OUT="/e2e/.env.generated"
+	replica)
+		TITLE="Peptide Store"
+		STAND_SEO="rankmath"
 		;;
 	*)
-		echo "E2E_MODE must be sandbox or test" >&2
+		echo "STAND must be vanilla or replica" >&2
 		exit 1
 		;;
 esac
+SEO="${E2E_SEO:-$STAND_SEO}"
+
+case "$MODE" in
+	test)
+		ADMIN_USER="${E2E_ADMIN_USER:-shopadmin}"
+		ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-shopadmin@example.test}"
+		ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-shop-admin-password}"
+		PLUGIN="${E2E_PLUGIN:-1}"
+		PROVISION="1"
+		OUT="/e2e/.env.$STAND"
+		;;
+	sandbox)
+		TITLE="Postulator E2E"
+		ADMIN_USER="${E2E_ADMIN_USER:-postulator}"
+		ADMIN_EMAIL="${E2E_ADMIN_EMAIL:-postulator@example.test}"
+		ADMIN_PASSWORD="${E2E_ADMIN_PASSWORD:-postulator-admin}"
+		PLUGIN="${E2E_PLUGIN:-0}"
+		if [ "$PROJECT" = "postulator-e2e" ]; then
+			OUT="/e2e/.env.sandbox"
+		else
+			OUT="/e2e/.env.$PROJECT"
+		fi
+		;;
+	*)
+		echo "E2E_MODE must be test or sandbox" >&2
+		exit 1
+		;;
+esac
+
+for pair in "E2E_PLUGIN=$PLUGIN" "E2E_WOO=$WOO" "E2E_PROVISION=$PROVISION"; do
+	case "${pair#*=}" in
+		0 | 1)
+			;;
+		*)
+			echo "${pair%%=*} must be 0 or 1" >&2
+			exit 1
+			;;
+	esac
+done
+
+case "$SEO" in
+	none | yoast | rankmath)
+		;;
+	*)
+		echo "E2E_SEO must be none, yoast or rankmath" >&2
+		exit 1
+		;;
+esac
+
+if [ "$STAND" = "replica" ] && [ "$SEO" != "rankmath" ]; then
+	echo "the replica stand runs Rank Math, so E2E_SEO must be rankmath or unset" >&2
+	exit 1
+fi
+if [ "$STAND" = "replica" ] && [ "$PROVISION" = "1" ] && [ "$WOO" != "1" ]; then
+	echo "the replica stand is a store, so E2E_WOO must be 1" >&2
+	exit 1
+fi
 
 attempt=0
 until wp db check >/dev/null 2>&1; do
@@ -38,15 +100,18 @@ fresh=0
 if ! wp core is-installed >/dev/null 2>&1; then
 	wp core install \
 		--url="$SITE_URL" \
-		--title="Postulator E2E" \
+		--title="$TITLE" \
 		--admin_user="$ADMIN_USER" \
 		--admin_password="$ADMIN_PASSWORD" \
 		--admin_email="$ADMIN_EMAIL" \
 		--skip-email
 	fresh=1
+	if [ "$MODE" = "test" ]; then
+		wp db query "ALTER TABLE $(wp db prefix)terms AUTO_INCREMENT = 100000"
+	fi
 fi
 
-install_plugin() {
+install_companion() {
 	if [ ! -f "$PLUGIN_ZIP" ]; then
 		echo "$PLUGIN_ZIP is missing; run task plugin:zip first" >&2
 		exit 1
@@ -54,15 +119,77 @@ install_plugin() {
 	wp plugin install "$PLUGIN_ZIP" --force
 }
 
-if [ "$MODE" = "sandbox" ]; then
-	if [ "$PLUGIN" = "1" ]; then
-		install_plugin
-		wp plugin activate postulator-companion
+ensure_plugin() {
+	installed="$(wp plugin get "$1" --field=version 2>/dev/null || true)"
+	if [ -z "$installed" ] || { [ "$MODE" = "test" ] && [ "$installed" != "$2" ]; }; then
+		wp plugin install "$1" --version="$2" --force
 	fi
-	if [ "$fresh" = "1" ]; then
+	if ! wp plugin is-active "$1" >/dev/null 2>&1; then
+		wp plugin activate "$1"
+	fi
+}
+
+ensure_theme() {
+	installed="$(wp theme get "$1" --field=version 2>/dev/null || true)"
+	if [ -z "$installed" ] || { [ "$MODE" = "test" ] && [ "$installed" != "$2" ]; }; then
+		wp theme install "$1" --version="$2" --force
+	fi
+	if ! wp theme is-active "$1" >/dev/null 2>&1; then
+		wp theme activate "$1"
+	fi
+}
+
+set_option() {
+	if [ "$(wp option get "$1" 2>/dev/null || true)" != "$2" ]; then
+		wp option update "$1" "$2"
+	fi
+}
+
+page_id() {
+	wp post list --post_type=page --post_status=publish,draft,pending,private,future \
+		--name="$1" --post_parent="$2" --field=ID
+}
+
+ensure_page() {
+	found="$(page_id "$1" "$3")"
+	if [ -n "$found" ]; then
+		echo "$found"
+		return
+	fi
+	wp post create \
+		--user="$ADMIN_USER" \
+		--post_type=page \
+		--post_status=publish \
+		--post_name="$1" \
+		--post_title="$2" \
+		--post_parent="$3" \
+		--post_content="$4" \
+		--porcelain
+}
+
+ensure_term_description() {
+	term_id="$(wp term list "$1" --slug="$2" --field=term_id)"
+	if [ -z "$term_id" ]; then
+		echo "the $1 term $2 is missing" >&2
+		exit 1
+	fi
+	if [ "$(wp term get "$1" "$term_id" --field=description)" != "$3" ]; then
+		wp term update "$1" "$term_id" --description="$3"
+	fi
+}
+
+import_products() {
+	wp eval-file /e2e/import-products.php "$1" --user="$ADMIN_USER"
+}
+
+set_permalinks() {
+	if [ "$(wp option get permalink_structure)" != "/%postname%/" ]; then
 		wp rewrite structure '/%postname%/' --hard
-		wp rewrite flush --hard
 	fi
+	wp rewrite flush --hard
+}
+
+sandbox_password() {
 	if ! wp user application-password list "$ADMIN_USER" --field=name | grep -qx postulator-sandbox; then
 		APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" postulator-sandbox --porcelain)"
 		{
@@ -71,83 +198,75 @@ if [ "$MODE" = "sandbox" ]; then
 			echo "SANDBOX_WP_APP_PASSWORD=$APP_PASSWORD"
 		} > "$OUT"
 	fi
+}
+
+if [ "$MODE" = "test" ]; then
+	install_companion
+	if [ "$PLUGIN" = "1" ]; then
+		wp plugin activate postulator-companion
+	elif wp plugin is-active postulator-companion >/dev/null 2>&1; then
+		wp plugin deactivate postulator-companion
+	fi
+elif [ "$PLUGIN" = "1" ]; then
+	install_companion
+	wp plugin activate postulator-companion
+fi
+
+if [ "$PROVISION" = "0" ]; then
+	if [ "$fresh" = "1" ]; then
+		set_permalinks
+	fi
+	sandbox_password
 	echo "the sandbox is ready at $SITE_URL"
 	exit 0
 fi
 
-install_plugin
-
-case "$PLUGIN" in
-	1)
-		wp plugin activate postulator-companion
-		;;
-	0)
-		if wp plugin is-active postulator-companion >/dev/null 2>&1; then
-			wp plugin deactivate postulator-companion
-		fi
-		;;
-	*)
-		echo "E2E_PLUGIN must be 0 or 1" >&2
-		exit 1
-		;;
-esac
-
 for slug in wordpress-seo seo-by-rank-math; do
+	case "$SEO:$slug" in
+		yoast:wordpress-seo | rankmath:seo-by-rank-math)
+			continue
+			;;
+	esac
 	if wp plugin is-active "$slug" >/dev/null 2>&1; then
 		wp plugin deactivate "$slug"
 	fi
 done
 
 case "$SEO" in
-	none)
-		;;
 	yoast)
-		wp plugin install wordpress-seo --activate
+		ensure_plugin wordpress-seo "$YOAST_VERSION"
 		wp yoast index --reindex
 		;;
 	rankmath)
-		wp plugin install seo-by-rank-math --activate
-		wp option update rank_math_is_configured 1
-		wp option update rank_math_registration_skip 1
-		;;
-	*)
-		echo "E2E_SEO must be none, yoast or rankmath" >&2
-		exit 1
+		ensure_plugin seo-by-rank-math "$RANKMATH_VERSION"
+		set_option rank_math_is_configured 1
+		set_option rank_math_registration_skip 1
 		;;
 esac
 
-if [ "$WOO" = "1" ] && ! wp plugin is-active woocommerce >/dev/null 2>&1; then
-	wp plugin install woocommerce --version=11.1.2 --activate
-fi
-
 if [ "$WOO" = "1" ]; then
-	wp option update woocommerce_coming_soon no
-	if [ "$(wp term list product_cat --slug=postulator-koffein --format=count)" = "0" ]; then
-		wp term create product_cat "Koffein" \
-			--slug=postulator-koffein \
-			--description="Caffeine products."
-	fi
-	if [ "$(wp post list --post_type=product --name=postulator-powder --format=count)" = "0" ]; then
-		PRODUCT_ID="$(wp post create \
-			--post_type=product \
-			--post_title="Powder" \
-			--post_name=postulator-powder \
-			--post_status=publish \
-			--post_content='<p>See <a href="/product-category/postulator-koffein/">Koffein</a>.</p>' \
-			--porcelain)"
-		wp post term add "$PRODUCT_ID" product_cat postulator-koffein
-	fi
+	ensure_plugin woocommerce "$WOOCOMMERCE_VERSION"
+	set_option woocommerce_coming_soon no
 fi
 
-wp rewrite structure '/%postname%/' --hard
-wp rewrite flush --hard
+. "$STAND_DIR/provision.sh"
+
+set_permalinks
+
+if [ "$MODE" = "sandbox" ]; then
+	sandbox_password
+	echo "the sandbox is provisioned as the $STAND stand at $SITE_URL"
+	exit 0
+fi
 
 if [ "$(wp user application-password list "$ADMIN_USER" --format=count)" != "0" ]; then
 	wp user application-password delete "$ADMIN_USER" --all
 fi
-APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" postulator-e2e --porcelain)"
+APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" e2e --porcelain)"
 
 {
+	echo "E2E_STAND=$STAND"
+	echo "E2E_PROJECT=$PROJECT"
 	echo "E2E_WP_URL=$SITE_URL"
 	echo "E2E_WP_USER=$ADMIN_USER"
 	echo "E2E_WP_APP_PASSWORD=$APP_PASSWORD"
@@ -156,4 +275,4 @@ APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" postulator-e2e
 	echo "E2E_PLUGIN=$PLUGIN"
 } > "$OUT"
 
-echo "wordpress is provisioned at $SITE_URL"
+echo "the $STAND stand is provisioned at $SITE_URL"
