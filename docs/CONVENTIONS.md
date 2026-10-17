@@ -210,27 +210,53 @@ in the same commit.
 ## Docker end-to-end
 
 `docker/e2e/compose.yaml` pins WordPress 7.0.1 (PHP 8.3), MariaDB 11.4.12 and WP-CLI 2.12.0,
-and one file serves two stacks. `task e2e:*` is the suites' own, compose project
-`postulator-test` on `127.0.0.1:8088`, with WooCommerce on unless `E2E_WOO=0`; `task sandbox:*`
-is the one people test the application against, project `postulator-e2e` on 8089, bare unless
-`E2E_PLUGIN=1` and without a store unless `E2E_WOO=1`. The suites force-delete what they wrote, so
-both harnesses refuse 8089. `task e2e:up` provisions the site, installs the plugin from
-`bin/postulator-companion.zip` and writes `.env.generated`.
+`bootstrap.sh` pins WooCommerce 11.1.2, Rank Math 1.0.280 and Yoast 28.7, and one file serves
+three compose projects:
+
+- **vanilla**, `task e2e:* STAND=vanilla` (the default), project `postulator-test-vanilla` on
+  `127.0.0.1:8088`: Twenty Twenty-Five 1.5 and the block editor, WooCommerce's own breadcrumbs, no
+  SEO plugin unless `E2E_SEO` names one, pages nested under `/guide/` and a front page of posts;
+- **replica**, `STAND=replica`, project `postulator-test-replica` on 8087, a replica of the
+  client's first site: Classic Editor 1.7.0, Blocksy 2.1.60 and Rank Math with its breadcrumbs on,
+  flat pages under a static front page, and the mu-plugin `stands/replica/site-behaviour.php`,
+  copied into `mu-plugins`, which registers an `entity` product taxonomy without `show_in_rest`
+  and gives every page whose slug is a product category or an entity a breadcrumb `nav` before
+  its content, a product grid after it and BreadcrumbList, ItemList and CollectionPage JSON-LD;
+  one hub's raw is empty, one is a lone shortcode, one is text, and one crumb names a path no
+  page answers;
+- **the sandbox**, `task sandbox:*`, project `postulator-e2e` on 8089, the one people test the
+  application against: `sandbox:up` brings it up bare unless `E2E_PLUGIN=1` and without a store
+  unless `E2E_WOO=1`, `sandbox:provision STAND=` makes it that stand on that command only, adding
+  what is missing and keeping what it holds, and only `sandbox:reset` throws it away.
+
+Both stands import their `products.csv` through WooCommerce's CSV importer
+(`docker/e2e/import-products.php`), so each carries a simple product and a variable one with SKU'd
+variations. `task e2e:up STAND=` provisions the stand, installs the plugin from
+`bin/postulator-companion.zip` and writes `docker/e2e/.env.<stand>` with `E2E_STAND`,
+`E2E_PROJECT`, `E2E_WP_URL`, `E2E_WP_USER`, `E2E_WP_APP_PASSWORD`, `E2E_SEO`, `E2E_WOO` and
+`E2E_PLUGIN`. A stand's title, admin user and seeds name nothing of the program, and its term ids
+start at 100000, so a term id is never a post id. The suites force-delete what they wrote, so
+both harnesses refuse 8089 and the sandbox's project; they read `POSTULATOR_E2E_ENV`, else
+`.env.$E2E_STAND`, else `.env.vanilla`, and take what differs between the stands from `standOf`
+in `internal/adapters/wp/e2e/stands_test.go`, never from a stand's name.
 
 ```
-task e2e:up                E2E_SEO=none|yoast|rankmath, E2E_WOO=0|1, E2E_PLUGIN=0|1
-task e2e:test              the plugin contract, ./internal/adapters/wp/e2e/...
-task e2e:full              the whole loop, ./internal/e2e/...
+task e2e:up STAND=         E2E_SEO=none|yoast|rankmath (vanilla), E2E_WOO=0|1, E2E_PLUGIN=0|1
+task e2e:test STAND=       the plugin contract, ./internal/adapters/wp/e2e/...; -- <args> reach go test
+task e2e:full STAND=       the whole loop, ./internal/e2e/...; -- <args> reach go test
 task e2e:full:noplugin     e2e:up with E2E_PLUGIN=0, then the degraded loop
-task e2e:down              e2e:reset does both
+task e2e:both              e2e:up and e2e:test on vanilla, then on the replica, never at once
+task e2e:down STAND=       e2e:reset does both
+task plugin:deploy STAND=  the zip installed over the plugin of a running stand
+task sandbox:provision     STAND=vanilla|replica on 8089; never -v, the plugin only with E2E_PLUGIN=1
 ```
 
 `E2E_PLUGIN=0` leaves the companion plugin installed but deactivated: the client who refuses
-to install it. `e2e:test` then skips, being that plugin's contract, and the loop tests in
-`internal/e2e` each skip the stack they cannot use, so both targets stay green either way; the
-product loop skips a site that answers no WooCommerce store. `e2e:full:noplugin` runs
-`-run TestTheWholeLoopDegradesWithoutThePlugin` and does not pass `-v`: to read what it proved,
-run its `go test` line from `Taskfile.yml` with `-v`.
+to install it. `e2e:test` then skips, being that plugin's contract, and fails instead when the env
+file says the plugin is on and the site answers no manifest; the loop tests in `internal/e2e` each
+skip the stack they cannot use, so both targets stay green either way; the product loop skips a
+site that answers no WooCommerce store. `e2e:full:noplugin` runs
+`-run TestTheWholeLoopDegradesWithoutThePlugin`; to read what it proved, pass `-- -v`.
 
 `internal/e2e` composes the real application over `adapters/llm/fake` and syncs the docker site,
 and every loop removes what it wrote before it starts and after it passes, so it can be run again
@@ -243,15 +269,15 @@ without resetting the stack:
   the sections it writes;
 - the product loop writes its CSV in the test.
 
-A test that needs WordPress state no route can set, such as an expired preview token, runs
-`wp` through the compose `bootstrap` service with `--no-deps --entrypoint wp`, which carries
-the database variables and the site volume; it skips when the environment names another site.
+A test that needs WordPress state no route can set, such as an expired preview token, calls
+`wpCLI`, which runs `wp` in the stand's compose project through the `bootstrap` service with
+`--no-deps --entrypoint wp`, carrying the database variables and the site volume.
 
 Both suites are `_test.go` behind `//go:build e2e`: it adds nothing to the coverage
 profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l .`.
 `task lint:e2e` refuses to start while another golangci-lint runs ("parallel golangci-lint is
 running"): run it alone, or run its line from `Taskfile.yml` by hand with
 `--allow-parallel-runners`.
-`task plugin:lint` runs `php -l` on PHP 7.4, the plugin's floor: the compose `phplint` service's
-`php:7.4.33-cli` on Windows and `setup-php` 7.4 on CI, which also packages the plugin and never
-starts the stack.
+`task plugin:lint` runs `php -l` and `task plugin:test` runs `wp-plugin/tests/normalize.php` on
+PHP 7.4, the plugin's floor: the compose `phplint` service's `php:7.4.33-cli` on Windows and
+`setup-php` 7.4 on CI, which also packages the plugin and never starts a stand.
