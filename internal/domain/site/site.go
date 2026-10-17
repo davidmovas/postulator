@@ -79,6 +79,7 @@ type Site struct {
 	Plugin        PluginState
 	Commerce      Commerce
 	Defaults      Defaults
+	Settings      Settings
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -186,5 +187,5 @@ func (s Site) Validate() error {
 			return invalid("model profile needs a provider and a model", field)
 		}
 	}
-	return nil
+	return s.Settings.Normalized().Validate()
 }
