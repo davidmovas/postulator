@@ -25,9 +25,9 @@ func TestExtractTypesEveryLink(t *testing.T) {
 		{"the crumb to the hub", "http://localhost:8087/peptides/", 3, "", "", -1},
 		{"the listed product", "http://localhost:8087/product/tb-500-peptide/", 1, pagemap.LinkListing, render.RegionListing, -1},
 		{"the header and drawer menus", "http://localhost:8087/cart/", 2, pagemap.LinkNavigation, render.RegionNavigation, -1},
-		{"the menus' own link to the page", "http://localhost:8087/tb-500/", 2, pagemap.LinkNavigation, render.RegionNavigation, -1},
+		{"the menus' own link to the page is no page link", "http://localhost:8087/tb-500/", 0, "", "", -1},
 		{"the footer's credit", "https://creativethemes.com", 1, pagemap.LinkNavigation, render.RegionNavigation, -1},
-		{"the skip link", "#main", 1, pagemap.LinkUnknown, render.RegionUnknown, -1},
+		{"the skip link is no page link", "#main", 0, "", "", -1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestExtractTypesEveryLink(t *testing.T) {
 	}
 	want := map[pagemap.LinkType]int{
 		pagemap.LinkContextual: 1, pagemap.LinkBreadcrumb: 3, pagemap.LinkListing: 1,
-		pagemap.LinkNavigation: 21, pagemap.LinkUnknown: 1,
+		pagemap.LinkNavigation: 19, pagemap.LinkUnknown: 0,
 	}
 	for typ, count := range want {
 		if byType[typ] != count {
@@ -83,7 +83,6 @@ func TestExtractResolvesARelativeHrefAgainstTheDocument(t *testing.T) {
 		{"a root-relative href", "/x/y/", "/c/", "/c/", pagemap.LinkPath},
 		{"an absolute href on the site", "/x/y/", "https://shop.test/d/", "/d/", pagemap.LinkPath},
 		{"another host", "/x/y/", "https://other.test/d/", "", pagemap.LinkExternal},
-		{"a fragment", "/x/y/", "#top", "", pagemap.LinkSameDocument},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -97,6 +96,45 @@ func TestExtractResolvesARelativeHrefAgainstTheDocument(t *testing.T) {
 			link := got.Links[0]
 			if link.Path != tc.wantPath || link.Kind != tc.wantKind || link.Anchor != "this" || link.Href != tc.href {
 				t.Errorf("%+v, want %s (%s)", link, tc.wantPath, tc.wantKind)
+			}
+		})
+	}
+}
+
+func TestExtractEmitsNoLinkToTheDocumentItself(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		href string
+	}{
+		{"a fragment", "#comments"},
+		{"a bare query", "?add-to-cart=14"},
+		{"the page's own path with a fragment", "/x/y/#respond"},
+		{"the page's own absolute address", "https://shop.test/x/y/"},
+		{"the page's own path with a query", "/x/y/?add-to-cart=14"},
+		{"the page's own path in capitals", "/X/Y"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			public := `<html><body><header><a href="` + tc.href + `">Self</a><a href="/home/">Home</a></header>` +
+				`<main><p>Read <a href="` + tc.href + `">this</a> and <a href="/other/">that</a>.</p></main></body></html>`
+			got := synthetic(t, render.Input{Public: public, Body: block.Parse(""), Document: "/x/y/"})
+			paths := make([]string, 0, len(got.Links))
+			for _, link := range got.Links {
+				paths = append(paths, link.Path)
+			}
+			if len(got.Links) != 2 || paths[0] != "/home/" || paths[1] != "/other/" {
+				t.Errorf("links %+v, want only /home/ and /other/", got.Links)
+			}
+			links := 0
+			for _, region := range got.Regions {
+				links += region.Links
+			}
+			if links != 2 {
+				t.Errorf("regions %+v count %d links, want the 2 emitted", got.Regions, links)
 			}
 		})
 	}

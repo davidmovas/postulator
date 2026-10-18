@@ -3,6 +3,7 @@ package render
 import (
 	"slices"
 	"sort"
+	"strings"
 
 	"golang.org/x/net/html"
 
@@ -10,7 +11,13 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
-const gridProducts = 3
+const (
+	gridLinks     = 3
+	gridProducts  = 2
+	relWordsShare = 2
+)
+
+var relTypes = []string{"tag", "category", "author"}
 
 type claim struct {
 	node   *html.Node
@@ -33,7 +40,13 @@ func (p *page) claimRegions() {
 		p.claim(node, RegionNavigation, SignalLandmark)
 	}
 	p.claimProductGrids()
+	p.claimRelLinks()
 	slices.SortFunc(p.claims, func(a, b claim) int { return p.order[a.node][0] - p.order[b.node][0] })
+}
+
+func (p *page) claimedOtherThanListing(node *html.Node) bool {
+	at := p.innermost(node)
+	return at >= 0 && p.claims[at].kind != RegionListing
 }
 
 func (p *page) claim(node *html.Node, kind RegionKind, signal string) {
@@ -124,7 +137,7 @@ func (p *page) covers(node *html.Node, need []string) bool {
 func (p *page) pure(node *html.Node, member func(*anchor) bool) bool {
 	total, hits := 0, 0
 	for _, a := range p.anchorsUnder(node) {
-		if a.link.Kind == pagemap.LinkSameDocument {
+		if a.self {
 			continue
 		}
 		total++
@@ -176,7 +189,11 @@ func (p *page) navigates(node *html.Node) bool {
 	if !named(node, "header", "footer") {
 		return false
 	}
-	return !p.within(node, func(up *html.Node) bool { return named(up, "article", "aside", "main", "nav", "section") || isMain(up) })
+	return !p.within(node, sectioning)
+}
+
+func sectioning(node *html.Node) bool {
+	return named(node, "article", "section") || isMain(node) || isNav(node) || isAside(node)
 }
 
 func (p *page) within(node *html.Node, test func(*html.Node) bool) bool {
@@ -188,54 +205,101 @@ func (p *page) within(node *html.Node, test func(*html.Node) bool) bool {
 	return false
 }
 
+type tally struct {
+	links int
+	paths map[string]bool
+}
+
+func (t *tally) grid() bool {
+	return t != nil && t.links >= gridLinks && len(t.paths) >= gridProducts
+}
+
 func (p *page) claimProductGrids() {
 	if p.in.Lookup == nil {
 		return
 	}
 	product := func(a *anchor) bool {
-		if a.link.Kind != pagemap.LinkPath {
+		if a.self || a.link.Kind != pagemap.LinkPath {
 			return false
 		}
 		wpType, ok := p.in.Lookup(a.link.Path)
 		return ok && wpType == pagemap.WPProduct
 	}
 
-	products := make(map[*html.Node]map[string]bool)
+	tallies := make(map[*html.Node]*tally)
 	for _, a := range p.anchors {
-		if !p.inside(a.node, p.root) || !product(a) {
+		if !product(a) {
 			continue
 		}
-		for node := a.node.Parent; node != nil && node != p.root; node = node.Parent {
-			if products[node] == nil {
-				products[node] = make(map[string]bool)
+		for node := a.node.Parent; node != nil && !p.tooWide(node); node = node.Parent {
+			if tallies[node] == nil {
+				tallies[node] = &tally{paths: make(map[string]bool)}
 			}
-			products[node][a.link.Path] = true
+			tallies[node].links++
+			tallies[node].paths[a.link.Path] = true
 		}
 	}
 
 	grids := make([]*html.Node, 0)
-	for node, paths := range products {
-		if len(paths) >= gridProducts && !p.holdsGrid(node, products) {
+	for node, t := range tallies {
+		if t.grid() && !p.holdsGrid(node, tallies) {
 			grids = append(grids, node)
 		}
 	}
 	slices.SortFunc(grids, func(a, b *html.Node) int { return p.order[a][0] - p.order[b][0] })
 
 	for _, grid := range grids {
-		if p.holdsContent(grid) {
+		if p.holdsContent(grid) || p.claimedOtherThanListing(grid) {
 			continue
 		}
 		p.claim(p.climb(grid, func(up *html.Node) bool { return p.pure(up, product) && !p.holdsContent(up) }), RegionListing, SignalLinks)
 	}
 }
 
-func (p *page) holdsGrid(node *html.Node, products map[*html.Node]map[string]bool) bool {
+func (p *page) holdsGrid(node *html.Node, tallies map[*html.Node]*tally) bool {
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		if len(products[child]) >= gridProducts {
+		if tallies[child].grid() {
 			return true
 		}
 	}
 	return false
+}
+
+func (p *page) claimRelLinks() {
+	for _, a := range p.anchors {
+		if a.self || !relTyped(a.node) || p.contentOwn(a) || p.claimedOtherThanListing(a.node) {
+			continue
+		}
+		p.claim(p.climb(a.node, func(up *html.Node) bool { return p.relGroup(up) && !p.holdsContent(up) }), RegionNavigation, SignalRel)
+	}
+}
+
+func (p *page) contentOwn(a *anchor) bool {
+	return p.inside(a.node, p.root) && (p.holdsContent(a.node) || len(p.positions[a.key]) > 0)
+}
+
+func relTyped(node *html.Node) bool {
+	value, _ := attr(node, "rel")
+	for _, token := range strings.Fields(strings.ToLower(value)) {
+		if slices.Contains(relTypes, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *page) relGroup(node *html.Node) bool {
+	words := 0
+	for _, a := range p.anchorsUnder(node) {
+		if a.self {
+			continue
+		}
+		if !relTyped(a.node) {
+			return false
+		}
+		words += p.text.count(a.node)
+	}
+	return p.text.count(node) <= relWordsShare*words
 }
 
 func (p *page) holdsContent(node *html.Node) bool {
@@ -277,7 +341,9 @@ func (p *page) regions() (regions []Region, wordsContent, wordsGenerated int) {
 	}
 	links := make([]int, unknownAt+1)
 	for _, a := range p.anchors {
-		links[a.region]++
+		if !a.self {
+			links[a.region]++
+		}
 	}
 
 	regions = make([]Region, 0, len(p.claims)+3)

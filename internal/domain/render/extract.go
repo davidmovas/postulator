@@ -177,6 +177,10 @@ func isNav(node *html.Node) bool {
 	return named(node, "nav") || hasRole(node, "navigation")
 }
 
+func isAside(node *html.Node) bool {
+	return named(node, "aside") || hasRole(node, "complementary")
+}
+
 func (p *page) robots() string {
 	for node := range elementsUnder(p.doc, false) {
 		if !named(node, "meta") {

@@ -18,6 +18,7 @@ type anchor struct {
 	region   int
 	kind     RegionKind
 	position int
+	self     bool
 }
 
 type rawBlock struct {
@@ -36,6 +37,7 @@ func (p *page) collectAnchors() {
 			link:     Link{Href: href, Path: path, Kind: kind, Anchor: name},
 			key:      linkKey(path, kind, href, name),
 			position: -1,
+			self:     kind == pagemap.LinkSameDocument || (kind == pagemap.LinkPath && path == p.in.Document),
 		})
 	}
 }
@@ -176,6 +178,9 @@ func linkType(kind RegionKind) pagemap.LinkType {
 func (p *page) typedLinks() []Link {
 	out := make([]Link, 0, len(p.anchors))
 	for _, a := range p.anchors {
+		if a.self {
+			continue
+		}
 		link := a.link
 		link.Region = a.kind
 		link.Type = linkType(a.kind)

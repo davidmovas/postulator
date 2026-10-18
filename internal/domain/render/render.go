@@ -37,6 +37,7 @@ const (
 	SignalMicrodata = "microdata"
 	SignalLandmark  = "landmark"
 	SignalLinks     = "links"
+	SignalRel       = "rel"
 )
 
 const (

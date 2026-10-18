@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
@@ -74,6 +75,15 @@ func defaultBuilders() []render.Builder {
 func technicalNames() []string {
 	defaults := site.DefaultSettings()
 	return append(slices.Clone(defaults.TechnicalBlocks), defaults.TechnicalShortcodes...)
+}
+
+func productsUnder(prefix string) func(string) (pagemap.WPType, bool) {
+	return func(path string) (pagemap.WPType, bool) {
+		if strings.HasPrefix(path, prefix) {
+			return pagemap.WPProduct, true
+		}
+		return pagemap.WPPage, true
+	}
 }
 
 func lookupOf(stand string) func(string) (pagemap.WPType, bool) {
