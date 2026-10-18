@@ -18,6 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/secrets/export"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/browser"
@@ -53,6 +54,7 @@ type Config struct {
 	DatabasePath string
 	KeyDir       string
 	Provider     llmport.Client
+	WordPress    []wp.Option
 	Environment  func(name string) string
 	Open         func(cfg sqlite.Config) (*sqlite.Store, error)
 }

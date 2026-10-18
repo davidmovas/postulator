@@ -14,6 +14,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	port "github.com/davidmovas/postulator/internal/application/llm"
@@ -127,6 +128,7 @@ func configure(cfg app.Config) (harness, error) {
 	if key == "" {
 		cfg.Provider = provider
 	}
+	cfg.WordPress = []wp.Option{wp.WithRateLimit(0)}
 	cfg.Environment = environment()
 
 	if !fresh {

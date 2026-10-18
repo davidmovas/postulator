@@ -42,7 +42,7 @@ type useCases struct {
 func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 	templateService := templates.New(stores.templates, stores.policies, stores.pages, stores.entities, stores.sites,
 		stores.store, c.Events, stores.now)
-	wordpress := registry.New(stores.sites, stores.secrets, wp.FromSettings(stores.values)...)
+	wordpress := registry.New(stores.sites, stores.secrets, append(wp.FromSettings(stores.values), c.cfg.WordPress...)...)
 
 	return authoring{
 		templates: templateService,
