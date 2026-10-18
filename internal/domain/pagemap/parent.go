@@ -211,15 +211,16 @@ func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, ind
 			}
 		}
 	}
-	if crumb.Linked() && !(crumb.Path != "" && crumb.Dead()) {
+	if crumb.Linked() && (crumb.Path == "" || !crumb.Dead()) {
 		d.unresolved(crumb)
 		return Page{}, MethodNone, false
 	}
 
-	candidates := make([]Page, 0)
-	for _, named := range index.ByName(crumb.Name) {
-		if named.ID != page.ID && !descends(named.Path, page.Path) {
-			candidates = append(candidates, named)
+	named := index.ByName(crumb.Name)
+	candidates := make([]Page, 0, len(named))
+	for i := range named {
+		if named[i].ID != page.ID && !descends(named[i].Path, page.Path) {
+			candidates = append(candidates, named[i])
 		}
 	}
 	switch len(candidates) {
@@ -281,8 +282,8 @@ func (d *Derivation) ambiguous(crumb Crumb, candidates []Page) {
 		}
 	}
 	ids := make([]string, 0, len(candidates))
-	for _, candidate := range candidates {
-		ids = append(ids, candidate.ID)
+	for i := range candidates {
+		ids = append(ids, candidates[i].ID)
 	}
 	d.Ambiguous = append(d.Ambiguous, Ambiguity{Crumb: crumb, Candidates: ids})
 }

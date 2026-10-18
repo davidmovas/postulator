@@ -180,8 +180,8 @@ func (e extraction) archive(page pagemap.Page) bool {
 	if page.WPID == nil {
 		return false
 	}
-	id := *page.WPID
-	return (e.technical.Shop != 0 && id == e.technical.Shop) || (e.technical.Posts != 0 && id == e.technical.Posts)
+	wpID := *page.WPID
+	return (e.technical.Shop != 0 && wpID == e.technical.Shop) || (e.technical.Posts != 0 && wpID == e.technical.Posts)
 }
 
 func (s *Service) fetch(ctx context.Context, readers Readers, owner site.Site, settings site.Settings, technical site.TechnicalPages,
@@ -292,7 +292,7 @@ func (l crumbLookups) trails(ctx context.Context, page pagemap.Page, trails []pa
 			if crumb.Path == "" || crumb.Path == pagemap.RootPath || crumb.Path == page.Path {
 				continue
 			}
-			if _, modelled := l.index.ByPath(crumb.Path); modelled {
+			if _, modeled := l.index.ByPath(crumb.Path); modeled {
 				continue
 			}
 			resolved, known := l.found[crumb.Path]

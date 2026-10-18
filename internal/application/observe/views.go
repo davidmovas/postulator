@@ -201,7 +201,8 @@ func modelView(model PageModel, index pagemap.Index, written []block.Written) Mo
 	if model.Render != nil {
 		view.Render = renderView(page, *model.Render, index)
 	}
-	for _, link := range model.Links {
+	for i := range model.Links {
+		link := &model.Links[i]
 		item := LinkView{
 			Type: string(link.Type), Region: link.Region, Source: string(link.Source), Position: link.Position, Ours: link.Ours,
 			ToURL: link.ToURL, ToPath: link.ToURL, Anchor: link.AnchorText,
@@ -217,7 +218,8 @@ func modelView(model PageModel, index pagemap.Index, written []block.Written) Mo
 	if model.Body != nil {
 		view.BodyKind, view.Blocks = blockViews(*model.Body, written)
 	}
-	for _, record := range model.Findings {
+	for i := range model.Findings {
+		record := &model.Findings[i]
 		if record.Status != finding.Open {
 			continue
 		}

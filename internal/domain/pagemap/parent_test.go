@@ -197,7 +197,7 @@ func TestDeriveParentResolvesTheNearestCrumb(t *testing.T) {
 			parent: "home", reason: pagemap.ParentURL,
 			unresolved: []string{"/healing/"},
 		},
-		"a modelled archive whose own visit lands on its hub hands the crumb to the hub": {
+		"a modeled archive whose own visit lands on its hub hands the crumb to the hub": {
 			page: "bpc",
 			evidence: pagemap.ParentSignals{
 				Trails:   []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Healing Peptides", "/product-category/peptides/healing-peptides/", "BPC-157", "/bpc-157/")},

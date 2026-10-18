@@ -27,8 +27,9 @@ func TestCyclesNamesEachLoopOnceInPathOrder(t *testing.T) {
 		under(sitePage("fine", "/fine/", pagemap.WPPage, 9), "home"),
 	}
 
-	got := make([][]string, 0)
-	for _, cycle := range pagemap.Cycles(pages) {
+	cycles := pagemap.Cycles(pages)
+	got := make([][]string, 0, len(cycles))
+	for _, cycle := range cycles {
 		ids := make([]string, 0, len(cycle))
 		for _, page := range cycle {
 			ids = append(ids, page.ID)

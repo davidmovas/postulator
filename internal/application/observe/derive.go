@@ -298,9 +298,9 @@ func (s *Service) breakCycles(ctx context.Context, tracked *findings, m *siteMod
 		progressed := false
 		for _, cycle := range cycles {
 			at := -1
-			for _, member := range cycle {
-				if member.WPID != nil {
-					at = position[member.ID]
+			for i := range cycle {
+				if cycle[i].WPID != nil {
+					at = position[cycle[i].ID]
 					break
 				}
 			}
@@ -314,8 +314,8 @@ func (s *Service) breakCycles(ctx context.Context, tracked *findings, m *siteMod
 				derived := pagemap.DeriveParent(page, pagemap.ParentSignals{WPParentID: m.wpParentOf(page.ID)}, m.index)
 				page.ParentPageID, page.ParentReason, page.ParentMethod = derived.ParentID, derived.Reason, derived.Method
 				paths := make([]string, 0, len(cycle))
-				for _, member := range cycle {
-					paths = append(paths, member.Path)
+				for i := range cycle {
+					paths = append(paths, cycle[i].Path)
 				}
 				broken[page.ID] = paths
 			}
@@ -334,12 +334,13 @@ func (s *Service) breakCycles(ctx context.Context, tracked *findings, m *siteMod
 			return err
 		}
 	}
-	for _, open := range tracked.openFor(finding.ParentCycle, "") {
-		if open.PageID == nil {
+	open := tracked.openFor(finding.ParentCycle, "")
+	for i := range open {
+		if open[i].PageID == nil {
 			continue
 		}
-		if _, still := broken[*open.PageID]; !still {
-			if err := tracked.clear(ctx, finding.ParentCycle, open.SubjectKey); err != nil {
+		if _, still := broken[*open[i].PageID]; !still {
+			if err := tracked.clear(ctx, finding.ParentCycle, open[i].SubjectKey); err != nil {
 				return err
 			}
 		}

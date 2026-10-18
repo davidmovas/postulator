@@ -77,8 +77,8 @@ func (i Index) PathParentID(page Page) *string {
 
 func (i Index) ByName(name string) []Page {
 	out := make([]Page, 0)
-	for _, page := range i.pages {
-		if page.WPID != nil && page.Status != StatusArchived && carriesName(page, name) {
+	for at := range i.pages {
+		if page := i.pages[at]; page.WPID != nil && page.Status != StatusArchived && carriesName(page, name) {
 			out = append(out, page)
 		}
 	}
