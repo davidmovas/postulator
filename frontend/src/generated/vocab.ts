@@ -19,6 +19,79 @@ export type PageWpType = (typeof pageWpTypes)[number];
 export const linkOrigins = ["generated", "observed"] as const;
 export type LinkOrigin = (typeof linkOrigins)[number];
 
+export const linkTypes = ["breadcrumb", "listing", "navigation", "contextual", "unknown"] as const;
+export type LinkType = (typeof linkTypes)[number];
+
+export const linkSources = ["raw", "render"] as const;
+export type LinkSource = (typeof linkSources)[number];
+
+export const parentReasons = [
+    "jsonld_breadcrumb",
+    "aria_breadcrumb",
+    "wp_parent",
+    "url",
+    "workbook",
+    "none",
+] as const;
+export type ParentReason = (typeof parentReasons)[number];
+
+export const parentMethods = ["href", "redirect", "name", ""] as const;
+export type ParentMethod = (typeof parentMethods)[number];
+
+export const trailSources = ["jsonld", "nav"] as const;
+export type TrailSource = (typeof trailSources)[number];
+
+export const technicalReasons = [
+    "posts_page",
+    "privacy",
+    "shop",
+    "cart",
+    "checkout",
+    "account",
+    "terms",
+    "shortcode",
+    "noindex",
+    "workbook",
+    "manual",
+    "",
+] as const;
+export type TechnicalReason = (typeof technicalReasons)[number];
+
+export const contentRootStates = ["found", "empty_raw", "dynamic_only", "not_found", "archive"] as const;
+export type ContentRootState = (typeof contentRootStates)[number];
+
+export const regionKinds = [
+    "breadcrumb",
+    "listing",
+    "navigation",
+    "content",
+    "content_dynamic",
+    "generated",
+    "unknown",
+] as const;
+export type RegionKind = (typeof regionKinds)[number];
+
+export const findingCodes = [
+    "parent_unresolved",
+    "parent_ambiguous",
+    "parent_cycle",
+    "parent_differs",
+    "plugin_outdated",
+    "field_changed_on_site",
+    "body_changed_on_site",
+    "render_unreachable",
+    "render_redirected",
+    "builder_detected",
+    "technical_detected",
+    "page_title_differs",
+    "page_h1_differs",
+    "url_form_mixed",
+] as const;
+export type FindingCode = (typeof findingCodes)[number];
+
+export const findingSeverities = ["info", "warning", "error"] as const;
+export type FindingSeverity = (typeof findingSeverities)[number];
+
 export const previewKinds = ["public", "preview"] as const;
 export type PreviewKind = (typeof previewKinds)[number];
 
