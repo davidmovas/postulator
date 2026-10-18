@@ -20,6 +20,7 @@ import (
 type expectedParent struct {
 	path   string
 	reason pagemap.ParentReason
+	method pagemap.ParentMethod
 }
 
 type standModel struct {
@@ -28,8 +29,9 @@ type standModel struct {
 	listings        []string
 	technical       map[string]pagemap.TechnicalReason
 	technicalCounts []pagemap.TechnicalReason
-	unresolvedCrumb string
-	hubs            []string
+	unresolved      map[string]string
+	resolvedHubs    []string
+	redirected      map[string]string
 	trailsResolved  int
 }
 
@@ -41,40 +43,58 @@ func modelOf(t *testing.T, env environment) standModel {
 		return standModel{
 			parents: map[string]expectedParent{
 				"/guide/setup/":    {path: "/guide/", reason: pagemap.ParentWP},
-				"/product/powder/": {path: "/product-category/koffein/", reason: pagemap.ParentJSONLD},
+				"/product/powder/": {path: "/product-category/koffein/", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref},
 			},
 			roots: map[string]render.RootState{
-				"/guide/":          render.RootFound,
-				"/guide/setup/":    render.RootFound,
-				"/product/powder/": render.RootFound,
+				"/guide/":                    render.RootFound,
+				"/guide/setup/":              render.RootFound,
+				"/product/powder/":           render.RootFound,
+				"/shop/":                     render.RootArchive,
+				"/product-category/koffein/": render.RootArchive,
+				"/cart/":                     render.RootDynamicOnly,
+				"/checkout/":                 render.RootDynamicOnly,
+				"/my-account/":               render.RootDynamicOnly,
 			},
 			technicalCounts: []pagemap.TechnicalReason{
 				pagemap.TechnicalShop, pagemap.TechnicalCart, pagemap.TechnicalCheckout, pagemap.TechnicalAccount,
 			},
+			redirected:     map[string]string{"/checkout/": "/cart/"},
 			trailsResolved: 1,
 		}
 	case "replica":
 		return standModel{
 			parents: map[string]expectedParent{
-				"/bpc-157/":                 {path: "/", reason: pagemap.ParentURL},
-				"/tb-500/":                  {path: "/", reason: pagemap.ParentURL},
-				"/peptides/":                {path: "/", reason: pagemap.ParentURL},
-				"/product/bpc-157-peptide/": {path: "/product-category/peptides/healing-peptides/", reason: pagemap.ParentJSONLD},
+				"/peptides/":         {path: "/", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref},
+				"/healing-peptides/": {path: "/peptides/", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref},
+				"/bpc-157/":          {path: "/product-category/peptides/healing-peptides/", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref},
+				"/tb-500/":           {path: "/healing-peptides/", reason: pagemap.ParentJSONLD, method: pagemap.MethodRedirect},
+				"/reconstitution/":   {path: "/lab-guides/", reason: pagemap.ParentARIA, method: pagemap.MethodName},
+				"/product/bpc-157-peptide/": {
+					path: "/product-category/peptides/healing-peptides/", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref,
+				},
 				"/product-category/peptides/healing-peptides/": {path: "/product-category/peptides/", reason: pagemap.ParentWP},
 			},
 			roots: map[string]render.RootState{
-				"/peptides/": render.RootEmptyRaw,
-				"/bpc-157/":  render.RootDynamicOnly,
-				"/tb-500/":   render.RootFound,
+				"/peptides/":                  render.RootEmptyRaw,
+				"/healing-peptides/":          render.RootEmptyRaw,
+				"/bpc-157/":                   render.RootDynamicOnly,
+				"/tb-500/":                    render.RootFound,
+				"/product/bpc-157-capsules/":  render.RootEmptyRaw,
+				"/shop/":                      render.RootArchive,
+				"/product-category/peptides/": render.RootArchive,
+				"/cart/":                      render.RootDynamicOnly,
+				"/checkout/":                  render.RootDynamicOnly,
+				"/my-account/":                render.RootDynamicOnly,
 			},
-			listings:  []string{"/peptides/", "/bpc-157/", "/tb-500/"},
+			listings:  []string{"/peptides/", "/healing-peptides/", "/bpc-157/", "/tb-500/"},
 			technical: map[string]pagemap.TechnicalReason{"/": pagemap.TechnicalNone},
 			technicalCounts: []pagemap.TechnicalReason{
 				pagemap.TechnicalShop, pagemap.TechnicalCart, pagemap.TechnicalCheckout, pagemap.TechnicalAccount,
 			},
-			unresolvedCrumb: "/healing-peptides/",
-			hubs:            []string{"/bpc-157/", "/tb-500/"},
-			trailsResolved:  1,
+			unresolved:     map[string]string{"/hello-world/": "/category/uncategorized/"},
+			resolvedHubs:   []string{"/peptides/", "/healing-peptides/", "/bpc-157/", "/tb-500/", "/reconstitution/"},
+			redirected:     map[string]string{"/checkout/": "/cart/"},
+			trailsResolved: 7,
 		}
 	}
 	t.Fatalf("E2E_STAND is %q, and the observation test knows the vanilla and the replica stands", env.stand)
@@ -159,12 +179,21 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 			t.Errorf("the model holds no %s", path)
 			continue
 		}
-		if model.Page.ParentReason != want.reason || model.Page.ParentPageID == nil || byID[*model.Page.ParentPageID] != want.path {
+		if model.Page.ParentReason != want.reason || model.Page.ParentMethod != want.method || model.Page.ParentPageID == nil ||
+			byID[*model.Page.ParentPageID] != want.path {
 			parent := "<none>"
 			if model.Page.ParentPageID != nil {
 				parent = byID[*model.Page.ParentPageID]
 			}
-			t.Errorf("%s sits under %s by %s, want %s by %s", path, parent, model.Page.ParentReason, want.path, want.reason)
+			t.Errorf("%s sits under %s by %s %q, want %s by %s %q", path, parent, model.Page.ParentReason, model.Page.ParentMethod, want.path, want.reason, want.method)
+		}
+	}
+	if summary.Roots[string(render.RootNotFound)] != 0 {
+		t.Errorf("roots = %v, want no page not found", summary.Roots)
+	}
+	for path, landed := range expected.redirected {
+		if model, ok := models[path]; !ok || model.Render == nil || model.Render.FinalPath != landed || len(model.Render.Trails) != 0 {
+			t.Errorf("%s's render = %+v, want it landed on %s and nothing kept of that page", path, model.Render, landed)
 		}
 	}
 	for path, want := range expected.roots {
@@ -188,17 +217,24 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 			t.Errorf("%s is technical for %q, want %s", path, model.Page.TechnicalReason, want)
 		}
 	}
-	for _, hub := range expected.hubs {
-		model, ok := models[hub]
+	for path, crumb := range expected.unresolved {
+		model, ok := models[path]
 		if !ok {
-			t.Errorf("the model holds no hub %s", hub)
+			t.Errorf("the model holds no %s", path)
 			continue
 		}
-		subject := finding.SubjectCrumb(model.Page.ID, expected.unresolvedCrumb)
+		subject := finding.SubjectCrumb(model.Page.ID, crumb)
 		if !slices.ContainsFunc(model.Findings, func(f finding.Finding) bool {
 			return f.Code == finding.ParentUnresolved && f.SubjectKey == subject && f.Status == finding.Open
 		}) {
-			t.Errorf("%s raises no parent_unresolved for %s: %+v", hub, expected.unresolvedCrumb, model.Findings)
+			t.Errorf("%s raises no parent_unresolved for %s: %+v", path, crumb, model.Findings)
+		}
+	}
+	for _, hub := range expected.resolvedHubs {
+		if slices.ContainsFunc(models[hub].Findings, func(f finding.Finding) bool {
+			return f.Status == finding.Open && (f.Code == finding.ParentUnresolved || f.Code == finding.ParentAmbiguous || f.Code == finding.ParentCycle)
+		}) {
+			t.Errorf("the hub %s keeps a parent finding: %+v", hub, models[hub].Findings)
 		}
 	}
 
