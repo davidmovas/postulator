@@ -13,7 +13,9 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -47,6 +49,17 @@ func (s *stubSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPa
 		spec = own
 	}
 	return templates.ResolveForPageResponse{TemplateID: "template", Version: s.version, Spec: spec}, nil
+}
+
+type stubTypes struct {
+	rules field.LinkRules
+}
+
+func (s *stubTypes) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	entity := pagetype.Type{ID: "type-entity", SiteID: siteID, Name: "Entity", Preset: pagetype.Entity}
+	body := pagetype.DefaultScope(pagetype.Entity, field.Body, entity.ID)
+	body.Links.Rules = s.rules
+	return pagetype.NewSet([]pagetype.Type{entity}, []field.Scope{body}), nil
 }
 
 type stubKeys struct {
@@ -193,6 +206,7 @@ type harness struct {
 	blobs       *sqlite.ArtifactRepo
 	log         *sqlite.RunEventRepo
 	specs       *stubSpecs
+	types       *stubTypes
 	keys        *stubKeys
 	catalog     *stubCatalog
 	profiles    *stubProfiles
@@ -234,6 +248,7 @@ func newHarness(t *testing.T, targets int) *harness {
 				Length:   template.Length{Min: 200, Max: 900},
 			},
 		},
+		types:    &stubTypes{},
 		keys:     &stubKeys{},
 		catalog:  &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
 		profiles: &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
@@ -270,6 +285,7 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 		Events:     h.log,
 		Pages:      sqlite.NewPageRepo(h.store),
 		Specs:      h.specs,
+		Types:      h.types,
 		Keys:       h.keys,
 		Spend:      h.spend,
 		Catalog:    h.catalog,

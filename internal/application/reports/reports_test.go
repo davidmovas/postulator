@@ -8,11 +8,13 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -26,6 +28,8 @@ type fixture struct {
 	store      *sqlite.Store
 	siteID     string
 	templateID string
+	hubType    string
+	types      *pagetypes.Service
 	pages      map[string]pagemap.Page
 	entities   map[string]graph.Entity
 	runID      string
@@ -57,13 +61,27 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatalf("give the site a default template: %v", err)
 	}
 
+	types := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
+		Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: &applicationtest.Recorder{},
+		Clock: clock.NewFake(sqlitetest.Stamp),
+	})
+	if err := types.Seed(t.Context(), owner.ID); err != nil {
+		t.Fatalf("seed the page types: %v", err)
+	}
+	set, err := types.Set(t.Context(), owner.ID)
+	if err != nil {
+		t.Fatalf("read the page types: %v", err)
+	}
+	hubType, _ := set.ByPreset(pagetype.Hub)
+
 	f := &fixture{
-		store: store, siteID: owner.ID, templateID: hub.ID,
+		store: store, siteID: owner.ID, templateID: hub.ID, hubType: hubType.ID, types: types,
 		pages: make(map[string]pagemap.Page), entities: make(map[string]graph.Entity),
 		service: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 			Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
-			Sites: siteRepo, Specs: templateService, Policies: templateService,
+			Sites: siteRepo, Specs: templateService, Policies: templateService, Types: types,
 		}),
 	}
 
@@ -97,6 +115,7 @@ func (f *fixture) page(t *testing.T, repo *sqlite.PageRepo, path string, status 
 
 	record := pagemap.Page{
 		ID: id.New(), SiteID: f.siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
+		PageTypeID: &f.hubType, TypeSource: pagemap.TypeSourceAuto, TypeReason: pagemap.TypeByKind,
 		Title: path, H1: path, Status: status, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if status != pagemap.StatusPlanned {

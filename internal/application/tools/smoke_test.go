@@ -141,10 +141,14 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	book := ledger.New(client, callRepo, built, bus, now)
 	modelProfiles := profiles.New(sqlite.NewModelProfileRepo(store), siteRepo, built, now)
 	templateService := templates.New(templateRepo, sqlite.NewLinkPolicyRepo(store), pageRepo, entityRepo, siteRepo, store, bus, now)
+	types := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
+		UnitOfWork: store, Publisher: bus, Clock: now,
+	})
 	reportsService := reports.New(reports.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
-		Sites: siteRepo, Specs: templateService, Policies: templateService,
+		Sites: siteRepo, Specs: templateService, Policies: templateService, Types: types,
 	})
 
 	pagesService := pages.New(pages.Deps{
@@ -152,10 +156,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	return tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, pagetypes.New(pagetypes.Deps{
-			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
-			UnitOfWork: store, Publisher: bus, Clock: now,
-		}), stubProbe{}, bus, now),
+		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
@@ -175,7 +176,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 			secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), book, bus, now),
 		Content: content.New(content.Deps{
 			Pages: pageRepo, Entities: entityRepo, Edges: edgeRepo, Specs: templateService,
-			Policies: templateService, Profiles: modelProfiles, LLM: book,
+			Types: types, Profiles: modelProfiles, LLM: book,
 		}),
 		Schedules: schedules.New(schedules.Deps{
 			Schedules: sqlite.NewScheduleRepo(store), Pages: pageRepo, Sites: siteRepo,

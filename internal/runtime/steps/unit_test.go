@@ -10,13 +10,14 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	port "github.com/davidmovas/postulator/internal/application/llm"
-	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -116,36 +117,47 @@ func (s siteStub) Get(context.Context, string) (site.Site, error) {
 	return s.record, nil
 }
 
-type policyStub struct {
-	rules      template.LinkRules
-	specs      map[string]template.LinkRules
-	err        error
-	resolveErr error
+type typesStub struct {
+	rules   field.LinkRules
+	perPage map[string]field.LinkRules
+	err     error
 }
 
-func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error) {
-	if p.err != nil {
-		return templates.GetEffectivePolicyResponse{}, p.err
-	}
-	return templates.GetEffectivePolicyResponse{
-		Policy: templates.LinkPolicy{
-			Rules: p.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user",
-		},
-	}, nil
+func linksOf(rules field.LinkRules) field.LinkPolicy {
+	return field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 }
 
-func (p policyStub) ResolveForPage(_ context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
-	if p.resolveErr != nil {
-		return templates.ResolveForPageResponse{}, p.resolveErr
+func unitLinks() field.LinkPolicy {
+	return linksOf(field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 5, MaxPerTarget: 1})
+}
+
+func (s typesStub) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	if s.err != nil {
+		return pagetype.Set{}, s.err
 	}
-	rules, ok := p.specs[req.PageID]
-	if !ok {
-		rules = template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxPerTarget: 1}
+	fallback := field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxPerTarget: 1}
+	types := []pagetype.Type{
+		{ID: "type-entity", SiteID: siteID, Name: "Entity", Preset: pagetype.Entity},
+		{ID: "type-product", SiteID: siteID, Name: "Product", Preset: pagetype.Product},
 	}
-	return templates.ResolveForPageResponse{
-		TemplateID: "template", SiteID: "site", Version: 1,
-		Spec: template.TemplateSpec{LinkRules: rules},
-	}, nil
+	product := pagetype.DefaultScope(pagetype.Product, field.ProductDescription, "type-product")
+	product.Links = linksOf(fallback)
+	scopes := []field.Scope{scopeWith("type-entity", fallback), product}
+	for pageID, rules := range s.perPage {
+		if rules == (field.LinkRules{}) {
+			rules = s.rules
+		}
+		kind := pagetype.Type{ID: "type-" + pageID, SiteID: siteID, Name: pageID, Preset: pagetype.Entity, CreatedAt: time.Unix(1, 0)}
+		types = append(types, kind)
+		scopes = append(scopes, scopeWith(kind.ID, rules))
+	}
+	return pagetype.NewSet(types, scopes), nil
+}
+
+func scopeWith(typeID string, rules field.LinkRules) field.Scope {
+	scope := pagetype.DefaultScope(pagetype.Entity, field.Body, typeID)
+	scope.Links = linksOf(rules)
+	return scope
 }
 
 type profileStub struct {
@@ -213,7 +225,7 @@ func unitDeps() steps.Deps {
 			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},
 		}},
 		Sites:    siteStub{},
-		Policies: policyStub{},
+		Types:    typesStub{},
 		Profiles: profileStub{},
 		LLM:      llmStub{reply: goodDraft},
 		Clock:    clock.NewFake(sqlitetest.Stamp),
@@ -240,6 +252,7 @@ func unitContext(t *testing.T, artifacts map[run.ArtifactKind][]byte) *run.StepC
 			WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child"),
 		},
 		Spec:      spec(),
+		Links:     unitLinks(),
 		Params:    map[string]any{},
 		Artifacts: stored,
 		Check:     run.NewCheckpoint(),
@@ -291,11 +304,6 @@ func TestResolveContextReportsWhatItCannotRead(t *testing.T) {
 		{
 			name: "the pages cannot be listed",
 			deps: func(d steps.Deps) steps.Deps { d.Pages = pageList{err: boom}; return d },
-			want: errors.External,
-		},
-		{
-			name: "the policy cannot be read",
-			deps: func(d steps.Deps) steps.Deps { d.Policies = policyStub{err: boom}; return d },
 			want: errors.External,
 		},
 		{
@@ -464,18 +472,12 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 	}
 
 	cases := []struct {
-		name   string
-		rules  template.LinkRules
-		policy template.LinkRules
-		want   bool
+		name  string
+		rules field.LinkRules
+		want  bool
 	}{
-		{name: "the rules ask for a children section", rules: template.LinkRules{UpDepth: 1, ChildrenSection: true}, want: true},
-		{name: "the rules do not", rules: template.LinkRules{UpDepth: 1}},
-		{
-			name:   "the template inherits a site policy that asks for one",
-			policy: template.LinkRules{UpDepth: 1, DownLinks: true, ChildrenSection: true},
-			want:   true,
-		},
+		{name: "the page type's rules ask for a children section", rules: field.LinkRules{UpDepth: 1, ChildrenSection: true}, want: true},
+		{name: "the rules do not", rules: field.LinkRules{UpDepth: 1}},
 	}
 
 	for _, tc := range cases {
@@ -485,9 +487,8 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 			deps := unitDeps()
 			recorder := &promptRecorder{reply: goodDraft}
 			deps.LLM = recorder
-			deps.Policies = policyStub{rules: tc.policy}
 			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: down})
-			sc.Spec.LinkRules = tc.rules
+			sc.Links = linksOf(tc.rules)
 
 			if _, runErr := steps.GenerateBody(deps).Run(t.Context(), sc); runErr != nil {
 				t.Fatalf("GenerateBody: %v", runErr)
@@ -952,7 +953,7 @@ func TestRepairLinksLeavesALinkTheBudgetCannotHold(t *testing.T) {
 		run.ArtifactLinkContext: owingContext(t),
 		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Our espresso starts with the coffee we roast.</p>"),
 	})
-	sc.Spec.LinkRules.MaxLinks = 1
+	sc.Links.Rules.MaxLinks = 1
 
 	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
 	if err != nil {
@@ -979,7 +980,7 @@ func TestRepairLinksPutsTheKeywordInTheLeadAndTheAnchorWhereTheParentLinkMayGo(t
 		run.ArtifactLinkContext: blob,
 		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>A shot of the good stuff.</p><p>Second thoughts.</p>"),
 	})
-	sc.Spec.LinkRules.ParentLinkWithinParagraphs = 1
+	sc.Links.Rules.ParentLinkWithinParagraphs = 1
 
 	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
 	if err != nil {
@@ -1161,7 +1162,7 @@ func TestRepairLinksHonoursTheIterationParameter(t *testing.T) {
 			if tc.param != nil {
 				sc.Params = map[string]any{steps.ParamIterations: tc.param}
 			}
-			sc.Spec.LinkRules.ParentLinkWithinParagraphs = 1
+			sc.Links.Rules.ParentLinkWithinParagraphs = 1
 
 			result, err := steps.RepairLinks(local).Run(t.Context(), sc)
 			if err != nil {
@@ -1201,7 +1202,7 @@ func TestWriterCeilingGrowsWithTheTemplateAndTheAttempt(t *testing.T) {
 
 	long := spec()
 	long.Sections = []template.Section{{Heading: "Overview", TargetWords: 1800, Required: true}}
-	short := template.TemplateSpec{Length: template.Length{Max: 200}, LinkRules: spec().LinkRules}
+	short := template.TemplateSpec{Length: template.Length{Max: 200}}
 
 	for _, tc := range []struct {
 		name     string
@@ -1347,9 +1348,9 @@ func TestMaxTokensFallsBackToTheTemplateLength(t *testing.T) {
 		{name: "sections carry the target", spec: spec()},
 		{
 			name: "only a length ceiling",
-			spec: template.TemplateSpec{Length: template.Length{Max: 400}, LinkRules: spec().LinkRules},
+			spec: template.TemplateSpec{Length: template.Length{Max: 400}},
 		},
-		{name: "nothing at all", spec: template.TemplateSpec{LinkRules: spec().LinkRules}},
+		{name: "nothing at all", spec: template.TemplateSpec{}},
 	}
 
 	for _, tc := range cases {
@@ -1392,7 +1393,7 @@ func TestTheWriterPromptCarriesTheBrief(t *testing.T) {
 	blob := linkContextBlob(t, deps)
 
 	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
-	sc.Spec.LinkRules.ParentLinkWithinParagraphs = 2
+	sc.Links.Rules.ParentLinkWithinParagraphs = 2
 	sc.Spec.Sections[0].KeywordRules.PrimaryInHeading = true
 
 	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {

@@ -40,10 +40,7 @@ func Validate(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
+			policy := sc.Links
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {
 				return run.Result{}, err

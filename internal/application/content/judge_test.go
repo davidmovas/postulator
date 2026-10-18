@@ -9,10 +9,12 @@ import (
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -57,42 +59,36 @@ func (e edgeStub) ListBySite(context.Context, string) ([]graph.Edge, error) {
 }
 
 type specStub struct {
-	rules *template.LinkRules
-	err   error
+	err error
 }
 
 func (s specStub) ResolveForPage(context.Context, templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
 	if s.err != nil {
 		return templates.ResolveForPageResponse{}, s.err
 	}
-	rules := template.LinkRules{UpDepth: 1, DownLinks: true, MaxLinks: 10, MaxPerTarget: 1}
-	if s.rules != nil {
-		rules = *s.rules
-	}
 	return templates.ResolveForPageResponse{
 		TemplateID: "t1", SiteID: "site", Version: 1,
-		Spec: template.TemplateSpec{
-			Tone:      "plain",
-			Length:    template.Length{Min: 200, Max: 900},
-			LinkRules: rules,
-		},
+		Spec: template.TemplateSpec{Tone: "plain", Length: template.Length{Min: 200, Max: 900}},
 	}, nil
 }
 
-type policyStub struct {
-	rules template.LinkRules
+type typesStub struct {
+	rules *field.LinkRules
 	err   error
 }
 
-func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error) {
-	if p.err != nil {
-		return templates.GetEffectivePolicyResponse{}, p.err
+func (s typesStub) Set(context.Context, string) (pagetype.Set, error) {
+	if s.err != nil {
+		return pagetype.Set{}, s.err
 	}
-	return templates.GetEffectivePolicyResponse{
-		Policy: templates.LinkPolicy{
-			Rules: p.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user",
-		},
-	}, nil
+	rules := field.LinkRules{UpDepth: 1, DownLinks: true, MaxLinks: 10, MaxPerTarget: 1}
+	if s.rules != nil {
+		rules = *s.rules
+	}
+	entity := pagetype.Type{ID: "type-entity", SiteID: "site", Name: "Entity", Preset: pagetype.Entity}
+	body := pagetype.DefaultScope(pagetype.Entity, field.Body, entity.ID)
+	body.Links.Rules = rules
+	return pagetype.NewSet([]pagetype.Type{entity}, []field.Scope{body}), nil
 }
 
 type profileStub struct {
@@ -183,7 +179,7 @@ func newService(model *llmStub, mutate func(*appcontent.Deps)) *appcontent.Servi
 		Entities: entityStub{items: entities()},
 		Edges:    edgeStub{items: edges()},
 		Specs:    specStub{},
-		Policies: policyStub{},
+		Types:    typesStub{},
 		Profiles: profileStub{},
 		Raw:      rawStub{body: "<h1>Espresso</h1><p>Espresso is a way to make coffee.</p>"},
 		LLM:      model,
@@ -339,11 +335,10 @@ func TestJudgePlansTheLinksOfThePageItAudits(t *testing.T) {
 			want:   "- /coffee/espresso/ (up",
 		},
 		{
-			name:   "a template with no link rules of its own takes the site policy's",
+			name:   "the page's type gives the rules its links are planned on",
 			pageID: "page-child",
 			mutate: func(d *appcontent.Deps) {
-				d.Specs = specStub{rules: &template.LinkRules{}}
-				d.Policies = policyStub{rules: template.LinkRules{UpDepth: 1, MaxPerTarget: 1}}
+				d.Types = typesStub{rules: &field.LinkRules{UpDepth: 1, MaxPerTarget: 1}}
 			},
 			want: "- /coffee/ (up",
 		},
@@ -414,7 +409,7 @@ func TestJudgeRefusesWhatItCannotAudit(t *testing.T) {
 		},
 		{
 			name: "the policy cannot be read", pageID: "page-child", want: errors.External,
-			mutate: func(d *appcontent.Deps) { d.Policies = policyStub{err: boom} },
+			mutate: func(d *appcontent.Deps) { d.Types = typesStub{err: boom} },
 		},
 		{
 			name: "the entity is gone", pageID: "page-child", want: errors.NotFound,

@@ -46,17 +46,12 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
-
 			call, err := modelFor(ctx, deps, sc, NameGenerateBody, domainllm.RoleWriter)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
+			brief := content.NewBrief(sc.Spec, sc.Links.Rules, sc.Page, entity, lc)
 			request, err := stepRequest(sc, call, bodyPrompt{
 				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
 			}, writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts))

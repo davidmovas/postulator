@@ -3,6 +3,7 @@ package content
 import (
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -64,7 +65,7 @@ func briefKeywords(keywords keyword.List, rules template.KeywordRules) []BriefKe
 	return out
 }
 
-func NewBrief(spec template.TemplateSpec, rules template.LinkRules, page pagemap.Page, entity graph.Entity, lc LinkContext) Brief {
+func NewBrief(spec template.TemplateSpec, rules field.LinkRules, page pagemap.Page, entity graph.Entity, lc LinkContext) Brief {
 	keywords := pagemap.Keywords(page, entity)
 	brief := Brief{
 		Title:          strings.TrimSpace(page.Title),
@@ -123,7 +124,7 @@ func NewBrief(spec template.TemplateSpec, rules template.LinkRules, page pagemap
 	return brief
 }
 
-func owedWithin(lc LinkContext, rules template.LinkRules) []LinkTarget {
+func owedWithin(lc LinkContext, rules field.LinkRules) []LinkTarget {
 	if rules.MaxLinks <= 0 || len(lc.Targets) <= rules.MaxLinks {
 		return lc.Targets
 	}

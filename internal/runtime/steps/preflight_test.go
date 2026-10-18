@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/images"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -34,7 +35,7 @@ func preflightRun(recipe []template.StepSpec, targets ...pagemap.Page) (record r
 	planned = make(map[string]run.Target, len(targets))
 	for i := range targets {
 		record.Targets = append(record.Targets, targets[i].ID)
-		planned[targets[i].ID] = run.Target{Page: targets[i], Spec: spec()}
+		planned[targets[i].ID] = run.Target{Page: targets[i], Spec: spec(), Links: unitLinks()}
 	}
 	return record, planned
 }
@@ -162,18 +163,13 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 func TestThePreflightOwesWhatTheStepWillResolve(t *testing.T) {
 	t.Parallel()
 
-	parentOnly := template.LinkRules{UpDepth: 1, MaxPerTarget: 1}
-	downOnly := template.LinkRules{DownLinks: true, MaxPerTarget: 1}
-
 	cases := []struct {
-		name     string
-		site     template.LinkRules
-		template template.LinkRules
-		owed     bool
+		name  string
+		rules field.LinkRules
+		owed  bool
 	}{
-		{name: "the template asks for the parent", template: parentOnly, owed: true},
-		{name: "a template without rules inherits the site's", site: parentOnly, owed: true},
-		{name: "the template's own rules win over the site's", site: parentOnly, template: downOnly},
+		{name: "the page type asks for the parent", rules: field.LinkRules{UpDepth: 1, MaxPerTarget: 1}, owed: true},
+		{name: "the page type links down only", rules: field.LinkRules{DownLinks: true, MaxPerTarget: 1}},
 	}
 
 	for _, tc := range cases {
@@ -188,13 +184,11 @@ func TestThePreflightOwesWhatTheStepWillResolve(t *testing.T) {
 				{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("parent")},
 				{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child")},
 			}}
-			deps.Policies = policyStub{rules: tc.site}
-
 			sc := unitContext(t, nil)
-			sc.Spec.LinkRules = tc.template
+			sc.Links = linksOf(tc.rules)
 			record, targets := preflightRun([]template.StepSpec{{Name: steps.NameResolveContext, Enabled: true}}, sc.Page)
 			target := targets[sc.Page.ID]
-			target.Spec.LinkRules = tc.template
+			target.Links = linksOf(tc.rules)
 			targets[sc.Page.ID] = target
 
 			findings, err := steps.ResolveContext(deps).Preflight(t.Context(), record, targets)

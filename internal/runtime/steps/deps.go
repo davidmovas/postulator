@@ -10,11 +10,11 @@ import (
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/observe"
-	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -65,9 +65,8 @@ type fieldRecorder interface {
 	Record(ctx context.Context, pageID string, key field.Key, value, runID string, at time.Time) error
 }
 
-type templateReader interface {
-	GetEffectivePolicy(ctx context.Context, req templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error)
-	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
 type profileResolver interface {
@@ -104,7 +103,7 @@ type Deps struct {
 	Sites         siteReader
 	SiteWriter    siteWriter
 	WordPress     siteClients
-	Policies      templateReader
+	Types         typeSets
 	Profiles      profileResolver
 	Content       judgeService
 	LLM           llm.Client

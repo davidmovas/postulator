@@ -14,7 +14,9 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -66,6 +68,7 @@ type pipeline struct {
 	recipe  []template.StepSpec
 	llm     *fake.Scripted
 	current *clock.Fake
+	types   *pagetypes.Service
 }
 
 func guideSpec(t *testing.T) template.Template {
@@ -170,6 +173,7 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 	return &pipeline{
 		store: store, server: server, siteID: owner.ID, pageID: childPage.ID,
 		parent: nested[0].ID, recipe: guide.Spec.Recipe,
+		types: typedSite(t, store, owner.ID, field.LinkRules(guide.Spec.LinkRules)),
 		runs:  sqlite.NewRunRepo(store),
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
@@ -215,7 +219,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 		Sites:         sqlite.NewSiteRepo(p.store),
 		SiteWriter:    sqlite.NewSiteRepo(p.store),
 		WordPress:     oneClient{client: syncClient(t, p.server)},
-		Policies:      specs,
+		Types:         p.types,
 		Profiles:      stubProfiles{},
 		Content:       appcontent.New(appcontent.Deps{Profiles: stubProfiles{}, LLM: p.llm}),
 		LLM:           p.llm,
@@ -229,7 +233,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 
 	engine := runtime.New(runtime.Deps{
 		Runs: p.runs, Items: p.items, Artifacts: p.blobs, Execs: sqlite.NewStepExecRepo(p.store),
-		Events: sqlite.NewRunEventRepo(p.store), Pages: p.pages, Specs: specs,
+		Events: sqlite.NewRunEventRepo(p.store), Pages: p.pages, Specs: specs, Types: p.types,
 		Keys: stubKeys{}, Spend: sqlite.NewLLMCallRepo(p.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
 		Tuning: stubTuning{}, UnitOfWork: p.store, Publisher: &recorder{},
 	}, registry, runtime.Config{

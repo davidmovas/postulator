@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -62,18 +63,18 @@ func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 	harness := newHarness(t, 1)
 	repair := pricedStep("repair_links", llm.RoleLinker, run.Price{
 		OutputTokens: 256,
-		Calls: func(spec template.TemplateSpec, params map[string]any) int {
-			return spec.LinkRules.UpDepth * 2
+		Calls: func(target run.Target, params map[string]any) int {
+			return target.Links.Rules.UpDepth * 2
 		},
 	})
 	engine := harness.engine(t, mustRegister(t, repair))
 
-	harness.specs.spec = template.TemplateSpec{LinkRules: template.LinkRules{UpDepth: 1}}
+	harness.types.rules = field.LinkRules{UpDepth: 1}
 	one, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
-	harness.specs.spec = template.TemplateSpec{LinkRules: template.LinkRules{UpDepth: 3}}
+	harness.types.rules = field.LinkRules{UpDepth: 3}
 	three, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
@@ -82,13 +83,13 @@ func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 		t.Fatalf("three levels of parents cost %d against one level's %d", three.Tokens, one.Tokens)
 	}
 
-	harness.specs.spec = template.TemplateSpec{}
+	harness.types.rules = field.LinkRules{}
 	none, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
 	if none.Tokens != 0 || none.USD != 0 {
-		t.Fatalf("a template that asks for no parent links costs %+v", none)
+		t.Fatalf("a page type that asks for no parent links costs %+v", none)
 	}
 }
 
@@ -157,7 +158,7 @@ func TestEstimateWarnsWhenAPageWantsImagesTheRecipeWillNotDraw(t *testing.T) {
 				Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
 				Produces: []run.ArtifactKind{run.ArtifactImages},
 				Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
-				Price:    run.Price{Calls: func(template.TemplateSpec, map[string]any) int { return 0 }},
+				Price:    run.Price{Calls: func(run.Target, map[string]any) int { return 0 }},
 			}
 			engine := harness.engine(t, mustRegister(t, body, images))
 			harness.specs.spec = template.TemplateSpec{Images: tc.images}
@@ -195,7 +196,7 @@ func TestAStepThatMakesNoCallIsNotReportedUnpriced(t *testing.T) {
 		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
 		Price: run.Price{
 			Unpriced: true,
-			Calls:    func(spec template.TemplateSpec, _ map[string]any) int { return spec.Images.Wanted() },
+			Calls:    func(target run.Target, _ map[string]any) int { return target.Spec.Images.Wanted() },
 		},
 	}
 	engine := harness.engine(t, mustRegister(t, images))
@@ -605,7 +606,7 @@ func TestEstimatePricesImagesOnTheModelThatDrawsThem(t *testing.T) {
 		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
 		Price: run.Price{
 			Ref: &drawer, OutputTokens: 1000,
-			Calls: func(spec template.TemplateSpec, _ map[string]any) int { return spec.Images.Inline },
+			Calls: func(target run.Target, _ map[string]any) int { return target.Spec.Images.Inline },
 		},
 	}
 	engine := harness.engine(t, mustRegister(t, images))

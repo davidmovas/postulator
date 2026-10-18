@@ -13,11 +13,14 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -92,8 +95,38 @@ type factory struct {
 	log    *sqlite.RunEventRepo
 	llm    *fake.Scripted
 	bus    *recorder
+	types  *pagetypes.Service
 	siteID string
 	pageID string
+}
+
+func typedSite(t *testing.T, store *sqlite.Store, siteID string, rules field.LinkRules) *pagetypes.Service {
+	t.Helper()
+
+	service := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: silentPublisher{}, Clock: clock.System{},
+	})
+	if err := service.Seed(t.Context(), siteID); err != nil {
+		t.Fatalf("seed the page types: %v", err)
+	}
+	listed, err := service.List(t.Context(), pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("list the page types: %v", err)
+	}
+	for i := range listed.Types {
+		preset := pagetype.Preset(listed.Types[i].Preset)
+		if !preset.Writable() {
+			continue
+		}
+		links := field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+		if _, err = service.SetScope(t.Context(), pagetypes.SetScopeRequest{
+			PageTypeID: listed.Types[i].ID, Field: string(pagetype.LinkField(preset)), Enabled: true, AIWrites: true, Links: links,
+		}); err != nil {
+			t.Fatalf("give the %s type the fixture's rules: %v", preset, err)
+		}
+	}
+	return service
 }
 
 func recipe() []template.StepSpec {
@@ -206,6 +239,7 @@ func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec
 
 	return &factory{
 		store: store,
+		types: typedSite(t, store, owner.ID, field.LinkRules(chosen.LinkRules)),
 		runs:  sqlite.NewRunRepo(store),
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
@@ -269,7 +303,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 		Edges:    sqlite.NewEdgeRepo(f.store),
 		Pages:    sqlite.NewPageRepo(f.store),
 		Sites:    sqlite.NewSiteRepo(f.store),
-		Policies: specs,
+		Types:    f.types,
 		Profiles: stubProfiles{},
 		LLM:      f.llm,
 	}); err != nil {
@@ -278,7 +312,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 
 	engine := runtime.New(runtime.Deps{
 		Runs: f.runs, Items: f.items, Artifacts: f.blobs, Execs: sqlite.NewStepExecRepo(f.store),
-		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs, Keys: stubKeys{},
+		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs, Types: f.types, Keys: stubKeys{},
 		Spend: sqlite.NewLLMCallRepo(f.store), Catalog: stubCatalog{}, Profiles: stubProfiles{}, Tuning: stubTuning{},
 		UnitOfWork: f.store, Publisher: f.bus,
 	}, registry, runtime.Config{

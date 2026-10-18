@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 var stamp = time.Date(2026, time.October, 18, 12, 0, 0, 0, time.UTC)
@@ -228,6 +229,31 @@ func TestEachPresetCarriesTheFormerRules(t *testing.T) {
 				t.Errorf("policy = %+v, want %+v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestEachPresetAnswersWhatItsBuiltInTemplateAnswered(t *testing.T) {
+	t.Parallel()
+
+	kinds := map[string][]pagetype.Preset{
+		"hub": {pagetype.Hub}, "category": {pagetype.StoreCategory, pagetype.Catalog}, "guide": {pagetype.Entity},
+	}
+	checked := 0
+	for _, seed := range template.Seed() {
+		for _, preset := range kinds[seed.PageKind] {
+			got := pagetype.DefaultScope(preset, pagetype.LinkField(preset), "type-1").Links
+			want := field.LinkPolicy{
+				Links: true, Rules: field.LinkRules(seed.Spec.LinkRules), ForbidExternal: true, ForbidSelf: true,
+				AnchorStrategy: field.AnchorPreferUser,
+			}
+			if got != want {
+				t.Errorf("%s answers %+v, the built-in %s answered %+v under the Default policy", preset, got, seed.Name, want)
+			}
+			checked++
+		}
+	}
+	if checked != 4 {
+		t.Fatalf("compared %d presets with their built-ins, want 4", checked)
 	}
 }
 

@@ -5,8 +5,8 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -40,7 +40,7 @@ func (b siteBody) put(ctx context.Context, client *wp.Client, page pagemap.Page,
 	return client.PutRaw(ctx, onSiteType(page), *page.WPID, rendered, b.raw.ContentHash)
 }
 
-func backfill(doc *content.Document, lc content.LinkContext, policy template.LinkPolicy,
+func backfill(doc *content.Document, lc content.LinkContext, policy field.LinkPolicy,
 	target content.LinkTarget) (placement content.InsertResult, sentence string) {
 	placement = content.InsertTarget(doc, lc, policy, target)
 	if _, inserted := insertedAnchor(placement); inserted || !writable(placement) || len(target.Anchors) == 0 {

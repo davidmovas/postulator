@@ -6,9 +6,9 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -53,10 +53,7 @@ func RelinkPage(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
+			policy := sc.Links
 			if reason, held := offLimits(sc.Page); held {
 				return needsHuman("the page " + sc.Page.Path + " " + reason), nil
 			}
@@ -126,7 +123,7 @@ func (w *pageRelink) read(raw wp.RawContent) {
 }
 
 func (w *pageRelink) place(doc *content.Document, lc content.LinkContext,
-	policy template.LinkPolicy, page pagemap.Page, live map[string]bool) {
+	policy field.LinkPolicy, page pagemap.Page, live map[string]bool) {
 	for i := range lc.Targets {
 		target := lc.Targets[i]
 		if target.PageID == page.ID || target.PageID == "" {
@@ -137,7 +134,7 @@ func (w *pageRelink) place(doc *content.Document, lc content.LinkContext,
 	w.result.Findings = append(w.result.Findings, content.Unpublished(doc, lc, live, page.ID)...)
 }
 
-func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, policy template.LinkPolicy,
+func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, policy field.LinkPolicy,
 	page pagemap.Page, target content.LinkTarget, live bool) PlacedLink {
 	var (
 		placement content.InsertResult

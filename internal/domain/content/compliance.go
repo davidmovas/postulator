@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
 type Severity string
@@ -51,7 +51,7 @@ const (
 	warnPenalty  = 0.05
 )
 
-func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageID string) Report {
+func Compliance(doc *Document, lc LinkContext, policy field.LinkPolicy, pageID string) Report {
 	report := Report{Items: make([]Finding, 0)}
 
 	for _, target := range lc.Targets {

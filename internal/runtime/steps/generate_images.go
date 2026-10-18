@@ -69,11 +69,11 @@ func GenerateImages(deps Deps) run.StepDef {
 			Ref:          deps.ImageModel,
 			OutputTokens: imageOutputTokens,
 			Unpriced:     deps.ImageModel == nil,
-			Calls: func(spec template.TemplateSpec, _ map[string]any) int {
-				if spec.Images.Source != template.ImagesAI {
+			Calls: func(target run.Target, _ map[string]any) int {
+				if target.Spec.Images.Source != template.ImagesAI {
 					return 0
 				}
-				return spec.Images.Wanted()
+				return target.Spec.Images.Wanted()
 			},
 		},
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
@@ -104,7 +105,7 @@ func TestComplianceOnHandWrittenBodies(t *testing.T) {
 			t.Parallel()
 
 			doc := mustParse(t, tc.body)
-			report := content.Compliance(doc, lc, policy(template.LinkRules{}), "self")
+			report := content.Compliance(doc, lc, policy(field.LinkRules{}), "self")
 
 			if len(report.Items) != len(tc.codes) {
 				t.Fatalf("findings = %v, want %v", codesOf(report), tc.codes)
@@ -172,7 +173,7 @@ func TestCompliancePolicySwitchesAndCaps(t *testing.T) {
 		`<a href="https://example.com/">elsewhere</a>.</p>`
 	doc := mustParse(t, body)
 
-	permissive := template.LinkPolicy{Rules: template.LinkRules{MaxLinks: 2}}
+	permissive := field.LinkPolicy{Rules: field.LinkRules{MaxLinks: 2}}
 	report := content.Compliance(doc, lc, permissive, "self")
 	if hasCode(report, content.CodeSelfLink) || hasCode(report, content.CodeExternalLink) {
 		t.Fatalf("a permissive policy allows both: %v", codesOf(report))
@@ -181,7 +182,7 @@ func TestCompliancePolicySwitchesAndCaps(t *testing.T) {
 		t.Fatalf("a permissive policy reports no error: %v", codesOf(report))
 	}
 
-	strict := content.Compliance(doc, lc, policy(template.LinkRules{}), "self")
+	strict := content.Compliance(doc, lc, policy(field.LinkRules{}), "self")
 	if !strict.HasErrors() {
 		t.Fatalf("a strict policy reports errors: %v", codesOf(strict))
 	}
@@ -195,7 +196,7 @@ func TestTheLinkCapCountsGraphLinksOnBothSides(t *testing.T) {
 		target("/b/", []string{"bravo"}, content.RelationDown, false),
 		target("/c/", []string{"charlie"}, content.RelationDown, false),
 	)
-	rules := template.LinkRules{MaxLinks: 2}
+	rules := field.LinkRules{MaxLinks: 2}
 
 	cases := []struct {
 		name    string
@@ -257,7 +258,7 @@ func TestComplianceFloorsTheScore(t *testing.T) {
 	}
 
 	report := content.Compliance(mustParse(t, "<p>Nothing.</p>"), contextOf(targets...),
-		policy(template.LinkRules{}), "self")
+		policy(field.LinkRules{}), "self")
 	if report.Score != 0 {
 		t.Fatalf("Score = %v, want the floor", report.Score)
 	}

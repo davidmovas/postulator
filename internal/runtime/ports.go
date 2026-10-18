@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -59,6 +60,10 @@ type pageReader interface {
 
 type specResolver interface {
 	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
+}
+
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
 type keyStore interface {

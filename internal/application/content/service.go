@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
@@ -30,8 +31,8 @@ type specResolver interface {
 	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
 }
 
-type policyReader interface {
-	GetEffectivePolicy(ctx context.Context, req templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error)
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
 type profileResolver interface {
@@ -47,7 +48,7 @@ type Deps struct {
 	Entities entityStore
 	Edges    edgeStore
 	Specs    specResolver
-	Policies policyReader
+	Types    typeSets
 	Profiles profileResolver
 	Raw      rawReader
 	LLM      llm.Client

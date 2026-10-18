@@ -109,8 +109,12 @@ func (e *Engine) planTargets(ctx context.Context, record run.Run, assigned map[s
 	_, ownsRecipe := record.Kind.Recipe()
 	undrawn := writesWithoutImages(record.Recipe)
 	pages := e.targetPages(ctx, record.Targets)
+	types, err := e.deps.Types.Set(ctx, record.SiteID)
+	if err != nil {
+		return nil, err
+	}
 	for _, targetID := range record.Targets {
-		target := run.Target{Page: pages[targetID]}
+		target := run.Target{Page: pages[targetID], Links: types.Policy(pages[targetID])}
 		resolved, err := e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{
 			PageID: targetID, TemplateID: assigned[targetID],
 		})
@@ -163,7 +167,7 @@ func pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
 }
 
 func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, target *run.Target, priced *pricing) error {
-	calls := callsOf(def, target.Spec, run.ParamsFor(record.Recipe, def.Name))
+	calls := callsOf(def, *target, run.ParamsFor(record.Recipe, def.Name))
 	if calls == 0 {
 		return nil
 	}
@@ -278,11 +282,11 @@ func outputOf(def run.StepDef, body int) int {
 	return body
 }
 
-func callsOf(def run.StepDef, spec template.TemplateSpec, params map[string]any) int {
+func callsOf(def run.StepDef, target run.Target, params map[string]any) int {
 	if def.Price.Calls == nil {
 		return 1
 	}
-	return max(def.Price.Calls(spec, params), 0)
+	return max(def.Price.Calls(target, params), 0)
 }
 
 func targetWords(spec template.TemplateSpec, wpType pagemap.WPType) int {

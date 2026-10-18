@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
-	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -32,7 +32,6 @@ const (
 	ReasonNeighborGone       = "the neighbor is no longer on the site"
 	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
 	ReasonNeighborUnmapped   = "the neighbor is not mapped to an entity, so it has no rules of its own"
-	ReasonNeighborNoTemplate = "the neighbor has no template, so nothing says what it may link to"
 	ReasonNeighborIsATerm    = "the neighbor is a product category, whose description the companion plugin does not write"
 
 	ReasonNeighborOwesNothing = "the rules of the neighbor do not ask it to link to this page"
@@ -108,7 +107,7 @@ type neighborhood struct {
 	site   pagemap.Site
 	index  pagemap.Index
 	graph  graph.Graph
-	base   template.LinkPolicy
+	types  pagetype.Set
 }
 
 func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighborhood, error) {
@@ -120,7 +119,7 @@ func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighb
 	if err != nil {
 		return neighborhood{}, err
 	}
-	base, err := effectivePolicy(ctx, deps, sc.Run.SiteID, template.TemplateSpec{})
+	types, err := deps.Types.Set(ctx, sc.Run.SiteID)
 	if err != nil {
 		return neighborhood{}, err
 	}
@@ -152,7 +151,7 @@ func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighb
 
 	return neighborhood{
 		client: client, lc: lc, entity: entity, page: sc.Page, site: pagemap.NewSite(owner.BaseURL),
-		index: pagemap.NewIndex(pages), graph: built, base: base,
+		index: pagemap.NewIndex(pages), graph: built, types: types,
 	}, nil
 }
 
@@ -244,7 +243,7 @@ func (n neighborhood) candidates() []candidate {
 
 type owedLink struct {
 	lc     content.LinkContext
-	policy template.LinkPolicy
+	policy field.LinkPolicy
 	target content.LinkTarget
 }
 
@@ -253,51 +252,34 @@ func (n neighborhood) relinkOne(ctx context.Context, deps Deps, neighbor pagemap
 		PageID: neighbor.ID, Path: neighbor.Path, Type: string(neighbor.WPType), WPID: *neighbor.WPID,
 	}
 
-	owed, reason, err := n.owedBy(ctx, deps, neighbor)
-	if err != nil {
-		return NeighborResult{}, err
-	}
+	owed, reason := n.owedBy(neighbor)
 	if reason != "" {
 		return skip(outcome, reason), nil
 	}
 	return n.placeOwed(ctx, deps, neighbor, owed, outcome)
 }
 
-func (n neighborhood) owedBy(ctx context.Context, deps Deps, neighbor pagemap.Page) (owed owedLink, standDown string, err error) {
+func (n neighborhood) owedBy(neighbor pagemap.Page) (owed owedLink, standDown string) {
 	if neighbor.EntityID == nil {
-		return owedLink{}, ReasonNeighborUnmapped, nil
-	}
-	lc, policy, err := n.planOf(ctx, deps, neighbor)
-	if errors.IsCode(err, errors.NotFound) {
-		return owedLink{}, ReasonNeighborNoTemplate, nil
-	}
-	if err != nil {
-		return owedLink{}, "", err
-	}
-
-	target, found := lc.ByPageID(n.page.ID)
-	if !found {
-		return owedLink{}, owedReason(lc, n.page), nil
+		return owedLink{}, ReasonNeighborUnmapped
 	}
 	if neighbor.WPType == pagemap.WPProductCategory {
-		return owedLink{}, ReasonNeighborIsATerm, nil
+		return owedLink{}, ReasonNeighborIsATerm
 	}
-	return owedLink{lc: lc, policy: policy, target: target}, "", nil
+	lc, policy := n.planOf(neighbor)
+	target, found := lc.ByPageID(n.page.ID)
+	if !found {
+		return owedLink{}, owedReason(lc, n.page)
+	}
+	return owedLink{lc: lc, policy: policy, target: target}, ""
 }
 
-func (n neighborhood) planOf(ctx context.Context, deps Deps, neighbor pagemap.Page) (content.LinkContext, template.LinkPolicy, error) {
-	resolved, err := deps.Policies.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: neighbor.ID})
-	if err != nil {
-		return content.LinkContext{}, template.LinkPolicy{}, err
-	}
-
-	policy := n.base
-	policy.Rules = templates.EffectiveRules(n.base.Rules, resolved.Spec.LinkRules)
-
+func (n neighborhood) planOf(neighbor pagemap.Page) (content.LinkContext, field.LinkPolicy) {
+	policy := n.types.Policy(neighbor)
 	plan := content.PlanLinks(n.graph, n.index, content.Subject{
 		Site: n.site, PageID: neighbor.ID, PagePath: neighbor.Path, EntityID: *neighbor.EntityID,
 	}, policy)
-	return plan.Context, policy, nil
+	return plan.Context, policy
 }
 
 func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap.Page, owed owedLink,
@@ -361,8 +343,8 @@ func owedReason(lc content.LinkContext, page pagemap.Page) string {
 func quiet(outcome NeighborResult) bool {
 	switch outcome.Outcome {
 	case OutcomeSkipped:
-		return outcome.Detail == ReasonNeighborOwesNothing || outcome.Detail == ReasonNeighborNoTemplate ||
-			outcome.Detail == ReasonNeighborUnmapped || outcome.Detail == ReasonNeighborOwesTheCanonicalPage
+		return outcome.Detail == ReasonNeighborOwesNothing || outcome.Detail == ReasonNeighborUnmapped ||
+			outcome.Detail == ReasonNeighborOwesTheCanonicalPage
 	case OutcomeUnchanged:
 		return !outcome.missing
 	default:

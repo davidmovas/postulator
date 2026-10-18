@@ -3,7 +3,7 @@ package reports
 import (
 	"encoding/json"
 
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
@@ -99,10 +99,7 @@ type RunReportResponse struct {
 
 type SkipReason string
 
-const (
-	SkipUnmapped   SkipReason = "unmapped"
-	SkipNoTemplate SkipReason = "no_template"
-)
+const SkipUnmapped SkipReason = "unmapped"
 
 type LinkState string
 
@@ -211,9 +208,9 @@ type ExtraLink struct {
 }
 
 type LinkAuditPageResponse struct {
-	Page       PageAudit          `json:"page"`
-	TemplateID string             `json:"templateId"`
-	Rules      template.LinkRules `json:"rules"`
-	Required   []RequiredLink     `json:"required"`
-	Extra      []ExtraLink        `json:"extra"`
+	Page       PageAudit       `json:"page"`
+	TemplateID string          `json:"templateId"`
+	Rules      field.LinkRules `json:"rules"`
+	Required   []RequiredLink  `json:"required"`
+	Extra      []ExtraLink     `json:"extra"`
 }

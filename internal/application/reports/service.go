@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -69,6 +70,11 @@ type Deps struct {
 	Sites     siteReader
 	Specs     specResolver
 	Policies  policyReader
+	Types     typeSets
+}
+
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
 type Service struct {
@@ -82,13 +88,14 @@ type Service struct {
 	sites     siteReader
 	specs     specResolver
 	policies  policyReader
+	types     typeSets
 }
 
 func New(deps Deps) *Service {
 	return &Service{
 		entities: deps.Entities, edges: deps.Edges, pages: deps.Pages, links: deps.Links,
 		runs: deps.Runs, items: deps.Items, artifacts: deps.Artifacts,
-		sites: deps.Sites, specs: deps.Specs, policies: deps.Policies,
+		sites: deps.Sites, specs: deps.Specs, policies: deps.Policies, types: deps.Types,
 	}
 }
 

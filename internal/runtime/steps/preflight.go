@@ -74,13 +74,9 @@ func graphPreflight(deps Deps) run.Preflight {
 				continue
 			}
 
-			policy, policyErr := effectivePolicy(ctx, deps, record.SiteID, target.Spec)
-			if policyErr != nil {
-				return nil, policyErr
-			}
 			plan := content.PlanLinks(g, index, content.Subject{
 				Site: pagemap.NewSite(owner.BaseURL), PageID: page.ID, PagePath: page.Path, EntityID: entity.ID,
-			}, policy)
+			}, target.Links)
 			for _, blocked := range plan.Blocked {
 				if !blocked.Required {
 					continue

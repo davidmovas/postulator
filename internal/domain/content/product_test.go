@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -37,7 +38,7 @@ func storeProductPage() pagemap.Page {
 
 func productBrief(page pagemap.Page) content.Brief {
 	entity := graph.Entity{Name: "BPC-157 Liquid", Keywords: keyword.Of("bpc 157 liquid")}
-	return content.NewBrief(productSpec(), template.LinkRules{}, page, entity, content.LinkContext{})
+	return content.NewBrief(productSpec(), field.LinkRules{}, page, entity, content.LinkContext{})
 }
 
 func TestNewBriefWritesAProductUnderTheNameTheStoreGivesIt(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -17,6 +18,7 @@ type claim struct {
 	record    run.Run
 	page      pagemap.Page
 	spec      template.TemplateSpec
+	links     field.LinkPolicy
 	def       run.Definition
 	step      run.StepDef
 	artifacts map[run.ArtifactKind]run.Artifact
@@ -112,7 +114,11 @@ func (e *Engine) locate(ctx context.Context, held *claim) *run.Fault {
 		if err != nil {
 			return classified(err)
 		}
-		held.page = page
+		types, err := e.deps.Types.Set(ctx, page.SiteID)
+		if err != nil {
+			return classified(err)
+		}
+		held.page, held.links = page, types.Policy(page)
 	}
 	return nil
 }

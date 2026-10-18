@@ -7,6 +7,7 @@ import (
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -55,9 +56,12 @@ func RepairLinks(deps Deps) run.StepDef {
 		Timeout:  editorTimeout,
 		Price: run.Price{
 			OutputTokens: repairTokens,
-			Calls: func(spec template.TemplateSpec, params map[string]any) int {
-				phrases := spec.LinkRules.UpDepth
-				if spec.KeywordRules.PrimaryInFirstParagraph {
+			Calls: func(target run.Target, params map[string]any) int {
+				phrases := 0
+				if target.Links.Links {
+					phrases = target.Links.Rules.UpDepth
+				}
+				if target.Spec.KeywordRules.PrimaryInFirstParagraph {
 					phrases++
 				}
 				return iterations(params) * phrases
@@ -72,10 +76,7 @@ func RepairLinks(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
+			policy := sc.Links
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {
 				return run.Result{}, err
@@ -154,7 +155,7 @@ func iterations(params map[string]any) int {
 	return min(max(int(count), 1), maxIterations)
 }
 
-func nextOwed(doc *content.Document, result content.InsertResult, policy template.LinkPolicy,
+func nextOwed(doc *content.Document, result content.InsertResult, policy field.LinkPolicy,
 	spec template.TemplateSpec, primary string, settled map[string]struct{}) (owedPhrase, bool) {
 	if spec.KeywordRules.PrimaryInFirstParagraph && primary != "" {
 		if _, done := settled[primary]; !done && !leadCarries(doc, primary) {
@@ -184,7 +185,7 @@ func nextOwed(doc *content.Document, result content.InsertResult, policy templat
 	return owedPhrase{}, false
 }
 
-func placeFor(doc *content.Document, policy template.LinkPolicy, target content.LinkTarget) int {
+func placeFor(doc *content.Document, policy field.LinkPolicy, target content.LinkTarget) int {
 	if target.Relation == content.RelationUp {
 		return insertionPoint(doc, policy)
 	}
@@ -214,7 +215,7 @@ func leadCarries(doc *content.Document, phrase string) bool {
 	return found
 }
 
-func insertionPoint(doc *content.Document, policy template.LinkPolicy) int {
+func insertionPoint(doc *content.Document, policy field.LinkPolicy) int {
 	paragraphs := doc.Paragraphs()
 	if len(paragraphs) == 0 {
 		return 0

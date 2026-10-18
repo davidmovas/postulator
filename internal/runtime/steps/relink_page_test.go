@@ -244,7 +244,7 @@ func TestRelinkPageBackfillsWhatThePageOwes(t *testing.T) {
 			}
 			sc := relinkPageContext(t, deps, wpID)
 			if tc.cap > 0 {
-				sc.Spec.LinkRules.MaxLinks = tc.cap
+				sc.Links.Rules.MaxLinks = tc.cap
 			}
 
 			relinked, _, result := runRelinkPage(t, deps, sc)
@@ -321,7 +321,7 @@ func TestRelinkPageSpendsThePagesOwnCap(t *testing.T) {
 			deps = withGrandparent(deps, wpID)
 
 			sc := relinkPageContext(t, deps, wpID)
-			sc.Spec.LinkRules.MaxLinks = tc.cap
+			sc.Links.Rules.MaxLinks = tc.cap
 
 			relinked, _, _ := runRelinkPage(t, deps, sc)
 			if relinked.Linked != tc.want {

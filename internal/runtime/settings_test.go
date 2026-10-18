@@ -87,7 +87,7 @@ func TestEnqueueTakesItsDeadlineFromTheSetting(t *testing.T) {
 	h := newHarness(t, 1)
 	engine := runtime.New(runtime.Deps{
 		Runs: h.runs, Items: h.items, Artifacts: h.blobs, Execs: h.execs, Events: h.log,
-		Pages: pageRepoOf(h), Specs: h.specs, Spend: h.spend,
+		Pages: pageRepoOf(h), Specs: h.specs, Types: h.types, Spend: h.spend,
 		Keys:       &stubKeys{},
 		Catalog:    &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
 		Profiles:   &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},

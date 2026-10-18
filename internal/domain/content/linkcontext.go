@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 type Relation string
@@ -84,7 +84,7 @@ type Subject struct {
 	EntityID string
 }
 
-func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy template.LinkPolicy) LinkPlan {
+func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy field.LinkPolicy) LinkPlan {
 	plan := LinkPlan{
 		Context: LinkContext{
 			PageID: subject.PageID, PageURL: subject.PagePath, EntityID: subject.EntityID,
@@ -97,18 +97,20 @@ func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy templ
 	if !known {
 		return plan
 	}
+	page, mapped := canonical(index, self)
+	if subject.PageID == "" && mapped {
+		plan.Context.PageID = page.ID
+		plan.Context.PageURL = page.Path
+	}
+	if !policy.Links {
+		return plan
+	}
 
 	walk := planner{
 		g: g, index: index, seen: map[string]struct{}{subject.EntityID: {}},
 		targets: make([]LinkTarget, 0), blocked: make([]BlockedTarget, 0),
 	}
-
-	page, mapped := canonical(index, self)
-	switch {
-	case subject.PageID == "" && mapped:
-		plan.Context.PageID = page.ID
-		plan.Context.PageURL = page.Path
-	case subject.PageID != "" && mapped && page.ID != subject.PageID:
+	if subject.PageID != "" && mapped && page.ID != subject.PageID {
 		walk.targets = append(walk.targets, LinkTarget{
 			EntityID: self.ID, PageID: page.ID, URL: page.Path, Anchors: targetAnchors(self, g.Label(self.ID)),
 			Relation: RelationUp, Weight: 1,

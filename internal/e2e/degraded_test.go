@@ -591,7 +591,7 @@ func assertRelinkStoodDown(t *testing.T, final steps.FinalReport) []string {
 	}
 
 	standing := []string{steps.ReasonNoPlugin, steps.ReasonNeighborOwesNothing,
-		steps.ReasonNeighborOwesTheCanonicalPage, steps.ReasonNeighborUnmapped, steps.ReasonNeighborNoTemplate}
+		steps.ReasonNeighborOwesTheCanonicalPage, steps.ReasonNeighborUnmapped}
 
 	reasons := make([]string, 0, len(final.Relink.Neighbors))
 	for i := range final.Relink.Neighbors {

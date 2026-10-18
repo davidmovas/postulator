@@ -9,10 +9,10 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -130,7 +130,7 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 	if espresso.TemplateID != f.templateID {
 		t.Fatalf("templateId = %s, want %s", espresso.TemplateID, f.templateID)
 	}
-	rules := template.LinkRules{
+	rules := field.LinkRules{
 		UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 20, MaxPerTarget: 1,
 		ParentLinkWithinParagraphs: 2, ChildrenSection: true,
 	}
@@ -279,11 +279,14 @@ func TestTheAuditSaysWhyALinkIsAbsent(t *testing.T) {
 	}
 }
 
-func TestLinkAuditSkipsAPageWithoutATemplate(t *testing.T) {
+func TestLinkAuditAuditsAPageWithoutATemplateByItsType(t *testing.T) {
 	t.Parallel()
 
 	f := newFixture(t)
 	other := sqlitetest.Site(t, f.store, "bare")
+	if err := f.types.Seed(t.Context(), other.ID); err != nil {
+		t.Fatalf("seed the bare site's types: %v", err)
+	}
 	page := sqlitetest.Page(t, f.store, other.ID, "/alone/")
 	entity := sqlitetest.Entity(t, f.store, other.ID, "Alone")
 	page.EntityID = &entity.ID
@@ -295,11 +298,18 @@ func TestLinkAuditSkipsAPageWithoutATemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LinkAudit: %v", err)
 	}
-	if len(got.Pages) != 1 || got.Pages[0].SkipReason != "no_template" || got.Pages[0].Targets != 0 {
-		t.Fatalf("pages = %+v", got.Pages)
+	if len(got.Pages) != 1 || got.Pages[0].SkipReason != "" || got.Pages[0].Targets != 0 {
+		t.Fatalf("pages = %+v, want the page audited although no template answers for it", got.Pages)
 	}
-	if got.Totals.Audited != 0 || got.Totals.Pages != 1 {
+	if got.Totals.Audited != 1 || got.Totals.Pages != 1 {
 		t.Fatalf("totals = %+v", got.Totals)
+	}
+	detail, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: page.ID})
+	if err != nil {
+		t.Fatalf("LinkAuditPage: %v", err)
+	}
+	if detail.TemplateID != "" || detail.Rules.MaxLinks != 12 {
+		t.Fatalf("detail = template %q rules %+v, want no template and the Entity type's rules", detail.TemplateID, detail.Rules)
 	}
 }
 
@@ -431,7 +441,7 @@ func TestLinkAuditRefusesWhatItCannotRead(t *testing.T) {
 	}
 }
 
-func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules template.LinkRules) content.LinkContext {
+func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules field.LinkRules) content.LinkContext {
 	t.Helper()
 
 	entities, err := sqlite.NewEntityRepo(f.store).ListBySite(t.Context(), f.siteID)
@@ -457,7 +467,7 @@ func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules t
 
 	return content.PlanLinks(built, pagemap.NewIndex(pages), content.Subject{
 		Site: pagemap.NewSite(owner.BaseURL), PageID: page.ID, PagePath: page.Path, EntityID: entityID,
-	}, template.LinkPolicy{Rules: rules, ForbidExternal: true, ForbidSelf: true}).Context
+	}, field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true}).Context
 }
 
 func TestASecondPageOfAnEntityIsAuditedAndValidatedAlike(t *testing.T) {
@@ -505,8 +515,8 @@ func TestASecondPageOfAnEntityIsAuditedAndValidatedAlike(t *testing.T) {
 				t.Fatalf("parse the body: %v", err)
 			}
 
-			report := content.Compliance(doc, lc, template.LinkPolicy{
-				Rules: detail.Rules, ForbidExternal: true, ForbidSelf: true,
+			report := content.Compliance(doc, lc, field.LinkPolicy{
+				Links: true, Rules: detail.Rules, ForbidExternal: true, ForbidSelf: true,
 			}, second.ID)
 			selfLinks, offGraph := 0, 0
 			for _, item := range report.Items {

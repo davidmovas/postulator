@@ -7,7 +7,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
 type Outcome string
@@ -45,15 +45,15 @@ var forbiddenZones = []string{
 	"script", "style", "textarea", "noscript", "template", "iframe", "svg", "math",
 }
 
-func InsertLinks(doc *Document, lc LinkContext, policy template.LinkPolicy) InsertResult {
+func InsertLinks(doc *Document, lc LinkContext, policy field.LinkPolicy) InsertResult {
 	return insert(doc, lc, policy, lc.Targets)
 }
 
-func InsertTarget(doc *Document, lc LinkContext, policy template.LinkPolicy, only LinkTarget) InsertResult {
+func InsertTarget(doc *Document, lc LinkContext, policy field.LinkPolicy, only LinkTarget) InsertResult {
 	return insert(doc, lc, policy, []LinkTarget{only})
 }
 
-func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []LinkTarget) InsertResult {
+func insert(doc *Document, lc LinkContext, policy field.LinkPolicy, wanted []LinkTarget) InsertResult {
 	result := InsertResult{
 		Placed:    make([]Placement, 0, len(wanted)),
 		Missing:   make([]LinkTarget, 0),
@@ -118,9 +118,9 @@ func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []
 	return result
 }
 
-func anchorOrder(target LinkTarget, strategy template.AnchorStrategy, placed int) []string {
+func anchorOrder(target LinkTarget, strategy field.AnchorStrategy, placed int) []string {
 	shift := 0
-	if strategy == template.AnchorRotate && len(target.Anchors) > 1 {
+	if strategy == field.AnchorRotate && len(target.Anchors) > 1 {
 		shift = placed % len(target.Anchors)
 	}
 	if shift == 0 {
@@ -129,7 +129,7 @@ func anchorOrder(target LinkTarget, strategy template.AnchorStrategy, placed int
 	return append(slices.Clone(target.Anchors[shift:]), target.Anchors[:shift]...)
 }
 
-func insertOne(doc *Document, target LinkTarget, policy template.LinkPolicy, placed int) (Placement, Outcome, string) {
+func insertOne(doc *Document, target LinkTarget, policy field.LinkPolicy, placed int) (Placement, Outcome, string) {
 	limit := policy.Rules.ParentLinkWithinParagraphs
 	restricted := target.Relation == RelationUp && limit > 0
 

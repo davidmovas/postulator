@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -30,6 +31,7 @@ type StepContext struct {
 	Item      Item
 	Page      pagemap.Page
 	Spec      template.TemplateSpec
+	Links     field.LinkPolicy
 	Params    map[string]any
 	Artifacts map[ArtifactKind]Artifact
 	Check     Checkpoint
@@ -76,15 +78,16 @@ type Result struct {
 }
 
 type Price struct {
-	Calls        func(spec template.TemplateSpec, params map[string]any) int
+	Calls        func(target Target, params map[string]any) int
 	Ref          *llm.ModelRef
 	OutputTokens int
 	Unpriced     bool
 }
 
 type Target struct {
-	Page pagemap.Page
-	Spec template.TemplateSpec
+	Page  pagemap.Page
+	Spec  template.TemplateSpec
+	Links field.LinkPolicy
 }
 
 type Preflight func(ctx context.Context, record Run, targets map[string]Target) ([]EstimateFinding, error)

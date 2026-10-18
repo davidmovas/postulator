@@ -25,12 +25,7 @@ func InsertLinks(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
-
-			result := content.InsertLinks(doc, lc, policy)
+			result := content.InsertLinks(doc, lc, sc.Links)
 
 			body, err := doc.Render()
 			if err != nil {

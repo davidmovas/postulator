@@ -11,7 +11,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -100,7 +99,7 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 		return JudgeResponse{}, err
 	}
 
-	entity, targets, err := s.context(ctx, page, resolved.Spec)
+	entity, targets, err := s.context(ctx, page)
 	if err != nil {
 		return JudgeResponse{}, err
 	}
@@ -122,8 +121,7 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 	return JudgeResponse{PageID: page.ID, Path: page.Path, Report: assessed.Report, Tokens: assessed.Tokens}, nil
 }
 
-func (s *Service) context(ctx context.Context, page pagemap.Page,
-	spec template.TemplateSpec) (graph.Entity, []contentdomain.LinkTarget, error) {
+func (s *Service) context(ctx context.Context, page pagemap.Page) (graph.Entity, []contentdomain.LinkTarget, error) {
 	entities, err := s.deps.Entities.ListBySite(ctx, page.SiteID)
 	if err != nil {
 		return graph.Entity{}, nil, err
@@ -136,16 +134,11 @@ func (s *Service) context(ctx context.Context, page pagemap.Page,
 	if err != nil {
 		return graph.Entity{}, nil, err
 	}
-	effective, err := s.deps.Policies.GetEffectivePolicy(ctx, templates.GetEffectivePolicyRequest{SiteID: page.SiteID})
+	types, err := s.deps.Types.Set(ctx, page.SiteID)
 	if err != nil {
 		return graph.Entity{}, nil, err
 	}
-	policy := template.LinkPolicy{
-		Rules:          templates.EffectiveRules(effective.Policy.Rules, spec.LinkRules),
-		ForbidExternal: effective.Policy.ForbidExternal,
-		ForbidSelf:     effective.Policy.ForbidSelf,
-		AnchorStrategy: template.AnchorStrategy(effective.Policy.AnchorStrategy),
-	}
+	policy := types.Policy(page)
 
 	var entity graph.Entity
 	for i := range entities {
