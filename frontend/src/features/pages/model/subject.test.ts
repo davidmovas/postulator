@@ -19,8 +19,8 @@ describe("a finding's subject in words", () => {
         ["parent_cycle", { paths: ["/a/", "/b/"] }, "The parents loop through /a/ › /b/, so the loop is broken here."],
         [
             "parent_differs",
-            { workbook: "p1", derived: "p2", reason: "jsonld_breadcrumb" },
-            "The workbook names a different parent from the one above, which comes from the JSON-LD breadcrumb.",
+            { workbook: "p1", derived: "p2", reason: "jsonld_breadcrumb", workbookPath: "/peptides/", derivedPath: "/healing/" },
+            "The workbook puts this page under /peptides/; the parent above comes from the JSON-LD breadcrumb.",
         ],
         ["plugin_outdated", { version: "1.4.0", required: "1.4.1" }, "The companion plugin is version 1.4.0 and 1.4.1 is needed."],
         [

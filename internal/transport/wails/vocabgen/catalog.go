@@ -41,6 +41,8 @@ func catalog() []vocabulary {
 		{export: "regionKinds", tsType: "RegionKind", pkg: "internal/domain/render", typeName: "RegionKind"},
 		{export: "findingCodes", tsType: "FindingCode", pkg: "internal/domain/finding", typeName: "Code"},
 		{export: "findingSeverities", tsType: "FindingSeverity", pkg: "internal/domain/finding", typeName: "Severity"},
+		{export: "blockKinds", tsType: "BlockKind", pkg: "internal/domain/block", typeName: "BlockKind"},
+		{export: "bodyKinds", tsType: "BodyKind", pkg: "internal/domain/block", typeName: "Kind"},
 		{export: "previewKinds", tsType: "PreviewKind", pkg: "internal/application/pages", typeName: "PreviewKind"},
 		{
 			export: "cannibalizationReasons", tsType: "CannibalizationReason", pkg: "internal/domain/pagemap",

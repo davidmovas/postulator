@@ -1,5 +1,7 @@
 import { copy } from "../../../copy/index.js";
 import type {
+    BlockKind,
+    BodyKind,
     ContentRootState,
     FindingCode,
     FindingSeverity,
@@ -14,6 +16,8 @@ import type {
     UrlForm,
 } from "../../../generated/vocab.js";
 import {
+    blockKinds,
+    bodyKinds,
     contentRootStates,
     findingCodes,
     findingSeverities,
@@ -46,6 +50,8 @@ const codeWords: Readonly<Record<FindingCode, string>> = said.findingCodes;
 const severityWords: Readonly<Record<FindingSeverity, string>> = said.severities;
 const urlFormWords: Readonly<Record<UrlForm, string>> = said.urlForms;
 const wpTypeWords: Readonly<Record<PageWpType, string>> = said.wpTypes;
+const blockKindWords: Readonly<Record<BlockKind, string>> = said.blockKinds;
+const bodyKindWords: Readonly<Record<BodyKind, string>> = said.bodyKinds;
 
 const severityTones: Readonly<Record<FindingSeverity, Tone>> = {
     info: "info",
@@ -155,11 +161,11 @@ export function taxonomyLabel(taxonomy: string): string {
 }
 
 export function blockKindLabel(kind: string): string {
-    return said.blockKinds[kind] ?? kind;
+    return isOneOf(blockKinds, kind) ? blockKindWords[kind] : kind;
 }
 
 export function bodyKindLabel(kind: string): string {
-    return said.bodyKinds[kind] ?? kind;
+    return isOneOf(bodyKinds, kind) ? bodyKindWords[kind] : kind;
 }
 
 export function fieldLabel(key: string): string {

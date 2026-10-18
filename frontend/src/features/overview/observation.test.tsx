@@ -12,7 +12,7 @@ const replica: ModelSummary = {
     technical: { cart: 1, checkout: 1, account: 1, shop: 1 },
     findings: { parent_unresolved: 3, parent_ambiguous: 1, render_redirected: 1 },
     trailsByMethod: { href: 6, redirect: 1, name: 2 },
-    trailsBySource: { jsonld_breadcrumb: 7, aria_breadcrumb: 2 },
+    trailsByReason: { jsonld_breadcrumb: 7, aria_breadcrumb: 2 },
     pages: 16,
     observed: 15,
     rendered: 13,
@@ -54,7 +54,7 @@ describe("the observation summary", () => {
         expect(group(said.groups.roots).getByText("Archive page")).toBeDefined();
         expect(group(said.groups.roots).queryByText("Content not located")).toBeNull();
         expect(group(said.groups.trailsByMethod).getByText("Through a redirect")).toBeDefined();
-        expect(group(said.groups.trailsBySource).getByText("JSON-LD breadcrumb")).toBeDefined();
+        expect(group(said.groups.trailsByReason).getByText("JSON-LD breadcrumb")).toBeDefined();
         expect(group(said.groups.linksByType).getByText("Contextual")).toBeDefined();
         expect(group(said.groups.technical).getByText("Checkout")).toBeDefined();
         expect(group(said.groups.findings).getByText("Crumb without a page")).toBeDefined();

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    blockKinds,
+    bodyKinds,
     contentRootStates,
     findingCodes,
     findingSeverities,
@@ -15,6 +17,8 @@ import {
     urlForms,
 } from "../../../generated/vocab.js";
 import {
+    blockKindLabel,
+    bodyKindLabel,
     findingCodeLabel,
     linkSourceLabel,
     linkTypeLabel,
@@ -51,6 +55,8 @@ const vocabularies: readonly [string, readonly string[], (value: string) => stri
     ["finding severities", findingSeverities, severityLabel],
     ["url forms", urlForms, urlFormLabel],
     ["WordPress types", pageWpTypes, wpTypeLabel],
+    ["block kinds", blockKinds, blockKindLabel],
+    ["body kinds", bodyKinds, bodyKindLabel],
 ];
 
 describe("the page model's vocabulary in words", () => {

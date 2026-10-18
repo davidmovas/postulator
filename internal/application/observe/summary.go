@@ -19,7 +19,7 @@ type Summary struct {
 	Technical      map[string]int `json:"technical"`
 	Findings       map[string]int `json:"findings"`
 	TrailsByMethod map[string]int `json:"trailsByMethod"`
-	TrailsBySource map[string]int `json:"trailsBySource"`
+	TrailsByReason map[string]int `json:"trailsByReason"`
 	Pages          int            `json:"pages"`
 	Observed       int            `json:"observed"`
 	Rendered       int            `json:"rendered"`
@@ -41,7 +41,7 @@ func (s *Service) Summary(ctx context.Context, siteID string) (Summary, error) {
 	}
 	summary := Summary{
 		ByType: map[string]int{}, Roots: map[string]int{}, LinksByType: map[string]int{}, Technical: map[string]int{}, Findings: map[string]int{},
-		TrailsByMethod: map[string]int{}, TrailsBySource: map[string]int{},
+		TrailsByMethod: map[string]int{}, TrailsByReason: map[string]int{},
 		LastObservedAt: dto.TimeOf(owner.Settings.Observation.LastFinishedAt), LastFullWalkAt: dto.TimeOf(owner.Settings.Observation.LastFullWalkAt),
 	}
 	for i := range m.pages {
@@ -59,7 +59,7 @@ func (s *Service) Summary(ctx context.Context, siteID string) (Summary, error) {
 		}
 		if page.ParentReason == pagemap.ParentJSONLD || page.ParentReason == pagemap.ParentARIA {
 			summary.TrailsResolved++
-			summary.TrailsBySource[string(page.ParentReason)]++
+			summary.TrailsByReason[string(page.ParentReason)]++
 			summary.TrailsByMethod[string(page.ParentMethod)]++
 		}
 	}

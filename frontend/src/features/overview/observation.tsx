@@ -107,7 +107,7 @@ export function ObservationPanel({ siteId }: ObservationPanelProps): ReactElemen
                         <Group title={said.groups.linksByType} rows={countRows(held.linksByType, linkTypeLabel)} />
                         <Group title={said.groups.findings} rows={countRows(held.findings, findingCodeLabel)} />
                         <Group title={said.groups.trailsByMethod} rows={countRows(held.trailsByMethod, parentMethodName)} />
-                        <Group title={said.groups.trailsBySource} rows={countRows(held.trailsBySource, parentReasonLabel)} />
+                        <Group title={said.groups.trailsByReason} rows={countRows(held.trailsByReason, parentReasonLabel)} />
                         <Group title={said.groups.technical} rows={countRows(held.technical, technicalReasonLabel)} />
                     </div>
                 </>

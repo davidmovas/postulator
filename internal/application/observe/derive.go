@@ -226,12 +226,19 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 
 	if page.ParentReason == pagemap.ParentWorkbook && page.ParentPageID != nil && !sameRef(page.ParentPageID, derived.ParentID) {
 		workbook := *page.ParentPageID
-		derivedID := ""
+		derivedID, derivedPath, workbookPath := "", "", ""
 		if derived.ParentID != nil {
 			derivedID = *derived.ParentID
+			if found, ok := m.index.ByID(derivedID); ok {
+				derivedPath = found.Path
+			}
+		}
+		if found, ok := m.index.ByID(workbook); ok {
+			workbookPath = found.Path
 		}
 		if err := tracked.raise(ctx, finding.ParentDiffers, &page.ID, finding.SubjectPage(page.ID), map[string]string{
 			"workbook": workbook, "derived": derivedID, "reason": string(derived.Reason),
+			"workbookPath": workbookPath, "derivedPath": derivedPath,
 		}); err != nil {
 			return err
 		}

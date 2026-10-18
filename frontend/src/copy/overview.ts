@@ -117,7 +117,7 @@ export const overview = {
         groups: {
             roots: "Content roots",
             trailsByMethod: "Breadcrumb parents, by method",
-            trailsBySource: "Breadcrumb parents, by source",
+            trailsByReason: "Breadcrumb parents, by breadcrumb",
             linksByType: "Links by type",
             technical: "Technical pages",
             findings: "Open findings",

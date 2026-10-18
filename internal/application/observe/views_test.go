@@ -79,8 +79,8 @@ func TestTheSummaryCountsTrailsByMethodAndSource(t *testing.T) {
 	}
 	byMethod := summary.TrailsByMethod
 	if byMethod[string(pagemap.MethodName)] != 1 || byMethod[string(pagemap.MethodHref)]+byMethod[string(pagemap.MethodName)] != summary.TrailsResolved ||
-		summary.TrailsBySource[string(pagemap.ParentJSONLD)] != summary.TrailsResolved {
-		t.Errorf("trails = %d by method %v by source %v", summary.TrailsResolved, summary.TrailsByMethod, summary.TrailsBySource)
+		summary.TrailsByReason[string(pagemap.ParentJSONLD)] != summary.TrailsResolved {
+		t.Errorf("trails = %d by method %v by reason %v", summary.TrailsResolved, summary.TrailsByMethod, summary.TrailsByReason)
 	}
 	if summary.LastObservedAt.Std().IsZero() || summary.LastFullWalkAt.Std().IsZero() {
 		t.Errorf("walk times = %v %v, want both set after a first walk", summary.LastObservedAt, summary.LastFullWalkAt)

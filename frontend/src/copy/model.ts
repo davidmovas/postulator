@@ -95,10 +95,12 @@ export const model = {
             paths.length === 0
                 ? "The parents loop, so the loop is broken here."
                 : `The parents loop through ${paths.join(" › ")}, so the loop is broken here.`,
-        differs: (source: string) =>
-            source === ""
-                ? "The workbook names a different parent from the one above."
-                : `The workbook names a different parent from the one above, which comes ${source}.`,
+        differs: (source: string, workbook: string) => {
+            const named = workbook === "" ? "a different parent" : workbook;
+            return source === ""
+                ? `The workbook puts this page under ${named}, not under the parent above.`
+                : `The workbook puts this page under ${named}; the parent above comes ${source}.`;
+        },
         outdated: (version: string, required: string) =>
             required === ""
                 ? "The companion plugin is out of date."
@@ -264,9 +266,9 @@ export const model = {
         shortcode: "Shortcode",
         wp: "Block",
         foreign: "Other block",
-    } as Readonly<Record<string, string>>,
+    },
     bodyKinds: {
         classic: "Classic editor",
         blocks: "Block editor",
-    } as Readonly<Record<string, string>>,
+    },
 };

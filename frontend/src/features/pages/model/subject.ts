@@ -32,7 +32,7 @@ export function findingSentence(code: string, subject: Subject): string {
         case "parent_cycle":
             return said.cycle(texts(subject, "paths"));
         case "parent_differs":
-            return said.differs(parentSourceLabel(text(subject, "reason")));
+            return said.differs(parentSourceLabel(text(subject, "reason")), text(subject, "workbookPath"));
         case "plugin_outdated":
             return said.outdated(text(subject, "version"), text(subject, "required"));
         case "field_changed_on_site":

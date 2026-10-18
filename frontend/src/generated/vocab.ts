@@ -92,6 +92,21 @@ export type FindingCode = (typeof findingCodes)[number];
 export const findingSeverities = ["info", "warning", "error"] as const;
 export type FindingSeverity = (typeof findingSeverities)[number];
 
+export const blockKinds = [
+    "paragraph",
+    "heading",
+    "list",
+    "quote",
+    "html",
+    "shortcode",
+    "wp",
+    "foreign",
+] as const;
+export type BlockKind = (typeof blockKinds)[number];
+
+export const bodyKinds = ["classic", "blocks"] as const;
+export type BodyKind = (typeof bodyKinds)[number];
+
 export const previewKinds = ["public", "preview"] as const;
 export type PreviewKind = (typeof previewKinds)[number];
 
