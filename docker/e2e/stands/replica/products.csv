@@ -7,3 +7,4 @@ variable,TB500,TB-500 Peptide,1,visible,<p>Lyophilized TB-500 in a sealed vial.<
 variation,TB500-2MG,TB-500 Peptide - 2 mg,1,visible,,,1,45.00,,TB500,,Strength,2 mg,,1,
 variation,TB500-5MG,TB-500 Peptide - 5 mg,1,visible,,,1,89.00,,TB500,,Strength,5 mg,,1,
 simple,BACWATER,Bacteriostatic Water,1,visible,<p>Sterile water with benzyl alcohol.</p>,"<p>Reconstitute any of our <a href=""/peptides/"">Peptides</a> with it.</p>",1,9.00,Peptides,,,,,,,
+simple,BPC157-CAPS,BPC-157 Capsules,1,visible,<p>Capsules for research use.</p>,,1,49.00,Peptides > Healing Peptides,,BPC-157,,,,,

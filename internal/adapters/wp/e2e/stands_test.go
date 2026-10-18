@@ -21,7 +21,9 @@ type standFacts struct {
 	hubEmptyRaw         string
 	hubShortcode        string
 	hubWithText         string
-	unresolvedCrumb     string
+	termCrumb           string
+	redirectedCrumb     string
+	redirectTarget      string
 	simpleProduct       string
 	simpleProductTitle  string
 	simpleProductLink   link
@@ -72,7 +74,9 @@ func standOf(t *testing.T, env environment) standFacts {
 			hubEmptyRaw:         "peptides",
 			hubShortcode:        "bpc-157",
 			hubWithText:         "tb-500",
-			unresolvedCrumb:     "/healing-peptides/",
+			termCrumb:           "/product-category/peptides/healing-peptides/",
+			redirectedCrumb:     "/category/healing-peptides/",
+			redirectTarget:      "/healing-peptides/",
 			simpleProduct:       "bacteriostatic-water",
 			simpleProductTitle:  "Bacteriostatic Water",
 			simpleProductLink:   link{Href: "/peptides/", Anchor: "Peptides"},
@@ -175,8 +179,8 @@ func TestTheStandHoldsItsFixture(t *testing.T) {
 		if raw := requirePage(t, c, facts.hubWithText).Content.Raw; strings.TrimSpace(raw) == "" || strings.Contains(raw, "[") {
 			t.Errorf("the hub %s holds %q, want paragraphs of text", facts.hubWithText, raw)
 		}
-		if _, found := pageBySlug(t, c, strings.Trim(facts.unresolvedCrumb, "/")); found {
-			t.Errorf("a page answers %s, which the breadcrumb must name without a page", facts.unresolvedCrumb)
+		if _, found := pageBySlug(t, c, strings.Trim(facts.redirectTarget, "/")); !found {
+			t.Errorf("no page answers %s, the hub a redirected crumb must land on", facts.redirectTarget)
 		}
 	})
 
@@ -196,8 +200,19 @@ func TestTheStandHoldsItsFixture(t *testing.T) {
 		if nav < 0 {
 			t.Fatalf("the hub %s carries no breadcrumb", probe)
 		}
-		if !strings.Contains(body, `href="`+env.baseURL+facts.unresolvedCrumb+`"`) {
-			t.Errorf("the breadcrumb of %s names no crumb at %s", probe, facts.unresolvedCrumb)
+		if !strings.Contains(body, `href="`+env.baseURL+facts.redirectedCrumb+`"`) {
+			t.Errorf("the breadcrumb of %s names no crumb at %s", probe, facts.redirectedCrumb)
+		}
+		unfollowed := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		resp, err := unfollowed.Get(env.baseURL + facts.redirectedCrumb)
+		if err != nil {
+			t.Fatalf("GET %s: %v", facts.redirectedCrumb, err)
+		}
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Fatalf("close %s: %v", facts.redirectedCrumb, closeErr)
+		}
+		if resp.StatusCode != http.StatusMovedPermanently || !strings.HasSuffix(resp.Header.Get("Location"), facts.redirectTarget) {
+			t.Errorf("%s answers %d to %q, want a 301 to the hub %s", facts.redirectedCrumb, resp.StatusCode, resp.Header.Get("Location"), facts.redirectTarget)
 		}
 		if !strings.Contains(body[nav:], "<h2>") {
 			t.Errorf("the hub %s carries no listing heading after its breadcrumb", probe)

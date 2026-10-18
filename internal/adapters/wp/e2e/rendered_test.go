@@ -49,8 +49,8 @@ func TestRenderedContentCarriesTheInjectedBreadcrumbOnTheReplica(t *testing.T) {
 		if strings.Contains(shortcode.Content, "[products") {
 			t.Errorf("the shortcode hub renders its shortcode unexpanded: %q", shortcode.Content)
 		}
-		if !strings.Contains(shortcode.Content, stand.unresolvedCrumb) {
-			t.Errorf("the shortcode hub renders no crumb to %s, which has no page", stand.unresolvedCrumb)
+		if !strings.Contains(shortcode.Content, stand.termCrumb) {
+			t.Errorf("the shortcode hub renders no crumb to its term archive %s", stand.termCrumb)
 		}
 	}
 

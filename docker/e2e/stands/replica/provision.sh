@@ -8,6 +8,12 @@ Every vial ships with a certificate of analysis. Compare it with <a href="/bpc-1
 
 SHORTCODE_BODY='[products category="healing-peptides" limit="4" columns="2"]'
 
+GUIDES_BODY='Step-by-step guides for handling research peptides in the laboratory.'
+
+RECONSTITUTION_BODY='Reconstitute a lyophilized peptide with bacteriostatic water, adding it slowly along the wall of the vial.
+
+Swirl gently and never shake the vial.'
+
 MU_PLUGINS="$WP_ROOT/wp-content/mu-plugins"
 
 ensure_plugin classic-editor 1.7.0
@@ -29,6 +35,9 @@ home_id="$(ensure_page home Home 0 "$HOME_BODY")"
 ensure_page peptides Peptides 0 ""
 ensure_page bpc-157 BPC-157 0 "$SHORTCODE_BODY"
 ensure_page tb-500 TB-500 0 "$TB_BODY"
+ensure_page healing-peptides "Healing Peptides" 0 ""
+ensure_page lab-guides "Lab Guides" 0 "$GUIDES_BODY"
+ensure_page reconstitution Reconstitution 0 "$RECONSTITUTION_BODY"
 
 set_option show_on_front page
 set_option page_on_front "$home_id"
