@@ -8,10 +8,46 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
 run is under **The gate**. **The site-model redesign is underway**: stage 0 and the owner's
 answers landed on 2026-10-17, stage 1a (the plugin's reads, its client and the two stands) the
-same day, **stage 1b (the page model, its storage and the observation) on 2026-10-18**, and
-stage 1c, the screens, is next.
+same day, stage 1b (the page model, its storage and the observation) and **stage 1c (1b's gaps
+closed and the screens) on 2026-10-18, which closes stage 1**; stage 2, page types, the field
+catalog and the context pack, is next.
 
 ## Where we are
+
+**2026-10-18, stage 1c of the site model: 1b's gaps closed and the screens. Stage 1 is done.**
+The reasoning is under **stage 1c** in `DECISIONS.md`; the task list is under 1c in
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **The hierarchy follows the breadcrumbs.** A crumb resolves by its link against every modelled
+  page (a modelled page whose own visit lands on another is followed), else through the redirect
+  its link led to (looked up once in the render stage, kept on the crumb), else by its exact name
+  when it has no link or a dead one; one name candidate resolves, several are `parent_ambiguous`.
+  `pages.parent_method` (0055) says which. The front page is the root and no longer technical
+  (0056); a Home-only trail is weak; a parent loop is broken and named `parent_cycle`.
+- **The diagnosis**: the replica's mu-plugin linked a crumb to an address that answered 404, and
+  the derivation had no redirect and no name to fall back on; the third `parent_unresolved` was the
+  post's "Uncategorized", a post category archive the model never holds, and it stays.
+- **The replica carries every breadcrumb shape**: a hub linking its parent hub, a hub linking term
+  archives, a middle crumb with no link, a legacy category address answering 301 to a hub, a
+  nav-only trail beside a Home-only JSON-LD list, and a product with no description.
+- **Every root state is truthful**: `archive` (0057 recreates the render cache) for term pages, the
+  shop and the posts page; the state follows the body when the root is not located; a page whose
+  visit lands elsewhere keeps only its body's state and `render_redirected`. `not_found` is 0 on
+  both stands.
+- **Links are typed site-agnostically**: self links are dropped, `rel` tag, category and author
+  links are navigation, the listing rule holds outside the root, ARIA landmark roles count. The
+  replica's unknown links went from 39 to 2, vanilla's from 39 to 9.
+- **The derivation writes only what it owns** (`UpdateDerived`, `UpdateObservation`), and so do
+  the plugin probes (`UpdatePlugin`), so an edit made while a walk runs is kept.
+- **The screens**: the Pages drawer's **Model** tab (identity, the parent with its reason and
+  method, trails crumb by crumb, the render's root and regions, typed links, technical and
+  read-only reasons, blocks read-only, the open findings); the Links tab's type and source; the
+  Sites settings (User-Agent, render concurrency, full-walk cadence, link URL form) and a sync with
+  "Full walk" and "Render every page again"; the observation summary on Overview; Linking by type,
+  owed links contextual only. `PagesService.Model` and `ModelSummary` are bound; `vocab.ts` gains
+  the model's vocabularies.
+- **The UI harness** places nested pages with their breadcrumb, and its sync failure (the fake
+  listed trashed posts, which the plugin never does) is fixed.
 
 **2026-10-18, stage 1b of the site model.** The reasoning is under **stage 1b** in
 `DECISIONS.md`; the plan's task list is under 1b in
@@ -260,6 +296,30 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
+**2026-10-18, on Windows, at the close of stage 1c. Partial: the machine ran out of memory before
+the heavy legs.**
+- **Run and green on the final code:** `gofmt -l .` silent; the comment check; `go vet ./...`,
+  `go vet -tags e2e` and `go vet -tags uiharness` clean; `golangci-lint run` and `task lint:e2e`
+  (alone) 0 issues; `task build` green in 212 s with no generated drift; `npm run typecheck`
+  clean; `npm run test:run` **1604 tests in 151 files** with two workers (the first full run had
+  eight workers fail to start under memory pressure, no test failing). Every package this stage
+  touched passed its tests on its own (`pagemap`, `observe`, `sqlite`, `reports`, `pages`,
+  `transport/wails`, `app`, `runtime/steps`, `render`, `wp`, `wptest`, `finding`, `vocabgen`), and
+  the harness's `TestTheSeededSiteIsObservedIntoTheModel` and `TestASyncKeepsThePagesTheSiteStillHolds`
+  pass. `TestTheSiteIsObservedIntoTheModel` passes on both stands with the full wiring (replica 23
+  pages, vanilla 14).
+- **1b's three legs** at the start of the stage: `task e2e:full:noplugin STAND=vanilla` green
+  (288 s), `task e2e:up STAND=vanilla` restored the plugin, and `task ui:lint` found the harness's
+  sync test red (the fake listed trashed posts), fixed in `63d009e` and green alone; a rerun of the
+  whole `ui:lint` was invalidated by an edit made during it.
+- **Not run, for the owner to run one at a time:** `go test -race -count=1 -p 2 -covermode=atomic`
+  in the five groups and `go run ./cmd/covergate` (the run's first group failed to start the
+  linker, `0xc0000142`, with about a gigabyte free, and the session's memory guard then stopped
+  it); `task ui:lint`; `task e2e:test` on both stands; `task e2e:full` on both stands;
+  `task e2e:full:noplugin STAND=vanilla` followed by `task e2e:up STAND=vanilla`. The plugin did
+  not change, so its lint and tests are not owed.
+- **Counts:** migrations end at **0057**; **93 tools**; **126 bound methods**; plugin **1.4.1**.
+
 **2026-10-18, on Windows, at the close of stage 1b, at `8f0c80a`.** The last two commits after
 the whole run are the sync request's JSON tags (`8e88fbe`) and the harness seam (`8f0c80a`); the
 checks they touched were run again on the final tree, the rest stands from `d2e939b`.
@@ -423,7 +483,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stage 0, 1a and 1b done, 1c next |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 and 1 done (1c on 2026-10-18), stage 2 next |
 
 ## Known gaps
 
@@ -519,13 +579,14 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Stage 1c of the site model**: the screens. The Pages drawer shows a page as the model
-   (identity, hierarchy with its reason, regions, trails, typed links, technical and read-only
-   reasons, blocks read-only), Linking counts by type, `vocab.ts` gains `linkTypes`,
-   `regionKinds`, `parentReasons`, `technicalReasons` and `contentRootStates`, and the UI
-   harness fixtures carry a model. `Core.Observe` (`Summary`, `Page`) is the read 1c binds; the
-   Sites panel gets the `full` and `renderRescan` options `SyncSiteRequest` already carries and
-   the per-site settings `sites.Update` already takes.
+1. **Stage 2 of the site model**: page types named by the client over presets, the field
+   catalog and per-type scopes with their UI, and the context pack the writer, the linker and the
+   judge work from (migrations from 0058). What stage 1 hands it: the parent tree is acyclic and
+   follows the breadcrumbs with a reason and a method per page; `Index.ByName` reads
+   `Observed.Title`/`H1`, which stage 3 drops, so it must move onto the `title` field then; the
+   front page may become editable through a scope, the start's refusal of `/` standing until then;
+   `url_form` still follows the theme rather than the contextual links; the owner's answer on name
+   twins (under stage 1c in `DECISIONS.md`) may change one rule of the derivation.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the

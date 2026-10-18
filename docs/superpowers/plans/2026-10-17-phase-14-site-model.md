@@ -349,6 +349,12 @@ Execution: `superpowers:executing-plans`, one accountable owner, at most two age
 
 #### 1c tasks
 
+**Status, 2026-10-18: 1c.1 to 1c.14 done; 1c.15's gate is partial.** The static checks, the
+build, the frontend suite and both stands' observation proof are green; the Go race suite with
+the coverage gate, `task ui:lint` and the stands' full suites were stopped or not started for want
+of memory and are left for the owner, listed under **The gate** in `STATUS.md`. The rulings are
+under stage 1c in `DECISIONS.md`.
+
 **Part 0 closes what the owner's review of 1b found; Part 1 is the screens.** Execution: `superpowers:executing-plans`, one accountable owner, at most two agents at once and only on disjoint Go packages (R: `domain/render`, then `adapters/wp` and `wptest`; F: `frontend/`). Every commit uses `git commit -- <paths>`; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; the heavy e2e legs run alone.
 
 **Decided at the plan** (recorded in `DECISIONS.md` at the close; the spec amended in the same commits):

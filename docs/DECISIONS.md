@@ -3035,3 +3035,116 @@ recorded here as deferred.
 - **ARCHITECTURE**: fifteen steps; the observation's stages; the new domain packages; the href
   rule; plugin 1.4.1.
 - **Open with the owner**: none. The code answered every question the brief raised.
+
+## 2026-10-18 — stage 1c: what the owner's review of 1b found, closed; the screens
+
+The owner's review of 1b found the replica's hubs under their URL parent, three
+`parent_unresolved` findings, 7 of 19 replica pages (6 of 14 vanilla) `not_found`, 39 `unknown`
+links on each stand, the front page called technical and a settings edit the derivation could
+lose. The twelve decisions taken at the plan are under "Decided at the plan" in the 1c tasks of
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md` and are not repeated here.
+
+### The diagnosis
+
+A per-page log in `TestTheSiteIsObservedIntoTheModel` read the replica before any change.
+
+- **Both the fixture and the derivation were at fault.** The mu-plugin linked a hub's middle
+  crumb to `home_url('/' . slug . '/')`, and `/healing-peptides/` answered 404, the term archive
+  living at `/product-category/peptides/healing-peptides/`. `DeriveParent` tried the nearest crumb
+  by exact path only, then the WordPress parent (none on a flat site), then the URL, which gave
+  Home. `/peptides/` (Home › Peptides) fell to the URL as well, because a crumb at `/` was always
+  dropped and nothing else remained.
+- **The third `parent_unresolved` named "Uncategorized", not Healing Peptides**: `/hello-world/`'s
+  Rank Math trail links the post category archive `/category/uncategorized/`, which the model never
+  holds (post taxonomies are terms on posts, not pages). It stays, honestly: the link is live.
+- **`not_found` came from the order of the root rule**: the state followed the body only when the
+  root was located, term pages carry no body, and a cart block with nested text was not dynamic.
+  `Visit` also followed redirects and dropped the final URL, so `/checkout/` was extracted from the
+  cart's render.
+- **The 39 unknown links** were self links (`#respond`, `?add-to-cart=`), `rel="tag"` and
+  `rel="author"` links, WooCommerce's related-products block (outside the root, where the listing
+  rule never looked) and the archives' product grids inside a fallback root.
+
+### Decided while building
+
+- **A dead link falls to its name, and only a dead one.** A crumb whose internal link answers an
+  error status after redirects resolves by its name; a live link to a page the model lacks, or an
+  external one, never does, because the replica's post "Uncategorized" would otherwise hang under
+  the product category of the same name. The owner's brief said "no link or neither 1 nor 2
+  resolved"; this narrows it on that evidence.
+- **A redirect's landing must carry the crumb's name**, and may not be the root, the page or a
+  descendant: WordPress's `redirect_guess_404_permalink` sends a dead slug to any page whose slug
+  begins the same way, which would make a broken crumb silently a product.
+- **A Home-only trail is weak.** With the root crumb now resolving to the front page, Rank Math's
+  and Yoast's two-crumb `Home › Page` lists would have named the front page before a nav with a
+  real middle crumb was read; the other trails come first, then the WordPress parent, then the
+  front page. The same rule keeps a sub-term printed "Home › Term" under its parent term.
+- **Every trail is tried in order**, the best JSON-LD list first, then the other lists, then the
+  navs; an unresolved nearest crumb still never falls to the next crumb of its own trail.
+- **The lookups live in the render stage, on the crumb.** `derive` re-derives every page on every
+  walk; a network call there would repeat every walk, flip a parent on a transient error and sit
+  between derive's read and its writes. A crumb's final path and status are stored in
+  `page_renders.trail`, looked up once per batch, and a failed lookup leaves the page unreachable
+  for the walk with its old row.
+- **`wp.Client.Resolve` stops at a change of scheme too**: ports default by scheme, so `http` to
+  `https` on the same host counts as off-site, and the crumb keeps no final path. A site whose
+  crumbs cross schemes resolves them by their links once its base URL names the scheme it serves.
+- **A redirected visit is judged by the paths requested and reached**, never by the page's path,
+  so a preview link (`/?page_id=N`) and a scheme or trailing-slash hop are not redirects.
+- **The method is a column, `pages.parent_method`**, beside the reason that keeps the trail's
+  source; the owner's example named `trail_href`, `trail_redirect` and `trail_name` as reasons,
+  which would have meant rebuilding `pages` and losing which breadcrumb won.
+- **0057 recreates `page_renders`**, a cache, so the first walk after the upgrade renders every
+  page again; a rebuild that kept rows would have kept the old `not_found` states until a full walk.
+- **The front page's `front_page` word stays in the `technical_reason` CHECK** after 0056 clears its
+  rows, as `repair` stays in the kinds.
+- **The extraction's rules** (agent R): a rel tag, category or author link is navigation whenever
+  it is not the content's own (outside the root, or inside it overlapping no content run and
+  matching no raw link), since a product without a description has only an assumed root; the
+  listing rule is one everywhere, at least three product links and two products, self links
+  excluded; a block named in the site's technical lists, or a paragraph holding only one such
+  shortcode, counts as dynamic; a rel region grows only while every page link under it is
+  rel-typed; `banner` and `contentinfo` stay unconditional landmarks while `complementary`,
+  `navigation` and `main` count in the sectioning check; a JSON-LD crumb's href is its first item
+  URL that resolves on the site. `render.BodyState` is the one rule for the state a body gives.
+- **The fake's `/content` listed trashed posts**, which the plugin never does: a seeded run that
+  trashed a page made the harness's next incremental walk fail on `/terms/{id}`. That was the red
+  `task ui:lint` of 1b's gate, not the observation.
+- **The bindings sit on `PagesService`** through a second source, as the phase plan's 1c says, so
+  the service count stays fifteen and two methods join (`Model`, `ModelSummary`).
+- **The audit's orphan rule is one rule** for the audit and the overview: a page on the site, not
+  archived, not technical, not a term page and not the front page, with no contextual link in.
+- **The harness gives nested pages their ancestors as a breadcrumb**, which resolves to the parent
+  the WordPress parent already gave, so the seeded hierarchy does not move and the Model tab has a
+  trail to show.
+
+### Deviations from the request
+
+- **The trail's method is its own column and vocabulary (`parentMethods`)** rather than three new
+  parent reasons; see above.
+- **Name resolution is narrower** than the brief: no link, or a dead internal link.
+- **No fields pane** in the drawer: the 1c list names none, and stage 2's field scopes are where
+  fields become visible.
+
+### What it amends in the record
+
+- **Spec 16.1**: `parent_method`; `archive` and `final_path` on `page_renders`; a crumb keeps its
+  href, final path and status. **16.4**: the root states in order with `archive`, and the
+  not-located rule; the link rules. **16.5**: the resolution order, the weak Home trail, the front
+  page as the root, the broken cycle; the front page is no technical page. **16.8**:
+  `parent_ambiguous`, `parent_cycle`, `render_redirected`.
+- **The 2026-10-17 record**: "technical pages … are never link targets and never generated" no
+  longer covers the front page, which is the root every trail starts at and may be edited where a
+  stage-2 field scope allows; the start's refusal of `/` stands until then.
+- **CONTRACTS**: `PagesService.Model` and `ModelSummary`, a hundred and twenty-six methods.
+  **ARCHITECTURE**: the render stage's lookups and landings; derive offline and narrowed.
+
+### Open with the owner
+
+- **Name twins.** On the client's sites a hub page and a WooCommerce category usually share a
+  name ("Peptides" the page and "Peptides" the category). A crumb with no link, or a dead one,
+  that names such a twin is `parent_ambiguous` under the brief's "only when exactly one candidate
+  matches", and the page falls to its next source. A crumb with a live link is unaffected, and
+  that is nearly every crumb the stands and the client's themes print. The recommendation is to
+  keep the rule and let stage 4's inbox resolve the few ambiguities, unless the owner wants the
+  page twin preferred over the term twin for a page's own crumb.
