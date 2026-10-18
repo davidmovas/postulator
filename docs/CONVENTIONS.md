@@ -186,7 +186,11 @@ Conventional commits: `<type>(<scope>): <subject>` with
 `type ∈ feat|fix|perf|refactor|docs|test|style|chore|ci|build|revert`. The scope names
 the package or the phase task (`feat(kernel): cursor pagination`). The commit-msg hook
 in `lefthook.yml` rejects anything else. Every commit ends with the attribution line
-the session was given. Commit on `dev`; never amend, rebase or force-push.
+the session was given. Commit on `dev`; never amend, rebase or force-push. When several
+writers share one tree, each commits with `git commit -m "…" -- <paths>`, which commits the
+named paths only, and never stages anything ahead of its own commit: a plain `git commit`
+takes the whole index, and on 2026-10-18 one writer's commit swept another's staged
+deletions in.
 
 **`lefthook` is still not installed on the development machine**
 (`go install github.com/evilmartians/lefthook@latest && lefthook install`), so nothing

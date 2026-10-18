@@ -47,6 +47,14 @@ A hundred and twenty-four methods. Where a use case answers with bytes the servi
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
+`SitesService.Update{…, settings?}` takes a site's settings since 2026-10-18 (`userAgent`, the
+`observe` block's `renderConcurrency` 1–16 and `fullWalkEvery` ≥ 1, `linkUrlForm`), keeping the
+observation's own bookkeeping, and `Get` answers them normalized as `settings`; every request the
+registry sends for that site carries its `userAgent`, the connection test of a saved site
+included. `SyncService.SyncSite{siteId, full?, renderRescan?}` walks the whole site or fetches
+every published render again; without either the walk is incremental and reads only what changed
+since the previous one.
+
 `GraphService.MoveEntity{entityId, newParentId, keepBoth?}` adds the parent edge, checks the
 graph is still acyclic and drops the approved parent edges it replaces inside one unit of
 work, and answers `removedEdgeIds`; running it again is quiet. `RunsService.RevertRun{runId}`
@@ -144,7 +152,8 @@ composes the core again from what it restored. A wrong password or a truncated f
   (`internal/application/<context>`) and passed through unchanged; only `HealthService`,
   `ToolsService` and `SettingsService`, which have no use case behind them, declare theirs
   in `internal/transport/wails`. Domain types carry no JSON tags, except
-  `template.TemplateSpec` and the `llm` catalog types, whose persisted form is JSON.
+  `template.TemplateSpec`, the `llm` catalog types, `site.Settings`, the `render` extraction's
+  parts and `pagemap`'s trail and identity, whose persisted form is JSON.
 - Generics are allowed in exported signatures: `paging.List[T]` generates `List<T>`. A Go
   type with a custom `MarshalJSON` generates as `any`, which is why `Slice<T>` and
   `dto.Time` lose their shape; `frontend/src/lib/paging.ts` restores it with `List<T>` and
@@ -206,18 +215,18 @@ enables a step another kind owns, for every kind but `custom`.
 |---|---|
 | `generate` | the template's, or `run.GenerateRecipe()` (which carries `generate_images`) when neither the request nor the template names one |
 | `relink` | `resolve_context relink_page sync_back report` |
-| `repair` | `repair_hierarchy sync_back report` |
-| `sync` | `sync_site` |
+| `repair` | none since 2026-10-18: the hierarchy is read from the site and never written, so `runs.Start` refuses the kind and names `relink` instead; the word stays in `runs.kind` and `runKinds` so old rows decode |
+| `sync` | `sync_site`, which takes the params `full` (walk the whole site) and `renderRescan` (fetch every published render again) |
 | `revert` | `revert`, and `runs.Start` refuses the kind: only `RunsService.RevertRun` can set `parentRunId` |
 | `audit`, `import` | none of its own |
 | `custom` | none of its own, and the one kind exempt from every step rule |
 
-`repair_hierarchy`, `sync_site`, `relink_page` and `revert` are `run.PerKindStepName` values,
+`sync_site`, `relink_page` and `revert` are `run.PerKindStepName` values,
 a type of their own, so none of them reaches `vocab.ts`, the blank template's recipe or the
 three tool step enums; `run.PerKindStep(name)` is the domain predicate and
 `run.StepNames()` is what a template recipe may draw from.
 
-`RunsService.Estimate` answers zero for `relink`, `repair` and `sync`, because none of their
+`RunsService.Estimate` answers zero for `relink` and `sync`, because none of their
 steps declares a model role. It prices every target on the template that resolves for it and
 carries `findings []{severity, code, message, pageId?, path?}`: `unpriced_step` names an
 enabled step that declares no ceiling and no model, `template_unresolved`, `entity_missing`,
@@ -228,8 +237,7 @@ are warnings, as is `images_step_off`, raised per page whose template asks for i
 recipe will not draw. Over a product, `commerce_unknown`, `commerce_absent`, `commerce_forbidden`,
 `product_needs_plugin`, `product_not_in_store`, `product_edited_live` and
 `product_category_unwritable` are errors and `product_outputs_missing` and
-`product_outputs_ignored` warnings; a repair over a product or a product category is refused with
-`store_placed`, and one over a post, which WordPress keeps flat, with `post_unnested`.
+`product_outputs_ignored` warnings.
 `model_provider_removed` warns of a template that pins a model of a provider Postulator no longer
 works with and names the model the role uses instead. Each step is priced at its role's service tier and, on a model that
 reasons, with half the allowance of the role's effort added to its output. `Budget` carries
@@ -364,7 +372,7 @@ status`. A site that cannot issue a link answers `INVALID` with `details.code` s
 
 `SyncService.CheckPlugin{siteId}` answers `{plugin, commerce}`; `plugin` is `{installed, version,
 requiredVersion, outdated, capabilities, seoPlugin}`. `outdated` is true when the manifest's
-version is below `requiredVersion` (1.4.0 since 2026-10-17) or a capability the client needs is
+version is below `requiredVersion` (1.4.1 since 2026-10-18, 1.4.0 the day before) or a capability the client needs is
 missing, and the Sites panel then says to upload the new zip over the old one, which WordPress
 offers as "Replace current with uploaded". The verdict is the probe's and is never stored.
 

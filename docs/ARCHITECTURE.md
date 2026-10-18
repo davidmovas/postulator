@@ -73,7 +73,14 @@ The shared vocabulary every layer is allowed to speak.
 Value types and pure functions. `site`, `graph` (a DAG on `parent` edges plus weighted
 undirected `related` edges, an entity's name unique under the parent it is scoped to, and the
 labels that tell a shared name apart), `pagemap` (paths, tree, index, a page's keywords and
-notes), `keyword` (the ordered list with volumes and the one cell grammar), `importmap` (the
+notes, its identity and terms, the typed links and `DeriveParent`, which reads the parent from
+the JSON-LD trails, the breadcrumb nav, the WordPress parent and the URL in that order, each
+with its reason), `block` (the body as addressable blocks, classic or block editor, serialised
+byte for byte), `render` (the extraction of a public render: the content root found by the
+content's words, the regions, the trails, the typed links, the JSON-LD facts, the headings and
+word counts, the builder and the robots meta), `field` (the catalog with its deny list and a
+field's current and base values), `finding` (the persistent findings with their codes, severities
+and options), `keyword` (the ordered list with volumes and the one cell grammar), `importmap` (the
 mapping of a sheet's headers, its level and note columns, and what each column became),
 `template` (spec plus link policy, resolved global → site → page by JSON merge patch),
 `content` (an HTML document, link context, link insertion, compliance and structure reports),
@@ -92,22 +99,39 @@ kind (`path`, `same_document`, `external`, `unresolved`), and the companion plug
 `internal_href_to_path` follows it: the host with its port, the path escaped as `EscapedPath` and
 lowercased, a dot segment or an invalid escape dropped. One table, `wp-plugin/testdata/hrefs.json`,
 is answered by both and by the fake, so what the plugin records and what the domain judges
-cannot drift; only a relative href differs, the plugin resolving it against the page's parent and
-the domain against the site base. `content.LinkContext` carries that site and every classifier — insertion,
+cannot drift; since 2026-10-18 a relative href resolves against the document on every side,
+`Site.ResolveAt(document, href)` taking the page's path up to its last slash as a browser does.
+`content.LinkContext` carries that site and every classifier — insertion,
 compliance, the audit and the link counter — resolves through it.
 
 ## Run engine
 
 A run is a recipe of named steps over a set of target pages, and a run kind may own that
-recipe. `relink` (`resolve_context relink_page sync_back report`), `repair`
-(`repair_hierarchy sync_back report`), `sync` (`sync_site`) and `revert` (`revert`) hand out
-their own steps and refuse a recipe that disagrees; `generate` takes the template's, or
-`run.GenerateRecipe()` when neither the request nor the template names one; `custom` is the
-one kind exempt from every step rule. The four steps a kind owns — `repair_hierarchy`,
-`sync_site`, `relink_page` and `revert` — are `PerKindStepName` values, a type of their own,
-because `StepName` is the vocabulary a *template* recipe may draw from and it is rendered into
-`vocab.ts`, into the blank template's recipe and into three tool enums. Sixteen steps are
-registered; twelve of them a template may name.
+recipe. `relink` (`resolve_context relink_page sync_back report`), `sync` (`sync_site`) and
+`revert` (`revert`) hand out their own steps and refuse a recipe that disagrees; `generate`
+takes the template's, or `run.GenerateRecipe()` when neither the request nor the template names
+one; `custom` is the one kind exempt from every step rule; `repair` owns nothing since
+2026-10-18 and cannot be started, the hierarchy being read-only, while its word stays for old
+rows. The three steps a kind owns — `sync_site`, `relink_page` and `revert` — are
+`PerKindStepName` values, a type of their own, because `StepName` is the vocabulary a
+*template* recipe may draw from and it is rendered into `vocab.ts`, into the blank template's
+recipe and into three tool enums. Fifteen steps are registered; twelve of them a template may
+name.
+
+`sync_site` is the observation. Each execution runs one batch of one stage of
+`application/observe` — inventory (the plugin's manifest and outdated verdict, the post types,
+the technical page ids), content (the plugin's `/content` with `since` and the types named, or
+core's items type by type), store (the products and their variations), render (a few renders at
+once, `settings.observe.renderConcurrency` of them, for the pages that changed or every page on a
+full walk or a `renderRescan`), derive (technical and read-only reasons, the parent with its
+reason through `pagemap.DeriveParent`, the findings, the archive after a full walk, the site's
+observation state) — and keeps the `observe.State` in its checkpoint, so a crash resumes at the
+batch. The first observation, one asked for with `full`, every Nth (`fullWalkEvery`) and every
+one without the plugin walk the whole site; the others pass `since`. The step's adapters in
+`observe_readers.go` are the only place `*wp.Client` meets the observation's reader
+interfaces, which the use case declares over its own item types. `publish`, `publish_product`,
+`relink_page`, `relink_neighbors`, `revert` and `sync_back` record the body they wrote as the
+page's current and base, so the next observation raises no finding over our own write.
 
 `relink_page` places the links a page's own rules ask for against the page's own cap and
 writes the body back under a hash compare-and-swap. It calls no model, so a relink, a repair
@@ -221,14 +245,15 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` **1.4.0** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies, `Update URI`
+`wp-plugin/postulator-companion` **1.4.1** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies, `Update URI`
 so wordpress.org never offers a plugin of the same slug) serves `/wp-json/postulator/v1` and
 advertises `bulk seo_meta seo_meta_read content_hash raw preview rendered meta terms settings`;
 every permission callback requires `edit_posts`, and the password must belong to an
 **administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not
 name is refused from the cached manifest before any request, so a site on an older plugin answers
-`plugin_outdated` rather than a 404, and `wp.Capabilities.Outdated` names a plugin below 1.4.0 or
-missing a capability for the Sites panel. The post routes answer a content post only, a post of
+`plugin_outdated` rather than a 404, and `wp.Capabilities.Outdated` names a plugin below 1.4.1 or
+missing a capability for the Sites panel; 1.4.1 resolves a relative href in `/content` against
+the page's URL as a browser does, where 1.4.0 used the page's parent. The post routes answer a content post only, a post of
 a public post type other than an attachment; a variation, a reusable block, a navigation menu or
 a template answers 404. `uninstall.php` deletes the term clock and the preview tokens and keeps
 the `_postulator_seo_*` values; there is no activation hook, an upload over the installed plugin

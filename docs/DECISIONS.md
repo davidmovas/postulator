@@ -2828,3 +2828,210 @@ written to a site.
 - **The site-specific scan reads its needles from the replica fixture**, so the test names no
   class, and Blocksy's `ct-container` is covered by the theme's slug. Its CSS-selector rule waits
   for `domain/render` in 1b.
+
+## 2026-10-18 — stage 1b: the page model, its storage and the observation of the site
+
+Stage 1b made every page of every public type exist in the model and taught `sync_site` to
+observe a site into it. Nothing new is written to a site; `publish` stops sending slug and parent
+to an existing page; the `repair` kind is retired. The thirteen decisions taken at the plan are
+recorded under "Decided at the plan" in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`
+and are not repeated here; this section holds what was decided while building.
+
+### What landed
+
+- **The domain**: `block` (a body as blocks, classic or block editor, serialised byte for byte),
+  `field` (the catalog with its deny list, instanced keys and a value's current and base),
+  `finding` (the codes, severities, options and subject keys), `render` (the extraction of a
+  public render), `site.Settings`, and in `pagemap` the identity, the terms, the typed links,
+  `DeriveParent` with a reason per source, the three reasons on `Page`, `Site.ResolveAt` and an
+  open `WPType`.
+- **Ten migrations, 0045 to 0054**, and the repositories over them; `sites.settings` as JSON.
+- **`application/observe`**: five stages, incremental through `since`, a full walk every tenth
+  and on demand, renders four at a time, and the findings `parent_unresolved`,
+  `plugin_outdated`, `field_changed_on_site`, `body_changed_on_site`, `render_unreachable`,
+  `builder_detected`, `technical_detected`, `page_title_differs`, `page_h1_differs`,
+  `parent_differs` and `url_form_mixed`. `Summary` and `Page` are its reads; the composition
+  root exposes them as `Core.Observe` for the harness and for 1c, with no Wails binding yet.
+- **The steps**: `sync_site` drives the observation batch by batch through its checkpoint;
+  `publish` sends title, content and status to an existing page; `publish_parent` is the
+  creation-only lookup; `repair_hierarchy` and the five `sync_*` helper steps are gone; every
+  writer records the body and fields it wrote as the page's base.
+- **The href alignment**: plugin 1.4.1 resolves a relative href against the document, as the
+  domain and the fake do; `hrefs.json` pins all three.
+- **The wiring 1a left**: `sites.Update` and the `sites_update` tool take the per-site settings
+  (`userAgent`, `renderConcurrency`, `fullWalkEvery`, `linkUrlForm`); the registry builds every
+  client, and the connection test of a saved site, with `wp.WithUserAgent(settings.userAgent)`
+  and rebuilds a cached client when the agent changes; the site-specific scan's
+  `TestTheExtractionNamesNoSelector` walks the string literals of `domain/render` and
+  `application/observe` with `go/ast` and refuses a class, an id or a selector call.
+- **The e2e proof**: `TestTheSiteIsObservedIntoTheModel` on both stands, and the full suites.
+
+### Decided without asking
+
+- **A block without text is dynamic.** An image, a rule or a cart block is `Dynamic`, so an
+  image-only body reads `dynamic_only`, which is what "whose expansion is content" means.
+- **A crumb at the site root is dropped**, as a technical page is, whatever the front page
+  shows: on vanilla the front is the posts listing and "Home" would be an unresolved crumb on every
+  term page. The URL source still names the front page as a flat page's parent for the tree.
+- **`NewPage` keeps a non-empty slug** and derives one from the path only when it has none; the
+  spec's "stops deriving" is read as "stops overwriting". `Mismatches` compares the slug only
+  when the plan has one.
+- **The import accepts a type the site's pages carry** plus the four built-ins, and keeps
+  `unknown_wp_type` for the rest, since an open `WPType` would otherwise plan a page of a type
+  no site registers. A custom type must be observed once before a sheet may name it.
+- **`BuildTree` nests by `ParentPageID`** with the path ancestor as the fallback and breaks a
+  cycle at the first path, so a site with a page at `/` still has one root.
+- **`Site.Validate` validates the normalized settings**, so a zero `Settings` is valid and an
+  unknown URL form or a concurrency above 16 is refused at the service.
+- **The downs of 0045 and 0052 rebuild through a TEMP copy under the real name**, so the schema
+  text equals 0044's; a rename would store a quoted name.
+- **The extraction's rules, from the live renders** (agent R): the filtered top-level blocks are
+  a second content-root fallback; a text that repeats takes the occurrence carrying the
+  fragment's links; a JSON-LD breadcrumb names an element only when more than half its links are
+  crumb paths, never the body, main or an ancestor of the root (Rank Math's two-crumb list names
+  nothing); a listing widens while the parent's links are mostly item links and never overlaps
+  the raw text; header and footer are navigation only outside article, aside, main, nav and
+  section; the last text-only or `aria-current` crumb takes the document's path; a builder's
+  region widens to the largest ancestor with the same words; a link's anchor is its accessible
+  name. The URL form follows the theme (absolute on both stands) while the client's content links
+  are relative, and the H1 sits outside the content root on both themes.
+- **A render is fetched again when the page's `modified_gmt` or its body's `observed_at` is later
+  than the render's `extracted_at`**, so the checkpoint carries no page ids; a title-only edit
+  WordPress does not stamp keeps an old render until the next full walk. The archive and "seen
+  this walk" read `page_identity.observed_at` against the walk's start for the same reason.
+- **A denied field is always agreed**: the observation moves its base with its current, and only
+  a writable field raises `field_changed_on_site`. An open finding re-raised with the same
+  subject touches nothing; a render that failed has no row to keep and is tried again every
+  observation; `parent_differs` is raised once and stands until a person resolves it.
+- **`PageBodyRepo.Record` takes no run id**; the run is on `page_blocks_written`.
+- **A parent at the site root is never a WordPress parent on a creation** (`steps.parentOf`,
+  `runs.parentOf`), which is how the old code behaved; a planned page with a nested path and no
+  parent row is still refused at the start, and the path check against the parent is gone.
+- **A creation's address is checked after the retry too** (`writeRequest.created`), an update's
+  never. **A full walk rebuilds the raw links from the stored body** even when its hash is
+  unchanged, the links table following the body. **An unreadable sync checkpoint is `INTERNAL`**,
+  not `INVALID`. **The `sync_site` tool takes its own args** (`full`, `renderRescan`), by the
+  2026-09-22 ruling; the schema ceiling is 63,450 for 63,443 bytes.
+- **A draft's href base is its publishable permalink** (agent R): `get_permalink` answers
+  `/?page_id=N` for a draft, so `permalink_url` gives the base the observation's `Document`
+  expects. `Variation.ManageStock` is a `StockManagement` (`yes`, `no`, `parent`, null).
+- **The fake serves a public render for any GET outside `/wp-json`**, 404 otherwise; fault
+  injection skips public pages and `WithStorefrontDown` answers 503; only `product_cat` terms are
+  served, the front page and the preview link are not, and a draft is a 404.
+- **`SyncSiteRequest.Full` and `RenderRescan` were coded ten lines before their test**, which
+  followed and ran red first; recorded rather than hidden.
+- **The settings tool's optional args are pointers** (agent W), so `"userAgent": ""` resets the
+  agent to the default; a 0 for the concurrency or the cadence falls back to the default because
+  `Normalized` reads 0 as unset, while a negative value or a concurrency above 16 is refused. The
+  registry reads `Settings.UserAgent` raw, since `Normalized` would rebuild the builder lists on
+  every call. The service trims the agent as it trims the name.
+- **The fake's storefront changed what a sync test sees**: once every page had a public render,
+  the render stage stored its navigation links beside the raw ones and four steps tests that
+  counted every link of a page failed. They now count the raw source, which is what they were
+  about; the e2e proof counts the render's links by type.
+
+### What the whole-branch review found, and what was done about it
+
+A fresh reviewer read the branch at its close and graded one finding Critical, four Important and
+ten Minor. Every Critical and Important finding was fixed in its own commit with a test that failed
+first; two Minors were re-graded Important by their effect on a person and fixed too; the rest are
+recorded here as deferred.
+
+- **One body hash.** Three functions wrote and compared the one `page_bodies.hash` column:
+  `block.Hash` folds CRLF and trims, `wp.ContentHash` and the plugin's `content_hash` take the
+  exact bytes, and `field.Hash("")` is empty. A product without a description and any body we
+  wrote with CRLF therefore read as `body_changed_on_site` on the first walk. `block.BodyHash`
+  is now the exact sha256, equal to `wp.ContentHash` by a test, and the hash of every body
+  snapshot; `block.Hash` stays a block's identity in `page_blocks_written`. Two steps tests over
+  the fake site pin both cases.
+- **An archived page is not visited.** The render stage skipped nothing, so a page the client
+  deleted was visited every walk, raised `render_unreachable` forever and was never cleared; and
+  the finding's subject carried the transport's error text with the visit's nonce, so a dismissed
+  one reopened every walk. The render stage now skips archived pages and the ones a full walk is
+  about to archive, the derivation clears the finding on archive, and the subject is the page's
+  path and the status.
+- **A failed filtered render is unreachable.** A failing `GetRendered` used to extract without
+  the filtered content, changing the root state and the regions silently; it now counts as
+  unreachable and the old render row stays.
+- **The site is read outside the write unit.** The content and store stages called the plugin
+  and the store inside the SQLite transaction, holding the one writer for a batch's worth of
+  round trips while the UI, the agent and the second worker waited and then failed busy. Each
+  stage now reads its batch first and writes inside; the observe fakes count a read made inside a
+  unit and the test wants zero. The read pass remembers a new page before its insert, so a raw
+  link to a page later in the same batch keeps no target until the derivation resolves it, or the
+  link's foreign key fails; the full loops on both stands found that and a steps test pins it.
+- **A render batch reads its own bodies.** The site model loaded every body of the site, both
+  sides, for every render batch; it now carries no bodies, the derivation lists them once, and a
+  candidate page is read on its own.
+- **`since` follows the site's clock.** It was the previous walk's start on this PC minus a
+  second, compared by the plugin with the server's `post_modified_gmt`; a server behind this PC
+  missed every edit made in the gap until the next full walk. The observation now records when a
+  walk finished and the newest `modified` it saw, and `since` is that stamp minus the walk's
+  duration and a second, which is at or before the walk's start in the server's own time. Items
+  within one walk-duration of the newest stamp are re-pulled each walk, so a re-pulled item
+  nothing changed on now writes nothing: a field moves only when its hash moves and the page row
+  only when something but its stamps moved.
+- **A crumb after the page's own is never its parent.** A theme that appends a "Reviews" crumb
+  made it the parent; the trail is now cut at the page's own crumb, as "nearest" in spec 16.5
+  means the nearest preceding one.
+- **The whole suite found what the per-package runs never reached.** `TestEveryToolChoiceIsADomainVocabulary`
+  had been red since the `repair` kind left the `runs_start` enum, and agent W's `linkUrlForm`
+  enum had no vocabulary behind it. `run.Kind.Startable()` now derives `startableRunKinds` (the
+  enum drops `revert` too, which the start refuses), `site.URLForm` is a named type behind
+  `urlForms`, a derived vocabulary counts as a domain vocabulary in the tripwire, and the start
+  drawer reads the generated list instead of filtering by hand.
+- **The UI harness runs its fake site unpaced.** Its scenarios re-seed a core whose adoption
+  sync now reads, visits and renders every page of the in-process fake through the real registry,
+  paced by the client's default four requests a second, so a seed took close to a minute and the
+  harness tests ran past their budget. `app.Config.WordPress` carries the options every WordPress
+  client is built with after the settings', the seam the harness uses to lift the limit, as
+  `Config.Provider` is the seam for the model. A real site keeps the limiter: a first walk costs
+  three to four requests a page, so two thousand pages take about half an hour at the default and
+  `wp.rateLimitPerSecond` (1 to 100) is the knob; the plan's "about four minutes" counted the
+  renders alone.
+- **Deferred, as minors:** the derivation can persist a parent cycle between two on-site pages
+  whose trails name each other (`BuildTree` guards it; stage 2's trail builder must too); a page
+  whose type stops being viewable is never archived; `technical_detected` keeps the old reason when
+  the reason moves between two non-none values; `url_form_mixed` reads archived pages' renders;
+  `observe.Service.Run` has only test callers; the concurrency test proves the bound, not the
+  overlap; a slug change on the site onto a planned row's path fails the sync on the path's unique
+  index (pre-existing; the spec wants a finding); the derivation writes the whole site row, so a
+  settings edit in that window is lost. The reviewer's set-aside list — the deny list gating writes
+  only in stage 3, `publish` without an expected hash, `parent_differs` standing until a person
+  resolves it, the `repair` word kept, no Wails binding yet — stands as ruled above.
+
+### Deviations from the request
+
+- **`sync_reconcile`, `sync_settle` and `sync_archive` are not kept as steps.** The brief said
+  `sync_reconcile` stops merging silently; the observation does that inside `sync_site`, where
+  the five stages share one checkpoint, and the five helper steps are deleted. `sync_site` is the
+  one `sync` step.
+- **The hold of a planned child behind its parent is proven by the existing e2e test**, not
+  duplicated inside the observation test; `task e2e:full` on both stands runs both.
+- **The e2e proof found a bug of its own**: the store stage observed a product's excerpt as empty
+  because the store's item lacked the short description, so a first observation raised
+  `field_changed_on_site`; fixed with a unit assertion in `observe`.
+- **A commit swept another writer's staged deletions.** Agent R's render commit took my staged
+  `git rm` of the five sync steps, leaving the tree broken until the steps commit. From that
+  moment every writer commits with `git commit -- <paths>` and stages nothing ahead of its own
+  commit; `CONVENTIONS.md` says so.
+- **`CheckPlugin`'s outdated verdict reaches the model as `plugin_outdated`** from the
+  observation's inventory stage, as 1a left it; the Sites panel still shows the probe's view.
+- **Nothing new on screen.** The model fills behind the Pages screen; 1c binds `Core.Observe`.
+
+### What it amends in the record
+
+- **Spec 16.1**: `ParentReason` gains `workbook`; `NewPage` keeps an observed slug.
+- **Spec 16.5**: a breadcrumb nav is an `aria-label` or a microdata `BreadcrumbList`, with or
+  without a list; several lists tie to the first; a crumb at the root is dropped; the
+  `BreadcrumbList` item shapes.
+- **Spec 16.6**: `noindex` comes from the render's robots meta; the shortcode list is a settings
+  default; the root is never a WordPress parent.
+- **Spec 16.7**: the store's facts are denied fields of `page_fields`; a variation is a field
+  of its product.
+- **Spec 16.8**: `render_unreachable`; how the observation raises, clears and leaves a finding.
+- **CONTRACTS**: the `repair` kind owns nothing and cannot be started; `sync_site` takes `full`
+  and `renderRescan`; three per-kind steps; the plugin floor is 1.4.1.
+- **ARCHITECTURE**: fifteen steps; the observation's stages; the new domain packages; the href
+  rule; plugin 1.4.1.
+- **Open with the owner**: none. The code answered every question the brief raised.

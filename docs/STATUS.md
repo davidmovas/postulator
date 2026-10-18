@@ -7,10 +7,53 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 **Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02,
 2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
 run is under **The gate**. **The site-model redesign is underway**: stage 0 and the owner's
-answers landed on 2026-10-17, **stage 1a (the plugin's reads, its client and the two stands) is
-done**, and stage 1b is next.
+answers landed on 2026-10-17, stage 1a (the plugin's reads, its client and the two stands) the
+same day, **stage 1b (the page model, its storage and the observation) on 2026-10-18**, and
+stage 1c, the screens, is next.
 
 ## Where we are
+
+**2026-10-18, stage 1b of the site model.** The reasoning is under **stage 1b** in
+`DECISIONS.md`; the plan's task list is under 1b in
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **The model exists.** Every page of a site, of any public post type plus the `product_cat`
+  term family, has an identity (`page_identity`), its terms (`page_terms`), its fields with a
+  current and a base value (`page_fields`), its body as blocks, current and base
+  (`page_bodies`, `page_blocks_written`), the extraction of its render (`page_renders`: the
+  content root, the regions, every trail, the JSON-LD facts, headings, word counts, the builder,
+  the URL form, the robots meta), typed links per source (`page_links` rebuilt), and a parent with
+  its reason, a technical reason and a read-only reason on `pages`. `findings` holds what the
+  observation disagrees with, `sites.settings` what a site is told. Migrations 0045 to 0054.
+- **`sync_site` is the observation**: five stages inside one step, each batch checkpointed, over
+  `application/observe`, incremental through `since` with a full walk every tenth and on demand
+  (`full`, `renderRescan`); renders fetched four at a time; `parent_unresolved`,
+  `plugin_outdated`, `field_changed_on_site`, `body_changed_on_site`, `render_unreachable`,
+  `builder_detected`, `technical_detected`, `page_title_differs`, `page_h1_differs`,
+  `parent_differs` and `url_form_mixed` are its findings, and nothing is merged silently.
+- **Nothing new is written to a site**: `publish` sends neither slug nor parent to an existing
+  page, `publish_parent` is the creation-only lookup, `repair_hierarchy` and the `repair`
+  recipe are gone, and every writer records the body it wrote as the page's base.
+- **The extraction reads the stands as they are**: Rank Math's and WooCommerce's JSON-LD shapes,
+  the fixture's own lists, a microdata-only breadcrumb nav (Blocksy), WooCommerce's list-less
+  nav, two `BreadcrumbList` objects on one page, the hubs' empty and shortcode-only raws. Goldens
+  from both stands live under `internal/domain/render/testdata`.
+- **A relative href resolves against the document on every side**; the plugin is **1.4.1**.
+- **A site has settings**: `sites.Update` and the `sites_update` tool take the User-Agent
+  override, the render concurrency, the full-walk cadence and the link URL form; every client the
+  registry builds, the connection test of a saved site included, sends the site's agent.
+- **A fresh whole-branch review closed the stage**: one body hash everywhere (our own write and
+  a product without a description raised `body_changed_on_site` before), the render stage skipping
+  archived pages with a stable finding subject, the site read outside the SQLite write unit, a
+  render batch reading its own bodies, `since` anchored on the site's own stamps, and the trail
+  cut at the page's own crumb. The minors it left are listed under stage 1b in `DECISIONS.md`.
+- **`TestTheSiteIsObservedIntoTheModel`** passes on both stands: vanilla 14 pages observed and
+  rendered, 2 trails resolved, 0 listings, 7 breadcrumb and 3 contextual links, shop, cart,
+  checkout, account, privacy and a noindex page technical; the replica 19 pages observed and
+  rendered, 4 trails resolved, 8 listings, 18 breadcrumb, 6 contextual and 79 listing links, the
+  front page and the store pages technical, and three `parent_unresolved` findings naming
+  Healing Peptides. The owner sees nothing new on screen yet: the model fills behind the Pages
+  screen.
 
 **2026-10-17, stage 1a of the site model.** The reasoning is under **the owner's answers** and
 **stage 1a** in `DECISIONS.md`.
@@ -217,6 +260,38 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
+**2026-10-18, on Windows, at the close of stage 1b, at `8f0c80a`.** The last two commits after
+the whole run are the sync request's JSON tags (`8e88fbe`) and the harness seam (`8f0c80a`); the
+checks they touched were run again on the final tree, the rest stands from `d2e939b`.
+- **Static checks**, on the final tree: `gofmt -l .` silent; the comment check passes;
+  `go vet ./...`, `go vet -tags e2e` and `go vet -tags uiharness` are clean; `golangci-lint run`
+  and `task lint:e2e` (run alone) report 0 issues at `8e88fbe`, and the two packages the seam
+  touched 0 issues at the final tree.
+- **The Go suite:** `go test -race -count=1 -p 2 -covermode=atomic` is green in the same five
+  groups, 86 packages, groups 3 and 5 rerun on the final tree and the profiles merged.
+  `go run ./cmd/covergate`: **domain+application 88.12% of 11488** (gate 80%), **total 88.39% of
+  25055** (gate 70%). Run whole for the first time this stage, it found the vocabulary tripwire
+  red since the `repair` kind left the start enum; fixed under stage 1b in `DECISIONS.md`.
+- **The build and the frontend:** `task build` is green on the final tree and leaves no generated
+  diff, after it caught the sync request's two walk options bound as required fields;
+  `npm run typecheck` is clean against the regenerated bindings; **1512 vitest tests in 143
+  files**. `task ui:lint`: the lint half reports 0 issues on the final tree; its harness-test half
+  has no result on this tree, because the run before the seam fix ran past its 15-minute budget
+  (every scenario re-seeded a core whose adoption sync was paced at four requests a second, which
+  `8f0c80a` lifts for the fake) and the two reruns were stopped by the session's memory guard.
+  Run `task ui:lint` once more before a tag.
+- **The plugin:** `task plugin:lint` covers 10 files and `task plugin:test` agrees on 53 cases,
+  both on PHP 7.4.
+- **The stands**, at `d2e939b` (the two later commits touch neither the observation nor the
+  plugin): `task e2e:test` passes on vanilla (67 s) and on the replica (111 s); `task e2e:full`
+  passes on vanilla (154 s) and on the replica (196 s), the observation proof among them.
+  `task e2e:full:noplugin` passed at `d2076a9`, one commit before; its rerun was stopped by the
+  session's memory guard mid-test together with the step that restores vanilla's plugin, so
+  vanilla stands without the plugin until `task e2e:up STAND=vanilla` runs. Run
+  `task e2e:full:noplugin STAND=vanilla` once more before a tag.
+- **Counts:** migrations end at **0054**; **93 tools**; plugin **1.4.1**.
+- **Not run:** a live OpenAI call with a funded key, and the `E2E_SEO=yoast` pass.
+
 **2026-10-17, on Windows, whole, at the close of stage 1a, at `66a7d58`.**
 - **Static checks:** `gofmt -l .` silent; the comment check passes; `go vet ./...` and
   `go vet -tags e2e` are clean; `golangci-lint run` and `task lint:e2e` (run alone) report 0
@@ -348,7 +423,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stage 0 and 1a done, 1b next |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stage 0, 1a and 1b done, 1c next |
 
 ## Known gaps
 
@@ -425,24 +500,32 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
   `Options.AnchorSeparator` description says comma while the default is `|` (`imports/views.go:61`
   against `importmap/mapping.go:12`); `Sanitize` lets a class or id the model emits through. The
   port mismatch between `normalize.php` and `Site.Resolve` was fixed in 1a.
-- **A relative href resolves differently on the two sides**: the plugin uses the page's parent and
-  `Site.Resolve` the site base, while a browser uses the document URL. Classic and block content
-  rarely carries one, and 1b's render extraction resolves against the document URL.
+- **What the extraction leaves to stage 2.** `page_renders.url_form` is the majority form of
+  every internal href of the page, which follows the theme (absolute on both stands) while the
+  client's own content links are relative; the writer's "URL form the site already uses" should
+  weigh the contextual links. The H1 sits outside the content root on both themes, so a heading
+  list never carries it; `page_h1_differs` reads the plugin's `h1`.
+- **A first walk is paced by the client's limiter.** It costs three to four requests a page
+  (the raw, the terms, the visit, the filtered render), and the default `wp.rateLimitPerSecond`
+  is 4, so two thousand pages take about half an hour the first time; later walks read only what
+  changed. The setting goes up to 100 for a host that allows it.
+- **`parent_differs` is raised once and never cleared by the observation**, the workbook's
+  parent it records having been replaced by the derived one; stage 4's `findings.Resolve`
+  settles it. A page deleted on the site is archived on the next full walk, not the next
+  observation.
 - **`TestTheServerTakesAnAddress` in `wptest` can flake** under a parallel `go test`, because it
   reserves an ephemeral port, releases it and binds it again; another process took the port once
   during 1a. It passes alone.
 
 ## Next steps
 
-1. **Stage 1b of the site model**: the page model, its migrations 0045 to 0054 and the
-   observation inside `sync_site`, as `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`
-   lays it out, its task list written at its start. 1b wires what 1a left by design:
-   - the per-site User-Agent override (`sites.settings`, 0052) into `wp.WithUserAgent`;
-   - the outdated verdict into the `plugin_outdated` finding;
-   - the new client methods into the observation's readers;
-   - the site-specific scan's CSS-selector rule over `domain/render`.
-
-   Then 1c, the screens.
+1. **Stage 1c of the site model**: the screens. The Pages drawer shows a page as the model
+   (identity, hierarchy with its reason, regions, trails, typed links, technical and read-only
+   reasons, blocks read-only), Linking counts by type, `vocab.ts` gains `linkTypes`,
+   `regionKinds`, `parentReasons`, `technicalReasons` and `contentRootStates`, and the UI
+   harness fixtures carry a model. `Core.Observe` (`Summary`, `Page`) is the read 1c binds; the
+   Sites panel gets the `full` and `renderRescan` options `SyncSiteRequest` already carries and
+   the per-site settings `sites.Update` already takes.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
