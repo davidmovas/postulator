@@ -1,6 +1,7 @@
 package render
 
 import (
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -9,12 +10,15 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 )
 
 const rawShare = 0.6
 
 var unseenElements = []string{"head", "script", "style", "noscript", "template"}
+
+var loneShortcode = regexp.MustCompile(`(?s)^\[([a-zA-Z_][\w-]*)(?:\s[^\]]*)?/?\](?:.*\[/([a-zA-Z_][\w-]*)\])?$`)
 
 type segment struct {
 	start int
@@ -266,7 +270,7 @@ func (p *page) findRoot() {
 		return
 	}
 	p.root = p.landmark()
-	p.state = RootNotFound
+	p.state = stateOf(p.in.Archive, p.body, false)
 }
 
 func (p *page) byBlocks(blocks []rawBlock) *html.Node {
@@ -323,14 +327,40 @@ func wraps(node *html.Node) bool {
 
 func (p *page) setRoot(root *html.Node) {
 	p.root = root
+	p.state = stateOf(p.in.Archive, p.body, true)
+}
+
+func stateOf(archive bool, body block.Body, located bool) RootState {
 	switch {
-	case p.in.Body.Empty():
-		p.state = RootEmptyRaw
-	case p.in.Body.DynamicOnly():
-		p.state = RootDynamicOnly
+	case archive:
+		return RootArchive
+	case body.Empty():
+		return RootEmptyRaw
+	case body.DynamicOnly():
+		return RootDynamicOnly
+	case located:
+		return RootFound
 	default:
-		p.state = RootFound
+		return RootNotFound
 	}
+}
+
+func technicalBody(body block.Body, names []string) block.Body {
+	blocks := slices.Clone(body.Blocks)
+	for i := range blocks {
+		if !blocks[i].Dynamic && technical(&blocks[i], names) {
+			blocks[i].Dynamic = true
+		}
+	}
+	return block.Body{Kind: body.Kind, Blocks: blocks}
+}
+
+func technical(b *block.Block, names []string) bool {
+	if b.Name != "" && slices.Contains(names, b.Name) {
+		return true
+	}
+	match := loneShortcode.FindStringSubmatch(strings.TrimSpace(b.Text()))
+	return len(match) == 3 && slices.Contains(names, match[1]) && (match[2] == "" || match[2] == match[1])
 }
 
 func (p *page) landmark() *html.Node {

@@ -63,7 +63,7 @@ func (p *page) listCrumbs(nav *html.Node) []pagemap.Crumb {
 	lastLinked := false
 	for _, item := range listItems(list) {
 		if link := firstUnder(item, isHrefAnchor); link != nil {
-			crumbs = append(crumbs, pagemap.Crumb{Name: accessibleName(link), Path: p.pathOf(link)})
+			crumbs = append(crumbs, p.linkedCrumb(link))
 			lastLinked = true
 			continue
 		}
@@ -82,6 +82,11 @@ func (p *page) listCrumbs(nav *html.Node) []pagemap.Crumb {
 		crumbs[len(crumbs)-1].Path = p.in.Document
 	}
 	return crumbs
+}
+
+func (p *page) linkedCrumb(link *html.Node) pagemap.Crumb {
+	href, _ := attr(link, "href")
+	return pagemap.Crumb{Name: accessibleName(link), Path: p.resolved(href), Href: href}
 }
 
 func current(item *html.Node) bool {
@@ -103,7 +108,7 @@ func (p *page) inlineCrumbs(nav *html.Node) []pagemap.Crumb {
 				trailing.WriteString(child.Data)
 			case child.Type != html.ElementNode || slices.Contains(unseenElements, child.Data):
 			case isHrefAnchor(child):
-				crumbs = append(crumbs, pagemap.Crumb{Name: accessibleName(child), Path: p.pathOf(child)})
+				crumbs = append(crumbs, p.linkedCrumb(child))
 				trailing.Reset()
 			default:
 				trailing.WriteByte(' ')

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
@@ -31,6 +32,7 @@ var standPaths = map[string]map[string]pagemap.WPType{
 		"/tb-500/":                       pagemap.WPPage,
 		"/healing-peptides/":             pagemap.WPPage,
 		"/sample-page/":                  pagemap.WPPage,
+		"/hello-world/":                  pagemap.WPPost,
 		"/shop/":                         pagemap.WPPage,
 		"/cart/":                         pagemap.WPPage,
 		"/checkout/":                     pagemap.WPPage,
@@ -67,6 +69,11 @@ func defaultBuilders() []render.Builder {
 		})
 	}
 	return out
+}
+
+func technicalNames() []string {
+	defaults := site.DefaultSettings()
+	return append(slices.Clone(defaults.TechnicalBlocks), defaults.TechnicalShortcodes...)
 }
 
 func lookupOf(stand string) func(string) (pagemap.WPType, bool) {

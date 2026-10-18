@@ -10,12 +10,14 @@ import (
 
 	"golang.org/x/net/html"
 
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 type page struct {
 	in        Input
+	body      block.Body
 	doc       *html.Node
 	text      *stream
 	order     map[*html.Node][2]int
@@ -34,9 +36,10 @@ type page struct {
 
 func Extract(in Input) (Extraction, error) {
 	sum := sha256.Sum256([]byte(in.Public))
+	body := technicalBody(in.Body, in.Dynamic)
 	out := Extraction{
 		Hash:     hex.EncodeToString(sum[:]),
-		Root:     RootNotFound,
+		Root:     stateOf(in.Archive, body, false),
 		Regions:  []Region{},
 		Trails:   []pagemap.Trail{},
 		JSONLD:   map[string][]json.RawMessage{},
@@ -52,7 +55,7 @@ func Extract(in Input) (Extraction, error) {
 		return Extraction{}, errors.Wrap(err, errors.Invalid, "the public render is not parseable html")
 	}
 
-	p := newPage(in, doc)
+	p := newPage(in, body, doc)
 	p.findRoot()
 	rootFrom, rootTo := p.text.wordRange(p.root)
 	p.content = p.matchBlocks(p.blocks, rootFrom, rootTo)
@@ -73,8 +76,8 @@ func Extract(in Input) (Extraction, error) {
 	return out, nil
 }
 
-func newPage(in Input, doc *html.Node) *page {
-	p := &page{in: in, doc: doc, text: newStream(doc), order: make(map[*html.Node][2]int)}
+func newPage(in Input, body block.Body, doc *html.Node) *page {
+	p := &page{in: in, body: body, doc: doc, text: newStream(doc), order: make(map[*html.Node][2]int)}
 	p.index()
 	p.collectAnchors()
 	p.collectBlocks()

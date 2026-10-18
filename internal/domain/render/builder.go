@@ -9,7 +9,7 @@ import (
 
 func (p *page) builder() string {
 	scope := p.widest(p.root)
-	shortcodes := p.in.Body.Shortcodes()
+	shortcodes := p.body.Shortcodes()
 	for i := range p.in.Builders {
 		rule := &p.in.Builders[i]
 		if p.builtBy(scope, rule) || prefixed(shortcodes, rule.ShortcodePrefixes) {

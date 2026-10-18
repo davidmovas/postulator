@@ -25,6 +25,7 @@ type ldCrumb struct {
 	position float64
 	name     string
 	path     string
+	href     string
 	located  bool
 }
 
@@ -169,12 +170,22 @@ func itemURLs(entry map[string]json.RawMessage) []string {
 }
 
 func (p *page) firstPath(urls []string) string {
+	path, _ := p.firstLink(urls)
+	return path
+}
+
+func (p *page) firstLink(urls []string) (path, href string) {
+	external := ""
 	for _, u := range urls {
-		if path := p.resolved(u); path != "" {
-			return path
+		resolved, kind := p.in.Site.ResolveAt(p.in.Document, u)
+		switch {
+		case kind == pagemap.LinkPath:
+			return resolved, u
+		case kind == pagemap.LinkExternal && external == "":
+			external = u
 		}
 	}
-	return ""
+	return "", external
 }
 
 func (p *page) ldCrumbs(list *ldObject) []pagemap.Crumb {
@@ -192,10 +203,12 @@ func (p *page) ldCrumbs(list *ldObject) []pagemap.Crumb {
 			}
 		}
 		urls := itemURLs(entry)
+		path, href := p.firstLink(urls)
 		crumbs = append(crumbs, ldCrumb{
 			position: positionOf(entry["position"]),
 			name:     strings.TrimSpace(html.UnescapeString(name)),
-			path:     p.firstPath(urls),
+			path:     path,
+			href:     href,
 			located:  len(urls) > 0,
 		})
 	}
@@ -207,7 +220,7 @@ func (p *page) ldCrumbs(list *ldObject) []pagemap.Crumb {
 		if !c.located && i == len(crumbs)-1 {
 			path = p.in.Document
 		}
-		out = append(out, pagemap.Crumb{Name: c.name, Path: path})
+		out = append(out, pagemap.Crumb{Name: c.name, Path: path, Href: c.href})
 	}
 	return out
 }

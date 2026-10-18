@@ -16,6 +16,7 @@ const (
 	RootEmptyRaw    RootState = "empty_raw"
 	RootDynamicOnly RootState = "dynamic_only"
 	RootNotFound    RootState = "not_found"
+	RootArchive     RootState = "archive"
 )
 
 type RegionKind string
@@ -82,6 +83,8 @@ type Input struct {
 	Document string
 	Builders []Builder
 	Lookup   func(path string) (pagemap.WPType, bool)
+	Archive  bool
+	Dynamic  []string
 }
 
 type Extraction struct {
@@ -107,4 +110,5 @@ type Record struct {
 	PageID string `json:"pageId"`
 	Extraction
 	ExtractedAt time.Time `json:"extractedAt"`
+	FinalPath   string    `json:"finalPath"`
 }

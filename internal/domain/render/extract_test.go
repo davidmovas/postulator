@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
@@ -19,23 +20,34 @@ func TestExtractFindsTheContentRootOnEveryStandPage(t *testing.T) {
 		stand    string
 		slug     string
 		document string
+		archive  bool
+		dynamic  []string
 		want     render.RootState
 	}{
-		{"the replica's hub with an empty raw", replica, "peptides", "/peptides/", render.RootEmptyRaw},
-		{"the replica's hub whose raw is one shortcode", replica, "bpc-157", "/bpc-157/", render.RootDynamicOnly},
-		{"the replica's page of plain text", replica, "tb-500", "/tb-500/", render.RootFound},
-		{"the replica's product", replica, "bpc-157-peptide", "/product/bpc-157-peptide/", render.RootFound},
-		{"the replica's term with no description", replica, "healing-peptides", "/product-category/peptides/healing-peptides/", render.RootNotFound},
-		{"vanilla's guide", vanilla, "guide", "/guide/", render.RootFound},
-		{"vanilla's nested page", vanilla, "setup", "/guide/setup/", render.RootFound},
-		{"vanilla's product whose description repeats its excerpt", vanilla, "powder", "/product/powder/", render.RootFound},
-		{"vanilla's term found by its description alone", vanilla, "koffein", "/product-category/koffein/", render.RootFound},
+		{"the replica's hub with an empty raw", replica, "peptides", "/peptides/", false, nil, render.RootEmptyRaw},
+		{"the replica's hub whose raw is one shortcode", replica, "bpc-157", "/bpc-157/", false, nil, render.RootDynamicOnly},
+		{"the replica's page of plain text", replica, "tb-500", "/tb-500/", false, nil, render.RootFound},
+		{"the replica's product", replica, "bpc-157-peptide", "/product/bpc-157-peptide/", false, nil, render.RootFound},
+		{"the replica's post", replica, "hello-world", "/hello-world/", false, technicalNames(), render.RootFound},
+		{"the replica's term with no description", replica, "healing-peptides", "/product-category/peptides/healing-peptides/", true, technicalNames(), render.RootArchive},
+		{"the replica's shop", replica, "shop", "/shop/", true, technicalNames(), render.RootArchive},
+		{"the replica's shop not known as one has an empty raw", replica, "shop", "/shop/", false, technicalNames(), render.RootEmptyRaw},
+		{"the replica's cart block counted technical", replica, "cart", "/cart/", false, technicalNames(), render.RootDynamicOnly},
+		{"the replica's cart block not counted technical holds text the render never shows", replica, "cart", "/cart/", false, nil, render.RootNotFound},
+		{"the replica's account shortcode", replica, "my-account", "/my-account/", false, technicalNames(), render.RootDynamicOnly},
+		{"vanilla's guide", vanilla, "guide", "/guide/", false, nil, render.RootFound},
+		{"vanilla's nested page", vanilla, "setup", "/guide/setup/", false, nil, render.RootFound},
+		{"vanilla's product whose description repeats its excerpt", vanilla, "powder", "/product/powder/", false, nil, render.RootFound},
+		{"vanilla's term read as a page of its description", vanilla, "koffein", "/product-category/koffein/", false, nil, render.RootFound},
+		{"vanilla's term", vanilla, "koffein", "/product-category/koffein/", true, technicalNames(), render.RootArchive},
+		{"vanilla's shop", vanilla, "shop", "/shop/", true, technicalNames(), render.RootArchive},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			in := standInput(t, tc.stand, tc.slug, tc.document)
+			in.Archive, in.Dynamic = tc.archive, tc.dynamic
 			got, err := render.Extract(in)
 			if err != nil {
 				t.Fatalf("extract: %v", err)
@@ -114,25 +126,169 @@ func TestExtractPlacesTheRootWhereTheContentsLinksAre(t *testing.T) {
 	}
 }
 
+func TestExtractStatesTheRootTruthfully(t *testing.T) {
+	t.Parallel()
+
+	const page = `<html><body><header><a href="/">Shop</a></header><main><h1>Koffein</h1><div><p>Strong beans, ground fine.</p></div>` +
+		`<form><p>Showing all results</p></form></main></body></html>`
+	cases := []struct {
+		name          string
+		in            render.Input
+		want          render.RootState
+		wantContent   int
+		wantGenerated int
+	}{
+		{
+			name: "an archive keeps its root where its description landed",
+			in: render.Input{
+				Public: page, Filtered: `<p>Strong beans, ground fine.</p>`, Body: block.Parse(`<p>Strong beans, ground fine.</p>`),
+				Archive: true,
+			},
+			want: render.RootArchive, wantContent: 4, wantGenerated: 0,
+		},
+		{
+			name:          "an archive without a description assumes the landmark",
+			in:            render.Input{Public: page, Body: block.Parse(""), Archive: true},
+			want:          render.RootArchive,
+			wantGenerated: 8,
+		},
+		{
+			name:          "an empty raw whose root cannot be located",
+			in:            render.Input{Public: page, Body: block.Parse("")},
+			want:          render.RootEmptyRaw,
+			wantGenerated: 8,
+		},
+		{
+			name:          "a raw of one shortcode whose expansion cannot be located",
+			in:            render.Input{Public: page, Filtered: `<div><form><p>Log in</p></form></div>`, Body: block.Parse(`[account_form]`)},
+			want:          render.RootDynamicOnly,
+			wantGenerated: 8,
+		},
+		{
+			name: "a block the site counts technical holds text the render never shows",
+			in: render.Input{
+				Public:  page,
+				Body:    block.Parse(`<!-- wp:shop/basket --><div><h2>Your basket is empty</h2></div><!-- /wp:shop/basket -->`),
+				Dynamic: []string{"shop/basket"},
+			},
+			want:          render.RootDynamicOnly,
+			wantGenerated: 8,
+		},
+		{
+			name: "the same block the site does not count technical is text that cannot be found",
+			in: render.Input{
+				Public: page,
+				Body:   block.Parse(`<!-- wp:shop/basket --><div><h2>Your basket is empty</h2></div><!-- /wp:shop/basket -->`),
+			},
+			want:          render.RootNotFound,
+			wantGenerated: 8,
+		},
+		{
+			name: "a paragraph holding only a shortcode the site counts technical",
+			in: render.Input{
+				Public:  page,
+				Body:    block.Parse(`<!-- wp:paragraph --><p>[account_form]</p><!-- /wp:paragraph -->`),
+				Dynamic: []string{"account_form"},
+			},
+			want:          render.RootDynamicOnly,
+			wantGenerated: 8,
+		},
+		{
+			name: "a technical block whose text is found is still dynamic",
+			in: render.Input{
+				Public:   page,
+				Filtered: `<div><p>Strong beans, ground fine.</p></div>`,
+				Body:     block.Parse(`<!-- wp:shop/notice --><div><p>Strong beans, ground fine.</p></div><!-- /wp:shop/notice -->`),
+				Dynamic:  []string{"shop/notice"},
+			},
+			want:          render.RootDynamicOnly,
+			wantGenerated: 4,
+		},
+		{
+			name:          "text that cannot be found",
+			in:            render.Input{Public: page, Body: block.Parse(`<p>Words the page never shows.</p>`)},
+			want:          render.RootNotFound,
+			wantGenerated: 8,
+		},
+		{
+			name:        "text that is found",
+			in:          render.Input{Public: page, Body: block.Parse(`<p>Strong beans, ground fine.</p>`)},
+			want:        render.RootFound,
+			wantContent: 4,
+		},
+		{
+			name:          "an empty name in the technical list names no block",
+			in:            render.Input{Public: page, Body: block.Parse(`<p>Strong beans, ground fine.</p>`), Dynamic: []string{""}},
+			want:          render.RootFound,
+			wantContent:   4,
+			wantGenerated: 0,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tc.in.Document = "/koffein/"
+			got := synthetic(t, tc.in)
+			if got.Root != tc.want {
+				t.Errorf("root %q, want %q", got.Root, tc.want)
+			}
+			if got.WordsContent != tc.wantContent || got.WordsGenerated != tc.wantGenerated {
+				t.Errorf("content %d and generated %d words, want %d and %d", got.WordsContent, got.WordsGenerated, tc.wantContent, tc.wantGenerated)
+			}
+		})
+	}
+}
+
+func TestARecordKeepsWhereItsVisitLanded(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		final string
+		want  string
+	}{
+		{"a visit that moved", "/cart/", `"finalPath":"/cart/"`},
+		{"a visit that stayed", "", `"finalPath":""`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			encoded, err := json.Marshal(render.Record{PageID: "p", FinalPath: tc.final})
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			if !strings.Contains(string(encoded), tc.want) {
+				t.Errorf("%s, want it to carry %s", encoded, tc.want)
+			}
+		})
+	}
+}
+
 func TestExtractSurvivesAnErrorPage(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name         string
 		public       string
+		raw          string
+		wantRoot     render.RootState
 		wantLinks    int
 		wantHeadings int
 	}{
-		{"a forbidden page", readGolden(t, "errors", "forbidden.html"), 1, 1},
-		{"an empty answer", "", 0, 0},
+		{"a forbidden page instead of the page's text", readGolden(t, "errors", "forbidden.html"), "<p>The page's own words.</p>", render.RootNotFound, 1, 1},
+		{"a forbidden page instead of an empty page", readGolden(t, "errors", "forbidden.html"), "", render.RootEmptyRaw, 1, 1},
+		{"an empty answer instead of the page's text", "", "<p>The page's own words.</p>", render.RootNotFound, 0, 0},
+		{"an empty answer instead of an empty page", "", "", render.RootEmptyRaw, 0, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := synthetic(t, render.Input{Public: tc.public, Body: block.Parse(""), Document: "/a/"})
-			if got.Root != render.RootNotFound {
-				t.Errorf("root %q, want not_found", got.Root)
+			got := synthetic(t, render.Input{Public: tc.public, Body: block.Parse(tc.raw), Document: "/a/"})
+			if got.Root != tc.wantRoot {
+				t.Errorf("root %q, want %q", got.Root, tc.wantRoot)
 			}
 			if len(got.Trails) != 0 || len(got.JSONLD) != 0 {
 				t.Errorf("trails %v, json-ld %v, want none", got.Trails, got.JSONLD)

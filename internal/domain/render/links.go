@@ -42,8 +42,8 @@ func (p *page) collectAnchors() {
 
 func (p *page) collectBlocks() {
 	p.positions = make(map[string][]int)
-	for i := range p.in.Body.Blocks {
-		b := &p.in.Body.Blocks[i]
+	for i := range p.body.Blocks {
+		b := &p.body.Blocks[i]
 		if b.Dynamic || b.Kind == block.Shortcode {
 			continue
 		}
@@ -100,11 +100,6 @@ func accessibleName(node *html.Node) string {
 	return ""
 }
 
-func (p *page) pathOf(node *html.Node) string {
-	href, _ := attr(node, "href")
-	return p.resolved(href)
-}
-
 func (p *page) resolved(href string) string {
 	path, kind := p.in.Site.ResolveAt(p.in.Document, href)
 	if kind != pagemap.LinkPath {
@@ -157,7 +152,7 @@ func (p *page) innermost(node *html.Node) int {
 }
 
 func (p *page) rest() RegionKind {
-	if p.in.Body.DynamicOnly() {
+	if p.body.DynamicOnly() {
 		return RegionContentDynamic
 	}
 	return RegionGenerated
