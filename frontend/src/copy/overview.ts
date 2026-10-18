@@ -102,6 +102,27 @@ export const overview = {
         body: "Edited by hand in WordPress after the last publish.",
         action: "Open the page map",
     },
+    observation: {
+        title: "The site as observed",
+        loading: "Reading the observation",
+        none: "Not observed yet: a sync reads the site into the model.",
+        walks: (last: string, full: string) => `last walk ${last} · last full walk ${full}`,
+        observed: "Pages observed",
+        observedOf: (observed: number, pages: number) => `${observed} of ${pages}`,
+        rendered: "Rendered",
+        listings: "With a listing",
+        readOnly: "Read only",
+        resolved: "Parents from a breadcrumb",
+        empty: "None",
+        groups: {
+            roots: "Content roots",
+            trailsByMethod: "Breadcrumb parents, by method",
+            trailsBySource: "Breadcrumb parents, by source",
+            linksByType: "Links by type",
+            technical: "Technical pages",
+            findings: "Open findings",
+        },
+    },
     coverage: {
         title: "Edge coverage",
         gap: (count: number) =>

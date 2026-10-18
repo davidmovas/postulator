@@ -30,6 +30,7 @@ import {
 } from "../../ui/index.js";
 import { ReadinessChecklist } from "./checklist.js";
 import { driftCount, edgeTile, entityTile, histogram, isEmptySite, pageTile, runSummary } from "./model/overview.js";
+import { ObservationPanel } from "./observation.js";
 import { CoveragePanel, DepthPanel, DriftPanel, RunPanel, TopEntities } from "./panels.js";
 import { Tiles } from "./tiles.js";
 import { useReadiness } from "./readiness.js";
@@ -202,6 +203,7 @@ export function OverviewScreen(): ReactElement {
                                 <DepthPanel bars={histogram(answered.depth ?? [])} />
                                 <TopEntities entries={answered.top ?? []} siteId={siteId} />
                             </div>
+                            <ObservationPanel siteId={siteId} />
                         </>
                     )}
                 </div>

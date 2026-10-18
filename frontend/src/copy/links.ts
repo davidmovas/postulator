@@ -19,6 +19,8 @@ export const links = {
         ofPages: (audited: number, pages: number) => `${audited} of ${pages}`,
         orphans: "Orphan pages",
         offGraph: "Links outside the graph",
+        byType: "On the site, by type",
+        contextualOnly: "Only contextual links count toward the links the graph asks for, orphans and links outside the graph.",
     },
     relink: {
         start: (count: number) => (count === 1 ? "Relink 1 page" : `Relink ${count} pages`),

@@ -4,8 +4,20 @@
     "route": "#/sites"
   },
   {
+    "name": "sites-settings",
+    "route": "#/sites",
+    "height": 1400,
+    "wait": 1000
+  },
+  {
     "name": "overview",
     "route": "#/s/:siteId/overview",
+    "wait": 1500
+  },
+  {
+    "name": "overview-observation",
+    "route": "#/s/:siteId/overview",
+    "height": 1400,
     "wait": 1500
   },
   {

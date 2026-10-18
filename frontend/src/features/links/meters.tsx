@@ -1,9 +1,12 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
-import type { LinkPolicySummary, LinkTotals } from "../../data/types.js";
+import type { LinkPolicySummary, LinkTotals, LinkTypeCounts } from "../../data/types.js";
+import type { LinkType } from "../../generated/vocab.js";
+import { linkTypes } from "../../generated/vocab.js";
 import { cx, toneClasses } from "../../ui/index.js";
 import type { Tone } from "../../ui/index.js";
+import { linkTypeLabel } from "../pages/model/labels.js";
 
 interface Segment {
     key: string;
@@ -48,6 +51,26 @@ function policyLine(policy: LinkPolicySummary): string {
     ].join(" · ");
 }
 
+const contextual: LinkType = "contextual";
+
+function TypeStrip({ counts }: { counts: LinkTypeCounts }): ReactElement {
+    return (
+        <ul aria-label={copy.links.meters.byType} className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <li className="text-2xs text-ink-faint">{copy.links.meters.byType}</li>
+            {linkTypes.map((type) => (
+                <li
+                    key={type}
+                    title={type === contextual ? copy.links.meters.contextualOnly : undefined}
+                    className="flex items-baseline gap-1.5 text-2xs text-ink-dim"
+                >
+                    <span className={cx("font-mono", type === contextual ? "text-ink" : "text-ink-soft")}>{counts[type]}</span>
+                    <span className={type === contextual ? "text-ink-soft" : undefined}>{linkTypeLabel(type)}</span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 export interface AuditStripProps {
     totals: LinkTotals;
     policy: LinkPolicySummary;
@@ -80,6 +103,7 @@ export function AuditStrip({ totals, policy }: AuditStripProps): ReactElement {
                     ))}
                     <li className="text-2xs text-ink-faint">{copy.links.meters.targets(totals.targets)}</li>
                 </ul>
+                <TypeStrip counts={totals.byType} />
             </div>
             <div className="flex shrink-0 items-center gap-4">
                 <Stat label={copy.links.meters.audited} value={copy.links.meters.ofPages(totals.audited, totals.pages)} />

@@ -24,7 +24,9 @@ import {
 } from "../../ui/index.js";
 import { PluginPanel } from "./plugin-panel.js";
 import { ReachabilityReport } from "./reachability.js";
+import { SiteSettingsForm } from "./settings-form.js";
 import { siteStatusLabel, siteStatusTone } from "./status.js";
+import { SiteSyncPanel } from "./sync-panel.js";
 
 function Row({ label, children }: { label: string; children: ReactNode }): ReactElement {
     return (
@@ -145,7 +147,11 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
 
                 <PluginPanel site={site} />
 
+                <SiteSyncPanel site={site} />
+
                 <Defaults site={site} />
+
+                <SiteSettingsForm site={site} />
 
                 <div className="flex flex-col gap-2">
                     <Button variant="secondary" icon={TravelExploreIcon} busy={probe.isPending} onClick={runTest}>
