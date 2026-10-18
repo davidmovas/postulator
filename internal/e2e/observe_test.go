@@ -3,7 +3,9 @@
 package e2e_test
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/observe"
@@ -149,6 +151,7 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 			t.Errorf("%s has no body row", path)
 		}
 	}
+	logModels(t, models, byID)
 
 	for path, want := range expected.parents {
 		model, ok := models[path]
@@ -231,5 +234,48 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 		if model.Page.ParentReason != before.Page.ParentReason {
 			t.Errorf("the second observation changed the parent of %s from %s to %s", path, before.Page.ParentReason, model.Page.ParentReason)
 		}
+	}
+}
+
+func logModels(t *testing.T, models map[string]observe.PageModel, byID map[string]string) {
+	t.Helper()
+
+	paths := make([]string, 0, len(models))
+	for path := range models {
+		paths = append(paths, path)
+	}
+	slices.Sort(paths)
+	for _, path := range paths {
+		model := models[path]
+		root := "<no render>"
+		trails := make([]string, 0)
+		if model.Render != nil {
+			root = string(model.Render.Root)
+			for _, trail := range model.Render.Trails {
+				crumbs := make([]string, 0, len(trail.Crumbs))
+				for _, crumb := range trail.Crumbs {
+					crumbs = append(crumbs, fmt.Sprintf("%s<%s>", crumb.Name, crumb.Path))
+				}
+				trails = append(trails, fmt.Sprintf("%s: %s", trail.Source, strings.Join(crumbs, " › ")))
+			}
+		}
+		parent := "<none>"
+		if model.Page.ParentPageID != nil {
+			parent = byID[*model.Page.ParentPageID]
+		}
+		findings := make([]string, 0, len(model.Findings))
+		for _, f := range model.Findings {
+			if f.Status == finding.Open {
+				findings = append(findings, fmt.Sprintf("%s %s", f.Code, f.Subject))
+			}
+		}
+		unknown := map[string]int{}
+		for _, link := range model.Links {
+			if link.Type == pagemap.LinkUnknown {
+				unknown[link.Region]++
+			}
+		}
+		t.Logf("%s | %s %s | root %s | parent %s by %s | technical %q | trails %v | unknown links %v | findings %v",
+			path, model.Page.WPType, model.Page.Status, root, parent, model.Page.ParentReason, model.Page.TechnicalReason, trails, unknown, findings)
 	}
 }
