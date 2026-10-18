@@ -30,7 +30,7 @@ the composition root binds the two.
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity` |
-| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink Model ModelSummary` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
@@ -43,7 +43,11 @@ the composition root binds the two.
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and twenty-four methods. Where a use case answers with bytes the service writes them
+A hundred and twenty-six methods. `PagesService.Model{pageId}` answers a page as the model
+(`observe.ModelView`: identity, the parent with its reason and method, the render's root, regions
+and trails with each crumb's link, redirect and page, typed links, the blocks read-only, the open
+findings) and `ModelSummary{siteId}` the site's (`observe.Summary`); both resolve
+`application/observe` through the service's second source. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 

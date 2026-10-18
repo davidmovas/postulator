@@ -123,9 +123,13 @@ name.
 the technical page ids), content (the plugin's `/content` with `since` and the types named, or
 core's items type by type), store (the products and their variations), render (a few renders at
 once, `settings.observe.renderConcurrency` of them, for the pages that changed or every page on a
-full walk or a `renderRescan`), derive (technical and read-only reasons, the parent with its
-reason through `pagemap.DeriveParent`, the findings, the archive after a full walk, the site's
-observation state) — and keeps the `observe.State` in its checkpoint, so a crash resumes at the
+full walk or a `renderRescan`; a page whose visit lands on another keeps only its body's state and
+the landing, and every crumb whose internal link names no modelled page is looked up once with
+`wp.Client.Resolve`, its final path and status kept on the crumb, before the write unit), derive
+(offline: technical and read-only reasons, the parent with its reason and method through
+`pagemap.DeriveParent`, a parent loop broken, the findings, the archive after a full walk, the
+site's observation state; it writes only the derived page columns and the settings' observation
+keys) — and keeps the `observe.State` in its checkpoint, so a crash resumes at the
 batch. The first observation, one asked for with `full`, every Nth (`fullWalkEvery`) and every
 one without the plugin walk the whole site; the others pass `since`. The step's adapters in
 `observe_readers.go` are the only place `*wp.Client` meets the observation's reader
