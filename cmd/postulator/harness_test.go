@@ -17,6 +17,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/models"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
@@ -1002,6 +1003,44 @@ func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 	}
 	if len(after) != len(before) {
 		t.Errorf("the map went from %d to %d pages", len(before), len(after))
+	}
+}
+
+func TestTheSeededSiteIsObservedIntoTheModel(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	summary, err := core.Observe.SummaryOf(t.Context(), observe.SummaryRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("SummaryOf: %v", err)
+	}
+	if summary.Rendered == 0 || summary.TrailsResolved == 0 || summary.LinksByType["breadcrumb"] == 0 || summary.LinksByType["navigation"] == 0 {
+		t.Fatalf("summary = %+v, want rendered pages with trails, breadcrumb and navigation links", summary)
+	}
+
+	shown := 0
+	held := pagesByPath(t, core, siteID)
+	for path, page := range held {
+		parent := parentOf(path)
+		if above, nested := held[parent]; page.WPID == nil || page.Status != "published" || !nested || above.WPID == nil {
+			continue
+		}
+		view, modelErr := core.Observe.Model(t.Context(), observe.ModelRequest{PageID: page.ID})
+		if modelErr != nil {
+			t.Fatalf("Model of %s: %v", path, modelErr)
+		}
+		if view.Render == nil || len(view.Render.Trails) == 0 || view.Hierarchy.ParentPath != parent || view.Hierarchy.Reason != "jsonld_breadcrumb" {
+			t.Errorf("%s reads render %v hierarchy %+v, want its trail naming %s", path, view.Render != nil, view.Hierarchy, parent)
+		}
+		shown++
+	}
+	if shown == 0 {
+		t.Fatal("the seed holds no nested published page to read as the model")
 	}
 }
 

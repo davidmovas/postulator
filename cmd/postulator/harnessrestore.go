@@ -85,6 +85,13 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 		return depthOf(mapped[a].Path) < depthOf(mapped[b].Path)
 	})
 
+	titles := make(map[string]string, len(mapped))
+	for index := range mapped {
+		if mapped[index].Status != statusArchived && mapped[index].Status != statusPlanned {
+			titles[mapped[index].Path] = mapped[index].Title
+		}
+	}
+
 	wpByPath := make(map[string]int64, len(mapped))
 	for index := range mapped {
 		page := &mapped[index]
@@ -99,7 +106,7 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 		item := wptest.Item{
 			Type: page.WPType, Title: page.Title, H1: page.H1, Slug: slugOf(page.Path),
 			Content: body, Status: wpStatus(page.Status), Modified: time.Now().UTC(),
-			Parent: wpByPath[parentOf(page.Path)],
+			Parent: wpByPath[parentOf(page.Path)], Crumbs: crumbsOf(page.Path, page.Title, titles),
 		}
 		if page.WPID != nil {
 			item.ID = *page.WPID
@@ -107,6 +114,20 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 		wpByPath[page.Path] = site.Restore(item)[0].ID
 	}
 	return nil
+}
+
+func crumbsOf(path, title string, titles map[string]string) []wptest.Crumb {
+	if _, nested := titles[parentOf(path)]; !nested {
+		return nil
+	}
+	ancestors := make([]wptest.Crumb, 0)
+	for ancestor := parentOf(path); ancestor != "" && ancestor != "/"; ancestor = parentOf(ancestor) {
+		if name, known := titles[ancestor]; known {
+			ancestors = append([]wptest.Crumb{{Name: name, Path: ancestor}}, ancestors...)
+		}
+	}
+	crumbs := append([]wptest.Crumb{{Name: "Home", Path: "/"}}, ancestors...)
+	return append(crumbs, wptest.Crumb{Name: title, Path: path})
 }
 
 func restoredContent(page *pages.Page, body string) (string, error) {
