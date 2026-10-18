@@ -157,9 +157,9 @@ func TestDeriveParentResolvesTheNearestCrumb(t *testing.T) {
 			parent: "guides", reason: pagemap.ParentARIA, method: pagemap.MethodName, trailFrom: pagemap.TrailNav,
 		},
 		"a term page's WordPress parent beats a trail that names only the front page": {
-			page:       "healing",
-			evidence:   pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Healing Peptides", "/product-category/peptides/healing-peptides/")}, WPParentID: wpParent(100000)},
-			parent:     "pepcat", reason: pagemap.ParentWP,
+			page:     "healing",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Healing Peptides", "/product-category/peptides/healing-peptides/")}, WPParentID: wpParent(100000)},
+			parent:   "pepcat", reason: pagemap.ParentWP,
 		},
 		"a nested page's WordPress parent": {
 			page: "setup", evidence: pagemap.ParentSignals{WPParentID: wpParent(20)},
