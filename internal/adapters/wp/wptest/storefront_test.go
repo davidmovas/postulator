@@ -151,6 +151,57 @@ func TestEveryPublishedItemHasAPublicRenderOnItsPath(t *testing.T) {
 	}
 }
 
+func TestAPublicRedirectAndAPublicHeadStayOutsideTheAPIsGuards(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t,
+		wptest.WithPublicRedirect("/category/healing/", "/product-category/healing/"),
+		wptest.WithPublicRedirect("/old/", "https://elsewhere.example/new/"),
+	)
+	server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "Live", Slug: "live", Content: "<p>Live.</p>"},
+		wptest.Item{Type: wptest.TypeProduct, Title: "Powder", Slug: "powder", Content: "<p>Made by hand.</p>"},
+	)
+	server.FailNext(http.StatusServiceUnavailable, 1)
+
+	cases := []struct {
+		name     string
+		method   string
+		path     string
+		status   int
+		location string
+		body     bool
+	}{
+		{name: "a redirected path read", method: http.MethodGet, path: "/category/healing/", status: http.StatusMovedPermanently, location: "/product-category/healing/"},
+		{name: "a redirected path asked for its head", method: http.MethodHead, path: "/category/healing/", status: http.StatusMovedPermanently, location: "/product-category/healing/"},
+		{name: "a redirected path asked without its trailing slash", method: http.MethodHead, path: "/category/healing", status: http.StatusMovedPermanently, location: "/product-category/healing/"},
+		{name: "a redirect off the site", method: http.MethodGet, path: "/old/", status: http.StatusMovedPermanently, location: "https://elsewhere.example/new/"},
+		{name: "a page asked for its head", method: http.MethodHead, path: "/live/", status: http.StatusOK},
+		{name: "a product asked for its head", method: http.MethodHead, path: "/product/powder/", status: http.StatusOK},
+		{name: "a missing page asked for its head", method: http.MethodHead, path: "/nowhere/", status: http.StatusNotFound},
+		{name: "a page read in full", method: http.MethodGet, path: "/live/", status: http.StatusOK, body: true},
+	}
+	for _, tc := range cases {
+		response, payload := call(t, server, tc.method, tc.path, nil, false)
+		if response.StatusCode != tc.status {
+			t.Errorf("%s: status = %d, want %d", tc.name, response.StatusCode, tc.status)
+		}
+		if got := response.Header.Get("Location"); got != tc.location {
+			t.Errorf("%s: location = %q, want %q", tc.name, got, tc.location)
+		}
+		if (len(payload) > 0) != tc.body {
+			t.Errorf("%s: body of %d bytes, want one: %t", tc.name, len(payload), tc.body)
+		}
+	}
+
+	if response, _ := call(t, server, http.MethodGet, "/wp-json", nil, true); response.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("the API after the public requests = %d, want the 503 still queued for it", response.StatusCode)
+	}
+	if response, _ := call(t, server, http.MethodHead, "/wp-json", nil, false); response.StatusCode != http.StatusUnauthorized {
+		t.Errorf("an anonymous head of the API = %d, want 401", response.StatusCode)
+	}
+}
+
 func TestADraftHasNoPublicRender(t *testing.T) {
 	t.Parallel()
 

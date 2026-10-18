@@ -18,6 +18,7 @@ const (
 
 type Visit struct {
 	Body   string
+	URL    string
 	Status int
 }
 
@@ -38,7 +39,7 @@ func (c *Client) Visit(ctx context.Context, link string) (Visit, error) {
 	if err != nil {
 		return Visit{}, err
 	}
-	return Visit{Status: resp.StatusCode, Body: string(body)}, nil
+	return Visit{Status: resp.StatusCode, Body: string(body), URL: resp.Request.URL.String()}, nil
 }
 
 func freshQuery(raw string, at time.Time) string {

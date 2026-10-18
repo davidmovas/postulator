@@ -58,6 +58,7 @@ type Server struct {
 	address       string
 	seoPlugin     string
 	redirect      Redirect
+	redirects     map[string]string
 	pendingEdit   *edit
 	pluginVersion string
 	capabilities  []string
@@ -136,6 +137,15 @@ func WithRedirect(mode Redirect) Option {
 	return func(s *Server) { s.redirect = mode }
 }
 
+func WithPublicRedirect(from, to string) Option {
+	return func(s *Server) {
+		if s.redirects == nil {
+			s.redirects = make(map[string]string)
+		}
+		s.redirects[normalisePath(from)] = to
+	}
+}
+
 func WithAddress(address string) Option {
 	return func(s *Server) { s.address = address }
 }
@@ -200,7 +210,7 @@ func (s *Server) handler() http.Handler {
 	public := http.NewServeMux()
 	s.routeStorefront(public)
 	public.Handle("/", s.publicOr(s.redirectRoot(s.injectFaults(s.authenticate(mux)))))
-	return s.record(public)
+	return s.record(s.redirectPublic(public))
 }
 
 func (s *Server) record(next http.Handler) http.Handler {

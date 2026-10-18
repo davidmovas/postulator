@@ -27,12 +27,39 @@ func (s *Server) routeStorefront(mux *http.ServeMux) {
 
 func (s *Server) publicOr(api http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path == rootPath || strings.HasPrefix(r.URL.Path, rootPath+"/") {
+		if !publicRequest(r) {
 			api.ServeHTTP(w, r)
 			return
 		}
 		s.handlePublicPage(w, r)
 	})
+}
+
+func (s *Server) redirectPublic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !publicRequest(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		s.mu.Lock()
+		location, moved := s.redirects[normalisePath(r.URL.Path)]
+		s.mu.Unlock()
+
+		if !moved {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Location", location)
+		w.WriteHeader(http.StatusMovedPermanently)
+	})
+}
+
+func publicRequest(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	return r.URL.Path != rootPath && !strings.HasPrefix(r.URL.Path, rootPath+"/")
 }
 
 func (s *Server) handlePublicPage(w http.ResponseWriter, r *http.Request) {

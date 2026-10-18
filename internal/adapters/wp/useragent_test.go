@@ -60,10 +60,13 @@ func TestAUserAgentOverrideReachesEveryRequest(t *testing.T) {
 	if _, err := client.Visit(t.Context(), server.URL()+"/product/powder/"); err != nil {
 		t.Fatalf("Visit: %v", err)
 	}
+	if _, err := client.Resolve(t.Context(), server.URL()+"/product/powder/"); err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
 
 	requests := server.Requests()
-	if len(requests) != 3 {
-		t.Fatalf("requests = %d, want 3", len(requests))
+	if len(requests) != 4 {
+		t.Fatalf("requests = %d, want 4", len(requests))
 	}
 	for _, recorded := range requests {
 		if got := recorded.Header.Get("User-Agent"); got != "Agent/1" {

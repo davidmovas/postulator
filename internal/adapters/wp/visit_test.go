@@ -3,6 +3,7 @@ package wp_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -33,6 +34,43 @@ func TestVisitReadsAPageAsAVisitorSeesIt(t *testing.T) {
 	}
 	if !strings.Contains(recorded.Header.Get("Accept"), "text/html") {
 		t.Errorf("accept = %q, want a page", recorded.Header.Get("Accept"))
+	}
+}
+
+func TestVisitNamesWhereItLanded(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithPublicRedirect("/checkout/", "/cart/"))
+	server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "Cart", Slug: "cart", Status: "publish", Content: "<p>Your cart is empty.</p>"},
+		wptest.Item{Type: wptest.TypePage, Title: "Checkout", Slug: "checkout", Status: "publish", Content: "<p>Pay here.</p>"},
+	)
+	client := newClient(t, server)
+
+	cases := []struct {
+		name     string
+		path     string
+		wantPath string
+		wantBody string
+	}{
+		{name: "a visit that was redirected", path: "/checkout/", wantPath: "/cart/", wantBody: "Your cart is empty."},
+		{name: "a visit that stayed", path: "/cart/", wantPath: "/cart/", wantBody: "Your cart is empty."},
+	}
+	for _, tc := range cases {
+		visit, err := client.Visit(t.Context(), server.URL()+tc.path)
+		if err != nil {
+			t.Fatalf("%s: Visit: %v", tc.name, err)
+		}
+		landed, err := url.Parse(visit.URL)
+		if err != nil {
+			t.Fatalf("%s: the landing URL %q: %v", tc.name, visit.URL, err)
+		}
+		if landed.Host != strings.TrimPrefix(server.URL(), "http://") || landed.Path != tc.wantPath {
+			t.Errorf("%s: landed on %q, want %s on the site", tc.name, visit.URL, tc.wantPath)
+		}
+		if visit.Status != http.StatusOK || !strings.Contains(visit.Body, tc.wantBody) {
+			t.Errorf("%s: visit = %d %q", tc.name, visit.Status, visit.Body)
+		}
 	}
 }
 

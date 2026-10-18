@@ -78,6 +78,7 @@ func TestNothingTheClientSendsNamesTheProgram(t *testing.T) {
 		}},
 		{name: "Commerce", call: func() error { _, err := client.Commerce(ctx); return err }},
 		{name: "Visit", call: func() error { _, err := client.Visit(ctx, server.URL()+"/product/powder/"); return err }},
+		{name: "Resolve", call: func() error { _, err := client.Resolve(ctx, server.URL()+"/coffee/"); return err }},
 	}
 	for _, step := range calls {
 		if err := step.call(); err != nil {
