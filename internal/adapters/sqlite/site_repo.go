@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 
@@ -16,6 +17,8 @@ const (
 	siteColumns = `id, name, base_url, username, secret_ref, status, allow_insecure, plugin_installed, plugin_version, plugin_capabilities, plugin_seo, commerce, default_template_id, default_link_policy_id, model_profiles, settings, created_at, updated_at`
 	insertSite  = `INSERT INTO sites (` + siteColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateSite  = `UPDATE sites SET name = ?, base_url = ?, username = ?, status = ?, allow_insecure = ?, plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, default_template_id = ?, default_link_policy_id = ?, model_profiles = ?, settings = ?, updated_at = ? WHERE id = ?`
+	observeSite = `UPDATE sites SET settings = json_set(settings, '$.technical', json(?), '$.observation', json(?)), updated_at = ? WHERE id = ?`
+	pluginSite  = `UPDATE sites SET plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, updated_at = ? WHERE id = ?`
 	deleteSite  = `DELETE FROM sites WHERE id = ?`
 	selectSite  = `SELECT ` + siteColumns + ` FROM sites WHERE id = ?`
 )
@@ -93,6 +96,36 @@ func (r *SiteRepo) Update(ctx context.Context, s site.Site) error {
 		formatTime(s.UpdatedAt), s.ID,
 	}, nil, "update the site")
 	return requireAffected(affected, err, siteNotFound(s.ID))
+}
+
+func (r *SiteRepo) UpdateObservation(ctx context.Context, id string, technical site.TechnicalPages, observation site.ObservationState, at time.Time) error {
+	encodedTechnical, err := encodeJSON(technical)
+	if err != nil {
+		return err
+	}
+	encodedObservation, err := encodeJSON(observation)
+	if err != nil {
+		return err
+	}
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), observeSite, []any{
+		encodedTechnical, encodedObservation, formatTime(at), id,
+	}, nil, "record the site's observation")
+	return requireAffected(affected, err, siteNotFound(id))
+}
+
+func (r *SiteRepo) UpdatePlugin(ctx context.Context, id string, plugin site.PluginState, commerce site.Commerce, at time.Time) error {
+	capabilities := plugin.Capabilities
+	if capabilities == nil {
+		capabilities = []string{}
+	}
+	encodedCapabilities, err := encodeJSON(capabilities)
+	if err != nil {
+		return err
+	}
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), pluginSite, []any{
+		boolInt(plugin.Installed), plugin.Version, encodedCapabilities, plugin.SEOPlugin, string(commerce), formatTime(at), id,
+	}, nil, "record the site's plugin")
+	return requireAffected(affected, err, siteNotFound(id))
 }
 
 func (r *SiteRepo) Delete(ctx context.Context, id string) error {

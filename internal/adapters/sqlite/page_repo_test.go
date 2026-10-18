@@ -20,7 +20,7 @@ func fullPage(siteID, path string, at time.Time) pagemap.Page {
 	pageType := "page-type-guide"
 	return pagemap.Page{
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPost, WPID: &wpID,
-		ParentReason: pagemap.ParentJSONLD, PageTypeID: &pageType, TechnicalReason: pagemap.TechnicalShop, ReadOnlyReason: pagemap.ReadOnlyBuilder("elementor"),
+		ParentReason: pagemap.ParentJSONLD, ParentMethod: pagemap.MethodRedirect, PageTypeID: &pageType, TechnicalReason: pagemap.TechnicalShop, ReadOnlyReason: pagemap.ReadOnlyBuilder("elementor"),
 		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description", Canonical: "https://shop.example.com" + path,
 		Keywords: keyword.New([]keyword.Keyword{{Text: "title keyword", Volume: new(5400)}, {Text: "one", Volume: new(0)}, {Text: "two"}}),
 		Notes:    []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
@@ -84,6 +84,7 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	want.Status = pagemap.StatusPublished
 	want.WPID = nil
 	want.ParentReason = pagemap.ParentWorkbook
+	want.ParentMethod = pagemap.MethodNone
 	want.PageTypeID = nil
 	want.TechnicalReason = pagemap.TechnicalNone
 	want.ReadOnlyReason = pagemap.ReadOnlyTerm
@@ -116,6 +117,65 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	}
 	if _, err = repo.Get(t.Context(), parent.ID); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("Get missing code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
+func TestPageRepoUpdateDerivedTouchesOnlyTheDerivedColumns(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageRepo(store)
+
+	parent := fullPage(owner.ID, "/peptides/", sqlitetest.Stamp)
+	if err := repo.Insert(t.Context(), parent); err != nil {
+		t.Fatalf("Insert parent: %v", err)
+	}
+	read := fullPage(owner.ID, "/bpc-157/", sqlitetest.Stamp)
+	if err := repo.Insert(t.Context(), read); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	edited := read
+	edited.Keywords = keyword.New([]keyword.Keyword{{Text: "edited while the walk ran"}})
+	edited.Title = "Edited"
+	edited.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
+	if err := repo.Update(t.Context(), edited); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	derived := read
+	derived.ParentPageID = &parent.ID
+	derived.ParentReason = pagemap.ParentARIA
+	derived.ParentMethod = pagemap.MethodName
+	derived.TechnicalReason = pagemap.TechnicalNone
+	derived.ReadOnlyReason = pagemap.ReadOnlyNone
+	derived.Status = pagemap.StatusArchived
+	derived.UpdatedAt = sqlitetest.Stamp.Add(2 * time.Minute)
+	if err := repo.UpdateDerived(t.Context(), derived); err != nil {
+		t.Fatalf("UpdateDerived: %v", err)
+	}
+
+	got, err := repo.Get(t.Context(), read.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	want := edited
+	want.ParentPageID = &parent.ID
+	want.ParentReason = pagemap.ParentARIA
+	want.ParentMethod = pagemap.MethodName
+	want.TechnicalReason = pagemap.TechnicalNone
+	want.ReadOnlyReason = pagemap.ReadOnlyNone
+	want.Status = pagemap.StatusArchived
+	want.UpdatedAt = derived.UpdatedAt
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Get = %+v\nwant %+v", got, want)
+	}
+
+	missing := read
+	missing.ID = id.New()
+	if err = repo.UpdateDerived(t.Context(), missing); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("UpdateDerived of an unknown page code = %q, want NOT_FOUND", errors.CodeOf(err))
 	}
 }
 

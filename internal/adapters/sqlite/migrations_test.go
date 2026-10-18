@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const latestMigration = 54
+const latestMigration = 57
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -67,6 +67,9 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0052_page_links_typed.sql",
 		"0053_findings.sql",
 		"0054_site_settings.sql",
+		"0055_pages_parent_method.sql",
+		"0056_front_page_not_technical.sql",
+		"0057_page_renders_archive.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1195,6 +1198,88 @@ func TestPageLinksRebuildCopiesOldLinksAsContextualRawLinks(t *testing.T) {
 	}
 	if got := rowsOf(t, store, oldColumns); !slices.Equal(got, kept) {
 		t.Fatalf("the down kept the links\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(kept, "\n"))
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestTheParentMethodTheFrontPageAndTheArchiveState(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 54)
+	renders := schemaOf(t, store, "page_renders")
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) error {
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if execErr := exec(query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-18T09:00:00Z"
+
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	for _, page := range []struct{ id, path, reason, technical string }{
+		{"pg1", "/a/", "jsonld_breadcrumb", ""},
+		{"pg2", "/b/", "aria_breadcrumb", ""},
+		{"pg3", "/", "none", "front_page"},
+		{"pg4", "/shop/", "url", "shop"},
+	} {
+		must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, parent_reason, technical_reason, created_at, updated_at) VALUES (?, 's1', ?, ?, 'page', 'exists', ?, ?, ?, ?)`,
+			page.id, page.path, page.id, page.reason, page.technical, at, at)
+	}
+	must(`INSERT INTO page_renders (page_id, render_hash, content_root, extracted_at) VALUES ('pg1', 'h', 'not_found', ?)`, at)
+
+	if _, err = provider.UpTo(t.Context(), 57); err != nil {
+		t.Fatalf("up to 57: %v", err)
+	}
+	want := []string{"pg1 | href | ", "pg2 | href | ", "pg3 |  | ", "pg4 |  | shop"}
+	if got := rowsOf(t, store, `SELECT id, parent_method, technical_reason FROM pages ORDER BY id`); !slices.Equal(got, want) {
+		t.Fatalf("pages after 0055 and 0056 =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if got := rowsOf(t, store, `SELECT count(*) FROM page_renders`); !slices.Equal(got, []string{"0"}) {
+		t.Fatalf("page_renders after 0057 holds %v rows, want the cache emptied", got)
+	}
+
+	for _, step := range []struct {
+		why, query string
+		ok         bool
+	}{
+		{why: "an archive's render", query: `INSERT INTO page_renders (page_id, render_hash, content_root, extracted_at) VALUES ('pg4', 'h', 'archive', '` + at + `')`, ok: true},
+		{why: "a render that landed elsewhere", query: `INSERT INTO page_renders (page_id, render_hash, content_root, final_path, extracted_at) VALUES ('pg1', 'h', 'dynamic_only', '/cart/', '` + at + `')`, ok: true},
+		{why: "a root state the model does not name", query: `UPDATE page_renders SET content_root = 'missing' WHERE page_id = 'pg4'`},
+		{why: "a parent found through a redirect", query: `UPDATE pages SET parent_method = 'redirect' WHERE id = 'pg1'`, ok: true},
+		{why: "a parent found by name", query: `UPDATE pages SET parent_method = 'name' WHERE id = 'pg2'`, ok: true},
+		{why: "a method the model does not name", query: `UPDATE pages SET parent_method = 'guess' WHERE id = 'pg1'`},
+		{why: "no method at all", query: `UPDATE pages SET parent_method = NULL WHERE id = 'pg1'`},
+	} {
+		err = exec(step.query)
+		if step.ok && err != nil {
+			t.Fatalf("%s: %v", step.why, err)
+		}
+		if !step.ok && err == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+	if got := rowsOf(t, store, `SELECT page_id, final_path FROM page_renders ORDER BY page_id`); !slices.Equal(got, []string{"pg1 | /cart/", "pg4 | "}) {
+		t.Fatalf("final paths = %v, want the landing kept and empty by default", got)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 54); err != nil {
+		t.Fatalf("down to 54: %v", err)
+	}
+	if got := schemaOf(t, store, "page_renders"); !slices.Equal(got, renders) {
+		t.Fatalf("the down left page_renders as\n%s\nwant it as migration 51 made it\n%s", strings.Join(got, "\n"), strings.Join(renders, "\n"))
+	}
+	if got := columnOf(t, store, "pages", "parent_method"); got != "" {
+		t.Fatalf("the down kept parent_method as %q", got)
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)

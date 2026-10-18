@@ -81,6 +81,7 @@ type Page struct {
 	Slug            string
 	ParentPageID    *string
 	ParentReason    ParentReason
+	ParentMethod    ParentMethod
 	PageTypeID      *string
 	TechnicalReason TechnicalReason
 	ReadOnlyReason  ReadOnlyReason

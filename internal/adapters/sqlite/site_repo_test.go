@@ -217,6 +217,86 @@ func TestSiteRepoReadsTheSettingsNormalized(t *testing.T) {
 	}
 }
 
+func TestSiteRepoUpdateObservationTouchesOnlyTheObservationsKeys(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	repo := sqlite.NewSiteRepo(store)
+	record := fullSite("observed", sqlitetest.Stamp)
+	if err := repo.Insert(t.Context(), record); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	edited := record
+	edited.Name = "renamed while the walk ran"
+	edited.Settings.UserAgent = "Edited/2.0"
+	edited.Settings.Observe.RenderConcurrency = 2
+	if err := repo.Update(t.Context(), edited); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	finished := sqlitetest.Stamp.Add(2 * time.Hour)
+	technical := site.TechnicalPages{Posts: 3, Shop: 70, Cart: 80}
+	observation := site.ObservationState{LastStartedAt: &finished, LastFinishedAt: &finished, SinceFullWalk: 4}
+	at := sqlitetest.Stamp.Add(3 * time.Hour)
+	if err := repo.UpdateObservation(t.Context(), record.ID, technical, observation, at); err != nil {
+		t.Fatalf("UpdateObservation: %v", err)
+	}
+
+	got, err := repo.Get(t.Context(), record.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	want := edited.Settings.Normalized()
+	want.Technical = technical
+	want.Observation = observation
+	if !reflect.DeepEqual(got.Settings, want) {
+		t.Errorf("settings = %+v\nwant %+v", got.Settings, want)
+	}
+	if got.Name != edited.Name || !got.UpdatedAt.Equal(at) {
+		t.Errorf("name %q updated %v, want %q and %v", got.Name, got.UpdatedAt, edited.Name, at)
+	}
+
+	if err = repo.UpdateObservation(t.Context(), id.New(), technical, observation, at); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("UpdateObservation of an unknown site = %v, want NOT_FOUND", err)
+	}
+}
+
+func TestSiteRepoUpdatePluginTouchesOnlyThePluginAndCommerce(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	repo := sqlite.NewSiteRepo(store)
+	record := fullSite("probed", sqlitetest.Stamp)
+	if err := repo.Insert(t.Context(), record); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+	edited := record
+	edited.Settings.UserAgent = "Edited/2.0"
+	if err := repo.Update(t.Context(), edited); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	plugin := site.PluginState{Installed: true, Version: "1.4.1", Capabilities: []string{"bulk", "rendered"}, SEOPlugin: "rankmath"}
+	at := sqlitetest.Stamp.Add(time.Hour)
+	if err := repo.UpdatePlugin(t.Context(), record.ID, plugin, site.CommerceReady, at); err != nil {
+		t.Fatalf("UpdatePlugin: %v", err)
+	}
+	got, err := repo.Get(t.Context(), record.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !reflect.DeepEqual(got.Plugin, plugin) || got.Commerce != site.CommerceReady || !got.UpdatedAt.Equal(at) {
+		t.Errorf("plugin %+v commerce %s updated %v, want %+v editable %v", got.Plugin, got.Commerce, got.UpdatedAt, plugin, at)
+	}
+	if got.Settings.UserAgent != "Edited/2.0" {
+		t.Errorf("the User-Agent = %q, want the edit kept", got.Settings.UserAgent)
+	}
+	if err = repo.UpdatePlugin(t.Context(), id.New(), plugin, site.CommerceReady, at); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("UpdatePlugin of an unknown site = %v, want NOT_FOUND", err)
+	}
+}
+
 func TestSiteFixture(t *testing.T) {
 	t.Parallel()
 
