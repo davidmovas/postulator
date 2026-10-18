@@ -23,6 +23,7 @@ type siteLinks struct {
 	entities map[string]graph.Entity
 	outgoing map[string][]pagemap.PageLink
 	incoming map[string]int
+	typed    map[string]LinkTypeCounts
 }
 
 type pageDetail struct {
@@ -121,7 +122,8 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	for i := range entities {
 		byID[entities[i].ID] = entities[i]
 	}
-	_, incoming := linkSets(links)
+	owed := contextual(links)
+	_, incoming := linkSets(owed)
 
 	return siteLinks{
 		site: pagemap.NewSite(owner.BaseURL),
@@ -137,8 +139,56 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 			AnchorStrategy: effective.Policy.AnchorStrategy,
 		},
 		g: g, index: pagemap.NewIndex(pages), entities: byID,
-		outgoing: linksByPage(links), incoming: incoming,
+		outgoing: linksByPage(owed), incoming: incoming, typed: typesByPage(links),
 	}, nil
+}
+
+func contextual(links []pagemap.PageLink) []pagemap.PageLink {
+	out := make([]pagemap.PageLink, 0, len(links))
+	for i := range links {
+		if links[i].Type == pagemap.LinkContextual {
+			out = append(out, links[i])
+		}
+	}
+	return out
+}
+
+func typesByPage(links []pagemap.PageLink) map[string]LinkTypeCounts {
+	out := make(map[string]LinkTypeCounts)
+	for i := range links {
+		counts := out[links[i].FromPageID]
+		counts.add(links[i].Type)
+		out[links[i].FromPageID] = counts
+	}
+	return out
+}
+
+func (c *LinkTypeCounts) add(kind pagemap.LinkType) {
+	switch kind {
+	case pagemap.LinkBreadcrumb:
+		c.Breadcrumb++
+	case pagemap.LinkListing:
+		c.Listing++
+	case pagemap.LinkNavigation:
+		c.Navigation++
+	case pagemap.LinkContextual:
+		c.Contextual++
+	default:
+		c.Unknown++
+	}
+}
+
+func (c *LinkTypeCounts) plus(other LinkTypeCounts) {
+	c.Breadcrumb += other.Breadcrumb
+	c.Listing += other.Listing
+	c.Navigation += other.Navigation
+	c.Contextual += other.Contextual
+	c.Unknown += other.Unknown
+}
+
+func orphan(page pagemap.Page, inbound int) bool {
+	return page.WPID != nil && page.Status != pagemap.StatusArchived && page.TechnicalReason == pagemap.TechnicalNone &&
+		!page.WPType.Term() && page.Path != pagemap.RootPath && inbound == 0
 }
 
 func (s *Service) rulesFor(ctx context.Context, page pagemap.Page,
@@ -162,7 +212,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 	detail := pageDetail{
 		summary: PageAudit{
 			PageID: page.ID, Path: page.Path, Status: string(page.Status), SkipReason: string(skip), OnSite: onSite,
-			Inbound: inbound, Orphan: onSite && inbound == 0 && page.Status != pagemap.StatusArchived,
+			Inbound: inbound, Orphan: orphan(page, inbound), ByType: state.typed[page.ID],
 		},
 		required: make([]RequiredLink, 0),
 		extra:    make([]ExtraLink, 0),
@@ -302,6 +352,7 @@ func tally(totals *LinkTotals, row PageAudit) {
 	if row.Orphan {
 		totals.Orphans++
 	}
+	totals.ByType.plus(row.ByType)
 }
 
 func linksByPage(links []pagemap.PageLink) map[string][]pagemap.PageLink {

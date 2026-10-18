@@ -81,13 +81,15 @@ func TestLinkAuditAuditsEveryMappedPage(t *testing.T) {
 		f.row("/coffee/filter/", "planned", "Filter", "", [10]int{2, 1, 1, 0, 0, 0, 0, 0, 1, 0}, false, false),
 		f.row("/tea/", "exists", "", "unmapped", [10]int{0, 0, 0, 0, 0, 0, 0, 1, 0, 0}, false, true),
 	}
+	want[1].ByType = reports.LinkTypeCounts{Contextual: 4}
+	want[2].ByType = reports.LinkTypeCounts{Contextual: 1}
 	if !reflect.DeepEqual(got.Pages, want) {
 		t.Fatalf("pages =\n%+v\nwant\n%+v", got.Pages, want)
 	}
 
 	totals := reports.LinkTotals{
 		Pages: 4, Audited: 3, Targets: 7, Required: 2, Satisfied: 2, Missing: 1, MissingRequired: 0,
-		Blocked: 1, OffGraph: 3, Orphans: 0, Pending: 3, Unpublished: 0,
+		Blocked: 1, OffGraph: 3, Orphans: 0, Pending: 3, Unpublished: 0, ByType: reports.LinkTypeCounts{Contextual: 5},
 	}
 	if got.Totals != totals {
 		t.Fatalf("totals = %+v, want %+v", got.Totals, totals)
@@ -315,6 +317,89 @@ func TestLinkAuditOrphansAgreeWithTheOverview(t *testing.T) {
 	}
 	if audit.Totals.Orphans != overview.Pages.Orphans || audit.Totals.Orphans == 0 {
 		t.Fatalf("audit orphans = %d, overview orphans = %d", audit.Totals.Orphans, overview.Pages.Orphans)
+	}
+}
+
+func TestOnlyAContextualLinkSatisfiesAnOwedLink(t *testing.T) {
+	t.Parallel()
+
+	f := auditFixture(t)
+	espresso := f.pages["/coffee/espresso/"]
+	coffee := f.pages["/coffee/"]
+	tea := f.pages["/tea/"]
+	f.replaceLinks(t, espresso, f.storedLink(espresso, &tea.ID, "/tea/", "tea", 0))
+	crumb := f.storedLink(espresso, &coffee.ID, "/coffee/", "Coffee", 1)
+	crumb.Type, crumb.Source, crumb.Region = pagemap.LinkBreadcrumb, pagemap.SourceRender, "breadcrumb"
+	menu := f.storedLink(espresso, &coffee.ID, "/coffee/", "Coffee", 2)
+	menu.Type, menu.Source, menu.Region = pagemap.LinkNavigation, pagemap.SourceRender, "navigation"
+	if err := sqlite.NewPageLinkRepo(f.store).ReplaceForPage(t.Context(), espresso.ID, pagemap.SourceRender, []pagemap.PageLink{crumb, menu}); err != nil {
+		t.Fatalf("store the render links: %v", err)
+	}
+
+	detail, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: espresso.ID})
+	if err != nil {
+		t.Fatalf("LinkAuditPage: %v", err)
+	}
+	owed, ok := requiredFor(detail.Required, coffee.ID)
+	if !ok || owed.Satisfied || owed.State != string(reports.LinkMissing) {
+		t.Errorf("the link owed to /coffee/ = %+v %t, want missing although a breadcrumb and a menu link reach it", owed, ok)
+	}
+
+	audit, err := f.service.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("LinkAudit: %v", err)
+	}
+	want := reports.LinkTypeCounts{Breadcrumb: 1, Navigation: 1, Contextual: 1}
+	if site := (reports.LinkTypeCounts{Breadcrumb: 1, Navigation: 1, Contextual: 2}); audit.Totals.ByType != site {
+		t.Errorf("links by type = %+v, want %+v", audit.Totals.ByType, site)
+	}
+	for _, row := range audit.Pages {
+		switch row.Path {
+		case "/coffee/espresso/":
+			if row.ByType != want {
+				t.Errorf("espresso's links by type = %+v, want %+v", row.ByType, want)
+			}
+		case "/coffee/":
+			if !row.Orphan || row.Inbound != 0 {
+				t.Errorf("/coffee/ inbound %d orphan %t, want an orphan: no contextual link reaches it", row.Inbound, row.Orphan)
+			}
+		}
+	}
+}
+
+func TestTechnicalTermAndFrontPagesAreNeverOrphans(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	repo := sqlite.NewPageRepo(f.store)
+	f.page(t, repo, "/", pagemap.StatusPublished)
+	cart := f.page(t, repo, "/cart/", pagemap.StatusPublished)
+	cart.TechnicalReason = pagemap.TechnicalCart
+	term := f.page(t, repo, "/product-category/beans/", pagemap.StatusPublished)
+	term.WPType = pagemap.WPProductCategory
+	for _, page := range []pagemap.Page{cart, term} {
+		if err := repo.Update(t.Context(), page); err != nil {
+			t.Fatalf("update %s: %v", page.Path, err)
+		}
+	}
+	f.page(t, repo, "/lonely/", pagemap.StatusPublished)
+
+	audit, err := f.service.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("LinkAudit: %v", err)
+	}
+	want := map[string]bool{"/": false, "/cart/": false, "/product-category/beans/": false, "/lonely/": true}
+	for _, row := range audit.Pages {
+		if orphan, asked := want[row.Path]; asked && row.Orphan != orphan {
+			t.Errorf("%s orphan = %t, want %t", row.Path, row.Orphan, orphan)
+		}
+	}
+	overview, err := f.service.SiteOverview(t.Context(), reports.SiteOverviewRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("SiteOverview: %v", err)
+	}
+	if overview.Pages.Orphans != audit.Totals.Orphans {
+		t.Errorf("overview orphans %d, audit orphans %d, want the same rule", overview.Pages.Orphans, audit.Totals.Orphans)
 	}
 }
 

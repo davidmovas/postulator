@@ -127,40 +127,50 @@ type LinkPolicySummary struct {
 	AnchorStrategy string `json:"anchorStrategy"`
 }
 
+type LinkTypeCounts struct {
+	Breadcrumb int `json:"breadcrumb"`
+	Listing    int `json:"listing"`
+	Navigation int `json:"navigation"`
+	Contextual int `json:"contextual"`
+	Unknown    int `json:"unknown"`
+}
+
 type LinkTotals struct {
-	Pages           int `json:"pages"`
-	Audited         int `json:"audited"`
-	Targets         int `json:"targets"`
-	Required        int `json:"required"`
-	Satisfied       int `json:"satisfied"`
-	Missing         int `json:"missing"`
-	MissingRequired int `json:"missingRequired"`
-	Blocked         int `json:"blocked"`
-	OffGraph        int `json:"offGraph"`
-	Orphans         int `json:"orphans"`
-	Pending         int `json:"pending"`
-	Unpublished     int `json:"unpublished"`
+	Pages           int            `json:"pages"`
+	Audited         int            `json:"audited"`
+	Targets         int            `json:"targets"`
+	Required        int            `json:"required"`
+	Satisfied       int            `json:"satisfied"`
+	Missing         int            `json:"missing"`
+	MissingRequired int            `json:"missingRequired"`
+	Blocked         int            `json:"blocked"`
+	OffGraph        int            `json:"offGraph"`
+	Orphans         int            `json:"orphans"`
+	Pending         int            `json:"pending"`
+	Unpublished     int            `json:"unpublished"`
+	ByType          LinkTypeCounts `json:"byType"`
 }
 
 type PageAudit struct {
-	PageID          string `json:"pageId"`
-	Path            string `json:"path"`
-	Status          string `json:"status"`
-	EntityID        string `json:"entityId"`
-	EntityName      string `json:"entityName"`
-	SkipReason      string `json:"skipReason"`
-	OnSite          bool   `json:"onSite"`
-	Targets         int    `json:"targets"`
-	Required        int    `json:"required"`
-	Satisfied       int    `json:"satisfied"`
-	Missing         int    `json:"missing"`
-	MissingRequired int    `json:"missingRequired"`
-	Blocked         int    `json:"blocked"`
-	OffGraph        int    `json:"offGraph"`
-	Pending         int    `json:"pending"`
-	Unpublished     int    `json:"unpublished"`
-	Inbound         int    `json:"inbound"`
-	Orphan          bool   `json:"orphan"`
+	PageID          string         `json:"pageId"`
+	Path            string         `json:"path"`
+	Status          string         `json:"status"`
+	EntityID        string         `json:"entityId"`
+	EntityName      string         `json:"entityName"`
+	SkipReason      string         `json:"skipReason"`
+	OnSite          bool           `json:"onSite"`
+	Targets         int            `json:"targets"`
+	Required        int            `json:"required"`
+	Satisfied       int            `json:"satisfied"`
+	Missing         int            `json:"missing"`
+	MissingRequired int            `json:"missingRequired"`
+	Blocked         int            `json:"blocked"`
+	OffGraph        int            `json:"offGraph"`
+	Pending         int            `json:"pending"`
+	Unpublished     int            `json:"unpublished"`
+	Inbound         int            `json:"inbound"`
+	Orphan          bool           `json:"orphan"`
+	ByType          LinkTypeCounts `json:"byType"`
 }
 
 type LinkAuditResponse struct {
