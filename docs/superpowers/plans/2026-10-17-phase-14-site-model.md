@@ -347,11 +347,89 @@ Execution: `superpowers:executing-plans`, one accountable owner, at most two age
 - **Touches.** `frontend/src/features/pages/{drawer,details,summary,links}.tsx` and new model panes (identity, hierarchy with reason, regions, trail, typed links, technical and read-only reasons, blocks read-only), `frontend/src/features/links/*` (counts by type, contextual owed), `frontend/src/features/sites/*`, `frontend/src/generated/vocab.ts` (`linkTypes`, `regionKinds`, `parentReasons`, `technicalReasons`, `contentRootStates`), `internal/application/pages/views.go`, `internal/transport/wails/pages.go`, the UI harness fixtures.
 - **Exit.** `npm run test:run` and `task ui:lint` green; the harness walk shows a page as the model. Owner sees: every page as the model, Linking by type.
 
+#### 1c tasks
+
+**Part 0 closes what the owner's review of 1b found; Part 1 is the screens.** Execution: `superpowers:executing-plans`, one accountable owner, at most two agents at once and only on disjoint Go packages (R: `domain/render`, then `adapters/wp` and `wptest`; F: `frontend/`). Every commit uses `git commit -- <paths>`; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; the heavy e2e legs run alone.
+
+**Decided at the plan** (recorded in `DECISIONS.md` at the close; the spec amended in the same commits):
+1. **A crumb resolves** by its href against every modelled page (a modelled page whose own visit redirects to another is followed), else through the redirect the render stage recorded on it, else by exact name (`graph.Key` over observed titles, H1s and term names, after `html.UnescapeString`; the page, its descendants and archived pages excluded) when the crumb has no link or its internal link is dead (≥ 400 after redirects). One name candidate resolves; several are `parent_ambiguous`. A live unmodelled or external href never falls to its name. An unresolved nearest crumb still never falls to the next crumb.
+2. **The method is its own column**, `pages.parent_method` (`href`, `redirect`, `name`), beside the reason that keeps the source (`jsonld_breadcrumb`, `aria_breadcrumb`), so no `pages` rebuild; `vocab.ts` gains `parentMethods`.
+3. **The front page is the root**: not technical, no parent; a crumb at `/` resolves to it when it is modelled and is dropped otherwise; a trail whose nearest crumb is the front page is weak and yields to the other trails, then to the WordPress parent, and only then names the front page.
+4. **A redirect lookup** is one anonymous HEAD (a GET closed unread on 405 or 501) through the limiter on every hop and the site's User-Agent, stopping at the first off-site hop, made in the render stage and stored on the crumb in `page_renders.trail` as the normalized final path and status. It may not land on `/`, the page or a descendant, and its target must carry the crumb's name, because WordPress's 404 guesser redirects a dead slug to any similar one. A failed lookup makes the render unreachable for the walk.
+5. **A page whose own visit is redirected** to another path keeps no trail, region, link, builder, robots or URL form from the other page's render, its root state follows its body, and `render_redirected` names the target.
+6. **A parent cycle** is broken at its page with the smallest path, which re-derives without trails, repeated until none remains; `parent_cycle` names it.
+7. **`archive`** is a root state: a term page, or the site's shop or posts page. When the root is not located the state follows the body (`empty_raw`, `dynamic_only` counting the site's technical blocks and shortcodes), and only unfindable text is `not_found`.
+8. **Link rules**: a link to the document itself is no page link; `rel` tag, category or author outside the content is navigation; the product-listing rule (≥ 3 product links, ≥ 2 products) applies outside the root; ARIA landmark roles count as their elements outside the root.
+9. **Derive writes only what it owns**: `SiteRepo.UpdateObservation` (`json_set` on `settings.technical` and `settings.observation`) and `PageRepo.UpdateDerived`; `adoptExtensions` and `CheckPlugin` write only the plugin columns.
+10. **An owed link is satisfied by a contextual link only**; orphans and off-graph links count contextual links, and technical pages, term pages and the front page are never orphans.
+11. **The bindings sit on `PagesService`** (`Model`, `ModelSummary`) through a second source, so the service count stays fifteen.
+12. **Stage 2 and 3's migrations move up by three** (stage 2 from 0058, stage 3 from 0064), 0055–0057 being taken here.
+
+##### 1c.1 — the gate legs 1b left
+- `task e2e:full:noplugin STAND=vanilla`, `task e2e:up STAND=vanilla`, `task ui:lint`, one at a time with free memory checked; whatever is red is fixed in its own commit.
+
+##### 1c.2 — the diagnosis
+- `internal/e2e/observe_test.go` logs a row per page (path, type, root, trails with names and hrefs, parent, reason, findings); one replica run before any change gives the diagnosis and the before counts.
+- Commit `test(e2e): the observation proof logs the model page by page`.
+
+##### 1c.3 — the extraction (agent R)
+- `internal/domain/render`: `RootArchive`; `Input.Archive` and `Input.Dynamic` (the technical block and shortcode names); the state order of decision 7; `Crumb.Href` filled by both trail readers; the link rules of decision 8; goldens per state and per rule, the two stands' captured renders kept.
+- Commits `feat(render): truthful content-root states and the archive` and `feat(render): links typed by rel, listings outside the root and landmark roles`.
+
+##### 1c.4 — redirects in the client and the fake (agent R, after 1c.3)
+- `internal/adapters/wp`: `Visit` answers its final URL; `Resolve(ctx, url)` per decision 4; their tests through a recording server. `wptest`: `WithPublicRedirect(from, to)`, a public HEAD outside auth and fault injection.
+- Commit `feat(wp): a visit names where it landed and a redirect is resolved without a body`.
+
+##### 1c.5 — storage
+- Migrations 0055 `pages.parent_method`, 0056 the front page's technical reason cleared, 0057 `page_renders` recreated with `archive` and `final_path`; `PageRepo.UpdateDerived`, `SiteRepo.UpdateObservation`, `SiteRepo.UpdatePlugin`; `migrations_test.go` (`latestMigration = 57`).
+- Commit `feat(sqlite): the parent's method, the archive state and writes narrowed to their owners`.
+
+##### 1c.6 — the derivation
+- `internal/domain/pagemap`: `ParentMethod`, `Page.ParentMethod`, `Crumb` with `Href`, `Final`, `Status`; `TechnicalFront` gone; `DeriveParent` per decisions 1, 3 and 6 over `Index.ByName` and the redirects of modelled pages; the table gains the weak Home-only list, a same-name tie, the live-link guard, a dead link that falls to its name, a modelled alias, a cycle.
+- Commit `feat(pagemap): a crumb resolves by href, redirect or name and the front page is the root`.
+
+##### 1c.7 — the observation
+- `internal/application/observe`: the render stage resolves crumbs and records a redirected visit; `derive` offline with the narrowed writes; `parent_ambiguous`, `parent_cycle`, `render_redirected` raised and cleared; `Input.Archive` and `Input.Dynamic` passed; the summary counts trails by method; `steps/observe_readers.go` adapts `Resolve`; `sync_site`'s `adoptExtensions` narrowed; `sync.CheckPlugin` narrowed.
+- Tests: the cases of decisions 1–6 over the fakes and wptest, `TestASettingsEditDuringTheDerivationSurvives`, `TestAPageEditDuringTheDerivationSurvives`.
+- Commits per concern: `feat(observe): crumbs resolved through their redirects in the render stage`, `fix(observe): the derivation writes only the columns it owns`, `feat(observe): the front page is the root of the site`.
+
+##### 1c.8 — the replica fixture and the stand tables
+- `docker/e2e/stands/replica/{site-behaviour.php,provision.sh,products.csv}`: crumbs from a per-slug table, the new hub `/healing-peptides/`, `/lab-guides/` and `/reconstitution/`, the 301 from `/category/healing-peptides/`, a product with an empty description; `internal/e2e/observe_test.go` and `standFacts` where counts move.
+- Commit `test(e2e): the replica carries every breadcrumb shape the client's sites use`.
+
+##### 1c.9 — the vocabularies
+- `vocabgen`: `linkTypes`, `linkSources`, `regionKinds`, `parentReasons`, `parentMethods`, `trailSources`, `technicalReasons`, `contentRootStates`, `findingCodes`; `task vocab`.
+- Commit `feat(vocab): the page model's vocabularies`.
+
+##### 1c.10 — the bindings and the link view
+- `internal/application/observe/views.go` (tagged, `dto.Time`), `Page` reading its render and identity directly; `PagesService.Model` and `ModelSummary`; `pages.PageLink` with type, region, source, position and ours.
+- Commit `feat(pages): the page model and its summary are bound`.
+
+##### 1c.11 — Linking by type
+- `internal/application/reports/{linkaudit,site,requests}.go` per decision 10, `LinkTotals` with a named count per type.
+- Commit `feat(reports): the link audit owes contextual links and counts every type`.
+
+##### 1c.12 — the drawer's Model tab (agent F)
+- `frontend/src/features/pages/model/*` one pane a file, `copy/pages.ts`, `labels.ts`, the endpoint, hook and key, `bridge.tsx`; the Links tab shows type and source; screen tests.
+- Commit `feat(pages): the drawer shows a page as the model`.
+
+##### 1c.13 — Sites, Overview and Linking (agent F)
+- The settings section and the sync options on Sites, the observation summary on Overview, the by-type strip on Linking; screen tests.
+- Commit `feat(sites): per-site settings, the sync options and the observation summary`.
+
+##### 1c.14 — the harness
+- A harness test that the seeded core carries a model; walk routes for the Model tab and the Sites settings.
+- Commit `test(harness): the seeded site is observed into the model`.
+
+##### 1c.15 — the gate
+- The whole gate of the global constraints with exit codes read; docs: `STATUS.md` (stage 1 done, stage 2 next), `DECISIONS.md` (stage 1c), the spec (16.1, 16.4, 16.5, 16.8), `CONTRACTS.md`, `ARCHITECTURE.md`, `CLAUDE.md` footguns.
+- Commit `docs: stage 1c closes stage 1`.
+
 ## Stage 2 — page types, the field catalog and scope with UI, the context pack
 
 - **Goal.** The client names his page types over presets, enables fields per type with an instruction, limits and a link policy, and the writer, the linker and the judge work from the context pack.
 - **Touches.** `internal/domain/pagetype`, `internal/domain/field` (scope), `internal/domain/contextpack`, `internal/application/{pagetypes,fields}`, `internal/application/templates/policies.go` (deleted) and the four copies of the rules merge (one resolver), `internal/domain/content/{brief,draft,product,sanitize,linkcontext}.go`, `internal/runtime/steps/{generate_body,generate_meta,generate_fields,repair_links,insert_links,judge,ceiling,prompts}.go` and `prompts/*.tmpl`, `internal/application/content/*`, `internal/runtime/budget.go`, `internal/application/imports/{kinds,pages,export}.go`, `internal/application/graph/*` (kind removed, entity card), `internal/application/tools/{pagetypes_*,fields_*,pages_context_pack,templates_spec,graph_*}.go`, `policies_*.go` deleted, `internal/transport/wails/vocabgen`, `frontend/src/features/settings` (Page types), `frontend/src/features/templates` (policies screen deleted, editor without `pageKind`), `frontend/src/features/graph` (type of the canonical page), `frontend/src/features/pages/template.tsx`.
-- **Migrations.** 0055 `page_types`; 0056 `field_scopes`; 0057 the backfill of `pages.page_type_id` (data only, empty down); 0058 `entities.definition`, `facts`, `notes`; 0059 `link_policies` dropped and `sites.default_link_policy_id` removed by rebuild (down restores both); 0060 `entities.kind` dropped by the 0030 rebuild and `templates.page_kind` dropped (down restores both).
+- **Migrations.** 0058 `page_types`; 0059 `field_scopes`; 0060 the backfill of `pages.page_type_id` (data only, empty down); 0061 `entities.definition`, `facts`, `notes`; 0062 `link_policies` dropped and `sites.default_link_policy_id` removed by rebuild (down restores both); 0063 `entities.kind` dropped by the 0030 rebuild and `templates.page_kind` dropped (down restores both).
 - **Steps.** `generate_fields` joins `StepName`; `generate_body` and `generate_meta` keep their names and consume the pack; the writer leaves the client's own paragraphs alone unless the scope's `rewrites` is on for the type and field (off by default), and a run may switch it on for chosen pages with the user's confirmation (the owner's answer 5); `insert_links` and `repair_links` take the field's policy; the ceiling gains the input budget `llm.inputBudget.<role>`.
 - **Tools.** `pagetypes_list/get/create/update/delete`, `fields_catalog`, `fields_set_scope`, `pages_context_pack`; the `kind` field leaves the five graph request structs; `pageKind` and `linkRules` leave the templates trio; the ceiling moves in each commit.
 - **Reuses.** `template.Resolve` and the override layers, `Structure`, `Assemble`, `InsertTarget`, `pagemap.Keywords`, the import pipeline. **Rewrites.** `content.Brief` (the pack's writer view), the prompt templates, `imports/kinds.go`, `features/graph/labels.ts`.
@@ -360,7 +438,7 @@ Execution: `superpowers:executing-plans`, one accountable owner, at most two age
 ## Stage 3 — editing: block operations, field writes through the registry, the pipeline over existing pages, revert
 
 - **Goal.** A run edits an existing page field by field and block by block, writes under the hash of what it read, never touches the deny list, and a revert puts back exactly what each field and block held.
-- **Touches.** `internal/domain/block` (operations), `internal/domain/field` (write side), `internal/application/edit` (the writers `CoreWriter`, `StoreWriter`, `PluginWriter` declared here; the field write use case), `internal/runtime/steps/{publish,publish_product,publish_seo,relink,relink_page,relink_neighbors,revert,revert_product,generate_images}.go`, `internal/adapters/wp/{items,woo,plugin,media}.go` (writers: excerpt, featured media, meta by key, upsells and cross-sells, image alt and title, variation description, the raw PUT reading the stored content), `wp-plugin/postulator-companion` (`PUT /meta/{id}`, `meta_write`), `wp-plugin/openapi.yaml`, migrations 0061 (the old `pages` columns dropped, down restores) and 0062 (`page_links.origin` dropped), `internal/domain/pagemap/observed.go` deleted, `internal/application/tools/pages_replace_links.go` deleted, `frontend/src/features/runs/panes/*` (per-field diffs), `frontend/src/features/pages` (blocks editable through a run, revert per field).
+- **Touches.** `internal/domain/block` (operations), `internal/domain/field` (write side), `internal/application/edit` (the writers `CoreWriter`, `StoreWriter`, `PluginWriter` declared here; the field write use case), `internal/runtime/steps/{publish,publish_product,publish_seo,relink,relink_page,relink_neighbors,revert,revert_product,generate_images}.go`, `internal/adapters/wp/{items,woo,plugin,media}.go` (writers: excerpt, featured media, meta by key, upsells and cross-sells, image alt and title, variation description, the raw PUT reading the stored content), `wp-plugin/postulator-companion` (`PUT /meta/{id}`, `meta_write`), `wp-plugin/openapi.yaml`, migrations 0064 (the old `pages` columns dropped, down restores) and 0065 (`page_links.origin` dropped), `internal/domain/pagemap/observed.go` deleted, `internal/application/tools/pages_replace_links.go` deleted, `frontend/src/features/runs/panes/*` (per-field diffs), `frontend/src/features/pages` (blocks editable through a run, revert per field).
 - **Behaviour.** `publish` creates a planned page once (status, parent and slug in that one call, recorded in the artifact: the owner's answer 1) and otherwise writes every produced field through the registry under a per-field checkpoint; `publish_product` folds into the registry writers (the store's fields first, the description last, the hash read after, as today); relink places links with `PlaceLink` on blocks; revert restores per field and per block (neighbours by block hash); media names stay neutral.
 - **Reuses.** The raw route's CAS, `InsertTarget`, the publish artifact shape extended per field, the revert run kind, `generate_images`. **Rewrites.** `publish.go` as the field writer, `revert.go` at field granularity.
 - **Exit.** Unit: `Serialize` byte-exact for untouched blocks (a property test over random bodies and operations); every operation on classic and block bodies, a `wp:paragraph` with `align` kept valid; the deny list refused at the use case and at the adapter; a recording transport proves no slug, parent, status, price, stock, SKU, category or variation attribute leaves on an update; a publish killed after its second field resumes at the third with no second model call; the PHP deny set in `openapi.yaml` includes `field.Denied`'s keys. E2E on both stands: `TestAnExistingPageIsEditedBlockByBlock` (a hub with an injected breadcrumb and grid on the replica gets its body between them, untouched blocks identical, links placed only in content, a revert restores the base; on vanilla a nested page's body is edited and its URL and parent unchanged); `TestAProductIsEditedThroughTheRegistry` (description, short description, a `meta_data` key, a variation description written and reverted; price, SKU, stock and categories untouched, proven on the wire); `TestAWriteAgainstAStaleHashPauses`. Owner sees: a run that edits existing pages, the diff per field, revert per field.
