@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 	"github.com/davidmovas/postulator/internal/transport/wails"
@@ -57,12 +58,26 @@ func (f pagesFake) ReplaceLinks(context.Context, pages.ReplaceLinksRequest) (pag
 	return answer[pages.ReplaceLinksResponse](f.mode)
 }
 
+type pageModelsFake struct{ mode failure }
+
+func (f pageModelsFake) Model(context.Context, observe.ModelRequest) (observe.ModelView, error) {
+	return answer[observe.ModelView](f.mode)
+}
+
+func (f pageModelsFake) SummaryOf(context.Context, observe.SummaryRequest) (observe.Summary, error) {
+	return answer[observe.Summary](f.mode)
+}
+
+func pagesService(mode failure) *wails.PagesService {
+	return wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: mode}), ready[wails.ModelUseCase](pageModelsFake{mode: mode}))
+}
+
 func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{})), []string{
-		"Create", "Delete", "Get", "List", "MapToEntity", "PreviewLink", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
+	assertMethodNames(t, pagesService(missing), []string{
+		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
 	})
-	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: missing})), missingBody)
-	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: panicking})), panicBody)
+	assertEveryMethodConverts(t, pagesService(missing), missingBody)
+	assertEveryMethodConverts(t, pagesService(panicking), panicBody)
 }

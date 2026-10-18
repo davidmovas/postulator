@@ -28,6 +28,12 @@ func TestReplaceLinks(t *testing.T) {
 	if len(replaced.Links) != 2 || replaced.Links[0].Origin != "generated" || replaced.Links[1].Origin != "observed" || replaced.Links[0].FromPageID != from.ID || replaced.Links[0].ObservedAt.String() != "2026-09-18T09:00:00Z" {
 		t.Errorf("ReplaceLinks = %+v", replaced.Links)
 	}
+	if first := replaced.Links[0]; first.Type != "contextual" || first.Source != "raw" || first.Region != "" || !first.Ours {
+		t.Errorf("a generated link reads type %q source %q region %q ours %t, want a contextual raw link of ours", first.Type, first.Source, first.Region, first.Ours)
+	}
+	if second := replaced.Links[1]; second.Ours {
+		t.Error("an observed link reads as ours")
+	}
 	h.wantEvents(t, events.PagesChanged)
 
 	got, err := h.service.Get(t.Context(), pages.GetRequest{ID: from.ID})

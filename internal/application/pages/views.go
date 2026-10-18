@@ -62,6 +62,11 @@ type PageLink struct {
 	ToURL      string   `json:"toUrl"`
 	AnchorText string   `json:"anchorText"`
 	Origin     string   `json:"origin"`
+	Type       string   `json:"type"`
+	Region     string   `json:"region"`
+	Source     string   `json:"source"`
+	Position   *int     `json:"position"`
+	Ours       bool     `json:"ours"`
 	ObservedAt dto.Time `json:"observedAt"`
 }
 
@@ -137,6 +142,11 @@ func linkView(l pagemap.PageLink) PageLink {
 		ToURL:      l.ToURL,
 		AnchorText: l.AnchorText,
 		Origin:     string(l.Origin),
+		Type:       string(l.Type),
+		Region:     l.Region,
+		Source:     string(l.Source),
+		Position:   l.Position,
+		Ours:       l.Ours,
 		ObservedAt: dto.NewTime(l.ObservedAt),
 	}
 }

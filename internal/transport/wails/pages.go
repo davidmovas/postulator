@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -24,6 +25,11 @@ type PagesUseCase interface {
 	PreviewLink(ctx context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error)
 }
 
+type ModelUseCase interface {
+	Model(ctx context.Context, req observe.ModelRequest) (observe.ModelView, error)
+	SummaryOf(ctx context.Context, req observe.SummaryRequest) (observe.Summary, error)
+}
+
 type PagesService struct {
 	create       middleware.Handler[pages.CreateRequest, pages.CreateResponse]
 	update       middleware.Handler[pages.UpdateRequest, pages.UpdateResponse]
@@ -36,9 +42,11 @@ type PagesService struct {
 	setCanonical middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
 	replaceLinks middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
 	previewLink  middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
+	model        middleware.Handler[observe.ModelRequest, observe.ModelView]
+	modelSummary middleware.Handler[observe.SummaryRequest, observe.Summary]
 }
 
-func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesService {
+func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models Source[ModelUseCase]) *PagesService {
 	return &PagesService{
 		create:       Wrap(logger, "pages.create", call(useCase, PagesUseCase.Create)),
 		update:       Wrap(logger, "pages.update", call(useCase, PagesUseCase.Update)),
@@ -51,7 +59,17 @@ func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesSer
 		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
 		replaceLinks: Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
 		previewLink:  Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
+		model:        Wrap(logger, "pages.model", call(models, ModelUseCase.Model)),
+		modelSummary: Wrap(logger, "pages.modelSummary", call(models, ModelUseCase.SummaryOf)),
 	}
+}
+
+func (s *PagesService) Model(c context.Context, req observe.ModelRequest) (observe.ModelView, error) {
+	return s.model(c, req)
+}
+
+func (s *PagesService) ModelSummary(c context.Context, req observe.SummaryRequest) (observe.Summary, error) {
+	return s.modelSummary(c, req)
 }
 
 func (s *PagesService) Create(c context.Context, req pages.CreateRequest) (pages.CreateResponse, error) {

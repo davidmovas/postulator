@@ -205,6 +205,16 @@ func (i identityStore) Put(_ context.Context, identity pagemap.Identity) error {
 	return nil
 }
 
+func (i identityStore) Get(_ context.Context, pageID string) (pagemap.Identity, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	identity, ok := i.s.identities[pageID]
+	if !ok {
+		return pagemap.Identity{}, errors.New(errors.NotFound, "no identity")
+	}
+	return identity, nil
+}
+
 func (i identityStore) ListBySite(_ context.Context, siteID string) ([]pagemap.Identity, error) {
 	i.s.mu.Lock()
 	defer i.s.mu.Unlock()

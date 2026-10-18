@@ -8,6 +8,8 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 type Summary struct {
@@ -16,21 +18,31 @@ type Summary struct {
 	LinksByType    map[string]int `json:"linksByType"`
 	Technical      map[string]int `json:"technical"`
 	Findings       map[string]int `json:"findings"`
+	TrailsByMethod map[string]int `json:"trailsByMethod"`
+	TrailsBySource map[string]int `json:"trailsBySource"`
 	Pages          int            `json:"pages"`
 	Observed       int            `json:"observed"`
 	Rendered       int            `json:"rendered"`
 	TrailsResolved int            `json:"trailsResolved"`
 	Listings       int            `json:"listings"`
 	ReadOnly       int            `json:"readOnly"`
+	LastObservedAt dto.Time       `json:"lastObservedAt"`
+	LastFullWalkAt dto.Time       `json:"lastFullWalkAt"`
 }
 
 func (s *Service) Summary(ctx context.Context, siteID string) (Summary, error) {
+	owner, err := s.deps.Sites.Get(ctx, siteID)
+	if err != nil {
+		return Summary{}, err
+	}
 	m, err := s.model(ctx, siteID)
 	if err != nil {
 		return Summary{}, err
 	}
 	summary := Summary{
 		ByType: map[string]int{}, Roots: map[string]int{}, LinksByType: map[string]int{}, Technical: map[string]int{}, Findings: map[string]int{},
+		TrailsByMethod: map[string]int{}, TrailsBySource: map[string]int{},
+		LastObservedAt: dto.TimeOf(owner.Settings.Observation.LastFinishedAt), LastFullWalkAt: dto.TimeOf(owner.Settings.Observation.LastFullWalkAt),
 	}
 	for i := range m.pages {
 		page := m.pages[i]
@@ -47,6 +59,8 @@ func (s *Service) Summary(ctx context.Context, siteID string) (Summary, error) {
 		}
 		if page.ParentReason == pagemap.ParentJSONLD || page.ParentReason == pagemap.ParentARIA {
 			summary.TrailsResolved++
+			summary.TrailsBySource[string(page.ParentReason)]++
+			summary.TrailsByMethod[string(page.ParentMethod)]++
 		}
 	}
 	for id := range m.renders {
@@ -95,14 +109,12 @@ func (s *Service) Page(ctx context.Context, pageID string) (PageModel, error) {
 		return PageModel{}, err
 	}
 	model := PageModel{Page: page}
-	identities, err := s.deps.Identity.ListBySite(ctx, page.SiteID)
-	if err != nil {
+	identity, err := s.deps.Identity.Get(ctx, pageID)
+	switch {
+	case err == nil:
+		model.Identity = identity
+	case !errors.IsCode(err, errors.NotFound):
 		return PageModel{}, err
-	}
-	for i := range identities {
-		if identities[i].PageID == pageID {
-			model.Identity = identities[i]
-		}
 	}
 	if model.Terms, err = s.deps.Identity.ListTerms(ctx, pageID); err != nil {
 		return PageModel{}, err
@@ -117,8 +129,12 @@ func (s *Service) Page(ctx context.Context, pageID string) (PageModel, error) {
 	if found {
 		model.Body, model.Base = &current, &base
 	}
-	if record, renderErr := s.deps.Renders.Get(ctx, pageID); renderErr == nil {
+	record, err := s.deps.Renders.Get(ctx, pageID)
+	switch {
+	case err == nil:
 		model.Render = &record
+	case !errors.IsCode(err, errors.NotFound):
+		return PageModel{}, err
 	}
 	if model.Links, err = s.deps.Links.ListForPage(ctx, pageID); err != nil {
 		return PageModel{}, err
