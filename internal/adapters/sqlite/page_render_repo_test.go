@@ -25,7 +25,10 @@ func renderOf(pageID string, root render.RootState, at time.Time) render.Record 
 				{Kind: render.RegionBreadcrumb, Links: 2, Words: 3, Signal: render.SignalJSONLD},
 				{Kind: render.RegionContent, Inside: true, Links: 1, Words: 120, Signal: render.SignalLinks},
 			},
-			Trails: []pagemap.Trail{{Source: pagemap.TrailJSONLD, Crumbs: []pagemap.Crumb{{Name: "Home", Path: "/"}, {Name: "Peptides", Path: "/peptides/"}}}},
+			Trails: []pagemap.Trail{{Source: pagemap.TrailJSONLD, Crumbs: []pagemap.Crumb{
+				{Name: "Home", Path: "/", Href: "https://shop/"},
+				{Name: "Peptides", Path: "/category/peptides/", Href: "/category/peptides/", Final: "/peptides/", Status: 200},
+			}}},
 			JSONLD: map[string][]json.RawMessage{"BreadcrumbList": {json.RawMessage(`{"@type":"BreadcrumbList"}`)}},
 			Headings: []render.Heading{
 				{Level: 1, Text: "TB-500"},
@@ -33,6 +36,7 @@ func renderOf(pageID string, root render.RootState, at time.Time) render.Record 
 			},
 			WordsContent: 120, WordsGenerated: 40, Builder: "elementor", URLForm: render.URLFormAbsolute, Robots: "index, follow",
 		},
+		FinalPath:   "/landed/",
 		ExtractedAt: at,
 	}
 }

@@ -11,15 +11,15 @@ import (
 )
 
 const (
-	renderColumns = `page_id, render_hash, content_root, regions, jsonld, trail, headings, word_count_content, word_count_generated, builder, url_form, robots, extracted_at`
-	upsertRender  = `INSERT INTO page_renders (` + renderColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	renderColumns = `page_id, render_hash, content_root, regions, jsonld, trail, headings, word_count_content, word_count_generated, builder, url_form, robots, final_path, extracted_at`
+	upsertRender  = `INSERT INTO page_renders (` + renderColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (page_id) DO UPDATE SET render_hash = excluded.render_hash, content_root = excluded.content_root, regions = excluded.regions,
 		jsonld = excluded.jsonld, trail = excluded.trail, headings = excluded.headings, word_count_content = excluded.word_count_content,
 		word_count_generated = excluded.word_count_generated, builder = excluded.builder, url_form = excluded.url_form, robots = excluded.robots,
-		extracted_at = excluded.extracted_at`
+		final_path = excluded.final_path, extracted_at = excluded.extracted_at`
 	selectRender        = `SELECT ` + renderColumns + ` FROM page_renders WHERE page_id = ?`
 	selectRendersBySite = `SELECT r.page_id, r.render_hash, r.content_root, r.regions, r.jsonld, r.trail, r.headings, r.word_count_content,
-		r.word_count_generated, r.builder, r.url_form, r.robots, r.extracted_at
+		r.word_count_generated, r.builder, r.url_form, r.robots, r.final_path, r.extracted_at
 		FROM page_renders AS r JOIN pages AS p ON p.id = r.page_id WHERE p.site_id = ? ORDER BY r.page_id`
 )
 
@@ -83,7 +83,7 @@ func (r *PageRenderRepo) Put(ctx context.Context, record render.Record) error {
 	}
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), upsertRender, []any{
 		record.PageID, record.Hash, string(record.Root), encoded.regions, encoded.jsonld, encoded.trails, encoded.headings,
-		record.WordsContent, record.WordsGenerated, record.Builder, record.URLForm, record.Robots, formatTime(record.ExtractedAt),
+		record.WordsContent, record.WordsGenerated, record.Builder, record.URLForm, record.Robots, record.FinalPath, formatTime(record.ExtractedAt),
 	}, nil, "store the page render")
 	return err
 }
@@ -104,7 +104,7 @@ func scanRender(rows *sql.Rows) (render.Record, error) {
 		extractedAt                       string
 	)
 	if err := rows.Scan(&record.PageID, &record.Hash, &root, &regions, &jsonld, &trails, &headings,
-		&record.WordsContent, &record.WordsGenerated, &record.Builder, &record.URLForm, &record.Robots, &extractedAt); err != nil {
+		&record.WordsContent, &record.WordsGenerated, &record.Builder, &record.URLForm, &record.Robots, &record.FinalPath, &extractedAt); err != nil {
 		return render.Record{}, err
 	}
 	record.Root = render.RootState(root)
