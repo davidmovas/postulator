@@ -72,6 +72,11 @@ func TestDeriveParentTakesTheNearestResolvingCrumb(t *testing.T) {
 			trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/")},
 			parent: "peptides", reason: pagemap.ParentJSONLD, trailFrom: pagemap.TrailJSONLD,
 		},
+		"a crumb after the page's own is not its parent": {
+			page:   "bpc",
+			trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/", "Reviews", "/guide/")},
+			parent: "peptides", reason: pagemap.ParentJSONLD, trailFrom: pagemap.TrailJSONLD,
+		},
 		"a trail of Home and the page falls through to the URL": {
 			page:   "peptides",
 			trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/")},

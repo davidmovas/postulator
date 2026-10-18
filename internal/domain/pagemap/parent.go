@@ -66,7 +66,10 @@ func DeriveParent(page Page, trails []Trail, wpParentID *int64, index Index) Der
 func (d *Derivation) decide(page Page, t Trail, reason ParentReason, index Index) bool {
 	remaining := make([]Crumb, 0, len(t.Crumbs))
 	for _, crumb := range t.Crumbs {
-		if crumb.Path == page.Path || crumb.Path == RootPath {
+		if crumb.Path == page.Path {
+			break
+		}
+		if crumb.Path == RootPath {
 			continue
 		}
 		if resolved, found := index.ByPath(crumb.Path); crumb.Path != "" && found && resolved.TechnicalReason != TechnicalNone {
