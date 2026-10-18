@@ -23,6 +23,7 @@ export type * as GraphModels from "../../bindings/github.com/davidmovas/postulat
 export type * as ImportModels from "../../bindings/github.com/davidmovas/postulator/internal/application/imports/models.js";
 export type * as SchemaModels from "../../bindings/github.com/davidmovas/postulator/internal/application/llm/models.js";
 export type * as CatalogModels from "../../bindings/github.com/davidmovas/postulator/internal/application/models/models.js";
+export type * as ObserveModels from "../../bindings/github.com/davidmovas/postulator/internal/application/observe/models.js";
 export type * as PagesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/pages/models.js";
 export type * as ReportsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/reports/models.js";
 export type * as RunsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/runs/models.js";

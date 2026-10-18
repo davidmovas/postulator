@@ -74,6 +74,7 @@ function audit(overrides: Partial<PageAudit> = {}): PageAudit {
         unpublished: 0,
         inbound: 1,
         orphan: false,
+        byType: { breadcrumb: 0, listing: 0, navigation: 0, contextual: 2, unknown: 0 },
         ...overrides,
     };
 }

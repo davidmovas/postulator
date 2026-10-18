@@ -23,6 +23,7 @@ import { PageDetails } from "./details.js";
 import type { EntityIndex } from "./entities.js";
 import { PageLinks } from "./links.js";
 import { PageMapping } from "./mapping.js";
+import { PageModelTab } from "./model/tab.js";
 import { PreviewTab } from "./preview/tab.js";
 import { PageReportPanel } from "./report.js";
 import { TemplatePanel } from "./template.js";
@@ -31,6 +32,7 @@ const drawerWidth = 688;
 
 const tabs: readonly TabItem<PageTab>[] = [
     { key: "details", label: copy.pages.tabs.details },
+    { key: "model", label: copy.pages.tabs.model },
     { key: "links", label: copy.pages.tabs.links },
     { key: "mapping", label: copy.pages.tabs.mapping },
     { key: "report", label: copy.pages.tabs.report },
@@ -132,6 +134,9 @@ export function PageDrawer({
                     </div>
                     <TabPanel label={copy.pages.tabs.details} active={active === "details"}>
                         <PageDetails page={page} siteId={siteId} search={search} />
+                    </TabPanel>
+                    <TabPanel label={copy.pages.tabs.model} active={active === "model"}>
+                        <PageModelTab pageId={page.id} siteId={siteId} search={search} />
                     </TabPanel>
                     <TabPanel label={copy.pages.tabs.links} active={active === "links"}>
                         <div className="p-3">

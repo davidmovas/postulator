@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { pageStatuses } from "../../generated/vocab.js";
-import { pageStatusLabel, pageStatusTone } from "./labels.js";
+import { linkOrigins, pageStatuses } from "../../generated/vocab.js";
+import { originLabel, pageStatusLabel, pageStatusTone } from "./labels.js";
 
 describe("the page vocabulary in words", () => {
     it("names every page status without printing the stored value", () => {
@@ -15,6 +15,16 @@ describe("the page vocabulary in words", () => {
 
     it("shows a status it has never heard of as it arrived", () => {
         expect(pageStatusLabel("teleported")).toBe("teleported");
+    });
+
+    it("names where every link came from without printing the stored value", () => {
+        for (const origin of linkOrigins) {
+            const label = originLabel(origin);
+            expect(label).not.toBe("");
+            expect(label).not.toBe(origin);
+            expect(label).not.toContain("_");
+        }
+        expect(originLabel("teleported")).toBe("teleported");
     });
 
     it("gives every page status a tone and an unknown one a muted tone", () => {

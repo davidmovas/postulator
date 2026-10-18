@@ -57,7 +57,14 @@ function fanOutSite(client: QueryClient, siteId: string | null): void {
     invalidateBySite(client, keys.pages.lists(), siteId);
     invalidateBySite(client, keys.graph.entityLists(), siteId);
     invalidateBySite(client, keys.graph.edgeLists(), siteId);
-    invalidateAll(client, keys.pages.tree(siteId), keys.graph.full(siteId), keys.reports.site(siteId));
+    invalidateAll(
+        client,
+        keys.pages.tree(siteId),
+        keys.pages.models(),
+        keys.pages.summary(siteId),
+        keys.graph.full(siteId),
+        keys.reports.site(siteId),
+    );
 }
 
 function runLifecycle(client: QueryClient, envelope: Envelope<EventType>, ...extra: readonly (readonly unknown[])[]): void {
@@ -201,6 +208,8 @@ function handlersFor(client: QueryClient): Handlers {
                     client,
                     keys.pages.details(),
                     keys.pages.tree(siteId),
+                    keys.pages.models(),
+                    keys.pages.summary(siteId),
                     keys.reports.site(siteId),
                     keys.graph.entityAll(),
                 );

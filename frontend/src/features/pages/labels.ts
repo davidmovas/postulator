@@ -36,3 +36,7 @@ export function originTone(origin: string): Tone {
 export function originIcon(origin: string): IconComponent {
     return isOneOf(linkOrigins, origin) ? originIcons[origin] : TravelExploreIcon;
 }
+
+export function originLabel(origin: string): string {
+    return isOneOf(linkOrigins, origin) ? copy.pages.origins[origin] : origin;
+}

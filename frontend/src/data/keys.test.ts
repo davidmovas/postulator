@@ -90,6 +90,20 @@ describe("the spend keys", () => {
     });
 });
 
+describe("the page model lives under the page cache", () => {
+    test("every model and every summary sits under its handle and under the page root", () => {
+        expect(isPrefix(keys.pages.models(), keys.pages.model("p1"))).toBe(true);
+        expect(isPrefix(keys.pages.summaries(), keys.pages.summary("s1"))).toBe(true);
+        expect(isPrefix(keys.pages.root(), keys.pages.model("p1"))).toBe(true);
+        expect(isPrefix(keys.pages.root(), keys.pages.summary("s1"))).toBe(true);
+    });
+
+    test("a model is not a page detail, so a detail refresh leaves it alone", () => {
+        expect(isPrefix(keys.pages.details(), keys.pages.model("p1"))).toBe(false);
+        expect(isPrefix(keys.pages.summaries(), keys.pages.model("s1"))).toBe(false);
+    });
+});
+
 describe("a preview link lives outside the page cache", () => {
     test("no page invalidation reaches a live preview link", () => {
         expect(isPrefix(keys.pages.root(), keys.previews.link("p1", "exists"))).toBe(false);

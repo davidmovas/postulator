@@ -61,6 +61,10 @@ export const keys = {
         detail: (id: string) => [scope, "pages", "detail", id] as const,
         trees: () => [scope, "pages", "tree"] as const,
         tree: (siteId: string) => [scope, "pages", "tree", siteId] as const,
+        models: () => [scope, "pages", "model"] as const,
+        model: (pageId: string) => [scope, "pages", "model", pageId] as const,
+        summaries: () => [scope, "pages", "summary"] as const,
+        summary: (siteId: string) => [scope, "pages", "summary", siteId] as const,
     },
     previews: {
         root: () => [scope, "preview"] as const,

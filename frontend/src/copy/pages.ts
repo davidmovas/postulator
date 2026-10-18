@@ -1,3 +1,5 @@
+import { model } from "./model.js";
+
 export const pages = {
     statuses: {
         planned: "Planned",
@@ -11,6 +13,7 @@ export const pages = {
     openOnSite: "Open in Tor Browser",
     tabs: {
         details: "Details",
+        model: "Model",
         links: "Links",
         mapping: "Mapping",
         report: "Report",
@@ -207,6 +210,12 @@ export const pages = {
         deleteConfirm: "Delete",
         cancel: "Cancel",
     },
+    origins: {
+        generated: "Written by a run",
+        observed: "Read from the site",
+    },
+    linkKind: (type: string, source: string) => (source === "" ? type : `${type} · ${source}`),
+    model,
     create: {
         title: "Plan a page",
         body: "A planned page is a row in the map. It does not exist on WordPress until a run publishes it.",

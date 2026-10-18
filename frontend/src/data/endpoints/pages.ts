@@ -12,3 +12,5 @@ export const mapPageToEntity = one(Pages.MapToEntity);
 export const unmapPage = one(Pages.Unmap);
 export const setCanonicalPage = one(Pages.SetCanonical);
 export const previewLink = one(Pages.PreviewLink);
+export const pageModel = one(Pages.Model);
+export const modelSummary = one(Pages.ModelSummary);

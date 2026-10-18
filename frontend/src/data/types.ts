@@ -6,6 +6,7 @@ import type {
     GraphModels,
     ImportModels,
     LlmModels,
+    ObserveModels,
     PagesModels,
     ReportsModels,
     RunDomainModels,
@@ -31,6 +32,7 @@ export type SiteDefaults = Wire<SitesModels.Defaults>;
 export type SitePlugin = Wire<SitesModels.Plugin>;
 export type SiteFilter = ListFilter<SitesModels.ListRequest>;
 export type Reachability = Wire<SitesModels.Reachability>;
+export type SiteSettings = Site["settings"];
 
 export type Page = Wire<PagesModels.Page>;
 export type PageLink = Wire<PagesModels.PageLink>;
@@ -38,6 +40,19 @@ export type PageTreeNode = Wire<PagesModels.TreeNode>;
 export type PreviewLink = Wire<PagesModels.PreviewLinkResponse>;
 export type PageLinkInput = Wire<PagesModels.LinkInput>;
 export type PageFilter = ListFilter<PagesModels.ListRequest>;
+
+export type PageModel = Wire<ObserveModels.ModelView>;
+export type ModelIdentity = Wire<ObserveModels.IdentityView>;
+export type ModelHierarchy = Wire<ObserveModels.HierarchyView>;
+export type ModelTerm = Wire<ObserveModels.TermView>;
+export type ModelRender = Wire<ObserveModels.RenderView>;
+export type ModelRegion = Wire<ObserveModels.RegionView>;
+export type ModelTrail = Wire<ObserveModels.TrailView>;
+export type ModelCrumb = Wire<ObserveModels.CrumbView>;
+export type ModelLink = Wire<ObserveModels.LinkView>;
+export type ModelBlock = Wire<ObserveModels.BlockView>;
+export type ModelFinding = Wire<ObserveModels.FindingView>;
+export type ModelSummary = Wire<ObserveModels.Summary>;
 
 export type Entity = Wire<GraphModels.Entity>;
 export type Edge = Wire<GraphModels.Edge>;
@@ -125,6 +140,7 @@ export type PageAudit = Wire<ReportsModels.PageAudit>;
 export type RequiredLink = Wire<ReportsModels.RequiredLink>;
 export type ExtraLink = Wire<ReportsModels.ExtraLink>;
 export type LinkTotals = Wire<ReportsModels.LinkTotals>;
+export type LinkTypeCounts = Wire<ReportsModels.LinkTypeCounts>;
 export type LinkPolicySummary = Wire<ReportsModels.LinkPolicySummary>;
 export type JudgeResult = Wire<ContentModels.JudgeResponse>;
 export type JudgeReport = Wire<ContentModels.JudgeReport>;

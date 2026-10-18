@@ -1,4 +1,14 @@
-import type { ExtraLink, LinkAuditPage, PageAudit, RequiredLink } from "../../../data/types.js";
+import type { ExtraLink, LinkAuditPage, LinkTypeCounts, PageAudit, RequiredLink } from "../../../data/types.js";
+
+export function typed(counts: Partial<LinkTypeCounts> = {}): LinkTypeCounts {
+    return {
+        breadcrumb: counts.breadcrumb ?? 0,
+        listing: counts.listing ?? 0,
+        navigation: counts.navigation ?? 0,
+        contextual: counts.contextual ?? 0,
+        unknown: counts.unknown ?? 0,
+    };
+}
 
 export interface RowSeed {
     pageId: string;
@@ -19,6 +29,7 @@ export interface RowSeed {
     inbound?: number;
     orphan?: boolean;
     onSite?: boolean;
+    byType?: Partial<LinkTypeCounts>;
 }
 
 export function row(seed: RowSeed): PageAudit {
@@ -41,6 +52,7 @@ export function row(seed: RowSeed): PageAudit {
         unpublished: seed.unpublished ?? 0,
         inbound: seed.inbound ?? 0,
         orphan: seed.orphan ?? false,
+        byType: typed(seed.byType ?? { contextual: seed.satisfied ?? 0 }),
     };
 }
 

@@ -6,7 +6,8 @@ import type { PageLink } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { LinkIcon, OpenInNewIcon, Panel, PanelHeader, PublicIcon, toneClasses } from "../../ui/index.js";
-import { originIcon, originTone } from "./labels.js";
+import { originIcon, originLabel, originTone } from "./labels.js";
+import { linkSourceLabel, linkTypeLabel } from "./model/labels.js";
 
 export interface PageLinksProps {
     links: readonly PageLink[];
@@ -36,9 +37,18 @@ export function PageLinks({ links, siteId, search }: PageLinksProps): ReactEleme
                                 key={held.id}
                                 className="flex min-w-0 items-center gap-2 border-b border-inset px-3 py-1.5 last:border-b-0"
                             >
-                                <span className="flex shrink-0" title={held.origin}>
+                                <span
+                                    className="flex shrink-0"
+                                    title={originLabel(held.origin)}
+                                    aria-label={originLabel(held.origin)}
+                                >
                                     <Icon size={13} className={tone.ink} />
                                 </span>
+                                {held.type === "" ? null : (
+                                    <span className="w-36 shrink-0 truncate text-2xs text-ink-dim">
+                                        {copy.pages.linkKind(linkTypeLabel(held.type), linkSourceLabel(held.source))}
+                                    </span>
+                                )}
                                 {held.toPageId === null ? (
                                     isBrowsable(held.toUrl) ? (
                                         <button

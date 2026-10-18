@@ -6,6 +6,8 @@ import {
     getPage,
     listPages,
     mapPageToEntity,
+    modelSummary,
+    pageModel,
     pageTree,
     previewLink,
     setCanonicalPage,
@@ -41,6 +43,22 @@ export function usePageTree(siteId: string | null) {
     return useUnlockedQuery({
         queryKey: keys.pages.tree(siteId ?? ""),
         queryFn: ({ signal }) => pageTree({ siteId: siteId ?? "" }, signal),
+        enabled: siteId !== null && siteId !== "",
+    });
+}
+
+export function usePageModel(pageId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.model(pageId ?? ""),
+        queryFn: ({ signal }) => pageModel({ pageId: pageId ?? "" }, signal),
+        enabled: pageId !== null && pageId !== "",
+    });
+}
+
+export function useModelSummary(siteId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.summary(siteId ?? ""),
+        queryFn: ({ signal }) => modelSummary({ siteId: siteId ?? "" }, signal),
         enabled: siteId !== null && siteId !== "",
     });
 }

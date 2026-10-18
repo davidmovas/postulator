@@ -162,3 +162,45 @@ describe("the spend panel follows the ledger", () => {
         expect(stale(client)).toEqual(["lastWeek", "lastMonth", "calls"]);
     });
 });
+
+describe("the page model follows the observation", () => {
+    const modelled = {
+        model: keys.pages.model("p1"),
+        summary: keys.pages.summary("s1"),
+        otherSummary: keys.pages.summary("s2"),
+    } as const;
+
+    type Modelled = keyof typeof modelled;
+
+    function seeded(): QueryClient {
+        const client = bridged();
+        for (const key of Object.values(modelled)) {
+            client.setQueryData(key, { held: true });
+        }
+        client.setQueryData(keys.runs.detail("r1"), { run: { siteId: "s1" } });
+        return client;
+    }
+
+    function refreshed(client: QueryClient): Modelled[] {
+        return (Object.keys(modelled) as Modelled[]).filter(
+            (name) => client.getQueryState(modelled[name])?.isInvalidated === true,
+        );
+    }
+
+    it("refreshes every page model and the site's summary when the site's pages change", () => {
+        const client = seeded();
+
+        fire("pages.changed", { siteId: "s1" });
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual(["model", "summary"]);
+    });
+
+    it("refreshes them when a run on the site completes", () => {
+        const client = seeded();
+
+        fire("run.completed", { runId: "r1", succeeded: 1, failed: 0 }, "r1");
+
+        expect(refreshed(client)).toEqual(["model", "summary"]);
+    });
+});

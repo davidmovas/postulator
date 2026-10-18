@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { CatalogModels, PagingModels, RunsModels, SitesModels } from "../lib/api.js";
+import type { CatalogModels, ObserveModels, PagingModels, RunsModels, SitesModels } from "../lib/api.js";
 import type { Timestamp, Wire } from "./wire.js";
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
@@ -23,6 +23,15 @@ describe("Wire narrowing", () => {
         const since: Equal<Wire<CatalogModels.SpendReportResponse>["since"], Timestamp> = true;
         const createdAt: Equal<Wire<CatalogModels.Call>["createdAt"], Timestamp> = true;
         expect([since, createdAt]).toEqual([true, true]);
+    });
+
+    test("narrows the page model's times", () => {
+        const modified: Equal<Wire<ObserveModels.IdentityView>["modifiedGmt"], Timestamp> = true;
+        const observed: Equal<Wire<ObserveModels.IdentityView>["observedAt"], Timestamp> = true;
+        const extracted: Equal<Wire<ObserveModels.RenderView>["extractedAt"], Timestamp> = true;
+        const lastWalk: Equal<Wire<ObserveModels.Summary>["lastObservedAt"], Timestamp> = true;
+        const lastFull: Equal<Wire<ObserveModels.Summary>["lastFullWalkAt"], Timestamp> = true;
+        expect([modified, observed, extracted, lastWalk, lastFull]).toEqual([true, true, true, true, true]);
     });
 
     test("leaves RawMessage opaque", () => {

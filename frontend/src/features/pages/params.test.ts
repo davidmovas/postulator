@@ -112,6 +112,7 @@ describe("the drawer tab in the address", () => {
     it("reads a tab another screen asked for", () => {
         expect(readTab(new URLSearchParams("tab=preview"))).toBe("preview");
         expect(readTab(new URLSearchParams("tab=mapping"))).toBe("mapping");
+        expect(readTab(new URLSearchParams("tab=model"))).toBe("model");
     });
 
     it("falls back to the details tab for anything it does not know", () => {
