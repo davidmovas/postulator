@@ -433,13 +433,112 @@ under stage 1c in `DECISIONS.md`.
 
 ## Stage 2 — page types, the field catalog and scope with UI, the context pack
 
-- **Goal.** The client names his page types over presets, enables fields per type with an instruction, limits and a link policy, and the writer, the linker and the judge work from the context pack.
-- **Touches.** `internal/domain/pagetype`, `internal/domain/field` (scope), `internal/domain/contextpack`, `internal/application/{pagetypes,fields}`, `internal/application/templates/policies.go` (deleted) and the four copies of the rules merge (one resolver), `internal/domain/content/{brief,draft,product,sanitize,linkcontext}.go`, `internal/runtime/steps/{generate_body,generate_meta,generate_fields,repair_links,insert_links,judge,ceiling,prompts}.go` and `prompts/*.tmpl`, `internal/application/content/*`, `internal/runtime/budget.go`, `internal/application/imports/{kinds,pages,export}.go`, `internal/application/graph/*` (kind removed, entity card), `internal/application/tools/{pagetypes_*,fields_*,pages_context_pack,templates_spec,graph_*}.go`, `policies_*.go` deleted, `internal/transport/wails/vocabgen`, `frontend/src/features/settings` (Page types), `frontend/src/features/templates` (policies screen deleted, editor without `pageKind`), `frontend/src/features/graph` (type of the canonical page), `frontend/src/features/pages/template.tsx`.
-- **Migrations.** 0058 `page_types`; 0059 `field_scopes`; 0060 the backfill of `pages.page_type_id` (data only, empty down); 0061 `entities.definition`, `facts`, `notes`; 0062 `link_policies` dropped and `sites.default_link_policy_id` removed by rebuild (down restores both); 0063 `entities.kind` dropped by the 0030 rebuild and `templates.page_kind` dropped (down restores both).
-- **Steps.** `generate_fields` joins `StepName`; `generate_body` and `generate_meta` keep their names and consume the pack; the writer leaves the client's own paragraphs alone unless the scope's `rewrites` is on for the type and field (off by default), and a run may switch it on for chosen pages with the user's confirmation (the owner's answer 5); `insert_links` and `repair_links` take the field's policy; the ceiling gains the input budget `llm.inputBudget.<role>`.
-- **Tools.** `pagetypes_list/get/create/update/delete`, `fields_catalog`, `fields_set_scope`, `pages_context_pack`; the `kind` field leaves the five graph request structs; `pageKind` and `linkRules` leave the templates trio; the ceiling moves in each commit.
-- **Reuses.** `template.Resolve` and the override layers, `Structure`, `Assemble`, `InsertTarget`, `pagemap.Keywords`, the import pipeline. **Rewrites.** `content.Brief` (the pack's writer view), the prompt templates, `imports/kinds.go`, `features/graph/labels.ts`.
-- **Exit.** Unit: pack builder priorities and `Fit` goldens (a pack over budget drops siblings before the trail, products before keywords); the backfill round trip over a fixture database with every kind; the import's kind cell to type by name and synonym; the single rules resolver equals the four old answers over the old fixtures; `vocab.ts` loses `entityKinds` and the generator test is green. E2E on both stands: `TestTheWriterSeesTheFullPicture` (a generate run over a planned child on each stand; the prompt the fake provider received carries the trail, the listed products on the replica's hub, the field's instruction and policy, and the current title of an existing page). Owner sees: Settings → Page types with his names, per-field switches and instructions, and a "what the writer will see" pane per page and field.
+**Goal.** The client names his page types over presets, enables fields per type with an instruction, limits and a link policy, and the writer, the linker and the judge work from the context pack. Split on 2026-10-18 into two gated sub-stages: **2a** the types, the scopes, the link rules in the scopes, the entity card and the move from `kind`; **2b** the context pack and the writer, linker and judge reading it.
+
+### 2a — page types, the field catalog and scopes, the entity card
+
+- **Touches.** `internal/domain/{note,pagetype,field,pagemap,graph,template,content,importmap}`, `internal/application/{pagetypes,pages,sites,templates,graph,imports,observe,reports,content,tools}`, `internal/runtime/{claim,budget}.go` and `steps/{policy,generate_body,insert_links,repair_links,validate,relink_page,relink_neighbors,preflight,resolve_context,observe_readers}.go`, `internal/adapters/sqlite` (repositories, migrations 0058–0063), `internal/transport/wails` (`templates.go`, `pages.go`, `vocabgen`), `cmd/postulator` (harness), `internal/e2e`, `frontend/src/features/{settings,templates,pages,graph,sites,links,agent}`, `frontend/src/copy`, `frontend/scripts/routes.json`.
+- **Migrations.** 0058 `page_types` and `pages.page_type_source`, `page_type_reason`; 0059 `field_scopes`; 0060 the presets seeded for every site, their default scopes and the backfill of `pages.page_type_*` (data only; the down deletes what the up made); 0061 `entities.definition`, `facts`, `notes`; 0062 `link_policies` dropped, `sites.default_link_policy_id` removed by rebuild, `linkRules` stripped from stored specs and overrides (the down restores the table with the Default policy and the column); 0063 `entities.kind` dropped by the 0030 rebuild, `templates.page_kind` and its index dropped, saved mappings' `entity_kind`, `page_kind` and row type `kind` rewritten (the down restores the columns, the index and the names).
+- **Tools.** `pagetypes_list` (the types with their scopes and the field catalog, so `fields_catalog` folds in), `pagetypes_save`, `pagetypes_delete`, `fields_set_scope`; `pages_update` takes `pageTypeId`; `graph_update_entity` takes the card; the six `policies_*` tools go; `kind` leaves the five graph request structs; `pageKind` and `linkRules` leave the templates trio and `templates_list`; `defaultLinkPolicyId` leaves `sites_update`.
+- **Exit.** Unit: the `DeriveParent` table with name twins; the auto-assignment table (untyped pages only, a regular page waits for its render, a typed page never touched); `field.CheckScope` refusing a denied key at scope time; the backfill round trip over a fixture database with every kind; the SQL seed equal to the Go seed; the import's kind cell to a type by the site's own name, then synonym, a term page whatever its cell; the golden table proving the one resolver gives the four old answers over the old fixtures; a stored override carrying `linkRules` resolving after 0062; every migration's round trip. E2E on both stands, one at a time: types seeded on the first observation, the replica's hubs typed Hub by their listing, products Product, term pages Store category, the shop Catalog, technical pages Technical; a scope edit persists; a custom field's value read on the next observation. Owner sees: Settings → Page types with his names and the scope editor per type, a page's type with its source and reason in the drawer, an entity's canonical page type and its card on the Graph screen, no Policies screen.
+
+#### 2a tasks
+
+**Status, 2026-10-18: planned.**
+
+**Part 0 settles the owner's ruling on name twins; Part 1 is the stage.** Execution: `superpowers:executing-plans`, one accountable owner, at most two agents at once and only on disjoint packages (F: `frontend/`; H: `cmd/postulator` and `internal/e2e`, after the Go has landed); every other Go package is the owner's. Every commit uses `git commit -- <paths>` with `gofmt -l` checked inside the commit command; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; the heavy legs run alone, one stand at a time.
+
+**Decided at the plan** (recorded in `DECISIONS.md` at the close; the spec amended in the same commits):
+1. **Name twins** (the owner's ruling): a crumb resolved by name splits its candidates into regular pages and term pages; one regular page wins with the method `name` and an informational `parent_name_twin` naming the crumb, the page and the term twins; two or more regular pages are `parent_ambiguous`; with no regular page one term resolves and several are ambiguous. A product is a regular page. The finding clears when the page is derived again without it, `breakCycles` included.
+2. **Types are set by the observation only on an untyped page** (the owner's answer at the plan). The identity rules apply at once: a `product` → Product, a `product_cat` → Store category, the shop → Catalog, any technical reason → Technical; a regular page waits for its first render: a `listing` region inside the content root (`render.Region.Inside`) → Hub, else Entity. A typed page is never touched; the write is guarded (`WHERE page_type_id IS NULL`). An untyped page, a dangling id and another site's id resolve their template and policy as the identity rules would type the page without a render.
+3. **"Category" names one thing** (the owner's answer at the plan): the read-only archive preset is `store_category`, named "Store category". A regular page whose entity kind, template kind or sheet cell says Category gets the hub role; a `product_cat` page is Store category whatever its cell says. A cell matches the site's own type names first (`graph.Key`), synonyms second, so a client who renames Hub to "Category" keeps his vocabulary.
+4. **Source and reason**: `pages.page_type_source` (`''`, `auto`, `manual`; NOT NULL) and `page_type_reason` (`auto`: `product`, `store_category`, `shop`, `technical`, `listing`, `default`, `kind`; `manual`: `user`, `ai`, `import`). The whole-row `updatePage` stops writing the three type columns; `PageRepo.SetType` (manual) and `PageRepo.AutoType` (guarded) are their only writers after insert, so a snapshot the content stage, `publish.record`, the import or graph apply took before can never put an old type back.
+5. **Seeding**: `pagetypes.Service.Seed` is idempotent and runs in the unit of `sites.Create` and in the observation's inventory stage; 0060 seeds the sites that exist in SQL with v4 UUIDs; a test proves the SQL seed equals the Go seed. Automatic typing and synonyms use the oldest type of a preset; the last type of a preset cannot be deleted; deleting a type reassigns its pages to another (manual, `user`).
+6. **The backfill** (0060): identity facts first, then the template's `page_kind`, then the entity's kind (`category` on a regular page → Hub; `topic`, `custom`, `guide`, `comparison` → Entity), every assignment `auto` with the reason `kind` or its identity reason, never `manual`, because the import gave every entity of a Root group the kind `hub` by default.
+7. **No `role` column**: the preset fixes the behaviour (`pagetype.RoleOf`). A type carries `template_id`; `ResolveForPage` resolves the run start's template, else the page's, else **the type's**, else the site default.
+8. **A scope** (`field_scopes`): enabled, `aiWrites`, instruction, minimum and maximum length, `rewrites` (off by default), the link policy, and for a `meta:<key>` field a label and a provider (`plugin`, `store`). `field.CheckScope` refuses an unknown key, a denied key and any meta key the plugin's deny set refuses (`_`-protected keys, `total_sales`, the SEO plugins' keys as `openapi.yaml` pins them) with `INVALID`, details `field` and `reason: field_denied`. Defaults: Hub and Entity body, SEO title and description; Product description, short description, SEO title and description on, variation descriptions and image alt off; Store category, Catalog and Technical nothing writable.
+9. **The link policy is `field.LinkPolicy`**: the former rules (`upDepth`, `downLinks`, `siblingMinWeight`, `maxLinks`, `maxPerTarget`, `parentLinkWithinParagraphs`, `childrenSection`), `forbidExternal`, `forbidSelf`, `anchorStrategy`, and an explicit `links` switch, since `maxLinks: 0` keeps meaning no cap; `links` is always written and a stored policy without it is refused. Each preset's default carries the former rules: Hub the hub built-in's, Store category and Catalog the category built-in's, Entity the guide built-in's; the product description up one level, no down, no siblings, at most three; the short description and Technical no links; the flags of the Default policy. **One resolver**, `pagetype.Set.Policy(page)`, over a site's types and scopes loaded once; a product's link-bearing field is `product_description`, every other page's `body`; a disabled scope carries no links. **The policy is taken at claim** (`sc.Links`) as the spec is, so a type changed during a run cannot split the brief from the compliance check.
+10. **0062** strips `linkRules` from every stored template spec and override patch, because `template.Resolve` decodes with `DisallowUnknownFields`, and carries each site's chosen policy's flags onto its scopes; a template's or an override's own `linkRules` are not carried. The proof is a **golden table captured in 2a.6** from the old fixtures over template, override and site policy, before `EffectiveRules` goes; every divergence is listed in `DECISIONS.md` (a comparison page takes the guide's rules, a product the brief's budget, a page without a template is owed links). The down cannot restore a site's own policies.
+11. **The entity card**: `definition`, `facts` (`[{label, value}]`), `notes` (`[{label, text}]`); notes move to `domain/note`, shared by pages and entities. The import gives the card a note column whose header names the entity ("Entity notes", "Entity definition", added to the detection) and every note of a row with no page; every other note stays the page's. The export writes the card's notes back under their labels.
+12. **From `kind` to types**: one import field `page_type`; an entity-level header wins over a page-kind header and the preview names the column it dropped; "Template" and "Page template" stop mapping, the template coming from the type; an unknown cell is `unknown_page_type`; the product row type `kind` becomes `type`; a saved mapping holding both keeps the entity column. The downs restore `entities.kind` from the canonical page's preset and `templates.page_kind` from the built-ins' names, else `guide`.
+13. **The bindings** for types and scopes sit on `TemplatesService` in place of its six policy methods, so the services stay fifteen; `PagesService.SetType` changes a page's type; the `pages_update` tool takes its own arguments with `pageTypeId` and records `ai`.
+14. **Custom fields** are read by the content stage through `PluginReader.GetMeta`, for a re-pulled page or an enabled key never read; an absent key is stored empty so it is not asked again every walk; a change to meta alone is read on the next full walk, WordPress stamping no `modified` for it.
+15. **The built-ins** lose `pageKind` and `linkRules`; the current seeds join `seed/superseded`, and a test refreshes an untouched built-in stored before 2a.
+
+##### 2a.0 — the plan
+- This section and 2b below.
+- Commit `docs(plan): stage 2 split into 2a and 2b, and 2a's tasks`.
+
+##### 2a.1 — name twins
+- `internal/domain/pagemap/parent.go`: `Derivation.Twins`, the candidate split of decision 1; `parent_test.go` gains a page and a term of one name, two pages and a term, two terms, a lone term, a product beside its category. `internal/domain/finding`: `ParentNameTwin` (Info, `ignore`). `internal/application/observe/derive.go`: raised and cleared beside `parent_ambiguous`, cleared by `breakCycles`. `task vocab`. `DECISIONS.md` (the ruling, dated), spec 16.5 and 16.8.
+- Commit `feat(pagemap): a page wins its name over a store category of the same name`.
+
+##### 2a.2 — the domain
+- `internal/domain/note` (`Note`, `Clean`, `Merge`; `pagemap` and the import move to it). `internal/domain/pagetype`: `Preset`, `Presets()` with their default names, `RoleOf`, `Type` and `Validate`, `Assign(facts) (Preset, Reason, bool)`, `Match(cell, types, facts)`, `Set` with `TypeOf(page)`, `ScopeOf(page, key)`, `Policy(page)`. `internal/domain/field`: `Scope`, `LinkPolicy` (JSON with `links` required), `CheckScope`, `DefaultScopes(preset)`, `Provider`.
+- Tests: the assignment table, `Match` (name before synonym, term whatever its cell, category on a regular page to the hub role), `CheckScope` per refused class, the policy JSON refusing a missing `links`, `Set` over untyped, dangling and foreign ids.
+- Commits `refactor(note): notes are their own domain`, `feat(pagetype): presets, roles and the typing rules`, `feat(field): scopes, the link policy and the scope-time refusal`.
+
+##### 2a.3 — storage
+- Migrations 0058, 0059, 0060; `PageTypeRepo`, `FieldScopeRepo`; `PageRepo` inserts and reads the type columns, `SetType`, `AutoType` guarded, `updatePage` without them; `migrations_test.go` (`latestMigration = 60`, the backfill over a fixture with every kind, entity and template kind, product, term, shop and technical page; the SQL seed against `pagetype.Presets()` and `field.DefaultScopes`).
+- Commit `feat(sqlite): page types, field scopes and the backfill`.
+
+##### 2a.4 — the use cases
+- `internal/application/pagetypes`: `Seed`, `List`, `Get`, `Create` (from a preset, copying its scopes), `Save` (name, template), `Delete` (with reassignment; the last of a preset refused), `SetScope` (`CheckScope`), `Set`. `sites.Create` seeds in its unit; `pages.Service.SetType` (manual, refuses another site's type); `templates.ResolveForPage` takes the type's template; `internal/app/build_*.go`.
+- Commit `feat(pagetypes): the client's page types and their scopes`.
+
+##### 2a.5 — the observation
+- `inventory` seeds; `derive` types untyped pages per decision 2 through `AutoType`; `content` reads custom fields through `GetMeta` per decision 14; `runtime/steps/observe_readers.go` adapts `wp.Client.GetMeta`; the fakes.
+- Tests: the typing table over the fakes, `TestAManualTypeDuringTheWalkSurvives` (set between the content stage's read and its write), `TestAManualTypeDuringARunSurvives` (between claim and `publish.record`), a custom key read once and an absent key not asked again.
+- Commits `feat(observe): an untyped page is typed by what the site shows`, `feat(observe): custom fields a scope names are read`.
+
+##### 2a.6 — one resolver
+- `internal/domain/content` takes `field.LinkPolicy` (`PlanLinks`, the brief, `InsertLinks`, `Compliance`); `runtime/claim.go` takes `sc.Links`; `steps/policy.go`, `relink_neighbors.planOf`, `reports.rulesFor`, `content/judge.go` and the estimate read the type set; the golden table of decision 10 in `pagetype`.
+- Commit `feat(links): one link policy per page type and field`.
+
+##### 2a.7 — the entity card
+- Migration 0061; `graph.Entity` `Definition`, `Facts`, `Notes`; the repository, `graph.UpdateEntityRequest`, `graph_update_entity`; the import and export of decision 11; ceiling moved.
+- Commit `feat(graph): the entity card`.
+
+##### 2a.8 — the policies go
+- Migration 0062; `link_policy_repo.go`, `templates/policies.go`, `template.LinkRules`, `template.LinkPolicy`, `site.Defaults.LinkPolicyID`, the `policies_*` tools and their group, the trio's and `sites_update`'s fields; the test of decision 10 for a stored override; ceiling down.
+- Commit `refactor(templates): link rules live in the scopes; policies are gone`.
+
+##### 2a.9 — from `kind` to types
+- Migration 0063; `graph.Kind` and its filter, the proposals' schemas and `propose.tmpl`, `generate_body.tmpl` showing the type (`TestEveryPromptExecutes`); `Template.PageKind`, the seeds and `seed/superseded`; the import field `page_type`, the synonyms, the export; `agent/conversations.go`; `vocabgen` (`entityKinds` out; `pageTypePresets`, `pageTypeSources`, `pageTypeReasons`, `fieldKeys`, `fieldProviders` in); the harness data and the e2e fixtures that name kinds.
+- Commits `refactor(graph): an entity has no kind; it shows its page's type`, `refactor(templates): a template has no page kind`, `feat(imports): the kind cell names a page type`.
+
+##### 2a.10 — the tools
+- `pagetypes_list`, `pagetypes_save`, `pagetypes_delete`, `fields_set_scope`, `pages_update` with its own arguments; `groups.go`; the registry list; the ceiling with the bytes logged.
+- Commit `feat(tools): page types and scopes for the agent`.
+
+##### 2a.11 — the bindings and views
+- `TemplatesService` (types and scopes), `PagesService.SetType`, the page view's type with source and reason, the graph view's canonical page type; `task build`.
+- Commit `feat(wails): page types, scopes and a page's type are bound`.
+
+##### 2a.12 — the screens (agent F)
+- Settings → Page types and the scope drawer; the drawer's type selector with its source and reason; the Graph screen's type and card editor; the templates editor without `pageKind`; the Policies screen, its route and the Sites picker removed; copy, labels, screen tests, `routes.json`.
+- Commits per screen, `feat(settings): page types and their scopes`, `feat(pages): a page's type`, `feat(graph): the entity card and the page type`, `refactor(templates): no policies and no page kind`.
+
+##### 2a.13 — the harness (agent H)
+- `cmd/postulator/harness*.go`: types and scopes seeded, a scope with a custom key; `TestTheSeededSiteCarriesPageTypes`; walk routes.
+- Commit `test(harness): the seeded site carries page types`.
+
+##### 2a.14 — the e2e proof (agent H)
+- `internal/e2e/pagetypes_test.go` `TestThePageTypesFollowTheSite` per the exit list, a meta key set through `wpCLI`; `standModel` gains the expected types.
+- Commit `test(e2e): page types follow what each stand shows`.
+
+##### 2a.15 — the review and the gate
+- A fresh whole-branch review briefed with these decisions; its findings fixed or recorded; the whole gate of the global constraints; docs: `STATUS.md` (2a done, 2b next), `DECISIONS.md` (stage 2a), the spec (16.1, 16.5, 16.6, 16.7, 16.8), `CONTRACTS.md`, `ARCHITECTURE.md`, `CLAUDE.md`.
+- Commit `docs: stage 2a, page types and their scopes`.
+
+### 2b — the context pack and the writer that reads it
+
+- **Touches.** `internal/domain/contextpack`, `internal/domain/content/{brief,draft,product,sanitize,linkcontext}.go`, `internal/runtime/steps/{generate_body,generate_meta,generate_fields,repair_links,insert_links,judge,ceiling,prompts}.go` and `prompts/*.tmpl`, `internal/application/content/*`, `internal/runtime/budget.go`, `internal/application/graph` (card proposals), `internal/application/tools/pages_context_pack.go`, `frontend/src/features/pages` (the "what the writer will see" pane).
+- **Migrations.** None; the input budget is a setting, `llm.inputBudget.<role>`.
+- **Steps.** `generate_fields` joins `StepName`; `generate_body` and `generate_meta` keep their names and consume the pack; the writer leaves the client's own paragraphs alone unless the scope's `rewrites` is on for the type and field, and a run may switch it on for chosen pages with the user's confirmation (the owner's answer 5); `insert_links` and `repair_links` take the field's policy; `Sanitize` keeps the links a field's policy allows; the ceiling gains the input budget.
+- **Tools.** `pages_context_pack`; the agent proposes entity cards through findings.
+- **Reuses.** 2a's type set and scopes, `template.Resolve`, `Structure`, `Assemble`, `InsertTarget`, `pagemap.Keywords`. **Rewrites.** `content.Brief` as the pack's writer view, the prompt templates.
+- **Exit.** Unit: pack builder priorities and `Fit` goldens (a pack over budget drops siblings before the trail, products before keywords). E2E on both stands: `TestTheWriterSeesTheFullPicture` (a generate run over a planned child on each stand; the prompt the fake provider received carries the trail, the listed products on the replica's hub, the field's instruction and policy, and the current title of an existing page). Owner sees: a "what the writer will see" pane per page and field.
 
 ## Stage 3 — editing: block operations, field writes through the registry, the pipeline over existing pages, revert
 
