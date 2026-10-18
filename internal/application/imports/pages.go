@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -155,7 +156,7 @@ func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, templateID,
 	next.MetaTitle = fill(current.MetaTitle, draft.metaTitle)
 	next.MetaDescription = fill(current.MetaDescription, draft.metaDesc)
 	next.Keywords = current.Keywords.Merge(draft.keywords)
-	next.Notes = pagemap.MergeNotes(current.Notes, draft.notes)
+	next.Notes = note.Merge(current.Notes, draft.notes)
 	next.WPType = b.keptType(current, draft)
 	if current.Path != draft.path {
 		next.PlannedPath = draft.path

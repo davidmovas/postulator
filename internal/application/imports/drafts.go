@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -21,7 +22,7 @@ type pageDraft struct {
 	pageKind    string
 	entity      string
 	keywords    keyword.List
-	notes       []pagemap.Note
+	notes       []note.Note
 	own         ownership
 	modeType    pagemap.WPType
 	matchedBy   pagemap.MatchedBy
@@ -61,7 +62,7 @@ func (p *pageDraft) merge(row *rowDraft, at int) {
 	p.wpType = fill(p.wpType, row.wpType)
 	p.pageKind = fill(p.pageKind, row.pageKind)
 	p.keywords = p.keywords.Merge(row.keywords)
-	p.notes = pagemap.MergeNotes(p.notes, row.notes)
+	p.notes = note.Merge(p.notes, row.notes)
 	if p.own == ownUnset {
 		p.own = row.own
 	}

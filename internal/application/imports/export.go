@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -176,23 +177,23 @@ func noteLabels(pages []pagemap.Page) []string {
 	out := make([]string, 0)
 	seen := make(map[string]struct{})
 	for i := range pages {
-		for _, note := range pages[i].Notes {
-			if _, held := seen[strings.ToLower(note.Label)]; held {
+		for _, n := range pages[i].Notes {
+			if _, held := seen[strings.ToLower(n.Label)]; held {
 				continue
 			}
-			seen[strings.ToLower(note.Label)] = struct{}{}
-			out = append(out, note.Label)
+			seen[strings.ToLower(n.Label)] = struct{}{}
+			out = append(out, n.Label)
 		}
 	}
 	return out
 }
 
-func noteCells(notes []pagemap.Note, labels []string) []string {
+func noteCells(notes []note.Note, labels []string) []string {
 	out := make([]string, len(labels))
 	for at, label := range labels {
-		for _, note := range notes {
-			if strings.EqualFold(note.Label, label) {
-				out[at] = note.Text
+		for _, n := range notes {
+			if strings.EqualFold(n.Label, label) {
+				out[at] = n.Text
 			}
 		}
 	}

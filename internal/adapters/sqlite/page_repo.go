@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/squirrel"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -42,7 +43,7 @@ func encodePlan(p pagemap.Page) (keywords, notes string, err error) {
 	if keywords, err = encodeJSON(keyword.New(p.Keywords)); err != nil {
 		return "", "", err
 	}
-	if notes, err = encodeJSON(pagemap.NewNotes(p.Notes)); err != nil {
+	if notes, err = encodeJSON(note.Clean(p.Notes)); err != nil {
 		return "", "", err
 	}
 	return keywords, notes, nil
@@ -161,11 +162,11 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		&p.Observed.Title, &p.Observed.H1, &wpModifiedAt, &lastSyncedAt, &drift, &createdAt, &updatedAt); err != nil {
 		return pagemap.Page{}, err
 	}
-	var stored []pagemap.Note
+	var stored []note.Note
 	if err := decodeJSON(notes, &stored, "decode the page notes"); err != nil {
 		return pagemap.Page{}, err
 	}
-	p.Notes = pagemap.NewNotes(stored)
+	p.Notes = note.Clean(stored)
 	p.ParentPageID = optString(parentID)
 	p.ParentReason = pagemap.ParentReason(parentReason)
 	p.ParentMethod = pagemap.ParentMethod(parentMethod)

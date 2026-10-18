@@ -1,4 +1,4 @@
-package pagemap
+package note
 
 import "strings"
 
@@ -7,12 +7,12 @@ type Note struct {
 	Text  string `json:"text"`
 }
 
-func NewNotes(notes []Note) []Note {
+func Clean(notes []Note) []Note {
 	out := make([]Note, 0, len(notes))
 	held := make(map[string]struct{}, len(notes))
-	for _, note := range notes {
-		label := strings.TrimSpace(note.Label)
-		text := strings.TrimSpace(note.Text)
+	for _, n := range notes {
+		label := strings.TrimSpace(n.Label)
+		text := strings.TrimSpace(n.Text)
 		if label == "" || text == "" {
 			continue
 		}
@@ -26,13 +26,13 @@ func NewNotes(notes []Note) []Note {
 	return out
 }
 
-func MergeNotes(stored, file []Note) []Note {
-	merged := NewNotes(stored)
+func Merge(stored, file []Note) []Note {
+	merged := Clean(stored)
 	at := make(map[string]int, len(merged))
 	for i := range merged {
 		at[strings.ToLower(merged[i].Label)] = i
 	}
-	for _, incoming := range NewNotes(file) {
+	for _, incoming := range Clean(file) {
 		if i, held := at[strings.ToLower(incoming.Label)]; held {
 			merged[i].Text = incoming.Text
 			continue

@@ -10,7 +10,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/graph"
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 )
 
 func (h harness) sheet(t *testing.T, path, name string) imports.Mapping {
@@ -117,7 +117,7 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	if left := ignored(wide.Report); !slices.Equal(left, []string{"Entity ID", "Primary Entity", "Entity Type", "Category", "Subcategory"}) {
 		t.Fatalf("the wide sheet ignored %v", left)
 	}
-	want := []pagemap.Note{{Label: "Intent Owner", Text: "Commercial Product"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
+	want := []note.Note{{Label: "Intent Owner", Text: "Commercial Product"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
 	if got := notesAt(t, h, "/peptides/bpc-157/"); !slices.Equal(got, want) {
 		t.Fatalf("the notes of BPC-157 = %+v, want %+v", got, want)
 	}

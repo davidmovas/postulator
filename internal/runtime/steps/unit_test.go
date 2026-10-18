@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -1580,13 +1581,13 @@ func TestTheWriterReadsTheNotesOfThePageAsContext(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		notes []pagemap.Note
+		notes []note.Note
 		want  []string
 		gone  []string
 	}{
 		{
 			name:  "a page with notes",
-			notes: []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
+			notes: []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
 			want:  []string{"NOTES\n", "- Intent Owner: Commercial\n", "- Notes: Sold as a 10 ml vial\n", "never copy"},
 		},
 		{name: "a page without notes", gone: []string{"NOTES\n"}},

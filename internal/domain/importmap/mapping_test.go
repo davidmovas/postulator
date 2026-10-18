@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -167,31 +167,31 @@ func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
 		name   string
 		row    []string
 		levels []string
-		notes  []pagemap.Note
+		notes  []note.Note
 	}{
 		{
 			name:   "every level and note filled",
 			row:    []string{"Peptides", "BPC-157", "Liquid", "/bpc-157/liquid/", "Commercial", "Sold as a 10 ml vial"},
 			levels: []string{"Peptides"},
-			notes:  []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
+			notes:  []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
 		},
 		{
 			name:   "a level cell is trimmed",
 			row:    []string{" Peptides ", "", "", "/bpc-157/"},
 			levels: []string{"Peptides"},
-			notes:  []pagemap.Note{},
+			notes:  []note.Note{},
 		},
 		{
 			name:   "a placeholder is no level",
 			row:    []string{"—", "BPC-157", "Liquid", "/bpc-157/"},
 			levels: []string{},
-			notes:  []pagemap.Note{},
+			notes:  []note.Note{},
 		},
 		{
 			name:   "every placeholder the sheets carry",
 			row:    []string{"-", "N/A", "none", "/about/", " ", ""},
 			levels: []string{},
-			notes:  []pagemap.Note{},
+			notes:  []note.Note{},
 		},
 	}
 

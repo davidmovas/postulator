@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -57,7 +58,7 @@ func Page(t testing.TB, store *sqlite.Store, siteID, path string) pagemap.Page {
 
 	record := pagemap.Page{
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage, ParentReason: pagemap.ParentNone,
-		Title: path, H1: path, Keywords: keyword.Of(), Notes: []pagemap.Note{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
+		Title: path, H1: path, Keywords: keyword.Of(), Notes: []note.Note{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}
 	if err := sqlite.NewPageRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the page fixture: %v", err)

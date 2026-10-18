@@ -2,6 +2,7 @@ package pages
 
 import (
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -116,10 +117,10 @@ func view(p pagemap.Page) Page {
 	}
 }
 
-func noteViews(notes []pagemap.Note) []Note {
+func noteViews(notes []note.Note) []Note {
 	out := make([]Note, 0, len(notes))
-	for _, note := range notes {
-		out = append(out, Note{Label: note.Label, Text: note.Text})
+	for _, n := range notes {
+		out = append(out, Note{Label: n.Label, Text: n.Text})
 	}
 	return out
 }

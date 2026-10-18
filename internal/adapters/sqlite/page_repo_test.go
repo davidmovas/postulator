@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -23,7 +24,7 @@ func fullPage(siteID, path string, at time.Time) pagemap.Page {
 		ParentReason: pagemap.ParentJSONLD, ParentMethod: pagemap.MethodRedirect, PageTypeID: &pageType, TechnicalReason: pagemap.TechnicalShop, ReadOnlyReason: pagemap.ReadOnlyBuilder("elementor"),
 		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description", Canonical: "https://shop.example.com" + path,
 		Keywords: keyword.New([]keyword.Keyword{{Text: "title keyword", Volume: new(5400)}, {Text: "one", Volume: new(0)}, {Text: "two"}}),
-		Notes:    []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
+		Notes:    []note.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
 		Status:   pagemap.StatusExists, ContentHash: "abc", WPModifiedAt: &modified, LastSyncedAt: &at, Drift: true, CreatedAt: at, UpdatedAt: at,
 		Observed: pagemap.Observed{
 			Link: "https://shop.example.com" + path, Slug: pagemap.Slug(path), Status: "draft",

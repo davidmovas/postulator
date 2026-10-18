@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -26,7 +27,7 @@ type rowDraft struct {
 	wpType    string
 	pageKind  string
 	keywords  keyword.List
-	notes     []pagemap.Note
+	notes     []note.Note
 	name      string
 	own       ownership
 	kind      string

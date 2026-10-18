@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -50,7 +51,7 @@ func TestNewPageNormalises(t *testing.T) {
 	p := page(pageA, "/Shop/Bags", nil)
 	p.Title = "  Bags  "
 	p.Keywords = keyword.List{{Text: " totes"}, {Text: "Totes"}, {Text: ""}, {Text: "clutches"}, {Text: " leather bags ", Volume: new(700)}}
-	p.Notes = []pagemap.Note{
+	p.Notes = []note.Note{
 		{Label: " Intent Owner ", Text: " GEO Commercial "}, {Label: "Notes", Text: "  "}, {Label: " ", Text: "no label"},
 		{Label: "intent owner", Text: "said twice"}, {Label: "Reason", Text: "one form of the product"},
 	}
@@ -64,7 +65,7 @@ func TestNewPageNormalises(t *testing.T) {
 	if !slices.Equal(got.Keywords.Texts(), []string{"leather bags", "totes", "clutches"}) {
 		t.Errorf("NewPage keywords = %v, want them trimmed, deduplicated and ordered by volume", got.Keywords.Texts())
 	}
-	wantNotes := []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Reason", Text: "one form of the product"}}
+	wantNotes := []note.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Reason", Text: "one form of the product"}}
 	if !slices.Equal(got.Notes, wantNotes) {
 		t.Errorf("NewPage notes = %+v, want %+v", got.Notes, wantNotes)
 	}

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 )
 
 const (
@@ -355,12 +355,12 @@ func (b Binding) Levels(row []string) []string {
 	return out
 }
 
-func (b Binding) Notes(row []string) []pagemap.Note {
-	notes := make([]pagemap.Note, 0, len(b.notes))
+func (b Binding) Notes(row []string) []note.Note {
+	notes := make([]note.Note, 0, len(b.notes))
 	for _, column := range b.notes {
-		notes = append(notes, pagemap.Note{Label: column.label, Text: cellAt(row, column.at)})
+		notes = append(notes, note.Note{Label: column.label, Text: cellAt(row, column.at)})
 	}
-	return pagemap.NewNotes(notes)
+	return note.Clean(notes)
 }
 
 func (b Binding) Options() Options {

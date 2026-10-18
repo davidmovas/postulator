@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -630,7 +631,7 @@ func TestThePreviewSaysWhatEachColumnBecame(t *testing.T) {
 	}
 }
 
-func notesAt(t *testing.T, h harness, path string) []pagemap.Note {
+func notesAt(t *testing.T, h harness, path string) []note.Note {
 	t.Helper()
 
 	stored := h.pages(t)
@@ -654,7 +655,7 @@ func TestNoteColumnsTravelWithThePage(t *testing.T) {
 	}
 	h.apply(t, first, mapping)
 
-	want := []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
+	want := []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
 	if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, want) {
 		t.Fatalf("notes = %+v, want %+v", got, want)
 	}
@@ -664,7 +665,7 @@ func TestNoteColumnsTravelWithThePage(t *testing.T) {
 
 	second := h.file(t, "again.csv", "URL,Title,Notes\n/bpc-157/,BPC-157,Now a 5 ml vial\n/tb-500/,TB-500,\n")
 	h.apply(t, second, h.detected(t, second))
-	want = []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Now a 5 ml vial"}}
+	want = []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Now a 5 ml vial"}}
 	if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, want) {
 		t.Fatalf("notes after a second import = %+v, want %+v", got, want)
 	}

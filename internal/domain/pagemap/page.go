@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -93,7 +94,7 @@ type Page struct {
 	MetaDescription string
 	Canonical       string
 	Keywords        keyword.List
-	Notes           []Note
+	Notes           []note.Note
 	Status          Status
 	EntityID        *string
 	TemplateID      *string
@@ -209,7 +210,7 @@ func NewPage(p Page) (Page, error) {
 	p.MetaDescription = strings.TrimSpace(p.MetaDescription)
 	p.Canonical = strings.TrimSpace(p.Canonical)
 	p.Keywords = keyword.New(p.Keywords)
-	p.Notes = NewNotes(p.Notes)
+	p.Notes = note.Clean(p.Notes)
 	return p, nil
 }
 

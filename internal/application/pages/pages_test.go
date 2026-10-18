@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -753,7 +754,7 @@ func TestAPageShowsTheNotesItCarries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the page: %v", err)
 	}
-	stored.Notes = []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}}
+	stored.Notes = []note.Note{{Label: "Intent Owner", Text: "Commercial"}}
 	if err = repo.Update(t.Context(), stored); err != nil {
 		t.Fatalf("store the notes: %v", err)
 	}
