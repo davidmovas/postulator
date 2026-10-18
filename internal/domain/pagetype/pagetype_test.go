@@ -9,7 +9,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
-	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 var stamp = time.Date(2026, time.October, 18, 12, 0, 0, 0, time.UTC)
@@ -232,28 +231,28 @@ func TestEachPresetCarriesTheFormerRules(t *testing.T) {
 	}
 }
 
-func TestEachPresetAnswersWhatItsBuiltInTemplateAnswered(t *testing.T) {
+func TestEachPresetCarriesTheRulesItsFormerBuiltInTemplateHad(t *testing.T) {
 	t.Parallel()
 
-	kinds := map[string][]pagetype.Preset{
-		"hub": {pagetype.Hub}, "category": {pagetype.StoreCategory, pagetype.Catalog}, "guide": {pagetype.Entity},
+	hub := field.LinkRules{UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 20, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2, ChildrenSection: true}
+	category := field.LinkRules{UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 15, MaxPerTarget: 1, ParentLinkWithinParagraphs: 1, ChildrenSection: true}
+	guide := field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 12, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2}
+	cases := []struct {
+		preset pagetype.Preset
+		former string
+		rules  field.LinkRules
+	}{
+		{preset: pagetype.Hub, former: "Hub", rules: hub},
+		{preset: pagetype.StoreCategory, former: "Category", rules: category},
+		{preset: pagetype.Catalog, former: "Category", rules: category},
+		{preset: pagetype.Entity, former: "Guide", rules: guide},
 	}
-	checked := 0
-	for _, seed := range template.Seed() {
-		for _, preset := range kinds[seed.PageKind] {
-			got := pagetype.DefaultScope(preset, pagetype.LinkField(preset), "type-1").Links
-			want := field.LinkPolicy{
-				Links: true, Rules: field.LinkRules(seed.Spec.LinkRules), ForbidExternal: true, ForbidSelf: true,
-				AnchorStrategy: field.AnchorPreferUser,
-			}
-			if got != want {
-				t.Errorf("%s answers %+v, the built-in %s answered %+v under the Default policy", preset, got, seed.Name, want)
-			}
-			checked++
+	for _, tc := range cases {
+		got := pagetype.DefaultScope(tc.preset, pagetype.LinkField(tc.preset), "type-1").Links
+		want := field.LinkPolicy{Links: true, Rules: tc.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+		if got != want {
+			t.Errorf("%s answers %+v, the built-in %s answered %+v under the Default policy", tc.preset, got, tc.former, want)
 		}
-	}
-	if checked != 4 {
-		t.Fatalf("compared %d presets with their built-ins, want 4", checked)
 	}
 }
 

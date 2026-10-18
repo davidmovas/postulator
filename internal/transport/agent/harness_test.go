@@ -164,8 +164,8 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 	actionRepo := sqlite.NewPendingActionRepo(store)
 	callRepo := sqlite.NewLLMCallRepo(store)
 
-	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, bus, now)
+	templateService := templates.New(sqlite.NewTemplateRepo(store), pageRepo, sqlite.NewEntityRepo(store), siteRepo,
+		sqlite.NewPageTypeRepo(store), store, bus, now)
 	registered := tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, nil, store, pagetypes.New(pagetypes.Deps{
 			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: sqlite.NewTemplateRepo(store),
@@ -179,7 +179,7 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 		Reports: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 			Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
-			Sites: siteRepo, Specs: templateService, Policies: templateService,
+			Sites: siteRepo, Specs: templateService,
 		}),
 		Actions:   actionRepo,
 		Publisher: bus,
@@ -214,7 +214,7 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 		Reports: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 			Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
-			Sites: siteRepo, Specs: templateService, Policies: templateService,
+			Sites: siteRepo, Specs: templateService,
 		}),
 		Templates: templateService,
 		Profiles:  chatProfiles{},

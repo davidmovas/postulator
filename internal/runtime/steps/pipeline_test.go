@@ -20,6 +20,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -100,20 +101,11 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 		t.Fatalf("insert the guide template: %v", err)
 	}
 
-	policy := template.LinkPolicy{
-		ID: id.New(), Scope: template.ScopeGlobal, Name: templates.DefaultPolicyName,
-		Rules: guide.Spec.LinkRules, ForbidExternal: true, ForbidSelf: true,
-		AnchorStrategy: template.AnchorPreferUser, CreatedAt: at, UpdatedAt: at,
-	}
-	if err := sqlite.NewLinkPolicyRepo(store).Insert(t.Context(), policy); err != nil {
-		t.Fatalf("insert the link policy: %v", err)
-	}
-
 	owner := site.Site{
 		ID: id.New(), Name: "Shop", BaseURL: server.URL(), Username: wptest.DefaultUser,
 		Status: site.StatusActive, AllowInsecure: true, Plugin: site.PluginState{Installed: true, Capabilities: []string{}},
 		Defaults: site.Defaults{
-			TemplateID: &guide.ID, LinkPolicyID: &policy.ID,
+			TemplateID:    &guide.ID,
 			ModelProfiles: map[domainllm.Role]domainllm.ModelRef{},
 		},
 		CreatedAt: at, UpdatedAt: at,
@@ -173,7 +165,7 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 	return &pipeline{
 		store: store, server: server, siteID: owner.ID, pageID: childPage.ID,
 		parent: nested[0].ID, recipe: guide.Spec.Recipe,
-		types: typedSite(t, store, owner.ID, field.LinkRules(guide.Spec.LinkRules)),
+		types: typedSite(t, store, owner.ID, pagetype.DefaultScope(pagetype.Entity, field.Body, "").Links.Rules),
 		runs:  sqlite.NewRunRepo(store),
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
@@ -206,8 +198,8 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 	t.Helper()
 
 	specs := templates.New(
-		sqlite.NewTemplateRepo(p.store), sqlite.NewLinkPolicyRepo(p.store), p.pages, sqlite.NewEntityRepo(p.store),
-		sqlite.NewSiteRepo(p.store), p.store, silentPublisher{}, clock.System{},
+		sqlite.NewTemplateRepo(p.store), p.pages, sqlite.NewEntityRepo(p.store), sqlite.NewSiteRepo(p.store),
+		sqlite.NewPageTypeRepo(p.store), p.store, silentPublisher{}, clock.System{},
 	)
 
 	registry := run.NewRegistry()

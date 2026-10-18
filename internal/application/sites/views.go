@@ -15,7 +15,6 @@ type Plugin struct {
 
 type Defaults struct {
 	TemplateID    *string                 `json:"templateId"`
-	LinkPolicyID  *string                 `json:"linkPolicyId"`
 	ModelProfiles map[string]llm.ModelRef `json:"modelProfiles"`
 }
 
@@ -74,7 +73,7 @@ func view(s site.Site) Site {
 		AllowInsecure: s.AllowInsecure,
 		Plugin:        Plugin{Installed: s.Plugin.Installed, Version: s.Plugin.Version, Capabilities: capabilities, SEOPlugin: s.Plugin.SEOPlugin},
 		Commerce:      string(s.Commerce),
-		Defaults:      Defaults{TemplateID: s.Defaults.TemplateID, LinkPolicyID: s.Defaults.LinkPolicyID, ModelProfiles: profiles},
+		Defaults:      Defaults{TemplateID: s.Defaults.TemplateID, ModelProfiles: profiles},
 		Settings:      s.Settings.Normalized(),
 		CreatedAt:     dto.NewTime(s.CreatedAt),
 		UpdatedAt:     dto.NewTime(s.UpdatedAt),

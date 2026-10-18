@@ -6,9 +6,9 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -227,9 +227,9 @@ func TestTheShippedStepsRegisterInRecipeOrder(t *testing.T) {
 	}
 }
 
-func heldByTheLinkBudget() template.TemplateSpec {
-	tight := spec()
-	tight.LinkRules.MaxLinks = 1
+func heldByTheLinkBudget() field.LinkRules {
+	tight := linkRules()
+	tight.MaxLinks = 1
 	return tight
 }
 
@@ -249,7 +249,7 @@ func TestValidateHoldsAPageWithErrorsForAHumanUnlessTheyAreAllowed(t *testing.T)
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			f := newFactoryWithSpec(t, goodDraft, heldByTheLinkBudget())
+			f := newFactoryWithRules(t, goodDraft, heldByTheLinkBudget())
 			recipe := recipe()
 			recipe[len(recipe)-1].Params = tc.params
 
@@ -295,7 +295,7 @@ func TestValidateHoldsAPageWithErrorsForAHumanUnlessTheyAreAllowed(t *testing.T)
 func TestAcceptingAHeldValidationLetsThePageGoOn(t *testing.T) {
 	t.Parallel()
 
-	f := newFactoryWithSpec(t, goodDraft, heldByTheLinkBudget())
+	f := newFactoryWithRules(t, goodDraft, heldByTheLinkBudget())
 	engine := f.engine(t)
 	queued, err := engine.Enqueue(t.Context(), run.Run{
 		ID: newID(), SiteID: f.siteID, Kind: run.KindGenerate, Targets: []string{f.pageID},

@@ -17,7 +17,6 @@ var groups = []Group{
 	{Name: "pages", Description: "The page map: plan, change or delete pages, map them to entities, " +
 		"set canonicals, replace recorded links, preview a page."},
 	{Name: "templates", Description: "Content templates, and their overrides for one site or one page."},
-	{Name: "policies", Description: "Link policies: the internal links a page may carry and owes."},
 	{Name: "runs", Description: "Runs that write, relink, audit, repair or revert pages: start, pause, resume, " +
 		"cancel, retry, regenerate and revert them, and read their items, events and artifacts."},
 	{Name: "sync", Description: "Pull the live WordPress content into the page map and probe the companion plugin."},

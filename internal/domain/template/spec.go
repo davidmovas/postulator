@@ -40,22 +40,6 @@ func (s ImageSource) Valid() bool {
 	}
 }
 
-type AnchorStrategy string
-
-const (
-	AnchorPreferUser AnchorStrategy = "prefer_user"
-	AnchorRotate     AnchorStrategy = "rotate"
-)
-
-func (s AnchorStrategy) Valid() bool {
-	switch s {
-	case AnchorPreferUser, AnchorRotate:
-		return true
-	default:
-		return false
-	}
-}
-
 type OverrideScope string
 
 const (
@@ -96,16 +80,6 @@ type KeywordRules struct {
 	PrimaryInFirstParagraph bool    `json:"primaryInFirstParagraph" description:"The primary keyword must appear in the opening paragraph"`
 	MaxDensity              float64 `json:"maxDensity" minimum:"0" maximum:"1" description:"The largest share of the words the primary keyword may take, between 0 and 1"`
 	RequiredKeywords        *int    `json:"requiredKeywords,omitempty" minimum:"0" description:"How many of the page's keywords, the most searched first, the body must use; left out, it must use every one"`
-}
-
-type LinkRules struct {
-	UpDepth                    int     `json:"upDepth" minimum:"0" description:"How many levels up the tree a page links to, 1 for its parent alone"`
-	DownLinks                  bool    `json:"downLinks" description:"Link down to the children of the entity"`
-	SiblingMinWeight           float64 `json:"siblingMinWeight" minimum:"0" maximum:"1" description:"The weight a related edge needs before a sibling link is placed, between 0 and 1"`
-	MaxLinks                   int     `json:"maxLinks" minimum:"0" description:"The most internal links one page may carry"`
-	MaxPerTarget               int     `json:"maxPerTarget" minimum:"0" description:"The most links one page may point at a single target"`
-	ParentLinkWithinParagraphs int     `json:"parentLinkWithinParagraphs" minimum:"0" description:"The parent link must appear within this many paragraphs of the start"`
-	ChildrenSection            bool    `json:"childrenSection" description:"Close the page with a section listing its children"`
 }
 
 type MetaRules struct {
@@ -162,7 +136,6 @@ type TemplateSpec struct {
 	Tone          string                    `json:"tone"`
 	Length        Length                    `json:"length"`
 	KeywordRules  KeywordRules              `json:"keywordRules"`
-	LinkRules     LinkRules                 `json:"linkRules"`
 	MetaRules     MetaRules                 `json:"metaRules"`
 	Images        Images                    `json:"images"`
 	Product       *Product                  `json:"product,omitempty"`
@@ -190,17 +163,4 @@ type Override struct {
 	Patch      json.RawMessage
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
-}
-
-type LinkPolicy struct {
-	ID             string
-	Scope          Scope
-	SiteID         *string
-	Name           string
-	Rules          LinkRules
-	ForbidExternal bool
-	ForbidSelf     bool
-	AnchorStrategy AnchorStrategy
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
 }

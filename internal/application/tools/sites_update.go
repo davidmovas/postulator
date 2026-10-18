@@ -10,23 +10,22 @@ import (
 const sitesUpdateName = "sites_update"
 
 type sitesUpdateArgs struct {
-	ID                  string  `json:"id" description:"Site id"`
-	Name                *string `json:"name,omitempty" description:"New name"`
-	BaseURL             *string `json:"baseUrl,omitempty" description:"New site URL"`
-	Username            *string `json:"username,omitempty" description:"New administrator login"`
-	Password            *string `json:"password,omitempty" description:"New application password; sealed, never read back"`
-	AllowInsecure       *bool   `json:"allowInsecure,omitempty" description:"Accept an untrusted certificate, local sites only"`
-	Status              *string `json:"status,omitempty" enum:"active,paused,error" description:"New status"`
-	DefaultTemplateID   *string `json:"defaultTemplateId,omitempty" description:"Fallback template id"`
-	DefaultLinkPolicyID *string `json:"defaultLinkPolicyId,omitempty" description:"Fallback link policy id"`
-	UserAgent           *string `json:"userAgent,omitempty" description:"User-Agent sent to this site; default a neutral browser string"`
-	RenderConcurrency   *int    `json:"renderConcurrency,omitempty" minimum:"1" maximum:"16" description:"Renders fetched at once during an observation; default 4"`
-	FullWalkEvery       *int    `json:"fullWalkEvery,omitempty" minimum:"1" description:"Observations between two full walks; default 10"`
-	LinkURLForm         *string `json:"linkUrlForm,omitempty" enum:"auto,absolute,relative" description:"URL form of the links we place; default auto"`
+	ID                string  `json:"id" description:"Site id"`
+	Name              *string `json:"name,omitempty" description:"New name"`
+	BaseURL           *string `json:"baseUrl,omitempty" description:"New site URL"`
+	Username          *string `json:"username,omitempty" description:"New administrator login"`
+	Password          *string `json:"password,omitempty" description:"New application password; sealed, never read back"`
+	AllowInsecure     *bool   `json:"allowInsecure,omitempty" description:"Accept an untrusted certificate, local sites only"`
+	Status            *string `json:"status,omitempty" enum:"active,paused,error" description:"New status"`
+	DefaultTemplateID *string `json:"defaultTemplateId,omitempty" description:"Fallback template id"`
+	UserAgent         *string `json:"userAgent,omitempty" description:"User-Agent sent to this site; default a neutral browser string"`
+	RenderConcurrency *int    `json:"renderConcurrency,omitempty" minimum:"1" maximum:"16" description:"Renders fetched at once during an observation; default 4"`
+	FullWalkEvery     *int    `json:"fullWalkEvery,omitempty" minimum:"1" description:"Observations between two full walks; default 10"`
+	LinkURLForm       *string `json:"linkUrlForm,omitempty" enum:"auto,absolute,relative" description:"URL form of the links we place; default auto"`
 }
 
 func (in *sitesUpdateArgs) touchesDefaults() bool {
-	return in.DefaultTemplateID != nil || in.DefaultLinkPolicyID != nil
+	return in.DefaultTemplateID != nil
 }
 
 func (in *sitesUpdateArgs) touchesSettings() bool {
@@ -36,9 +35,6 @@ func (in *sitesUpdateArgs) touchesSettings() bool {
 func (in *sitesUpdateArgs) defaultsOver(current sites.Defaults) *sites.Defaults {
 	if in.DefaultTemplateID != nil {
 		current.TemplateID = in.DefaultTemplateID
-	}
-	if in.DefaultLinkPolicyID != nil {
-		current.LinkPolicyID = in.DefaultLinkPolicyID
 	}
 	return &current
 }

@@ -50,8 +50,8 @@ func newFixture(t *testing.T) *fixture {
 	itemRepo := sqlite.NewRunItemRepo(store)
 	artifactRepo := sqlite.NewArtifactRepo(store)
 	siteRepo := sqlite.NewSiteRepo(store)
-	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
+	templateService := templates.New(sqlite.NewTemplateRepo(store), pageRepo, sqlite.NewEntityRepo(store), siteRepo,
+		sqlite.NewPageTypeRepo(store), store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
 	if err := templateService.EnsureSeeded(t.Context()); err != nil {
 		t.Fatalf("seed the templates: %v", err)
 	}
@@ -81,7 +81,7 @@ func newFixture(t *testing.T) *fixture {
 		service: reports.New(reports.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 			Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
-			Sites: siteRepo, Specs: templateService, Policies: templateService, Types: types,
+			Sites: siteRepo, Specs: templateService, Types: types,
 		}),
 	}
 

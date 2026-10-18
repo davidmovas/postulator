@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	siteColumns = `id, name, base_url, username, secret_ref, status, allow_insecure, plugin_installed, plugin_version, plugin_capabilities, plugin_seo, commerce, default_template_id, default_link_policy_id, model_profiles, settings, created_at, updated_at`
-	insertSite  = `INSERT INTO sites (` + siteColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateSite  = `UPDATE sites SET name = ?, base_url = ?, username = ?, status = ?, allow_insecure = ?, plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, default_template_id = ?, default_link_policy_id = ?, model_profiles = ?, settings = ?, updated_at = ? WHERE id = ?`
+	siteColumns = `id, name, base_url, username, secret_ref, status, allow_insecure, plugin_installed, plugin_version, plugin_capabilities, plugin_seo, commerce, default_template_id, model_profiles, settings, created_at, updated_at`
+	insertSite  = `INSERT INTO sites (` + siteColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateSite  = `UPDATE sites SET name = ?, base_url = ?, username = ?, status = ?, allow_insecure = ?, plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, default_template_id = ?, model_profiles = ?, settings = ?, updated_at = ? WHERE id = ?`
 	observeSite = `UPDATE sites SET settings = json_set(settings, '$.technical', json(?), '$.observation', json(?)), updated_at = ? WHERE id = ?`
 	pluginSite  = `UPDATE sites SET plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, updated_at = ? WHERE id = ?`
 	deleteSite  = `DELETE FROM sites WHERE id = ?`
@@ -78,7 +78,7 @@ func (r *SiteRepo) Insert(ctx context.Context, s site.Site) error {
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertSite, []any{
 		s.ID, s.Name, s.BaseURL, s.Username, s.SecretRef, string(s.Status), boolInt(s.AllowInsecure),
 		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin, string(s.Commerce),
-		nullString(s.Defaults.TemplateID), nullString(s.Defaults.LinkPolicyID), encoded.profiles, encoded.settings,
+		nullString(s.Defaults.TemplateID), encoded.profiles, encoded.settings,
 		formatTime(s.CreatedAt), formatTime(s.UpdatedAt),
 	}, siteConflict(s.ID), "insert the site")
 	return err
@@ -92,7 +92,7 @@ func (r *SiteRepo) Update(ctx context.Context, s site.Site) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateSite, []any{
 		s.Name, s.BaseURL, s.Username, string(s.Status), boolInt(s.AllowInsecure),
 		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin, string(s.Commerce),
-		nullString(s.Defaults.TemplateID), nullString(s.Defaults.LinkPolicyID), encoded.profiles, encoded.settings,
+		nullString(s.Defaults.TemplateID), encoded.profiles, encoded.settings,
 		formatTime(s.UpdatedAt), s.ID,
 	}, nil, "update the site")
 	return requireAffected(affected, err, siteNotFound(s.ID))
@@ -166,11 +166,11 @@ func scanSite(rows *sql.Rows) (site.Site, error) {
 		allowInsecure, pluginInstalled int64
 		capabilities, profiles         string
 		settings                       string
-		templateID, policyID           sql.NullString
+		templateID                     sql.NullString
 		createdAt, updatedAt           string
 	)
 	if err := rows.Scan(&s.ID, &s.Name, &s.BaseURL, &s.Username, &s.SecretRef, &status, &allowInsecure, &pluginInstalled,
-		&s.Plugin.Version, &capabilities, &s.Plugin.SEOPlugin, &commerce, &templateID, &policyID, &profiles, &settings,
+		&s.Plugin.Version, &capabilities, &s.Plugin.SEOPlugin, &commerce, &templateID, &profiles, &settings,
 		&createdAt, &updatedAt); err != nil {
 		return site.Site{}, err
 	}
@@ -180,7 +180,6 @@ func scanSite(rows *sql.Rows) (site.Site, error) {
 	s.AllowInsecure = allowInsecure == 1
 	s.Plugin.Installed = pluginInstalled == 1
 	s.Defaults.TemplateID = optString(templateID)
-	s.Defaults.LinkPolicyID = optString(policyID)
 	if err := decodeJSON(capabilities, &s.Plugin.Capabilities, "decode the site plugin capabilities"); err != nil {
 		return site.Site{}, err
 	}

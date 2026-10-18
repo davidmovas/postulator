@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -37,7 +38,7 @@ func newHarness(t *testing.T) harness {
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
-		service:  templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store), sqlite.NewPageRepo(store), sqlite.NewEntityRepo(store), sqlite.NewSiteRepo(store), store, recorder, clk),
+		service:  templates.New(sqlite.NewTemplateRepo(store), sqlite.NewPageRepo(store), sqlite.NewEntityRepo(store), sqlite.NewSiteRepo(store), sqlite.NewPageTypeRepo(store), store, recorder, clk),
 		store:    store,
 		recorder: recorder,
 		clock:    clk,
@@ -198,10 +199,13 @@ func TestTemplateLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	for _, key := range []string{`"pageKind":"hub"`, `"siteId":null`, `"spec":{"sections":[`, `"linkRules":{"upDepth":1`, `"createdAt":"2026-09-18T09:00:00Z"`} {
+	for _, key := range []string{`"pageKind":"hub"`, `"siteId":null`, `"spec":{"sections":[`, `"metaRules":{"titlePattern"`, `"createdAt":"2026-09-18T09:00:00Z"`} {
 		if !strings.Contains(string(encoded), key) {
 			t.Errorf("view lacks %s: %s", key, encoded)
 		}
+	}
+	if strings.Contains(string(encoded), `"linkRules"`) {
+		t.Errorf("a template still carries link rules, which live in the page types' scopes: %s", encoded)
 	}
 
 	h.clock.Advance(time.Minute)
@@ -306,7 +310,7 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 		t.Errorf("ResolveForPage via the site default = %+v, %v", viaDefault, err)
 	}
 
-	siteOverride, err := h.service.SetOverride(t.Context(), templates.SetOverrideRequest{TemplateID: hub.ID, Scope: "site", TargetID: h.siteID, Patch: json.RawMessage(`{"tone":"warm","linkRules":{"maxLinks":5}}`)})
+	siteOverride, err := h.service.SetOverride(t.Context(), templates.SetOverrideRequest{TemplateID: hub.ID, Scope: "site", TargetID: h.siteID, Patch: json.RawMessage(`{"tone":"warm","keywordRules":{"maxDensity":0.05}}`)})
 	if err != nil {
 		t.Fatalf("SetOverride site: %v", err)
 	}
@@ -328,7 +332,7 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveForPage: %v", err)
 	}
-	if resolved.Spec.Tone != "warm" || resolved.Spec.LinkRules.MaxLinks != 5 || resolved.Spec.Length.Min != 100 ||
+	if resolved.Spec.Tone != "warm" || resolved.Spec.KeywordRules.MaxDensity != 0.05 || resolved.Spec.Length.Min != 100 ||
 		resolved.Spec.Images.Inline != 3 || resolved.Spec.Images.Source != template.ImagesAI || resolved.Spec.Images.Featured {
 		t.Errorf("ResolveForPage = %+v", resolved.Spec)
 	}
@@ -375,6 +379,46 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	afterDelete, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID})
 	if err != nil || afterDelete.Spec.Tone != hub.Spec.Tone || afterDelete.Spec.Length.Min != 100 {
 		t.Errorf("ResolveForPage after deleting the site override = %+v, %v", afterDelete.Spec, err)
+	}
+}
+
+func TestResolveForPageTakesThePageTypesTemplateBeforeTheSiteDefault(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	hub := h.hub(t)
+	guideSeed := builtIn(t, template.Seed(), "Guide")
+	guide, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Guide", PageKind: guideSeed.PageKind, Spec: guideSeed.Spec})
+	if err != nil {
+		t.Fatalf("CreateTemplate: %v", err)
+	}
+	owner, err := sqlite.NewSiteRepo(h.store).Get(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("Get site: %v", err)
+	}
+	owner.Defaults.TemplateID = &hub.ID
+	if err = sqlite.NewSiteRepo(h.store).Update(t.Context(), owner); err != nil {
+		t.Fatalf("set the site default: %v", err)
+	}
+	entity := pagetype.Type{
+		ID: id.New(), SiteID: h.siteID, Name: "Entity", Preset: pagetype.Entity, TemplateID: &guide.Template.ID,
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	if err = sqlite.NewPageTypeRepo(h.store).Insert(t.Context(), entity); err != nil {
+		t.Fatalf("insert the page type: %v", err)
+	}
+	page := sqlitetest.Page(t, h.store, h.siteID, "/guides/brewing/")
+
+	typed, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID})
+	if err != nil || typed.TemplateID != guide.Template.ID {
+		t.Fatalf("ResolveForPage = %s, %v, want the template of the page's type before the site default", typed.TemplateID, err)
+	}
+	page.TemplateID = &hub.ID
+	if err = sqlite.NewPageRepo(h.store).Update(t.Context(), page); err != nil {
+		t.Fatalf("assign the page template: %v", err)
+	}
+	if own, ownErr := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID}); ownErr != nil || own.TemplateID != hub.ID {
+		t.Fatalf("ResolveForPage = %s, %v, want the page's own template before its type's", own.TemplateID, ownErr)
 	}
 }
 

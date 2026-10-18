@@ -97,12 +97,6 @@ func TestLinkAuditAuditsEveryMappedPage(t *testing.T) {
 	if got.SiteID != f.siteID {
 		t.Fatalf("siteId = %s", got.SiteID)
 	}
-
-	policy := got.Policy
-	if policy.ID == "" || policy.Name != "Default" || !policy.ForbidExternal || !policy.ForbidSelf ||
-		policy.AnchorStrategy != "prefer_user" {
-		t.Fatalf("policy = %+v", policy)
-	}
 }
 
 func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {

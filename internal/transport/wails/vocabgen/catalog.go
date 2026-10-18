@@ -114,7 +114,7 @@ func catalog() []vocabulary {
 		{export: "templateScopes", tsType: "TemplateScope", pkg: "internal/domain/template", typeName: "Scope"},
 		{export: "overrideScopes", tsType: "OverrideScope", pkg: "internal/domain/template", typeName: "OverrideScope"},
 		{
-			export: "anchorStrategies", tsType: "AnchorStrategy", pkg: "internal/domain/template",
+			export: "anchorStrategies", tsType: "AnchorStrategy", pkg: "internal/domain/field",
 			typeName: "AnchorStrategy",
 		},
 		{export: "imageSources", tsType: "ImageSource", pkg: "internal/domain/template", typeName: "ImageSource"},

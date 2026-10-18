@@ -18,7 +18,6 @@ import (
 type siteLinks struct {
 	site     pagemap.Site
 	types    pagetype.Set
-	view     LinkPolicySummary
 	g        graph.Graph
 	index    pagemap.Index
 	entities map[string]graph.Entity
@@ -46,7 +45,7 @@ func (s *Service) LinkAudit(ctx context.Context, req LinkAuditRequest) (LinkAudi
 	}
 
 	pages := state.index.Pages()
-	response := LinkAuditResponse{SiteID: siteID, Policy: state.view, Pages: make([]PageAudit, 0, len(pages))}
+	response := LinkAuditResponse{SiteID: siteID, Pages: make([]PageAudit, 0, len(pages))}
 	for i := range pages {
 		if pages[i].Status == pagemap.StatusArchived {
 			continue
@@ -119,10 +118,6 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	if err != nil {
 		return siteLinks{}, err
 	}
-	effective, err := s.policies.GetEffectivePolicy(ctx, templates.GetEffectivePolicyRequest{SiteID: siteID})
-	if err != nil {
-		return siteLinks{}, err
-	}
 	types, err := s.types.Set(ctx, siteID)
 	if err != nil {
 		return siteLinks{}, err
@@ -142,12 +137,7 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	return siteLinks{
 		site:  pagemap.NewSite(owner.BaseURL),
 		types: types,
-		view: LinkPolicySummary{
-			ID: effective.Policy.ID, Name: effective.Policy.Name,
-			ForbidExternal: effective.Policy.ForbidExternal, ForbidSelf: effective.Policy.ForbidSelf,
-			AnchorStrategy: effective.Policy.AnchorStrategy,
-		},
-		g: g, index: pagemap.NewIndex(pages), entities: byID,
+		g:     g, index: pagemap.NewIndex(pages), entities: byID,
 		outgoing: linksByPage(owed), incoming: incoming, typed: typesByPage(links),
 	}, nil
 }

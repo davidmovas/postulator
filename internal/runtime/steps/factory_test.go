@@ -145,42 +145,32 @@ func spec() template.TemplateSpec {
 			{Heading: "About", Intent: "Explain the topic", TargetWords: 120, Required: true},
 			{Heading: "Brewing", Intent: "Give practical advice", TargetWords: 120},
 		},
-		Tone:         "practical",
-		KeywordRules: template.KeywordRules{PrimaryInH1: true, PrimaryInFirstParagraph: true},
-		LinkRules: template.LinkRules{
-			UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 5, MaxPerTarget: 1,
-		},
+		Tone:          "practical",
+		KeywordRules:  template.KeywordRules{PrimaryInH1: true, PrimaryInFirstParagraph: true},
 		ModelProfiles: map[domainllm.Role]domainllm.ModelRef{},
 		Recipe:        recipe(),
 	}
 }
 
-func newFactory(t *testing.T, draft string) *factory {
-	t.Helper()
-	return newFactoryWithSpec(t, draft, spec())
+func linkRules() field.LinkRules {
+	return field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 5, MaxPerTarget: 1}
 }
 
-func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec) *factory {
+func newFactory(t *testing.T, draft string) *factory {
+	t.Helper()
+	return newFactoryWithRules(t, draft, linkRules())
+}
+
+func newFactoryWithRules(t *testing.T, draft string, rules field.LinkRules) *factory {
 	t.Helper()
 
 	store := sqlitetest.Open(t)
 	at := sqlitetest.Stamp
 
-	policyRepo := sqlite.NewLinkPolicyRepo(store)
-	policy := template.LinkPolicy{
-		ID: id.New(), Scope: template.ScopeGlobal, Name: templates.DefaultPolicyName,
-		Rules:          chosen.LinkRules,
-		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: template.AnchorPreferUser,
-		CreatedAt: at, UpdatedAt: at,
-	}
-	if err := policyRepo.Insert(t.Context(), policy); err != nil {
-		t.Fatalf("insert the link policy: %v", err)
-	}
-
 	templateRepo := sqlite.NewTemplateRepo(store)
 	base := template.Template{
 		ID: id.New(), Scope: template.ScopeGlobal, Name: "Guide", PageKind: "guide", Version: 1,
-		Spec: chosen, CreatedAt: at, UpdatedAt: at,
+		Spec: spec(), CreatedAt: at, UpdatedAt: at,
 	}
 	if err := templateRepo.Insert(t.Context(), base); err != nil {
 		t.Fatalf("insert the template: %v", err)
@@ -191,7 +181,7 @@ func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec
 		ID: id.New(), Name: "Shop", BaseURL: "https://shop.example.com", Username: "editor",
 		Status: site.StatusActive, Plugin: site.PluginState{Capabilities: []string{}},
 		Defaults: site.Defaults{
-			TemplateID: &base.ID, LinkPolicyID: &policy.ID,
+			TemplateID:    &base.ID,
 			ModelProfiles: map[domainllm.Role]domainllm.ModelRef{},
 		},
 		CreatedAt: at, UpdatedAt: at,
@@ -239,7 +229,7 @@ func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec
 
 	return &factory{
 		store: store,
-		types: typedSite(t, store, owner.ID, field.LinkRules(chosen.LinkRules)),
+		types: typedSite(t, store, owner.ID, rules),
 		runs:  sqlite.NewRunRepo(store),
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
@@ -293,8 +283,8 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 	t.Helper()
 
 	specs := templates.New(
-		sqlite.NewTemplateRepo(f.store), sqlite.NewLinkPolicyRepo(f.store), sqlite.NewPageRepo(f.store),
-		sqlite.NewEntityRepo(f.store), sqlite.NewSiteRepo(f.store), f.store, silentPublisher{}, clock.System{},
+		sqlite.NewTemplateRepo(f.store), sqlite.NewPageRepo(f.store), sqlite.NewEntityRepo(f.store),
+		sqlite.NewSiteRepo(f.store), sqlite.NewPageTypeRepo(f.store), f.store, silentPublisher{}, clock.System{},
 	)
 
 	registry := run.NewRegistry()

@@ -140,7 +140,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	client := fake.New()
 	book := ledger.New(client, callRepo, built, bus, now)
 	modelProfiles := profiles.New(sqlite.NewModelProfileRepo(store), siteRepo, built, now)
-	templateService := templates.New(templateRepo, sqlite.NewLinkPolicyRepo(store), pageRepo, entityRepo, siteRepo, store, bus, now)
+	templateService := templates.New(templateRepo, pageRepo, entityRepo, siteRepo, sqlite.NewPageTypeRepo(store), store, bus, now)
 	types := pagetypes.New(pagetypes.Deps{
 		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
 		UnitOfWork: store, Publisher: bus, Clock: now,
@@ -148,7 +148,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	reportsService := reports.New(reports.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
-		Sites: siteRepo, Specs: templateService, Policies: templateService, Types: types,
+		Sites: siteRepo, Specs: templateService, Types: types,
 	})
 
 	pagesService := pages.New(pages.Deps{
@@ -260,8 +260,6 @@ func TestEveryWriteToolRunsAgainstTheRealUseCases(t *testing.T) {
 const minimalSpec = `{"sections":[{"heading":"Overview","intent":"what it is","targetWords":200,"required":true,` +
 	`"keywordRules":{"include":[],"primaryInHeading":false}}],"tone":"plain","length":{"min":300,"max":900},` +
 	`"keywordRules":{"primaryInTitle":true,"primaryInH1":true,"primaryInFirstParagraph":true,"maxDensity":0.02},` +
-	`"linkRules":{"upDepth":1,"downLinks":true,"siblingMinWeight":0.5,"maxLinks":8,"maxPerTarget":2,` +
-	`"parentLinkWithinParagraphs":2,"childrenSection":false},` +
 	`"metaRules":{"titlePattern":"{primaryKeyword}","descriptionMax":155},` +
 	`"images":{"featured":false,"inline":0,"source":"ai"}}`
 

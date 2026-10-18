@@ -116,14 +116,6 @@ type LinkAuditRequest struct {
 	SiteID string `json:"siteId"`
 }
 
-type LinkPolicySummary struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	ForbidExternal bool   `json:"forbidExternal"`
-	ForbidSelf     bool   `json:"forbidSelf"`
-	AnchorStrategy string `json:"anchorStrategy"`
-}
-
 type LinkTypeCounts struct {
 	Breadcrumb int `json:"breadcrumb"`
 	Listing    int `json:"listing"`
@@ -171,10 +163,9 @@ type PageAudit struct {
 }
 
 type LinkAuditResponse struct {
-	SiteID string            `json:"siteId"`
-	Policy LinkPolicySummary `json:"policy"`
-	Totals LinkTotals        `json:"totals"`
-	Pages  []PageAudit       `json:"pages"`
+	SiteID string      `json:"siteId"`
+	Totals LinkTotals  `json:"totals"`
+	Pages  []PageAudit `json:"pages"`
 }
 
 type LinkAuditPageRequest struct {

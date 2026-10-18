@@ -42,7 +42,7 @@ type useCases struct {
 }
 
 func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
-	templateService := templates.New(stores.templates, stores.policies, stores.pages, stores.entities, stores.sites,
+	templateService := templates.New(stores.templates, stores.pages, stores.entities, stores.sites, stores.pageTypes,
 		stores.store, c.Events, stores.now)
 	wordpress := registry.New(stores.sites, stores.secrets, append(wp.FromSettings(stores.values), c.cfg.WordPress...)...)
 	pageTypes := pagetypes.New(pagetypes.Deps{
@@ -99,7 +99,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		reports: reports.New(reports.Deps{
 			Entities: stores.entities, Edges: stores.edges, Pages: stores.pages, Links: stores.links,
 			Runs: stores.runs, Items: stores.items, Artifacts: stores.artifacts,
-			Sites: stores.sites, Specs: writing.templates, Policies: writing.templates, Types: writing.pageTypes,
+			Sites: stores.sites, Specs: writing.templates, Types: writing.pageTypes,
 		}),
 		schedules: schedules.New(schedules.Deps{
 			Schedules: stores.schedules, Pages: stores.pages, Sites: stores.sites, Runs: runsService,

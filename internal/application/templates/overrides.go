@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -113,6 +114,13 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	templateID := page.TemplateID
 	if picked != "" {
 		templateID = &picked
+	}
+	if templateID == nil {
+		types, typesErr := s.types.ListBySite(ctx, page.SiteID)
+		if typesErr != nil {
+			return ResolveForPageResponse{}, typesErr
+		}
+		templateID = pagetype.NewSet(types, nil).TypeOf(page).TemplateID
 	}
 	if templateID == nil {
 		templateID = owner.Defaults.TemplateID

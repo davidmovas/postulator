@@ -144,7 +144,7 @@ export const offGraphLinkClasses: readonly LinkClass[] = ["self", "external", "u
 export const linkBlockedReasons = ["no_canonical_page", "no_page"] as const;
 export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
 
-export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;
+export const linkAuditSkipReasons = ["unmapped"] as const;
 export type LinkAuditSkipReason = (typeof linkAuditSkipReasons)[number];
 
 export const linkStates = [

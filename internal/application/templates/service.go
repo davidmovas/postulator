@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -28,12 +29,8 @@ type templateStore interface {
 	ListOverrides(ctx context.Context, templateID string) ([]template.Override, error)
 }
 
-type policyStore interface {
-	Insert(ctx context.Context, p template.LinkPolicy) error
-	Update(ctx context.Context, p template.LinkPolicy) error
-	Delete(ctx context.Context, id string) error
-	Get(ctx context.Context, id string) (template.LinkPolicy, error)
-	List(ctx context.Context, q template.PolicyQuery, page paging.Request) (paging.List[template.LinkPolicy], error)
+type typeReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagetype.Type, error)
 }
 
 type pageReader interface {
@@ -54,17 +51,17 @@ type unitOfWork interface {
 
 type Service struct {
 	templates templateStore
-	policies  policyStore
 	pages     pageReader
 	entities  entityReader
 	sites     siteReader
+	types     typeReader
 	uow       unitOfWork
 	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(templates templateStore, policies policyStore, pages pageReader, entities entityReader, sites siteReader, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{templates: templates, policies: policies, pages: pages, entities: entities, sites: sites, uow: uow, publisher: publisher, clock: clk}
+func New(templates templateStore, pages pageReader, entities entityReader, sites siteReader, types typeReader, uow unitOfWork, publisher application.Publisher, clk clock.Clock) *Service {
+	return &Service{templates: templates, pages: pages, entities: entities, sites: sites, types: types, uow: uow, publisher: publisher, clock: clk}
 }
 
 func (s *Service) now() time.Time {
@@ -106,7 +103,7 @@ func sortOf(sort *dto.Sort) (key template.Sort, desc bool, err error) {
 	}
 	key = template.Sort(sort.Field)
 	if !key.Valid() {
-		return "", false, errors.New(errors.Invalid, "templates and policies are sorted by createdAt or name").WithDetail("field", "sort.field")
+		return "", false, errors.New(errors.Invalid, "templates are sorted by createdAt or name").WithDetail("field", "sort.field")
 	}
 	return key, sort.Desc, nil
 }

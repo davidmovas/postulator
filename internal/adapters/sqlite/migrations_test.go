@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"io/fs"
@@ -13,10 +14,11 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 61
+const latestMigration = 62
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -80,6 +82,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0059_field_scopes.sql",
 		"0060_page_types_backfill.sql",
 		"0061_entity_card.sql",
+		"0062_link_rules_in_scopes.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1472,6 +1475,124 @@ func TestTheMigrationSeedsWhatTheApplicationSeeds(t *testing.T) {
 	}
 }
 
+func TestTheLinkRulesMoveIntoTheScopesAndThePoliciesGo(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 59)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	text := func(query string, args ...any) sql.NullString {
+		t.Helper()
+		var out sql.NullString
+		if scanErr := store.reader.QueryRowContext(t.Context(), query, args...).Scan(&out); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return out
+	}
+	const at = "2026-10-18T09:00:00Z"
+	const hubRules = `{"upDepth":1,"downLinks":true,"siblingMinWeight":0.5,"maxLinks":20,"maxPerTarget":1,"parentLinkWithinParagraphs":2,"childrenSection":true}`
+
+	for _, site := range []string{"s1", "s2"} {
+		must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+			site, site, "https://"+site, "site:"+site+":wp_password", at, at)
+	}
+	if _, err = provider.UpTo(t.Context(), 61); err != nil {
+		t.Fatalf("up to 61: %v", err)
+	}
+	must(`INSERT INTO link_policies (id, scope, site_id, name, rules, forbid_external, forbid_self, anchor_strategy, created_at, updated_at) VALUES ('p-default', 'global', NULL, 'Default', '{}', 1, 1, 'prefer_user', ?, ?)`, at, at)
+	must(`INSERT INTO link_policies (id, scope, site_id, name, rules, forbid_external, forbid_self, anchor_strategy, created_at, updated_at) VALUES ('p-loose', 'site', 's1', 'Loose', '{}', 0, 1, 'rotate', ?, ?)`, at, at)
+	must(`UPDATE sites SET default_link_policy_id = 'p-loose' WHERE id = 's1'`)
+
+	seeds := template.Seed()
+	hubAt := slices.IndexFunc(seeds, func(seed template.Template) bool { return seed.Name == "Hub" })
+	if hubAt < 0 {
+		t.Fatal("the Hub built-in is not seeded")
+	}
+	hub := seeds[hubAt]
+	seedSpec, err := json.Marshal(hub.Spec)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	must(`INSERT INTO templates (id, scope, name, page_kind, version, spec, created_at, updated_at) VALUES ('tpl-hub', 'global', 'Hub', 'hub', 1, json_set(?, '$.linkRules', json(?)), ?, ?)`, string(seedSpec), hubRules, at, at)
+	must(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o1', 'tpl-hub', 'site', 's1', NULL, '{"tone":"warm","linkRules":{"maxLinks":5}}', ?, ?)`, at, at)
+
+	if _, err = provider.UpTo(t.Context(), 62); err != nil {
+		t.Fatalf("up to 62: %v", err)
+	}
+
+	cases := []struct {
+		site, preset, field string
+		want                map[string]any
+	}{
+		{site: "s1", preset: "hub", field: "body", want: map[string]any{"links": true, "forbidExternal": false, "forbidSelf": true, "anchorStrategy": "rotate"}},
+		{site: "s1", preset: "product", field: "product_description", want: map[string]any{"links": true, "forbidExternal": false, "forbidSelf": true, "anchorStrategy": "rotate"}},
+		{site: "s1", preset: "hub", field: "seo_title", want: map[string]any{"links": false, "forbidExternal": false, "forbidSelf": false, "anchorStrategy": "prefer_user"}},
+		{site: "s2", preset: "entity", field: "body", want: map[string]any{"links": true, "forbidExternal": true, "forbidSelf": true, "anchorStrategy": "prefer_user"}},
+	}
+	for _, tc := range cases {
+		raw := text(`SELECT field_scopes.link_policy FROM field_scopes JOIN page_types ON page_types.id = field_scopes.page_type_id WHERE page_types.site_id = ? AND page_types.preset = ? AND field_scopes.field_key = ?`, tc.site, tc.preset, tc.field)
+		var got map[string]any
+		if decodeErr := json.Unmarshal([]byte(raw.String), &got); decodeErr != nil {
+			t.Fatalf("decode %s: %v", raw.String, decodeErr)
+		}
+		for key, want := range tc.want {
+			if got[key] != want {
+				t.Errorf("%s %s %s: %s = %v, want %v (the site's chosen policy, else Default, carried once)", tc.site, tc.preset, tc.field, key, got[key], want)
+			}
+		}
+	}
+
+	var stored, seeded map[string]any
+	if err = json.Unmarshal([]byte(text(`SELECT spec FROM templates WHERE id = 'tpl-hub'`).String), &stored); err != nil {
+		t.Fatalf("decode the stored spec: %v", err)
+	}
+	if err = json.Unmarshal(seedSpec, &seeded); err != nil {
+		t.Fatalf("decode the seed spec: %v", err)
+	}
+	if !reflect.DeepEqual(stored, seeded) {
+		t.Errorf("a built-in stored before 2a = %v, want the new seed exactly", stored)
+	}
+	patch := text(`SELECT patch FROM template_overrides WHERE id = 'o1'`)
+	resolved, err := template.Resolve(hub.Spec, json.RawMessage(patch.String), nil)
+	if err != nil || resolved.Tone != "warm" {
+		t.Errorf("a stored override after 0062 = %s resolves to %+v, %v; want its tone kept and its link rules gone", patch.String, resolved.Tone, err)
+	}
+	for _, gone := range []string{"link_policies"} {
+		if name := text(`SELECT coalesce((SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?), '')`, gone); name.String != "" {
+			t.Errorf("%s survived 0062", gone)
+		}
+	}
+	if sites := strings.Join(schemaOf(t, store, "sites"), "\n"); !strings.Contains(sites, "default_template_id") || strings.Contains(sites, "default_link_policy_id") ||
+		!strings.Contains(sites, "index sites_name") || !strings.Contains(sites, "index sites_created_at") {
+		t.Errorf("sites after 0062 = %s, want the template default, both indexes and no policy column", sites)
+	}
+	must(`DELETE FROM sites WHERE id = 's1'`)
+	if n := text(`SELECT count(*) FROM page_types WHERE site_id = 's1'`); n.String != "0" {
+		t.Errorf("page types of a deleted site = %s, want the cascade the rebuilt sites table still drives", n.String)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 61); err != nil {
+		t.Fatalf("down to 61: %v", err)
+	}
+	if policy := text(`SELECT id FROM link_policies WHERE scope = 'global' AND name = 'Default'`); !id.Valid(policy.String) {
+		t.Errorf("the down's Default policy id = %q, want a v4 UUID", policy.String)
+	}
+	if chosen := text(`SELECT default_link_policy_id FROM sites WHERE id = 's2'`); chosen.Valid {
+		t.Errorf("the down's site policy = %v, want none", chosen)
+	}
+	if depth := text(`SELECT json_extract(spec, '$.linkRules.maxLinks') FROM templates WHERE id = 'tpl-hub'`); depth.String != "20" {
+		t.Errorf("the down's Hub maxLinks = %q, want the built-in's 20 back", depth.String)
+	}
+}
+
 func TestFindingsSubjectIsUniquePerSite(t *testing.T) {
 	t.Parallel()
 
@@ -1879,8 +2000,9 @@ func TestSchemaCascades(t *testing.T) {
 
 	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
 	exec(`INSERT INTO templates (id, scope, site_id, name, page_kind, version, spec, created_at, updated_at) VALUES ('t1', 'global', NULL, 'Hub', 'hub', 1, '{}', ?, ?)`, at, at)
-	exec(`INSERT INTO link_policies (id, scope, site_id, name, rules, forbid_external, forbid_self, anchor_strategy, created_at, updated_at) VALUES ('p1', 'site', 's1', 'Strict', '{}', 1, 1, 'rotate', ?, ?)`, at, at)
-	exec(`UPDATE sites SET default_template_id = 't1', default_link_policy_id = 'p1' WHERE id = 's1'`)
+	exec(`INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('p1', 's1', 'Hub', 'hub', ?, ?)`, at, at)
+	exec(`INSERT INTO field_scopes (page_type_id, field_key, link_policy, updated_at) VALUES ('p1', 'body', '{"links":true}', ?)`, at)
+	exec(`UPDATE sites SET default_template_id = 't1' WHERE id = 's1'`)
 	exec(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Shoes', 'hub', 'user', ?, ?)`, at, at)
 	exec(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e2', 's1', 'Boots', 'topic', 'user', ?, ?)`, at, at)
 	exec(`INSERT INTO entity_anchors (entity_id, position, text, source, weight) VALUES ('e1', 0, 'shoes', 'user', 1)`)
@@ -1936,7 +2058,7 @@ func TestSchemaCascades(t *testing.T) {
 	}
 
 	exec(`DELETE FROM sites WHERE id = 's1'`)
-	for _, table := range []string{"entities", "pages", "page_links", "link_policies", "template_overrides"} {
+	for _, table := range []string{"entities", "pages", "page_links", "page_types", "field_scopes", "template_overrides"} {
 		if got := count(table); got != 0 {
 			t.Errorf("%s after site delete = %d", table, got)
 		}

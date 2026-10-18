@@ -166,7 +166,6 @@ func apply(current *site.Site, req *UpdateRequest) (site.Site, error) {
 	if req.Defaults != nil {
 		next.Defaults = site.Defaults{
 			TemplateID:    req.Defaults.TemplateID,
-			LinkPolicyID:  req.Defaults.LinkPolicyID,
 			ModelProfiles: profilesOf(req.Defaults.ModelProfiles),
 		}
 	}

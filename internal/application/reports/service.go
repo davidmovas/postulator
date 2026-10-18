@@ -55,10 +55,6 @@ type specResolver interface {
 	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
 }
 
-type policyReader interface {
-	GetEffectivePolicy(ctx context.Context, req templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error)
-}
-
 type Deps struct {
 	Entities  entityReader
 	Edges     edgeReader
@@ -69,7 +65,6 @@ type Deps struct {
 	Artifacts artifactReader
 	Sites     siteReader
 	Specs     specResolver
-	Policies  policyReader
 	Types     typeSets
 }
 
@@ -87,7 +82,6 @@ type Service struct {
 	artifacts artifactReader
 	sites     siteReader
 	specs     specResolver
-	policies  policyReader
 	types     typeSets
 }
 
@@ -95,7 +89,7 @@ func New(deps Deps) *Service {
 	return &Service{
 		entities: deps.Entities, edges: deps.Edges, pages: deps.Pages, links: deps.Links,
 		runs: deps.Runs, items: deps.Items, artifacts: deps.Artifacts,
-		sites: deps.Sites, specs: deps.Specs, policies: deps.Policies, types: deps.Types,
+		sites: deps.Sites, specs: deps.Specs, types: deps.Types,
 	}
 }
 

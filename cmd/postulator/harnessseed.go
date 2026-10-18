@@ -360,12 +360,12 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
 	script.onSite(siteID)
 
-	guide, policy, err := seedTemplates(ctx, core, siteID)
+	guide, err := seedTemplates(ctx, core, siteID)
 	if err != nil {
 		return err
 	}
 	if _, err = core.Sites.Update(ctx, sites.UpdateRequest{
-		ID: siteID, Defaults: &sites.Defaults{TemplateID: &guide, LinkPolicyID: &policy},
+		ID: siteID, Defaults: &sites.Defaults{TemplateID: &guide},
 	}); err != nil {
 		return err
 	}
@@ -648,42 +648,31 @@ func seedPages(ctx context.Context, core *app.Core, siteID string, entities map[
 	return byPath, nil
 }
 
-func seedTemplates(ctx context.Context, core *app.Core, siteID string) (guide, policy string, err error) {
+func seedTemplates(ctx context.Context, core *app.Core, siteID string) (string, error) {
 	listed, err := core.Templates.ListTemplates(ctx, templates.ListTemplatesRequest{
 		Scope: "global", ListRequest: dto.ListRequest{Limit: 20},
 	})
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
+	guide := ""
 	for index := range listed.Items {
 		if listed.Items[index].PageKind == "guide" {
 			guide = listed.Items[index].ID
 		}
 	}
 	if guide == "" {
-		return "", "", errors.New(errors.NotFound, "the shipped guide template is missing")
+		return "", errors.New(errors.NotFound, "the shipped guide template is missing")
 	}
 
 	if _, err = core.Templates.SetOverride(ctx, templates.SetOverrideRequest{
 		TemplateID: guide, Scope: "site", TargetID: siteID,
 		Patch: json.RawMessage(`{"tone":"Plain and practical; write as a barista talking across the bench, never as a brochure","length":{"min":1200,"max":1800}}`),
 	}); err != nil {
-		return "", "", err
+		return "", err
 	}
-
-	created, err := core.Templates.CreatePolicy(ctx, templates.CreatePolicyRequest{
-		Scope: "site", SiteID: &siteID, Name: "Crema Bench linking",
-		Rules: template.LinkRules{
-			UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.6, MaxLinks: 10, MaxPerTarget: 1,
-			ParentLinkWithinParagraphs: 2, ChildrenSection: true,
-		},
-		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "rotate",
-	})
-	if err != nil {
-		return "", "", err
-	}
-	return guide, created.Policy.ID, nil
+	return guide, nil
 }
 
 func seedSchedule(ctx context.Context, core *app.Core, siteID, guide string) error {

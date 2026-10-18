@@ -62,11 +62,6 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 		if len(seeded.Items) != 5 {
 			t.Errorf("round %d: seeded templates = %d, want 5", round, len(seeded.Items))
 		}
-		policies, err := core.Templates.ListPolicies(t.Context(), templates.ListPoliciesRequest{Scope: "global"})
-		if err != nil || len(policies.Items) != 1 {
-			t.Errorf("round %d: seeded policies = %d, %v; want 1", round, len(policies.Items), err)
-		}
-
 		if err = core.Close(); err != nil {
 			t.Fatalf("Close: %v", err)
 		}

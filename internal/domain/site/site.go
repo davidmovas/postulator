@@ -64,7 +64,6 @@ type Extensions struct {
 
 type Defaults struct {
 	TemplateID    *string
-	LinkPolicyID  *string
 	ModelProfiles map[llm.Role]llm.ModelRef
 }
 

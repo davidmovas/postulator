@@ -87,28 +87,6 @@ func (a keywordRulesArgs) rules() template.KeywordRules {
 	}
 }
 
-type linkRulesArgs struct {
-	UpDepth                    int     `json:"upDepth,omitempty" minimum:"0" description:"Levels up to link; 1 is the parent"`
-	DownLinks                  bool    `json:"downLinks,omitempty" description:"Link to children"`
-	SiblingMinWeight           float64 `json:"siblingMinWeight,omitempty" minimum:"0" maximum:"1" description:"Related weight a sibling link needs; omit for all"`
-	MaxLinks                   int     `json:"maxLinks,omitempty" minimum:"0" description:"Max internal links"`
-	MaxPerTarget               int     `json:"maxPerTarget,omitempty" minimum:"0" description:"Max links per target"`
-	ParentLinkWithinParagraphs int     `json:"parentLinkWithinParagraphs,omitempty" minimum:"0" description:"Parent link within N first paragraphs"`
-	ChildrenSection            bool    `json:"childrenSection,omitempty" description:"End with a list of children"`
-}
-
-func (a linkRulesArgs) rules() template.LinkRules {
-	return template.LinkRules{
-		UpDepth:                    a.UpDepth,
-		DownLinks:                  a.DownLinks,
-		SiblingMinWeight:           a.SiblingMinWeight,
-		MaxLinks:                   a.MaxLinks,
-		MaxPerTarget:               a.MaxPerTarget,
-		ParentLinkWithinParagraphs: a.ParentLinkWithinParagraphs,
-		ChildrenSection:            a.ChildrenSection,
-	}
-}
-
 type metaRulesArgs struct {
 	TitlePattern   string `json:"titlePattern,omitempty" description:"e.g. {primaryKeyword} | {siteName}; default the page title"`
 	DescriptionMax int    `json:"descriptionMax,omitempty" minimum:"0" description:"Max SEO description chars"`
@@ -164,7 +142,6 @@ type templateSpecArgs struct {
 	Tone          string             `json:"tone,omitempty" description:"Voice, one or two sentences"`
 	Length        *lengthArgs        `json:"length,omitempty" description:"Word count window"`
 	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"Keyword placement and density"`
-	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"Internal links owed and allowed"`
 	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"SEO title and description"`
 	Images        *imagesArgs        `json:"images,omitempty" description:"Images; default none"`
 	Product       *productArgs       `json:"product,omitempty" description:"Product outputs; omit for pages"`
@@ -184,9 +161,6 @@ func (a templateSpecArgs) spec() template.TemplateSpec {
 	}
 	if a.KeywordRules != nil {
 		built.KeywordRules = a.KeywordRules.rules()
-	}
-	if a.LinkRules != nil {
-		built.LinkRules = a.LinkRules.rules()
 	}
 	if a.MetaRules != nil {
 		built.MetaRules = a.MetaRules.rules()
@@ -245,7 +219,6 @@ type templatePatchArgs struct {
 	Tone          *string            `json:"tone,omitempty" description:"New tone"`
 	Length        *lengthArgs        `json:"length,omitempty" description:"New word count window"`
 	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"New keyword rules"`
-	LinkRules     *linkRulesArgs     `json:"linkRules,omitempty" description:"New link rules"`
 	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"New meta rules"`
 	Images        *imagesArgs        `json:"images,omitempty" description:"New image settings"`
 	Product       *productArgs       `json:"product,omitempty" description:"New product outputs"`
@@ -266,9 +239,6 @@ func (a templatePatchArgs) patch() (json.RawMessage, error) {
 	}
 	if a.KeywordRules != nil {
 		written["keywordRules"] = a.KeywordRules.rules()
-	}
-	if a.LinkRules != nil {
-		written["linkRules"] = a.LinkRules.rules()
 	}
 	if a.MetaRules != nil {
 		written["metaRules"] = a.MetaRules.rules()
