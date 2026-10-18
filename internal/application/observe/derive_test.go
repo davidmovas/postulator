@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/render"
 )
 
 func (s *scenario) allPages() []pagemap.Page {
@@ -93,6 +94,35 @@ func TestTheFrontPageIsTheRootAndNotTechnical(t *testing.T) {
 	peptides := s.pageAt(t, "/peptides/")
 	if peptides.ParentPageID == nil || *peptides.ParentPageID != home.ID || peptides.ParentReason != pagemap.ParentJSONLD || peptides.ParentMethod != pagemap.MethodHref {
 		t.Errorf("peptides' parent = %v %s by %q, want the front page its trail names by its link", peptides.ParentPageID, peptides.ParentReason, peptides.ParentMethod)
+	}
+}
+
+func TestArchivesAndStorePagesReadTruthfulRoots(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+
+	s.run(t, observe.Options{})
+
+	want := map[string]render.RootState{
+		"/shop/":                      render.RootArchive,
+		"/product-category/peptides/": render.RootArchive,
+		"/account/":                   render.RootDynamicOnly,
+		"/peptides/":                  render.RootEmptyRaw,
+		"/tb-500/":                    render.RootFound,
+		"/product/bpc-157-peptide/":   render.RootFound,
+	}
+	for path, root := range want {
+		if got := s.stores.renders[s.pageAt(t, path).ID].Root; got != root {
+			t.Errorf("%s reads %s, want %s", path, got, root)
+		}
+	}
+	summary, err := s.service.Summary(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("Summary: %v", err)
+	}
+	if summary.Roots[string(render.RootNotFound)] != 0 {
+		t.Errorf("roots = %v, want no page not found", summary.Roots)
 	}
 }
 

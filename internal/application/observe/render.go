@@ -128,7 +128,7 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 		return exhausted, nil
 	}
 
-	outcomes := s.fetch(ctx, readers, owner, settings, m, targets)
+	outcomes := s.fetch(ctx, readers, owner, settings, state.Technical, m, targets)
 	if err := s.keepRenders(ctx, state, m, outcomes); err != nil {
 		return false, err
 	}
@@ -162,17 +162,41 @@ func (s *Service) renderURL(ctx context.Context, readers Readers, page pagemap.P
 	return link, link != ""
 }
 
-func (s *Service) fetch(ctx context.Context, readers Readers, owner site.Site, settings site.Settings, m siteModel, targets []renderTarget) []renderOutcome {
-	install := pagemap.NewSite(owner.BaseURL)
-	builders := make([]render.Builder, 0, len(settings.Builders))
+type extraction struct {
+	install   pagemap.Site
+	builders  []render.Builder
+	dynamic   []string
+	technical site.TechnicalPages
+	lookup    func(string) (pagemap.WPType, bool)
+}
+
+func (e extraction) archive(page pagemap.Page) bool {
+	if page.WPType.Term() {
+		return true
+	}
+	if page.WPID == nil {
+		return false
+	}
+	id := *page.WPID
+	return (e.technical.Shop != 0 && id == e.technical.Shop) || (e.technical.Posts != 0 && id == e.technical.Posts)
+}
+
+func (s *Service) fetch(ctx context.Context, readers Readers, owner site.Site, settings site.Settings, technical site.TechnicalPages,
+	m siteModel, targets []renderTarget) []renderOutcome {
+	using := extraction{
+		install:   pagemap.NewSite(owner.BaseURL),
+		builders:  make([]render.Builder, 0, len(settings.Builders)),
+		dynamic:   append(slices.Clone(settings.TechnicalBlocks), settings.TechnicalShortcodes...),
+		technical: technical,
+		lookup: func(path string) (pagemap.WPType, bool) {
+			page, found := m.index.ByPath(path)
+			return page.WPType, found
+		},
+	}
 	for _, rule := range settings.Builders {
-		builders = append(builders, render.Builder{
+		using.builders = append(using.builders, render.Builder{
 			Name: rule.Name, DataAttributes: rule.DataAttributes, ClassPrefixes: rule.ClassPrefixes, ShortcodePrefixes: rule.ShortcodePrefixes,
 		})
-	}
-	lookup := func(path string) (pagemap.WPType, bool) {
-		page, found := m.index.ByPath(path)
-		return page.WPType, found
 	}
 
 	outcomes := make([]renderOutcome, len(targets))
@@ -184,15 +208,14 @@ func (s *Service) fetch(ctx context.Context, readers Readers, owner site.Site, s
 			defer wait.Done()
 			slots <- struct{}{}
 			defer func() { <-slots }()
-			outcomes[i] = s.fetchOne(ctx, readers, install, builders, lookup, targets[i])
+			outcomes[i] = s.fetchOne(ctx, readers, using, targets[i])
 		}(i)
 	}
 	wait.Wait()
 	return outcomes
 }
 
-func (s *Service) fetchOne(ctx context.Context, readers Readers, install pagemap.Site, builders []render.Builder,
-	lookup func(string) (pagemap.WPType, bool), target renderTarget) renderOutcome {
+func (s *Service) fetchOne(ctx context.Context, readers Readers, using extraction, target renderTarget) renderOutcome {
 	outcome := renderOutcome{target: target}
 	visit, err := readers.Render.Visit(ctx, target.url)
 	if err != nil {
@@ -214,11 +237,11 @@ func (s *Service) fetchOne(ctx context.Context, readers Readers, install pagemap
 		}
 		filtered = rendered.Content
 	}
-	extraction, err := render.Extract(render.Input{
-		Public: visit.Body, Filtered: filtered, Body: block.Parse(target.raw), Site: install, Document: target.page.Path,
-		Builders: builders, Lookup: lookup,
+	extracted, err := render.Extract(render.Input{
+		Public: visit.Body, Filtered: filtered, Body: block.Parse(target.raw), Site: using.install, Document: target.page.Path,
+		Builders: using.builders, Lookup: using.lookup, Archive: using.archive(target.page), Dynamic: using.dynamic,
 	})
-	outcome.extraction, outcome.err = extraction, err
+	outcome.extraction, outcome.err = extracted, err
 	return outcome
 }
 
