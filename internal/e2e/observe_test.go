@@ -300,15 +300,15 @@ func logModels(t *testing.T, models map[string]observe.PageModel, byID map[strin
 			parent = byID[*model.Page.ParentPageID]
 		}
 		findings := make([]string, 0, len(model.Findings))
-		for _, f := range model.Findings {
-			if f.Status == finding.Open {
+		for i := range model.Findings {
+			if f := &model.Findings[i]; f.Status == finding.Open {
 				findings = append(findings, fmt.Sprintf("%s %s", f.Code, f.Subject))
 			}
 		}
 		unknown := map[string]int{}
-		for _, link := range model.Links {
-			if link.Type == pagemap.LinkUnknown {
-				unknown[link.Region]++
+		for i := range model.Links {
+			if model.Links[i].Type == pagemap.LinkUnknown {
+				unknown[model.Links[i].Region]++
 			}
 		}
 		t.Logf("%s | %s %s | root %s | parent %s by %s | technical %q | trails %v | unknown links %v | findings %v",
