@@ -46,6 +46,15 @@ func vocabularies(t *testing.T) map[string]string {
 			t.Fatalf("read %s.%s: %v", entry.pkg, entry.typeName, err)
 		}
 		known[settled(values)] = entry.export
+		for _, derived := range entry.derived {
+			kept := make([]string, 0, len(values))
+			for _, value := range values {
+				if derived.keep(value) {
+					kept = append(kept, value)
+				}
+			}
+			known[settled(kept)] = derived.export
+		}
 	}
 	return known
 }

@@ -7,6 +7,9 @@ export type SiteReach = (typeof siteReaches)[number];
 export const siteCommerces = ["", "absent", "forbidden", "ready"] as const;
 export type SiteCommerce = (typeof siteCommerces)[number];
 
+export const urlForms = ["auto", "absolute", "relative"] as const;
+export type UrlForm = (typeof urlForms)[number];
+
 export const pageStatuses = ["planned", "exists", "published", "archived"] as const;
 export type PageStatus = (typeof pageStatuses)[number];
 
@@ -78,6 +81,15 @@ export const runKinds = [
 export type RunKind = (typeof runKinds)[number];
 
 export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "revert"];
+
+export const startableRunKinds: readonly RunKind[] = [
+    "generate",
+    "relink",
+    "audit",
+    "sync",
+    "import",
+    "custom",
+];
 
 export const runStatuses = [
     "pending",

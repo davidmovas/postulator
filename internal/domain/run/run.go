@@ -30,6 +30,15 @@ func (k Kind) Valid() bool {
 	}
 }
 
+func (k Kind) Startable() bool {
+	switch k {
+	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindCustom:
+		return true
+	default:
+		return false
+	}
+}
+
 func (k Kind) PageScoped() bool {
 	switch k {
 	case KindGenerate, KindRelink, KindAudit, KindRepair, KindCustom:

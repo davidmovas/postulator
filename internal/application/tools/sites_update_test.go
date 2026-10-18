@@ -67,7 +67,7 @@ func TestSitesUpdateCarriesTheSettings(t *testing.T) {
 		got := updateSite(t, call, step.args)
 		settings := got.Settings
 		if settings.UserAgent != step.agent || settings.Observe.RenderConcurrency != step.concurrency ||
-			settings.Observe.FullWalkEvery != step.cadence || settings.LinkURLForm != step.form {
+			settings.Observe.FullWalkEvery != step.cadence || string(settings.LinkURLForm) != step.form {
 			t.Fatalf("%s: settings = %+v", step.name, settings)
 		}
 		if len(settings.Builders) == 0 || len(settings.TechnicalShortcodes) == 0 {

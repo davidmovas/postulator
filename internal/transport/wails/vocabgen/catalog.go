@@ -27,6 +27,7 @@ func catalog() []vocabulary {
 		{export: "siteStatuses", tsType: "SiteStatus", pkg: "internal/domain/site", typeName: "Status"},
 		{export: "siteReaches", tsType: "SiteReach", pkg: "internal/domain/site", typeName: "Reach"},
 		{export: "siteCommerces", tsType: "SiteCommerce", pkg: "internal/domain/site", typeName: "Commerce"},
+		{export: "urlForms", tsType: "UrlForm", pkg: "internal/domain/site", typeName: "URLForm"},
 		{export: "pageStatuses", tsType: "PageStatus", pkg: "internal/domain/pagemap", typeName: "Status"},
 		{export: "pageWpTypes", tsType: "PageWpType", pkg: "internal/domain/pagemap", typeName: "WPType"},
 		{export: "linkOrigins", tsType: "LinkOrigin", pkg: "internal/domain/pagemap", typeName: "LinkOrigin"},
@@ -66,6 +67,7 @@ func catalog() []vocabulary {
 						return owns
 					},
 				},
+				{export: "startableRunKinds", keep: func(value string) bool { return run.Kind(value).Startable() }},
 			},
 		},
 		{

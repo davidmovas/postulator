@@ -2,18 +2,22 @@ package site
 
 import "time"
 
-const (
-	URLFormAuto     = "auto"
-	URLFormAbsolute = "absolute"
-	URLFormRelative = "relative"
+type URLForm string
 
+const (
+	URLFormAuto     URLForm = "auto"
+	URLFormAbsolute URLForm = "absolute"
+	URLFormRelative URLForm = "relative"
+)
+
+const (
 	defaultRenderConcurrency = 4
 	maxRenderConcurrency     = 16
 	defaultFullWalkEvery     = 10
 )
 
 type Settings struct {
-	LinkURLForm         string           `json:"linkUrlForm"`
+	LinkURLForm         URLForm          `json:"linkUrlForm"`
 	UserAgent           string           `json:"userAgent"`
 	Observe             ObserveSettings  `json:"observe"`
 	Builders            []BuilderRule    `json:"builders"`

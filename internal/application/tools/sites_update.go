@@ -54,7 +54,7 @@ func (in *sitesUpdateArgs) settingsOver(current site.Settings) *site.Settings {
 		current.Observe.FullWalkEvery = *in.FullWalkEvery
 	}
 	if in.LinkURLForm != nil {
-		current.LinkURLForm = *in.LinkURLForm
+		current.LinkURLForm = site.URLForm(*in.LinkURLForm)
 	}
 	return &current
 }

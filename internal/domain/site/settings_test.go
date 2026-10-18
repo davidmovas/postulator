@@ -61,7 +61,7 @@ func TestSettingsRefuseAnUnknownURLFormOrConcurrency(t *testing.T) {
 	if err := (site.Settings{Observe: site.ObserveSettings{FullWalkEvery: -1}}).Normalized().Validate(); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a negative cadence is accepted: %v", err)
 	}
-	for _, form := range []string{site.URLFormAuto, site.URLFormAbsolute, site.URLFormRelative} {
+	for _, form := range []site.URLForm{site.URLFormAuto, site.URLFormAbsolute, site.URLFormRelative} {
 		if err := (site.Settings{LinkURLForm: form}).Normalized().Validate(); err != nil {
 			t.Errorf("%s is refused: %v", form, err)
 		}

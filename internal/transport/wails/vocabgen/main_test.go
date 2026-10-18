@@ -120,6 +120,7 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 		},
 		"offGraphLinkClasses":        {"self", "external", "unknown_internal"},
 		"runKindsWithTheirOwnRecipe": {"relink", "sync", "revert"},
+		"startableRunKinds":          {"generate", "relink", "audit", "sync", "import", "custom"},
 	}
 
 	seen := make(map[string][]string)

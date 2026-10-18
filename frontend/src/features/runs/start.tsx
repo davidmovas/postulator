@@ -7,13 +7,13 @@ import { react } from "../../data/errors.js";
 import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
 import { useTemplates } from "../../data/hooks/templates.js";
 import type { AddedPage, Estimate } from "../../data/types.js";
-import { publishModes, runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
+import { publishModes, runKindsWithTheirOwnRecipe, startableRunKinds } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../../ui/index.js";
 import { publishModeLabel, runKindLabel } from "./labels.js";
 import { StartCaps, StartPrice } from "./start-price.js";
 import { TargetTree } from "./start-tree.js";
-import { kindGenerate, kindRepair, kindRevert } from "./statuses.js";
+import { kindGenerate } from "./statuses.js";
 
 const drawerWidth = 688;
 const templateAuto = "";
@@ -60,7 +60,7 @@ export function blockingFindings(estimate: GradedFindings | null): number {
     return (estimate.findings ?? []).filter((finding) => finding.severity === "error").length;
 }
 
-export const startableKinds: readonly string[] = runKinds.filter((kind) => kind !== kindRevert && kind !== kindRepair);
+export const startableKinds: readonly string[] = startableRunKinds;
 
 export interface StartRefusal {
     targets: string | null;
