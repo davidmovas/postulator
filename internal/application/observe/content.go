@@ -3,6 +3,7 @@ package observe
 import (
 	"context"
 	"maps"
+	"reflect"
 	"slices"
 	"time"
 
@@ -136,12 +137,14 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 }
 
 func (a *absorber) keep(ctx context.Context, p prepared) error {
-	if p.known {
+	switch {
+	case p.known && sameButStamps(p.current, p.next):
+	case p.known:
 		if err := a.service.deps.Pages.Update(ctx, p.next); err != nil {
 			return err
 		}
 		a.state.Counts.Updated++
-	} else {
+	default:
 		if err := a.service.deps.Pages.Insert(ctx, p.next); err != nil {
 			return err
 		}
@@ -161,6 +164,11 @@ func (a *absorber) keep(ctx context.Context, p prepared) error {
 		return err
 	}
 	return a.plan(ctx, p.current, p.known, p.next, p.it)
+}
+
+func sameButStamps(current, next pagemap.Page) bool {
+	current.LastSyncedAt, current.UpdatedAt = next.LastSyncedAt, next.UpdatedAt
+	return reflect.DeepEqual(current, next)
 }
 
 func (a *absorber) identity(ctx context.Context, page pagemap.Page, it item) error {
@@ -216,9 +224,6 @@ func (a *absorber) fields(ctx context.Context, page pagemap.Page, it item) error
 }
 
 func (a *absorber) observeFields(ctx context.Context, page pagemap.Page, values []field.Value) error {
-	if err := a.service.deps.Fields.Observe(ctx, page.ID, values); err != nil {
-		return err
-	}
 	stored, err := a.service.deps.Fields.ListForPage(ctx, page.ID)
 	if err != nil {
 		return err
@@ -226,6 +231,23 @@ func (a *absorber) observeFields(ctx context.Context, page pagemap.Page, values 
 	byKey := make(map[field.Key]field.Value, len(stored))
 	for i := range stored {
 		byKey[stored[i].Key] = stored[i]
+	}
+	moved := make([]field.Value, 0, len(values))
+	for i := range values {
+		if kept, exists := byKey[values[i].Key]; !exists || kept.CurrentHash != values[i].CurrentHash {
+			moved = append(moved, values[i])
+		}
+	}
+	if len(moved) > 0 {
+		if err := a.service.deps.Fields.Observe(ctx, page.ID, moved); err != nil {
+			return err
+		}
+		if stored, err = a.service.deps.Fields.ListForPage(ctx, page.ID); err != nil {
+			return err
+		}
+		for i := range stored {
+			byKey[stored[i].Key] = stored[i]
+		}
 	}
 	for i := range values {
 		value := byKey[values[i].Key]

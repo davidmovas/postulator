@@ -47,9 +47,11 @@ type TechnicalPages struct {
 }
 
 type ObservationState struct {
-	LastStartedAt  *time.Time `json:"lastStartedAt"`
-	LastFullWalkAt *time.Time `json:"lastFullWalkAt"`
-	SinceFullWalk  int        `json:"sinceFullWalk"`
+	LastStartedAt    *time.Time `json:"lastStartedAt"`
+	LastFinishedAt   *time.Time `json:"lastFinishedAt"`
+	LastFullWalkAt   *time.Time `json:"lastFullWalkAt"`
+	LastModifiedSeen *time.Time `json:"lastModifiedSeen"`
+	SinceFullWalk    int        `json:"sinceFullWalk"`
 }
 
 func DefaultSettings() Settings {

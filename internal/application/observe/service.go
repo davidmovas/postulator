@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -34,18 +35,23 @@ func (s *Service) Begin(ctx context.Context, siteID string, readers Readers, opt
 		source = SourcePlugin
 	}
 	observation := settings.Observation
-	full := opts.Full || source == SourceCore || observation.LastStartedAt == nil ||
-		observation.SinceFullWalk+1 >= settings.Observe.FullWalkEvery
+	anchored := observation.LastStartedAt != nil && observation.LastFinishedAt != nil && observation.LastModifiedSeen != nil
+	full := opts.Full || source == SourceCore || !anchored || observation.SinceFullWalk+1 >= settings.Observe.FullWalkEvery
 
 	state := State{
 		SiteID: siteID, StartedAt: s.now(), Source: source, Stage: StageInventory, Full: full, Rescan: opts.RenderRescan,
 		Types: []string{}, Findings: []content.Finding{},
 	}
 	if !full {
-		since := observation.LastStartedAt.Add(-time.Second)
+		since := sinceOf(observation)
 		state.Since = &since
 	}
 	return state, nil
+}
+
+func sinceOf(observation site.ObservationState) time.Time {
+	walk := max(observation.LastFinishedAt.Sub(*observation.LastStartedAt), 0)
+	return observation.LastModifiedSeen.Add(-walk).Add(-time.Second)
 }
 
 func (s *Service) Step(ctx context.Context, state State, readers Readers, batch int) (State, error) {

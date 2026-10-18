@@ -320,11 +320,11 @@ func TestASecondObservationIsIncrementalAndChangesNothing(t *testing.T) {
 
 	s.clock.Set(start.Add(time.Hour))
 	state := s.run(t, observe.Options{})
-	if state.Full || state.Since == nil || !state.Since.Equal(start.Add(-time.Second)) {
-		t.Errorf("the second observation is incremental since a second before the first, got full=%t since=%v", state.Full, state.Since)
+	if state.Full || state.Since == nil || !state.Since.Equal(earlier.Add(-time.Second)) {
+		t.Errorf("the second observation is incremental since a second before the newest stamp the first walk saw, got full=%t since=%v", state.Full, state.Since)
 	}
 	last := s.plugin.queries[len(s.plugin.queries)-1]
-	if last.Since == nil || !last.Since.Equal(start.Add(-time.Second)) {
+	if last.Since == nil || !last.Since.Equal(earlier.Add(-time.Second)) {
 		t.Errorf("the plugin was asked since %v", last.Since)
 	}
 	if len(s.store.queries) == 0 || s.store.queries[len(s.store.queries)-1].ModifiedAfter == nil {
@@ -408,6 +408,41 @@ func difference(before, after modelSnapshot) string {
 	}
 	return report("counts", []int{len(before.pages), len(before.fields), len(before.bodies), len(before.links), len(before.findings)},
 		[]int{len(after.pages), len(after.fields), len(after.bodies), len(after.links), len(after.findings)})
+}
+
+func TestSinceFollowsTheSitesClockNotOurs(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	skew := 5 * time.Second
+	for i := range s.plugin.items {
+		s.plugin.items[i].Modified = start.Add(-time.Minute - skew)
+	}
+
+	s.clock.Set(start.Add(10 * time.Second))
+	s.run(t, observe.Options{})
+	owner := s.stores.sites[siteID]
+	observation := owner.Settings.Observation
+	if observation.LastFinishedAt == nil || observation.LastModifiedSeen == nil || !observation.LastModifiedSeen.Equal(start.Add(-time.Minute-skew)) {
+		t.Fatalf("the walk recorded %+v, want when it finished and the newest stamp it saw", observation)
+	}
+
+	editedOnTheSiteAt := start.Add(12*time.Second - skew)
+	for i := range s.plugin.items {
+		if s.plugin.items[i].ID == tb500ID {
+			s.plugin.items[i].Title = "TB-500, edited"
+			s.plugin.items[i].Modified = editedOnTheSiteAt
+		}
+	}
+	s.clock.Set(start.Add(time.Hour))
+	state := s.run(t, observe.Options{})
+	if state.Full || state.Since == nil || !state.Since.Before(editedOnTheSiteAt) {
+		t.Fatalf("the second walk asked since %v for a site whose clock runs %s behind; the edit at %v would be missed", state.Since, skew, editedOnTheSiteAt)
+	}
+	tb := s.pageAt(t, "/tb-500/")
+	if title := s.fieldOf(t, tb.ID, field.Title); title.Current != "TB-500, edited" {
+		t.Errorf("the edit made on the site's clock was not observed: title = %q", title.Current)
+	}
 }
 
 func TestTheObservationReadsTheSiteOutsideItsWriteUnit(t *testing.T) {

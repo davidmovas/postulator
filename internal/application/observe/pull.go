@@ -62,6 +62,7 @@ func pullBulk(ctx context.Context, state *State, readers Readers, install pagema
 		if normalizeErr != nil {
 			continue
 		}
+		state.sawModified(pulled.Modified)
 		out = append(out, item{
 			WPID: pulled.ID, ParentWPID: pulled.Parent, Type: pagemap.WPType(pulled.Type), Path: path, URL: install.URL(path),
 			Slug: pulled.Slug, Status: pulled.Status, Title: pulled.Title, H1: pulled.H1, Excerpt: pulled.Excerpt,
@@ -86,6 +87,7 @@ func pullCore(ctx context.Context, state *State, readers Readers, install pagema
 		}
 		out := make([]item, 0, len(listed.Items))
 		for i := range listed.Items {
+			state.sawModified(listed.Items[i].Modified)
 			if converted, ok := fromCore(listed.Items[i], state.Types[index], install); ok {
 				out = append(out, converted)
 			}

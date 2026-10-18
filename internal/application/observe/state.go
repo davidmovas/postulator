@@ -39,24 +39,31 @@ type Counts struct {
 }
 
 type State struct {
-	StartedAt   time.Time           `json:"startedAt"`
-	Since       *time.Time          `json:"since,omitempty"`
-	SiteID      string              `json:"siteId"`
-	Source      string              `json:"source"`
-	Stage       Stage               `json:"stage"`
-	Types       []string            `json:"types"`
-	Cursor      string              `json:"cursor"`
-	CoreType    string              `json:"coreType"`
-	CorePage    int                 `json:"corePage"`
-	StorePage   int                 `json:"storePage"`
-	RenderAfter string              `json:"renderAfter"`
-	Technical   site.TechnicalPages `json:"technical"`
-	Findings    []content.Finding   `json:"findings,omitempty"`
-	Counts      Counts              `json:"counts"`
-	Full        bool                `json:"full"`
-	Rescan      bool                `json:"rescan"`
+	StartedAt    time.Time           `json:"startedAt"`
+	ModifiedSeen time.Time           `json:"modifiedSeen"`
+	Since        *time.Time          `json:"since,omitempty"`
+	SiteID       string              `json:"siteId"`
+	Source       string              `json:"source"`
+	Stage        Stage               `json:"stage"`
+	Types        []string            `json:"types"`
+	Cursor       string              `json:"cursor"`
+	CoreType     string              `json:"coreType"`
+	CorePage     int                 `json:"corePage"`
+	StorePage    int                 `json:"storePage"`
+	RenderAfter  string              `json:"renderAfter"`
+	Technical    site.TechnicalPages `json:"technical"`
+	Findings     []content.Finding   `json:"findings,omitempty"`
+	Counts       Counts              `json:"counts"`
+	Full         bool                `json:"full"`
+	Rescan       bool                `json:"rescan"`
 }
 
 func (s State) Done() bool {
 	return s.Stage == StageDone
+}
+
+func (s *State) sawModified(at time.Time) {
+	if at.After(s.ModifiedSeen) {
+		s.ModifiedSeen = at.UTC()
+	}
 }

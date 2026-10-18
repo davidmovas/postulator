@@ -27,6 +27,7 @@ func (s *Service) store(ctx context.Context, state *State, readers Readers, batc
 	items := make([]item, 0, len(listed.Items))
 	products := make(map[int64]Product, len(listed.Items))
 	for i := range listed.Items {
+		state.sawModified(listed.Items[i].Modified)
 		if converted, ok := fromProduct(listed.Items[i], install); ok {
 			items = append(items, converted)
 			products[listed.Items[i].ID] = listed.Items[i]

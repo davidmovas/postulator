@@ -101,8 +101,12 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	}
 
 	observation := &owner.Settings.Observation
-	started := state.StartedAt
-	observation.LastStartedAt = &started
+	started, finished := state.StartedAt, now
+	observation.LastStartedAt, observation.LastFinishedAt = &started, &finished
+	if !state.ModifiedSeen.IsZero() && (observation.LastModifiedSeen == nil || state.ModifiedSeen.After(*observation.LastModifiedSeen)) {
+		seen := state.ModifiedSeen
+		observation.LastModifiedSeen = &seen
+	}
 	if state.Full {
 		observation.LastFullWalkAt = &started
 		observation.SinceFullWalk = 0
