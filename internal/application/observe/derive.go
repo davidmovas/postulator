@@ -199,7 +199,7 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 	if identity, observed := m.identities[page.ID]; observed {
 		wpParent = identity.WPParentID
 	}
-	derived := pagemap.DeriveParent(*page, trails, wpParent, m.index)
+	derived := pagemap.DeriveParent(*page, pagemap.ParentSignals{Trails: trails, WPParentID: wpParent}, m.index)
 
 	if page.ParentReason == pagemap.ParentWorkbook && page.ParentPageID != nil && !sameRef(page.ParentPageID, derived.ParentID) {
 		workbook := *page.ParentPageID

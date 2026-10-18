@@ -75,6 +75,16 @@ func (i Index) PathParentID(page Page) *string {
 	return &parent.ID
 }
 
+func (i Index) ByName(name string) []Page {
+	out := make([]Page, 0)
+	for _, page := range i.pages {
+		if page.WPID != nil && page.Status != StatusArchived && carriesName(page, name) {
+			out = append(out, page)
+		}
+	}
+	return out
+}
+
 func (i Index) ByEntity(entityID string) []Page {
 	return slices.Clone(i.byEntity[entityID])
 }

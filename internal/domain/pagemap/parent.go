@@ -1,6 +1,12 @@
 package pagemap
 
-import "slices"
+import (
+	"html"
+	"net/http"
+	"strings"
+
+	"github.com/davidmovas/postulator/internal/domain/graph"
+)
 
 type TrailSource string
 
@@ -10,8 +16,26 @@ const (
 )
 
 type Crumb struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name   string `json:"name"`
+	Path   string `json:"path"`
+	Href   string `json:"href,omitempty"`
+	Final  string `json:"final,omitempty"`
+	Status int    `json:"status,omitempty"`
+}
+
+func (c Crumb) Key() string {
+	if c.Path != "" {
+		return c.Path
+	}
+	return c.Name
+}
+
+func (c Crumb) Linked() bool {
+	return c.Href != "" || c.Path != ""
+}
+
+func (c Crumb) Dead() bool {
+	return c.Status >= http.StatusBadRequest
 }
 
 type Trail struct {
@@ -19,16 +43,102 @@ type Trail struct {
 	Crumbs []Crumb     `json:"crumbs"`
 }
 
+type ParentMethod string
+
+const (
+	MethodHref     ParentMethod = "href"
+	MethodRedirect ParentMethod = "redirect"
+	MethodName     ParentMethod = "name"
+	MethodNone     ParentMethod = ""
+)
+
+func (m ParentMethod) Valid() bool {
+	switch m {
+	case MethodHref, MethodRedirect, MethodName, MethodNone:
+		return true
+	default:
+		return false
+	}
+}
+
+type ParentSignals struct {
+	Trails     []Trail
+	WPParentID *int64
+	Landings   map[string]string
+}
+
+type Ambiguity struct {
+	Crumb      Crumb
+	Candidates []string
+}
+
 type Derivation struct {
 	ParentID   *string
 	Reason     ParentReason
+	Method     ParentMethod
 	Trail      *Trail
 	Unresolved []Crumb
+	Ambiguous  []Ambiguity
 }
 
-func DeriveParent(page Page, trails []Trail, wpParentID *int64, index Index) Derivation {
-	d := Derivation{Reason: ParentNone, Unresolved: make([]Crumb, 0)}
+type rankedTrail struct {
+	trail  Trail
+	reason ParentReason
+}
 
+type outcome struct {
+	parent *Page
+	method ParentMethod
+	weak   bool
+}
+
+func DeriveParent(page Page, evidence ParentSignals, index Index) Derivation {
+	d := Derivation{Reason: ParentNone, Unresolved: make([]Crumb, 0), Ambiguous: make([]Ambiguity, 0)}
+	if page.Path == RootPath {
+		return d
+	}
+
+	var weak *rankedTrail
+	var weakParent *Page
+	for _, ranked := range rankTrails(evidence.Trails, index) {
+		decided := d.decide(page, ranked.trail, evidence, index)
+		switch {
+		case decided.parent == nil:
+		case !decided.weak:
+			d.settle(*decided.parent, ranked, decided.method)
+			return d
+		case weak == nil:
+			chosen := ranked
+			weak, weakParent = &chosen, decided.parent
+		}
+	}
+	if evidence.WPParentID != nil {
+		if parent, found := index.ByWordPressID(page.WPType, *evidence.WPParentID); found && parent.ID != page.ID {
+			d.ParentID = &parent.ID
+			d.Reason = ParentWP
+			return d
+		}
+	}
+	if weak != nil {
+		d.settle(*weakParent, *weak, MethodHref)
+		return d
+	}
+	if parent := index.PathParentID(page); parent != nil {
+		d.ParentID = parent
+		d.Reason = ParentURL
+	}
+	return d
+}
+
+func (d *Derivation) settle(parent Page, ranked rankedTrail, method ParentMethod) {
+	chosen := ranked.trail
+	d.ParentID = &parent.ID
+	d.Reason = ranked.reason
+	d.Method = method
+	d.Trail = &chosen
+}
+
+func rankTrails(trails []Trail, index Index) []rankedTrail {
 	lists := make([]Trail, 0, len(trails))
 	navs := make([]Trail, 0, len(trails))
 	for _, t := range trails {
@@ -38,38 +148,32 @@ func DeriveParent(page Page, trails []Trail, wpParentID *int64, index Index) Der
 			navs = append(navs, t)
 		}
 	}
-
-	if chosen, ok := bestTrail(lists, navs, index); ok {
-		if d.decide(page, chosen, ParentJSONLD, index) {
-			return d
+	ranked := make([]rankedTrail, 0, len(trails))
+	if best, ok := bestTrail(lists, navs, index); ok {
+		ranked = append(ranked, rankedTrail{trail: lists[best], reason: ParentJSONLD})
+		for i := range lists {
+			if i != best {
+				ranked = append(ranked, rankedTrail{trail: lists[i], reason: ParentJSONLD})
+			}
 		}
 	}
 	for i := range navs {
-		if d.decide(page, navs[i], ParentARIA, index) {
-			return d
-		}
+		ranked = append(ranked, rankedTrail{trail: navs[i], reason: ParentARIA})
 	}
-	if wpParentID != nil {
-		if parent, found := index.ByWordPressID(page.WPType, *wpParentID); found && parent.ID != page.ID {
-			d.ParentID = &parent.ID
-			d.Reason = ParentWP
-			return d
-		}
-	}
-	if parent := index.PathParentID(page); parent != nil {
-		d.ParentID = parent
-		d.Reason = ParentURL
-	}
-	return d
+	return ranked
 }
 
-func (d *Derivation) decide(page Page, t Trail, reason ParentReason, index Index) bool {
+func (d *Derivation) decide(page Page, t Trail, evidence ParentSignals, index Index) outcome {
+	front, hasFront := index.ByPath(RootPath)
 	remaining := make([]Crumb, 0, len(t.Crumbs))
 	for _, crumb := range t.Crumbs {
 		if crumb.Path == page.Path {
 			break
 		}
 		if crumb.Path == RootPath {
+			if hasFront {
+				remaining = append(remaining, crumb)
+			}
 			continue
 		}
 		if resolved, found := index.ByPath(crumb.Path); crumb.Path != "" && found && resolved.TechnicalReason != TechnicalNone {
@@ -78,27 +182,114 @@ func (d *Derivation) decide(page Page, t Trail, reason ParentReason, index Index
 		remaining = append(remaining, crumb)
 	}
 	if len(remaining) == 0 {
-		return false
+		return outcome{}
 	}
+
 	nearest := remaining[len(remaining)-1]
-	if nearest.Path != "" {
-		if parent, found := index.ByPath(nearest.Path); found && parent.ID != page.ID {
-			chosen := t
-			d.ParentID = &parent.ID
-			d.Reason = reason
-			d.Trail = &chosen
-			return true
+	if nearest.Path == RootPath {
+		return outcome{parent: &front, method: MethodHref, weak: true}
+	}
+	if parent, method, ok := d.resolve(page, nearest, evidence, index); ok {
+		return outcome{parent: &parent, method: method}
+	}
+	return outcome{}
+}
+
+func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, index Index) (Page, ParentMethod, bool) {
+	if crumb.Path != "" {
+		if target, found := index.ByPath(crumb.Path); found && target.ID != page.ID {
+			if landed, moved := evidence.Landings[target.Path]; moved {
+				if final, ok := landing(page, crumb, landed, index); ok {
+					return final, MethodRedirect, true
+				}
+			}
+			return target, MethodHref, true
+		}
+		if crumb.Final != "" && crumb.Final != crumb.Path {
+			if final, ok := landing(page, crumb, crumb.Final, index); ok {
+				return final, MethodRedirect, true
+			}
 		}
 	}
-	if !slices.Contains(d.Unresolved, nearest) {
-		d.Unresolved = append(d.Unresolved, nearest)
+	if crumb.Linked() && !(crumb.Path != "" && crumb.Dead()) {
+		d.unresolved(crumb)
+		return Page{}, MethodNone, false
+	}
+
+	candidates := make([]Page, 0)
+	for _, named := range index.ByName(crumb.Name) {
+		if named.ID != page.ID && !descends(named.Path, page.Path) {
+			candidates = append(candidates, named)
+		}
+	}
+	switch len(candidates) {
+	case 1:
+		return candidates[0], MethodName, true
+	case 0:
+		d.unresolved(crumb)
+	default:
+		d.ambiguous(crumb, candidates)
+	}
+	return Page{}, MethodNone, false
+}
+
+func landing(page Page, crumb Crumb, landed string, index Index) (Page, bool) {
+	if landed == RootPath || landed == page.Path || descends(landed, page.Path) {
+		return Page{}, false
+	}
+	target, found := index.ByPath(landed)
+	if !found || target.ID == page.ID || !carriesName(target, crumb.Name) {
+		return Page{}, false
+	}
+	return target, true
+}
+
+func descends(path, ancestor string) bool {
+	return ancestor != RootPath && path != ancestor && strings.HasPrefix(path, ancestor)
+}
+
+func nameKey(name string) string {
+	return graph.Key(html.UnescapeString(name))
+}
+
+func carriesName(page Page, name string) bool {
+	key := nameKey(name)
+	if key == "" {
+		return false
+	}
+	for _, held := range []string{page.Observed.Title, page.Observed.H1, page.Title, page.H1} {
+		if held != "" && nameKey(held) == key {
+			return true
+		}
 	}
 	return false
 }
 
-func bestTrail(lists, navs []Trail, index Index) (Trail, bool) {
+func (d *Derivation) unresolved(crumb Crumb) {
+	for _, held := range d.Unresolved {
+		if held.Key() == crumb.Key() {
+			return
+		}
+	}
+	d.Unresolved = append(d.Unresolved, crumb)
+}
+
+func (d *Derivation) ambiguous(crumb Crumb, candidates []Page) {
+	for _, held := range d.Ambiguous {
+		if held.Crumb.Key() == crumb.Key() {
+			return
+		}
+	}
+	ids := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		ids = append(ids, candidate.ID)
+	}
+	d.Ambiguous = append(d.Ambiguous, Ambiguity{Crumb: crumb, Candidates: ids})
+}
+
+func bestTrail(lists, navs []Trail, index Index) (int, bool) {
 	if len(lists) == 0 {
-		return Trail{}, false
+		return 0, false
 	}
 	best := 0
 	bestScore := -1
@@ -113,7 +304,7 @@ func bestTrail(lists, navs []Trail, index Index) (Trail, bool) {
 		}
 	}
 	if !tied {
-		return lists[best], true
+		return best, true
 	}
 	for i := range lists {
 		if resolving(lists[i], index) != bestScore {
@@ -121,11 +312,11 @@ func bestTrail(lists, navs []Trail, index Index) (Trail, bool) {
 		}
 		for j := range navs {
 			if samePaths(lists[i], navs[j]) {
-				return lists[i], true
+				return i, true
 			}
 		}
 	}
-	return lists[best], true
+	return best, true
 }
 
 func resolving(t Trail, index Index) int {

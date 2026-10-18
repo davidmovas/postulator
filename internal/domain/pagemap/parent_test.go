@@ -1,6 +1,7 @@
 package pagemap_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -13,26 +14,37 @@ func sitePage(id, path string, wpType pagemap.WPType, wpID int64) pagemap.Page {
 	return page
 }
 
+func titled(page pagemap.Page, title string) pagemap.Page {
+	page.Observed.Title = title
+	return page
+}
+
 func derivationPages() []pagemap.Page {
-	home := sitePage("home", "/", pagemap.WPPage, 1)
-	home.TechnicalReason = pagemap.TechnicalFront
 	shop := sitePage("shop", "/shop/", pagemap.WPPage, 5)
 	shop.TechnicalReason = pagemap.TechnicalShop
 	planned := pagemap.Page{ID: "planned", SiteID: "site", Path: "/planned-child/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned}
 	peptides := "peptides"
 	planned.ParentPageID = &peptides
 	planned.ParentReason = pagemap.ParentWorkbook
+	gone := titled(sitePage("gone", "/gone-guides/", pagemap.WPPage, 30), "Lab Guides")
+	gone.Status = pagemap.StatusArchived
 	return []pagemap.Page{
-		home,
+		titled(sitePage("home", "/", pagemap.WPPage, 1), "Home"),
 		shop,
-		sitePage("peptides", "/peptides/", pagemap.WPPage, 2),
-		sitePage("bpc", "/bpc-157/", pagemap.WPPage, 3),
-		sitePage("guide", "/guide/", pagemap.WPPage, 20),
-		sitePage("setup", "/guide/setup/", pagemap.WPPage, 21),
+		titled(sitePage("peptides", "/peptides/", pagemap.WPPage, 2), "Peptides"),
+		titled(sitePage("bpc", "/bpc-157/", pagemap.WPPage, 3), "BPC-157"),
+		titled(sitePage("tb", "/tb-500/", pagemap.WPPage, 4), "TB-500"),
+		titled(sitePage("hub", "/healing-peptides/", pagemap.WPPage, 6), "Healing Peptides"),
+		titled(sitePage("guides", "/lab-guides/", pagemap.WPPage, 7), "Lab Guides"),
+		titled(sitePage("reconstitution", "/reconstitution/", pagemap.WPPage, 8), "Reconstitution"),
+		gone,
+		titled(sitePage("guide", "/guide/", pagemap.WPPage, 20), "Guide"),
+		titled(sitePage("setup", "/guide/setup/", pagemap.WPPage, 21), "Setup"),
 		sitePage("collide", "/collide/", pagemap.WPPage, 100000),
-		sitePage("pepcat", "/product-category/peptides/", pagemap.WPProductCategory, 100000),
-		sitePage("healing", "/product-category/peptides/healing-peptides/", pagemap.WPProductCategory, 100001),
-		sitePage("product", "/product/bpc-157-peptide/", pagemap.WPProduct, 10),
+		titled(sitePage("pepcat", "/product-category/peptides/", pagemap.WPProductCategory, 100000), "Peptides"),
+		titled(sitePage("healing", "/product-category/peptides/healing-peptides/", pagemap.WPProductCategory, 100001), "Healing Peptides"),
+		titled(sitePage("uncategorized", "/product-category/uncategorized/", pagemap.WPProductCategory, 100002), "Uncategorized"),
+		titled(sitePage("product", "/product/bpc-157-peptide/", pagemap.WPProduct, 10), "BPC-157 Peptide"),
 		planned,
 	}
 }
@@ -40,12 +52,20 @@ func derivationPages() []pagemap.Page {
 func trail(source pagemap.TrailSource, crumbs ...string) pagemap.Trail {
 	t := pagemap.Trail{Source: source, Crumbs: make([]pagemap.Crumb, 0, len(crumbs)/2)}
 	for i := 0; i+1 < len(crumbs); i += 2 {
-		t.Crumbs = append(t.Crumbs, pagemap.Crumb{Name: crumbs[i], Path: crumbs[i+1]})
+		t.Crumbs = append(t.Crumbs, pagemap.Crumb{Name: crumbs[i], Path: crumbs[i+1], Href: crumbs[i+1]})
 	}
 	return t
 }
 
-func TestDeriveParentTakesTheNearestResolvingCrumb(t *testing.T) {
+func crumbs(source pagemap.TrailSource, list ...pagemap.Crumb) pagemap.Trail {
+	return pagemap.Trail{Source: source, Crumbs: list}
+}
+
+func linked(name, path string) pagemap.Crumb {
+	return pagemap.Crumb{Name: name, Path: path, Href: path}
+}
+
+func TestDeriveParentResolvesTheNearestCrumb(t *testing.T) {
 	t.Parallel()
 
 	index := pagemap.NewIndex(derivationPages())
@@ -57,92 +77,167 @@ func TestDeriveParentTakesTheNearestResolvingCrumb(t *testing.T) {
 		return page
 	}
 	wpParent := func(id int64) *int64 { return &id }
+	home := linked("Home", "/")
 
 	cases := map[string]struct {
 		page       string
-		trails     []pagemap.Trail
-		wpParentID *int64
+		evidence   pagemap.ParentSignals
 		parent     string
 		reason     pagemap.ParentReason
+		method     pagemap.ParentMethod
 		trailFrom  pagemap.TrailSource
-		unresolved []pagemap.Crumb
+		unresolved []string
+		ambiguous  map[string][]string
 	}{
-		"the page itself is dropped and the nearest crumb is the parent": {
-			page:   "bpc",
-			trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/")},
-			parent: "peptides", reason: pagemap.ParentJSONLD, trailFrom: pagemap.TrailJSONLD,
+		"the page itself is dropped and the nearest crumb is the parent by its link": {
+			page:     "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/")}},
+			parent:   "peptides", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref, trailFrom: pagemap.TrailJSONLD,
 		},
 		"a crumb after the page's own is not its parent": {
-			page:   "bpc",
-			trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/", "Reviews", "/guide/")},
-			parent: "peptides", reason: pagemap.ParentJSONLD, trailFrom: pagemap.TrailJSONLD,
+			page:     "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/", "Reviews", "/guide/")}},
+			parent:   "peptides", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref, trailFrom: pagemap.TrailJSONLD,
 		},
-		"a trail of Home and the page falls through to the URL": {
-			page:   "peptides",
-			trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/")},
-			parent: "home", reason: pagemap.ParentURL,
+		"a trail of Home and the page names the front page when nothing else does": {
+			page:     "peptides",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/")}},
+			parent:   "home", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref, trailFrom: pagemap.TrailJSONLD,
+		},
+		"the front page has no parent": {
+			page:     "home",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/")}},
+			reason:   pagemap.ParentNone,
 		},
 		"an unresolved crumb is named and the next source is taken": {
 			page: "bpc",
-			trails: []pagemap.Trail{
-				trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "Healing Peptides", "/healing-peptides/", "BPC-157", "/bpc-157/"),
-				trail(pagemap.TrailNav, "Home", "/", "Peptides", "/peptides/", "Healing Peptides", "/healing-peptides/", "BPC-157", "/bpc-157/"),
-			},
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{
+				trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "Healing", "/healing/", "BPC-157", "/bpc-157/"),
+				trail(pagemap.TrailNav, "Home", "/", "Peptides", "/peptides/", "Healing", "/healing/", "BPC-157", "/bpc-157/"),
+			}},
 			parent: "home", reason: pagemap.ParentURL,
-			unresolved: []pagemap.Crumb{{Name: "Healing Peptides", Path: "/healing-peptides/"}},
+			unresolved: []string{"/healing/"},
 		},
 		"the list with the most resolving crumbs wins": {
 			page: "bpc",
-			trails: []pagemap.Trail{
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{
 				trail(pagemap.TrailJSONLD, "Home", "/", "BPC-157", "/bpc-157/"),
 				trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/"),
-			},
-			parent: "peptides", reason: pagemap.ParentJSONLD, trailFrom: pagemap.TrailJSONLD,
+			}},
+			parent: "peptides", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref, trailFrom: pagemap.TrailJSONLD,
 		},
 		"a tie goes to the list the nav shows": {
 			page: "bpc",
-			trails: []pagemap.Trail{
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{
 				trail(pagemap.TrailJSONLD, "Home", "/", "Shop", "/shop/", "BPC-157", "/bpc-157/"),
 				trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/"),
 				trail(pagemap.TrailNav, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/"),
-			},
-			parent: "peptides", reason: pagemap.ParentJSONLD, trailFrom: pagemap.TrailJSONLD,
+			}},
+			parent: "peptides", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref, trailFrom: pagemap.TrailJSONLD,
 		},
-		"a tie without a nav takes the first list": {
+		"a list that names only the front page yields to another list": {
 			page: "bpc",
-			trails: []pagemap.Trail{
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{
 				trail(pagemap.TrailJSONLD, "Home", "/", "Shop", "/shop/", "BPC-157", "/bpc-157/"),
 				trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/"),
-			},
-			parent: "home", reason: pagemap.ParentURL,
+			}},
+			parent: "peptides", reason: pagemap.ParentJSONLD, method: pagemap.MethodHref, trailFrom: pagemap.TrailJSONLD,
 		},
 		"the nav decides when no list resolves": {
-			page: "bpc",
-			trails: []pagemap.Trail{
-				trail(pagemap.TrailNav, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/"),
-			},
-			parent: "peptides", reason: pagemap.ParentARIA, trailFrom: pagemap.TrailNav,
+			page:     "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailNav, "Home", "/", "Peptides", "/peptides/", "BPC-157", "/bpc-157/")}},
+			parent:   "peptides", reason: pagemap.ParentARIA, method: pagemap.MethodHref, trailFrom: pagemap.TrailNav,
 		},
-		"a term page's WordPress parent is its parent term": {
+		"a Home-only list does not hide a nav with an unlinked crumb": {
+			page: "reconstitution",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{
+				trail(pagemap.TrailJSONLD, "Home", "/", "Reconstitution", "/reconstitution/"),
+				crumbs(pagemap.TrailNav, home, pagemap.Crumb{Name: "Lab Guides"}, pagemap.Crumb{Name: "Reconstitution", Path: "/reconstitution/"}),
+			}},
+			parent: "guides", reason: pagemap.ParentARIA, method: pagemap.MethodName, trailFrom: pagemap.TrailNav,
+		},
+		"a term page's WordPress parent beats a trail that names only the front page": {
 			page:       "healing",
-			trails:     []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Healing Peptides", "/product-category/peptides/healing-peptides/")},
-			wpParentID: wpParent(100000),
+			evidence:   pagemap.ParentSignals{Trails: []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Healing Peptides", "/product-category/peptides/healing-peptides/")}, WPParentID: wpParent(100000)},
 			parent:     "pepcat", reason: pagemap.ParentWP,
 		},
 		"a nested page's WordPress parent": {
-			page: "setup", wpParentID: wpParent(20),
+			page: "setup", evidence: pagemap.ParentSignals{WPParentID: wpParent(20)},
 			parent: "guide", reason: pagemap.ParentWP,
 		},
 		"a product with no trail has no parent": {
 			page: "product", reason: pagemap.ParentNone,
 		},
-		"a nearest crumb that points off the site is unresolved": {
+		"a crumb that links off the site is unresolved and never falls to its name": {
 			page: "bpc",
-			trails: []pagemap.Trail{
-				trail(pagemap.TrailJSONLD, "Home", "/", "Peptides", "/peptides/", "Elsewhere", "", "BPC-157", "/bpc-157/"),
-			},
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailJSONLD,
+				home, pagemap.Crumb{Name: "Peptides", Href: "https://elsewhere.example/peptides/"}, linked("BPC-157", "/bpc-157/"))}},
 			parent: "home", reason: pagemap.ParentURL,
-			unresolved: []pagemap.Crumb{{Name: "Elsewhere", Path: ""}},
+			unresolved: []string{"Peptides"},
+		},
+		"a crumb resolves through the redirect its link led to": {
+			page: "tb",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailJSONLD,
+				home, pagemap.Crumb{Name: "Peptides"},
+				pagemap.Crumb{Name: "Healing Peptides", Path: "/category/healing-peptides/", Href: "/category/healing-peptides/", Final: "/healing-peptides/", Status: 200},
+				linked("TB-500", "/tb-500/"))}},
+			parent: "hub", reason: pagemap.ParentJSONLD, method: pagemap.MethodRedirect, trailFrom: pagemap.TrailJSONLD,
+		},
+		"a redirect to a page of another name is not followed": {
+			page: "tb",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailJSONLD,
+				home, pagemap.Crumb{Name: "Healing Peptides", Path: "/healing/", Href: "/healing/", Final: "/guide/", Status: 200}, linked("TB-500", "/tb-500/"))}},
+			parent: "home", reason: pagemap.ParentURL,
+			unresolved: []string{"/healing/"},
+		},
+		"a redirect to the front page is not followed": {
+			page: "tb",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailJSONLD,
+				home, pagemap.Crumb{Name: "Home", Path: "/healing/", Href: "/healing/", Final: "/", Status: 200}, linked("TB-500", "/tb-500/"))}},
+			parent: "home", reason: pagemap.ParentURL,
+			unresolved: []string{"/healing/"},
+		},
+		"a modelled archive whose own visit lands on its hub hands the crumb to the hub": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{
+				Trails:   []pagemap.Trail{trail(pagemap.TrailJSONLD, "Home", "/", "Healing Peptides", "/product-category/peptides/healing-peptides/", "BPC-157", "/bpc-157/")},
+				Landings: map[string]string{"/product-category/peptides/healing-peptides/": "/healing-peptides/"},
+			},
+			parent: "hub", reason: pagemap.ParentJSONLD, method: pagemap.MethodRedirect, trailFrom: pagemap.TrailJSONLD,
+		},
+		"a dead link falls to its name": {
+			page: "reconstitution",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: "Lab Guides", Path: "/old-guides/", Href: "/old-guides/", Final: "/old-guides/", Status: 404}, linked("Reconstitution", "/reconstitution/"))}},
+			parent: "guides", reason: pagemap.ParentARIA, method: pagemap.MethodName, trailFrom: pagemap.TrailNav,
+		},
+		"a live link to a page the model lacks never falls to its name": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailJSONLD,
+				home, pagemap.Crumb{Name: "Uncategorized", Path: "/category/uncategorized/", Href: "/category/uncategorized/", Final: "/category/uncategorized/", Status: 200},
+				linked("BPC-157", "/bpc-157/"))}},
+			parent: "home", reason: pagemap.ParentURL,
+			unresolved: []string{"/category/uncategorized/"},
+		},
+		"an unlinked crumb two pages answer to is ambiguous": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: "peptides"}, pagemap.Crumb{Name: "BPC-157", Path: "/bpc-157/"})}},
+			parent: "home", reason: pagemap.ParentURL,
+			ambiguous: map[string][]string{"peptides": {"peptides", "pepcat"}},
+		},
+		"an unlinked crumb no page answers to is unresolved": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: "Nowhere"}, pagemap.Crumb{Name: "BPC-157", Path: "/bpc-157/"})}},
+			parent: "home", reason: pagemap.ParentURL,
+			unresolved: []string{"Nowhere"},
+		},
+		"an entity-encoded name compares by the store's key": {
+			page: "reconstitution",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: " LAB&#32;guides "}, linked("Reconstitution", "/reconstitution/"))}},
+			parent: "guides", reason: pagemap.ParentARIA, method: pagemap.MethodName, trailFrom: pagemap.TrailNav,
 		},
 	}
 
@@ -150,15 +245,15 @@ func TestDeriveParentTakesTheNearestResolvingCrumb(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			got := pagemap.DeriveParent(byID(tc.page), tc.trails, tc.wpParentID, index)
+			got := pagemap.DeriveParent(byID(tc.page), tc.evidence, index)
 			switch {
 			case tc.parent == "" && got.ParentID != nil:
 				t.Errorf("parent = %s, want none", *got.ParentID)
 			case tc.parent != "" && (got.ParentID == nil || *got.ParentID != tc.parent):
 				t.Errorf("parent = %v, want %s", got.ParentID, tc.parent)
 			}
-			if got.Reason != tc.reason {
-				t.Errorf("reason = %s, want %s", got.Reason, tc.reason)
+			if got.Reason != tc.reason || got.Method != tc.method {
+				t.Errorf("reason = %s by %q, want %s by %q", got.Reason, got.Method, tc.reason, tc.method)
 			}
 			switch {
 			case tc.trailFrom == "" && got.Trail != nil:
@@ -166,15 +261,40 @@ func TestDeriveParentTakesTheNearestResolvingCrumb(t *testing.T) {
 			case tc.trailFrom != "" && (got.Trail == nil || got.Trail.Source != tc.trailFrom):
 				t.Errorf("deciding trail = %v, want source %s", got.Trail, tc.trailFrom)
 			}
-			if len(got.Unresolved) != len(tc.unresolved) {
-				t.Fatalf("unresolved = %v, want %v", got.Unresolved, tc.unresolved)
+			unresolved := make([]string, 0, len(got.Unresolved))
+			for _, crumb := range got.Unresolved {
+				unresolved = append(unresolved, crumb.Key())
 			}
-			for i := range tc.unresolved {
-				if got.Unresolved[i] != tc.unresolved[i] {
-					t.Errorf("unresolved[%d] = %v, want %v", i, got.Unresolved[i], tc.unresolved[i])
+			if !slices.Equal(unresolved, tc.unresolved) && (len(unresolved) > 0 || len(tc.unresolved) > 0) {
+				t.Errorf("unresolved = %v, want %v", unresolved, tc.unresolved)
+			}
+			if len(got.Ambiguous) != len(tc.ambiguous) {
+				t.Fatalf("ambiguous = %+v, want %v", got.Ambiguous, tc.ambiguous)
+			}
+			for _, tie := range got.Ambiguous {
+				if want := tc.ambiguous[tie.Crumb.Key()]; !slices.Equal(tie.Candidates, want) {
+					t.Errorf("ambiguous %s = %v, want %v", tie.Crumb.Key(), tie.Candidates, want)
 				}
 			}
 		})
+	}
+}
+
+func TestARootCrumbIsDroppedWithoutAFrontPage(t *testing.T) {
+	t.Parallel()
+
+	pages := []pagemap.Page{
+		sitePage("koffein", "/product-category/koffein/", pagemap.WPProductCategory, 100000),
+		sitePage("powder", "/product/powder/", pagemap.WPProduct, 10),
+	}
+	index := pagemap.NewIndex(pages)
+	powder, _ := index.ByID("powder")
+
+	got := pagemap.DeriveParent(powder, pagemap.ParentSignals{Trails: []pagemap.Trail{
+		trail(pagemap.TrailJSONLD, "Home", "/", "Powder", "/product/powder/"),
+	}}, index)
+	if got.ParentID != nil || got.Reason != pagemap.ParentNone || len(got.Unresolved) != 0 {
+		t.Errorf("derivation = %+v, want no parent and nothing unresolved", got)
 	}
 }
 
@@ -196,5 +316,27 @@ func TestByWordPressIDTellsPostsFromTerms(t *testing.T) {
 	}
 	if _, found := index.ByWordPressID(pagemap.WPPage, 404); found {
 		t.Error("an unknown id is found")
+	}
+}
+
+func TestByNameAnswersEveryOnSitePageThatCarriesTheName(t *testing.T) {
+	t.Parallel()
+
+	index := pagemap.NewIndex(derivationPages())
+	ids := func(pages []pagemap.Page) []string {
+		out := make([]string, 0, len(pages))
+		for _, page := range pages {
+			out = append(out, page.ID)
+		}
+		return out
+	}
+	if got := ids(index.ByName("PEPTIDES")); !slices.Equal(got, []string{"peptides", "pepcat"}) {
+		t.Errorf("ByName(PEPTIDES) = %v, want the hub and the term", got)
+	}
+	if got := ids(index.ByName("Lab Guides")); !slices.Equal(got, []string{"guides"}) {
+		t.Errorf("ByName(Lab Guides) = %v, want only the page on the site, not the archived one", got)
+	}
+	if got := index.ByName("  "); len(got) != 0 {
+		t.Errorf("ByName(blank) = %v, want nothing", ids(got))
 	}
 }

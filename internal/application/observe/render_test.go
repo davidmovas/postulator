@@ -161,8 +161,11 @@ func TestTheRenderDerivesTheParentFromTheTrail(t *testing.T) {
 	if s.stores.renders[bpc.ID].Root != render.RootDynamicOnly || s.stores.renders[peptides.ID].Root != render.RootEmptyRaw {
 		t.Errorf("roots: bpc %s peptides %s", s.stores.renders[bpc.ID].Root, s.stores.renders[peptides.ID].Root)
 	}
+	if peptides.ParentPageID == nil || *peptides.ParentPageID != home.ID || peptides.ParentReason != pagemap.ParentJSONLD {
+		t.Errorf("peptides' parent = %v %s, want the front page its Home-only trail names", peptides.ParentPageID, peptides.ParentReason)
+	}
 	summary, err := s.service.Summary(t.Context(), siteID)
-	if err != nil || summary.Rendered != 9 || summary.TrailsResolved != 2 || summary.Listings != 3 || summary.LinksByType["breadcrumb"] == 0 {
+	if err != nil || summary.Rendered != 9 || summary.TrailsResolved != 4 || summary.Listings != 3 || summary.LinksByType["breadcrumb"] == 0 {
 		t.Errorf("summary = %+v (%v)", summary, err)
 	}
 }
