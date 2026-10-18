@@ -84,6 +84,8 @@ type Page struct {
 	ParentReason    ParentReason
 	ParentMethod    ParentMethod
 	PageTypeID      *string
+	TypeSource      TypeSource
+	TypeReason      TypeReason
 	TechnicalReason TechnicalReason
 	ReadOnlyReason  ReadOnlyReason
 	WPType          WPType
@@ -181,6 +183,10 @@ func NewPage(p Page) (Page, error) {
 		return Page{}, invalid("template id must not be empty when set", "templateId")
 	case emptyRef(p.PageTypeID):
 		return Page{}, invalid("page type id must not be empty when set", "pageTypeId")
+	case !p.TypeSource.Valid() || !p.TypeReason.Valid():
+		return Page{}, invalid("page type source or reason is not recognized", "typeReason")
+	case (p.PageTypeID == nil) != (p.TypeSource == TypeSourceNone):
+		return Page{}, invalid("a page type comes with its source", "typeSource")
 	case p.ParentReason != "" && !p.ParentReason.Valid():
 		return Page{}, invalid("parent reason is not recognized", "parentReason")
 	case !p.TechnicalReason.Valid():

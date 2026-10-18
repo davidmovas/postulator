@@ -66,44 +66,6 @@ func (t Type) Validate() error {
 	}
 }
 
-type Source string
-
-const (
-	SourceNone   Source = ""
-	SourceAuto   Source = "auto"
-	SourceManual Source = "manual"
-)
-
-func (s Source) Valid() bool {
-	return s == SourceNone || s == SourceAuto || s == SourceManual
-}
-
-type Reason string
-
-const (
-	ReasonNone          Reason = ""
-	ReasonProduct       Reason = "product"
-	ReasonStoreCategory Reason = "store_category"
-	ReasonShop          Reason = "shop"
-	ReasonTechnical     Reason = "technical"
-	ReasonListing       Reason = "listing"
-	ReasonDefault       Reason = "default"
-	ReasonKind          Reason = "kind"
-	ReasonUser          Reason = "user"
-	ReasonAI            Reason = "ai"
-	ReasonImport        Reason = "import"
-)
-
-func (r Reason) Valid() bool {
-	switch r {
-	case ReasonNone, ReasonProduct, ReasonStoreCategory, ReasonShop, ReasonTechnical, ReasonListing, ReasonDefault,
-		ReasonKind, ReasonUser, ReasonAI, ReasonImport:
-		return true
-	default:
-		return false
-	}
-}
-
 type Facts struct {
 	WPType    pagemap.WPType
 	Technical pagemap.TechnicalReason
@@ -125,22 +87,22 @@ func FactsOf(page pagemap.Page, record *render.Record) Facts {
 	return facts
 }
 
-func Assign(facts Facts) (Preset, Reason, bool) {
+func Assign(facts Facts) (Preset, pagemap.TypeReason, bool) {
 	switch {
 	case facts.WPType == pagemap.WPProduct:
-		return Product, ReasonProduct, true
+		return Product, pagemap.TypeByProduct, true
 	case facts.WPType.Term():
-		return StoreCategory, ReasonStoreCategory, true
+		return StoreCategory, pagemap.TypeByStoreCategory, true
 	case facts.Technical == pagemap.TechnicalShop:
-		return Catalog, ReasonShop, true
+		return Catalog, pagemap.TypeByShop, true
 	case facts.Technical != pagemap.TechnicalNone:
-		return Technical, ReasonTechnical, true
+		return Technical, pagemap.TypeByTechnical, true
 	case !facts.Rendered:
-		return "", ReasonNone, false
+		return "", pagemap.TypeByNone, false
 	case facts.Listing:
-		return Hub, ReasonListing, true
+		return Hub, pagemap.TypeByListing, true
 	default:
-		return Entity, ReasonDefault, true
+		return Entity, pagemap.TypeByDefault, true
 	}
 }
 

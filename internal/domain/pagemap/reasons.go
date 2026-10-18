@@ -22,6 +22,48 @@ func (r ParentReason) Valid() bool {
 	}
 }
 
+type TypeSource string
+
+const (
+	TypeSourceNone   TypeSource = ""
+	TypeSourceAuto   TypeSource = "auto"
+	TypeSourceManual TypeSource = "manual"
+)
+
+func (s TypeSource) Valid() bool {
+	return s == TypeSourceNone || s == TypeSourceAuto || s == TypeSourceManual
+}
+
+type TypeReason string
+
+const (
+	TypeByNone          TypeReason = ""
+	TypeByProduct       TypeReason = "product"
+	TypeByStoreCategory TypeReason = "store_category"
+	TypeByShop          TypeReason = "shop"
+	TypeByTechnical     TypeReason = "technical"
+	TypeByListing       TypeReason = "listing"
+	TypeByDefault       TypeReason = "default"
+	TypeByKind          TypeReason = "kind"
+	TypeByUser          TypeReason = "user"
+	TypeByAI            TypeReason = "ai"
+	TypeByImport        TypeReason = "import"
+)
+
+func (r TypeReason) Valid() bool {
+	switch r {
+	case TypeByNone, TypeByProduct, TypeByStoreCategory, TypeByShop, TypeByTechnical, TypeByListing, TypeByDefault,
+		TypeByKind, TypeByUser, TypeByAI, TypeByImport:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r TypeReason) Manual() bool {
+	return r == TypeByUser || r == TypeByAI || r == TypeByImport
+}
+
 type TechnicalReason string
 
 const (

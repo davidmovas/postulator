@@ -81,20 +81,20 @@ func TestAnUntypedPageIsTypedByWhatTheSiteShows(t *testing.T) {
 		page     pagemap.Page
 		record   *render.Record
 		preset   pagetype.Preset
-		reason   pagetype.Reason
+		reason   pagemap.TypeReason
 		assigned bool
 	}{
-		"a product":                             {page: pagemap.Page{WPType: pagemap.WPProduct}, preset: pagetype.Product, reason: pagetype.ReasonProduct, assigned: true},
-		"a store category":                      {page: pagemap.Page{WPType: pagemap.WPProductCategory}, preset: pagetype.StoreCategory, reason: pagetype.ReasonStoreCategory, assigned: true},
-		"the shop":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalShop}, preset: pagetype.Catalog, reason: pagetype.ReasonShop, assigned: true},
-		"the cart":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalCart}, preset: pagetype.Technical, reason: pagetype.ReasonTechnical, assigned: true},
-		"a page the workbook calls technical":   {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalWorkbook}, preset: pagetype.Technical, reason: pagetype.ReasonTechnical, assigned: true},
-		"a page whose content lists products":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(true)), preset: pagetype.Hub, reason: pagetype.ReasonListing, assigned: true},
-		"a page with products in its sidebar":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(false)), preset: pagetype.Entity, reason: pagetype.ReasonDefault, assigned: true},
-		"a page without a listing":              {page: pagemap.Page{WPType: pagemap.WPPost}, record: &render.Record{}, preset: pagetype.Entity, reason: pagetype.ReasonDefault, assigned: true},
+		"a product":                             {page: pagemap.Page{WPType: pagemap.WPProduct}, preset: pagetype.Product, reason: pagemap.TypeByProduct, assigned: true},
+		"a store category":                      {page: pagemap.Page{WPType: pagemap.WPProductCategory}, preset: pagetype.StoreCategory, reason: pagemap.TypeByStoreCategory, assigned: true},
+		"the shop":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalShop}, preset: pagetype.Catalog, reason: pagemap.TypeByShop, assigned: true},
+		"the cart":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalCart}, preset: pagetype.Technical, reason: pagemap.TypeByTechnical, assigned: true},
+		"a page the workbook calls technical":   {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalWorkbook}, preset: pagetype.Technical, reason: pagemap.TypeByTechnical, assigned: true},
+		"a page whose content lists products":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(true)), preset: pagetype.Hub, reason: pagemap.TypeByListing, assigned: true},
+		"a page with products in its sidebar":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(false)), preset: pagetype.Entity, reason: pagemap.TypeByDefault, assigned: true},
+		"a page without a listing":              {page: pagemap.Page{WPType: pagemap.WPPost}, record: &render.Record{}, preset: pagetype.Entity, reason: pagemap.TypeByDefault, assigned: true},
 		"a page not rendered yet waits":         {page: pagemap.Page{WPType: pagemap.WPPage}},
-		"a technical page not rendered yet":     {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalNoindex}, preset: pagetype.Technical, reason: pagetype.ReasonTechnical, assigned: true},
-		"a product with a listing is a product": {page: pagemap.Page{WPType: pagemap.WPProduct}, record: new(listing(true)), preset: pagetype.Product, reason: pagetype.ReasonProduct, assigned: true},
+		"a technical page not rendered yet":     {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalNoindex}, preset: pagetype.Technical, reason: pagemap.TypeByTechnical, assigned: true},
+		"a product with a listing is a product": {page: pagemap.Page{WPType: pagemap.WPProduct}, record: new(listing(true)), preset: pagetype.Product, reason: pagemap.TypeByProduct, assigned: true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

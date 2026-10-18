@@ -21,7 +21,8 @@ func fullPage(siteID, path string, at time.Time) pagemap.Page {
 	pageType := "page-type-guide"
 	return pagemap.Page{
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPost, WPID: &wpID,
-		ParentReason: pagemap.ParentJSONLD, ParentMethod: pagemap.MethodRedirect, PageTypeID: &pageType, TechnicalReason: pagemap.TechnicalShop, ReadOnlyReason: pagemap.ReadOnlyBuilder("elementor"),
+		ParentReason: pagemap.ParentJSONLD, ParentMethod: pagemap.MethodRedirect, PageTypeID: &pageType, TypeSource: pagemap.TypeSourceAuto, TypeReason: pagemap.TypeByKind,
+		TechnicalReason: pagemap.TechnicalShop, ReadOnlyReason: pagemap.ReadOnlyBuilder("elementor"),
 		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description", Canonical: "https://shop.example.com" + path,
 		Keywords: keyword.New([]keyword.Keyword{{Text: "title keyword", Volume: new(5400)}, {Text: "one", Volume: new(0)}, {Text: "two"}}),
 		Notes:    []note.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
@@ -39,6 +40,77 @@ func pagePaths(pages []pagemap.Page) []string {
 		out = append(out, pages[i].Path)
 	}
 	return out
+}
+
+func TestAPageTypeHasItsOwnWriters(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageRepo(store)
+	page := sqlitetest.Page(t, store, owner.ID, "/peptides/")
+	at := sqlitetest.Stamp.Add(time.Minute)
+	typeOf := func() (string, pagemap.TypeSource, pagemap.TypeReason) {
+		t.Helper()
+		got, err := repo.Get(t.Context(), page.ID)
+		if err != nil {
+			t.Fatalf("Get: %v", err)
+		}
+		typeID := ""
+		if got.PageTypeID != nil {
+			typeID = *got.PageTypeID
+		}
+		return typeID, got.TypeSource, got.TypeReason
+	}
+	expect := func(step, typeID string, source pagemap.TypeSource, reason pagemap.TypeReason) {
+		t.Helper()
+		if gotID, gotSource, gotReason := typeOf(); gotID != typeID || gotSource != source || gotReason != reason {
+			t.Fatalf("%s: type = %q %s %s, want %q %s %s", step, gotID, gotSource, gotReason, typeID, source, reason)
+		}
+	}
+
+	snapshot, err := repo.Get(t.Context(), page.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	stale := "stale-type"
+	snapshot.PageTypeID, snapshot.TypeSource, snapshot.TypeReason = &stale, pagemap.TypeSourceAuto, pagemap.TypeByDefault
+	if err = repo.Update(t.Context(), snapshot); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	expect("a whole-row update", "", pagemap.TypeSourceNone, pagemap.TypeByNone)
+
+	if err = repo.AutoType(t.Context(), page.ID, "hub", pagemap.TypeByListing, at); err != nil {
+		t.Fatalf("AutoType: %v", err)
+	}
+	expect("the first automatic type", "hub", pagemap.TypeSourceAuto, pagemap.TypeByListing)
+	if err = repo.AutoType(t.Context(), page.ID, "entity", pagemap.TypeByDefault, at); err != nil {
+		t.Fatalf("AutoType again: %v", err)
+	}
+	expect("a second automatic type", "hub", pagemap.TypeSourceAuto, pagemap.TypeByListing)
+
+	if err = repo.SetType(t.Context(), page.ID, "pillar", pagemap.TypeByUser, at); err != nil {
+		t.Fatalf("SetType: %v", err)
+	}
+	expect("a person's type", "pillar", pagemap.TypeSourceManual, pagemap.TypeByUser)
+	if err = repo.AutoType(t.Context(), page.ID, "entity", pagemap.TypeByDefault, at); err != nil {
+		t.Fatalf("AutoType over a manual type: %v", err)
+	}
+	expect("an automatic type over a person's", "pillar", pagemap.TypeSourceManual, pagemap.TypeByUser)
+	if err = repo.Update(t.Context(), snapshot); err != nil {
+		t.Fatalf("Update from an old snapshot: %v", err)
+	}
+	expect("an old snapshot written back", "pillar", pagemap.TypeSourceManual, pagemap.TypeByUser)
+
+	moved, err := repo.ReassignType(t.Context(), "pillar", "hub", pagemap.TypeByUser, at)
+	if err != nil || moved != 1 {
+		t.Fatalf("ReassignType = %d %v, want one page moved", moved, err)
+	}
+	expect("a reassignment", "hub", pagemap.TypeSourceManual, pagemap.TypeByUser)
+
+	if err = repo.SetType(t.Context(), "no-such-page", "hub", pagemap.TypeByAI, at); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("SetType on a missing page = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
 }
 
 func TestPageRepoRoundTrip(t *testing.T) {
@@ -86,7 +158,6 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	want.WPID = nil
 	want.ParentReason = pagemap.ParentWorkbook
 	want.ParentMethod = pagemap.MethodNone
-	want.PageTypeID = nil
 	want.TechnicalReason = pagemap.TechnicalNone
 	want.ReadOnlyReason = pagemap.ReadOnlyTerm
 	want.LastSyncedAt = nil

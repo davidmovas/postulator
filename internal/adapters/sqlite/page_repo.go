@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 
@@ -14,10 +15,13 @@ import (
 )
 
 const (
-	pageColumns       = `id, site_id, path, planned_path, slug, parent_page_id, parent_reason, parent_method, page_type_id, technical_reason, read_only_reason, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, keywords, notes, status, entity_id, template_id, content_hash, wp_link, wp_slug, wp_status, wp_title, wp_h1, wp_modified_at, last_synced_at, drift, created_at, updated_at`
-	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, slug = ?, parent_page_id = ?, parent_reason = ?, parent_method = ?, page_type_id = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
+	pageColumns       = `id, site_id, path, planned_path, slug, parent_page_id, parent_reason, parent_method, page_type_id, page_type_source, page_type_reason, technical_reason, read_only_reason, wp_type, wp_id, title, h1, meta_title, meta_description, canonical, keywords, notes, status, entity_id, template_id, content_hash, wp_link, wp_slug, wp_status, wp_title, wp_h1, wp_modified_at, last_synced_at, drift, created_at, updated_at`
+	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, slug = ?, parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
 	updateDerived     = `UPDATE pages SET parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, status = ?, updated_at = ? WHERE id = ?`
+	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE id = ?`
+	autoPageType      = `UPDATE pages SET page_type_id = ?, page_type_source = 'auto', page_type_reason = ?, updated_at = ? WHERE id = ? AND page_type_id IS NULL`
+	reassignPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE page_type_id = ?`
 	deletePage        = `DELETE FROM pages WHERE id = ?`
 	selectPage        = `SELECT ` + pageColumns + ` FROM pages WHERE id = ?`
 	selectPagesBySite = `SELECT ` + pageColumns + ` FROM pages WHERE site_id = ? ORDER BY path, id`
@@ -56,7 +60,8 @@ func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
 	}
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertPage, []any{
 		p.ID, p.SiteID, p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID),
-		storedParentReason(p.ParentReason), string(p.ParentMethod), nullString(p.PageTypeID), string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
+		storedParentReason(p.ParentReason), string(p.ParentMethod), nullString(p.PageTypeID), string(p.TypeSource), string(p.TypeReason),
+		string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, keywords, notes, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
@@ -71,7 +76,7 @@ func (r *PageRepo) Update(ctx context.Context, p pagemap.Page) error {
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updatePage, []any{
 		p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID),
-		storedParentReason(p.ParentReason), string(p.ParentMethod), nullString(p.PageTypeID), string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
+		storedParentReason(p.ParentReason), string(p.ParentMethod), string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, p.Canonical, keywords, notes, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title, p.Observed.H1,
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.UpdatedAt), p.ID,
@@ -85,6 +90,20 @@ func (r *PageRepo) UpdateDerived(ctx context.Context, p pagemap.Page) error {
 		string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.Status), formatTime(p.UpdatedAt), p.ID,
 	}, nil, "update the page's derived facts")
 	return requireAffected(affected, err, pageNotFound(p.ID))
+}
+
+func (r *PageRepo) SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), setPageType, []any{typeID, string(reason), formatTime(at), pageID}, nil, "set the page's type")
+	return requireAffected(affected, err, pageNotFound(pageID))
+}
+
+func (r *PageRepo) AutoType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error {
+	_, err := execWrite(ctx, r.store.writeFrom(ctx), autoPageType, []any{typeID, string(reason), formatTime(at), pageID}, nil, "type the untyped page")
+	return err
+}
+
+func (r *PageRepo) ReassignType(ctx context.Context, fromTypeID, toTypeID string, reason pagemap.TypeReason, at time.Time) (int64, error) {
+	return execWrite(ctx, r.store.writeFrom(ctx), reassignPageType, []any{toTypeID, string(reason), formatTime(at), fromTypeID}, nil, "reassign the pages of a type")
 }
 
 func (r *PageRepo) Delete(ctx context.Context, id string) error {
@@ -146,6 +165,7 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		p                              pagemap.Page
 		parentID, entityID, templateID sql.NullString
 		pageTypeID                     sql.NullString
+		typeSource, typeReason         string
 		parentReason, parentMethod     string
 		technicalReason                string
 		readOnlyReason                 string
@@ -156,7 +176,7 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		createdAt, updatedAt           string
 		keywords, notes                string
 	)
-	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.PlannedPath, &p.Slug, &parentID, &parentReason, &parentMethod, &pageTypeID, &technicalReason, &readOnlyReason,
+	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.PlannedPath, &p.Slug, &parentID, &parentReason, &parentMethod, &pageTypeID, &typeSource, &typeReason, &technicalReason, &readOnlyReason,
 		&wpType, &wpID, &p.Title, &p.H1, &p.MetaTitle, &p.MetaDescription, &p.Canonical,
 		&keywords, &notes, &status, &entityID, &templateID, &p.ContentHash, &p.Observed.Link, &p.Observed.Slug, &p.Observed.Status,
 		&p.Observed.Title, &p.Observed.H1, &wpModifiedAt, &lastSyncedAt, &drift, &createdAt, &updatedAt); err != nil {
@@ -171,6 +191,8 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 	p.ParentReason = pagemap.ParentReason(parentReason)
 	p.ParentMethod = pagemap.ParentMethod(parentMethod)
 	p.PageTypeID = optString(pageTypeID)
+	p.TypeSource = pagemap.TypeSource(typeSource)
+	p.TypeReason = pagemap.TypeReason(typeReason)
 	p.TechnicalReason = pagemap.TechnicalReason(technicalReason)
 	p.ReadOnlyReason = pagemap.ReadOnlyReason(readOnlyReason)
 	p.WPType = pagemap.WPType(wpType)

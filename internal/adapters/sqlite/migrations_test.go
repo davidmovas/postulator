@@ -5,12 +5,18 @@ import (
 	stderrors "errors"
 	"fmt"
 	"io/fs"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 57
+const latestMigration = 60
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -70,6 +76,9 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0055_pages_parent_method.sql",
 		"0056_front_page_not_technical.sql",
 		"0057_page_renders_archive.sql",
+		"0058_page_types.sql",
+		"0059_field_scopes.sql",
+		"0060_page_types_backfill.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -114,7 +123,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders", "findings", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders", "findings", "page_types", "field_scopes", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)
@@ -342,9 +351,9 @@ func TestEntityScopeMigrationTakesTheParentAnEntityHas(t *testing.T) {
 	if got := text(`SELECT scope_entity_id FROM entities WHERE id = 'c'`); got != "a" {
 		t.Fatalf("the scope of an entity with two parents = %q, want the earlier one", got)
 	}
-	for _, id := range []string{"a", "b", "d"} {
-		if got := text(`SELECT scope_entity_id FROM entities WHERE id = '` + id + `'`); got != "" {
-			t.Fatalf("%s took the scope %q, want none", id, got)
+	for _, entityID := range []string{"a", "b", "d"} {
+		if got := text(`SELECT scope_entity_id FROM entities WHERE id = '` + entityID + `'`); got != "" {
+			t.Fatalf("%s took the scope %q, want none", entityID, got)
 		}
 	}
 	if got := text(`SELECT keywords FROM entities WHERE id = 'c'`); got != "[]" {
@@ -1283,6 +1292,182 @@ func TestTheParentMethodTheFrontPageAndTheArchiveState(t *testing.T) {
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestEverySiteGetsThePresetsAndEveryPageAType(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 57)
+	pagesBefore := schemaOf(t, store, "pages")
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-18T09:00:00Z"
+
+	for _, site := range []string{"s1", "s2"} {
+		must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+			site, site, "https://"+site, "site:"+site+":wp_password", at, at)
+	}
+	for _, tpl := range []struct{ id, kind string }{{"tpl-hub", "hub"}, {"tpl-category", "category"}, {"tpl-comparison", "comparison"}, {"tpl-product", "product"}} {
+		must(`INSERT INTO templates (id, scope, name, page_kind, version, spec, created_at, updated_at) VALUES (?, 'global', ?, ?, 1, '{}', ?, ?)`, tpl.id, tpl.id, tpl.kind, at, at)
+	}
+	for _, entity := range []struct{ id, kind string }{{"e-hub", "hub"}, {"e-category", "category"}, {"e-product", "product"}, {"e-topic", "topic"}, {"e-custom", "custom"}} {
+		must(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES (?, 's1', ?, ?, 'import', ?, ?)`, entity.id, entity.id, entity.kind, at, at)
+	}
+	pages := []struct{ id, wpType, technical, template, entity string }{
+		{id: "pg-product", wpType: "product", entity: "e-hub"},
+		{id: "pg-term", wpType: "product_cat", template: "tpl-product"},
+		{id: "pg-shop", wpType: "page", technical: "shop"},
+		{id: "pg-cart", wpType: "page", technical: "cart", entity: "e-hub"},
+		{id: "pg-hub-template", wpType: "page", template: "tpl-hub", entity: "e-topic"},
+		{id: "pg-category-template", wpType: "page", template: "tpl-category"},
+		{id: "pg-comparison-template", wpType: "page", template: "tpl-comparison", entity: "e-hub"},
+		{id: "pg-hub-entity", wpType: "page", entity: "e-hub"},
+		{id: "pg-category-entity", wpType: "page", entity: "e-category"},
+		{id: "pg-product-entity", wpType: "page", entity: "e-product"},
+		{id: "pg-topic-entity", wpType: "page", entity: "e-topic"},
+		{id: "pg-custom-entity", wpType: "page", entity: "e-custom"},
+		{id: "pg-plain", wpType: "post"},
+	}
+	for _, page := range pages {
+		must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, technical_reason, template_id, entity_id, created_at, updated_at) VALUES (?, 's1', ?, ?, ?, 'exists', ?, nullif(?, ''), nullif(?, ''), ?, ?)`,
+			page.id, "/"+page.id+"/", page.id, page.wpType, page.technical, page.template, page.entity, at, at)
+	}
+
+	if _, err = provider.UpTo(t.Context(), 60); err != nil {
+		t.Fatalf("up to 60: %v", err)
+	}
+
+	want := []string{
+		"pg-cart | technical | auto | technical",
+		"pg-category-entity | hub | auto | kind",
+		"pg-category-template | hub | auto | kind",
+		"pg-comparison-template | entity | auto | kind",
+		"pg-custom-entity | entity | auto | kind",
+		"pg-hub-entity | hub | auto | kind",
+		"pg-hub-template | hub | auto | kind",
+		"pg-plain | entity | auto | default",
+		"pg-product | product | auto | product",
+		"pg-product-entity | product | auto | kind",
+		"pg-shop | catalog | auto | shop",
+		"pg-term | store_category | auto | store_category",
+		"pg-topic-entity | entity | auto | kind",
+	}
+	got := rowsOf(t, store, `SELECT pages.id, page_types.preset, pages.page_type_source, pages.page_type_reason
+		FROM pages JOIN page_types ON page_types.id = pages.page_type_id AND page_types.site_id = pages.site_id ORDER BY pages.id`)
+	if !slices.Equal(got, want) {
+		t.Fatalf("the backfill =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if got := rowsOf(t, store, `SELECT site_id, group_concat(name, ',') FROM (SELECT site_id, name FROM page_types ORDER BY site_id, created_at) GROUP BY site_id`); !slices.Equal(got, []string{
+		"s1 | Hub,Entity,Product,Store category,Catalog,Technical", "s2 | Hub,Entity,Product,Store category,Catalog,Technical",
+	}) {
+		t.Fatalf("the seeded types = %v, want the six presets on every site in their order", got)
+	}
+	for _, typeID := range rowsOf(t, store, `SELECT id FROM page_types`) {
+		if !id.Valid(typeID) {
+			t.Errorf("the seeded type id %q is not a canonical v4 UUID", typeID)
+		}
+	}
+	if got := rowsOf(t, store, `SELECT page_types.preset, count(*) FROM field_scopes JOIN page_types ON page_types.id = field_scopes.page_type_id WHERE page_types.site_id = 's1' GROUP BY page_types.preset ORDER BY page_types.preset`); !slices.Equal(got, []string{
+		"entity | 3", "hub | 3", "product | 4",
+	}) {
+		t.Fatalf("the seeded scopes per preset = %v", got)
+	}
+
+	for _, step := range []struct {
+		why, query string
+		ok         bool
+	}{
+		{why: "a type of the client's own", query: `INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('t-pillar', 's1', 'Pillar', 'hub', '` + at + `', '` + at + `')`, ok: true},
+		{why: "a second type of one name in any case", query: `INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('t-pillar-2', 's1', 'PILLAR', 'entity', '` + at + `', '` + at + `')`},
+		{why: "the same name on another site", query: `INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('t-pillar-s2', 's2', 'Pillar', 'hub', '` + at + `', '` + at + `')`, ok: true},
+		{why: "the word category as a preset", query: `INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('t-cat', 's1', 'Cat', 'category', '` + at + `', '` + at + `')`},
+		{why: "a blank name", query: `INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('t-blank', 's1', '  ', 'hub', '` + at + `', '` + at + `')`},
+		{why: "a manual type", query: `UPDATE pages SET page_type_id = 't-pillar', page_type_source = 'manual', page_type_reason = 'user' WHERE id = 'pg-plain'`, ok: true},
+		{why: "a source the model does not name", query: `UPDATE pages SET page_type_source = 'guess' WHERE id = 'pg-plain'`},
+		{why: "a reason the model does not name", query: `UPDATE pages SET page_type_reason = 'hunch' WHERE id = 'pg-plain'`},
+		{why: "a scope with its policy", query: `INSERT INTO field_scopes (page_type_id, field_key, link_policy, updated_at) VALUES ('t-pillar', 'excerpt', '{"links":false}', '` + at + `')`, ok: true},
+		{why: "a policy that does not say whether it links", query: `INSERT INTO field_scopes (page_type_id, field_key, link_policy, updated_at) VALUES ('t-pillar', 'title', '{}', '` + at + `')`},
+		{why: "a second scope of one field", query: `INSERT INTO field_scopes (page_type_id, field_key, link_policy, updated_at) VALUES ('t-pillar', 'excerpt', '{"links":false}', '` + at + `')`},
+		{why: "a provider the model does not name", query: `INSERT INTO field_scopes (page_type_id, field_key, link_policy, provider, updated_at) VALUES ('t-pillar', 'meta:x', '{"links":false}', 'acf', '` + at + `')`},
+		{why: "a deleted type takes its scopes", query: `DELETE FROM page_types WHERE id = 't-pillar-s2'`, ok: true},
+	} {
+		_, execErr := store.writer.ExecContext(t.Context(), step.query)
+		if step.ok && execErr != nil {
+			t.Fatalf("%s: %v", step.why, execErr)
+		}
+		if !step.ok && execErr == nil {
+			t.Fatalf("%s was accepted", step.why)
+		}
+	}
+
+	if _, err = provider.DownTo(t.Context(), 57); err != nil {
+		t.Fatalf("down to 57: %v", err)
+	}
+	if got := schemaOf(t, store, "pages"); !slices.Equal(got, pagesBefore) {
+		t.Fatalf("the down left pages as\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(pagesBefore, "\n"))
+	}
+	if got := schemaOf(t, store, "page_types"); len(got) != 0 {
+		t.Fatalf("the down kept page_types: %v", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestTheMigrationSeedsWhatTheApplicationSeeds(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 59)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	const at = "2026-10-18T09:00:00Z"
+	if _, err = store.writer.ExecContext(t.Context(), `INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at); err != nil {
+		t.Fatalf("insert the site: %v", err)
+	}
+	if _, err = provider.UpTo(t.Context(), 60); err != nil {
+		t.Fatalf("up to 60: %v", err)
+	}
+
+	types, err := NewPageTypeRepo(store).ListBySite(t.Context(), "s1")
+	if err != nil {
+		t.Fatalf("ListBySite types: %v", err)
+	}
+	presets := pagetype.Presets()
+	if len(types) != len(presets) {
+		t.Fatalf("seeded %d types, want %d", len(types), len(presets))
+	}
+	want := make([]field.Scope, 0, 4*len(types))
+	for i := range types {
+		if types[i].Preset != presets[i] || types[i].Name != presets[i].DefaultName() || types[i].TemplateID != nil {
+			t.Errorf("type %d = %+v, want the %s preset by its default name", i, types[i], presets[i])
+		}
+		want = append(want, pagetype.DefaultScopes(types[i].Preset, types[i].ID)...)
+	}
+	got, err := NewFieldScopeRepo(store).ListBySite(t.Context(), "s1")
+	if err != nil {
+		t.Fatalf("ListBySite scopes: %v", err)
+	}
+	for i := range got {
+		got[i].UpdatedAt = time.Time{}
+	}
+	byKey := func(a, b field.Scope) int {
+		return strings.Compare(a.PageTypeID+string(a.Key), b.PageTypeID+string(b.Key))
+	}
+	slices.SortFunc(got, byKey)
+	slices.SortFunc(want, byKey)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("the migration seeded\n%+v\nwant what the application seeds\n%+v", got, want)
 	}
 }
 
