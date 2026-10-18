@@ -618,6 +618,27 @@ func TestSyncSiteReadsTheStockManagementAsTheStoreSendsIt(t *testing.T) {
 	}
 }
 
+func TestSyncSiteLinksAPageToATargetLaterInTheSameBatch(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	h.server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "Alpha", Slug: "alpha", Status: "publish",
+		Content: `<h1>Alpha</h1><p>See <a href="/beta/">beta</a>.</p>`,
+	})
+	h.server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Beta", Slug: "beta", Status: "publish", Content: "<h1>Beta</h1><p>Here.</p>"})
+
+	state := h.all(t)
+	if state.Pulled != 2 || state.Created != 2 {
+		t.Fatalf("state = %+v, want both pages in one batch", state)
+	}
+	alpha, beta := h.byPath(t, "/alpha/"), h.byPath(t, "/beta/")
+	links := h.rawLinks(t, alpha.ID)
+	if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != beta.ID {
+		t.Fatalf("alpha's raw links are %+v, want the one to beta resolved once the walk is done", links)
+	}
+}
+
 func TestSyncSiteRaisesNothingOverAProductWithoutADescription(t *testing.T) {
 	t.Parallel()
 

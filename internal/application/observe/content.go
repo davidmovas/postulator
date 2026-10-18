@@ -45,6 +45,7 @@ type absorber struct {
 	install  pagemap.Site
 	rows     siteRows
 	tracked  *findings
+	pending  map[string]struct{}
 	now      time.Time
 	findings []content.Finding
 }
@@ -62,7 +63,8 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 		return err
 	}
 	a := &absorber{
-		service: s, state: state, readers: readers, owner: owner, install: install, rows: rowsOf(pages), tracked: tracked, now: s.now(),
+		service: s, state: state, readers: readers, owner: owner, install: install, rows: rowsOf(pages), tracked: tracked,
+		pending: map[string]struct{}{}, now: s.now(),
 	}
 	batch, err := a.prepare(ctx, resolveDraftPaths(items, a.rows.byWPID))
 	if err != nil {
@@ -121,6 +123,9 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 		if known && current.Path != next.Path {
 			delete(a.rows.byPath, current.Path)
 		}
+		if !known {
+			a.pending[next.ID] = struct{}{}
+		}
 		a.rows.remember(next)
 
 		terms, err := a.readTerms(ctx, items[i])
@@ -148,6 +153,7 @@ func (a *absorber) keep(ctx context.Context, p prepared) error {
 		if err := a.service.deps.Pages.Insert(ctx, p.next); err != nil {
 			return err
 		}
+		delete(a.pending, p.next.ID)
 		a.state.Counts.Created++
 	}
 
@@ -379,7 +385,7 @@ func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, body block.B
 			if wasGenerated {
 				link.Origin = pagemap.OriginGenerated
 			}
-			if target, ok := a.rows.byPath[path]; ok {
+			if target, ok := a.stored(path); ok {
 				link.ToPageID = &target.ID
 			}
 			if built, buildErr := pagemap.NewPageLink(link); buildErr == nil {
@@ -388,6 +394,15 @@ func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, body block.B
 		}
 	}
 	return a.service.deps.Links.ReplaceForPage(ctx, page.ID, pagemap.SourceRaw, links)
+}
+
+func (a *absorber) stored(path string) (pagemap.Page, bool) {
+	target, ok := a.rows.byPath[path]
+	if !ok {
+		return pagemap.Page{}, false
+	}
+	_, waiting := a.pending[target.ID]
+	return target, !waiting
 }
 
 func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item) error {
@@ -413,7 +428,7 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 		if wasGenerated {
 			link.Origin = pagemap.OriginGenerated
 		}
-		if target, ok := a.rows.byPath[path]; ok {
+		if target, ok := a.stored(path); ok {
 			link.ToPageID = &target.ID
 		}
 		if built, buildErr := pagemap.NewPageLink(link); buildErr == nil {
