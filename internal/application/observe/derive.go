@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
 )
@@ -92,12 +93,24 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		}
 	}
 
+	set, err := s.deps.Types.Set(ctx, state.SiteID)
+	if err != nil {
+		return err
+	}
+	typed := untyped(m, changed, set)
+	state.Counts.Typed += len(typed)
+
 	err = s.inUnit(ctx, func(c context.Context) error {
 		for id := range changed {
 			page := changed[id]
 			page.UpdatedAt = now
 			if updateErr := s.deps.Pages.UpdateDerived(c, page); updateErr != nil {
 				return updateErr
+			}
+		}
+		for _, t := range typed {
+			if typeErr := s.deps.Pages.AutoType(c, t.pageID, t.typeID, t.reason, now); typeErr != nil {
+				return typeErr
 			}
 		}
 		return s.resolveLinks(c, state.SiteID, pagemap.NewIndex(m.pages))
@@ -192,6 +205,37 @@ func technicalReason(page pagemap.Page, body block.Snapshot, record render.Recor
 		return pagemap.TechnicalNoindex
 	}
 	return pagemap.TechnicalNone
+}
+
+type typing struct {
+	pageID string
+	typeID string
+	reason pagemap.TypeReason
+}
+
+func untyped(m siteModel, changed map[string]pagemap.Page, set pagetype.Set) []typing {
+	out := make([]typing, 0)
+	for i := range m.pages {
+		page := m.pages[i]
+		if moved, held := changed[page.ID]; held {
+			page = moved
+		}
+		if page.WPID == nil || page.PageTypeID != nil || page.Status == pagemap.StatusArchived {
+			continue
+		}
+		var record *render.Record
+		if held, rendered := m.renders[page.ID]; rendered {
+			record = &held
+		}
+		preset, reason, assigned := pagetype.Assign(pagetype.FactsOf(page, record))
+		if !assigned {
+			continue
+		}
+		if kind, found := set.ByPreset(preset); found {
+			out = append(out, typing{pageID: page.ID, typeID: kind.ID, reason: reason})
+		}
+	}
+	return out
 }
 
 func derivedMoved(before, after pagemap.Page) bool {

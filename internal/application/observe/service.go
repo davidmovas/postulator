@@ -75,6 +75,8 @@ func (s *Service) Step(ctx context.Context, state State, readers Readers, batch 
 	case StageDerive:
 		err = s.derive(ctx, &state, readers)
 		done = true
+	case StageFields:
+		done, err = s.fields(ctx, &state, readers, batch)
 	case StageDone:
 		return state, nil
 	default:
@@ -99,6 +101,8 @@ func nextStage(stage Stage) Stage {
 		return StageRender
 	case StageRender:
 		return StageDerive
+	case StageDerive:
+		return StageFields
 	default:
 		return StageDone
 	}

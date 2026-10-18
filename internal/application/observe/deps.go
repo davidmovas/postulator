@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -25,6 +26,12 @@ type pageStore interface {
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
 	UpdateDerived(ctx context.Context, page pagemap.Page) error
+	AutoType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+}
+
+type typeSet interface {
+	Seed(ctx context.Context, siteID string) error
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
 type identityStore interface {
@@ -82,6 +89,7 @@ type Deps struct {
 	Renders    renderStore
 	Links      linkStore
 	Findings   findingStore
+	Types      typeSet
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

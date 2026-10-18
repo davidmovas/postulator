@@ -16,6 +16,9 @@ const (
 )
 
 func (s *Service) inventory(ctx context.Context, state *State, readers Readers) error {
+	if err := s.deps.Types.Seed(ctx, state.SiteID); err != nil {
+		return err
+	}
 	tracked, err := s.findings(ctx, state.SiteID, finding.PluginOutdated)
 	if err != nil {
 		return err

@@ -18,16 +18,16 @@ type runtimeParts struct {
 	observe *observe.Service
 }
 
-func (c *Core) buildObserver(stores repos) *observe.Service {
+func (c *Core) buildObserver(stores repos, writing authoring) *observe.Service {
 	return observe.New(observe.Deps{
 		Sites: stores.sites, Pages: stores.pages, Identity: stores.identities, Fields: stores.fields, Bodies: stores.bodies,
-		Renders: stores.renders, Links: stores.links, Findings: stores.findings,
+		Renders: stores.renders, Links: stores.links, Findings: stores.findings, Types: writing.pageTypes,
 		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 	})
 }
 
 func (c *Core) buildRuntime(stores repos, llm llmParts, writing authoring) (runtimeParts, error) {
-	observer := c.buildObserver(stores)
+	observer := c.buildObserver(stores, writing)
 	stepRegistry := run.NewRegistry()
 	if err := steps.Register(stepRegistry, c.stepDeps(stores, llm, writing, observer)); err != nil {
 		return runtimeParts{}, err

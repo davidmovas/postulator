@@ -1,6 +1,9 @@
 package pagetype
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
@@ -62,6 +65,17 @@ func (s Set) Scope(typeID string, key field.Key) (field.Scope, bool) {
 	scope := DefaultScope(kind.Preset, key, typeID)
 	scope.Enabled = false
 	return scope, false
+}
+
+func (s Set) Custom(typeID string) []field.Scope {
+	out := make([]field.Scope, 0)
+	for key := range s.scopes {
+		if key.typeID == typeID && key.key.Kind() == field.Meta && s.scopes[key].Enabled {
+			out = append(out, s.scopes[key])
+		}
+	}
+	slices.SortFunc(out, func(a, b field.Scope) int { return strings.Compare(string(a.Key), string(b.Key)) })
+	return out
 }
 
 func (s Set) Policy(page pagemap.Page) field.LinkPolicy {

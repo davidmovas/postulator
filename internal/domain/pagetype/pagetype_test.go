@@ -286,4 +286,20 @@ func TestTheSetResolvesEveryPageToATypeAndAPolicy(t *testing.T) {
 	if scope, found := set.Scope("s1-hub", field.Instance(field.Meta, "spec_sheet")); found || scope.Enabled {
 		t.Errorf("a custom field no scope names = %+v %t", scope, found)
 	}
+
+	custom := func(key string, enabled bool) field.Scope {
+		return field.Scope{PageTypeID: "s1-hub", Key: field.Instance(field.Meta, key), Enabled: enabled, Label: key, Provider: field.ProviderPlugin, Links: field.NoLinks()}
+	}
+	withCustom := pagetype.NewSet(types, append(slices.Clone(scopes), custom("spec_sheet", true), custom("dosage", true), custom("retired", false)))
+	listed := withCustom.Custom("s1-hub")
+	got := make([]field.Key, 0, len(listed))
+	for i := range listed {
+		got = append(got, listed[i].Key)
+	}
+	if !slices.Equal(got, []field.Key{field.Instance(field.Meta, "dosage"), field.Instance(field.Meta, "spec_sheet")}) {
+		t.Errorf("Custom = %v, want the enabled custom fields by key", got)
+	}
+	if len(withCustom.Custom("s1-entity")) != 0 {
+		t.Error("a type without custom fields lists some")
+	}
 }

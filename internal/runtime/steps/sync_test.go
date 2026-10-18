@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
@@ -92,6 +93,10 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 		Sites: siteRepo, Pages: pageRepo, Identity: identityRepo, Fields: fieldRepo, Bodies: bodyRepo,
 		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: findingRepo,
 		UnitOfWork: store, Publisher: bus, Clock: fake,
+		Types: pagetypes.New(pagetypes.Deps{
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
+			Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: bus, Clock: fake,
+		}),
 	})
 
 	return &syncHarness{
@@ -941,7 +946,7 @@ func TestSyncSiteArchivesNothingUntilThePullIsComplete(t *testing.T) {
 
 	for range 80 {
 		state, _ := h.once(t)
-		if !state.Done {
+		if !state.Done && state.Stage != string(observe.StageFields) {
 			if state.Archived != 0 {
 				t.Fatalf("a partial pull archived %d pages: %+v", state.Archived, state)
 			}

@@ -15,6 +15,7 @@ const (
 	StageStore     Stage = "store"
 	StageRender    Stage = "render"
 	StageDerive    Stage = "derive"
+	StageFields    Stage = "fields"
 	StageDone      Stage = "done"
 )
 
@@ -36,6 +37,8 @@ type Counts struct {
 	Rendered    int `json:"rendered"`
 	Unreachable int `json:"unreachable"`
 	Archived    int `json:"archived"`
+	Typed       int `json:"typed"`
+	Custom      int `json:"custom"`
 }
 
 type State struct {
@@ -51,6 +54,7 @@ type State struct {
 	CorePage     int                 `json:"corePage"`
 	StorePage    int                 `json:"storePage"`
 	RenderAfter  string              `json:"renderAfter"`
+	FieldsAfter  string              `json:"fieldsAfter"`
 	Technical    site.TechnicalPages `json:"technical"`
 	Findings     []content.Finding   `json:"findings,omitempty"`
 	Counts       Counts              `json:"counts"`

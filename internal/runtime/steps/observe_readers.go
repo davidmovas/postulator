@@ -3,6 +3,8 @@ package steps
 import (
 	"context"
 	"encoding/json"
+	"slices"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/observe"
@@ -224,6 +226,31 @@ func (r pluginReader) GetTerms(ctx context.Context, postType string, id int64) (
 		return nil, err
 	}
 	return termsOf(terms), nil
+}
+
+func (r pluginReader) GetMeta(ctx context.Context, postType string, id int64, keys []string) (map[string]string, error) {
+	values := make(map[string]string, len(keys))
+	for asked := range slices.Chunk(keys, wp.MaxMetaKeys) {
+		found, err := r.client.GetMeta(ctx, wp.ItemType(postType), id, asked)
+		if err != nil {
+			return nil, err
+		}
+		for key, raw := range found {
+			values[key] = metaText(raw)
+		}
+	}
+	return values, nil
+}
+
+func metaText(raw json.RawMessage) string {
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return text
+	}
+	if trimmed := strings.TrimSpace(string(raw)); trimmed != "null" {
+		return trimmed
+	}
+	return ""
 }
 
 func (r pluginReader) Settings(ctx context.Context) (site.TechnicalPages, error) {

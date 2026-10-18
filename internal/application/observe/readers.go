@@ -114,6 +114,7 @@ type PluginReader interface {
 	GetRendered(ctx context.Context, postType string, id int64) (Rendered, error)
 	GetSEOMeta(ctx context.Context, postType string, id int64) (SEOMeta, error)
 	GetTerms(ctx context.Context, postType string, id int64) ([]pagemap.Term, error)
+	GetMeta(ctx context.Context, postType string, id int64, keys []string) (map[string]string, error)
 	Settings(ctx context.Context) (site.TechnicalPages, error)
 	PreviewLink(ctx context.Context, postType string, id int64) (string, error)
 }
@@ -222,6 +223,7 @@ const (
 	capabilityTerms    = "terms"
 	capabilitySettings = "settings"
 	capabilityPreview  = "preview"
+	capabilityMeta     = "meta"
 )
 
 func (r Readers) plugin(capability string) bool {

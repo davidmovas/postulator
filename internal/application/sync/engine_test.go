@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/llm"
@@ -101,6 +102,10 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 		Sites: siteRepo, Pages: pageRepo, Identity: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo,
 		Findings: sqlite.NewFindingRepo(store), UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
+		Types: pagetypes.New(pagetypes.Deps{
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
+			Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
+		}),
 	})
 	registry := run.NewRegistry()
 	if regErr := registry.Register(steps.SyncSite(steps.Deps{

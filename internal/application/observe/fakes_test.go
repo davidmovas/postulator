@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -76,6 +77,7 @@ type stores struct {
 	published  []events.Type
 	bodyLists  int
 	interleave func()
+	types      *typesFake
 }
 
 func (s *stores) interleaved() {
@@ -107,6 +109,7 @@ func newStores(owner site.Site) *stores {
 		renders:    map[string]render.Record{},
 		links:      map[string]map[pagemap.LinkSource][]pagemap.PageLink{},
 		findings:   map[string]finding.Finding{},
+		types:      &typesFake{types: map[string][]pagetype.Type{}},
 	}
 }
 
@@ -172,13 +175,71 @@ func (p pageStore) Insert(_ context.Context, page pagemap.Page) error {
 }
 
 func (p pageStore) Update(_ context.Context, page pagemap.Page) error {
+	p.s.interleaved()
 	p.s.mu.Lock()
 	defer p.s.mu.Unlock()
-	if _, ok := p.s.pages[page.ID]; !ok {
+	stored, ok := p.s.pages[page.ID]
+	if !ok {
 		return errors.New(errors.NotFound, "no such page")
 	}
+	page.PageTypeID, page.TypeSource, page.TypeReason = stored.PageTypeID, stored.TypeSource, stored.TypeReason
 	p.s.pages[page.ID] = page
 	return nil
+}
+
+func (p pageStore) AutoType(_ context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	stored, ok := p.s.pages[pageID]
+	if !ok || stored.PageTypeID != nil {
+		return nil
+	}
+	stored.PageTypeID, stored.TypeSource, stored.TypeReason, stored.UpdatedAt = &typeID, pagemap.TypeSourceAuto, reason, at
+	p.s.pages[pageID] = stored
+	return nil
+}
+
+func (s *stores) setType(pageID, typeID string, reason pagemap.TypeReason) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stored := s.pages[pageID]
+	stored.PageTypeID, stored.TypeSource, stored.TypeReason = &typeID, pagemap.TypeSourceManual, reason
+	s.pages[pageID] = stored
+}
+
+type typesFake struct {
+	mu     sync.Mutex
+	types  map[string][]pagetype.Type
+	scopes []field.Scope
+}
+
+func (f *typesFake) Seed(_ context.Context, siteID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.types[siteID]) > 0 {
+		return nil
+	}
+	for i, preset := range pagetype.Presets() {
+		kind := pagetype.Type{
+			ID: siteID + "-" + string(preset), SiteID: siteID, Name: preset.DefaultName(), Preset: preset,
+			CreatedAt: earlier.Add(time.Duration(i) * time.Second), UpdatedAt: earlier,
+		}
+		f.types[siteID] = append(f.types[siteID], kind)
+		f.scopes = append(f.scopes, pagetype.DefaultScopes(preset, kind.ID)...)
+	}
+	return nil
+}
+
+func (f *typesFake) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return pagetype.NewSet(slices.Clone(f.types[siteID]), slices.Clone(f.scopes)), nil
+}
+
+func (f *typesFake) add(scope field.Scope) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.scopes = append(f.scopes, scope)
 }
 
 func (p pageStore) UpdateDerived(_ context.Context, page pagemap.Page) error {
@@ -511,7 +572,7 @@ func (b bus) Publish(eventType events.Type, _ any) error {
 func (s *stores) deps(clk clock.Clock) observe.Deps {
 	return observe.Deps{
 		Sites: s, Pages: pageStore{s}, Identity: identityStore{s}, Fields: fieldStore{s}, Bodies: bodyStore{s},
-		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, UnitOfWork: unit{s.guard}, Publisher: bus{s}, Clock: clk,
+		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, Types: s.types, UnitOfWork: unit{s.guard}, Publisher: bus{s}, Clock: clk,
 	}
 }
 
@@ -526,6 +587,31 @@ type pluginFake struct {
 	pages    site.TechnicalPages
 	previews map[int64]string
 	queries  []observe.ContentQuery
+	custom   map[int64]map[string]string
+	asked    map[int64][]string
+}
+
+func (p *pluginFake) GetMeta(_ context.Context, _ string, id int64, keys []string) (map[string]string, error) {
+	p.guard.read()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.asked == nil {
+		p.asked = map[int64][]string{}
+	}
+	p.asked[id] = append(p.asked[id], keys...)
+	out := map[string]string{}
+	for _, key := range keys {
+		if value, held := p.custom[id][key]; held {
+			out[key] = value
+		}
+	}
+	return out, nil
+}
+
+func (p *pluginFake) askedFor(id int64) []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.asked[id])
 }
 
 func (p *pluginFake) ListContent(_ context.Context, q observe.ContentQuery) (observe.ContentPage, error) {

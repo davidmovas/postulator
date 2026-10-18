@@ -19,7 +19,7 @@ const (
 	CapabilityTerms    = "terms"
 	CapabilitySettings = "settings"
 
-	maxMetaKeys = 50
+	MaxMetaKeys = 50
 )
 
 type Rendered struct {
@@ -167,8 +167,8 @@ func metaKeys(keys []string) ([]string, error) {
 	if len(asked) == 0 {
 		return nil, errors.New(errors.Invalid, "a meta read names at least one key")
 	}
-	if len(asked) > maxMetaKeys {
-		return nil, errors.New(errors.Invalid, "a meta read names at most "+strconv.Itoa(maxMetaKeys)+" keys").
+	if len(asked) > MaxMetaKeys {
+		return nil, errors.New(errors.Invalid, "a meta read names at most "+strconv.Itoa(MaxMetaKeys)+" keys").
 			WithDetail("keys", len(asked))
 	}
 	return asked, nil
