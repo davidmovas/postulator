@@ -185,6 +185,27 @@ func TestContentPagesWithAnOpaqueCursorAndAnExclusiveSince(t *testing.T) {
 	}
 }
 
+func TestTheContentListingLeavesOutTrashAndAutoDrafts(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "Kept"},
+		wptest.Item{Type: wptest.TypePage, Title: "Thrown", Status: "trash"},
+		wptest.Item{Type: wptest.TypePost, Title: "Unsaved", Status: "auto-draft"},
+	)
+
+	var listed struct {
+		Items []map[string]any `json:"items"`
+	}
+	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content", nil, true)
+	decode(t, payload, &listed)
+
+	if len(listed.Items) != 1 || listed.Items[0]["title"] != "Kept" {
+		t.Errorf("content listed %+v, want only the kept page", listed.Items)
+	}
+}
+
 func TestTheContentLimitIsClampedRatherThanRejected(t *testing.T) {
 	t.Parallel()
 

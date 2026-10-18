@@ -197,7 +197,7 @@ func (s *Server) postsAfter(types []string, since time.Time, after cursor) []*It
 	matched := make([]*Item, 0, len(s.order))
 	for _, id := range s.order {
 		stored := s.items[id]
-		if !slices.Contains(types, stored.Type) {
+		if !slices.Contains(types, stored.Type) || stored.Status == "trash" || stored.Status == "auto-draft" {
 			continue
 		}
 		if !since.IsZero() && !stored.Modified.After(since) {
