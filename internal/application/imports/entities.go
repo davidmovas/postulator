@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
@@ -39,7 +40,7 @@ func edgeKey(e graph.Edge) string {
 }
 
 func sameEntity(a, b graph.Entity) bool {
-	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) && slices.Equal(a.Anchors, b.Anchors)
+	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) && slices.Equal(a.Anchors, b.Anchors) && slices.Equal(a.Notes, b.Notes)
 }
 
 func (b *builder) planEntities() error {
@@ -73,7 +74,7 @@ func (b *builder) createEntity(u *unit, kind graph.Kind) error {
 		scope = &parentID
 	}
 	entity, err := graph.NewEntity(graph.Entity{
-		ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: cmp.Or(kind, u.defaultKind()),
+		ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: cmp.Or(kind, u.defaultKind()), Notes: u.notes,
 		ScopeID: scope, Keywords: u.keywords, Anchors: unionAnchors(nil, u.anchors),
 		Source: graph.SourceImport, CreatedAt: b.now, UpdatedAt: b.now,
 	})
@@ -91,6 +92,7 @@ func (b *builder) updateEntity(u *unit, kind graph.Kind) error {
 	next := current
 	next.Kind = cmp.Or(kind, current.Kind)
 	next.Keywords = current.Keywords.Merge(u.keywords)
+	next.Notes = note.Merge(current.Notes, u.notes)
 	next.Anchors = unionAnchors(current.Anchors, u.anchors)
 	next.UpdatedAt = b.now
 	entity, err := graph.NewEntity(next)

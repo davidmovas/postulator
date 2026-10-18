@@ -15,12 +15,25 @@ type Anchor struct {
 	Weight float64 `json:"weight,omitempty" minimum:"0" maximum:"1" description:"Preference over the others; omit for none"`
 }
 
+type Fact struct {
+	Label string `json:"label" description:"What the fact is about"`
+	Value string `json:"value" description:"The fact"`
+}
+
+type Note struct {
+	Label string `json:"label" description:"Note heading"`
+	Text  string `json:"text" description:"Note text"`
+}
+
 type Entity struct {
 	ID              string        `json:"id"`
 	SiteID          string        `json:"siteId"`
 	Name            string        `json:"name"`
 	Kind            string        `json:"kind"`
 	Intent          string        `json:"intent"`
+	Definition      string        `json:"definition"`
+	Facts           []Fact        `json:"facts"`
+	Notes           []Note        `json:"notes"`
 	Keywords        []dto.Keyword `json:"keywords"`
 	Anchors         []Anchor      `json:"anchors"`
 	ScopeEntityID   *string       `json:"scopeEntityId"`
@@ -58,12 +71,23 @@ func entityView(e graphdomain.Entity) Entity {
 	for _, anchor := range e.Anchors {
 		anchors = append(anchors, Anchor{Text: anchor.Text, Source: string(anchor.Source), Weight: anchor.Weight})
 	}
+	facts := make([]Fact, 0, len(e.Facts))
+	for _, fact := range e.Facts {
+		facts = append(facts, Fact(fact))
+	}
+	notes := make([]Note, 0, len(e.Notes))
+	for _, n := range e.Notes {
+		notes = append(notes, Note(n))
+	}
 	return Entity{
 		ID:              e.ID,
 		SiteID:          e.SiteID,
 		Name:            e.Name,
 		Kind:            string(e.Kind),
 		Intent:          e.Intent,
+		Definition:      e.Definition,
+		Facts:           facts,
+		Notes:           notes,
 		Keywords:        application.KeywordViews(e.Keywords),
 		Anchors:         anchors,
 		ScopeEntityID:   e.ScopeID,

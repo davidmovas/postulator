@@ -37,6 +37,29 @@ type rowDraft struct {
 	levels    []string
 }
 
+func (r *rowDraft) cardNotes() []note.Note {
+	if r.path == "" {
+		return r.notes
+	}
+	out := make([]note.Note, 0, len(r.notes))
+	for _, n := range r.notes {
+		if importmap.DescribesEntity(n.Label) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func (r *rowDraft) pageNotes() []note.Note {
+	out := make([]note.Note, 0, len(r.notes))
+	for _, n := range r.notes {
+		if !importmap.DescribesEntity(n.Label) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
 func (r *rowDraft) named() string {
 	switch {
 	case r.name != "":

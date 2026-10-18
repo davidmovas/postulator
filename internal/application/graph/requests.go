@@ -38,11 +38,14 @@ type CreateEntitiesResponse struct {
 }
 
 type UpdateEntityRequest struct {
-	ID       string         `json:"id" description:"Entity id"`
-	Name     *string        `json:"name,omitempty" description:"New name"`
-	Kind     *string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"New kind"`
-	Intent   *string        `json:"intent,omitempty" description:"New reader goal"`
-	Keywords *[]dto.Keyword `json:"keywords,omitempty" description:"Whole new keyword list"`
+	ID         string         `json:"id" description:"Entity id"`
+	Name       *string        `json:"name,omitempty" description:"New name"`
+	Kind       *string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"New kind"`
+	Intent     *string        `json:"intent,omitempty" description:"New reader goal"`
+	Keywords   *[]dto.Keyword `json:"keywords,omitempty" description:"Whole new keyword list"`
+	Definition *string        `json:"definition,omitempty" description:"What the entity is, in a sentence or two"`
+	Facts      *[]Fact        `json:"facts,omitempty" description:"Whole new list of key facts"`
+	Notes      *[]Note        `json:"notes,omitempty" description:"Whole new list of notes"`
 }
 
 type UpdateEntityResponse struct {

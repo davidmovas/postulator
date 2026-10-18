@@ -681,6 +681,65 @@ func TestNoteColumnsTravelWithThePage(t *testing.T) {
 	}
 }
 
+func cardNotesOf(t *testing.T, h harness, name string) []note.Note {
+	t.Helper()
+
+	entities, err := sqlite.NewEntityRepo(h.store).ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the entities: %v", err)
+	}
+	for i := range entities {
+		if entities[i].Name == name {
+			return entities[i].Notes
+		}
+	}
+	t.Fatalf("no entity %s", name)
+	return nil
+}
+
+func TestANoteThatDescribesTheEntityGoesToItsCard(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	sheet := h.file(t, "card.csv", "URL,Entity,Title,Notes,Entity notes\n"+
+		"/bpc-157/,BPC-157,BPC-157,Sold as a 10 ml vial,A pentadecapeptide\n"+
+		",Healing,,Peptides that repair tissue,\n")
+	mapping := h.detected(t, sheet)
+	if !slices.Equal(mapping.Options.NoteColumns, []string{"Notes", "Entity notes"}) {
+		t.Fatalf("note columns = %v", mapping.Options.NoteColumns)
+	}
+	h.apply(t, sheet, mapping)
+
+	check := func(h harness, when string) {
+		t.Helper()
+		if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Sold as a 10 ml vial"}}) {
+			t.Fatalf("%s: the page's notes = %+v, want only the note about the page", when, got)
+		}
+		if got := cardNotesOf(t, h, "BPC-157"); !slices.Equal(got, []note.Note{{Label: "Entity notes", Text: "A pentadecapeptide"}}) {
+			t.Fatalf("%s: BPC-157's card = %+v, want the note that names the entity", when, got)
+		}
+		if got := cardNotesOf(t, h, "Healing"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Peptides that repair tissue"}}) {
+			t.Fatalf("%s: Healing's card = %+v, want the note of a row with no page", when, got)
+		}
+	}
+	check(h, "after the import")
+
+	report := h.preview(t, sheet, mapping)
+	for _, entity := range report.Entities {
+		if entity.Action != string(imports.ActionSkip) {
+			t.Fatalf("a second import of the same sheet would %s %s", entity.Action, entity.Name)
+		}
+	}
+
+	exported := filepath.Join(h.dir, "card.xlsx")
+	if _, err := h.service.Export(t.Context(), imports.ExportRequest{SiteID: h.siteID, Path: exported}); err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	target := newHarness(t)
+	target.apply(t, exported, target.detected(t, exported))
+	check(target, "after an export and an import")
+}
+
 func TestAnUnpublishedAncestorWithoutAnEntityGetsOne(t *testing.T) {
 	t.Parallel()
 

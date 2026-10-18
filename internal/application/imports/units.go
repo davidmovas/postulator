@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -30,6 +31,7 @@ type parentRef struct {
 type unit struct {
 	name     string
 	kind     string
+	notes    []note.Note
 	keywords keyword.List
 	anchors  []string
 	related  []string
@@ -114,6 +116,7 @@ func (b *builder) root(at int) int {
 func (b *builder) absorbRow(at int, row *rowDraft) {
 	u := &b.units[at]
 	u.kind = fill(u.kind, row.kind)
+	u.notes = note.Merge(u.notes, row.cardNotes())
 	u.keywords = u.keywords.Merge(row.keywords)
 	u.anchors = graph.Distinct(u.anchors, row.anchors)
 	u.related = graph.Distinct(u.related, row.related)

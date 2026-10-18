@@ -62,7 +62,7 @@ func (p *pageDraft) merge(row *rowDraft, at int) {
 	p.wpType = fill(p.wpType, row.wpType)
 	p.pageKind = fill(p.pageKind, row.pageKind)
 	p.keywords = p.keywords.Merge(row.keywords)
-	p.notes = note.Merge(p.notes, row.notes)
+	p.notes = note.Merge(p.notes, row.pageNotes())
 	if p.own == ownUnset {
 		p.own = row.own
 	}

@@ -183,8 +183,31 @@ func TestUpdateSetAnchorsAndGet(t *testing.T) {
 	}
 	h.wantEvents(t, events.GraphChanged)
 
+	carded, err := h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{
+		ID: entity.ID, Definition: ptr(" Shoes worn for running. "),
+		Facts: ptr([]graph.Fact{{Label: " Drop ", Value: "8 mm"}}),
+		Notes: ptr([]graph.Note{{Label: "Entity notes", Text: "Sold in pairs"}}),
+	})
+	if err != nil {
+		t.Fatalf("UpdateEntity card: %v", err)
+	}
+	for name, req := range map[string]graph.UpdateEntityRequest{
+		"a fact without its label": {ID: entity.ID, Facts: ptr([]graph.Fact{{Label: " ", Value: "8 mm"}})},
+		"a fact without its value": {ID: entity.ID, Facts: ptr([]graph.Fact{{Label: "Drop"}})},
+		"a note without its text":  {ID: entity.ID, Notes: ptr([]graph.Note{{Label: "Entity notes"}})},
+	} {
+		if _, refused := h.service.UpdateEntity(t.Context(), req); !errors.IsCode(refused, errors.Invalid) {
+			t.Errorf("%s = %v, want INVALID", name, refused)
+		}
+	}
+	if carded.Entity.Definition != "Shoes worn for running." || !slices.Equal(carded.Entity.Facts, []graph.Fact{{Label: "Drop", Value: "8 mm"}}) ||
+		!slices.Equal(carded.Entity.Notes, []graph.Note{{Label: "Entity notes", Text: "Sold in pairs"}}) {
+		t.Errorf("the card = %q %+v %+v, want it cleaned and kept", carded.Entity.Definition, carded.Entity.Facts, carded.Entity.Notes)
+	}
+	h.wantEvents(t, events.GraphChanged)
+
 	got, err := h.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: entity.ID})
-	if err != nil || got.Entity.Name != "Footwear" || len(got.Entity.Anchors) != 2 {
+	if err != nil || got.Entity.Name != "Footwear" || len(got.Entity.Anchors) != 2 || got.Entity.Definition != "Shoes worn for running." || len(got.Entity.Facts) != 1 {
 		t.Errorf("GetEntity = %+v, %v", got.Entity, err)
 	}
 

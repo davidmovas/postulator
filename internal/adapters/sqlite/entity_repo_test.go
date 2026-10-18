@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -18,6 +19,9 @@ import (
 func fullEntity(siteID, name string, at time.Time) graph.Entity {
 	return graph.Entity{
 		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Intent: "informational",
+		Definition: name + " is studied for tissue repair.",
+		Facts:      []graph.Fact{{Label: "Half-life", Value: "about 4 hours"}, {Label: "Form", Value: "lyophilized powder"}},
+		Notes:      []note.Note{{Label: "Entity notes", Text: "Sold as a vial"}},
 		Keywords: keyword.New([]keyword.Keyword{
 			{Text: name + " keyword", Volume: new(12000)}, {Text: name + " one", Volume: new(0)}, {Text: name + " two"},
 		}),

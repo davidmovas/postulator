@@ -29,7 +29,14 @@ var aliases = map[Field][]string{
 
 var levelAliases = []string{"root entity", "root"}
 
-var noteAliases = []string{"notes", "note", "intent owner", "reason", "detected form variation"}
+var noteAliases = []string{
+	"notes", "note", "intent owner", "reason", "detected form variation",
+	"entity notes", "entity note", "entity definition", "entity description",
+}
+
+func DescribesEntity(header string) bool {
+	return slices.Contains(strings.Fields(Words(header)), "entity")
+}
 
 var aliasIndex, compactIndex = buildIndexes()
 

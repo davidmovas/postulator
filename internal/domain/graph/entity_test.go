@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -60,6 +61,36 @@ func TestNewEntityNormalises(t *testing.T) {
 	}
 	if entity.Keywords.Main() != "running shoes" {
 		t.Errorf("main keyword = %q, want the one with the highest volume", entity.Keywords.Main())
+	}
+}
+
+func TestNewEntityCleansItsCard(t *testing.T) {
+	t.Parallel()
+
+	carded := validEntity()
+	carded.Definition = "  A pentadecapeptide studied for tissue repair.  "
+	carded.Facts = []graph.Fact{
+		{Label: " Half-life ", Value: " about 4 hours "}, {Label: "half-life", Value: "a second"}, {Label: "Form", Value: " "}, {Label: "", Value: "lost"},
+	}
+	carded.Notes = []note.Note{{Label: " Entity notes ", Text: " Sold as a vial "}, {Label: "entity notes", Text: "a second"}}
+
+	entity, err := graph.NewEntity(carded)
+	if err != nil {
+		t.Fatalf("NewEntity: %v", err)
+	}
+	if entity.Definition != "A pentadecapeptide studied for tissue repair." {
+		t.Errorf("Definition = %q, want it trimmed", entity.Definition)
+	}
+	if !slices.Equal(entity.Facts, []graph.Fact{{Label: "Half-life", Value: "about 4 hours"}}) {
+		t.Errorf("Facts = %+v, want one fact a label, trimmed, the empty ones gone", entity.Facts)
+	}
+	if !slices.Equal(entity.Notes, []note.Note{{Label: "Entity notes", Text: "Sold as a vial"}}) {
+		t.Errorf("Notes = %+v, want one note a label, trimmed", entity.Notes)
+	}
+
+	bare, err := graph.NewEntity(validEntity())
+	if err != nil || bare.Facts == nil || bare.Notes == nil {
+		t.Errorf("an entity without a card = %+v %v, want empty lists, never nil", bare, err)
 	}
 }
 

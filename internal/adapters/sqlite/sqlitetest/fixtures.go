@@ -44,6 +44,7 @@ func Entity(t testing.TB, store *sqlite.Store, siteID, name string) graph.Entity
 
 	record := graph.Entity{
 		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		Facts: []graph.Fact{}, Notes: []note.Note{},
 		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}

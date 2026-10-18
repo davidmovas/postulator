@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -67,12 +68,39 @@ type Anchor struct {
 	Weight float64
 }
 
+type Fact struct {
+	Label string
+	Value string
+}
+
+func CleanFacts(facts []Fact) []Fact {
+	out := make([]Fact, 0, len(facts))
+	held := make(map[string]struct{}, len(facts))
+	for _, fact := range facts {
+		label := strings.TrimSpace(fact.Label)
+		value := strings.TrimSpace(fact.Value)
+		if label == "" || value == "" {
+			continue
+		}
+		key := strings.ToLower(label)
+		if _, repeated := held[key]; repeated {
+			continue
+		}
+		held[key] = struct{}{}
+		out = append(out, Fact{Label: label, Value: value})
+	}
+	return out
+}
+
 type Entity struct {
 	ID              string
 	SiteID          string
 	Name            string
 	Kind            Kind
 	Intent          string
+	Definition      string
+	Facts           []Fact
+	Notes           []note.Note
 	Keywords        keyword.List
 	Anchors         []Anchor
 	ScopeID         *string
@@ -112,6 +140,9 @@ func NewEntity(e Entity) (Entity, error) {
 		return Entity{}, invalid("an entity cannot sit under itself", "scopeId")
 	}
 
+	e.Definition = strings.TrimSpace(e.Definition)
+	e.Facts = CleanFacts(e.Facts)
+	e.Notes = note.Clean(e.Notes)
 	e.Keywords = keyword.New(e.Keywords)
 	anchors, err := newAnchors(e.Anchors)
 	if err != nil {

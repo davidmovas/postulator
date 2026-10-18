@@ -45,7 +45,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 	slices.SortFunc(pages, func(a, b pagemap.Page) int { return strings.Compare(a.Path, b.Path) })
 
 	options := importmap.DefaultOptions()
-	labels := noteLabels(pages)
+	labels := noteLabels(pages, state.entities)
 	table := importmap.Table{Headers: append(headers(), labels...), Rows: make([][]string, 0, len(pages)+len(state.entities))}
 	mapped := make(map[string]struct{}, len(state.entities))
 
@@ -57,7 +57,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 			mapped[entity.ID] = struct{}{}
 		}
 		cells := row(page, &entity, kinds[refOf(page.TemplateID)], g, options)
-		table.Rows = append(table.Rows, append(cells, noteCells(page.Notes, labels)...))
+		table.Rows = append(table.Rows, append(cells, noteCells(append(slices.Clone(page.Notes), entity.Notes...), labels)...))
 	}
 
 	loose := g.Entities()
@@ -66,7 +66,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 			continue
 		}
 		cells := row(nil, &loose[i], "", g, options)
-		table.Rows = append(table.Rows, append(cells, noteCells(nil, labels)...))
+		table.Rows = append(table.Rows, append(cells, noteCells(byID[loose[i].ID].Notes, labels)...))
 	}
 
 	if err := s.deps.Tables.Write(req.Path, table); err != nil {
@@ -173,17 +173,23 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 	return out
 }
 
-func noteLabels(pages []pagemap.Page) []string {
+func noteLabels(pages []pagemap.Page, entities []graph.Entity) []string {
 	out := make([]string, 0)
 	seen := make(map[string]struct{})
-	for i := range pages {
-		for _, n := range pages[i].Notes {
+	add := func(notes []note.Note) {
+		for _, n := range notes {
 			if _, held := seen[strings.ToLower(n.Label)]; held {
 				continue
 			}
 			seen[strings.ToLower(n.Label)] = struct{}{}
 			out = append(out, n.Label)
 		}
+	}
+	for i := range pages {
+		add(pages[i].Notes)
+	}
+	for i := range entities {
+		add(entities[i].Notes)
 	}
 	return out
 }
@@ -192,7 +198,7 @@ func noteCells(notes []note.Note, labels []string) []string {
 	out := make([]string, len(labels))
 	for at, label := range labels {
 		for _, n := range notes {
-			if strings.EqualFold(n.Label, label) {
+			if strings.EqualFold(n.Label, label) && out[at] == "" {
 				out[at] = n.Text
 			}
 		}
