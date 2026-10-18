@@ -240,6 +240,44 @@ func TestExtractStatesTheRootTruthfully(t *testing.T) {
 	}
 }
 
+func TestBodyStateIsTheStateABodyAloneGives(t *testing.T) {
+	t.Parallel()
+
+	const basket = `<!-- wp:shop/basket --><div><h2>Your basket is empty</h2></div><!-- /wp:shop/basket -->`
+	cases := []struct {
+		name    string
+		raw     string
+		archive bool
+		dynamic []string
+		want    render.RootState
+	}{
+		{name: "an archive whatever its body", raw: "<p>A description.</p>", archive: true, want: render.RootArchive},
+		{name: "an empty body", raw: "", want: render.RootEmptyRaw},
+		{name: "a body of one shortcode", raw: "[account_form]", want: render.RootDynamicOnly},
+		{name: "a block the site counts technical", raw: basket, dynamic: []string{"shop/basket"}, want: render.RootDynamicOnly},
+		{name: "the same block the site does not count technical", raw: basket, want: render.RootNotFound},
+		{name: "a paragraph holding only a technical shortcode", raw: `<!-- wp:paragraph --><p>[account_form]</p><!-- /wp:paragraph -->`, dynamic: []string{"account_form"}, want: render.RootDynamicOnly},
+		{name: "a body of text", raw: "<p>The page's own words.</p>", dynamic: []string{"account_form"}, want: render.RootNotFound},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			body := block.Parse(tc.raw)
+			if got := render.BodyState(body, tc.archive, tc.dynamic); got != tc.want {
+				t.Errorf("BodyState = %q, want %q", got, tc.want)
+			}
+			extracted := synthetic(t, render.Input{
+				Public: `<html><body><main><p>Words of another page.</p></main></body></html>`,
+				Body:   body, Archive: tc.archive, Dynamic: tc.dynamic, Document: "/a/",
+			})
+			if extracted.Root != tc.want {
+				t.Errorf("an extraction whose root is not located = %q, want the body's %q", extracted.Root, tc.want)
+			}
+		})
+	}
+}
+
 func TestARecordKeepsWhereItsVisitLanded(t *testing.T) {
 	t.Parallel()
 

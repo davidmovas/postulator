@@ -39,7 +39,7 @@ func Extract(in Input) (Extraction, error) {
 	body := technicalBody(in.Body, in.Dynamic)
 	out := Extraction{
 		Hash:     hex.EncodeToString(sum[:]),
-		Root:     stateOf(in.Archive, body, false),
+		Root:     BodyState(in.Body, in.Archive, in.Dynamic),
 		Regions:  []Region{},
 		Trails:   []pagemap.Trail{},
 		JSONLD:   map[string][]json.RawMessage{},

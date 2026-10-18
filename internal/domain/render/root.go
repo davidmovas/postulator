@@ -270,7 +270,7 @@ func (p *page) findRoot() {
 		return
 	}
 	p.root = p.landmark()
-	p.state = stateOf(p.in.Archive, p.body, false)
+	p.state = BodyState(p.in.Body, p.in.Archive, p.in.Dynamic)
 }
 
 func (p *page) byBlocks(blocks []rawBlock) *html.Node {
@@ -328,6 +328,10 @@ func wraps(node *html.Node) bool {
 func (p *page) setRoot(root *html.Node) {
 	p.root = root
 	p.state = stateOf(p.in.Archive, p.body, true)
+}
+
+func BodyState(body block.Body, archive bool, dynamic []string) RootState {
+	return stateOf(archive, technicalBody(body, dynamic), false)
 }
 
 func stateOf(archive bool, body block.Body, located bool) RootState {
