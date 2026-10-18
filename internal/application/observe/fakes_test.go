@@ -681,14 +681,39 @@ func (s *storeFake) StorePages(_ context.Context) (site.TechnicalPages, error) {
 }
 
 type visitorFake struct {
-	mu       sync.Mutex
-	guard    *unitGuard
-	pages    map[string]observe.Visit
-	failed   map[string]bool
-	visits   []string
-	active   int
-	peak     int
-	failures int
+	mu        sync.Mutex
+	guard     *unitGuard
+	pages     map[string]observe.Visit
+	failed    map[string]bool
+	redirects map[string]string
+	visits    []string
+	lookups   []string
+	active    int
+	peak      int
+	failures  int
+}
+
+func (v *visitorFake) Resolve(_ context.Context, url string) (observe.Resolution, error) {
+	v.guard.read()
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.lookups = append(v.lookups, url)
+	if v.failed[url] {
+		return observe.Resolution{}, errors.New(errors.External, "the site did not answer "+url)
+	}
+	if target, moved := v.redirects[url]; moved {
+		url = target
+	}
+	if _, ok := v.pages[url]; ok {
+		return observe.Resolution{URL: url, Status: 200}, nil
+	}
+	return observe.Resolution{URL: url, Status: 404}, nil
+}
+
+func (v *visitorFake) lookedUp() []string {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return slices.Clone(v.lookups)
 }
 
 func (v *visitorFake) Visit(_ context.Context, url string) (observe.Visit, error) {
@@ -708,10 +733,15 @@ func (v *visitorFake) Visit(_ context.Context, url string) (observe.Visit, error
 		v.failures++
 		return observe.Visit{}, errors.New(errors.External, "the site did not answer "+url+"?_="+strconv.Itoa(v.failures))
 	}
-	visit, ok := v.pages[url]
-	if !ok {
-		return observe.Visit{Status: 404, Body: "<html><body><h1>Not found</h1></body></html>"}, nil
+	landed := url
+	if target, moved := v.redirects[url]; moved {
+		landed = target
 	}
+	visit, ok := v.pages[landed]
+	if !ok {
+		return observe.Visit{Status: 404, Body: "<html><body><h1>Not found</h1></body></html>", URL: landed}, nil
+	}
+	visit.URL = landed
 	return visit, nil
 }
 

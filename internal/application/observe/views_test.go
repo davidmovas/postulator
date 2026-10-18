@@ -14,6 +14,7 @@ func TestThePageModelViewShowsAPageAsTheModel(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
 	s.serveTheSite(false)
+	s.visitor.pages[baseURL+"/healing-peptides/"] = observe.Visit{Status: 200, Body: "<html><body><main><h1>Elsewhere</h1></main></body></html>"}
 	s.run(t, observe.Options{})
 
 	tb500 := s.pageAt(t, "/tb-500/")
@@ -76,7 +77,9 @@ func TestTheSummaryCountsTrailsByMethodAndSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SummaryOf: %v", err)
 	}
-	if summary.TrailsByMethod[string(pagemap.MethodHref)] != summary.TrailsResolved || summary.TrailsBySource[string(pagemap.ParentJSONLD)] == 0 {
+	byMethod := summary.TrailsByMethod
+	if byMethod[string(pagemap.MethodName)] != 1 || byMethod[string(pagemap.MethodHref)]+byMethod[string(pagemap.MethodName)] != summary.TrailsResolved ||
+		summary.TrailsBySource[string(pagemap.ParentJSONLD)] != summary.TrailsResolved {
 		t.Errorf("trails = %d by method %v by source %v", summary.TrailsResolved, summary.TrailsByMethod, summary.TrailsBySource)
 	}
 	if summary.LastObservedAt.Std().IsZero() || summary.LastFullWalkAt.Std().IsZero() {

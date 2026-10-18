@@ -253,7 +253,15 @@ func (r renderReader) Visit(ctx context.Context, link string) (observe.Visit, er
 	if err != nil {
 		return observe.Visit{}, err
 	}
-	return observe.Visit{Body: visit.Body, Status: visit.Status}, nil
+	return observe.Visit{Body: visit.Body, Status: visit.Status, URL: visit.URL}, nil
+}
+
+func (r renderReader) Resolve(ctx context.Context, link string) (observe.Resolution, error) {
+	resolved, err := r.client.Resolve(ctx, link)
+	if err != nil {
+		return observe.Resolution{}, err
+	}
+	return observe.Resolution{URL: resolved.URL, Status: resolved.Status}, nil
 }
 
 func termsOf(terms []wp.Term) []pagemap.Term {

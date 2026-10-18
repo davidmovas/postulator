@@ -54,6 +54,7 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		}
 	}
 	m.index = pagemap.NewIndex(m.pages)
+	m.landed = m.landings()
 	for i := range m.pages {
 		page := m.pages[i]
 		if page.WPID == nil {
@@ -197,6 +198,18 @@ func derivedMoved(before, after pagemap.Page) bool {
 	return !sameRef(before.ParentPageID, after.ParentPageID) || before.ParentReason != after.ParentReason || before.ParentMethod != after.ParentMethod
 }
 
+func (m siteModel) landings() map[string]string {
+	out := make(map[string]string)
+	for id := range m.renders {
+		if final := m.renders[id].FinalPath; final != "" {
+			if page, found := m.index.ByID(id); found {
+				out[page.Path] = final
+			}
+		}
+	}
+	return out
+}
+
 func (m siteModel) wpParentOf(pageID string) *int64 {
 	if identity, observed := m.identities[pageID]; observed {
 		return identity.WPParentID
@@ -209,7 +222,7 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 	if record, rendered := m.renders[page.ID]; rendered {
 		trails = record.Trails
 	}
-	derived := pagemap.DeriveParent(*page, pagemap.ParentSignals{Trails: trails, WPParentID: m.wpParentOf(page.ID)}, m.index)
+	derived := pagemap.DeriveParent(*page, pagemap.ParentSignals{Trails: trails, WPParentID: m.wpParentOf(page.ID), Landings: m.landed}, m.index)
 
 	if page.ParentReason == pagemap.ParentWorkbook && page.ParentPageID != nil && !sameRef(page.ParentPageID, derived.ParentID) {
 		workbook := *page.ParentPageID

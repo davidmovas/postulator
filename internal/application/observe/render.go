@@ -30,6 +30,7 @@ type renderOutcome struct {
 	extraction render.Extraction
 	err        error
 	status     int
+	landed     string
 }
 
 type siteModel struct {
@@ -38,6 +39,7 @@ type siteModel struct {
 	renders    map[string]render.Record
 	bodies     map[string]block.Snapshot
 	index      pagemap.Index
+	landed     map[string]string
 }
 
 func (s *Service) model(ctx context.Context, siteID string) (siteModel, error) {
@@ -129,6 +131,7 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 	}
 
 	outcomes := s.fetch(ctx, readers, owner, settings, state.Technical, m, targets)
+	lookUpCrumbs(ctx, readers, pagemap.NewSite(owner.BaseURL), m.index, outcomes)
 	if err := s.keepRenders(ctx, state, m, outcomes); err != nil {
 		return false, err
 	}
@@ -227,6 +230,14 @@ func (s *Service) fetchOne(ctx context.Context, readers Readers, using extractio
 		outcome.err = invalid("the site answered the render with an error status", "status")
 		return outcome
 	}
+	if landed := landedElsewhere(using.install, target.url, visit.URL); landed != "" {
+		outcome.landed = landed
+		outcome.extraction = render.Extraction{
+			Hash: block.BodyHash(visit.Body),
+			Root: render.BodyState(block.Parse(target.raw), using.archive(target.page), using.dynamic),
+		}
+		return outcome
+	}
 
 	filtered := ""
 	if readers.plugin(capabilityRendered) && !target.page.WPType.Term() {
@@ -245,8 +256,64 @@ func (s *Service) fetchOne(ctx context.Context, readers Readers, using extractio
 	return outcome
 }
 
+func landedElsewhere(install pagemap.Site, requested, final string) string {
+	if final == "" {
+		return ""
+	}
+	asked, askedKind := install.Resolve(requested)
+	landed, landedKind := install.Resolve(final)
+	if askedKind != pagemap.LinkPath || landedKind != pagemap.LinkPath || landed == asked {
+		return ""
+	}
+	return landed
+}
+
+type crumbLookups struct {
+	readers Readers
+	install pagemap.Site
+	index   pagemap.Index
+	found   map[string]Resolution
+}
+
+func lookUpCrumbs(ctx context.Context, readers Readers, install pagemap.Site, index pagemap.Index, outcomes []renderOutcome) {
+	lookups := crumbLookups{readers: readers, install: install, index: index, found: make(map[string]Resolution)}
+	for i := range outcomes {
+		if outcomes[i].err != nil || outcomes[i].landed != "" {
+			continue
+		}
+		outcomes[i].err = lookups.trails(ctx, outcomes[i].target.page, outcomes[i].extraction.Trails)
+	}
+}
+
+func (l crumbLookups) trails(ctx context.Context, page pagemap.Page, trails []pagemap.Trail) error {
+	for t := range trails {
+		for c := range trails[t].Crumbs {
+			crumb := &trails[t].Crumbs[c]
+			if crumb.Path == "" || crumb.Path == pagemap.RootPath || crumb.Path == page.Path {
+				continue
+			}
+			if _, modelled := l.index.ByPath(crumb.Path); modelled {
+				continue
+			}
+			resolved, known := l.found[crumb.Path]
+			if !known {
+				looked, err := l.readers.Render.Resolve(ctx, l.install.URL(crumb.Path))
+				if err != nil {
+					return err
+				}
+				resolved, l.found[crumb.Path] = looked, looked
+			}
+			crumb.Status = resolved.Status
+			if path, kind := l.install.Resolve(resolved.URL); kind == pagemap.LinkPath {
+				crumb.Final = path
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Service) keepRenders(ctx context.Context, state *State, m siteModel, outcomes []renderOutcome) error {
-	tracked, err := s.findings(ctx, state.SiteID, finding.RenderUnreachable)
+	tracked, err := s.findings(ctx, state.SiteID, finding.RenderUnreachable, finding.RenderRedirected)
 	if err != nil {
 		return err
 	}
@@ -264,13 +331,21 @@ func (s *Service) keepRenders(ctx context.Context, state *State, m siteModel, ou
 				}
 				continue
 			}
-			if err := s.deps.Renders.Put(c, render.Record{PageID: page.ID, Extraction: outcomes[i].extraction, ExtractedAt: now}); err != nil {
+			record := render.Record{PageID: page.ID, Extraction: outcomes[i].extraction, FinalPath: outcomes[i].landed, ExtractedAt: now}
+			if err := s.deps.Renders.Put(c, record); err != nil {
 				return err
 			}
 			if err := s.deps.Links.ReplaceForPage(c, page.ID, pagemap.SourceRender, renderLinks(page, outcomes[i].extraction, m.index, now)); err != nil {
 				return err
 			}
 			if err := tracked.clear(c, finding.RenderUnreachable, subject); err != nil {
+				return err
+			}
+			if outcomes[i].landed != "" {
+				if err := tracked.raise(c, finding.RenderRedirected, &page.ID, subject, map[string]string{"target": outcomes[i].landed}); err != nil {
+					return err
+				}
+			} else if err := tracked.clear(c, finding.RenderRedirected, subject); err != nil {
 				return err
 			}
 			state.Counts.Rendered++

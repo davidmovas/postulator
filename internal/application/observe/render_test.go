@@ -172,12 +172,17 @@ func TestTheRenderDerivesTheParentFromTheTrail(t *testing.T) {
 	}
 	bpc := s.pageAt(t, "/bpc-157/")
 	home := s.pageAt(t, "/")
-	if bpc.ParentPageID == nil || *bpc.ParentPageID != home.ID || bpc.ParentReason != pagemap.ParentURL {
-		t.Errorf("bpc-157's parent = %v %s, want the front page by url after the unresolved crumb", bpc.ParentPageID, bpc.ParentReason)
+	if bpc.ParentPageID == nil || *bpc.ParentPageID != healing.ID || bpc.ParentReason != pagemap.ParentJSONLD || bpc.ParentMethod != pagemap.MethodName {
+		t.Errorf("bpc-157's parent = %v %s by %q, want the term page its dead crumb names, by its name", bpc.ParentPageID, bpc.ParentReason, bpc.ParentMethod)
 	}
-	f, ok := s.finding(finding.ParentUnresolved, finding.SubjectCrumb(bpc.ID, "/healing-peptides/"))
-	if !ok || f.Status != finding.Open {
-		t.Errorf("parent_unresolved for Healing Peptides = %+v %t", f, ok)
+	if !slices.Contains(s.visitor.lookedUp(), baseURL+"/healing-peptides/") {
+		t.Errorf("lookups = %v, want the crumb's dead link looked up", s.visitor.lookedUp())
+	}
+	if f, ok := s.finding(finding.ParentUnresolved, finding.SubjectCrumb(bpc.ID, "/healing-peptides/")); ok {
+		t.Errorf("parent_unresolved for a crumb its name resolved = %+v", f)
+	}
+	if crumbs := s.stores.renders[bpc.ID].Trails[0].Crumbs; crumbs[2].Status != 404 || crumbs[2].Final != "/healing-peptides/" {
+		t.Errorf("the dead crumb kept %+v, want its status and final path", crumbs[2])
 	}
 	if s.stores.renders[bpc.ID].Root != render.RootDynamicOnly || s.stores.renders[peptides.ID].Root != render.RootEmptyRaw {
 		t.Errorf("roots: bpc %s peptides %s", s.stores.renders[bpc.ID].Root, s.stores.renders[peptides.ID].Root)
@@ -186,7 +191,7 @@ func TestTheRenderDerivesTheParentFromTheTrail(t *testing.T) {
 		t.Errorf("peptides' parent = %v %s, want the front page its Home-only trail names", peptides.ParentPageID, peptides.ParentReason)
 	}
 	summary, err := s.service.Summary(t.Context(), siteID)
-	if err != nil || summary.Rendered != 9 || summary.TrailsResolved != 4 || summary.Listings != 3 || summary.LinksByType["breadcrumb"] == 0 {
+	if err != nil || summary.Rendered != 9 || summary.TrailsResolved != 5 || summary.Listings != 3 || summary.LinksByType["breadcrumb"] == 0 {
 		t.Errorf("summary = %+v (%v)", summary, err)
 	}
 }

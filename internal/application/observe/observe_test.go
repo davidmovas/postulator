@@ -111,7 +111,7 @@ func newScenario(t *testing.T) *scenario {
 		}},
 		pages: site.TechnicalPages{Shop: shopID},
 	}
-	s.visitor = &visitorFake{pages: map[string]observe.Visit{}, failed: map[string]bool{}}
+	s.visitor = &visitorFake{pages: map[string]observe.Visit{}, failed: map[string]bool{}, redirects: map[string]string{}}
 	s.plugin.guard, s.core.guard, s.store.guard, s.visitor.guard = s.stores.guard, s.stores.guard, s.stores.guard, s.stores.guard
 	s.readers = observe.Readers{
 		Core: s.core, Store: s.store, Plugin: s.plugin, Render: s.visitor,

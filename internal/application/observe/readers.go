@@ -181,10 +181,17 @@ type StoreReader interface {
 type Visit struct {
 	Body   string
 	Status int
+	URL    string
+}
+
+type Resolution struct {
+	URL    string
+	Status int
 }
 
 type RenderReader interface {
 	Visit(ctx context.Context, url string) (Visit, error)
+	Resolve(ctx context.Context, url string) (Resolution, error)
 }
 
 type Manifest struct {
