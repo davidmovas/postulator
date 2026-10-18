@@ -154,13 +154,11 @@ func pages() []pagemap.Page {
 func entities() []graph.Entity {
 	return []graph.Entity{
 		{
-			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"), Kind: graph.KindTopic,
-			Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
+			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"), Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
 		},
 		{
-			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"), Kind: graph.KindTopic,
-			Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
+			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"), Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
 		},
 	}
@@ -499,9 +497,9 @@ func TestTheJudgeNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 		shared := entities()
 		shared[1].ScopeID = pointer("parent")
 		shared = append(shared,
-			graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+			graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Source: graph.SourceUser},
 			graph.Entity{
-				ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+				ID: "tea-espresso", SiteID: "site", Name: "Espresso", Source: graph.SourceUser,
 				ScopeID: pointer("tea"),
 			},
 		)

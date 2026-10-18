@@ -200,7 +200,7 @@ func TestACallTheSchemaRefusesBecomesAFailedRowTheModelCanRead(t *testing.T) {
 	}{
 		{
 			name:   "a value outside the enum",
-			script: `TOOL:graph_list_entities{"kind":"beverage"}`,
+			script: `TOOL:graph_add_edge{"fromEntityId":"a","toEntityId":"b","kind":"cousin","weight":0.5}`,
 			reads:  "value not in enum",
 		},
 		{

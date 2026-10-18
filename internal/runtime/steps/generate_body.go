@@ -23,6 +23,7 @@ const (
 
 type bodyPrompt struct {
 	Page    pagemap.Page
+	Type    string
 	Entity  graph.Entity
 	Spec    template.TemplateSpec
 	Brief   content.Brief
@@ -53,7 +54,7 @@ func GenerateBody(deps Deps) run.StepDef {
 
 			brief := content.NewBrief(sc.Spec, sc.Links.Rules, sc.Page, entity, lc)
 			request, err := stepRequest(sc, call, bodyPrompt{
-				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
+				Page: sc.Page, Type: sc.Type.Name, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
 			}, writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts))
 			if err != nil {
 				return run.Result{}, err

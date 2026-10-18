@@ -143,7 +143,7 @@ func (f *fixture) entity(t *testing.T, repo *sqlite.EntityRepo, name string, sco
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: f.siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		ID: id.New(), SiteID: f.siteID, Name: name, Keywords: keyword.Of(name),
 		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, Score: score, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}

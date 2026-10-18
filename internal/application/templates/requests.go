@@ -8,11 +8,10 @@ import (
 )
 
 type CreateTemplateRequest struct {
-	Scope    string                `json:"scope,omitempty"`
-	SiteID   *string               `json:"siteId,omitempty"`
-	Name     string                `json:"name"`
-	PageKind string                `json:"pageKind"`
-	Spec     template.TemplateSpec `json:"spec"`
+	Scope  string                `json:"scope,omitempty"`
+	SiteID *string               `json:"siteId,omitempty"`
+	Name   string                `json:"name"`
+	Spec   template.TemplateSpec `json:"spec"`
 }
 
 type CreateTemplateResponse struct {
@@ -20,10 +19,9 @@ type CreateTemplateResponse struct {
 }
 
 type UpdateTemplateRequest struct {
-	ID       string                 `json:"id"`
-	Name     *string                `json:"name,omitempty"`
-	PageKind *string                `json:"pageKind,omitempty"`
-	Spec     *template.TemplateSpec `json:"spec,omitempty"`
+	ID   string                 `json:"id"`
+	Name *string                `json:"name,omitempty"`
+	Spec *template.TemplateSpec `json:"spec,omitempty"`
 }
 
 type UpdateTemplateResponse struct {
@@ -47,9 +45,8 @@ type GetTemplateResponse struct {
 
 type ListTemplatesRequest struct {
 	dto.ListRequest
-	Scope    string `json:"scope,omitempty" enum:"global,site" description:"Only this scope"`
-	SiteID   string `json:"siteId,omitempty" description:"Only this site's"`
-	PageKind string `json:"pageKind,omitempty" description:"Only this page kind, such as hub or guide"`
+	Scope  string `json:"scope,omitempty" enum:"global,site" description:"Only this scope"`
+	SiteID string `json:"siteId,omitempty" description:"Only this site's"`
 }
 
 type SetOverrideRequest struct {

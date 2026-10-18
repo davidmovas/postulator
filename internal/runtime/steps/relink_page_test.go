@@ -48,7 +48,7 @@ func withGrandparent(deps steps.Deps, wpID int64) steps.Deps {
 	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
 		ID: "grand", SiteID: "site", Name: "Drinks", Keywords: keyword.Of("drinks"),
 		Anchors: []graph.Anchor{{Text: "drinks", Source: graph.AnchorUser, Weight: 1}},
-		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-grand"),
+		Source:  graph.SourceUser, CanonicalPageID: pointer("page-grand"),
 	})}
 	deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
 		ID: "e2", SiteID: "site", FromEntityID: "parent", ToEntityID: "grand",

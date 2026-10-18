@@ -1,7 +1,6 @@
 package imports
 
 import (
-	"context"
 	"maps"
 	"slices"
 	"time"
@@ -19,6 +18,7 @@ type plannedEntity struct {
 type plannedPage struct {
 	page    pagemap.Page
 	created bool
+	retyped bool
 }
 
 type canonical struct {
@@ -45,7 +45,16 @@ func newPlan(siteID string, mapping importmap.Mapping, table importmap.Table) pl
 		p.sheet = p.read[0]
 	}
 	p.report.Columns = columnViews(p.sheet, mapping.Uses(table.Headers))
+	p.noteDropped(mapping, table.Headers)
 	return p
+}
+
+func (p *plan) noteDropped(mapping importmap.Mapping, headers []string) {
+	read := mapping.Columns[importmap.FieldPageType]
+	for _, column := range mapping.Dropped(headers, importmap.FieldPageType) {
+		p.noteAt(p.whole(), string(importmap.FieldPageType), CodePageTypeColumnDropped,
+			"the column "+column+" also names a page type and was not read; the page type is read from "+read)
+	}
 }
 
 func sheetsRead(mapping importmap.Mapping, table importmap.Table) []string {
@@ -100,28 +109,24 @@ func (p *plan) counts() Counts {
 	return tally
 }
 
-func (s *Service) plan(ctx context.Context, state siteState, read *sheetRead, now time.Time) (plan, error) {
+func planSheet(state siteState, read *sheetRead, now time.Time) (plan, error) {
 	p := newPlan(state.siteID, read.mapping, read.table)
 	rows := readRows(read.binding, read.table, &p)
 	sheet := pagesOf(rows, &p)
 	state.byPlanned = maps.Clone(state.byPlanned)
 	resolveTypes(sheet, &state)
-	typeRows(sheet, rows, read.mapping.Options.RowType, &state)
+	typeRows(sheet, read.mapping.Options.RowType, &state)
 	matchProducts(sheet, &state, &p)
 	fillGaps(sheet, &state, &p)
-	templates, err := s.kindTemplates(ctx, state.siteID, sheet)
-	if err != nil {
-		return plan{}, err
-	}
 
-	if err := newBuilder(state, &p, rows, sheet, now).run(templates); err != nil {
+	if err := newBuilder(state, &p, rows, sheet, now).run(); err != nil {
 		return plan{}, err
 	}
 	p.report.settle()
 	return p, nil
 }
 
-func (b *builder) run(templates *kindTemplates) error {
+func (b *builder) run() error {
 	b.build()
 	if err := b.planEntities(); err != nil {
 		return err
@@ -132,7 +137,7 @@ func (b *builder) run(templates *kindTemplates) error {
 	if err := b.checkAcyclic(); err != nil {
 		return err
 	}
-	if err := b.planPages(templates); err != nil {
+	if err := b.planPages(); err != nil {
 		return err
 	}
 	if err := b.checkCannibalization(); err != nil {

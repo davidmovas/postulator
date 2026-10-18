@@ -1,7 +1,6 @@
 package imports
 
 import (
-	"cmp"
 	"maps"
 	"slices"
 
@@ -40,41 +39,31 @@ func edgeKey(e graph.Edge) string {
 }
 
 func sameEntity(a, b graph.Entity) bool {
-	return a.Kind == b.Kind && a.Keywords.Equal(b.Keywords) && slices.Equal(a.Anchors, b.Anchors) && slices.Equal(a.Notes, b.Notes)
+	return a.Keywords.Equal(b.Keywords) && slices.Equal(a.Anchors, b.Anchors) && slices.Equal(a.Notes, b.Notes)
 }
 
 func (b *builder) planEntities() error {
 	b.resolved = make(map[string]graph.Entity, len(b.order))
 	for _, at := range b.order {
 		u := &b.units[at]
-		kind := b.kindOf(u)
 		step := b.updateEntity
 		if u.matched == "" {
 			step = b.createEntity
 		}
-		if err := step(u, kind); err != nil {
+		if err := step(u); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (b *builder) kindOf(u *unit) graph.Kind {
-	kind, known := kindOf(u.kind)
-	if !known {
-		b.p.noteAt(u.at, string(importmap.FieldEntityKind), CodeUnknownEntityKind,
-			"the entity kind is not recognized and was read as a topic: "+u.kind)
-	}
-	return kind
-}
-
-func (b *builder) createEntity(u *unit, kind graph.Kind) error {
+func (b *builder) createEntity(u *unit) error {
 	var scope *string
 	if parentID := b.parentID(u); parentID != "" && parentID != u.id {
 		scope = &parentID
 	}
 	entity, err := graph.NewEntity(graph.Entity{
-		ID: u.id, SiteID: b.state.siteID, Name: u.name, Kind: cmp.Or(kind, u.defaultKind()), Notes: u.notes,
+		ID: u.id, SiteID: b.state.siteID, Name: u.name, Notes: u.notes,
 		ScopeID: scope, Keywords: u.keywords, Anchors: unionAnchors(nil, u.anchors),
 		Source: graph.SourceImport, CreatedAt: b.now, UpdatedAt: b.now,
 	})
@@ -87,10 +76,9 @@ func (b *builder) createEntity(u *unit, kind graph.Kind) error {
 	return nil
 }
 
-func (b *builder) updateEntity(u *unit, kind graph.Kind) error {
+func (b *builder) updateEntity(u *unit) error {
 	current := b.byID[u.matched]
 	next := current
-	next.Kind = cmp.Or(kind, current.Kind)
 	next.Keywords = current.Keywords.Merge(u.keywords)
 	next.Notes = note.Merge(current.Notes, u.notes)
 	next.Anchors = unionAnchors(current.Anchors, u.anchors)

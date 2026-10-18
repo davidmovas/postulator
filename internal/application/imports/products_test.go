@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
@@ -147,12 +148,13 @@ func TestASheetOfProductsFindsThemInTheStore(t *testing.T) {
 func TestTheRowTypeDecidesWhatARowBecomes(t *testing.T) {
 	t.Parallel()
 
-	const sheet = "path,entity kind,wp type\n" +
+	const sheet = "path,page type,wp type\n" +
 		"/tea/,product,\n" +
-		"/tea/green/,product,\n" +
-		"/mug/,product,\n" +
+		"/tea/green/,Compound,\n" +
+		"/mug/,Goods,\n" +
 		"/about/,topic,\n" +
-		"/cup/,product,page\n"
+		"/cup/,product,page\n" +
+		"/hub/,Hub,\n"
 
 	cases := []struct {
 		rows importmap.RowType
@@ -160,15 +162,19 @@ func TestTheRowTypeDecidesWhatARowBecomes(t *testing.T) {
 	}{
 		{rows: "", want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPPage, "/mug/": pagemap.WPPage, "/about/": pagemap.WPPage, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPPage,
 		}},
 		{rows: importmap.RowPages, want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPPage, "/mug/": pagemap.WPPage, "/about/": pagemap.WPPage, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPPage,
 		}},
 		{rows: importmap.RowProducts, want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPProduct, "/mug/": pagemap.WPProduct, "/about/": pagemap.WPProduct, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPProduct,
 		}},
-		{rows: importmap.RowKind, want: map[string]pagemap.WPType{
+		{rows: importmap.RowTyped, want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPProduct, "/mug/": pagemap.WPProduct, "/about/": pagemap.WPPage, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPPage,
 		}},
 	}
 
@@ -177,15 +183,19 @@ func TestTheRowTypeDecidesWhatARowBecomes(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
+			h.rename(t, pagetype.Product, "Goods")
 			mapping := h.mapping(map[string]string{
-				string(importmap.FieldPath): "path", string(importmap.FieldEntityKind): "entity kind", string(importmap.FieldWPType): "wp type",
+				string(importmap.FieldPath): "path", string(importmap.FieldPageType): "page type", string(importmap.FieldWPType): "wp type",
 			})
 			mapping.Options.RowType = tc.rows
-			report := h.preview(t, h.file(t, "kinds.csv", sheet), mapping)
+			report := h.preview(t, h.file(t, "types.csv", sheet), mapping)
 			for path, want := range tc.want {
 				if view, found := page(report, path); !found || view.WPType != string(want) {
 					t.Errorf("%s reads as %+v, want a %s", path, view, want)
 				}
+			}
+			if unknown := findings(report.Warnings, imports.CodeUnknownPageType); len(unknown) != 0 {
+				t.Errorf("unknown page types = %+v", unknown)
 			}
 		})
 	}

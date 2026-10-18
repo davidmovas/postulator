@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	templateColumns           = `id, scope, site_id, name, page_kind, version, spec, created_at, updated_at`
-	insertTemplate            = `INSERT INTO templates (` + templateColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateTemplate            = `UPDATE templates SET name = ?, page_kind = ?, version = ?, spec = ?, updated_at = ? WHERE id = ?`
+	templateColumns           = `id, scope, site_id, name, version, spec, created_at, updated_at`
+	insertTemplate            = `INSERT INTO templates (` + templateColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	updateTemplate            = `UPDATE templates SET name = ?, version = ?, spec = ?, updated_at = ? WHERE id = ?`
 	deleteTemplate            = `DELETE FROM templates WHERE id = ?`
 	selectTemplate            = `SELECT ` + templateColumns + ` FROM templates WHERE id = ?`
 	overrideColumns           = `id, template_id, scope, site_id, page_id, patch, created_at, updated_at`
@@ -53,7 +53,7 @@ func (r *TemplateRepo) Insert(ctx context.Context, t template.Template) error {
 		return err
 	}
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertTemplate, []any{
-		t.ID, string(t.Scope), nullString(t.SiteID), t.Name, t.PageKind, t.Version, spec, formatTime(t.CreatedAt), formatTime(t.UpdatedAt),
+		t.ID, string(t.Scope), nullString(t.SiteID), t.Name, t.Version, spec, formatTime(t.CreatedAt), formatTime(t.UpdatedAt),
 	}, templateConflict(t.Name), "insert the template")
 	return err
 }
@@ -64,7 +64,7 @@ func (r *TemplateRepo) Update(ctx context.Context, t template.Template) error {
 		return err
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateTemplate, []any{
-		t.Name, t.PageKind, t.Version, spec, formatTime(t.UpdatedAt), t.ID,
+		t.Name, t.Version, spec, formatTime(t.UpdatedAt), t.ID,
 	}, templateConflict(t.Name), "update the template")
 	return requireAffected(affected, err, templateNotFound(t.ID))
 }
@@ -98,9 +98,6 @@ func (r *TemplateRepo) List(ctx context.Context, q template.Query, page paging.R
 	}
 	if q.SiteID != nil {
 		builder = builder.Where(squirrel.Eq{"site_id": *q.SiteID})
-	}
-	if q.PageKind != "" {
-		builder = builder.Where(squirrel.Eq{"page_kind": q.PageKind})
 	}
 	if q.Name != "" {
 		builder = builder.Where(squirrel.Eq{"name": q.Name})
@@ -159,7 +156,7 @@ func scanTemplate(rows *sql.Rows) (template.Template, error) {
 		siteID               sql.NullString
 		createdAt, updatedAt string
 	)
-	if err := rows.Scan(&t.ID, &scope, &siteID, &t.Name, &t.PageKind, &t.Version, &spec, &createdAt, &updatedAt); err != nil {
+	if err := rows.Scan(&t.ID, &scope, &siteID, &t.Name, &t.Version, &spec, &createdAt, &updatedAt); err != nil {
 		return template.Template{}, err
 	}
 	t.Scope = template.Scope(scope)

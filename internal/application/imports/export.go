@@ -31,10 +31,6 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 	if err != nil {
 		return ExportResponse{}, err
 	}
-	kinds, err := s.pageKinds(ctx, state.pages)
-	if err != nil {
-		return ExportResponse{}, err
-	}
 
 	byID := make(map[string]graph.Entity, len(state.entities))
 	for i := range state.entities {
@@ -56,7 +52,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 			entity = byID[*page.EntityID]
 			mapped[entity.ID] = struct{}{}
 		}
-		cells := row(page, &entity, kinds[refOf(page.TemplateID)], g, options)
+		cells := row(page, &entity, state.typeName(page.PageTypeID), g, options)
 		table.Rows = append(table.Rows, append(cells, noteCells(append(slices.Clone(page.Notes), entity.Notes...), labels)...))
 	}
 
@@ -94,32 +90,6 @@ func exportFormat(req ExportRequest) (importmap.Format, error) {
 	return format, nil
 }
 
-func (s *Service) pageKinds(ctx context.Context, pages []pagemap.Page) (map[string]string, error) {
-	kinds := make(map[string]string)
-	for i := range pages {
-		templateID := refOf(pages[i].TemplateID)
-		if templateID == "" {
-			continue
-		}
-		if _, known := kinds[templateID]; known {
-			continue
-		}
-		found, err := s.deps.Templates.Get(ctx, templateID)
-		if err != nil {
-			return nil, err
-		}
-		kinds[templateID] = found.PageKind
-	}
-	return kinds, nil
-}
-
-func refOf(ref *string) string {
-	if ref == nil {
-		return ""
-	}
-	return *ref
-}
-
 func exportedFields() []importmap.Field {
 	out := make([]importmap.Field, 0, len(importmap.Fields()))
 	for _, field := range importmap.Fields() {
@@ -139,7 +109,7 @@ func headers() []string {
 	return out
 }
 
-func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Graph, options importmap.Options) []string {
+func row(page *pagemap.Page, entity *graph.Entity, pageType string, g graph.Graph, options importmap.Options) []string {
 	cells := make(map[importmap.Field]string, len(importmap.Fields()))
 	if page != nil {
 		cells[importmap.FieldPath] = page.Path
@@ -151,12 +121,11 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 		cells[importmap.FieldMetaTitle] = page.MetaTitle
 		cells[importmap.FieldMetaDescription] = page.MetaDescription
 		cells[importmap.FieldWPType] = string(page.WPType)
-		cells[importmap.FieldPageKind] = pageKind
+		cells[importmap.FieldPageType] = pageType
 		cells[importmap.FieldKeywords] = page.Keywords.Cell()
 	}
 	if entity.ID != "" {
 		cells[importmap.FieldEntity] = entity.Name
-		cells[importmap.FieldEntityKind] = string(entity.Kind)
 		cells[importmap.FieldKeywords] = fill(cells[importmap.FieldKeywords], entity.Keywords.Cell())
 		cells[importmap.FieldAnchors] = options.Join(importmap.FieldAnchors, anchorTexts(entity.Anchors))
 		if parents := g.Parents(entity.ID, 1); len(parents) > 0 {

@@ -18,7 +18,6 @@ func (s EntitySort) Valid() bool {
 
 type EntityQuery struct {
 	SiteID           string
-	Kind             *Kind
 	HasCanonicalPage *bool
 	NamePrefix       string
 	Sort             EntitySort

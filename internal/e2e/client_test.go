@@ -102,7 +102,7 @@ func planMapping(t *testing.T, core *app.Core, siteID string) imports.Mapping {
 	if seen.Rows != planRows {
 		t.Fatalf("the plan carries %d rows, want %d", seen.Rows, planRows)
 	}
-	for _, field := range []string{"entity", "parent_entity", "path", "title", "primary_keyword", "keywords", "page_kind"} {
+	for _, field := range []string{"entity", "parent_entity", "path", "title", "primary_keyword", "keywords", "page_type"} {
 		if seen.Detected.Columns[field] == "" {
 			t.Fatalf("%s is not detected in %v", field, seen.Headers)
 		}

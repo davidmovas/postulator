@@ -70,7 +70,7 @@ func (h harness) wantEvents(t *testing.T, count int) {
 func (h harness) hub(t *testing.T) templates.Template {
 	t.Helper()
 	seed := template.Seed()[3]
-	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Hub", PageKind: seed.PageKind, Spec: seed.Spec})
+	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Hub", Spec: seed.Spec})
 	if err != nil {
 		t.Fatalf("CreateTemplate: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestTemplateLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	for _, key := range []string{`"pageKind":"hub"`, `"siteId":null`, `"spec":{"sections":[`, `"metaRules":{"titlePattern"`, `"createdAt":"2026-09-18T09:00:00Z"`} {
+	for _, key := range []string{`"siteId":null`, `"spec":{"sections":[`, `"metaRules":{"titlePattern"`, `"createdAt":"2026-09-18T09:00:00Z"`} {
 		if !strings.Contains(string(encoded), key) {
 			t.Errorf("view lacks %s: %s", key, encoded)
 		}
@@ -220,24 +220,24 @@ func TestTemplateLifecycle(t *testing.T) {
 	}
 	h.wantEvents(t, 1)
 
-	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "hub page", PageKind: "hub", Spec: spec}); !errors.IsCode(err, errors.Conflict) {
+	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "hub page", Spec: spec}); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("duplicate name code = %q, want CONFLICT", errors.CodeOf(err))
 	}
 	broken := spec
 	broken.Sections = nil
-	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Broken", PageKind: "hub", Spec: broken}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Broken", Spec: broken}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("invalid spec code = %q, want INVALID", errors.CodeOf(err))
 	}
-	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "site", Name: "Local", PageKind: "hub", Spec: spec}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "site", Name: "Local", Spec: spec}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("site scope without a site code = %q, want INVALID", errors.CodeOf(err))
 	}
-	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "galaxy", Name: "Local", PageKind: "hub", Spec: spec}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "galaxy", Name: "Local", Spec: spec}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("unknown scope code = %q, want INVALID", errors.CodeOf(err))
 	}
-	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "site", SiteID: ptr("missing"), Name: "Local", PageKind: "hub", Spec: spec}); !errors.IsCode(err, errors.NotFound) {
+	if _, err = h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "site", SiteID: ptr("missing"), Name: "Local", Spec: spec}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("unknown site code = %q, want NOT_FOUND", errors.CodeOf(err))
 	}
-	local, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "site", SiteID: &h.siteID, Name: "Hub Page", PageKind: "hub", Spec: spec})
+	local, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Scope: "site", SiteID: &h.siteID, Name: "Hub Page", Spec: spec})
 	if err != nil || local.Template.SiteID == nil {
 		t.Fatalf("site-scoped template = %+v, %v", local.Template, err)
 	}
@@ -254,10 +254,6 @@ func TestTemplateLifecycle(t *testing.T) {
 	bySite, err := h.service.ListTemplates(t.Context(), templates.ListTemplatesRequest{Scope: "site", SiteID: h.siteID})
 	if err != nil || len(bySite.Items) != 1 || bySite.Items[0].ID != local.Template.ID {
 		t.Errorf("ListTemplates by site = %+v, %v", bySite, err)
-	}
-	byKind, err := h.service.ListTemplates(t.Context(), templates.ListTemplatesRequest{ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: "name", Desc: true}}, PageKind: "hub"})
-	if err != nil || len(byKind.Items) != 2 {
-		t.Errorf("ListTemplates by kind = %+v, %v", byKind, err)
 	}
 	if _, err = h.service.ListTemplates(t.Context(), templates.ListTemplatesRequest{Scope: "galaxy"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("bad scope code = %q, want INVALID", errors.CodeOf(err))
@@ -388,7 +384,7 @@ func TestResolveForPageTakesThePageTypesTemplateBeforeTheSiteDefault(t *testing.
 	h := newHarness(t)
 	hub := h.hub(t)
 	guideSeed := builtIn(t, template.Seed(), "Guide")
-	guide, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Guide", PageKind: guideSeed.PageKind, Spec: guideSeed.Spec})
+	guide, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Guide", Spec: guideSeed.Spec})
 	if err != nil {
 		t.Fatalf("CreateTemplate: %v", err)
 	}
@@ -429,14 +425,14 @@ func TestResolveForPageTakesTheTemplateItIsHanded(t *testing.T) {
 	hub := h.hub(t)
 	guideSeed := builtIn(t, template.Seed(), "Guide")
 	guide, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{
-		Name: "Guide", PageKind: guideSeed.PageKind, Spec: guideSeed.Spec,
+		Name: "Guide", Spec: guideSeed.Spec,
 	})
 	if err != nil {
 		t.Fatalf("CreateTemplate: %v", err)
 	}
 	other := sqlitetest.Site(t, h.store, "elsewhere")
 	foreign, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{
-		Scope: "site", SiteID: &other.ID, Name: "Local", PageKind: guideSeed.PageKind, Spec: guideSeed.Spec,
+		Scope: "site", SiteID: &other.ID, Name: "Local", Spec: guideSeed.Spec,
 	})
 	if err != nil {
 		t.Fatalf("CreateTemplate for another site: %v", err)
@@ -479,13 +475,13 @@ func TestResolveForPageFillsThePlaceholdersFromThePageItsEntityAndItsSite(t *tes
 	spec.Sections[0].Heading = "Why {primaryKeyword} matter on {siteName}"
 	spec.Sections[1].Intent = "Introduce {entityName} to a reader of {pageTitle}"
 	spec.MetaRules.TitlePattern = "{primaryKeyword} | {siteName}"
-	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Keyed hub", PageKind: seed.PageKind, Spec: spec})
+	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Keyed hub", Spec: spec})
 	if err != nil {
 		t.Fatalf("CreateTemplate: %v", err)
 	}
 
 	entity, err := graph.NewEntity(graph.Entity{
-		ID: id.New(), SiteID: h.siteID, Name: "Trail Shoes", Kind: graph.KindTopic, Keywords: keyword.Of("trail running shoes"),
+		ID: id.New(), SiteID: h.siteID, Name: "Trail Shoes", Keywords: keyword.Of("trail running shoes"),
 		Source: graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	})
 	if err != nil {
@@ -543,7 +539,7 @@ func TestResolveForPageTakesThePrimaryKeywordFromThePageBeforeItsEntity(t *testi
 	seed := template.Seed()[3]
 	spec := seed.Spec
 	spec.Sections[0].Heading = "About {primaryKeyword}"
-	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Keyed product", PageKind: seed.PageKind, Spec: spec})
+	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Keyed product", Spec: spec})
 	if err != nil {
 		t.Fatalf("CreateTemplate: %v", err)
 	}
@@ -595,7 +591,7 @@ func TestResolveForPageNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T)
 	seed := template.Seed()[3]
 	spec := seed.Spec
 	spec.Sections[0].Heading = "About {entityName}"
-	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Named product", PageKind: seed.PageKind, Spec: spec})
+	created, err := h.service.CreateTemplate(t.Context(), templates.CreateTemplateRequest{Name: "Named product", Spec: spec})
 	if err != nil {
 		t.Fatalf("CreateTemplate: %v", err)
 	}

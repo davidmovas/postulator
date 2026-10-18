@@ -17,14 +17,22 @@ var aliases = map[Field][]string{
 	FieldKeywords:        {"keywords", "secondary keywords", "tags", "keyword", "secondary kw"},
 	FieldAnchors:         {"anchors", "anchor texts", "anchor", "anchor text"},
 	FieldEntity:          {"entity", "topic", "cluster", "entity name", "topic name"},
-	FieldEntityKind:      {"entity kind", "entity level", "entity type", "topic type", "cluster type"},
+	FieldPageType:        {"entity kind", "entity level", "entity type", "topic type", "cluster type", "page type", "kind", "page kind"},
 	FieldParentEntity:    {"parent", "parent entity", "pillar", "parent topic", "parent cluster", "parent product entity", "parent product"},
 	FieldRelated:         {"related", "siblings", "related entities", "related topics"},
-	FieldPageKind:        {"page type", "template", "kind", "page kind", "page template"},
 	FieldMetaTitle:       {"meta title", "seo title"},
 	FieldMetaDescription: {"meta description", "seo description", "description"},
 	FieldWPType:          {"post type", "wp type", "wordpress type", "content type"},
 	FieldOwnEntity:       {"own entity", "is entity", "has entity"},
+}
+
+var weakAliases = map[Field][]string{
+	FieldPageType: {"page type", "kind", "page kind"},
+}
+
+func weak(field Field, header string) bool {
+	written := compact(Words(header))
+	return slices.ContainsFunc(weakAliases[field], func(alias string) bool { return written == compact(alias) })
 }
 
 var levelAliases = []string{"root entity", "root"}
@@ -106,7 +114,7 @@ func AutoDetect(headers []string) Mapping {
 	notes := make([]string, 0)
 	for _, header := range headers {
 		if field, known := Detect(header); known {
-			if _, taken := columns[field]; !taken {
+			if held, taken := columns[field]; !taken || weak(field, held) && !weak(field, header) {
 				columns[field] = header
 			}
 			continue

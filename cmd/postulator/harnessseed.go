@@ -216,7 +216,7 @@ func seedProduct(ctx context.Context, core *app.Core, siteID string, entities ma
 	}
 
 	created, err := core.Graph.CreateEntity(ctx, graph.CreateEntityRequest{
-		SiteID: siteID, Name: productName, Kind: "product", Intent: "commercial",
+		SiteID: siteID, Name: productName, Intent: "commercial",
 		Keywords: []dto.Keyword{{Text: productKeyword}},
 		Anchors:  []graph.Anchor{{Text: "the " + productName, Source: "user", Weight: 1}},
 		ParentID: entities[productHub], Source: "user",
@@ -243,7 +243,7 @@ func seedProductRun(ctx context.Context, core *app.Core, siteID string, byPath m
 	}
 	product := ""
 	for index := range listed.Items {
-		if listed.Items[index].PageKind == "product" {
+		if listed.Items[index].Name == "Product" {
 			product = listed.Items[index].ID
 		}
 	}
@@ -558,7 +558,7 @@ func seedGraph(ctx context.Context, core *app.Core, siteID string) (map[string]s
 	for index := range declared {
 		entity := &declared[index]
 		created, err := core.Graph.CreateEntity(ctx, graph.CreateEntityRequest{
-			SiteID: siteID, Name: entity.Name, Kind: entity.Kind, Intent: entity.Intent,
+			SiteID: siteID, Name: entity.Name, Intent: entity.Intent,
 			Keywords: []dto.Keyword{{Text: entity.Keyword}, {Text: entity.Anchor}},
 			Anchors:  []graph.Anchor{{Text: entity.Anchor, Source: "user", Weight: 1}},
 			Source:   "user",
@@ -658,7 +658,7 @@ func seedTemplates(ctx context.Context, core *app.Core, siteID string) (string, 
 
 	guide := ""
 	for index := range listed.Items {
-		if listed.Items[index].PageKind == "guide" {
+		if listed.Items[index].Name == "Guide" {
 			guide = listed.Items[index].ID
 		}
 	}

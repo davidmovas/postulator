@@ -33,7 +33,7 @@ func entity(id, name string, score float64, anchors []string, canonical string) 
 	}
 
 	record := graph.Entity{
-		ID: id, SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		ID: id, SiteID: siteID, Name: name, Keywords: keyword.Of(name),
 		Anchors: list, Source: graph.SourceUser, Score: score,
 	}
 	if canonical != "" {

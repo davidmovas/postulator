@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
 type siteState struct {
@@ -21,11 +22,12 @@ type siteState struct {
 	byPlanned map[string]pagemap.Page
 	edgeKeys  map[string]struct{}
 	types     map[pagemap.WPType]struct{}
+	pageTypes []pagetype.Type
 }
 
-func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page) siteState {
+func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, pageTypes []pagetype.Type) siteState {
 	state := siteState{
-		siteID: siteID, entities: entities, edges: edges, pages: pages,
+		siteID: siteID, entities: entities, edges: edges, pages: pages, pageTypes: pageTypes,
 		byName:    make(map[string][]graph.Entity, len(entities)),
 		byPath:    make(map[string]pagemap.Page, len(pages)),
 		byPlanned: make(map[string]pagemap.Page),
@@ -76,7 +78,27 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	if err != nil {
 		return siteState{}, err
 	}
-	return newSiteState(siteID, entities, edges, pages), nil
+	pageTypes, err := s.deps.Types.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	return newSiteState(siteID, entities, edges, pages, pageTypes), nil
+}
+
+func (s *siteState) typeName(typeID *string) string {
+	if typeID == nil {
+		return ""
+	}
+	for i := range s.pageTypes {
+		if s.pageTypes[i].ID == *typeID {
+			return s.pageTypes[i].Name
+		}
+	}
+	return ""
+}
+
+func (s *siteState) pageType(cell string, wpType pagemap.WPType) (pagetype.Type, bool) {
+	return pagetype.Match(cell, s.pageTypes, wpType)
 }
 
 func sortStored(entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page) {

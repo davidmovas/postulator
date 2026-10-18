@@ -29,7 +29,6 @@ type Entity struct {
 	ID              string        `json:"id"`
 	SiteID          string        `json:"siteId"`
 	Name            string        `json:"name"`
-	Kind            string        `json:"kind"`
 	Intent          string        `json:"intent"`
 	Definition      string        `json:"definition"`
 	Facts           []Fact        `json:"facts"`
@@ -83,7 +82,6 @@ func entityView(e graphdomain.Entity) Entity {
 		ID:              e.ID,
 		SiteID:          e.SiteID,
 		Name:            e.Name,
-		Kind:            string(e.Kind),
 		Intent:          e.Intent,
 		Definition:      e.Definition,
 		Facts:           facts,

@@ -60,7 +60,7 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 	orphaned = append(orphaned, graph.Entity{
 		ID: "latte", SiteID: "site", Name: "Latte", Keywords: keyword.Of("latte"),
 		Anchors: []graph.Anchor{{Text: "latte", Source: graph.AnchorUser, Weight: 1}},
-		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-latte"),
+		Source:  graph.SourceUser, CanonicalPageID: pointer("page-latte"),
 	})
 	orphanedEdges := append(unitEdges(), graph.Edge{
 		ID: "e2", SiteID: "site", FromEntityID: "latte", ToEntityID: "parent",

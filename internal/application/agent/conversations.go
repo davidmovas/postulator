@@ -194,7 +194,7 @@ func (s *Service) siteContext(ctx context.Context, conversation domainagent.Conv
 		if i >= templatesInPrompt {
 			break
 		}
-		built.Templates = append(built.Templates, listed.Items[i].Name+" ("+listed.Items[i].PageKind+")")
+		built.Templates = append(built.Templates, listed.Items[i].Name)
 	}
 
 	if conversation.SiteID == nil {

@@ -141,7 +141,7 @@ func productTemplate(t *testing.T, core *app.Core) string {
 		t.Fatalf("list the templates: %v", err)
 	}
 	for i := range listed.Items {
-		if listed.Items[i].PageKind == "product" {
+		if listed.Items[i].Name == "Product" {
 			return listed.Items[i].ID
 		}
 	}
@@ -200,7 +200,7 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	}
 	mapping := imports.Mapping{SiteID: siteID, Name: "products", Columns: map[string]string{
 		string(importmap.FieldPath): "path", string(importmap.FieldH1): "h1", string(importmap.FieldKeywords): "keywords",
-		string(importmap.FieldPageKind): "page kind",
+		string(importmap.FieldPageType): "page kind",
 	}, Options: imports.Options{RowType: importmap.RowProducts}}
 
 	applied, err := core.Imports.Apply(t.Context(), imports.ApplyRequest{SiteID: siteID, Path: sheet, Mapping: mapping})

@@ -101,7 +101,7 @@ func (f proposeFixture) entity(t *testing.T, name string) graphdomain.Entity {
 	t.Helper()
 
 	record, err := graphdomain.NewEntity(graphdomain.Entity{
-		ID: id.New(), SiteID: f.siteID, Name: name, Kind: graphdomain.KindTopic, Source: graphdomain.SourceUser,
+		ID: id.New(), SiteID: f.siteID, Name: name, Source: graphdomain.SourceUser,
 		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	})
 	if err != nil {
@@ -327,12 +327,12 @@ func TestProposeRelatedTellsSharedNamesApartByTheirParents(t *testing.T) {
 		t.Fatalf("ProposeRelated: %v", err)
 	}
 	prompt := f.model.calls[0].Messages[0].Text
-	for _, want := range []string{"Propose pairs that involve BPC-157 Liquid.", "- BPC-157 Liquid (topic)", "- TB-500 Liquid (topic)", "- Powder (topic)"} {
+	for _, want := range []string{"Propose pairs that involve BPC-157 Liquid.", "- BPC-157 Liquid", "- TB-500 Liquid", "- Powder"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("the prompt lacks %q:\n%s", want, prompt)
 		}
 	}
-	if strings.Contains(prompt, "- Liquid (") {
+	if strings.Contains(prompt, "\n- Liquid") {
 		t.Fatalf("the prompt lists a bare shared name:\n%s", prompt)
 	}
 

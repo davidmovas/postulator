@@ -1,6 +1,5 @@
 {
   "name": "Product",
-  "pageKind": "product",
   "spec": {
     "sections": [
       {"heading": "Overview", "intent": "State what the product is, the problem it solves and the one reason to choose it, in the customer's words", "targetWords": 150, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},

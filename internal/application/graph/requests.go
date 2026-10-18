@@ -5,7 +5,6 @@ import "github.com/davidmovas/postulator/internal/kernel/dto"
 type CreateEntityRequest struct {
 	SiteID   string        `json:"siteId"`
 	Name     string        `json:"name" description:"Subject, 2-4 words, title case"`
-	Kind     string        `json:"kind" enum:"hub,product,topic,category,custom" description:"hub roots a subject, category groups topics, topic is one subject, product is sold, custom is other"`
 	Intent   string        `json:"intent,omitempty" description:"Reader's goal, one sentence"`
 	Keywords []dto.Keyword `json:"keywords,omitempty" description:"Search phrases, sorted by volume"`
 	Anchors  []Anchor      `json:"anchors,omitempty" description:"Link texts other pages may use"`
@@ -19,7 +18,6 @@ type CreateEntityResponse struct {
 
 type EntityInput struct {
 	Name       string        `json:"name" description:"Subject, 2-4 words, title case"`
-	Kind       string        `json:"kind" enum:"hub,product,topic,category,custom" description:"hub roots a subject, category groups topics, topic is one subject, product is sold, custom is other"`
 	Intent     string        `json:"intent,omitempty" description:"Reader's goal, one sentence"`
 	Keywords   []dto.Keyword `json:"keywords,omitempty" description:"Search phrases, sorted by volume"`
 	Anchors    []Anchor      `json:"anchors,omitempty" description:"Link texts other pages may use"`
@@ -40,7 +38,6 @@ type CreateEntitiesResponse struct {
 type UpdateEntityRequest struct {
 	ID         string         `json:"id" description:"Entity id"`
 	Name       *string        `json:"name,omitempty" description:"New name"`
-	Kind       *string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"New kind"`
 	Intent     *string        `json:"intent,omitempty" description:"New reader goal"`
 	Keywords   *[]dto.Keyword `json:"keywords,omitempty" description:"Whole new keyword list"`
 	Definition *string        `json:"definition,omitempty" description:"What the entity is, in a sentence or two"`
@@ -69,7 +66,6 @@ type GetEntityResponse struct {
 type ListEntitiesRequest struct {
 	dto.ListRequest
 	SiteID           string `json:"siteId"`
-	Kind             string `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"Only this kind"`
 	HasCanonicalPage *bool  `json:"hasCanonicalPage,omitempty" description:"Only entities with, or without, a page"`
 	NamePrefix       string `json:"namePrefix,omitempty" description:"Only names starting with this"`
 }

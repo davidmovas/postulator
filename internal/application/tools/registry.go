@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
@@ -37,6 +38,7 @@ type Deps struct {
 	Sites     *sites.Service
 	Graph     *graph.Service
 	Pages     *pages.Service
+	PageTypes *pagetypes.Service
 	Templates *templates.Service
 	Runs      *runs.Service
 	Sync      *sync.Service

@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 62
+const latestMigration = 63
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -83,6 +83,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0060_page_types_backfill.sql",
 		"0061_entity_card.sql",
 		"0062_link_rules_in_scopes.sql",
+		"0063_kinds_become_types.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -275,7 +276,7 @@ func TestAnEntityNameIsUniqueUnderItsParent(t *testing.T) {
 	}
 	const at = "2026-10-02T09:00:00Z"
 	entity := func(id, name string, scope any) error {
-		return exec(`INSERT INTO entities (id, site_id, name, kind, scope_entity_id, source, created_at, updated_at) VALUES (?, 's1', ?, 'topic', ?, 'import', ?, ?)`,
+		return exec(`INSERT INTO entities (id, site_id, name, scope_entity_id, source, created_at, updated_at) VALUES (?, 's1', ?, ?, 'import', ?, ?)`,
 			id, name, scope, at, at)
 	}
 
@@ -364,7 +365,7 @@ func TestEntityScopeMigrationTakesTheParentAnEntityHas(t *testing.T) {
 		t.Fatalf("the rebuild lost the keywords column: %q", got)
 	}
 
-	exec(`INSERT INTO entities (id, site_id, name, kind, scope_entity_id, source, created_at, updated_at) VALUES ('e', 's1', 'Healing', 'topic', 'c', 'import', ?, ?)`, at, at)
+	exec(`INSERT INTO entities (id, site_id, name, scope_entity_id, source, created_at, updated_at) VALUES ('e', 's1', 'Healing', 'c', 'import', ?, ?)`, at, at)
 	if _, err = provider.DownTo(t.Context(), 29); err != nil {
 		t.Fatalf("down with a shared name: %v", err)
 	}
@@ -500,7 +501,7 @@ func TestEntityTermsAreDroppedAndADownBringsThemBackAsMigration34MadeThem(t *tes
 	}
 
 	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
-	exec(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Healing', 'topic', 'import', ?, ?)`, at, at)
+	exec(`INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e1', 's1', 'Healing', 'import', ?, ?)`, at, at)
 
 	if _, err = provider.DownTo(t.Context(), 41); err != nil {
 		t.Fatalf("down to 41: %v", err)
@@ -555,7 +556,7 @@ func TestSiteCategoryIsDroppedAndADownBringsItBackAsMigration33MadeIt(t *testing
 	}
 	for _, setup := range []string{
 		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
-		`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Healing', 'topic', 'import', ?, ?)`,
+		`INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e1', 's1', 'Healing', 'import', ?, ?)`,
 	} {
 		if err = exec(setup, at, at); err != nil {
 			t.Fatalf("%s: %v", setup, err)
@@ -1593,6 +1594,99 @@ func TestTheLinkRulesMoveIntoTheScopesAndThePoliciesGo(t *testing.T) {
 	}
 }
 
+func TestTheKindsBecomeTypesAndADownBringsThemBack(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 62)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	text := func(query string) string {
+		t.Helper()
+		var out string
+		if scanErr := store.reader.QueryRowContext(t.Context(), query).Scan(&out); scanErr != nil {
+			t.Fatalf("%s: %v", query, scanErr)
+		}
+		return out
+	}
+	const at = "2026-10-18T09:00:00Z"
+
+	for _, setup := range []string{
+		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
+		`INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('t-product', 's1', 'Product', 'product', ?, ?)`,
+	} {
+		must(setup, at, at)
+	}
+	must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, page_type_id, page_type_source, page_type_reason, created_at, updated_at) VALUES ('pg1', 's1', '/bpc/', 'bpc', 'product', 'exists', 't-product', 'auto', 'product', ?, ?)`, at, at)
+	must(`INSERT INTO entities (id, site_id, name, kind, canonical_page_id, source, created_at, updated_at) VALUES ('e-product', 's1', 'BPC', 'hub', 'pg1', 'import', ?, ?)`, at, at)
+	must(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e-loose', 's1', 'Peptides', 'hub', 'import', ?, ?)`, at, at)
+	for _, tpl := range []struct{ id, name, kind string }{{"tpl-hub", "Hub", "hub"}, {"tpl-mine", "Mine", "comparison"}} {
+		must(`INSERT INTO templates (id, scope, name, page_kind, version, spec, created_at, updated_at) VALUES (?, 'global', ?, ?, 1, '{}', ?, ?)`, tpl.id, tpl.name, tpl.kind, at, at)
+	}
+	must(`INSERT INTO import_mappings (id, site_id, name, columns, options, created_at, updated_at) VALUES ('m-both', 's1', 'Both', '{"entity_kind":"Entity type","page_kind":"Kind","path":"URL"}', '{"rowType":"kind"}', ?, ?)`, at, at)
+	must(`INSERT INTO import_mappings (id, site_id, name, columns, options, created_at, updated_at) VALUES ('m-page', 's1', 'Page', '{"page_kind":"Kind"}', '{"rowType":"products"}', ?, ?)`, at, at)
+	entitiesAt62 := schemaOf(t, store, "entities")
+
+	if _, err = provider.UpTo(t.Context(), 63); err != nil {
+		t.Fatalf("up to 63: %v", err)
+	}
+	if got := columnOf(t, store, "entities", "kind"); got != "" {
+		t.Errorf("entities.kind after 0063 = %q, want gone", got)
+	}
+	if got := columnOf(t, store, "templates", "page_kind"); got != "" {
+		t.Errorf("templates.page_kind after 0063 = %q, want gone", got)
+	}
+	mappings := []struct{ id, columns, options string }{
+		{id: "m-both", columns: `{"path":"URL","page_type":"Entity type"}`, options: `{"rowType":"type"}`},
+		{id: "m-page", columns: `{"page_type":"Kind"}`, options: `{"rowType":"products"}`},
+	}
+	for _, want := range mappings {
+		var columns, options map[string]any
+		if err = json.Unmarshal([]byte(text(`SELECT columns FROM import_mappings WHERE id = '`+want.id+`'`)), &columns); err != nil {
+			t.Fatalf("decode the columns of %s: %v", want.id, err)
+		}
+		if err = json.Unmarshal([]byte(text(`SELECT options FROM import_mappings WHERE id = '`+want.id+`'`)), &options); err != nil {
+			t.Fatalf("decode the options of %s: %v", want.id, err)
+		}
+		var wantColumns, wantOptions map[string]any
+		if err = json.Unmarshal([]byte(want.columns), &wantColumns); err != nil {
+			t.Fatalf("decode %s: %v", want.columns, err)
+		}
+		if err = json.Unmarshal([]byte(want.options), &wantOptions); err != nil {
+			t.Fatalf("decode %s: %v", want.options, err)
+		}
+		if !reflect.DeepEqual(columns, wantColumns) || !reflect.DeepEqual(options, wantOptions) {
+			t.Errorf("mapping %s after 0063 = %v %v, want %v %v (an entity column wins over a page-kind column)", want.id, columns, options, wantColumns, wantOptions)
+		}
+	}
+
+	if _, err = provider.DownTo(t.Context(), 62); err != nil {
+		t.Fatalf("down to 62: %v", err)
+	}
+	if got := schemaOf(t, store, "entities"); !slices.Equal(got, entitiesAt62) {
+		t.Errorf("the down left entities as\n%s\nwant it as 62 had it\n%s", strings.Join(got, "\n"), strings.Join(entitiesAt62, "\n"))
+	}
+	for query, want := range map[string]string{
+		`SELECT kind FROM entities WHERE id = 'e-product'`:                                       "product",
+		`SELECT kind FROM entities WHERE id = 'e-loose'`:                                         "topic",
+		`SELECT page_kind FROM templates WHERE id = 'tpl-hub'`:                                   "hub",
+		`SELECT page_kind FROM templates WHERE id = 'tpl-mine'`:                                  "guide",
+		`SELECT json_extract(columns, '$.entity_kind') FROM import_mappings WHERE id = 'm-both'`: "Entity type",
+		`SELECT json_extract(options, '$.rowType') FROM import_mappings WHERE id = 'm-both'`:     "kind",
+	} {
+		if got := text(query); got != want {
+			t.Errorf("%s after the down = %q, want %q", query, got, want)
+		}
+	}
+}
+
 func TestFindingsSubjectIsUniquePerSite(t *testing.T) {
 	t.Parallel()
 
@@ -1614,7 +1708,7 @@ func TestFindingsSubjectIsUniquePerSite(t *testing.T) {
 	for _, setup := range []string{
 		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`,
 		`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s2', 'Other', 'https://other', 'site:s2:wp_password', 'active', ?, ?)`,
-		`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Peptides', 'hub', 'import', ?, ?)`,
+		`INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e1', 's1', 'Peptides', 'import', ?, ?)`,
 		`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/peptides/', 'peptides', 'page', 'exists', ?, ?)`,
 	} {
 		if err := exec(setup, at, at); err != nil {
@@ -1999,12 +2093,12 @@ func TestSchemaCascades(t *testing.T) {
 	const at = "2026-09-18T09:00:00Z"
 
 	exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
-	exec(`INSERT INTO templates (id, scope, site_id, name, page_kind, version, spec, created_at, updated_at) VALUES ('t1', 'global', NULL, 'Hub', 'hub', 1, '{}', ?, ?)`, at, at)
+	exec(`INSERT INTO templates (id, scope, site_id, name, version, spec, created_at, updated_at) VALUES ('t1', 'global', NULL, 'Hub', 1, '{}', ?, ?)`, at, at)
 	exec(`INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('p1', 's1', 'Hub', 'hub', ?, ?)`, at, at)
 	exec(`INSERT INTO field_scopes (page_type_id, field_key, link_policy, updated_at) VALUES ('p1', 'body', '{"links":true}', ?)`, at)
 	exec(`UPDATE sites SET default_template_id = 't1' WHERE id = 's1'`)
-	exec(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e1', 's1', 'Shoes', 'hub', 'user', ?, ?)`, at, at)
-	exec(`INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e2', 's1', 'Boots', 'topic', 'user', ?, ?)`, at, at)
+	exec(`INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e1', 's1', 'Shoes', 'user', ?, ?)`, at, at)
+	exec(`INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e2', 's1', 'Boots', 'user', ?, ?)`, at, at)
 	exec(`INSERT INTO entity_anchors (entity_id, position, text, source, weight) VALUES ('e1', 0, 'shoes', 'user', 1)`)
 	exec(`INSERT INTO edges (id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, created_at) VALUES ('g1', 's1', 'e2', 'e1', 'parent', 1, 'user', 'approved', ?)`, at)
 	exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, entity_id, template_id, created_at, updated_at) VALUES ('pg1', 's1', '/shoes/', 'shoes', 'page', 'planned', 'e1', 't1', ?, ?)`, at, at)
@@ -2015,7 +2109,7 @@ func TestSchemaCascades(t *testing.T) {
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o1', 't1', 'site', 's1', NULL, '{}', ?, ?)`, at, at)
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o2', 't1', 'page', NULL, 'pg1', '{}', ?, ?)`, at, at)
 
-	if _, err := store.writer.ExecContext(t.Context(), `INSERT INTO entities (id, site_id, name, kind, source, created_at, updated_at) VALUES ('e3', 's1', 'shoes', 'hub', 'user', ?, ?)`, at, at); err == nil {
+	if _, err := store.writer.ExecContext(t.Context(), `INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e3', 's1', 'shoes', 'user', ?, ?)`, at, at); err == nil {
 		t.Fatal("entity names must be unique per site regardless of case")
 	}
 	if _, err := store.writer.ExecContext(t.Context(), `INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o3', 't1', 'site', 's1', NULL, '{}', ?, ?)`, at, at); err == nil {

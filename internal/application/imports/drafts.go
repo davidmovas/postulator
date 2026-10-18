@@ -19,7 +19,7 @@ type pageDraft struct {
 	metaTitle   string
 	metaDesc    string
 	wpType      string
-	pageKind    string
+	pageType    string
 	entity      string
 	keywords    keyword.List
 	notes       []note.Note
@@ -32,10 +32,6 @@ type pageDraft struct {
 	entityOnly  bool
 	typeUnknown bool
 	at          importmap.Origin
-}
-
-func (p *pageDraft) kind() string {
-	return strings.ToLower(strings.TrimSpace(p.pageKind))
 }
 
 func (p *pageDraft) cellType() pagemap.WPType {
@@ -60,7 +56,7 @@ func (p *pageDraft) merge(row *rowDraft, at int) {
 	p.metaTitle = fill(p.metaTitle, row.metaTitle)
 	p.metaDesc = fill(p.metaDesc, row.metaDesc)
 	p.wpType = fill(p.wpType, row.wpType)
-	p.pageKind = fill(p.pageKind, row.pageKind)
+	p.pageType = fill(p.pageType, row.pageType)
 	p.keywords = p.keywords.Merge(row.keywords)
 	p.notes = note.Merge(p.notes, row.pageNotes())
 	if p.own == ownUnset {

@@ -25,7 +25,6 @@ func (s *Service) CreateTemplate(ctx context.Context, req CreateTemplateRequest)
 		Scope:     scope,
 		SiteID:    req.SiteID,
 		Name:      strings.TrimSpace(req.Name),
-		PageKind:  strings.TrimSpace(req.PageKind),
 		Version:   1,
 		Spec:      req.Spec,
 		CreatedAt: now,
@@ -56,9 +55,6 @@ func (s *Service) UpdateTemplate(ctx context.Context, req UpdateTemplateRequest)
 		next := current
 		if req.Name != nil {
 			next.Name = strings.TrimSpace(*req.Name)
-		}
-		if req.PageKind != nil {
-			next.PageKind = strings.TrimSpace(*req.PageKind)
 		}
 		if req.Spec != nil {
 			next.Spec = *req.Spec
@@ -114,7 +110,7 @@ func (s *Service) ListTemplates(ctx context.Context, req ListTemplatesRequest) (
 	if err != nil {
 		return paging.List[Template]{}, err
 	}
-	q := template.Query{Scope: scope, SiteID: siteFilter(req.SiteID), PageKind: req.PageKind, Sort: key, Desc: desc}
+	q := template.Query{Scope: scope, SiteID: siteFilter(req.SiteID), Sort: key, Desc: desc}
 
 	list, err := s.templates.List(ctx, q, application.PageRequest(req.ListRequest))
 	if err != nil {

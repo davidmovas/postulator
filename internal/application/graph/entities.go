@@ -51,7 +51,6 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 		ID:        id.New(),
 		SiteID:    req.SiteID,
 		Name:      req.Name,
-		Kind:      graphdomain.Kind(req.Kind),
 		Intent:    req.Intent,
 		Keywords:  keywords,
 		Anchors:   requestedAnchors(ctx, req.Anchors),
@@ -125,9 +124,6 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 	updated, err := s.rewriteEntity(ctx, req.ID, func(next *graphdomain.Entity) {
 		if req.Name != nil {
 			next.Name = *req.Name
-		}
-		if req.Kind != nil {
-			next.Kind = graphdomain.Kind(*req.Kind)
 		}
 		if req.Intent != nil {
 			next.Intent = *req.Intent
@@ -234,13 +230,6 @@ func (s *Service) ListEntities(ctx context.Context, req ListEntitiesRequest) (pa
 		return paging.List[Entity]{}, err
 	}
 	q := graphdomain.EntityQuery{SiteID: req.SiteID, HasCanonicalPage: req.HasCanonicalPage, NamePrefix: req.NamePrefix}
-	if req.Kind != "" {
-		kind := graphdomain.Kind(req.Kind)
-		if !kind.Valid() {
-			return paging.List[Entity]{}, errors.New(errors.Invalid, "entity kind is not recognized").WithDetail("field", "kind")
-		}
-		q.Kind = &kind
-	}
 	key, desc, err := entitySort(req.Sort)
 	if err != nil {
 		return paging.List[Entity]{}, err

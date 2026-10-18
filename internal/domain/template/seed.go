@@ -18,9 +18,8 @@ const (
 )
 
 type seedFile struct {
-	Name     string       `json:"name"`
-	PageKind string       `json:"pageKind"`
-	Spec     TemplateSpec `json:"spec"`
+	Name string       `json:"name"`
+	Spec TemplateSpec `json:"spec"`
 }
 
 func Seed() []Template {
@@ -32,7 +31,7 @@ func Superseded() []Template {
 }
 
 func Supersedes(seed, stored Template) bool {
-	if stored.Scope != ScopeGlobal || !strings.EqualFold(stored.Name, seed.Name) || stored.PageKind != seed.PageKind {
+	if stored.Scope != ScopeGlobal || !strings.EqualFold(stored.Name, seed.Name) {
 		return false
 	}
 	if sameSpec(stored.Spec, seed.Spec) {
@@ -74,7 +73,7 @@ func seedsAt(pattern string, strict bool) []Template {
 		if decodeErr := decoder.Decode(&file); decodeErr != nil {
 			panic(fmt.Errorf("decode seed template %s: %w", name, decodeErr))
 		}
-		out = append(out, Template{Scope: ScopeGlobal, Name: file.Name, PageKind: file.PageKind, Version: 1, Spec: file.Spec})
+		out = append(out, Template{Scope: ScopeGlobal, Name: file.Name, Version: 1, Spec: file.Spec})
 	}
 	return out
 }

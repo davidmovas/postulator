@@ -12,7 +12,7 @@ import (
 var edgeStamp = time.Date(2026, time.October, 2, 9, 0, 0, 0, time.UTC)
 
 func named(id, name string, scope *string) graph.Entity {
-	return graph.Entity{ID: id, SiteID: siteA, Name: name, Kind: graph.KindTopic, Source: graph.SourceImport, ScopeID: scope}
+	return graph.Entity{ID: id, SiteID: siteA, Name: name, Source: graph.SourceImport, ScopeID: scope}
 }
 
 func parentEdge(id, from, to string, status graph.EdgeStatus, minute int) graph.Edge {

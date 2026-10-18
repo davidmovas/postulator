@@ -3179,3 +3179,64 @@ and what was decided while building.
   "Category"; the import matches a kind cell against the site's own type names first and the
   synonyms second, so his sheets keep his vocabulary. The client's E-001 row is the evidence: it
   calls `/peptides/`, a regular page with a product grid, "Category". Spec 16.6 says so.
+
+### Decided while building
+
+- **Custom fields are read by a sixth observation stage, `fields`**, after `derive`, not by the
+  content stage: it needs the plugin's `meta` capability, asks `GET /meta/{id}` outside the unit of
+  work, and on an incremental walk asks only the enabled keys a page has never read, on a full walk
+  every enabled key. A key the post lacks is stored empty, so it is not asked again every walk.
+- **The product description's links reach the hub and nothing beside it**: `siblingMinWeight` 1
+  is the closest the rules come to "no siblings" (only an all-but-identical sibling qualifies),
+  with an up depth of 1, no down links and three links at most.
+- **The link audit reads each page's type**: it no longer skips a page without a template and no
+  longer resolves a template per page, so a page that had no template is now owed links; its site
+  policy summary went with the policies. A neighbour that is a store category is refused before
+  the plan is built, and `neighbor_no_template` is gone.
+- **A fact or a note with a blank half is refused** by the use case, not cleaned away, so a card
+  edit never silently drops what was typed.
+- **Page types publish the existing events** (`sites.changed` for the types and scopes,
+  `pages.changed` when pages move between types); no event name was added.
+- **The page type's template joined `ResolveForPage` in 2a.8**, not 2a.4, so the templates use
+  case changed its constructor once (the policy store out, a type reader in).
+- **No superseded copies of the built-ins were added**: 0062 strips `linkRules` from every stored
+  spec in place, and a test proves an untouched built-in stored before 2a equals the new seed.
+- **0062's down** restores a global Default policy (a v4 id, the former default rules), the
+  `sites` table by its original text (0004's statement, then 0031's and 0054's `ADD COLUMN`,
+  because a test compares the text after the downs) and the built-ins' former link rules by name;
+  any other template takes the guide's.
+- **0063 drops `entities.kind` with `DROP COLUMN`** (its CHECK is the column's own) and
+  `templates.page_kind` with its index; its down restores `entities` by its exact text (0030's
+  rebuilt statement under its quoted name, then 0061's columns) and the kind from the canonical
+  page's preset, and re-adds `page_kind` at the end with the built-ins' kinds, else `guide`. Saved
+  import mappings are rewritten in SQL both ways.
+- **The writer's prompt names the page's type** (`Page type:`), snapshotted at claim as `sc.Type`
+  beside `sc.Links`, so a type changed mid-run cannot split the brief; the entity's kind line and
+  the proposals' kind rules are gone.
+- **The harness's own link policy** ("Crema Bench linking", rotating anchors) went with the
+  policies; its rules return as a scope edit when the harness seeds types (2a.13). The harness's
+  entity kinds went with `graph.Kind`; the six roots and Portafilter were hubs and the four
+  accessories products, which is how 2a.13 types their pages.
+- **`vocab.ts` was stale since 2a.6** (the `no_template` skip reason); 2a.8 regenerated it.
+- **The import's type cell** (agent I): an entity-level header beats a page-kind header whatever
+  the column order, and between two of the same strength the first wins; the preview raises
+  `page_type_column_dropped` for any header that names a type but is left unread, so the client's
+  workbook with both "Entity Level" and "Entity Type" gets one. An empty cell sets no type and
+  keeps an existing one; a page typed by `user` or `ai` keeps its type with `page_type_kept`, and
+  any other (untyped, auto, an earlier import) takes the sheet's, counting as an update. The
+  export's column is `page_type`, as every export header is its field's name, so a re-import
+  detects it. The import no longer sets a page's template; its Entities sheet ignores "Page
+  Template".
+- **2a.9 landed as one commit**, not three: 0063 drops both columns and the import read both.
+- **The scope tool is `pagetypes_set_scope`**, not the plan's `fields_set_scope`: one `pagetypes`
+  group holds the four tools, so loading on demand names one namespace, not two. It changes only
+  the fields it is given, over the scope the type has (a stored one, else the preset's default),
+  because a full put would make the agent resend a whole link policy to change an instruction.
+- **`pagetypes_save` creates and changes**: without an id it creates from a preset, with one it
+  renames or sets the template; the preset is fixed after creation.
+- **`pages_update` takes its own arguments**, the update request plus `pageTypeId`; a type given
+  alone only types the page, recorded as the agent's (`manual`, `ai`).
+- **The link policy's field descriptions were shortened** to the old template tool's wording, as
+  every tool resends them; the four tools cost 3,953 bytes, and the schemas stand at 61,437 bytes
+  for 91 tools against 63,932 for 93 at the stage's start. The scope tool's `field` is the
+  scopable keys' enum, and a custom field comes as `metaKey`, which no enum can list.

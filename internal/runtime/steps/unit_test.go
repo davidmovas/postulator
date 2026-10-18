@@ -199,12 +199,12 @@ func unitEntities() []graph.Entity {
 		{
 			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
-			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
+			Source:  graph.SourceUser, CanonicalPageID: pointer("page-parent"),
 		},
 		{
 			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
-			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
+			Source:  graph.SourceUser, CanonicalPageID: pointer("page-child"),
 		},
 	}
 }
@@ -1416,6 +1416,42 @@ func TestTheWriterPromptCarriesTheBrief(t *testing.T) {
 	}
 }
 
+func TestTheWriterPromptNamesThePageTypeAndNoKind(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name, typeName, want string
+		absent               []string
+	}{
+		{name: "a typed page", typeName: "Category", want: "Page type: Category\n", absent: []string{"Kind:"}},
+		{name: "an untyped page", absent: []string{"Page type:", "Kind:"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			recorder := &promptRecorder{reply: goodDraft}
+			deps.LLM = recorder
+			blob := linkContextBlob(t, deps)
+			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
+			sc.Type.Name = tc.typeName
+
+			if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+				t.Fatalf("GenerateBody: %v", err)
+			}
+			if tc.want != "" && !strings.Contains(recorder.last, tc.want) {
+				t.Fatalf("the prompt lacks %q:\n%s", tc.want, recorder.last)
+			}
+			for _, absent := range tc.absent {
+				if strings.Contains(recorder.last, absent) {
+					t.Fatalf("the prompt carries %q:\n%s", absent, recorder.last)
+				}
+			}
+		})
+	}
+}
+
 func TestTheWriterPromptListsTheKeywordsOfThePageMostImportantFirst(t *testing.T) {
 	t.Parallel()
 
@@ -1625,9 +1661,9 @@ func sharedNameEntities() []graph.Entity {
 	entities := unitEntities()
 	entities[1].ScopeID = pointer("parent")
 	return append(entities,
-		graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+		graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Source: graph.SourceUser},
 		graph.Entity{
-			ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+			ID: "tea-espresso", SiteID: "site", Name: "Espresso", Source: graph.SourceUser,
 			ScopeID: pointer("tea"),
 		},
 	)

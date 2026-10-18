@@ -21,7 +21,7 @@ func TestSeedShipsFiveValidGlobalTemplates(t *testing.T) {
 		if err := template.Validate(seed.Spec); err != nil {
 			t.Errorf("%s: %v", seed.Name, err)
 		}
-		if seed.PageKind == "" || len(seed.Spec.Recipe) == 0 || seed.Spec.Length.Min == 0 || seed.Spec.MetaRules.DescriptionMax == 0 {
+		if len(seed.Spec.Recipe) == 0 || seed.Spec.Length.Min == 0 || seed.Spec.MetaRules.DescriptionMax == 0 {
 			t.Errorf("%s: seed is missing content: %+v", seed.Name, seed.Spec)
 		}
 		if len(seed.Spec.ModelProfiles) != 0 {
@@ -76,8 +76,8 @@ func TestEverySupersededSpecPrecedesASeed(t *testing.T) {
 			continue
 		}
 		current := seeds[index]
-		if old.PageKind != current.PageKind || old.Scope != template.ScopeGlobal {
-			t.Errorf("the superseded %s = %+v, want the kind and scope of the current one", old.Name, old)
+		if old.Scope != template.ScopeGlobal {
+			t.Errorf("the superseded %s = %+v, want the scope of the current one", old.Name, old)
 		}
 		if template.Supersedes(current, current) {
 			t.Errorf("the current %s supersedes itself, so every start would refresh it again", current.Name)
@@ -116,10 +116,10 @@ func TestSupersedes(t *testing.T) {
 			},
 		},
 		{
-			name: "another page kind",
+			name: "another name",
 			stored: func() template.Template {
 				other := old
-				other.PageKind = "guide"
+				other.Name = "Guide"
 				return other
 			},
 		},

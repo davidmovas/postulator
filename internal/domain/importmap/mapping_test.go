@@ -102,6 +102,40 @@ func TestNewMappingRejectsWhatCannotBeImported(t *testing.T) {
 	}
 }
 
+func TestARowTypeIsPagesProductsOrTheRowsType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		rowType importmap.RowType
+		valid   bool
+	}{
+		{rowType: "", valid: true},
+		{rowType: importmap.RowPages, valid: true},
+		{rowType: importmap.RowProducts, valid: true},
+		{rowType: importmap.RowTyped, valid: true},
+		{rowType: "kind", valid: false},
+		{rowType: "variants", valid: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(string(tc.rowType), func(t *testing.T) {
+			t.Parallel()
+
+			if got := tc.rowType.Valid(); got != tc.valid {
+				t.Fatalf("%q.Valid() = %v, want %v", tc.rowType, got, tc.valid)
+			}
+			m := mapping()
+			m.Options.RowType = tc.rowType
+			if _, err := importmap.NewMapping(m); (err == nil) != tc.valid {
+				t.Fatalf("NewMapping with the row type %q = %v", tc.rowType, err)
+			}
+		})
+	}
+	if importmap.RowTyped != "type" {
+		t.Fatalf("the typed row type is %q, want type", importmap.RowTyped)
+	}
+}
+
 func TestNewMappingTakesARootColumnInPlaceOfAPath(t *testing.T) {
 	t.Parallel()
 

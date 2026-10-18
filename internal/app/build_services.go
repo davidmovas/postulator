@@ -84,7 +84,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 			Entities:   stores.entities,
 			Edges:      stores.edges,
 			Pages:      stores.pages,
-			Templates:  stores.templates,
+			Types:      stores.pageTypes,
 			Mappings:   stores.mappings,
 			Sites:      stores.sites,
 			UnitOfWork: stores.store,

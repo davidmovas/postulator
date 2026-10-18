@@ -302,7 +302,6 @@ func (b *builder) absorb(into, from int) {
 	source := &b.units[from]
 	source.alias = into
 	target := &b.units[into]
-	target.kind = fill(target.kind, source.kind)
 	target.keywords = target.keywords.Merge(source.keywords)
 	target.anchors = graph.Distinct(target.anchors, source.anchors)
 	target.related = graph.Distinct(target.related, source.related)

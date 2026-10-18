@@ -11,9 +11,6 @@ import (
 )
 
 var narrowed = map[string]bool{
-	"templates_create.parameters.pageKind":   true,
-	"templates_update.parameters.pageKind":   true,
-	"templates_list.parameters.pageKind":     true,
 	"graph_list_edges.parameters.sort.field": true,
 	"imports_export.parameters.format":       true,
 }

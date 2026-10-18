@@ -1,9 +1,9 @@
 package imports
 
 import (
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
 func (s *siteState) productDraft(draft *pageDraft) bool {
@@ -20,7 +20,7 @@ func (s *siteState) productDraft(draft *pageDraft) bool {
 	}
 }
 
-func typeRows(sheet *drafts, rows []rowDraft, rowType importmap.RowType, state *siteState) {
+func typeRows(sheet *drafts, rowType importmap.RowType, state *siteState) {
 	if rowType == "" || rowType == importmap.RowPages {
 		return
 	}
@@ -28,7 +28,7 @@ func typeRows(sheet *drafts, rows []rowDraft, rowType importmap.RowType, state *
 	byMode := make(map[string]bool, len(sheet.pages))
 	for _, path := range sheet.sortedPaths() {
 		if draft := sheet.pages[path]; draft.cellType() == "" {
-			byMode[path] = rowType == importmap.RowProducts || kindOfDraft(draft, rows) == graph.KindProduct
+			byMode[path] = rowType == importmap.RowProducts || rowType == importmap.RowTyped && state.namesProduct(draft)
 		}
 	}
 	product := func(path string) bool {
@@ -45,13 +45,13 @@ func typeRows(sheet *drafts, rows []rowDraft, rowType importmap.RowType, state *
 	}
 }
 
-func kindOfDraft(draft *pageDraft, rows []rowDraft) graph.Kind {
-	for _, at := range draft.rows {
-		if kind, known := kindOf(rows[at].kind); known && kind != "" {
-			return kind
-		}
+func (s *siteState) namesProduct(draft *pageDraft) bool {
+	wpType := pagemap.WPPage
+	if current, held := s.held(draft.path); held {
+		wpType = current.WPType
 	}
-	return ""
+	named, known := s.pageType(draft.pageType, wpType)
+	return known && named.Preset == pagetype.Product
 }
 
 func productsUnder(path string, sheet *drafts, product func(string) bool, state *siteState) bool {

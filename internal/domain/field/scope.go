@@ -39,21 +39,21 @@ func (s AnchorStrategy) Valid() bool {
 }
 
 type LinkRules struct {
-	UpDepth                    int     `json:"upDepth" minimum:"0" description:"How many levels up the tree a page links to, 1 for its parent alone"`
-	DownLinks                  bool    `json:"downLinks" description:"Link down to the children of the entity"`
-	SiblingMinWeight           float64 `json:"siblingMinWeight" minimum:"0" maximum:"1" description:"The weight a related edge needs before a sibling link is placed, between 0 and 1"`
-	MaxLinks                   int     `json:"maxLinks" minimum:"0" description:"The most internal links the field may carry, 0 for no cap"`
-	MaxPerTarget               int     `json:"maxPerTarget" minimum:"0" description:"The most links the field may point at a single target"`
-	ParentLinkWithinParagraphs int     `json:"parentLinkWithinParagraphs" minimum:"0" description:"The parent link must appear within this many paragraphs of the start"`
-	ChildrenSection            bool    `json:"childrenSection" description:"Close the field with a section listing the page's children"`
+	UpDepth                    int     `json:"upDepth" minimum:"0" description:"Levels up to link; 1 is the parent"`
+	DownLinks                  bool    `json:"downLinks" description:"Link to children"`
+	SiblingMinWeight           float64 `json:"siblingMinWeight" minimum:"0" maximum:"1" description:"Related weight a sibling link needs"`
+	MaxLinks                   int     `json:"maxLinks" minimum:"0" description:"Max links; 0 for no cap"`
+	MaxPerTarget               int     `json:"maxPerTarget" minimum:"0" description:"Max links per target"`
+	ParentLinkWithinParagraphs int     `json:"parentLinkWithinParagraphs" minimum:"0" description:"Parent link within N first paragraphs"`
+	ChildrenSection            bool    `json:"childrenSection" description:"End with a list of children"`
 }
 
 type LinkPolicy struct {
-	Links          bool           `json:"links" description:"Whether the field carries contextual links at all"`
-	Rules          LinkRules      `json:"rules"`
-	ForbidExternal bool           `json:"forbidExternal" description:"Refuse a link that leaves the site"`
-	ForbidSelf     bool           `json:"forbidSelf" description:"Refuse a link to the page itself"`
-	AnchorStrategy AnchorStrategy `json:"anchorStrategy" enum:"prefer_user,rotate" description:"prefer_user takes the user's anchors first, rotate cycles through every anchor"`
+	Links          bool           `json:"links" description:"Carries contextual links"`
+	Rules          LinkRules      `json:"rules" description:"Links owed and allowed"`
+	ForbidExternal bool           `json:"forbidExternal" description:"Refuse external links"`
+	ForbidSelf     bool           `json:"forbidSelf" description:"Refuse self links"`
+	AnchorStrategy AnchorStrategy `json:"anchorStrategy" enum:"prefer_user,rotate" description:"prefer_user takes human anchors first"`
 }
 
 func NoLinks() LinkPolicy {

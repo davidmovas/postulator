@@ -101,7 +101,6 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 			ID:        id.New(),
 			SiteID:    siteID,
 			Name:      name,
-			Kind:      kindOf(proposed.Kind),
 			Intent:    strings.TrimSpace(proposed.Intent),
 			Keywords:  keywords,
 			Anchors:   proposedAnchors(proposed.Anchors),

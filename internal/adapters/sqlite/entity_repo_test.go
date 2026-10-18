@@ -18,7 +18,7 @@ import (
 
 func fullEntity(siteID, name string, at time.Time) graph.Entity {
 	return graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Intent: "informational",
+		ID: id.New(), SiteID: siteID, Name: name, Intent: "informational",
 		Definition: name + " is studied for tissue repair.",
 		Facts:      []graph.Fact{{Label: "Half-life", Value: "about 4 hours"}, {Label: "Form", Value: "lyophilized powder"}},
 		Notes:      []note.Note{{Label: "Entity notes", Text: "Sold as a vial"}},
@@ -242,9 +242,6 @@ func TestEntityRepoListAndFilters(t *testing.T) {
 	names := []string{"Boots", "sandals", "Shoes", "slippers", "Trainers"}
 	for i, name := range names {
 		record := fullEntity(owner.ID, name, sqlitetest.Stamp.Add(time.Duration(i)*time.Minute))
-		if i%2 == 1 {
-			record.Kind = graph.KindProduct
-		}
 		if err := repo.Insert(t.Context(), record); err != nil {
 			t.Fatalf("Insert %s: %v", name, err)
 		}
@@ -290,15 +287,6 @@ func TestEntityRepoListAndFilters(t *testing.T) {
 	}
 	if got := entityNames(back.Items); !reflect.DeepEqual(got, []string{"Boots", "sandals"}) {
 		t.Fatalf("backward page = %v", got)
-	}
-
-	product := graph.KindProduct
-	products, err := repo.List(t.Context(), graph.EntityQuery{SiteID: owner.ID, Kind: &product, Sort: graph.EntitySortName}, paging.Request{Limit: 10})
-	if err != nil {
-		t.Fatalf("List products: %v", err)
-	}
-	if got := entityNames(products.Items); !reflect.DeepEqual(got, []string{"sandals", "slippers"}) {
-		t.Errorf("products = %v", got)
 	}
 
 	prefixed, err := repo.List(t.Context(), graph.EntityQuery{SiteID: owner.ID, NamePrefix: "s", Sort: graph.EntitySortName}, paging.Request{Limit: 10})

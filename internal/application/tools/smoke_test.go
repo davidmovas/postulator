@@ -145,6 +145,9 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
 		UnitOfWork: store, Publisher: bus, Clock: now,
 	})
+	if seedErr := types.Seed(t.Context(), owner.ID); seedErr != nil {
+		t.Fatalf("seed the page types: %v", seedErr)
+	}
 	reportsService := reports.New(reports.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
 		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
@@ -152,8 +155,8 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	})
 
 	pagesService := pages.New(pages.Deps{
-		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, UnitOfWork: store,
-		Publisher: bus, Clock: now, Preview: stubPreview{},
+		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Types: sqlite.NewPageTypeRepo(store),
+		UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
@@ -162,13 +165,14 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Pages:     pagesService,
+		PageTypes: types,
 		Templates: templateService,
 		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry(), pagesService),
 		Sync:      sync.New(stubEngine{}, siteRepo, stubProbe{}, stubPacker{}, now),
 		Reports:   reportsService,
 		Imports: imports.New(imports.Deps{
 			Tables:   importer.New(),
-			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Templates: templateRepo,
+			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Types: sqlite.NewPageTypeRepo(store),
 			Mappings: sqlite.NewImportMappingRepo(store), Sites: siteRepo, UnitOfWork: store,
 			Publisher: bus, Clock: now,
 		}),
@@ -283,7 +287,7 @@ func TestATemplateToolSaysHowManyKeywordsThePageMustUse(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := strings.Replace(minimalSpec, `"maxDensity":0.02}`, `"maxDensity":0.02`+tc.rule+`}`, 1)
 			out, err := registry.Call(t.Context(), binding, "templates_create",
-				json.RawMessage(`{"name":"Keyed `+tc.name+`","pageKind":"guide","spec":`+spec+`}`))
+				json.RawMessage(`{"name":"Keyed `+tc.name+`","spec":`+spec+`}`))
 			if err != nil {
 				t.Fatalf("templates_create: %v", err)
 			}
@@ -314,7 +318,7 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 		`"primaryKeyword":true},"specifications":[{"name":"Form","intent":"As the notes say"}]}}`
 	spec := strings.TrimSuffix(minimalSpec, "}") + product
 	out, err := registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"Product outputs","pageKind":"product","spec":`+spec+`}`))
+		json.RawMessage(`{"name":"Product outputs","spec":`+spec+`}`))
 	if err != nil {
 		t.Fatalf("templates_create: %v", err)
 	}
@@ -329,7 +333,7 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 	}
 
 	bare, err := registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"No product outputs","pageKind":"guide","spec":`+minimalSpec+`}`))
+		json.RawMessage(`{"name":"No product outputs","spec":`+minimalSpec+`}`))
 	if err != nil {
 		t.Fatalf("templates_create: %v", err)
 	}
@@ -343,7 +347,7 @@ func argumentsFor(name string) json.RawMessage {
 	case "imports_inspect", "imports_preview":
 		return json.RawMessage(`{"path":"C:/nowhere/absent.csv","mapping":{"columns":[]}}`)
 	case "templates_create":
-		return json.RawMessage(`{"name":"Guide","pageKind":"guide","spec":` + minimalSpec + `}`)
+		return json.RawMessage(`{"name":"Guide","spec":` + minimalSpec + `}`)
 	case "templates_update":
 		return json.RawMessage(`{"id":"t1","spec":` + minimalSpec + `}`)
 	default:

@@ -1,6 +1,5 @@
 {
   "name": "Comparison",
-  "pageKind": "comparison",
   "spec": {
     "sections": [
       {"heading": "Overview", "intent": "Name the options being compared, who each is for and the verdict in one sentence", "targetWords": 150, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},

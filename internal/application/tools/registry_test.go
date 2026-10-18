@@ -57,6 +57,10 @@ func registered() []string {
 		"pages_set_canonical",
 		"pages_tree",
 		"pages_replace_links",
+		"pagetypes_list",
+		"pagetypes_save",
+		"pagetypes_delete",
+		"pagetypes_set_scope",
 		"templates_list",
 		"templates_get",
 		"templates_create",
@@ -160,7 +164,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 58600
+	schemaCeilingBytes = 61440
 	charactersPerToken = 4
 	widestLogged       = 8
 )
@@ -503,17 +507,17 @@ func TestAnUnusableCallNeverBecomesAConfirmation(t *testing.T) {
 		{
 			name: "a field the tool does not take",
 			tool: "graph_create_entity",
-			args: `{"name":"Creatine","kind":"topic","shade":"blue"}`,
+			args: `{"name":"Creatine","shade":"blue"}`,
 		},
 		{
 			name: "a field of the wrong shape",
 			tool: "templates_create",
-			args: `{"name":"Guide","pageKind":"guide","spec":{"tone":{"voice":"warm"}}}`,
+			args: `{"name":"Guide","spec":{"tone":{"voice":"warm"}}}`,
 		},
 		{
 			name: "a specification the domain refuses",
 			tool: "templates_create",
-			args: `{"name":"Guide","pageKind":"guide","spec":{"sections":[],"tone":"plain"}}`,
+			args: `{"name":"Guide","spec":{"sections":[],"tone":"plain"}}`,
 		},
 	}
 

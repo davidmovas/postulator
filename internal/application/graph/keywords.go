@@ -21,7 +21,6 @@ const (
 type keywordProposal struct {
 	Keyword           string   `json:"keyword" description:"The keyword this entity answers, copied exactly as it was given"`
 	Name              string   `json:"name" description:"The topic the keyword names, two to four words in title case"`
-	Kind              string   `json:"kind" enum:"hub,category,topic,product" description:"What the entity is"`
 	Intent            string   `json:"intent" description:"What the searcher wants, one short sentence"`
 	SecondaryKeywords []string `json:"secondaryKeywords" description:"Other given keywords that mean the same topic, folded into this one"`
 	Anchors           []string `json:"anchors" description:"At most four link texts another page could point here with"`
@@ -107,7 +106,6 @@ func (s *Service) ProposeFromKeywords(ctx context.Context, req ProposeFromKeywor
 			}
 			response.Entities = append(response.Entities, ProposedEntity{
 				Name:             name,
-				Kind:             string(kindOf(proposed.Kind)),
 				Intent:           strings.TrimSpace(proposed.Intent),
 				Keywords:         application.KeywordViews(answeredKeywords(answered, proposed.SecondaryKeywords, given)),
 				Anchors:          graphdomain.Distinct(proposed.Anchors),
@@ -136,7 +134,7 @@ func answeredKeywords(answered keyword.Keyword, others []string, given keyword.L
 func knownEntitiesOf(state siteGraph) []knownEntity {
 	known := make([]knownEntity, 0, len(state.entities))
 	for i := range state.entities {
-		known = append(known, knownEntity{Name: state.labels[state.entities[i].ID], Kind: string(state.entities[i].Kind)})
+		known = append(known, knownEntity{Name: state.labels[state.entities[i].ID]})
 	}
 	slices.SortFunc(known, func(a, b knownEntity) int { return strings.Compare(a.Name, b.Name) })
 	return known

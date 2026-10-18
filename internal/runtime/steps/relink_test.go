@@ -191,7 +191,7 @@ func TestRelinkNamesALinkItCouldNotPlace(t *testing.T) {
 	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
 		ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 		Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
-		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
+		Source:  graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 	})}
 	deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
 		ID: "e2", SiteID: "site", FromEntityID: "parent", ToEntityID: "filter",
@@ -473,7 +473,7 @@ func TestRelinkSpendsTheNeighborsOwnBudget(t *testing.T) {
 			deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
 				ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 				Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
-				Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
+				Source:  graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 			})}
 			deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
 				ID: "e2", SiteID: "site", FromEntityID: "parent", ToEntityID: "filter",

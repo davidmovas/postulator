@@ -25,7 +25,6 @@ type ProposedEntity struct {
 	PageID           string        `json:"pageId,omitempty" description:"Page id as previewed; empty for a keyword"`
 	Path             string        `json:"path,omitempty" description:"That page's path"`
 	Name             string        `json:"name" description:"Name, 2-4 words"`
-	Kind             string        `json:"kind,omitempty" enum:"hub,product,topic,category,custom" description:"Kind; default topic"`
 	Intent           string        `json:"intent,omitempty" description:"Reader's goal"`
 	Keywords         []dto.Keyword `json:"keywords,omitempty" description:"Search phrases, main first"`
 	Anchors          []string      `json:"anchors,omitempty" description:"Link texts other pages may use"`

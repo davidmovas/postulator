@@ -33,8 +33,8 @@ func TestAddEdgeKeepsItsReason(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	leaf := h.entity(t, "Leaf")
 
 	added := h.edge(t, leaf.ID, hub.ID, "parent", "proposed")
 	if added.Reason != "share one subject" {
@@ -66,9 +66,9 @@ func TestAddEdgeAndCycles(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	mid := h.entity(t, "Mid", "topic")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	mid := h.entity(t, "Mid")
+	leaf := h.entity(t, "Leaf")
 	h.recorder.Reset()
 
 	first := h.edge(t, mid.ID, hub.ID, "parent", "")
@@ -121,9 +121,9 @@ func TestApproveRejectDeleteAndList(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	mid := h.entity(t, "Mid", "topic")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	mid := h.entity(t, "Mid")
+	leaf := h.entity(t, "Leaf")
 	h.edge(t, mid.ID, hub.ID, "parent", "approved")
 	h.clock.Advance(time.Minute)
 	leafMid := h.edge(t, leaf.ID, mid.ID, "parent", "proposed")
@@ -197,9 +197,9 @@ func TestLoadGraphAndRecomputeScores(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	mid := h.entity(t, "Mid", "topic")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	mid := h.entity(t, "Mid")
+	leaf := h.entity(t, "Leaf")
 	h.edge(t, mid.ID, hub.ID, "parent", "approved")
 	h.edge(t, leaf.ID, mid.ID, "parent", "approved")
 	h.recorder.Reset()
@@ -244,9 +244,9 @@ func TestLoadGraphCarriesTheStateOfEveryMappedPage(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Components", "hub")
-	topic := h.entity(t, "Range", "topic")
-	h.entity(t, "Unmapped", "topic")
+	hub := h.entity(t, "Components")
+	topic := h.entity(t, "Range")
+	h.entity(t, "Unmapped")
 
 	repo := sqlite.NewPageRepo(h.store)
 	wpID := int64(42)

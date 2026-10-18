@@ -37,7 +37,7 @@ func fieldOf(t *testing.T, err error) string {
 func validEntity() graph.Entity {
 	at := time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
 	return graph.Entity{
-		ID: entA, SiteID: siteA, Name: " Running Shoes ", Kind: graph.KindHub, Intent: "commercial",
+		ID: entA, SiteID: siteA, Name: " Running Shoes ", Intent: "commercial",
 		Keywords: keyword.List{
 			{Text: "trail shoes"}, {Text: " Trail Shoes "}, {Text: ""}, {Text: "road shoes", Volume: new(400)}, {Text: " running shoes ", Volume: new(9000)},
 		},
@@ -119,7 +119,6 @@ func TestNewEntityRejects(t *testing.T) {
 		{name: "no id", mutate: func(e *graph.Entity) { e.ID = "" }, field: "id"},
 		{name: "no site", mutate: func(e *graph.Entity) { e.SiteID = "" }, field: "siteId"},
 		{name: "blank name", mutate: func(e *graph.Entity) { e.Name = " " }, field: "name"},
-		{name: "unknown kind", mutate: func(e *graph.Entity) { e.Kind = "planet" }, field: "kind"},
 		{name: "unknown source", mutate: func(e *graph.Entity) { e.Source = "wind" }, field: "source"},
 		{name: "negative score", mutate: func(e *graph.Entity) { e.Score = -1 }, field: "score"},
 		{name: "empty canonical", mutate: func(e *graph.Entity) { empty := ""; e.CanonicalPageID = &empty }, field: "canonicalPageId"},
@@ -173,11 +172,6 @@ func TestNewEntityKeepsTheAnchorOrderAndTrims(t *testing.T) {
 func TestEnums(t *testing.T) {
 	t.Parallel()
 
-	for _, kind := range []graph.Kind{graph.KindHub, graph.KindProduct, graph.KindTopic, graph.KindCategory, graph.KindCustom} {
-		if !kind.Valid() {
-			t.Errorf("%q must be valid", kind)
-		}
-	}
 	for _, source := range []graph.Source{graph.SourceImport, graph.SourceUser, graph.SourceAI} {
 		if !source.Valid() {
 			t.Errorf("%q must be valid", source)
@@ -188,7 +182,7 @@ func TestEnums(t *testing.T) {
 			t.Errorf("%q must be valid", status)
 		}
 	}
-	if graph.Kind("x").Valid() || graph.Source("x").Valid() || graph.EdgeKind("x").Valid() || graph.EdgeStatus("x").Valid() {
+	if graph.Source("x").Valid() || graph.EdgeKind("x").Valid() || graph.EdgeStatus("x").Valid() {
 		t.Error("unknown enum values must be invalid")
 	}
 	if !graph.EntitySortCreatedAt.Valid() || !graph.EntitySortName.Valid() || graph.EntitySort("x").Valid() {

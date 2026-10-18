@@ -187,7 +187,7 @@ func TestTheAuditNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 	}
 	tea := f.entity(t, repo, "Tea", 0.1, nil)
 	if err := repo.Insert(t.Context(), graph.Entity{
-		ID: id.New(), SiteID: f.siteID, Name: "Espresso", Kind: graph.KindTopic, Keywords: keyword.Of("tea espresso"),
+		ID: id.New(), SiteID: f.siteID, Name: "Espresso", Keywords: keyword.Of("tea espresso"),
 		Source: graph.SourceUser, ScopeID: &tea.ID, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}); err != nil {
 		t.Fatalf("insert the other Espresso: %v", err)

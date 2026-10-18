@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -31,6 +32,7 @@ type StepContext struct {
 	Item      Item
 	Page      pagemap.Page
 	Spec      template.TemplateSpec
+	Type      pagetype.Type
 	Links     field.LinkPolicy
 	Params    map[string]any
 	Artifacts map[ArtifactKind]Artifact

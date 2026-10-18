@@ -21,30 +21,31 @@ const (
 type FindingCode string
 
 const (
-	CodeBadPath           FindingCode = "bad_path"
-	CodeNoTarget          FindingCode = "no_target"
-	CodeDuplicatePath     FindingCode = "duplicate_path"
-	CodeIntermediatePath  FindingCode = "intermediate_path"
-	CodeUnknownParent     FindingCode = "unknown_parent"
-	CodeUnknownRelated    FindingCode = "unknown_related"
-	CodeSelfEdge          FindingCode = "self_edge"
-	CodeCycle             FindingCode = "cycle"
-	CodeCannibalization   FindingCode = "cannibalization"
-	CodeUnknownEntityKind FindingCode = "unknown_entity_kind"
-	CodeUnknownPageKind   FindingCode = "unknown_page_kind"
-	CodeUnknownWPType     FindingCode = "unknown_wp_type"
-	CodeRootPageSkipped   FindingCode = "root_page_skipped"
-	CodeBadVolume         FindingCode = "bad_volume"
-	CodeUnknownOwnEntity  FindingCode = "unknown_own_entity"
-	CodeTechnicalParent   FindingCode = "technical_parent"
-	CodeGroupWithoutPage  FindingCode = "group_without_page"
-	CodeAmbiguousParent   FindingCode = "ambiguous_parent"
-	CodeAmbiguousEntity   FindingCode = "ambiguous_entity"
-	CodeProductNotInStore FindingCode = "product_not_in_store"
-	CodeProductRowLeft    FindingCode = "product_row_left"
-	CodeWPTypeKept        FindingCode = "wp_type_kept"
-	CodeIntermediateLevel FindingCode = "intermediate_level"
-	CodeScopeClash        FindingCode = "scope_clash"
+	CodeBadPath               FindingCode = "bad_path"
+	CodeNoTarget              FindingCode = "no_target"
+	CodeDuplicatePath         FindingCode = "duplicate_path"
+	CodeIntermediatePath      FindingCode = "intermediate_path"
+	CodeUnknownParent         FindingCode = "unknown_parent"
+	CodeUnknownRelated        FindingCode = "unknown_related"
+	CodeSelfEdge              FindingCode = "self_edge"
+	CodeCycle                 FindingCode = "cycle"
+	CodeCannibalization       FindingCode = "cannibalization"
+	CodeUnknownPageType       FindingCode = "unknown_page_type"
+	CodePageTypeKept          FindingCode = "page_type_kept"
+	CodePageTypeColumnDropped FindingCode = "page_type_column_dropped"
+	CodeUnknownWPType         FindingCode = "unknown_wp_type"
+	CodeRootPageSkipped       FindingCode = "root_page_skipped"
+	CodeBadVolume             FindingCode = "bad_volume"
+	CodeUnknownOwnEntity      FindingCode = "unknown_own_entity"
+	CodeTechnicalParent       FindingCode = "technical_parent"
+	CodeGroupWithoutPage      FindingCode = "group_without_page"
+	CodeAmbiguousParent       FindingCode = "ambiguous_parent"
+	CodeAmbiguousEntity       FindingCode = "ambiguous_entity"
+	CodeProductNotInStore     FindingCode = "product_not_in_store"
+	CodeProductRowLeft        FindingCode = "product_row_left"
+	CodeWPTypeKept            FindingCode = "wp_type_kept"
+	CodeIntermediateLevel     FindingCode = "intermediate_level"
+	CodeScopeClash            FindingCode = "scope_clash"
 )
 
 var blockingFindingCodes = []FindingCode{
@@ -64,7 +65,7 @@ type Options struct {
 	IndentColumns   []string          `json:"indentColumns,omitempty" description:"Columns whose position nests the path, shallowest first"`
 	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Root Entity or Root group columns, outermost first"`
 	NoteColumns     []string          `json:"noteColumns,omitempty" description:"Columns kept as notes for the writer"`
-	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"Default pages; a parent of products stays a page, a wp_type cell wins"`
+	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,type" description:"Default pages; a parent of products stays a page, a wp_type cell wins"`
 	NoHeader        bool              `json:"noHeader,omitempty" description:"No header row: columns go by letter, every row is data"`
 }
 
@@ -105,7 +106,7 @@ type PreviewPage struct {
 	MetaDescription string        `json:"metaDescription,omitempty"`
 	Keywords        []dto.Keyword `json:"keywords"`
 	WPType          string        `json:"wpType"`
-	PageKind        string        `json:"pageKind,omitempty"`
+	PageType        string        `json:"pageType,omitempty"`
 	Entity          string        `json:"entity,omitempty"`
 	Action          string        `json:"action"`
 	Generated       bool          `json:"generated,omitempty"`
@@ -115,7 +116,6 @@ type PreviewEntity struct {
 	Sheet    string        `json:"sheet,omitempty"`
 	Name     string        `json:"name"`
 	Parent   string        `json:"parent,omitempty"`
-	Kind     string        `json:"kind"`
 	Keywords []dto.Keyword `json:"keywords"`
 	Anchors  []string      `json:"anchors"`
 	Action   string        `json:"action"`
@@ -261,14 +261,13 @@ func entityView(sheet string, e graph.Entity, parent string, action Action) Prev
 		Sheet:    sheet,
 		Name:     e.Name,
 		Parent:   parent,
-		Kind:     string(e.Kind),
 		Keywords: application.KeywordViews(e.Keywords),
 		Anchors:  anchorTexts(e.Anchors),
 		Action:   string(action),
 	}
 }
 
-func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action) PreviewPage {
+func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action, pageType string) PreviewPage {
 	view := PreviewPage{
 		Sheet:           sheet,
 		Path:            p.Path,
@@ -280,7 +279,7 @@ func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action) Pre
 		MetaDescription: p.MetaDescription,
 		Keywords:        application.KeywordViews(p.Keywords),
 		WPType:          string(p.WPType),
-		PageKind:        draft.pageKind,
+		PageType:        pageType,
 		Entity:          draft.entity,
 		Action:          string(action),
 		Generated:       draft.generated,

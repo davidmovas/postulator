@@ -1,7 +1,6 @@
 package imports
 
 import (
-	"context"
 	"maps"
 	"slices"
 
@@ -9,9 +8,8 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/id"
-	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 func sameRef(a, b *string) bool {
@@ -29,65 +27,14 @@ func samePage(a, b pagemap.Page) bool {
 	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle && a.PlannedPath == b.PlannedPath &&
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
 		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) &&
-		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID)
+		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID) &&
+		sameRef(a.PageTypeID, b.PageTypeID) && a.TypeSource == b.TypeSource && a.TypeReason == b.TypeReason
 }
 
-type kindTemplates struct {
-	byKind map[string]*string
-	noted  map[string]struct{}
-}
-
-func (s *Service) kindTemplates(ctx context.Context, siteID string, sheet *drafts) (*kindTemplates, error) {
-	found := &kindTemplates{byKind: make(map[string]*string), noted: make(map[string]struct{})}
-	for _, path := range sheet.sortedPaths() {
-		draft := sheet.pages[path]
-		kind := draft.kind()
-		if _, looked := found.byKind[kind]; draft.entityOnly || kind == "" || looked {
-			continue
-		}
-		templateID, err := s.templateFor(ctx, siteID, kind)
-		if err != nil {
-			return nil, err
-		}
-		found.byKind[kind] = templateID
-	}
-	return found, nil
-}
-
-func (s *Service) templateFor(ctx context.Context, siteID, pageKind string) (*string, error) {
-	list, err := s.deps.Templates.List(ctx, template.Query{PageKind: pageKind}, paging.Request{Limit: paging.MaxLimit})
-	if err != nil {
-		return nil, err
-	}
-
-	var global *string
-	for i := range list.Items {
-		found := &list.Items[i]
-		if found.SiteID != nil && *found.SiteID == siteID {
-			return &found.ID, nil
-		}
-		if found.Scope == template.ScopeGlobal && global == nil {
-			global = &found.ID
-		}
-	}
-	return global, nil
-}
-
-func (k *kindTemplates) of(draft *pageDraft, p *plan) *string {
-	kind := draft.kind()
-	found := k.byKind[kind]
-	if _, noted := k.noted[kind]; kind == "" || found != nil || noted {
-		return found
-	}
-	k.noted[kind] = struct{}{}
-	p.noteAt(draft.at, string(importmap.FieldPageKind), CodeUnknownPageKind, "no template carries this page kind: "+draft.pageKind)
-	return nil
-}
-
-func (b *builder) planPages(templates *kindTemplates) error {
+func (b *builder) planPages() error {
 	for _, path := range b.sheet.sortedPaths() {
 		if draft := b.sheet.pages[path]; !draft.entityOnly {
-			if err := b.planPage(draft, templates); err != nil {
+			if err := b.planPage(draft); err != nil {
 				return err
 			}
 		}
@@ -95,24 +42,56 @@ func (b *builder) planPages(templates *kindTemplates) error {
 	return b.planSiteOwned()
 }
 
-func (b *builder) planPage(draft *pageDraft, templates *kindTemplates) error {
+func (b *builder) planPage(draft *pageDraft) error {
 	if draft.wpType != "" && draft.cellType() == "" {
 		b.p.noteAt(draft.at, string(importmap.FieldWPType), CodeUnknownWPType,
 			"the wordpress type is not recognized and was read as a page: "+draft.wpType)
 	}
-	templateID := templates.of(draft, b.p)
 	entityID := b.ownerOf(draft)
 
 	current, exists := b.state.held(draft.path)
 	switch {
 	case exists:
-		return b.updatePage(current, draft, templateID, entityID)
+		return b.updatePage(current, draft, entityID)
 	case draft.path == pagemap.RootPath:
 		b.p.noteAt(draft.at, string(importmap.FieldPath), CodeRootPageSkipped,
 			"the root of the site already exists on WordPress, so the import does not plan it; sync the site first to map it")
 		return nil
 	default:
-		return b.createPage(draft, templateID, entityID)
+		return b.createPage(draft, entityID)
+	}
+}
+
+func (b *builder) typeOf(draft *pageDraft, wpType pagemap.WPType) (pagetype.Type, bool) {
+	if draft.pageType == "" {
+		return pagetype.Type{}, false
+	}
+	named, known := b.state.pageType(draft.pageType, wpType)
+	if !known {
+		b.p.noteAt(draft.at, string(importmap.FieldPageType), CodeUnknownPageType,
+			"no page type of the site answers to "+draft.pageType+", so the sheet sets no type on "+draft.path)
+	}
+	return named, known
+}
+
+func typedByImport(page *pagemap.Page, named pagetype.Type) {
+	page.PageTypeID, page.TypeSource, page.TypeReason = &named.ID, pagemap.TypeSourceManual, pagemap.TypeByImport
+}
+
+func (b *builder) retype(next *pagemap.Page, current pagemap.Page, draft *pageDraft) {
+	named, known := b.typeOf(draft, next.WPType)
+	switch {
+	case !known || sameRef(current.PageTypeID, &named.ID):
+	case current.TypeReason == pagemap.TypeByUser || current.TypeReason == pagemap.TypeByAI:
+		chooser := "a person"
+		if current.TypeReason == pagemap.TypeByAI {
+			chooser = "the agent"
+		}
+		b.p.noteAt(draft.at, string(importmap.FieldPageType), CodePageTypeKept,
+			draft.path+" keeps the page type "+b.state.typeName(current.PageTypeID)+", which "+chooser+
+				" chose; the sheet names it "+named.Name)
+	default:
+		typedByImport(next, named)
 	}
 }
 
@@ -125,7 +104,7 @@ func (b *builder) ownerOf(draft *pageDraft) *string {
 	return &b.units[owner].id
 }
 
-func (b *builder) createPage(draft *pageDraft, templateID, entityID *string) error {
+func (b *builder) createPage(draft *pageDraft, entityID *string) error {
 	wpType := draft.createdType()
 	title := fill(draft.title, titleFrom(draft.path))
 	if wpType == pagemap.WPProduct {
@@ -135,21 +114,25 @@ func (b *builder) createPage(draft *pageDraft, templateID, entityID *string) err
 	if draft.technical() {
 		technical = pagemap.TechnicalWorkbook
 	}
-	page, err := pagemap.NewPage(pagemap.Page{
+	planned := pagemap.Page{
 		ID: id.New(), SiteID: b.state.siteID, Path: draft.path, WPType: wpType,
 		Title: title, H1: draft.h1, MetaTitle: draft.metaTitle, MetaDescription: draft.metaDesc,
 		Keywords: draft.keywords, Notes: draft.notes, Status: pagemap.StatusPlanned, EntityID: entityID,
-		TemplateID: templateID, TechnicalReason: technical, CreatedAt: b.now, UpdatedAt: b.now,
-	})
+		TechnicalReason: technical, CreatedAt: b.now, UpdatedAt: b.now,
+	}
+	if named, known := b.typeOf(draft, wpType); known {
+		typedByImport(&planned, named)
+	}
+	page, err := pagemap.NewPage(planned)
 	if err != nil {
 		return err
 	}
 	b.p.pages = append(b.p.pages, plannedPage{page: page, created: true})
-	b.p.report.Pages = append(b.p.report.Pages, pageView(b.p.sheetAt(draft.at), page, draft, ActionCreate))
+	b.p.report.Pages = append(b.p.report.Pages, b.pageView(page, draft, ActionCreate))
 	return nil
 }
 
-func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, templateID, entityID *string) error {
+func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, entityID *string) error {
 	next := current
 	next.Title = fill(current.Title, draft.title)
 	next.H1 = fill(current.H1, draft.h1)
@@ -158,11 +141,9 @@ func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, templateID,
 	next.Keywords = current.Keywords.Merge(draft.keywords)
 	next.Notes = note.Merge(current.Notes, draft.notes)
 	next.WPType = b.keptType(current, draft)
+	b.retype(&next, current, draft)
 	if current.Path != draft.path {
 		next.PlannedPath = draft.path
-	}
-	if templateID != nil {
-		next.TemplateID = templateID
 	}
 	if entityID != nil {
 		next.EntityID = entityID
@@ -193,10 +174,15 @@ func (b *builder) planUpdate(current, next pagemap.Page, draft *pageDraft) error
 	action := ActionSkip
 	if !samePage(page, current) {
 		action = ActionUpdate
-		b.p.pages = append(b.p.pages, plannedPage{page: page, created: false})
+		retyped := page.PageTypeID != nil && !sameRef(page.PageTypeID, current.PageTypeID)
+		b.p.pages = append(b.p.pages, plannedPage{page: page, retyped: retyped})
 	}
-	b.p.report.Pages = append(b.p.report.Pages, pageView(b.p.sheetAt(draft.at), page, draft, action))
+	b.p.report.Pages = append(b.p.report.Pages, b.pageView(page, draft, action))
 	return nil
+}
+
+func (b *builder) pageView(page pagemap.Page, draft *pageDraft, action Action) PreviewPage {
+	return pageView(b.p.sheetAt(draft.at), page, draft, action, b.state.typeName(page.PageTypeID))
 }
 
 func (b *builder) siteOwned() map[string]int {

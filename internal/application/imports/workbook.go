@@ -87,7 +87,7 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 	now := s.now()
 	book := workbook{plans: make([]plan, 0, len(reads))}
 	for i := range reads {
-		planned, planErr := s.plan(ctx, state, &reads[i], now)
+		planned, planErr := planSheet(state, &reads[i], now)
 		if planErr != nil {
 			return workbook{}, planErr
 		}
@@ -229,5 +229,5 @@ func (s siteState) after(p *plan, now time.Time) (siteState, error) {
 		entities[at].ScopeID, entities[at].UpdatedAt = moved[i].ScopeID, now
 	}
 	sortStored(entities, edges, pages)
-	return newSiteState(s.siteID, entities, edges, pages), err
+	return newSiteState(s.siteID, entities, edges, pages, s.pageTypes), err
 }

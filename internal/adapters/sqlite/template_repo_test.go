@@ -16,7 +16,7 @@ import (
 
 func globalTemplate(name string, at time.Time) template.Template {
 	seed := template.Seed()[3]
-	return template.Template{ID: id.New(), Scope: template.ScopeGlobal, Name: name, PageKind: seed.PageKind, Version: 1, Spec: seed.Spec, CreatedAt: at, UpdatedAt: at}
+	return template.Template{ID: id.New(), Scope: template.ScopeGlobal, Name: name, Version: 1, Spec: seed.Spec, CreatedAt: at, UpdatedAt: at}
 }
 
 func templateNames(list []template.Template) []string {
@@ -122,9 +122,6 @@ func TestTemplateRepoListAndFilters(t *testing.T) {
 	names := []string{"Category", "Guide", "Hub"}
 	for i, name := range names {
 		record := globalTemplate(name, sqlitetest.Stamp.Add(time.Duration(i)*time.Minute))
-		if name == "Guide" {
-			record.PageKind = "guide"
-		}
 		if err := repo.Insert(t.Context(), record); err != nil {
 			t.Fatalf("Insert %s: %v", name, err)
 		}
@@ -162,10 +159,6 @@ func TestTemplateRepoListAndFilters(t *testing.T) {
 	bySite, err := repo.List(t.Context(), template.Query{SiteID: &owner.ID, Sort: template.SortCreatedAt}, paging.Request{Limit: 10})
 	if err != nil || len(bySite.Items) != 1 || bySite.Items[0].Name != "Landing" {
 		t.Errorf("by site = %+v, %v", bySite.Items, err)
-	}
-	byKind, err := repo.List(t.Context(), template.Query{PageKind: "guide", Sort: template.SortCreatedAt}, paging.Request{Limit: 10})
-	if err != nil || len(byKind.Items) != 1 || byKind.Items[0].Name != "Guide" {
-		t.Errorf("by kind = %+v, %v", byKind.Items, err)
 	}
 	byName, err := repo.List(t.Context(), template.Query{Scope: &global, Name: "hub", Sort: template.SortCreatedAt}, paging.Request{Limit: 10})
 	if err != nil || len(byName.Items) != 1 || byName.Items[0].Name != "Hub" {

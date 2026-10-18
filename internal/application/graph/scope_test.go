@@ -10,7 +10,7 @@ import (
 func (h harness) under(t *testing.T, name, parentID string) graph.Entity {
 	t.Helper()
 	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: h.siteID, Name: name, Kind: "topic", ParentID: parentID,
+		SiteID: h.siteID, Name: name, ParentID: parentID,
 	})
 	if err != nil {
 		t.Fatalf("CreateEntity %s under %s: %v", name, parentID, err)
@@ -34,8 +34,8 @@ func TestTheSameNameLivesUnderTwoParents(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	bpc := h.entity(t, "BPC-157", "product")
-	tb := h.entity(t, "TB-500", "product")
+	bpc := h.entity(t, "BPC-157")
+	tb := h.entity(t, "TB-500")
 
 	first := h.under(t, "Liquid", bpc.ID)
 	second := h.under(t, "Liquid", tb.ID)
@@ -48,12 +48,12 @@ func TestTheSameNameLivesUnderTwoParents(t *testing.T) {
 		t.Fatalf("the graph holds %d edges, %v; want a parent edge for each", len(loaded.Edges), err)
 	}
 
-	_, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: "liquid", Kind: "topic", ParentID: bpc.ID})
+	_, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: "liquid", ParentID: bpc.ID})
 	if !errors.IsCode(err, errors.Conflict) {
 		t.Fatalf("the same name twice under one parent = %v, want CONFLICT", err)
 	}
 
-	_, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: "x", Kind: "topic", ParentID: "missing"})
+	_, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: "x", ParentID: "missing"})
 	if !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("a parent that does not exist = %v, want NOT_FOUND", err)
 	}
@@ -63,9 +63,9 @@ func TestAScopeFollowsTheParentEdges(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	bpc := h.entity(t, "BPC-157", "product")
-	tb := h.entity(t, "TB-500", "product")
-	loose := h.entity(t, "Liquid", "topic")
+	bpc := h.entity(t, "BPC-157")
+	tb := h.entity(t, "TB-500")
+	loose := h.entity(t, "Liquid")
 
 	added, err := h.service.AddEdge(t.Context(), graph.AddEdgeRequest{
 		SiteID: h.siteID, FromEntityID: loose.ID, ToEntityID: bpc.ID, Kind: "parent", Weight: 1,
@@ -104,8 +104,8 @@ func TestAMoveThatWouldPutTwoNamesUnderOneParentIsRefused(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	bpc := h.entity(t, "BPC-157", "product")
-	tb := h.entity(t, "TB-500", "product")
+	bpc := h.entity(t, "BPC-157")
+	tb := h.entity(t, "TB-500")
 	h.under(t, "Liquid", bpc.ID)
 	other := h.under(t, "Liquid", tb.ID)
 
@@ -122,8 +122,8 @@ func TestDeletingAParentThatWouldLeaveTwoNamesAtTheTopIsRefused(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	bpc := h.entity(t, "BPC-157", "product")
-	h.entity(t, "Liquid", "topic")
+	bpc := h.entity(t, "BPC-157")
+	h.entity(t, "Liquid")
 	child := h.under(t, "Liquid", bpc.ID)
 
 	if _, err := h.service.DeleteEntity(t.Context(), graph.DeleteEntityRequest{ID: bpc.ID}); !errors.IsCode(err, errors.Conflict) {
@@ -133,7 +133,7 @@ func TestDeletingAParentThatWouldLeaveTwoNamesAtTheTopIsRefused(t *testing.T) {
 		t.Fatalf("a refused delete removed the entity: %v", err)
 	}
 
-	tb := h.entity(t, "TB-500", "product")
+	tb := h.entity(t, "TB-500")
 	if _, err := h.service.AddEdge(t.Context(), graph.AddEdgeRequest{
 		SiteID: h.siteID, FromEntityID: child.ID, ToEntityID: tb.ID, Kind: "parent", Weight: 1,
 	}); err != nil {
@@ -154,10 +154,10 @@ func TestABatchPutsTheSameNameUnderTwoParents(t *testing.T) {
 	created, err := h.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
 		SiteID: h.siteID,
 		Entities: []graph.EntityInput{
-			{Name: "BPC-157", Kind: "product"},
-			{Name: "TB-500", Kind: "product"},
-			{Name: "Liquid", Kind: "topic", ParentName: "BPC-157"},
-			{Name: "Liquid", Kind: "topic", ParentName: "TB-500"},
+			{Name: "BPC-157"},
+			{Name: "TB-500"},
+			{Name: "Liquid", ParentName: "BPC-157"},
+			{Name: "Liquid", ParentName: "TB-500"},
 		},
 	})
 	if err != nil {
@@ -173,15 +173,15 @@ func TestABatchPutsTheSameNameUnderTwoParents(t *testing.T) {
 	}{
 		{
 			name:     "a parent named by a name two entities share",
-			entities: []graph.EntityInput{{Name: "Drops", Kind: "topic", ParentName: "Liquid"}},
+			entities: []graph.EntityInput{{Name: "Drops", ParentName: "Liquid"}},
 		},
 		{
 			name:     "the same name twice under one parent",
-			entities: []graph.EntityInput{{Name: "Powder", Kind: "topic", ParentName: "BPC-157"}, {Name: "powder", Kind: "topic", ParentName: "BPC-157"}},
+			entities: []graph.EntityInput{{Name: "Powder", ParentName: "BPC-157"}, {Name: "powder", ParentName: "BPC-157"}},
 		},
 		{
 			name:     "a name the parent already has",
-			entities: []graph.EntityInput{{Name: "liquid", Kind: "topic", ParentName: "BPC-157"}},
+			entities: []graph.EntityInput{{Name: "liquid", ParentName: "BPC-157"}},
 		},
 	}
 	for _, tc := range cases {
@@ -201,9 +201,9 @@ func TestABatchRefusesOnlyTheNamesTheStoreRefuses(t *testing.T) {
 	created, err := h.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
 		SiteID: h.siteID,
 		Entities: []graph.EntityInput{
-			{Name: "Coffee", Kind: "product"},
-			{Name: "Café", Kind: "topic", ParentName: "coffee"},
-			{Name: "CAFÉ", Kind: "topic", ParentName: "COFFEE"},
+			{Name: "Coffee"},
+			{Name: "Café", ParentName: "coffee"},
+			{Name: "CAFÉ", ParentName: "COFFEE"},
 		},
 	})
 	if err != nil {
@@ -214,7 +214,7 @@ func TestABatchRefusesOnlyTheNamesTheStoreRefuses(t *testing.T) {
 	}
 
 	_, err = h.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
-		SiteID: h.siteID, Entities: []graph.EntityInput{{Name: "café", Kind: "topic", ParentName: "Coffee"}},
+		SiteID: h.siteID, Entities: []graph.EntityInput{{Name: "café", ParentName: "Coffee"}},
 	})
 	if !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("a name the store holds under the parent = %v, want an invalid batch", err)

@@ -169,7 +169,7 @@ func newFactoryWithRules(t *testing.T, draft string, rules field.LinkRules) *fac
 
 	templateRepo := sqlite.NewTemplateRepo(store)
 	base := template.Template{
-		ID: id.New(), Scope: template.ScopeGlobal, Name: "Guide", PageKind: "guide", Version: 1,
+		ID: id.New(), Scope: template.ScopeGlobal, Name: "Guide", Version: 1,
 		Spec: spec(), CreatedAt: at, UpdatedAt: at,
 	}
 	if err := templateRepo.Insert(t.Context(), base); err != nil {
@@ -248,7 +248,7 @@ func seedEntity(t *testing.T, repo *sqlite.EntityRepo, siteID, name, anchor stri
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(anchor),
+		ID: id.New(), SiteID: siteID, Name: name, Keywords: keyword.Of(anchor),
 		Anchors: []graph.Anchor{{Text: anchor, Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}

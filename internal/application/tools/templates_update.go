@@ -10,19 +10,18 @@ import (
 const templatesUpdateName = "templates_update"
 
 type templatesUpdateArgs struct {
-	ID       string            `json:"id" description:"Template id"`
-	Name     *string           `json:"name,omitempty" description:"New name"`
-	PageKind *string           `json:"pageKind,omitempty" enum:"hub,category,guide,comparison,product" description:"New page kind"`
-	Spec     *templateSpecArgs `json:"spec,omitempty" description:"Full replacement specification"`
+	ID   string            `json:"id" description:"Template id"`
+	Name *string           `json:"name,omitempty" description:"New name"`
+	Spec *templateSpecArgs `json:"spec,omitempty" description:"Full replacement specification"`
 }
 
 func templatesUpdate(deps Deps) Tool {
 	return checking(NewTool(Def{
 		Name:        templatesUpdateName,
-		Description: "Change the name, page kind or specification of a template.",
+		Description: "Change the name or specification of a template.",
 		Risk:        RiskWrite,
 	}, func(ctx context.Context, _ Binding, in templatesUpdateArgs) (templates.UpdateTemplateResponse, error) {
-		request := templates.UpdateTemplateRequest{ID: in.ID, Name: in.Name, PageKind: in.PageKind}
+		request := templates.UpdateTemplateRequest{ID: in.ID, Name: in.Name}
 		if in.Spec != nil {
 			spec := in.Spec.spec()
 			request.Spec = &spec

@@ -156,9 +156,6 @@ func (t Template) Validate() error {
 	if strings.TrimSpace(t.Name) == "" {
 		return invalid("template name must not be empty", "name")
 	}
-	if strings.TrimSpace(t.PageKind) == "" {
-		return invalid("template page kind must not be empty", "pageKind")
-	}
 	if t.Version < 1 {
 		return invalid("template version starts at 1", "version")
 	}

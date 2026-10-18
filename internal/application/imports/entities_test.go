@@ -58,7 +58,7 @@ func TestAnImportAddsTheSheetAnchorsAndKeepsTheOnesAnEntityCarries(t *testing.T)
 
 			h := newHarness(t)
 			if err := sqlite.NewEntityRepo(h.store).Insert(t.Context(), graph.Entity{
-				ID: id.New(), SiteID: h.siteID, Name: "Hosting", Kind: graph.KindTopic, Keywords: keyword.Of("hosting"),
+				ID: id.New(), SiteID: h.siteID, Name: "Hosting", Keywords: keyword.Of("hosting"),
 				Anchors: carried, Source: graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 			}); err != nil {
 				t.Fatalf("insert the entity: %v", err)

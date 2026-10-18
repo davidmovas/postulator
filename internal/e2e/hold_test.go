@@ -160,12 +160,8 @@ func plantChild(t *testing.T, entities *graph.Service, service *pages.Service, s
 	siteID string, parent pages.Page) pages.Page {
 	t.Helper()
 
-	kin, err := entities.GetEntity(t.Context(), graph.GetEntityRequest{ID: *parent.EntityID})
-	if err != nil {
-		t.Fatalf("read the parent entity: %v", err)
-	}
 	created, err := entities.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: siteID, Name: "House Cocktails", Kind: kin.Entity.Kind, Keywords: []dto.Keyword{{Text: childTopic}},
+		SiteID: siteID, Name: "House Cocktails", Keywords: []dto.Keyword{{Text: childTopic}},
 	})
 	if err != nil {
 		t.Fatalf("create the child entity: %v", err)

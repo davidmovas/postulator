@@ -118,8 +118,82 @@ export const cannibalizationReasons = [
 ] as const;
 export type CannibalizationReason = (typeof cannibalizationReasons)[number];
 
-export const entityKinds = ["hub", "product", "topic", "category", "custom"] as const;
-export type EntityKind = (typeof entityKinds)[number];
+export const pageTypePresets = [
+    "hub",
+    "entity",
+    "product",
+    "store_category",
+    "catalog",
+    "technical",
+] as const;
+export type PageTypePreset = (typeof pageTypePresets)[number];
+
+export const pageTypeSources = ["", "auto", "manual"] as const;
+export type PageTypeSource = (typeof pageTypeSources)[number];
+
+export const pageTypeReasons = [
+    "",
+    "product",
+    "store_category",
+    "shop",
+    "technical",
+    "listing",
+    "default",
+    "kind",
+    "user",
+    "ai",
+    "import",
+] as const;
+export type PageTypeReason = (typeof pageTypeReasons)[number];
+
+export const fieldKeys = [
+    "title",
+    "excerpt",
+    "body",
+    "seo_title",
+    "seo_description",
+    "seo_canonical",
+    "product_description",
+    "product_short_description",
+    "variation_description",
+    "image_alt",
+    "image_title",
+    "upsells",
+    "cross_sells",
+    "meta",
+    "slug",
+    "status",
+    "parent",
+    "price",
+    "regular_price",
+    "sale_price",
+    "sku",
+    "stock_status",
+    "stock_quantity",
+    "manage_stock",
+    "attributes",
+    "variation",
+    "terms",
+] as const;
+export type FieldKey = (typeof fieldKeys)[number];
+
+export const scopableFieldKeys: readonly FieldKey[] = [
+    "title",
+    "excerpt",
+    "body",
+    "seo_title",
+    "seo_description",
+    "product_description",
+    "product_short_description",
+    "variation_description",
+    "image_alt",
+    "image_title",
+    "upsells",
+    "cross_sells",
+];
+
+export const fieldProviders = ["", "plugin", "store"] as const;
+export type FieldProvider = (typeof fieldProviders)[number];
 
 export const edgeKinds = ["parent", "related"] as const;
 export type EdgeKind = (typeof edgeKinds)[number];
@@ -302,10 +376,9 @@ export const importFields = [
     "keywords",
     "anchors",
     "entity",
-    "entity_kind",
+    "page_type",
     "parent_entity",
     "related",
-    "page_kind",
     "meta_title",
     "meta_description",
     "wp_type",
@@ -316,7 +389,7 @@ export type ImportField = (typeof importFields)[number];
 export const importColumnUses = ["field", "level", "note", "indent", "ignored"] as const;
 export type ImportColumnUse = (typeof importColumnUses)[number];
 
-export const importRowTypes = ["pages", "products", "kind"] as const;
+export const importRowTypes = ["pages", "products", "type"] as const;
 export type ImportRowType = (typeof importRowTypes)[number];
 
 export const importFindingCodes = [
@@ -329,8 +402,9 @@ export const importFindingCodes = [
     "self_edge",
     "cycle",
     "cannibalization",
-    "unknown_entity_kind",
-    "unknown_page_kind",
+    "unknown_page_type",
+    "page_type_kept",
+    "page_type_column_dropped",
     "unknown_wp_type",
     "root_page_skipped",
     "bad_volume",

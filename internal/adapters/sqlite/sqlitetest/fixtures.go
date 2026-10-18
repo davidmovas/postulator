@@ -43,7 +43,7 @@ func Entity(t testing.TB, store *sqlite.Store, siteID, name string) graph.Entity
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		ID: id.New(), SiteID: siteID, Name: name, Keywords: keyword.Of(name),
 		Facts: []graph.Fact{}, Notes: []note.Note{},
 		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, CreatedAt: Stamp, UpdatedAt: Stamp,
@@ -71,7 +71,7 @@ func Template(t testing.TB, store *sqlite.Store, name string) template.Template 
 	t.Helper()
 
 	seed := template.Seed()[3]
-	record := template.Template{ID: id.New(), Scope: template.ScopeGlobal, Name: name, PageKind: seed.PageKind, Version: 1, Spec: seed.Spec, CreatedAt: Stamp, UpdatedAt: Stamp}
+	record := template.Template{ID: id.New(), Scope: template.ScopeGlobal, Name: name, Version: 1, Spec: seed.Spec, CreatedAt: Stamp, UpdatedAt: Stamp}
 	if err := sqlite.NewTemplateRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the template fixture: %v", err)
 	}

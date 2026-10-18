@@ -12,10 +12,9 @@ const (
 	FieldKeywords        Field = "keywords"
 	FieldAnchors         Field = "anchors"
 	FieldEntity          Field = "entity"
-	FieldEntityKind      Field = "entity_kind"
+	FieldPageType        Field = "page_type"
 	FieldParentEntity    Field = "parent_entity"
 	FieldRelated         Field = "related"
-	FieldPageKind        Field = "page_kind"
 	FieldMetaTitle       Field = "meta_title"
 	FieldMetaDescription Field = "meta_description"
 	FieldWPType          Field = "wp_type"
@@ -24,8 +23,7 @@ const (
 
 var fields = []Field{
 	FieldPath, FieldTitle, FieldH1, FieldPrimaryKeyword, FieldKeywords, FieldAnchors, FieldEntity,
-	FieldEntityKind, FieldParentEntity, FieldRelated, FieldPageKind, FieldMetaTitle, FieldMetaDescription, FieldWPType,
-	FieldOwnEntity,
+	FieldPageType, FieldParentEntity, FieldRelated, FieldMetaTitle, FieldMetaDescription, FieldWPType, FieldOwnEntity,
 }
 
 func Fields() []Field {

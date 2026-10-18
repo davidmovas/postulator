@@ -148,7 +148,6 @@ type Template struct {
 	Scope     Scope
 	SiteID    *string
 	Name      string
-	PageKind  string
 	Version   int
 	Spec      TemplateSpec
 	CreatedAt time.Time

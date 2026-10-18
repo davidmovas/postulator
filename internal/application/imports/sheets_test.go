@@ -244,14 +244,15 @@ func TestOnlyTheRootColumnMakesAGroupAndTheUrlPlacesTheRowsInIt(t *testing.T) {
 	}
 }
 
-func (h harness) kinds(t *testing.T) map[string]graph.Kind {
+func (h harness) names(t *testing.T) []string {
 	t.Helper()
 
 	stored := h.entities(t)
-	out := make(map[string]graph.Kind, len(stored))
+	out := make([]string, 0, len(stored))
 	for i := range stored {
-		out[stored[i].Name] = stored[i].Kind
+		out = append(out, stored[i].Name)
 	}
+	slices.Sort(out)
 	return out
 }
 
@@ -261,28 +262,33 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 	cases := []struct {
 		name  string
 		sheet string
-		want  map[string]graph.Kind
+		want  []string
+		types map[string]string
 	}{
 		{
 			name: "a root beside category and subcategory columns",
 			sheet: "Root Entity,Category,Subcategory,URL,H1\nPeptides,,,/peptides/,Peptides\nPeptides,BPC-157,,/peptides/bpc-157/,BPC-157\n" +
 				"Peptides,BPC-157,Liquid,/peptides/bpc-157/liquid/,BPC-157 Liquid\n",
-			want: map[string]graph.Kind{"Peptides": graph.KindHub, "BPC-157": graph.KindTopic, "BPC-157 Liquid": graph.KindTopic},
+			want:  []string{"BPC-157", "BPC-157 Liquid", "Peptides"},
+			types: map[string]string{},
 		},
 		{
 			name:  "a root category column is ignored",
 			sheet: "Root Category,Category,URL,H1\nPeptides,,/peptides/,Peptides\nPeptides,BPC-157,/peptides/bpc-157/,BPC-157\n",
-			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "BPC-157": graph.KindTopic},
+			want:  []string{"BPC-157", "Peptides"},
+			types: map[string]string{},
 		},
 		{
-			name:  "a kind cell names the kind",
+			name:  "a level cell names the page type",
 			sheet: "Root,Category,URL,Entity Level\nPeptides,,/peptides/,Topic\nPeptides,BPC-157,/peptides/bpc-157/,Compound/Product\n",
-			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "Bpc 157": graph.KindProduct},
+			want:  []string{"Bpc 157", "Peptides"},
+			types: map[string]string{"/peptides/": "Entity", "/peptides/bpc-157/": "Product"},
 		},
 		{
 			name:  "category columns alone make no entity",
 			sheet: "Category,Subcategory,URL,H1\nPeptides,Liquid,/a/,Alpha\nPeptides,Powder,/b/,Beta\n",
-			want:  map[string]graph.Kind{"Alpha": graph.KindTopic, "Beta": graph.KindTopic},
+			want:  []string{"Alpha", "Beta"},
+			types: map[string]string{},
 		},
 	}
 
@@ -299,8 +305,11 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 			if orphaned := findings(applied.Report.Warnings, imports.CodeGroupWithoutPage); len(orphaned) != 0 {
 				t.Fatalf("groups without a page = %+v", orphaned)
 			}
-			if got := h.kinds(t); !maps.Equal(got, tc.want) {
-				t.Fatalf("entities = %+v, want %+v", got, tc.want)
+			if got := h.names(t); !slices.Equal(got, tc.want) {
+				t.Fatalf("entities = %v, want %v", got, tc.want)
+			}
+			if got := h.typeNames(t); !maps.Equal(got, tc.types) {
+				t.Fatalf("page types = %v, want %v", got, tc.types)
 			}
 		})
 	}

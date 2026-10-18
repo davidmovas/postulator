@@ -12,7 +12,6 @@ type Template struct {
 	Scope     string                `json:"scope"`
 	SiteID    *string               `json:"siteId"`
 	Name      string                `json:"name"`
-	PageKind  string                `json:"pageKind"`
 	Version   int                   `json:"version"`
 	Spec      template.TemplateSpec `json:"spec"`
 	CreatedAt dto.Time              `json:"createdAt"`
@@ -35,7 +34,6 @@ func templateView(t template.Template) Template {
 		Scope:     string(t.Scope),
 		SiteID:    t.SiteID,
 		Name:      t.Name,
-		PageKind:  t.PageKind,
 		Version:   t.Version,
 		Spec:      t.Spec,
 		CreatedAt: dto.NewTime(t.CreatedAt),

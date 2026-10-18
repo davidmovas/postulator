@@ -10,25 +10,6 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-type Kind string
-
-const (
-	KindHub      Kind = "hub"
-	KindProduct  Kind = "product"
-	KindTopic    Kind = "topic"
-	KindCategory Kind = "category"
-	KindCustom   Kind = "custom"
-)
-
-func (k Kind) Valid() bool {
-	switch k {
-	case KindHub, KindProduct, KindTopic, KindCategory, KindCustom:
-		return true
-	default:
-		return false
-	}
-}
-
 type Source string
 
 const (
@@ -96,7 +77,6 @@ type Entity struct {
 	ID              string
 	SiteID          string
 	Name            string
-	Kind            Kind
 	Intent          string
 	Definition      string
 	Facts           []Fact
@@ -126,8 +106,6 @@ func NewEntity(e Entity) (Entity, error) {
 		return Entity{}, invalid("entity site id must not be empty", "siteId")
 	case e.Name == "":
 		return Entity{}, invalid("entity name must not be empty", "name")
-	case !e.Kind.Valid():
-		return Entity{}, invalid("entity kind is not recognized", "kind")
 	case !e.Source.Valid():
 		return Entity{}, invalid("entity source is not recognized", "source")
 	case e.Score < 0:

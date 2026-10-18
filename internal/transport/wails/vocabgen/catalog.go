@@ -4,6 +4,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -48,7 +49,16 @@ func catalog() []vocabulary {
 			export: "cannibalizationReasons", tsType: "CannibalizationReason", pkg: "internal/domain/pagemap",
 			typeName: "Reason",
 		},
-		{export: "entityKinds", tsType: "EntityKind", pkg: "internal/domain/graph", typeName: "Kind"},
+		{export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset"},
+		{export: "pageTypeSources", tsType: "PageTypeSource", pkg: "internal/domain/pagemap", typeName: "TypeSource"},
+		{export: "pageTypeReasons", tsType: "PageTypeReason", pkg: "internal/domain/pagemap", typeName: "TypeReason"},
+		{
+			export: "fieldKeys", tsType: "FieldKey", pkg: "internal/domain/field", typeName: "Key",
+			derived: []derivation{
+				{export: "scopableFieldKeys", keep: func(value string) bool { return field.CheckScope(field.Key(value)) == nil }},
+			},
+		},
+		{export: "fieldProviders", tsType: "FieldProvider", pkg: "internal/domain/field", typeName: "Provider"},
 		{export: "edgeKinds", tsType: "EdgeKind", pkg: "internal/domain/graph", typeName: "EdgeKind"},
 		{export: "edgeStatuses", tsType: "EdgeStatus", pkg: "internal/domain/graph", typeName: "EdgeStatus"},
 		{export: "sources", tsType: "Source", pkg: "internal/domain/graph", typeName: "Source"},

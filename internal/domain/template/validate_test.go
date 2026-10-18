@@ -164,7 +164,7 @@ func TestValidateSpec(t *testing.T) {
 func TestTemplateValidate(t *testing.T) {
 	t.Parallel()
 
-	base := template.Template{ID: "t1", Scope: template.ScopeGlobal, Name: "Hub", PageKind: "hub", Version: 1, Spec: validSpec(), CreatedAt: stamp, UpdatedAt: stamp}
+	base := template.Template{ID: "t1", Scope: template.ScopeGlobal, Name: "Hub", Version: 1, Spec: validSpec(), CreatedAt: stamp, UpdatedAt: stamp}
 
 	cases := []struct {
 		name   string
@@ -178,7 +178,6 @@ func TestTemplateValidate(t *testing.T) {
 		{name: "global with site", mutate: func(x *template.Template) { x.SiteID = ptr("s1") }, field: "siteId"},
 		{name: "site without site", mutate: func(x *template.Template) { x.Scope = template.ScopeSite }, field: "siteId"},
 		{name: "blank name", mutate: func(x *template.Template) { x.Name = " " }, field: "name"},
-		{name: "blank kind", mutate: func(x *template.Template) { x.PageKind = "" }, field: "pageKind"},
 		{name: "zero version", mutate: func(x *template.Template) { x.Version = 0 }, field: "version"},
 		{name: "bad spec", mutate: func(x *template.Template) { x.Spec.Sections = nil }, field: "sections"},
 	}

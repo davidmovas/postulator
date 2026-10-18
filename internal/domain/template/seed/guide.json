@@ -1,6 +1,5 @@
 {
   "name": "Guide",
-  "pageKind": "guide",
   "spec": {
     "sections": [
       {"heading": "Introduction", "intent": "Say what the reader will achieve, how long it takes and what they need before starting", "targetWords": 200, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},

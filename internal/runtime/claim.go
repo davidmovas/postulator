@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -18,6 +19,7 @@ type claim struct {
 	record    run.Run
 	page      pagemap.Page
 	spec      template.TemplateSpec
+	kind      pagetype.Type
 	links     field.LinkPolicy
 	def       run.Definition
 	step      run.StepDef
@@ -118,7 +120,7 @@ func (e *Engine) locate(ctx context.Context, held *claim) *run.Fault {
 		if err != nil {
 			return classified(err)
 		}
-		held.page, held.links = page, types.Policy(page)
+		held.page, held.kind, held.links = page, types.TypeOf(page), types.Policy(page)
 	}
 	return nil
 }

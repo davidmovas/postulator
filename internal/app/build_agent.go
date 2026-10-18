@@ -18,7 +18,7 @@ type agentParts struct {
 func (c *Core) buildAgent(stores repos, llm llmParts, writing authoring, services useCases) agentParts {
 	values := stores.values
 	toolRegistry := tools.New(tools.Deps{
-		Sites: services.sites, Graph: services.graph, Pages: services.pages, Templates: writing.templates,
+		Sites: services.sites, Graph: services.graph, Pages: services.pages, PageTypes: writing.pageTypes, Templates: writing.templates,
 		Runs: services.runs, Sync: services.sync, Reports: services.reports, Imports: services.imports,
 		Models: services.models, Content: writing.content, Schedules: services.schedules,
 		Actions: stores.actions, Publisher: c.Events, Clock: stores.now,

@@ -25,12 +25,11 @@ type rowDraft struct {
 	metaTitle string
 	metaDesc  string
 	wpType    string
-	pageKind  string
+	pageType  string
 	keywords  keyword.List
 	notes     []note.Note
 	name      string
 	own       ownership
-	kind      string
 	anchors   []string
 	related   []string
 	parent    string
@@ -137,9 +136,8 @@ func cellsOf(binding importmap.Binding, row []string, at importmap.Origin) rowDr
 		metaTitle: binding.Text(row, importmap.FieldMetaTitle),
 		metaDesc:  binding.Text(row, importmap.FieldMetaDescription),
 		wpType:    binding.Text(row, importmap.FieldWPType),
-		pageKind:  binding.Text(row, importmap.FieldPageKind),
+		pageType:  binding.Text(row, importmap.FieldPageType),
 		name:      binding.Text(row, importmap.FieldEntity),
-		kind:      binding.Text(row, importmap.FieldEntityKind),
 		anchors:   binding.List(row, importmap.FieldAnchors),
 		related:   binding.List(row, importmap.FieldRelated),
 		parent:    binding.Text(row, importmap.FieldParentEntity),

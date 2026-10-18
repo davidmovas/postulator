@@ -13,7 +13,8 @@ under REQUIRED PHRASES to appear verbatim in the body text, where the brief says
 {{define "generate_body.user"}}
 PAGE
 Path: {{.Page.Path}}
-{{if .Brief.PlannedTitle}}Title: {{.Brief.Title}} (planned; answer with it as it is)
+{{if .Type}}Page type: {{.Type}}
+{{end}}{{if .Brief.PlannedTitle}}Title: {{.Brief.Title}} (planned; answer with it as it is)
 {{else}}Title: write one{{if .Brief.TitleRule}} that carries the primary keyword{{end}}
 {{end}}{{if and .Product .Brief.PlannedH1}}H1: {{.Brief.H1}} (the product's name in the store; answer with it as it is)
 {{else if .Brief.PlannedH1}}H1: {{.Brief.H1}} (planned; answer with it as it is)
@@ -21,7 +22,6 @@ Path: {{.Page.Path}}
 {{end}}
 ENTITY
 Name: {{.Entity.Name}}
-Kind: {{.Entity.Kind}}
 {{if .Entity.Intent}}Search intent: {{.Entity.Intent}}{{end}}
 Primary keyword: {{.Brief.PrimaryKeyword}}
 

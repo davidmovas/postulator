@@ -16,6 +16,7 @@ var groups = []Group{
 		"proposals from pages or keywords, authority scores."},
 	{Name: "pages", Description: "The page map: plan, change or delete pages, map them to entities, " +
 		"set canonicals, replace recorded links, preview a page."},
+	{Name: "pagetypes", Description: "Page types: the client's types over presets, their field scopes and link policies."},
 	{Name: "templates", Description: "Content templates, and their overrides for one site or one page."},
 	{Name: "runs", Description: "Runs that write, relink, audit, repair or revert pages: start, pause, resume, " +
 		"cancel, retry, regenerate and revert them, and read their items, events and artifacts."},

@@ -1,6 +1,5 @@
 {
   "name": "Hub",
-  "pageKind": "hub",
   "spec": {
     "sections": [
       {"heading": "Overview", "intent": "Define the topic, say who it is for and state what the reader will be able to decide after reading the hub", "targetWords": 250, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},

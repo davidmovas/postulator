@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -59,24 +60,32 @@ func (s *Service) write(ctx context.Context, computed *plan) error {
 			return err
 		}
 	}
+	now := s.now()
 	for i := range computed.pages {
-		planned := &computed.pages[i]
-		write := s.deps.Pages.Update
-		if planned.created {
-			write = s.deps.Pages.Insert
-		}
-		if err := write(ctx, planned.page); err != nil {
+		if err := s.writePage(ctx, &computed.pages[i], now); err != nil {
 			return err
 		}
 	}
 
-	now := s.now()
 	for _, owned := range computed.canonical {
 		if err := s.deps.Entities.SetCanonicalPage(ctx, owned.entityID, &owned.pageID, now); err != nil {
 			return err
 		}
 	}
 	return s.settleScopes(ctx, computed.siteID, now)
+}
+
+func (s *Service) writePage(ctx context.Context, planned *plannedPage, now time.Time) error {
+	if planned.created {
+		return s.deps.Pages.Insert(ctx, planned.page)
+	}
+	if err := s.deps.Pages.Update(ctx, planned.page); err != nil {
+		return err
+	}
+	if !planned.retyped {
+		return nil
+	}
+	return s.deps.Pages.SetType(ctx, planned.page.ID, *planned.page.PageTypeID, pagemap.TypeByImport, now)
 }
 
 func (s *Service) settleScopes(ctx context.Context, siteID string, now time.Time) error {

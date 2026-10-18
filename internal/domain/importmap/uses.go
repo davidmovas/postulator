@@ -46,3 +46,16 @@ func (m Mapping) Uses(headers []string) []ColumnUse {
 	}
 	return out
 }
+
+func (m Mapping) Dropped(headers []string, field Field) []string {
+	if _, read := m.Columns[field]; !read {
+		return nil
+	}
+	out := make([]string, 0)
+	for _, use := range m.Uses(headers) {
+		if detected, known := Detect(use.Header); known && detected == field && use.Use == UseIgnored {
+			out = append(out, use.Header)
+		}
+	}
+	return out
+}

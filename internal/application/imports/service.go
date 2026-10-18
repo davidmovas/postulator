@@ -9,11 +9,10 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
-	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type tableStore interface {
@@ -38,12 +37,12 @@ type edgeStore interface {
 type pageStore interface {
 	Insert(ctx context.Context, p pagemap.Page) error
 	Update(ctx context.Context, p pagemap.Page) error
+	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 }
 
-type templateStore interface {
-	Get(ctx context.Context, id string) (template.Template, error)
-	List(ctx context.Context, q template.Query, page paging.Request) (paging.List[template.Template], error)
+type typeReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagetype.Type, error)
 }
 
 type mappingStore interface {
@@ -66,7 +65,7 @@ type Deps struct {
 	Entities   entityStore
 	Edges      edgeStore
 	Pages      pageStore
-	Templates  templateStore
+	Types      typeReader
 	Mappings   mappingStore
 	Sites      siteReader
 	UnitOfWork unitOfWork

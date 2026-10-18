@@ -111,12 +111,12 @@ func TestResolveContextSaysWhatTheGraphAsksForAndNoPageCarries(t *testing.T) {
 		{
 			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
-			Kind:    graph.KindTopic, Source: graph.SourceUser,
+			Source:  graph.SourceUser,
 		},
 		{
 			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
-			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
+			Source:  graph.SourceUser, CanonicalPageID: pointer("page-child"),
 		},
 	}}
 	deps.Pages = pageList{items: []pagemap.Page{

@@ -242,7 +242,7 @@ func assertAProductIsRefusedWithoutThePlugin(t *testing.T, core *app.Core, siteI
 	t.Helper()
 
 	entity, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: siteID, Name: "Gift card", Kind: "product", Keywords: []dto.Keyword{{Text: "restaurant gift card"}},
+		SiteID: siteID, Name: "Gift card", Keywords: []dto.Keyword{{Text: "restaurant gift card"}},
 	})
 	if err != nil {
 		t.Fatalf("give the product row an entity: %v", err)

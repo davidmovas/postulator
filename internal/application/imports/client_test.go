@@ -2,6 +2,7 @@ package imports_test
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -73,14 +74,8 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 		bpc.Keywords[1].Volume == nil || *bpc.Keywords[1].Volume != 5400 {
 		t.Fatalf("the keywords of BPC-157 = %+v", bpc.Keywords)
 	}
-	for name, got := range h.kinds(t) {
-		want := graph.KindTopic
-		if name == "Peptides" {
-			want = graph.KindHub
-		}
-		if got != want {
-			t.Errorf("after the group sheet %s is a %s, want a %s", name, got, want)
-		}
+	if typed := h.typeNames(t); len(typed) != 0 {
+		t.Errorf("after the group sheet the pages carry the types %v, want none: the sheet names no type", typed)
 	}
 	catalog := h.apply(t, path, h.sheet(t, path, "Catalog"))
 	clean(t, "Catalog", catalog)
@@ -107,15 +102,23 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	if wide.Counts.EntitiesCreated != 1 {
 		t.Fatalf("the wide sheet wrote %+v, want Canada alone created", wide.Counts)
 	}
-	if canada, found := entity(wide.Report, "Peptides in Canada"); !found || canada.Kind != string(graph.KindCustom) ||
-		canada.Parent != "Peptides" {
-		t.Fatalf("Canada = %+v, want a geographic entity under Peptides", canada)
+	if canada, found := entity(wide.Report, "Peptides in Canada"); !found || canada.Parent != "Peptides" {
+		t.Fatalf("Canada = %+v, want an entity under Peptides", canada)
 	}
-	if bpc, _ := entity(wide.Report, "BPC-157"); bpc.Kind != string(graph.KindProduct) {
-		t.Fatalf("BPC-157 = %+v, want the product its entity level says", bpc)
+	wantTypes := map[string]string{"/peptides/": "Hub", "/peptides/bpc-157/": "Product", "/peptides/canada/": "Entity"}
+	if got := h.typeNames(t); !maps.Equal(got, wantTypes) {
+		t.Fatalf("the wide sheet typed the pages %v, want the types its entity level says %v", got, wantTypes)
 	}
-	if left := ignored(wide.Report); !slices.Equal(left, []string{"Entity ID", "Primary Entity", "Entity Type", "Category", "Subcategory"}) {
+	if canada, _ := page(wide.Report, "/peptides/canada/"); canada.PageType != "Entity" {
+		t.Fatalf("the preview shows Canada as %+v, want an Entity page", canada)
+	}
+	if left := ignored(wide.Report); !slices.Equal(left,
+		[]string{"Entity ID", "Primary Entity", "Entity Type", "Category", "Subcategory", "Page Template"}) {
 		t.Fatalf("the wide sheet ignored %v", left)
+	}
+	if dropped := findings(wide.Report.Warnings, imports.CodePageTypeColumnDropped); len(dropped) != 1 ||
+		!strings.Contains(dropped[0].Message, "Entity Type") || dropped[0].Sheet != "Entities" {
+		t.Fatalf("dropped findings = %+v, want the Entity Type column named once", dropped)
 	}
 	want := []note.Note{{Label: "Intent Owner", Text: "Commercial Product"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
 	if got := notesAt(t, h, "/peptides/bpc-157/"); !slices.Equal(got, want) {
@@ -175,7 +178,7 @@ func deref(ref *string) string {
 func (h harness) labels(t *testing.T) siteLabels {
 	t.Helper()
 
-	entities, edges, pages := h.entities(t), h.edges(t), h.pages(t)
+	entities, edges, pages, typed := h.entities(t), h.edges(t), h.pages(t), h.typeNames(t)
 	byID := make(map[string]graph.Entity, len(entities))
 	for i := range entities {
 		byID[entities[i].ID] = entities[i]
@@ -188,7 +191,7 @@ func (h harness) labels(t *testing.T) siteLabels {
 	out := siteLabels{}
 	for i := range entities {
 		held := &entities[i]
-		out.entities = append(out.entities, fmt.Sprintf("%s | %s | %s", trail(byID, held.ID), held.Kind, held.Keywords.Cell()))
+		out.entities = append(out.entities, fmt.Sprintf("%s | %s", trail(byID, held.ID), held.Keywords.Cell()))
 		if held.CanonicalPageID != nil {
 			out.canonicals = append(out.canonicals, trail(byID, held.ID)+" → "+pathOf[*held.CanonicalPageID])
 		}
@@ -199,9 +202,9 @@ func (h harness) labels(t *testing.T) siteLabels {
 	}
 	for i := range pages {
 		held := &pages[i]
-		out.pages = append(out.pages, fmt.Sprintf("%s | %s | %s | %s | %s | %s | %v | planned %s | under %s",
+		out.pages = append(out.pages, fmt.Sprintf("%s | %s | %s | %s | %s | %s | %v | planned %s | under %s | typed %s %s %s",
 			held.Path, held.WPType, trail(byID, deref(held.EntityID)), held.Title, held.H1, held.Keywords.Cell(),
-			held.Notes, held.PlannedPath, pathOf[deref(held.ParentPageID)]))
+			held.Notes, held.PlannedPath, pathOf[deref(held.ParentPageID)], typed[held.Path], held.TypeSource, held.TypeReason))
 	}
 	for _, list := range [][]string{out.entities, out.edges, out.pages, out.canonicals} {
 		slices.Sort(list)
@@ -272,7 +275,7 @@ func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
 			t.Errorf("the finding %+v names no sheet of the workbook", finding)
 		}
 	}
-	if left := ignored(applied.Report); len(left) != 2+2+5+1 {
+	if left := ignored(applied.Report); len(left) != 2+2+6+1 {
 		t.Errorf("ignored = %v, want the category columns of three sheets beside the columns no field reads", left)
 	}
 

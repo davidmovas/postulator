@@ -32,12 +32,12 @@ type RowType string
 const (
 	RowPages    RowType = "pages"
 	RowProducts RowType = "products"
-	RowKind     RowType = "kind"
+	RowTyped    RowType = "type"
 )
 
 func (r RowType) Valid() bool {
 	switch r {
-	case "", RowPages, RowProducts, RowKind:
+	case "", RowPages, RowProducts, RowTyped:
 		return true
 	default:
 		return false
@@ -45,7 +45,7 @@ func (r RowType) Valid() bool {
 }
 
 func unknownRowType(rowType RowType) error {
-	return invalid("the row type is not recognized; rows are pages, products or read by their kind", "rowType").
+	return invalid("the row type is not recognized; rows are pages, products or read by their page type", "rowType").
 		WithDetail("rowType", string(rowType))
 }
 

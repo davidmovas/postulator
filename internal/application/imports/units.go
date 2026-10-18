@@ -30,7 +30,6 @@ type parentRef struct {
 
 type unit struct {
 	name     string
-	kind     string
 	notes    []note.Note
 	keywords keyword.List
 	anchors  []string
@@ -43,13 +42,6 @@ type unit struct {
 	alias    int
 	matched  string
 	id       string
-}
-
-func (u *unit) defaultKind() graph.Kind {
-	if u.group < 0 {
-		return graph.KindTopic
-	}
-	return graph.KindHub
 }
 
 type builder struct {
@@ -115,7 +107,6 @@ func (b *builder) root(at int) int {
 
 func (b *builder) absorbRow(at int, row *rowDraft) {
 	u := &b.units[at]
-	u.kind = fill(u.kind, row.kind)
 	u.notes = note.Merge(u.notes, row.cardNotes())
 	u.keywords = u.keywords.Merge(row.keywords)
 	u.anchors = graph.Distinct(u.anchors, row.anchors)

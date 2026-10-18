@@ -1,6 +1,5 @@
 {
   "name": "Category",
-  "pageKind": "category",
   "spec": {
     "sections": [
       {"heading": "Overview", "intent": "Say what the category contains and who shops it, in two short paragraphs above the product grid", "targetWords": 120, "required": true, "keywordRules": {"include": [], "primaryInHeading": true}},

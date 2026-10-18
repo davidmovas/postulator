@@ -47,7 +47,6 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 			ID:        id.New(),
 			SiteID:    req.SiteID,
 			Name:      req.Entities[i].Name,
-			Kind:      graphdomain.Kind(req.Entities[i].Kind),
 			Intent:    req.Entities[i].Intent,
 			Keywords:  keywords,
 			Anchors:   requestedAnchors(ctx, req.Entities[i].Anchors),
