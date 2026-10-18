@@ -12,8 +12,10 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -51,8 +53,12 @@ func newHarness(t *testing.T) harness {
 	vault := secrets.NewStore(sqlite.NewSecretsRepo(store, clk), sqlitetest.Key())
 	recorder := &applicationtest.Recorder{}
 	reach := &probeStub{reached: site.Reachability{Reach: site.ReachOK, Message: "the site answered", HasPlugin: true}}
+	types := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk,
+	})
 	return harness{
-		service: sites.New(sqlite.NewSiteRepo(store), vault, store, reach, recorder, clk),
+		service: sites.New(sqlite.NewSiteRepo(store), vault, store, types, reach, recorder, clk),
 		store:   store,
 		secrets: vault,
 		clock:   clk,
@@ -289,6 +295,10 @@ func TestCreateStoresTheSiteAndItsPassword(t *testing.T) {
 	password, err := h.secrets.Get(t.Context(), site.SecretRef(got.ID))
 	if err != nil || password != "abcd efgh" {
 		t.Errorf("stored password = %q, %v", password, err)
+	}
+	types, err := sqlite.NewPageTypeRepo(h.store).ListBySite(t.Context(), got.ID)
+	if err != nil || len(types) != len(pagetype.Presets()) {
+		t.Errorf("the new site's page types = %d %v, want the %d presets seeded", len(types), err, len(pagetype.Presets()))
 	}
 
 	encoded, err := json.Marshal(got)

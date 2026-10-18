@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -21,6 +22,11 @@ type pageStore interface {
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	List(ctx context.Context, q pagemap.Query, page paging.Request) (paging.List[pagemap.Page], error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+}
+
+type typeReader interface {
+	Get(ctx context.Context, id string) (pagetype.Type, error)
 }
 
 type linkStore interface {
@@ -48,6 +54,7 @@ type unitOfWork interface {
 
 type Deps struct {
 	Pages      pageStore
+	Types      typeReader
 	Links      linkStore
 	Entities   entityStore
 	Edges      edgeReader
@@ -60,6 +67,7 @@ type Deps struct {
 
 type Service struct {
 	pages     pageStore
+	types     typeReader
 	links     linkStore
 	entities  entityStore
 	edges     edgeReader
@@ -72,7 +80,7 @@ type Service struct {
 
 func New(deps Deps) *Service {
 	return &Service{
-		pages: deps.Pages, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
+		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
 		uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
 	}
 }

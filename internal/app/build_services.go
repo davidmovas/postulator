@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
@@ -22,6 +23,7 @@ import (
 
 type authoring struct {
 	templates *templates.Service
+	pageTypes *pagetypes.Service
 	wordpress *registry.Registry
 	content   *content.Service
 }
@@ -46,6 +48,10 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 
 	return authoring{
 		templates: templateService,
+		pageTypes: pagetypes.New(pagetypes.Deps{
+			Types: stores.pageTypes, Scopes: stores.scopes, Pages: stores.pages, Templates: stores.templates,
+			UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
+		}),
 		wordpress: wordpress,
 		content: content.New(content.Deps{
 			Pages: stores.pages, Entities: stores.entities, Edges: stores.edges, Specs: templateService,
@@ -57,7 +63,7 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, running runtimeParts) useCases {
 	values := stores.values
 	pagesService := pages.New(pages.Deps{
-		Pages: stores.pages, Links: stores.links, Entities: stores.entities, Edges: stores.edges,
+		Pages: stores.pages, Types: stores.pageTypes, Links: stores.links, Entities: stores.entities, Edges: stores.edges,
 		Sites: stores.sites, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 		Preview: previewIssuer{clients: writing.wordpress},
 	})
@@ -65,7 +71,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		writing.templates, stores.pages, running.steps, pagesService)
 
 	return useCases{
-		sites: sites.New(stores.sites, stores.secrets, stores.store, writing.wordpress, c.Events, stores.now),
+		sites: sites.New(stores.sites, stores.secrets, stores.store, writing.pageTypes, writing.wordpress, c.Events, stores.now),
 		graph: graph.New(graph.Deps{
 			Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages,
 			Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,

@@ -36,17 +36,22 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type typeSeeder interface {
+	Seed(ctx context.Context, siteID string) error
+}
+
 type Service struct {
 	store     siteStore
 	secrets   secretStore
 	uow       unitOfWork
+	types     typeSeeder
 	probe     connectionProbe
 	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(store siteStore, secrets secretStore, uow unitOfWork, probe connectionProbe, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{store: store, secrets: secrets, uow: uow, probe: probe, publisher: publisher, clock: clk}
+func New(store siteStore, secrets secretStore, uow unitOfWork, types typeSeeder, probe connectionProbe, publisher application.Publisher, clk clock.Clock) *Service {
+	return &Service{store: store, secrets: secrets, uow: uow, types: types, probe: probe, publisher: publisher, clock: clk}
 }
 
 func (s *Service) now() time.Time {
@@ -84,6 +89,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	err = s.uow.Do(ctx, func(c context.Context) error {
 		if insertErr := s.store.Insert(c, record); insertErr != nil {
 			return insertErr
+		}
+		if seedErr := s.types.Seed(c, record.ID); seedErr != nil {
+			return seedErr
 		}
 		if req.Password == "" {
 			return nil

@@ -18,6 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -166,7 +167,10 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
 		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, bus, now)
 	registered := tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, nil, store, nil, bus, now),
+		Sites: sites.New(siteRepo, nil, store, pagetypes.New(pagetypes.Deps{
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: sqlite.NewTemplateRepo(store),
+			UnitOfWork: store, Publisher: bus, Clock: now,
+		}), nil, bus, now),
 		Pages: pages.New(pages.Deps{
 			Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
 			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},

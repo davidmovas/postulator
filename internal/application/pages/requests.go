@@ -1,6 +1,9 @@
 package pages
 
-import "github.com/davidmovas/postulator/internal/kernel/dto"
+import (
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
+)
 
 type CreateRequest struct {
 	SiteID          string        `json:"siteId"`
@@ -36,6 +39,16 @@ type UpdateRequest struct {
 }
 
 type UpdateResponse struct {
+	Page Page `json:"page"`
+}
+
+type SetTypeRequest struct {
+	PageID     string             `json:"pageId"`
+	PageTypeID string             `json:"pageTypeId"`
+	By         pagemap.TypeReason `json:"-"`
+}
+
+type SetTypeResponse struct {
 	Page Page `json:"page"`
 }
 

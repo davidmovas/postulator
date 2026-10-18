@@ -20,6 +20,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
@@ -151,7 +152,10 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	return tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, stubProbe{}, bus, now),
+		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, pagetypes.New(pagetypes.Deps{
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
+			UnitOfWork: store, Publisher: bus, Clock: now,
+		}), stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,

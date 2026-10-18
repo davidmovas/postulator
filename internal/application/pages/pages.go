@@ -200,6 +200,45 @@ func (s *Service) Update(ctx context.Context, req UpdateRequest) (UpdateResponse
 	return UpdateResponse{Page: view(updated)}, nil
 }
 
+func (s *Service) SetType(ctx context.Context, req SetTypeRequest) (SetTypeResponse, error) {
+	by := req.By
+	if by == pagemap.TypeByNone {
+		by = pagemap.TypeByUser
+	}
+	if by != pagemap.TypeByUser && by != pagemap.TypeByAI {
+		return SetTypeResponse{}, errors.New(errors.Invalid, "a page's type is set by a person or the agent").WithDetail("field", "by")
+	}
+	var updated pagemap.Page
+	err := s.uow.Do(ctx, func(c context.Context) error {
+		page, getErr := s.pages.Get(c, req.PageID)
+		if getErr != nil {
+			return getErr
+		}
+		kind, getErr := s.types.Get(c, req.PageTypeID)
+		if getErr != nil {
+			return getErr
+		}
+		if kind.SiteID != page.SiteID {
+			return errors.New(errors.Invalid, "the type "+kind.Name+" belongs to another site").
+				WithDetail("field", "pageTypeId").WithDetail("pageId", page.ID)
+		}
+		at := s.now()
+		if setErr := s.pages.SetType(c, page.ID, kind.ID, by, at); setErr != nil {
+			return setErr
+		}
+		page.PageTypeID, page.TypeSource, page.TypeReason, page.UpdatedAt = &kind.ID, pagemap.TypeSourceManual, by, at
+		updated = page
+		return nil
+	})
+	if err != nil {
+		return SetTypeResponse{}, err
+	}
+	if publishErr := s.changed(updated.SiteID); publishErr != nil {
+		return SetTypeResponse{}, publishErr
+	}
+	return SetTypeResponse{Page: view(updated)}, nil
+}
+
 func (s *Service) AssignTemplate(ctx context.Context, req AssignTemplateRequest) (AssignTemplateResponse, error) {
 	if err := requireSite(req.SiteID); err != nil {
 		return AssignTemplateResponse{}, err

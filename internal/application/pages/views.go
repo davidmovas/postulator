@@ -45,6 +45,9 @@ type Page struct {
 	Status          string        `json:"status"`
 	EntityID        *string       `json:"entityId"`
 	TemplateID      *string       `json:"templateId"`
+	PageTypeID      *string       `json:"pageTypeId"`
+	TypeSource      string        `json:"typeSource"`
+	TypeReason      string        `json:"typeReason"`
 	ContentHash     string        `json:"contentHash"`
 	Observed        Observed      `json:"observed"`
 	Mismatches      []Mismatch    `json:"mismatches"`
@@ -103,6 +106,9 @@ func view(p pagemap.Page) Page {
 		Status:          string(p.Status),
 		EntityID:        p.EntityID,
 		TemplateID:      p.TemplateID,
+		PageTypeID:      p.PageTypeID,
+		TypeSource:      string(p.TypeSource),
+		TypeReason:      string(p.TypeReason),
 		ContentHash:     p.ContentHash,
 		Observed: Observed{
 			Link: p.Observed.Link, Slug: p.Observed.Slug, Status: p.Observed.Status,

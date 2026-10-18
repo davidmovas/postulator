@@ -17,6 +17,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -46,7 +47,7 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
 		service: pages.New(pages.Deps{
-			Pages: sqlite.NewPageRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
+			Pages: sqlite.NewPageRepo(store), Types: sqlite.NewPageTypeRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
 			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store),
 			UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
 		}),
@@ -292,6 +293,53 @@ func TestCreateRefusesCannibalization(t *testing.T) {
 	}
 	if len(h.recorder.Events()) != 1 {
 		t.Errorf("refused creations must not publish, got %+v", h.recorder.Events())
+	}
+}
+
+func TestAPageTypeIsSetByAPersonOrTheAgent(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+
+	types := sqlite.NewPageTypeRepo(h.store)
+	other := sqlitetest.Site(t, h.store, "other")
+	kinds := map[string]pagetype.Type{}
+	for _, kind := range []pagetype.Type{
+		{ID: id.New(), SiteID: h.siteID, Name: "Hub", Preset: pagetype.Hub},
+		{ID: id.New(), SiteID: h.siteID, Name: "Pillar", Preset: pagetype.Hub},
+		{ID: id.New(), SiteID: other.ID, Name: "Hub", Preset: pagetype.Hub},
+	} {
+		kind.CreatedAt, kind.UpdatedAt = sqlitetest.Stamp, sqlitetest.Stamp
+		if err := types.Insert(t.Context(), kind); err != nil {
+			t.Fatalf("Insert %s: %v", kind.Name, err)
+		}
+		kinds[kind.SiteID+kind.Name] = kind
+	}
+	page := h.page(t, "/peptides/", nil)
+	h.recorder.Reset()
+
+	set, err := h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[h.siteID+"Pillar"].ID})
+	if err != nil {
+		t.Fatalf("SetType: %v", err)
+	}
+	if set.Page.PageTypeID == nil || *set.Page.PageTypeID != kinds[h.siteID+"Pillar"].ID || set.Page.TypeSource != "manual" || set.Page.TypeReason != "user" {
+		t.Errorf("the page = type %v %s %s, want Pillar set by a person", set.Page.PageTypeID, set.Page.TypeSource, set.Page.TypeReason)
+	}
+	if seen := h.recorder.Events(); len(seen) != 1 || seen[0].Type != events.PagesChanged {
+		t.Errorf("events = %+v, want pages.changed", seen)
+	}
+
+	set, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[h.siteID+"Hub"].ID, By: pagemap.TypeByAI})
+	if err != nil || set.Page.TypeReason != "ai" {
+		t.Errorf("the agent's type = %+v %v, want the reason ai", set.Page, err)
+	}
+	if _, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[other.ID+"Hub"].ID}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("another site's type = %q, want INVALID", errors.CodeOf(err))
+	}
+	if _, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: "no-such-type"}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("an unknown type = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+	if _, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[h.siteID+"Hub"].ID, By: pagemap.TypeByListing}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an automatic reason through SetType = %q, want INVALID", errors.CodeOf(err))
 	}
 }
 
