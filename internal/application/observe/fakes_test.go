@@ -75,6 +75,17 @@ type stores struct {
 	findings   map[string]finding.Finding
 	published  []events.Type
 	bodyLists  int
+	interleave func()
+}
+
+func (s *stores) interleaved() {
+	s.mu.Lock()
+	hook := s.interleave
+	s.interleave = nil
+	s.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 }
 
 func (s *stores) bodyListings() int {
@@ -109,10 +120,18 @@ func (s *stores) Get(_ context.Context, id string) (site.Site, error) {
 	return owner, nil
 }
 
-func (s *stores) Update(_ context.Context, owner site.Site) error {
+func (s *stores) UpdateObservation(_ context.Context, id string, technical site.TechnicalPages, observation site.ObservationState, at time.Time) error {
+	s.interleaved()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sites[owner.ID] = owner
+	owner, ok := s.sites[id]
+	if !ok {
+		return errors.New(errors.NotFound, "no such site")
+	}
+	owner.Settings.Technical = technical
+	owner.Settings.Observation = observation
+	owner.UpdatedAt = at
+	s.sites[id] = owner
 	return nil
 }
 
@@ -159,6 +178,21 @@ func (p pageStore) Update(_ context.Context, page pagemap.Page) error {
 		return errors.New(errors.NotFound, "no such page")
 	}
 	p.s.pages[page.ID] = page
+	return nil
+}
+
+func (p pageStore) UpdateDerived(_ context.Context, page pagemap.Page) error {
+	p.s.interleaved()
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	stored, ok := p.s.pages[page.ID]
+	if !ok {
+		return errors.New(errors.NotFound, "no such page")
+	}
+	stored.ParentPageID, stored.ParentReason, stored.ParentMethod = page.ParentPageID, page.ParentReason, page.ParentMethod
+	stored.TechnicalReason, stored.ReadOnlyReason = page.TechnicalReason, page.ReadOnlyReason
+	stored.Status, stored.UpdatedAt = page.Status, page.UpdatedAt
+	p.s.pages[page.ID] = stored
 	return nil
 }
 

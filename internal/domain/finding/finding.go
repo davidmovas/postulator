@@ -12,11 +12,14 @@ type Code string
 
 const (
 	ParentUnresolved   Code = "parent_unresolved"
+	ParentAmbiguous    Code = "parent_ambiguous"
+	ParentCycle        Code = "parent_cycle"
 	ParentDiffers      Code = "parent_differs"
 	PluginOutdated     Code = "plugin_outdated"
 	FieldChangedOnSite Code = "field_changed_on_site"
 	BodyChangedOnSite  Code = "body_changed_on_site"
 	RenderUnreachable  Code = "render_unreachable"
+	RenderRedirected   Code = "render_redirected"
 	BuilderDetected    Code = "builder_detected"
 	TechnicalDetected  Code = "technical_detected"
 	PageTitleDiffers   Code = "page_title_differs"
@@ -74,11 +77,14 @@ type rule struct {
 
 var rules = map[Code]rule{
 	ParentUnresolved:   {Warning, []Option{Ignore}},
+	ParentAmbiguous:    {Warning, []Option{Ignore}},
+	ParentCycle:        {Warning, []Option{Ignore}},
 	ParentDiffers:      {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
 	PluginOutdated:     {Warning, []Option{UpdatePlugin, Ignore}},
 	FieldChangedOnSite: {Warning, []Option{AcceptSite, Ignore}},
 	BodyChangedOnSite:  {Warning, []Option{AcceptSite, Ignore}},
 	RenderUnreachable:  {Warning, []Option{Rescan, Ignore}},
+	RenderRedirected:   {Info, []Option{Rescan, Ignore}},
 	BuilderDetected:    {Info, []Option{Ignore}},
 	TechnicalDetected:  {Info, []Option{ClearTechnical, Ignore}},
 	PageTitleDiffers:   {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},

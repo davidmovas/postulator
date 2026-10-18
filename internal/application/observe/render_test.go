@@ -17,6 +17,7 @@ import (
 type crumb struct {
 	name string
 	path string
+	bare bool
 }
 
 type publicPage struct {
@@ -49,7 +50,11 @@ func (p publicPage) html() string {
 	if len(p.crumbs) > 0 {
 		items := make([]map[string]any, 0, len(p.crumbs))
 		for i, c := range p.crumbs {
-			items = append(items, map[string]any{"@type": "ListItem", "position": i + 1, "name": c.name, "item": baseURL + c.path})
+			item := map[string]any{"@type": "ListItem", "position": i + 1, "name": c.name}
+			if !c.bare {
+				item["item"] = baseURL + c.path
+			}
+			items = append(items, item)
 		}
 		b.WriteString(`<script type="application/ld+json">` + mustJSON(map[string]any{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items}) + "</script>")
 	}
@@ -75,6 +80,10 @@ func (p publicPage) filtered() string {
 		for i, c := range p.crumbs {
 			if i == len(p.crumbs)-1 {
 				b.WriteString(`<li><span aria-current="page">` + c.name + "</span></li>")
+				continue
+			}
+			if c.bare {
+				b.WriteString("<li><span>" + c.name + "</span></li>")
 				continue
 			}
 			b.WriteString(`<li><a href="` + p.href(c.path) + `">` + c.name + "</a></li>")
@@ -104,17 +113,29 @@ func (s *scenario) serve(pages ...publicPage) {
 	}
 }
 
+func tb500Page(absolute bool, crumbs ...crumb) publicPage {
+	return publicPage{
+		title: "TB-500", path: "/tb-500/", crumbs: crumbs,
+		content: "<p>TB-500 is a synthetic fragment of thymosin beta-4.</p><p>Compare it with <a href=\"" + publicPage{absolute: absolute}.href("/bpc-157/") + "\">BPC-157</a> before you order.</p>",
+		listing: []string{"/product/bpc-157-peptide/"}, absolute: absolute,
+	}
+}
+
+func bpcPage(absolute bool, crumbs ...crumb) publicPage {
+	return publicPage{title: "BPC-157", path: "/bpc-157/", crumbs: crumbs, listing: []string{"/product/bpc-157-peptide/"}, absolute: absolute}
+}
+
 func (s *scenario) serveTheSite(absolute bool) {
 	s.serve(
 		publicPage{title: "Home", path: "/", content: "<p>" + homeRaw + "</p>", absolute: absolute},
-		publicPage{title: "Peptides", path: "/peptides/", crumbs: []crumb{{"Home", "/"}, {"Peptides", "/peptides/"}}, listing: []string{"/product/bpc-157-peptide/"}, absolute: absolute},
-		publicPage{title: "BPC-157", path: "/bpc-157/", crumbs: []crumb{{"Home", "/"}, {"Peptides", "/peptides/"}, {"Healing Peptides", "/healing-peptides/"}, {"BPC-157", "/bpc-157/"}}, listing: []string{"/product/bpc-157-peptide/"}, absolute: absolute},
-		publicPage{title: "TB-500", path: "/tb-500/", crumbs: []crumb{{"Home", "/"}, {"Peptides", "/peptides/"}, {"TB-500", "/tb-500/"}}, content: "<p>TB-500 is a synthetic fragment of thymosin beta-4.</p><p>Compare it with <a href=\"" + publicPage{absolute: absolute}.href("/bpc-157/") + "\">BPC-157</a> before you order.</p>", listing: []string{"/product/bpc-157-peptide/"}, absolute: absolute},
+		publicPage{title: "Peptides", path: "/peptides/", crumbs: []crumb{{name: "Home", path: "/"}, {name: "Peptides", path: "/peptides/"}}, listing: []string{"/product/bpc-157-peptide/"}, absolute: absolute},
+		bpcPage(absolute, crumb{name: "Home", path: "/"}, crumb{name: "Peptides", path: "/peptides/"}, crumb{name: "Healing Peptides", path: "/healing-peptides/"}, crumb{name: "BPC-157", path: "/bpc-157/"}),
+		tb500Page(absolute, crumb{name: "Home", path: "/"}, crumb{name: "Peptides", path: "/peptides/"}, crumb{name: "TB-500", path: "/tb-500/"}),
 		publicPage{title: "Shop", path: "/shop/", absolute: absolute},
 		publicPage{title: "Account", path: "/account/", content: "<form></form>", absolute: absolute},
-		publicPage{title: "BPC-157 Peptide", path: "/product/bpc-157-peptide/", crumbs: []crumb{{"Home", "/"}, {"Healing Peptides", "/product-category/peptides/healing-peptides/"}, {"BPC-157 Peptide", "/product/bpc-157-peptide/"}}, content: "<p>BPC-157 is a pentadecapeptide.</p>", absolute: absolute},
-		publicPage{title: "Peptides", path: "/product-category/peptides/", crumbs: []crumb{{"Home", "/"}, {"Peptides", "/product-category/peptides/"}}, absolute: absolute},
-		publicPage{title: "Healing Peptides", path: "/product-category/peptides/healing-peptides/", crumbs: []crumb{{"Home", "/"}, {"Healing Peptides", "/product-category/peptides/healing-peptides/"}}, absolute: absolute},
+		publicPage{title: "BPC-157 Peptide", path: "/product/bpc-157-peptide/", crumbs: []crumb{{name: "Home", path: "/"}, {name: "Healing Peptides", path: "/product-category/peptides/healing-peptides/"}, {name: "BPC-157 Peptide", path: "/product/bpc-157-peptide/"}}, content: "<p>BPC-157 is a pentadecapeptide.</p>", absolute: absolute},
+		publicPage{title: "Peptides", path: "/product-category/peptides/", crumbs: []crumb{{name: "Home", path: "/"}, {name: "Peptides", path: "/product-category/peptides/"}}, absolute: absolute},
+		publicPage{title: "Healing Peptides", path: "/product-category/peptides/healing-peptides/", crumbs: []crumb{{name: "Home", path: "/"}, {name: "Healing Peptides", path: "/product-category/peptides/healing-peptides/"}}, absolute: absolute},
 	)
 }
 
@@ -362,7 +383,7 @@ func TestASiteWithMixedURLFormsIsOneFinding(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
 	s.serveTheSite(true)
-	s.serve(publicPage{title: "TB-500", path: "/tb-500/", crumbs: []crumb{{"Home", "/"}, {"Peptides", "/peptides/"}, {"TB-500", "/tb-500/"}}, content: "<p>Relative <a href=\"/bpc-157/\">links</a> here.</p>"})
+	s.serve(publicPage{title: "TB-500", path: "/tb-500/", crumbs: []crumb{{name: "Home", path: "/"}, {name: "Peptides", path: "/peptides/"}, {name: "TB-500", path: "/tb-500/"}}, content: "<p>Relative <a href=\"/bpc-157/\">links</a> here.</p>"})
 
 	s.run(t, observe.Options{})
 	f, ok := s.finding(finding.URLFormMixed, finding.SubjectSite)

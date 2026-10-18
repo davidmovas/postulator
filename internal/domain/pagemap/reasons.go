@@ -25,7 +25,6 @@ func (r ParentReason) Valid() bool {
 type TechnicalReason string
 
 const (
-	TechnicalFront     TechnicalReason = "front_page"
 	TechnicalPosts     TechnicalReason = "posts_page"
 	TechnicalPrivacy   TechnicalReason = "privacy"
 	TechnicalShop      TechnicalReason = "shop"
@@ -42,7 +41,7 @@ const (
 
 func (r TechnicalReason) Valid() bool {
 	switch r {
-	case TechnicalFront, TechnicalPosts, TechnicalPrivacy, TechnicalShop, TechnicalCart, TechnicalCheckout,
+	case TechnicalPosts, TechnicalPrivacy, TechnicalShop, TechnicalCart, TechnicalCheckout,
 		TechnicalAccount, TechnicalTerms, TechnicalShortcode, TechnicalNoindex, TechnicalWorkbook, TechnicalManual, TechnicalNone:
 		return true
 	default:

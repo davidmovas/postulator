@@ -282,8 +282,8 @@ func TestTheFirstObservationWalksTheWholeSite(t *testing.T) {
 	if len(terms) != 2 || terms[0].Taxonomy != "product_cat" || terms[1].Taxonomy != "entity" {
 		t.Errorf("the product's terms = %+v", terms)
 	}
-	if s.pageAt(t, "/").TechnicalReason != pagemap.TechnicalFront || s.pageAt(t, "/shop/").TechnicalReason != pagemap.TechnicalShop {
-		t.Error("the front and shop pages are not technical")
+	if s.pageAt(t, "/").TechnicalReason != pagemap.TechnicalNone || s.pageAt(t, "/shop/").TechnicalReason != pagemap.TechnicalShop {
+		t.Error("the front page is technical or the shop page is not")
 	}
 	healing := s.pageAt(t, "/product-category/peptides/healing-peptides/")
 	pepcat := s.pageAt(t, "/product-category/peptides/")
@@ -518,8 +518,8 @@ func TestCoreWithoutThePluginAlwaysWalksFully(t *testing.T) {
 	if tb500.ParentPageID == nil || *tb500.ParentPageID != home.ID || tb500.ParentReason != pagemap.ParentWP {
 		t.Errorf("tb-500's parent = %v %s, want home by wp_parent", tb500.ParentPageID, tb500.ParentReason)
 	}
-	if home.TechnicalReason != pagemap.TechnicalFront {
-		t.Error("core's reading settings name the front page")
+	if home.TechnicalReason != pagemap.TechnicalNone {
+		t.Errorf("core's front page is technical for %q, want the root of the site", home.TechnicalReason)
 	}
 	product := s.pageAt(t, "/product/bpc-157-peptide/")
 	if product.WPType != pagemap.WPProduct || product.WPID == nil || *product.WPID != productID {
@@ -540,7 +540,7 @@ func TestTechnicalPagesAreNamedWithTheirReason(t *testing.T) {
 
 	s.run(t, observe.Options{})
 	cases := map[string]pagemap.TechnicalReason{
-		"/": pagemap.TechnicalFront, "/shop/": pagemap.TechnicalShop, "/account/": pagemap.TechnicalShortcode,
+		"/": pagemap.TechnicalNone, "/shop/": pagemap.TechnicalShop, "/account/": pagemap.TechnicalShortcode,
 		"/tb-500/": pagemap.TechnicalNone, "/peptides/": pagemap.TechnicalWorkbook,
 	}
 	for path, want := range cases {
@@ -552,7 +552,7 @@ func TestTechnicalPagesAreNamedWithTheirReason(t *testing.T) {
 		t.Error("the seeded row was not the one matched")
 	}
 	detected := s.openFindings(finding.TechnicalDetected)
-	if len(detected) != 3 {
+	if len(detected) != 2 {
 		t.Errorf("technical_detected findings = %d, want one per reason the observation set", len(detected))
 	}
 	account := s.pageAt(t, "/account/")
@@ -808,13 +808,13 @@ func TestTheSummaryCountsTheModel(t *testing.T) {
 	if summary.Pages != 9 || summary.Observed != 9 || summary.ByType["page"] != 6 || summary.ByType["product"] != 1 || summary.ByType["product_cat"] != 2 {
 		t.Errorf("summary = %+v", summary)
 	}
-	if summary.Technical["front_page"] != 1 || summary.Technical["shop"] != 1 || summary.Technical["shortcode"] != 1 {
-		t.Errorf("technical = %v", summary.Technical)
+	if len(summary.Technical) != 2 || summary.Technical["shop"] != 1 || summary.Technical["shortcode"] != 1 {
+		t.Errorf("technical = %v, want the shop and the account page and never the front page", summary.Technical)
 	}
 	if summary.LinksByType["contextual"] != 1 || summary.ReadOnly != 2 {
 		t.Errorf("links = %v read-only = %d", summary.LinksByType, summary.ReadOnly)
 	}
-	if summary.Findings["technical_detected"] != 3 {
+	if summary.Findings["technical_detected"] != 2 {
 		t.Errorf("findings = %v", summary.Findings)
 	}
 

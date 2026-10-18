@@ -16,7 +16,7 @@ import (
 
 type siteStore interface {
 	Get(ctx context.Context, id string) (site.Site, error)
-	Update(ctx context.Context, record site.Site) error
+	UpdateObservation(ctx context.Context, id string, technical site.TechnicalPages, observation site.ObservationState, at time.Time) error
 }
 
 type pageStore interface {
@@ -24,6 +24,7 @@ type pageStore interface {
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
+	UpdateDerived(ctx context.Context, page pagemap.Page) error
 }
 
 type identityStore interface {

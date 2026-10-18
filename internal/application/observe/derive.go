@@ -15,8 +15,8 @@ import (
 type timeStamp = time.Time
 
 var deriveCodes = []finding.Code{
-	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentDiffers, finding.URLFormMixed,
-	finding.RenderUnreachable,
+	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentAmbiguous, finding.ParentCycle,
+	finding.ParentDiffers, finding.URLFormMixed, finding.RenderUnreachable, finding.RenderRedirected,
 }
 
 func (s *Service) derive(ctx context.Context, state *State, readers Readers) error {
@@ -63,10 +63,13 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		if err := s.parent(ctx, tracked, &page, m); err != nil {
 			return err
 		}
-		if !sameRef(before.ParentPageID, page.ParentPageID) || before.ParentReason != page.ParentReason {
+		if derivedMoved(before, page) {
 			changed[page.ID] = page
 			m.pages[i] = page
 		}
+	}
+	if err := s.breakCycles(ctx, tracked, &m, changed); err != nil {
+		return err
 	}
 	if err := s.urlForm(ctx, tracked, m); err != nil {
 		return err
@@ -81,8 +84,10 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		if page.Status != pagemap.StatusArchived {
 			continue
 		}
-		if err := tracked.clear(ctx, finding.RenderUnreachable, finding.SubjectPage(page.ID)); err != nil {
-			return err
+		for _, code := range []finding.Code{finding.RenderUnreachable, finding.RenderRedirected, finding.ParentCycle} {
+			if err := tracked.clear(ctx, code, finding.SubjectPage(page.ID)); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -90,7 +95,7 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		for id := range changed {
 			page := changed[id]
 			page.UpdatedAt = now
-			if updateErr := s.deps.Pages.Update(c, page); updateErr != nil {
+			if updateErr := s.deps.Pages.UpdateDerived(c, page); updateErr != nil {
 				return updateErr
 			}
 		}
@@ -100,7 +105,7 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		return err
 	}
 
-	observation := &owner.Settings.Observation
+	observation := owner.Settings.Observation
 	started, finished := state.StartedAt, now
 	observation.LastStartedAt, observation.LastFinishedAt = &started, &finished
 	if !state.ModifiedSeen.IsZero() && (observation.LastModifiedSeen == nil || state.ModifiedSeen.After(*observation.LastModifiedSeen)) {
@@ -113,9 +118,7 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	} else {
 		observation.SinceFullWalk++
 	}
-	owner.Settings.Technical = state.Technical
-	owner.UpdatedAt = now
-	if err := s.deps.Sites.Update(ctx, owner); err != nil {
+	if err := s.deps.Sites.UpdateObservation(ctx, owner.ID, state.Technical, observation, now); err != nil {
 		return err
 	}
 	if s.deps.Publisher != nil {
@@ -159,7 +162,7 @@ func technicalReason(page pagemap.Page, body block.Snapshot, record render.Recor
 	if !page.WPType.Term() && page.WPID != nil {
 		ids := map[int64]pagemap.TechnicalReason{}
 		for id, reason := range map[int64]pagemap.TechnicalReason{
-			technical.Front: pagemap.TechnicalFront, technical.Posts: pagemap.TechnicalPosts, technical.Privacy: pagemap.TechnicalPrivacy,
+			technical.Posts: pagemap.TechnicalPosts, technical.Privacy: pagemap.TechnicalPrivacy,
 			technical.Shop: pagemap.TechnicalShop, technical.Cart: pagemap.TechnicalCart, technical.Checkout: pagemap.TechnicalCheckout,
 			technical.Account: pagemap.TechnicalAccount, technical.Terms: pagemap.TechnicalTerms,
 		} {
@@ -190,16 +193,23 @@ func technicalReason(page pagemap.Page, body block.Snapshot, record render.Recor
 	return pagemap.TechnicalNone
 }
 
+func derivedMoved(before, after pagemap.Page) bool {
+	return !sameRef(before.ParentPageID, after.ParentPageID) || before.ParentReason != after.ParentReason || before.ParentMethod != after.ParentMethod
+}
+
+func (m siteModel) wpParentOf(pageID string) *int64 {
+	if identity, observed := m.identities[pageID]; observed {
+		return identity.WPParentID
+	}
+	return nil
+}
+
 func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.Page, m siteModel) error {
 	var trails []pagemap.Trail
 	if record, rendered := m.renders[page.ID]; rendered {
 		trails = record.Trails
 	}
-	var wpParent *int64
-	if identity, observed := m.identities[page.ID]; observed {
-		wpParent = identity.WPParentID
-	}
-	derived := pagemap.DeriveParent(*page, pagemap.ParentSignals{Trails: trails, WPParentID: wpParent}, m.index)
+	derived := pagemap.DeriveParent(*page, pagemap.ParentSignals{Trails: trails, WPParentID: m.wpParentOf(page.ID)}, m.index)
 
 	if page.ParentReason == pagemap.ParentWorkbook && page.ParentPageID != nil && !sameRef(page.ParentPageID, derived.ParentID) {
 		workbook := *page.ParentPageID
@@ -215,26 +225,103 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 	}
 	page.ParentPageID = derived.ParentID
 	page.ParentReason = derived.Reason
+	page.ParentMethod = derived.Method
 
-	raised := make(map[string]struct{}, len(derived.Unresolved))
+	unresolved := make(map[string]struct{}, len(derived.Unresolved))
 	for _, crumb := range derived.Unresolved {
-		key := crumb.Path
-		if key == "" {
-			key = crumb.Name
-		}
-		subject := finding.SubjectCrumb(page.ID, key)
-		raised[subject] = struct{}{}
+		subject := finding.SubjectCrumb(page.ID, crumb.Key())
+		unresolved[subject] = struct{}{}
 		if err := tracked.raise(ctx, finding.ParentUnresolved, &page.ID, subject, map[string]string{"name": crumb.Name, "path": crumb.Path}); err != nil {
 			return err
 		}
 	}
-	open := tracked.openFor(finding.ParentUnresolved, finding.SubjectCrumb(page.ID, ""))
+	ambiguous := make(map[string]struct{}, len(derived.Ambiguous))
+	for _, tie := range derived.Ambiguous {
+		subject := finding.SubjectCrumb(page.ID, tie.Crumb.Key())
+		ambiguous[subject] = struct{}{}
+		candidates := make([]string, 0, len(tie.Candidates))
+		for _, candidate := range tie.Candidates {
+			if found, ok := m.index.ByID(candidate); ok {
+				candidates = append(candidates, found.Path)
+			}
+		}
+		if err := tracked.raise(ctx, finding.ParentAmbiguous, &page.ID, subject, map[string]any{"name": tie.Crumb.Name, "candidates": candidates}); err != nil {
+			return err
+		}
+	}
+	if err := clearStale(ctx, tracked, finding.ParentUnresolved, page.ID, unresolved); err != nil {
+		return err
+	}
+	return clearStale(ctx, tracked, finding.ParentAmbiguous, page.ID, ambiguous)
+}
+
+func clearStale(ctx context.Context, tracked *findings, code finding.Code, pageID string, raised map[string]struct{}) error {
+	open := tracked.openFor(code, finding.SubjectCrumb(pageID, ""))
 	for i := range open {
 		if _, still := raised[open[i].SubjectKey]; still {
 			continue
 		}
-		if err := tracked.clear(ctx, finding.ParentUnresolved, open[i].SubjectKey); err != nil {
+		if err := tracked.clear(ctx, code, open[i].SubjectKey); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) breakCycles(ctx context.Context, tracked *findings, m *siteModel, changed map[string]pagemap.Page) error {
+	position := make(map[string]int, len(m.pages))
+	for i := range m.pages {
+		position[m.pages[i].ID] = i
+	}
+	broken := make(map[string][]string)
+	for cycles := pagemap.Cycles(m.pages); len(cycles) > 0; cycles = pagemap.Cycles(m.pages) {
+		progressed := false
+		for _, cycle := range cycles {
+			at := -1
+			for _, member := range cycle {
+				if member.WPID != nil {
+					at = position[member.ID]
+					break
+				}
+			}
+			if at < 0 {
+				continue
+			}
+			page := m.pages[at]
+			if _, again := broken[page.ID]; again {
+				page.ParentPageID, page.ParentReason, page.ParentMethod = nil, pagemap.ParentNone, pagemap.MethodNone
+			} else {
+				derived := pagemap.DeriveParent(page, pagemap.ParentSignals{WPParentID: m.wpParentOf(page.ID)}, m.index)
+				page.ParentPageID, page.ParentReason, page.ParentMethod = derived.ParentID, derived.Reason, derived.Method
+				paths := make([]string, 0, len(cycle))
+				for _, member := range cycle {
+					paths = append(paths, member.Path)
+				}
+				broken[page.ID] = paths
+			}
+			m.pages[at] = page
+			changed[page.ID] = page
+			progressed = true
+		}
+		if !progressed {
+			break
+		}
+		m.index = pagemap.NewIndex(m.pages)
+	}
+
+	for pageID, paths := range broken {
+		if err := tracked.raise(ctx, finding.ParentCycle, &pageID, finding.SubjectPage(pageID), map[string]any{"paths": paths}); err != nil {
+			return err
+		}
+	}
+	for _, open := range tracked.openFor(finding.ParentCycle, "") {
+		if open.PageID == nil {
+			continue
+		}
+		if _, still := broken[*open.PageID]; !still {
+			if err := tracked.clear(ctx, finding.ParentCycle, open.SubjectKey); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

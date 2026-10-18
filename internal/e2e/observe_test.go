@@ -68,9 +68,9 @@ func modelOf(t *testing.T, env environment) standModel {
 				"/tb-500/":   render.RootFound,
 			},
 			listings:  []string{"/peptides/", "/bpc-157/", "/tb-500/"},
-			technical: map[string]pagemap.TechnicalReason{"/": pagemap.TechnicalFront},
+			technical: map[string]pagemap.TechnicalReason{"/": pagemap.TechnicalNone},
 			technicalCounts: []pagemap.TechnicalReason{
-				pagemap.TechnicalFront, pagemap.TechnicalShop, pagemap.TechnicalCart, pagemap.TechnicalCheckout, pagemap.TechnicalAccount,
+				pagemap.TechnicalShop, pagemap.TechnicalCart, pagemap.TechnicalCheckout, pagemap.TechnicalAccount,
 			},
 			unresolvedCrumb: "/healing-peptides/",
 			hubs:            []string{"/bpc-157/", "/tb-500/"},

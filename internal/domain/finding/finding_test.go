@@ -17,7 +17,10 @@ func TestANewFindingTakesItsCodesSeverityAndOptions(t *testing.T) {
 		options  []finding.Option
 	}{
 		finding.ParentUnresolved:   {finding.Warning, []finding.Option{finding.Ignore}},
-		finding.ParentDiffers:      {finding.Warning, []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}},
+		finding.ParentAmbiguous:    {finding.Warning, []finding.Option{finding.Ignore}},
+		finding.ParentCycle:        {finding.Warning, []finding.Option{finding.Ignore}},
+		finding.RenderRedirected:   {finding.Info, []finding.Option{finding.Rescan, finding.Ignore}},
+		finding.ParentDiffers:     {finding.Warning, []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}},
 		finding.PluginOutdated:     {finding.Warning, []finding.Option{finding.UpdatePlugin, finding.Ignore}},
 		finding.FieldChangedOnSite: {finding.Warning, []finding.Option{finding.AcceptSite, finding.Ignore}},
 		finding.BodyChangedOnSite:  {finding.Warning, []finding.Option{finding.AcceptSite, finding.Ignore}},
