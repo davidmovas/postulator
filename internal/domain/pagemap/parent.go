@@ -72,6 +72,12 @@ type Ambiguity struct {
 	Candidates []string
 }
 
+type Twin struct {
+	Crumb Crumb
+	Page  string
+	Terms []string
+}
+
 type Derivation struct {
 	ParentID   *string
 	Reason     ParentReason
@@ -79,6 +85,7 @@ type Derivation struct {
 	Trail      *Trail
 	Unresolved []Crumb
 	Ambiguous  []Ambiguity
+	Twins      []Twin
 }
 
 type rankedTrail struct {
@@ -93,7 +100,7 @@ type outcome struct {
 }
 
 func DeriveParent(page Page, evidence ParentSignals, index Index) Derivation {
-	d := Derivation{Reason: ParentNone, Unresolved: make([]Crumb, 0), Ambiguous: make([]Ambiguity, 0)}
+	d := Derivation{Reason: ParentNone, Unresolved: make([]Crumb, 0), Ambiguous: make([]Ambiguity, 0), Twins: make([]Twin, 0)}
 	if page.Path == RootPath {
 		return d
 	}
@@ -217,14 +224,26 @@ func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, ind
 	}
 
 	named := index.ByName(crumb.Name)
-	candidates := make([]Page, 0, len(named))
+	pages := make([]Page, 0, len(named))
+	terms := make([]Page, 0, len(named))
 	for i := range named {
-		if named[i].ID != page.ID && !descends(named[i].Path, page.Path) {
-			candidates = append(candidates, named[i])
+		switch {
+		case named[i].ID == page.ID || descends(named[i].Path, page.Path):
+		case named[i].WPType.Term():
+			terms = append(terms, named[i])
+		default:
+			pages = append(pages, named[i])
 		}
+	}
+	candidates := pages
+	if len(pages) == 0 {
+		candidates = terms
 	}
 	switch len(candidates) {
 	case 1:
+		if len(pages) == 1 && len(terms) > 0 {
+			d.twin(crumb, pages[0], terms)
+		}
 		return candidates[0], MethodName, true
 	case 0:
 		d.unresolved(crumb)
@@ -232,6 +251,14 @@ func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, ind
 		d.ambiguous(crumb, candidates)
 	}
 	return Page{}, MethodNone, false
+}
+
+func (d *Derivation) twin(crumb Crumb, chosen Page, terms []Page) {
+	ids := make([]string, 0, len(terms))
+	for i := range terms {
+		ids = append(ids, terms[i].ID)
+	}
+	d.Twins = append(d.Twins, Twin{Crumb: crumb, Page: chosen.ID, Terms: ids})
 }
 
 func landing(page Page, crumb Crumb, landed string, index Index) (Page, bool) {

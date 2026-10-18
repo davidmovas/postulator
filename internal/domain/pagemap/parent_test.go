@@ -45,6 +45,13 @@ func derivationPages() []pagemap.Page {
 		titled(sitePage("healing", "/product-category/peptides/healing-peptides/", pagemap.WPProductCategory, 100001), "Healing Peptides"),
 		titled(sitePage("uncategorized", "/product-category/uncategorized/", pagemap.WPProductCategory, 100002), "Uncategorized"),
 		titled(sitePage("product", "/product/bpc-157-peptide/", pagemap.WPProduct, 10), "BPC-157 Peptide"),
+		titled(sitePage("capsules", "/capsules/", pagemap.WPPage, 40), "Capsules"),
+		titled(sitePage("forms-capsules", "/forms/capsules/", pagemap.WPPage, 41), "Capsules"),
+		titled(sitePage("capsules-term", "/product-category/capsules/", pagemap.WPProductCategory, 100003), "Capsules"),
+		titled(sitePage("blends", "/product-category/blends/", pagemap.WPProductCategory, 100004), "Blends"),
+		titled(sitePage("peptide-blends", "/product-category/peptides/blends/", pagemap.WPProductCategory, 100005), "Blends"),
+		titled(sitePage("spray", "/product/nasal-spray/", pagemap.WPProduct, 42), "Nasal Spray"),
+		titled(sitePage("spray-term", "/product-category/nasal-spray/", pagemap.WPProductCategory, 100006), "Nasal Spray"),
 		planned,
 	}
 }
@@ -88,6 +95,7 @@ func TestDeriveParentResolvesTheNearestCrumb(t *testing.T) {
 		trailFrom  pagemap.TrailSource
 		unresolved []string
 		ambiguous  map[string][]string
+		twins      map[string][]string
 	}{
 		"the page itself is dropped and the nearest crumb is the parent by its link": {
 			page:     "bpc",
@@ -219,12 +227,39 @@ func TestDeriveParentResolvesTheNearestCrumb(t *testing.T) {
 			parent: "home", reason: pagemap.ParentURL,
 			unresolved: []string{"/category/uncategorized/"},
 		},
-		"an unlinked crumb two pages answer to is ambiguous": {
+		"a page wins its name over a store category of the same name": {
 			page: "bpc",
 			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
 				home, pagemap.Crumb{Name: "peptides"}, pagemap.Crumb{Name: "BPC-157", Path: "/bpc-157/"})}},
+			parent: "peptides", reason: pagemap.ParentARIA, method: pagemap.MethodName, trailFrom: pagemap.TrailNav,
+			twins: map[string][]string{"peptides": {"pepcat"}},
+		},
+		"a product wins its name over a store category of the same name": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: "Nasal Spray"}, pagemap.Crumb{Name: "BPC-157", Path: "/bpc-157/"})}},
+			parent: "spray", reason: pagemap.ParentARIA, method: pagemap.MethodName, trailFrom: pagemap.TrailNav,
+			twins: map[string][]string{"Nasal Spray": {"spray-term"}},
+		},
+		"two pages of one name are ambiguous whatever store category shares it": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: "Capsules"}, pagemap.Crumb{Name: "BPC-157", Path: "/bpc-157/"})}},
 			parent: "home", reason: pagemap.ParentURL,
-			ambiguous: map[string][]string{"peptides": {"peptides", "pepcat"}},
+			ambiguous: map[string][]string{"Capsules": {"capsules", "forms-capsules"}},
+		},
+		"two store categories of one name and no page are ambiguous": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: "Blends"}, pagemap.Crumb{Name: "BPC-157", Path: "/bpc-157/"})}},
+			parent: "home", reason: pagemap.ParentURL,
+			ambiguous: map[string][]string{"Blends": {"blends", "peptide-blends"}},
+		},
+		"a store category alone resolves by its name": {
+			page: "bpc",
+			evidence: pagemap.ParentSignals{Trails: []pagemap.Trail{crumbs(pagemap.TrailNav,
+				home, pagemap.Crumb{Name: "Uncategorized"}, pagemap.Crumb{Name: "BPC-157", Path: "/bpc-157/"})}},
+			parent: "uncategorized", reason: pagemap.ParentARIA, method: pagemap.MethodName, trailFrom: pagemap.TrailNav,
 		},
 		"an unlinked crumb no page answers to is unresolved": {
 			page: "bpc",
@@ -274,6 +309,15 @@ func TestDeriveParentResolvesTheNearestCrumb(t *testing.T) {
 			for _, tie := range got.Ambiguous {
 				if want := tc.ambiguous[tie.Crumb.Key()]; !slices.Equal(tie.Candidates, want) {
 					t.Errorf("ambiguous %s = %v, want %v", tie.Crumb.Key(), tie.Candidates, want)
+				}
+			}
+			if len(got.Twins) != len(tc.twins) {
+				t.Fatalf("twins = %+v, want %v", got.Twins, tc.twins)
+			}
+			for _, twin := range got.Twins {
+				want := tc.twins[twin.Crumb.Key()]
+				if got.ParentID == nil || twin.Page != *got.ParentID || !slices.Equal(twin.Terms, want) {
+					t.Errorf("twin %s = page %v terms %v, want the parent over %v", twin.Crumb.Key(), twin.Page, twin.Terms, want)
 				}
 			}
 		})

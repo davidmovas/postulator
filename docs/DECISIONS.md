@@ -3147,4 +3147,35 @@ A per-page log in `TestTheSiteIsObservedIntoTheModel` read the replica before an
   matches", and the page falls to its next source. A crumb with a live link is unaffected, and
   that is nearly every crumb the stands and the client's themes print. The recommendation is to
   keep the rule and let stage 4's inbox resolve the few ambiguities, unless the owner wants the
-  page twin preferred over the term twin for a page's own crumb.
+  page twin preferred over the term twin for a page's own crumb. **Answered at the 2a plan**:
+  the page twin is preferred (below).
+
+## 2026-10-18 — stage 2a: page types, the field catalog and scopes, the entity card
+
+Stage 2 was split in two on 2026-10-18: 2a gives the client his own page types over six presets,
+a field catalog with scopes per type, the link rules inside those scopes, the entity card and the
+move from the entity `kind` to types; 2b gives the writer, the linker and the judge the context
+pack. The fifteen decisions taken at the plan are under "Decided at the plan" in the 2a tasks of
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`; this section holds the owner's rulings
+and what was decided while building.
+
+### The owner's rulings
+
+- **Name twins** (the owner's review of 1c). On the client's sites a hub page and a WooCommerce
+  category often share a name ("Peptides"). When a crumb resolves by its name (no link, or a dead
+  one) and the candidates are one regular page and term pages, the regular page wins: it is the
+  page we write and link to, while the archive belongs to the store. The method is `name` and an
+  informational `parent_name_twin` names the crumb, the page and the term twins. Only two or more
+  regular pages make `parent_ambiguous`; with no regular page, one term page resolves and several
+  are ambiguous. A product is a regular page. Spec 16.5 and 16.8 say so.
+- **The observation types only an untyped page** (answered at the 2a plan). A typed page is never
+  touched by the observation, whatever set its type; a regular page waits for its first render
+  before Hub or Entity is decided, so a failed first render cannot pin it to Entity.
+- **"Category" names one thing** (answered at the 2a plan). The read-only preset for WooCommerce
+  term archives is **Store category** (`store_category`); its role is the archive's, read-only and
+  with nothing writable. The client's own word "Category" is then free: a regular page whose sheet
+  cell, entity kind or template kind says Category gets the hub role, and a `product_cat` page is a
+  Store category whatever its cell says. Type names belong to the client, who may rename Hub to
+  "Category"; the import matches a kind cell against the site's own type names first and the
+  synonyms second, so his sheets keep his vocabulary. The client's E-001 row is the evidence: it
+  calls `/peptides/`, a regular page with a product grid, "Category". Spec 16.6 says so.

@@ -18,6 +18,12 @@ describe("a finding's subject in words", () => {
         ],
         ["parent_cycle", { paths: ["/a/", "/b/"] }, "The parents loop through /a/ › /b/, so the loop is broken here."],
         [
+            "parent_name_twin",
+            { name: "Peptides", page: "/peptides/", terms: ["/product-category/peptides/"] },
+            "The breadcrumb names “Peptides”: the page /peptides/ was taken over the store category /product-category/peptides/.",
+        ],
+        ["parent_name_twin", { name: "Peptides", page: "", terms: [] }, "A crumb's name is shared by a page and a store category, so the page was taken."],
+        [
             "parent_differs",
             { workbook: "p1", derived: "p2", reason: "jsonld_breadcrumb", workbookPath: "/peptides/", derivedPath: "/healing/" },
             "The workbook puts this page under /peptides/; the parent above comes from the JSON-LD breadcrumb.",

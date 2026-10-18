@@ -16,7 +16,7 @@ type timeStamp = time.Time
 
 var deriveCodes = []finding.Code{
 	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentAmbiguous, finding.ParentCycle,
-	finding.ParentDiffers, finding.URLFormMixed, finding.RenderUnreachable, finding.RenderRedirected,
+	finding.ParentNameTwin, finding.ParentDiffers, finding.URLFormMixed, finding.RenderUnreachable, finding.RenderRedirected,
 }
 
 func (s *Service) derive(ctx context.Context, state *State, readers Readers) error {
@@ -269,10 +269,40 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 			return err
 		}
 	}
+	twins := make(map[string]struct{}, len(derived.Twins))
+	for _, twin := range derived.Twins {
+		subject := finding.SubjectCrumb(page.ID, twin.Crumb.Key())
+		twins[subject] = struct{}{}
+		if err := tracked.raise(ctx, finding.ParentNameTwin, &page.ID, subject, map[string]any{
+			"name": twin.Crumb.Name, "page": m.pathOf(twin.Page), "terms": m.pathsOf(twin.Terms),
+		}); err != nil {
+			return err
+		}
+	}
 	if err := clearStale(ctx, tracked, finding.ParentUnresolved, page.ID, unresolved); err != nil {
 		return err
 	}
+	if err := clearStale(ctx, tracked, finding.ParentNameTwin, page.ID, twins); err != nil {
+		return err
+	}
 	return clearStale(ctx, tracked, finding.ParentAmbiguous, page.ID, ambiguous)
+}
+
+func (m siteModel) pathOf(pageID string) string {
+	if found, ok := m.index.ByID(pageID); ok {
+		return found.Path
+	}
+	return ""
+}
+
+func (m siteModel) pathsOf(pageIDs []string) []string {
+	paths := make([]string, 0, len(pageIDs))
+	for _, id := range pageIDs {
+		if path := m.pathOf(id); path != "" {
+			paths = append(paths, path)
+		}
+	}
+	return paths
 }
 
 func clearStale(ctx context.Context, tracked *findings, code finding.Code, pageID string, raised map[string]struct{}) error {
@@ -331,6 +361,9 @@ func (s *Service) breakCycles(ctx context.Context, tracked *findings, m *siteMod
 
 	for pageID, paths := range broken {
 		if err := tracked.raise(ctx, finding.ParentCycle, &pageID, finding.SubjectPage(pageID), map[string]any{"paths": paths}); err != nil {
+			return err
+		}
+		if err := clearStale(ctx, tracked, finding.ParentNameTwin, pageID, nil); err != nil {
 			return err
 		}
 	}

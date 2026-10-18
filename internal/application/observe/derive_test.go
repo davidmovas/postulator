@@ -126,11 +126,57 @@ func TestArchivesAndStorePagesReadTruthfulRoots(t *testing.T) {
 	}
 }
 
-func TestAnUnlinkedCrumbTwoPagesAnswerToIsAFindingNamingThem(t *testing.T) {
+func TestAPageWinsItsNameOverAStoreCategoryAndSaysSo(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
 	s.serveTheSite(false)
 	s.serve(tb500Page(false, crumb{name: "Home", path: "/"}, crumb{name: "Peptides", bare: true}, crumb{name: "TB-500", path: "/tb-500/"}))
+
+	s.run(t, observe.Options{})
+
+	tb500 := s.pageAt(t, "/tb-500/")
+	peptides := s.pageAt(t, "/peptides/")
+	if tb500.ParentPageID == nil || *tb500.ParentPageID != peptides.ID || tb500.ParentMethod != pagemap.MethodName {
+		t.Errorf("tb-500's parent = %v by %q, want the hub page by its name", tb500.ParentPageID, tb500.ParentMethod)
+	}
+	if _, ambiguous := s.finding(finding.ParentAmbiguous, finding.SubjectCrumb(tb500.ID, "Peptides")); ambiguous {
+		t.Error("a page and a store category of one name raised parent_ambiguous")
+	}
+	raised, ok := s.finding(finding.ParentNameTwin, finding.SubjectCrumb(tb500.ID, "Peptides"))
+	if !ok || raised.Status != finding.Open || raised.Severity != finding.Info {
+		t.Fatalf("parent_name_twin for Peptides = %+v %t", raised, ok)
+	}
+	var subject struct {
+		Name  string   `json:"name"`
+		Page  string   `json:"page"`
+		Terms []string `json:"terms"`
+	}
+	if err := json.Unmarshal(raised.Subject, &subject); err != nil {
+		t.Fatalf("the subject: %v", err)
+	}
+	if subject.Name != "Peptides" || subject.Page != "/peptides/" || !slices.Equal(subject.Terms, []string{"/product-category/peptides/"}) {
+		t.Errorf("the subject = %+v, want the hub taken over the store category", subject)
+	}
+
+	s.serveTheSite(false)
+	s.clock.Set(start.Add(time.Hour))
+	s.run(t, observe.Options{Full: true, RenderRescan: true})
+	if cleared, _ := s.finding(finding.ParentNameTwin, finding.SubjectCrumb(tb500.ID, "Peptides")); cleared.Status != finding.Resolved {
+		t.Errorf("parent_name_twin after the trail links its crumb = %s, want resolved", cleared.Status)
+	}
+}
+
+func TestAnUnlinkedCrumbTwoPagesAnswerToIsAFindingNamingThem(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	const formsID = 77
+	s.plugin.items = append(s.plugin.items, contentItem(formsID, "page", "/forms/peptides/", "Peptides", ""))
+	s.plugin.raws[formsID] = rawOf("")
+	s.serveTheSite(false)
+	s.serve(
+		publicPage{title: "Peptides", path: "/forms/peptides/"},
+		tb500Page(false, crumb{name: "Home", path: "/"}, crumb{name: "Peptides", bare: true}, crumb{name: "TB-500", path: "/tb-500/"}),
+	)
 
 	s.run(t, observe.Options{})
 
@@ -150,15 +196,35 @@ func TestAnUnlinkedCrumbTwoPagesAnswerToIsAFindingNamingThem(t *testing.T) {
 	if err := json.Unmarshal(raised.Subject, &subject); err != nil {
 		t.Fatalf("the subject: %v", err)
 	}
-	if subject.Name != "Peptides" || !slices.Equal(subject.Candidates, []string{"/peptides/", "/product-category/peptides/"}) {
-		t.Errorf("the subject = %+v, want the hub and the term named", subject)
+	slices.Sort(subject.Candidates)
+	if subject.Name != "Peptides" || !slices.Equal(subject.Candidates, []string{"/forms/peptides/", "/peptides/"}) {
+		t.Errorf("the subject = %+v, want the two pages and not the store category", subject)
 	}
+	if _, twin := s.finding(finding.ParentNameTwin, finding.SubjectCrumb(tb500.ID, "Peptides")); twin {
+		t.Error("an ambiguous crumb raised parent_name_twin")
+	}
+}
 
+func TestATwinFindingClearsWhenTheCycleIsBrokenThere(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
 	s.serveTheSite(false)
-	s.clock.Set(start.Add(time.Hour))
-	s.run(t, observe.Options{Full: true, RenderRescan: true})
-	if cleared, _ := s.finding(finding.ParentAmbiguous, finding.SubjectCrumb(tb500.ID, "Peptides")); cleared.Status != finding.Resolved {
-		t.Errorf("parent_ambiguous after the trail links its crumb = %s, want resolved", cleared.Status)
+	s.serve(
+		bpcPage(false, crumb{name: "Home", path: "/"}, crumb{name: "Peptides", bare: true}, crumb{name: "BPC-157", path: "/bpc-157/"}),
+		publicPage{title: "Peptides", path: "/peptides/", crumbs: []crumb{{name: "Home", path: "/"}, {name: "BPC-157", path: "/bpc-157/"}, {name: "Peptides", path: "/peptides/"}}},
+	)
+
+	s.run(t, observe.Options{})
+
+	bpc := s.pageAt(t, "/bpc-157/")
+	if bpc.ParentReason != pagemap.ParentURL {
+		t.Errorf("bpc-157's parent reason = %s, want the URL's once the cycle is broken there", bpc.ParentReason)
+	}
+	if _, broken := s.finding(finding.ParentCycle, finding.SubjectPage(bpc.ID)); !broken {
+		t.Fatal("the cycle was not broken at bpc-157")
+	}
+	if twin, raised := s.finding(finding.ParentNameTwin, finding.SubjectCrumb(bpc.ID, "Peptides")); raised && twin.Status == finding.Open {
+		t.Error("parent_name_twin stays open on a page whose parent no longer comes from the name")
 	}
 }
 

@@ -31,6 +31,8 @@ export function findingSentence(code: string, subject: Subject): string {
             return said.ambiguous(text(subject, "name"), texts(subject, "candidates"));
         case "parent_cycle":
             return said.cycle(texts(subject, "paths"));
+        case "parent_name_twin":
+            return said.twin(text(subject, "name"), text(subject, "page"), texts(subject, "terms"));
         case "parent_differs":
             return said.differs(parentSourceLabel(text(subject, "reason")), text(subject, "workbookPath"));
         case "plugin_outdated":

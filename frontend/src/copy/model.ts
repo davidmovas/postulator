@@ -91,6 +91,13 @@ export const model = {
             }
             return `The breadcrumb names ${quoted(name)}, which ${candidates.length} pages carry: ${candidates.join(", ")}.`;
         },
+        twin: (name: string, page: string, terms: readonly string[]) => {
+            if (name === "" || page === "") {
+                return "A crumb's name is shared by a page and a store category, so the page was taken.";
+            }
+            const over = terms.length === 0 ? "a store category of the same name" : `the store category ${terms.join(", ")}`;
+            return `The breadcrumb names ${quoted(name)}: the page ${page} was taken over ${over}.`;
+        },
         cycle: (paths: readonly string[]) =>
             paths.length === 0
                 ? "The parents loop, so the loop is broken here."
@@ -235,6 +242,7 @@ export const model = {
         parent_unresolved: "Crumb without a page",
         parent_ambiguous: "Crumb matches several pages",
         parent_cycle: "Parents loop",
+        parent_name_twin: "Page and store category share a name",
         parent_differs: "Workbook parent differs",
         plugin_outdated: "Plugin out of date",
         field_changed_on_site: "Field edited on the site",

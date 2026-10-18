@@ -14,6 +14,7 @@ const (
 	ParentUnresolved   Code = "parent_unresolved"
 	ParentAmbiguous    Code = "parent_ambiguous"
 	ParentCycle        Code = "parent_cycle"
+	ParentNameTwin     Code = "parent_name_twin"
 	ParentDiffers      Code = "parent_differs"
 	PluginOutdated     Code = "plugin_outdated"
 	FieldChangedOnSite Code = "field_changed_on_site"
@@ -79,6 +80,7 @@ var rules = map[Code]rule{
 	ParentUnresolved:   {Warning, []Option{Ignore}},
 	ParentAmbiguous:    {Warning, []Option{Ignore}},
 	ParentCycle:        {Warning, []Option{Ignore}},
+	ParentNameTwin:     {Info, []Option{Ignore}},
 	ParentDiffers:      {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
 	PluginOutdated:     {Warning, []Option{UpdatePlugin, Ignore}},
 	FieldChangedOnSite: {Warning, []Option{AcceptSite, Ignore}},

@@ -75,6 +75,7 @@ export const findingCodes = [
     "parent_unresolved",
     "parent_ambiguous",
     "parent_cycle",
+    "parent_name_twin",
     "parent_differs",
     "plugin_outdated",
     "field_changed_on_site",
