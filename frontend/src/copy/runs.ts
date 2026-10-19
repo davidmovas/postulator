@@ -265,6 +265,17 @@ export const runs = {
         tokenCap: "Token cap",
         tokenCapHint: "The run pauses itself once it has used this many tokens. Zero means no cap at all.",
         tokenCapZero: "With no cap this run will not stop itself on tokens.",
+        rewrite: "Rewrite the owner's own text",
+        rewriteHint:
+            "Off, the owner's own paragraphs are kept byte for byte and the run's sections are added after them.",
+        rewriteOn: (paths: readonly string[]) =>
+            `The owner's own paragraphs will be replaced on ${paths.join(", ")}.`,
+        rewriteTitle: "Rewrite the owner's own text?",
+        rewriteBody:
+            "On every page ticked here, the run replaces the owner's own paragraphs with text it writes, instead of keeping them and adding after them. Untick a page to keep its text.",
+        rewriteConfirm: (count: number) =>
+            count === 0 ? "Replace none" : count === 1 ? "Replace the text of 1 page" : `Replace the text of ${count} pages`,
+        rewriteCancel: "Keep their text",
         kindDoes: {
             generate: "Writes each page from its template and publishes it, then links the pages around it.",
             relink: "Reads each page from WordPress and places the links its rules ask for. The body is left as it is and no model is called.",

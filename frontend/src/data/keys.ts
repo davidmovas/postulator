@@ -95,6 +95,8 @@ export const keys = {
         detail: (id: string) => [scope, "templates", "detail", id] as const,
         resolvedAll: () => [scope, "templates", "resolved"] as const,
         resolved: (pageId: string) => [scope, "templates", "resolved", pageId] as const,
+        resolvedWith: (pageId: string, templateId: string) =>
+            [scope, "templates", "resolved", pageId, templateId] as const,
     },
     runs: {
         root: () => [scope, "runs"] as const,

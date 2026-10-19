@@ -1,17 +1,20 @@
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { react } from "../../data/errors.js";
+import { usePageTree } from "../../data/hooks/pages.js";
 import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
-import { useTemplates } from "../../data/hooks/templates.js";
+import { useResolvedTemplate, useTemplates } from "../../data/hooks/templates.js";
 import type { AddedPage, Estimate } from "../../data/types.js";
 import { publishModes, runKindsWithTheirOwnRecipe, startableRunKinds } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../../ui/index.js";
 import { publishModeLabel, runKindLabel } from "./labels.js";
 import { StartCaps, StartPrice } from "./start-price.js";
+import { RewriteSwitch, rewriteOf, writesBody } from "./start-rewrite.js";
+import { indexTree } from "./start-selection.js";
 import { TargetTree } from "./start-tree.js";
 import { kindGenerate } from "./statuses.js";
 
@@ -107,11 +110,18 @@ export function StartRunDrawer({
     const [tokenCap, setTokenCap] = useState(defaultTokenCap);
     const [estimate, setEstimate] = useState<Estimate | null>(null);
     const [added, setAdded] = useState<readonly AddedPage[]>([]);
+    const [rewrite, setRewrite] = useState<ReadonlySet<string>>(new Set());
 
     const priced = useEstimateRun();
     const start = useStartRun();
     const siteTemplates = useTemplates({ siteId }, { field: "name", desc: false }, listSize);
     const globalTemplates = useTemplates({ scope: "global" }, { field: "name", desc: false }, listSize);
+    const tree = usePageTree(open ? siteId : null);
+    const index = useMemo(() => indexTree(tree.data?.roots ?? null), [tree.data]);
+    const first = [...selected][0] ?? null;
+    const resolved = useResolvedTemplate(open && takesATemplate(kind) ? first : null, templateId);
+    const offersRewrite = takesATemplate(kind) && resolved.data !== undefined && writesBody(resolved.data.spec.recipe);
+    const rewritten = offersRewrite ? rewriteOf(rewrite, selected) : [];
 
     useEffect(() => {
         if (!open) {
@@ -125,6 +135,7 @@ export function StartRunDrawer({
         setTokenCap(defaultTokenCap);
         setEstimate(null);
         setAdded([]);
+        setRewrite(new Set());
         priced.reset();
         start.reset();
     }, [open, siteId]);
@@ -155,6 +166,9 @@ export function StartRunDrawer({
         };
         if (templateId !== templateAuto) {
             built.templateId = templateId;
+        }
+        if (rewritten.length > 0) {
+            built.rewrite = rewritten;
         }
         return built;
     };
@@ -280,6 +294,17 @@ export function StartRunDrawer({
                             />
                         )}
                     </Field>
+                ) : null}
+
+                {offersRewrite && selected.size > 0 ? (
+                    <RewriteSwitch
+                        pages={[...selected].map((id) => ({ id, path: index.byId.get(id)?.path ?? id }))}
+                        rewrite={rewrite}
+                        onChange={(next) => {
+                            setRewrite(next);
+                            forget();
+                        }}
+                    />
                 ) : null}
 
                 <StartCaps

@@ -111,6 +111,14 @@ describe("the page model lives under the page cache", () => {
     });
 });
 
+describe("a template resolved for a page", () => {
+    test("through a picked template, it is refreshed with the page's own resolution", () => {
+        expect(isPrefix(keys.templates.resolved("p1"), keys.templates.resolvedWith("p1", "t1"))).toBe(true);
+        expect(isPrefix(keys.templates.resolvedAll(), keys.templates.resolvedWith("p1", "t1"))).toBe(true);
+        expect(keys.templates.resolvedWith("p1", "t1")).not.toEqual(keys.templates.resolved("p1"));
+    });
+});
+
 describe("a preview link lives outside the page cache", () => {
     test("no page invalidation reaches a live preview link", () => {
         expect(isPrefix(keys.pages.root(), keys.previews.link("p1", "exists"))).toBe(false);

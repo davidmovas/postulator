@@ -42,11 +42,13 @@ export function useTemplate(id: string | null) {
     });
 }
 
-export function useResolvedTemplate(pageId: string | null) {
+export function useResolvedTemplate(pageId: string | null, templateId = "") {
+    const page = pageId ?? "";
     return useUnlockedQuery({
-        queryKey: keys.templates.resolved(pageId ?? ""),
-        queryFn: ({ signal }) => resolveForPage({ pageId: pageId ?? "" }, signal),
-        enabled: pageId !== null && pageId !== "",
+        queryKey: templateId === "" ? keys.templates.resolved(page) : keys.templates.resolvedWith(page, templateId),
+        queryFn: ({ signal }) =>
+            resolveForPage(templateId === "" ? { pageId: page } : { pageId: page, templateId }, signal),
+        enabled: page !== "",
     });
 }
 
