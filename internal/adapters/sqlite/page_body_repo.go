@@ -16,6 +16,8 @@ const (
 	selectBodies       = `SELECT ` + bodyColumns + ` FROM page_bodies WHERE page_id = ?`
 	selectBodiesBySite = `SELECT b.page_id, b.side, b.raw, b.hash, b.kind, b.observed_at
 		FROM page_bodies AS b JOIN pages AS p ON p.id = b.page_id WHERE p.site_id = ? ORDER BY b.page_id, b.side`
+	selectCurrentBodies = `SELECT ` + bodyColumns + ` FROM page_bodies WHERE side = 'current' AND page_id IN `
+	orderBodies         = ` ORDER BY page_id`
 
 	deleteWritten = `DELETE FROM page_blocks_written WHERE page_id = ?`
 	insertWritten = `INSERT INTO page_blocks_written (page_id, block_hash, run_id, written_at) VALUES (?, ?, ?, ?)
@@ -75,6 +77,10 @@ func (r *PageBodyRepo) Get(ctx context.Context, pageID string) (current, base bl
 
 func (r *PageBodyRepo) ListBySite(ctx context.Context, siteID string) ([]block.Snapshot, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectBodiesBySite, []any{siteID}, scanSnapshot, "list the site bodies")
+}
+
+func (r *PageBodyRepo) ListCurrent(ctx context.Context, pageIDs []string) ([]block.Snapshot, error) {
+	return selectByIDs(ctx, r.store.execFrom(ctx), selectCurrentBodies, orderBodies, pageIDs, scanSnapshot, "list the current bodies of the pages")
 }
 
 func (r *PageBodyRepo) ReplaceWritten(ctx context.Context, pageID string, hashes []string, runID string, at time.Time) error {

@@ -21,6 +21,8 @@ const (
 	selectRendersBySite = `SELECT r.page_id, r.render_hash, r.content_root, r.regions, r.jsonld, r.trail, r.headings, r.word_count_content,
 		r.word_count_generated, r.builder, r.url_form, r.robots, r.final_path, r.extracted_at
 		FROM page_renders AS r JOIN pages AS p ON p.id = r.page_id WHERE p.site_id = ? ORDER BY r.page_id`
+	selectRendersForPages = `SELECT ` + renderColumns + ` FROM page_renders WHERE page_id IN `
+	orderRenders          = ` ORDER BY page_id`
 )
 
 type PageRenderRepo struct {
@@ -94,6 +96,10 @@ func (r *PageRenderRepo) Get(ctx context.Context, pageID string) (render.Record,
 
 func (r *PageRenderRepo) ListBySite(ctx context.Context, siteID string) ([]render.Record, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectRendersBySite, []any{siteID}, scanRender, "list the site renders")
+}
+
+func (r *PageRenderRepo) ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error) {
+	return selectByIDs(ctx, r.store.execFrom(ctx), selectRendersForPages, orderRenders, pageIDs, scanRender, "list the renders of the pages")
 }
 
 func scanRender(rows *sql.Rows) (render.Record, error) {

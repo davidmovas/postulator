@@ -20,6 +20,8 @@ const (
 	selectFieldsForPage = `SELECT ` + fieldColumns + ` FROM page_fields WHERE page_id = ? ORDER BY field_key`
 	selectFieldsBySite  = `SELECT f.page_id, f.field_key, f.current_value, f.current_hash, f.base_value, f.base_hash, f.observed_at, f.written_at, f.written_run_id
 		FROM page_fields AS f JOIN pages AS p ON p.id = f.page_id WHERE p.site_id = ? ORDER BY f.page_id, f.field_key`
+	selectFieldsForPages = `SELECT ` + fieldColumns + ` FROM page_fields WHERE page_id IN `
+	orderFields          = ` ORDER BY page_id, field_key`
 )
 
 type PageFieldRepo struct {
@@ -77,11 +79,23 @@ func (r *PageFieldRepo) ListBySite(ctx context.Context, siteID string) (map[stri
 	if err != nil {
 		return nil, err
 	}
+	return fieldsByPage(values), nil
+}
+
+func (r *PageFieldRepo) ListForPages(ctx context.Context, pageIDs []string) (map[string][]field.Value, error) {
+	values, err := selectByIDs(ctx, r.store.execFrom(ctx), selectFieldsForPages, orderFields, pageIDs, scanFieldValue, "list the fields of the pages")
+	if err != nil {
+		return nil, err
+	}
+	return fieldsByPage(values), nil
+}
+
+func fieldsByPage(values []field.Value) map[string][]field.Value {
 	byPage := make(map[string][]field.Value)
 	for i := range values {
 		byPage[values[i].PageID] = append(byPage[values[i].PageID], values[i])
 	}
-	return byPage, nil
+	return byPage
 }
 
 func scanFieldValue(rows *sql.Rows) (field.Value, error) {

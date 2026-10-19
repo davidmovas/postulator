@@ -14,6 +14,9 @@ const (
 	deleteLinksForPage = `DELETE FROM page_links WHERE from_page_id = ? AND source = ?`
 	selectLinksForPage = `SELECT ` + linkColumns + ` FROM page_links WHERE from_page_id = ? ORDER BY observed_at, id`
 	selectLinksBySite  = `SELECT ` + linkColumns + ` FROM page_links WHERE site_id = ? ORDER BY from_page_id, id`
+	selectLinksFrom    = `SELECT ` + linkColumns + ` FROM page_links WHERE from_page_id IN `
+	orderLinksFrom     = ` ORDER BY from_page_id, observed_at, id`
+	selectLinksToPage  = `SELECT ` + linkColumns + ` FROM page_links WHERE to_page_id = ? ORDER BY from_page_id, id`
 )
 
 type PageLinkRepo struct {
@@ -61,6 +64,14 @@ func (r *PageLinkRepo) ListForPage(ctx context.Context, pageID string) ([]pagema
 
 func (r *PageLinkRepo) ListBySite(ctx context.Context, siteID string) ([]pagemap.PageLink, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectLinksBySite, []any{siteID}, scanPageLink, "list the site links")
+}
+
+func (r *PageLinkRepo) ListFromPages(ctx context.Context, pageIDs []string) ([]pagemap.PageLink, error) {
+	return selectByIDs(ctx, r.store.execFrom(ctx), selectLinksFrom, orderLinksFrom, pageIDs, scanPageLink, "list the links of the pages")
+}
+
+func (r *PageLinkRepo) ListToPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectLinksToPage, []any{pageID}, scanPageLink, "list the links to the page")
 }
 
 func scanPageLink(rows *sql.Rows) (pagemap.PageLink, error) {
