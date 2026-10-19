@@ -84,6 +84,7 @@ and options), `keyword` (the ordered list with volumes and the one cell grammar)
 mapping of a sheet's headers, its level and note columns, and what each column became),
 `template` (spec plus link policy, resolved global → site → page by JSON merge patch),
 `content` (an HTML document, link context, link insertion, compliance and structure reports),
+`contextpack` (the read functions over a snapshot of the model, the writer's pack and its fit),
 `run`, `schedule`, `settings`, and the `llm` model catalog types with the service tiers, the
 reasoning allowance per effort, `Cost` and the purpose rules the spend report groups by.
 
@@ -103,6 +104,19 @@ cannot drift; since 2026-10-18 a relative href resolves against the document on 
 `Site.ResolveAt(document, href)` taking the page's path up to its last slash as a browser does.
 `content.LinkContext` carries that site and every classifier — insertion,
 compliance, the audit and the link counter — resolves through it.
+
+Since stage 2b one layer reads the site model for everyone who writes or advises. `contextpack`
+holds the pure read functions over a `Snapshot` (the index, the types, the graph, terms, fields,
+bodies, the blocks we wrote, renders, links and findings): `Facts` for one page (its type, card,
+trail, children and siblings, listed products or its twin's, terms, keywords, targets, typed links
+in and out, fields with their scopes, regions, notes, findings), `Summary`, `LinkForm`,
+`Overview`, `Gaps` and `Nodes`; `Build` and `Fit` turn a page's facts into the writer's pack under
+a budget, and `Brief` renders the overview with the link audit's totals for the agent.
+`application/sitemodel` alone loads snapshots: a page's neighbourhood by ids inside one read-only
+`Store.Read` for a pack, the whole site once for the brief, the tree and the gaps, and the link
+audit through `reports` rather than a second computation. The writer's steps, the judge, the Pages
+drawer's "What the writer will see", the agent's brief and `sites_explore` all ask it, so none of
+them computes a fact differently.
 
 ## Run engine
 

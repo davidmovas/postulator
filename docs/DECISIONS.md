@@ -3267,3 +3267,99 @@ moved them into 2b as its Part 0, the heavy gate legs run once at 2b's close.
 - **The e2e proof** (agent H, `3242f6a`), `TestThePageTypesFollowTheSite`, compiles, vets and lints
   under the `e2e` tag; it runs at 2b's gate with the stands, Docker having been off when it was
   written.
+
+## 2026-10-19 — stage 2b: one read layer, the writer's pack and the agent's view
+
+The owner's brief: one layer of read functions over the site model, shared by two views, the
+writer's budgeted pack per page and field and the agent's brief and query tools, neither computing
+anything differently. The sixteen decisions taken at the plan, with the Opus critic's review, are
+under "Decided at the plan" in the 2b tasks of
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`; this section holds the owner's answers
+and what was decided while building.
+
+### The owner's answers at the plan
+
+- **2a's tail lands inside 2b** as its Part 0, the heavy gate run once at 2b's close (above).
+- **`generate_fields` asks only for the fields `publish` writes today**: the excerpt, where the post
+  type supports one. Every preset has the excerpt off, so by default the step asks for nothing;
+  stage 3 widens it as its field writers land, and the product's short description stays in
+  `generate_body` until then.
+- **With `rewrites` off the client's text is kept, then ours is added**: his blocks byte for byte,
+  ours after his last text block.
+
+### Decided while building
+
+- **The token estimate** is `domain/llm.Tokens(text) = max(⌈words × 2.2⌉, ⌈runes / 3⌉)` in integer
+  arithmetic (22 per ten words), because `100 × 2.2` rounds up to 221 in floating point; the run's
+  estimate and the pack call the same function.
+- **The link form lives on the plan, not the target**: `LinkContext.Absolute` and `Href(target)`
+  give the site's form; `LinkTarget.URL` stays the path every comparison uses. A field on
+  `LinkTarget` took it to 128 bytes, and `gocritic`'s `rangeValCopy` flagged ten loops.
+- **A site's form is its own contextual links' majority**, ours left out, else the theme's
+  `url_form` from the renders, else the site setting; `sitemodel.Absolute` reads it and the two
+  link plans that splice a link (`resolve_context`, the neighbours' relink) carry it.
+- **The pack's summary of an empty page is built, never asked for**: its meta description, else
+  its excerpt (a product's short description), else the first sentence of its body (shortcodes
+  skipped), else "Hub for Peptides under Home; lists A, B and 3 more; its children are …" from
+  the model.
+- **The input budget** defaults to the window less the output ceiling, the effort's reasoning
+  allowance and the stable prompt (system, the bare user prompt, the answer's schema); an
+  explicit `llm.inputBudget.<role>` wins, and one too small to carry what every call carries is
+  refused in preflight (`input_budget_too_small`), never mid-run. The estimate prices each page's
+  fitted pack (`run.Price.Input`) and skips a step that will not call a model (`run.Price.Applies`).
+- **A cache key is named only when the stable prefix reaches 1,024 tokens** (`<step>:<siteId>`),
+  the provider's minimum; below it a key only splits the cache.
+- **Client blocks are the current blocks whose hash `page_blocks_written` does not hold.**
+  `publish` and `publish_product` now record the hashes of the content the site stored; nothing
+  wrote them before, so a second run would have kept the first run's article as client text.
+  With client text kept, the body goes through `PutRaw` against the hash the writer read; a
+  conflict pauses the item (`client_changed`), and without the plugin it pauses saying so. Our part
+  carries no H1; `Structure` reads our part and `Compliance` the whole body.
+- **The rewrite switch is the run's, set only in the run-start dialog with its confirmation**
+  (`runs.StartRequest.Rewrite`, kept in `generate_body`'s params), because an autonomous agent
+  confirms nothing.
+- **`generate_fields` writes under the editor's role**, so the excerpt's pack takes the editor's
+  budget; an excerpt scope is refused on a product, whose excerpt is its short description; the
+  excerpt is read raw only, never WordPress's auto-excerpt; a revert puts it back unless the owner
+  changed it since (`revert_excerpt_kept`). It is sent in `publish`'s one update with the body,
+  not under a per-field checkpoint of its own: the artifact keeps the answer, so a retried publish
+  never asks the model again.
+- **`Sanitize` keeps a link the writer placed** when the field's policy carries links, the href
+  resolves to a planned target and its text is one of that target's anchors, within the caps
+  counted across the draft's sections, rewriting the href in the site's form; a kept link counts
+  as placed. It now strips the model's classes, ids, styles and data attributes, which spec 16.3
+  said it did and it did not.
+- **`sites_explore` is one tool with five views** in the `sites` group, sent up front; it replaces
+  `pages_tree` and `reports_link_audit_page`, takes its own arguments (the view, the gap and the
+  pack's field are domain vocabularies: `sitemodel.View`, `contextpack.Gap`, the derived
+  `packFieldKeys`), names a page by id or by path, and fits the pack view to a quarter of the
+  tool-result cap in tokens. A page view caps each list at 25 and says how many it left out.
+- **The link audit is read, not repeated**: `sitemodel` reads `reports.LinkAudit` through a
+  consumer-declared reader, so the brief's link health, the gaps' orphans and the links view are
+  one computation; the composition root builds `reports` before `sitemodel` for it.
+- **The brief is built on a conversation's first turn**, not at its creation, and kept on the
+  conversation (0064, written only by `SetBrief`, so an update made from a copy read earlier never
+  clears it); it stays within 4,096 bytes by narrowing the hub tree first; a brief of planned
+  pages says nothing of their text.
+- **One in-memory pager** in the kernel, `Keyset.Page`, serves the explore views and the card
+  proposals with the cursors a query issues, `before` included.
+- **A card proposal is an `entity_card_proposed` finding** (Info, `accept` or `ignore`) whose
+  subject carries the card proposed and the hash of the card it was proposed over
+  (`Entity.CardHash`, the definition and the cleaned facts only); an omitted definition or facts
+  keep the entity's and an empty list of facts clears them. In confirm mode the approval of the
+  call is the acceptance (`ApplyCards`); `AcceptCard` refuses a card that moved since
+  (`card_changed`); a dismissed proposal filed again stays dismissed. `FindingRepo` gains `Get`
+  and `Settle`.
+- **The tool schemas** went from 61,437 bytes at the stage's start to 61,554 (`generate_fields`'s
+  enums), 62,369 (`sites_explore`, net of the two tools it replaced) and 63,203
+  (`graph_propose_cards`), against a ceiling of 63,220.
+
+### Deviations from the request
+
+- **Docker was down for the whole stage**, so nothing that needs a stand has run:
+  `TestThePageTypesFollowTheSite`, `TestTheWriterSeesTheFullPicture`, the capture
+  (`TestTheStandModelIsCaptured`) and with it the stand pack goldens, `TestTheAgentSeesTheSite` and
+  `e2e:full` on either stand. Each compiles, vets and lints under its tag; the owner's commands are
+  in `STATUS.md`. `TestThePackOfEveryStandPage` skips, naming the capture, until a capture exists.
+- **The excerpt's e2e on vanilla's posts** was left out of `TestTheWriterSeesTheFullPicture`; the
+  write and the revert are proved against `wptest`.
