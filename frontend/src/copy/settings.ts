@@ -172,7 +172,7 @@ export const settings = {
         },
         "llm.inputBudget.editor": {
             label: "Input budget when editing",
-            help: budgetHelp("a call that writes a page's search title and description"),
+            help: budgetHelp("a call that writes a page's search title and description, or its excerpt"),
         },
         "llm.inputBudget.judge": {
             label: "Input budget when judging quality",
@@ -184,7 +184,7 @@ export const settings = {
         },
         "llm.inputBudget.writer": {
             label: "Input budget when writing the body",
-            help: budgetHelp("a call that writes a page's body or its excerpt"),
+            help: budgetHelp("a call that writes a page's body, or a product's descriptions"),
         },
         "llm.flexPatience": {
             label: "Longest wait for a flex answer",
