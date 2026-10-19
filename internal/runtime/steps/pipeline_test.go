@@ -216,6 +216,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 		Tuning:        stubTuning{},
 		Models:        stubCatalog{},
 		Pictures:      siteModelOf(p.store, p.types),
+		Bodies:        sqlite.NewPageBodyRepo(p.store),
 		Content:       appcontent.New(appcontent.Deps{Profiles: stubProfiles{}, LLM: p.llm}),
 		LLM:           p.llm,
 		ImageProvider: &drawing{},

@@ -64,7 +64,7 @@ func TestKeepPutsOurPartAfterTheClientsText(t *testing.T) {
 	}
 }
 
-func TestClientTextIsWhatWeDidNotWrite(t *testing.T) {
+func TestTheClientsBlocksAreWhatWeDidNotWrite(t *testing.T) {
 	t.Parallel()
 
 	const ours = "<p>Ours.</p>"
@@ -75,19 +75,48 @@ func TestClientTextIsWhatWeDidNotWrite(t *testing.T) {
 		want    bool
 	}{
 		{name: "nothing", current: "", want: false},
+		{name: "blank lines only", current: "\n\n  \n", want: false},
 		{name: "the client's paragraph", current: "<p>Theirs.</p>", want: true},
 		{name: "only ours", current: ours, written: hashesOf(ours), want: false},
-		{name: "a shortcode carries no text", current: "[products limit=\"4\"]", want: false},
+		{name: "a lone shortcode is the client's though it carries no text", current: "[products limit=\"4\"]", want: true},
+		{name: "a gallery is the client's", current: "<!-- wp:gallery {\"ids\":[4,5]} -->\n<figure></figure>\n<!-- /wp:gallery -->", want: true},
 		{name: "theirs beside ours", current: "<p>Theirs.</p>\n\n" + ours, written: hashesOf(ours), want: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := block.ClientText(tc.current, tc.written); got != tc.want {
-				t.Errorf("ClientText(%q) = %t, want %t", tc.current, got, tc.want)
+			if got := block.HasClient(tc.current, tc.written); got != tc.want {
+				t.Errorf("HasClient(%q) = %t, want %t", tc.current, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestABlockEditorBodyKeepsItsFreeformClientContentAcrossRuns(t *testing.T) {
+	t.Parallel()
+
+	const (
+		paragraph = "<!-- wp:paragraph -->\n<p>Theirs.</p>\n<!-- /wp:paragraph -->"
+		form      = `[contact-form-7 id="1"]`
+		first     = "<h3>Storage</h3><p>Keep them cold.</p>"
+		second    = "<h3>Storage</h3><p>Keep them frozen.</p>"
+	)
+	current := paragraph + "\n\n" + form
+	stored, kept := block.Keep(current, nil, first)
+	if !kept || !strings.HasPrefix(stored, paragraph) || !strings.HasSuffix(stored, form) ||
+		!strings.Contains(stored, "<!-- wp:html -->\n"+first+"\n<!-- /wp:html -->") {
+		t.Fatalf("the first run stored %q, want the client's paragraph, ours as its own block, then the form", stored)
+	}
+	written := block.Ours(stored, block.Client(current, nil))
+	if len(written) != 1 {
+		t.Fatalf("ours = %v, want our one block and nothing of the client's", written)
+	}
+
+	again, _ := block.Keep(stored, written, second)
+	if !strings.HasPrefix(again, paragraph) || !strings.HasSuffix(again, form) || strings.Contains(again, first) ||
+		strings.Count(again, second) != 1 {
+		t.Errorf("the second run stored %q, want the client's paragraph and form kept and one copy of ours", again)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -60,6 +61,7 @@ type unitOfWork interface {
 type bodyRecorder interface {
 	Record(ctx context.Context, pageID, raw string, at time.Time) error
 	ReplaceWritten(ctx context.Context, pageID string, hashes []string, runID string, at time.Time) error
+	ListWritten(ctx context.Context, pageID string) ([]block.Written, error)
 }
 
 type fieldRecorder interface {

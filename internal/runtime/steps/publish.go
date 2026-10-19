@@ -98,33 +98,44 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if refusesDrift(sc) {
 		return driftRefused(sc.Page, "on the site since it was last published"), nil
 	}
-	replaced, err := bodyBeingReplaced(ctx, client, itemType, existing, found)
-	if err != nil {
-		return run.Result{}, err
-	}
-	keeping := keptOf(draft, found)
-	if keeping != nil {
-		switch {
-		case replaced.ContentHash == "":
-			return needsHuman(sc.Page.Path + ": " + ReasonKeptNeedsPlugin), nil
-		case replaced.ContentHash != keeping.Hash:
-			return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
+	var site liveBody
+	if found {
+		if site, err = readLiveBody(ctx, client, itemType, existing); err != nil {
+			return run.Result{}, err
 		}
 	}
-	final, err := composedBody(keeping, rendered)
-	if err != nil {
-		return run.Result{}, err
+	final, theirs, previous := rendered, "", site.raw
+	keeping := keptOf(draft, found)
+	switch {
+	case keeping != nil:
+		held, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, site, rendered)
+		if guardErr != nil {
+			return run.Result{}, guardErr
+		}
+		if !same {
+			return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
+		}
+		if held.client && !site.plugin {
+			return needsHuman(sc.Page.Path + ": " + ReasonKeptNeedsPlugin), nil
+		}
+		final, theirs, previous = held.final, held.theirs, held.previous
+	case found && sc.Page.WPID == nil && !adoptable(site, rendered):
+		return needsHuman(sc.Page.Path + ": " + ReasonSlugTaken), nil
 	}
 	kept, err := deps.keptFieldsOf(ctx, sc, found, field.Title, field.SEOTitle, field.SEODescription)
 	if err != nil {
 		return run.Result{}, err
 	}
-	if keeping != nil {
-		if _, putErr := client.PutRaw(ctx, itemType, existing.ID, final, keeping.Hash); putErr != nil {
+	viaRaw := keeping != nil && site.plugin
+	if viaRaw {
+		if _, putErr := client.PutRaw(ctx, itemType, existing.ID, final, site.hash); putErr != nil {
 			if errors.IsCode(putErr, errors.Conflict) {
 				return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
 			}
 			return run.Result{}, putErr
+		}
+		if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, existing.ID, final, theirs); recordErr != nil {
+			return run.Result{}, recordErr
 		}
 	}
 
@@ -134,7 +145,7 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	}
 	asked := itemRequest(sc, draft, final, placed.wpID, featured.FeaturedID)
 	asked.existing, asked.found = existing, found
-	asked.viaRaw, asked.keepTitle = keeping != nil, kept[field.Title]
+	asked.viaRaw, asked.keepTitle = viaRaw, kept[field.Title]
 	if excerpt, written := answered.Value(field.Excerpt); written {
 		asked.excerpt = &excerpt
 	}
@@ -149,13 +160,15 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	result := PublishResult{
 		WPID: written.ID, URL: written.Link, Status: written.Status,
 		ContentHash: wp.ContentHash(final), Created: !found,
-		PreviousContent: replaced.Content, PreviousContentHash: replaced.ContentHash,
 		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: driftFindings(sc.Page),
 		Mismatches: mismatches,
 	}
+	if site.plugin {
+		result.PreviousContent, result.PreviousContentHash = previous, wp.ContentHash(previous)
+	}
 	if asked.excerpt != nil {
-		previous := existing.Excerpt
-		result.Excerpt, result.PreviousExcerpt = *asked.excerpt, &previous
+		excerpt := existing.Excerpt
+		result.Excerpt, result.PreviousExcerpt = *asked.excerpt, &excerpt
 	}
 	seo, err := applySEO(ctx, client, sc, itemType, written.ID, found, kept)
 	if err != nil {
@@ -173,8 +186,10 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if recordErr := recordWritten(ctx, deps, sc, sc.Page.ID, final, title, seo.applied, kept); recordErr != nil {
 		return run.Result{}, recordErr
 	}
-	if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, written.ID, final, keeping); recordErr != nil {
-		return run.Result{}, recordErr
+	if !viaRaw {
+		if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, written.ID, final, theirs); recordErr != nil {
+			return run.Result{}, recordErr
+		}
 	}
 	if asked.excerpt != nil {
 		if recordErr := recordField(ctx, deps, sc, sc.Page.ID, field.Excerpt, *asked.excerpt); recordErr != nil {
@@ -377,22 +392,6 @@ func bySlug(items []wp.Item, page pagemap.Page, parent int64) (wp.Item, bool, er
 			WithDetail("slug", page.Slug).
 			WithDetail("path", page.Path).
 			WithDetail("parent", parent)
-	}
-}
-
-func bodyBeingReplaced(ctx context.Context, client *wp.Client, itemType wp.ItemType, existing wp.Item, found bool) (wp.RawContent, error) {
-	if !found {
-		return wp.RawContent{}, nil
-	}
-
-	raw, err := client.GetRaw(ctx, itemType, existing.ID)
-	switch {
-	case err == nil:
-		return raw, nil
-	case wp.IsPluginMissing(err), errors.IsCode(err, errors.NotFound):
-		return wp.RawContent{}, nil
-	default:
-		return wp.RawContent{}, err
 	}
 }
 

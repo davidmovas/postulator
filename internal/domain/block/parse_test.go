@@ -163,6 +163,18 @@ func TestParseKeepsAShortcodeAtomic(t *testing.T) {
 	if enclosing.DynamicOnly() {
 		t.Error("a body with a paragraph beside a shortcode is not dynamic only")
 	}
+
+	const paragraph = "<!-- wp:paragraph -->\n<p>Words.</p>\n<!-- /wp:paragraph -->"
+	editor := block.Parse(paragraph + "\n\n[contact-form-7 id=\"1\"]")
+	assertBlocks(t, editor, []wantBlock{
+		{kind: block.Paragraph, name: "core/paragraph", text: "Words."},
+		{kind: block.Shortcode, name: "contact-form-7", dynamic: true},
+	})
+	mixed := block.Parse(paragraph + "\n\n[contact-form-7 id=\"1\"]\n\n<p>Loose words.</p>")
+	assertBlocks(t, mixed, []wantBlock{
+		{kind: block.Paragraph, name: "core/paragraph", text: "Words."},
+		{kind: block.HTML, text: "[contact-form-7 id=\"1\"] Loose words."},
+	})
 }
 
 func TestAnEmptyBodyIsEmptyAndNotDynamicOnly(t *testing.T) {

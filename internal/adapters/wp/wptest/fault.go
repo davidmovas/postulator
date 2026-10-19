@@ -40,6 +40,25 @@ func (s *Server) FailAfterNext(status, times int) {
 	}
 }
 
+func (s *Server) FailNextItemUpdate(status int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.updateFaults = append(s.updateFaults, status)
+}
+
+func (s *Server) takeUpdateFault() (int, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(s.updateFaults) == 0 {
+		return 0, false
+	}
+	status := s.updateFaults[0]
+	s.updateFaults = s.updateFaults[1:]
+	return status, true
+}
+
 func (s *Server) RateLimitNext(retryAfter time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

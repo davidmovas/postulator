@@ -15,9 +15,14 @@ func parseBlocks(raw string) []span {
 	cursor := 0
 
 	freeform := func(from, to int) {
-		if strings.TrimSpace(raw[from:to]) != "" {
-			spans = append(spans, span{start: from, end: to, kind: HTML})
+		if strings.TrimSpace(raw[from:to]) == "" {
+			return
 		}
+		if match := shortcodePattern.FindStringSubmatch(raw[from:to]); match != nil {
+			spans = append(spans, span{start: from, end: to, kind: Shortcode, name: match[1], dynamic: true})
+			return
+		}
+		spans = append(spans, span{start: from, end: to, kind: HTML})
 	}
 
 	for _, match := range delimiterPattern.FindAllStringSubmatchIndex(raw, -1) {

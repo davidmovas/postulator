@@ -3,6 +3,7 @@ package steps_test
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -49,6 +51,16 @@ func (b *bodyLog) ReplaceWritten(_ context.Context, pageID string, hashes []stri
 	return nil
 }
 
+func (b *bodyLog) ListWritten(_ context.Context, pageID string) ([]block.Written, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	out := make([]block.Written, 0, len(b.written[pageID]))
+	for _, hash := range b.written[pageID] {
+		out = append(out, block.Written{PageID: pageID, BlockHash: hash})
+	}
+	return out, nil
+}
+
 func (b *bodyLog) ours(pageID string) []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -73,10 +85,16 @@ func keptDraft(t *testing.T, kept *content.KeptBody) []byte {
 func keptRun(t *testing.T, ours string, kept *content.KeptBody) (steps.Deps, *wptest.Server, *bodyLog, *run.StepContext) {
 	t.Helper()
 
+	return keptRunOver(t, clientText, ours, kept)
+}
+
+func keptRunOver(t *testing.T, onSite, ours string, kept *content.KeptBody) (steps.Deps, *wptest.Server, *bodyLog, *run.StepContext) {
+	t.Helper()
+
 	deps, server := imageDeps(t)
 	log := &bodyLog{}
 	deps.Bodies = log
-	seeded := server.Seed(wptest.Item{Type: "page", Title: "Espresso", Slug: "espresso", Status: "publish", Content: clientText})
+	seeded := server.Seed(wptest.Item{Type: "page", Title: "Espresso", Slug: "espresso", Status: "publish", Content: onSite})
 	sc := publishContext(t)
 	sc.Page.WPID = &seeded[0].ID
 	sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte("<h1>Espresso</h1>" + ours)}
@@ -129,6 +147,127 @@ func TestTwoRunsLeaveOneCopyOfOurSections(t *testing.T) {
 	}
 	if strings.Contains(rewritten.Content, oursBody) {
 		t.Errorf("the first run's part is still there:\n%s", rewritten.Content)
+	}
+}
+
+func TestALoneShortcodeSurvivesARunThatKeepsTheClientsBody(t *testing.T) {
+	t.Parallel()
+
+	const grid = `[products category="healing-peptides" limit="4"]`
+	kept := &content.KeptBody{Raw: grid, Hash: block.BodyHash(grid)}
+	deps, server, _, sc := keptRunOver(t, grid, oursBody, kept)
+
+	published := runPublish(t, deps, sc)
+	stored, _ := server.Lookup(published.WPID)
+	if stored.Content != oursBody+"\n\n"+grid {
+		t.Errorf("the site holds %q, want ours before the client's product grid, the grid kept", stored.Content)
+	}
+}
+
+func TestABlockEditorBodyKeepsItsFreeformClientContentAcrossTwoRuns(t *testing.T) {
+	t.Parallel()
+
+	const (
+		paragraph = "<!-- wp:paragraph -->\n<p>The owner's own words.</p>\n<!-- /wp:paragraph -->"
+		form      = `[contact-form-7 id="1"]`
+	)
+	theirs := paragraph + "\n\n" + form
+	deps, server, log, sc := keptRunOver(t, theirs, oursBody, &content.KeptBody{Raw: theirs, Hash: block.BodyHash(theirs)})
+	published := runPublish(t, deps, sc)
+	first, _ := server.Lookup(published.WPID)
+
+	again := "<p>Espresso is pulled under nine bars.</p>"
+	sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte("<h1>Espresso</h1>" + again)}
+	sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: keptDraft(t, &content.KeptBody{
+		Raw: first.Content, Hash: block.BodyHash(first.Content), Written: log.ours(sc.Page.ID),
+	})}
+	runPublish(t, deps, sc)
+
+	second, _ := server.Lookup(published.WPID)
+	if !strings.HasPrefix(second.Content, paragraph) || !strings.Contains(second.Content, form) ||
+		strings.Contains(second.Content, oursBody) || strings.Count(second.Content, again) != 1 {
+		t.Errorf("after two runs the site holds %q, want the owner's paragraph and form and one copy of the second run's part",
+			second.Content)
+	}
+}
+
+func TestAnEditToABodyThatWasAllOursPauses(t *testing.T) {
+	t.Parallel()
+
+	written := []string{block.Hash(oursBody)}
+	deps, server, log, sc := keptRunOver(t, oursBody, oursBody, &content.KeptBody{Raw: oursBody, Hash: block.BodyHash(oursBody), Written: written})
+	log.written = map[string][]string{sc.Page.ID: written}
+	edited := oursBody + "\n\n<p>Added by the owner after the last sync.</p>"
+	server.Rewrite(*sc.Page.WPID, edited)
+
+	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if result.Next != run.TransitionPause || !strings.Contains(result.Message, steps.ReasonClientChanged) {
+		t.Fatalf("result = %+v, want the page paused for the owner's edit", result)
+	}
+	if stored, _ := server.Lookup(*sc.Page.WPID); stored.Content != edited {
+		t.Errorf("the site holds %q, want the owner's edit untouched", stored.Content)
+	}
+}
+
+func TestAPublishRetriedAfterItsRawWriteLeavesOneCopy(t *testing.T) {
+	t.Parallel()
+
+	kept := &content.KeptBody{Raw: clientText, Hash: block.BodyHash(clientText)}
+	deps, server, log, sc := keptRun(t, oursBody, kept)
+	server.FailNextItemUpdate(http.StatusBadRequest)
+	if _, err := steps.Publish(deps).Run(t.Context(), sc); err == nil {
+		t.Fatal("the first attempt went through, want the injected update failure")
+	}
+	if len(log.ours(sc.Page.ID)) == 0 {
+		t.Fatal("the blocks the raw write stored were not recorded before the update failed")
+	}
+
+	published := runPublish(t, deps, sc)
+	stored, _ := server.Lookup(published.WPID)
+	if stored.Content != clientText+"\n\n"+oursBody {
+		t.Errorf("after the retry the site holds %q, want the client's text and one copy of ours", stored.Content)
+	}
+	if published.PreviousContent != clientText {
+		t.Errorf("the retry kept %q as what it replaced, want the body the writer read", published.PreviousContent)
+	}
+}
+
+func TestAPlannedPageFoundBySlugIsAdoptedOnlyWhenNothingOfItsOwnIsLost(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		onSite string
+		paused bool
+	}{
+		{name: "a stranger's page with its own text", onSite: clientText, paused: true},
+		{name: "an empty page under the slug", onSite: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server := imageDeps(t)
+			deps.Bodies = &bodyLog{}
+			seeded := server.Seed(wptest.Item{Type: "page", Title: "Espresso", Slug: "espresso", Status: "publish", Content: tc.onSite})
+			sc := publishContext(t)
+
+			result, err := steps.Publish(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("Publish: %v", err)
+			}
+			paused := result.Next == run.TransitionPause && strings.Contains(result.Message, steps.ReasonSlugTaken)
+			if paused != tc.paused {
+				t.Fatalf("result = %+v, want paused %t", result, tc.paused)
+			}
+			stored, _ := server.Lookup(seeded[0].ID)
+			if tc.paused && stored.Content != tc.onSite {
+				t.Errorf("the stranger's page holds %q, want its text untouched", stored.Content)
+			}
+		})
 	}
 }
 
@@ -192,15 +331,21 @@ func TestAKeptBodyWithoutThePluginPauses(t *testing.T) {
 func TestGenerateBodyKeepsTheClientsTextUnlessRewritesIsOn(t *testing.T) {
 	t.Parallel()
 
+	const grid = `[products category="espresso" limit="4"]`
 	cases := []struct {
-		name     string
-		written  bool
-		rewrite  bool
-		wantKept bool
+		name      string
+		body      string
+		planned   bool
+		written   bool
+		rewrite   bool
+		wantGuard bool
+		wantKept  bool
 	}{
-		{name: "the client's text is kept", wantKept: true},
-		{name: "a body that is all ours is rewritten", written: true},
-		{name: "a run that rewrites the page", rewrite: true},
+		{name: "the client's text is kept", body: clientText, wantGuard: true, wantKept: true},
+		{name: "a lone product grid is the client's and kept", body: grid, wantGuard: true, wantKept: true},
+		{name: "a body that is all ours is guarded, not kept", body: clientText, written: true, wantGuard: true},
+		{name: "a run that rewrites the page", body: clientText, rewrite: true},
+		{name: "a planned page has no body to guard", body: "", planned: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -208,13 +353,16 @@ func TestGenerateBodyKeepsTheClientsTextUnlessRewritesIsOn(t *testing.T) {
 
 			deps := unitDeps()
 			stub := stubOf(t, deps)
-			stub.bodies = map[string]block.Snapshot{"page-child": {PageID: "page-child", Side: block.Current, Raw: clientText, Kind: block.Classic}}
+			stub.bodies = map[string]block.Snapshot{"page-child": {PageID: "page-child", Side: block.Current, Raw: tc.body, Kind: block.Classic}}
 			if tc.written {
-				stub.written = map[string][]string{"page-child": {block.Hash(clientText)}}
+				stub.written = map[string][]string{"page-child": {block.Hash(tc.body)}}
 			}
 			recorder := &promptRecorder{reply: goodDraft}
 			deps.LLM = recorder
 			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+			if !tc.planned {
+				sc.Page.WPID, sc.Page.Status = new(int64(70)), pagemap.StatusPublished
+			}
 			if tc.rewrite {
 				sc.Params[run.ParamRewrite] = []any{"page-child"}
 			}
@@ -227,15 +375,15 @@ func TestGenerateBodyKeepsTheClientsTextUnlessRewritesIsOn(t *testing.T) {
 			if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil {
 				t.Fatalf("decode: %v", err)
 			}
-			if (draft.Kept != nil) != tc.wantKept {
-				t.Fatalf("kept = %+v, want kept %t", draft.Kept, tc.wantKept)
+			if (draft.Kept != nil) != tc.wantGuard {
+				t.Fatalf("kept = %+v, want a guard %t", draft.Kept, tc.wantGuard)
 			}
-			if tc.wantKept && (draft.Kept.Raw != clientText || draft.Kept.Hash != block.BodyHash(clientText)) {
+			if tc.wantGuard && (draft.Kept.Raw != tc.body || draft.Kept.Hash != block.BodyHash(tc.body)) {
 				t.Errorf("kept = %+v, want the body and hash the writer read", draft.Kept)
 			}
 			prompt := recorder.last
-			if tc.wantKept && !strings.Contains(prompt, "keep it as it stands") {
-				t.Errorf("the writer was not told to keep the client's text:\n%s", prompt)
+			if told := strings.Contains(prompt, "keep it as it stands"); told != tc.wantKept {
+				t.Errorf("the writer told to keep the client's text = %t, want %t:\n%s", told, tc.wantKept, prompt)
 			}
 			if tc.rewrite && !strings.Contains(prompt, "may be rewritten") {
 				t.Errorf("the writer was not told the run rewrites the page:\n%s", prompt)

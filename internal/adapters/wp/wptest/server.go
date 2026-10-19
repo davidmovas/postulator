@@ -51,6 +51,7 @@ type Server struct {
 	uploadOrder   []int64
 	requests      []Request
 	faults        []fault
+	updateFaults  []int
 	clock         time.Time
 	now           func() time.Time
 	user          string

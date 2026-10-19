@@ -14,9 +14,11 @@ func TestPublishKeepsTheBodyItReplaced(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
-	server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft", Content: humanBody})
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft", Content: humanBody})
+	sc := publishContext(t)
+	sc.Page.WPID = &seeded[0].ID
 
-	published := runPublish(t, deps, publishContext(t))
+	published := runPublish(t, deps, sc)
 	if published.Created {
 		t.Fatalf("publish = %+v, want an update of the seeded page", published)
 	}
@@ -47,9 +49,11 @@ func TestPublishKeepsNoPreviousBodyWithoutThePlugin(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDepsWith(t, wptest.WithoutPlugin())
-	server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft", Content: humanBody})
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft", Content: humanBody})
+	sc := publishContext(t)
+	sc.Page.WPID = &seeded[0].ID
 
-	published := runPublish(t, deps, publishContext(t))
+	published := runPublish(t, deps, sc)
 	if published.Created {
 		t.Fatalf("publish = %+v, want an update of the seeded page", published)
 	}

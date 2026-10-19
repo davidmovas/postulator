@@ -568,6 +568,28 @@ func TestAnEditJustBeforeARawWriteIsAConflict(t *testing.T) {
 	}
 }
 
+func TestTheNextItemUpdateFailsAndLeavesTheItemAsItWas(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Content: "<p>One.</p>"})
+	path := "/wp-json/wp/v2/pages/" + itoa(seeded[0].ID)
+
+	server.FailNextItemUpdate(http.StatusBadRequest)
+	if response, _ := call(t, server, http.MethodGet, path, nil, true); response.StatusCode != http.StatusOK {
+		t.Fatalf("a read was failed with %d, want only the next update failed", response.StatusCode)
+	}
+	if response, _ := call(t, server, http.MethodPost, path, []byte(`{"title":"Tea"}`), true); response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("the update answered %d, want the injected 400", response.StatusCode)
+	}
+	if stored, _ := server.Lookup(seeded[0].ID); stored.Title != "Coffee" {
+		t.Fatalf("the failed update landed: %q", stored.Title)
+	}
+	if response, _ := call(t, server, http.MethodPost, path, []byte(`{"title":"Tea"}`), true); response.StatusCode != http.StatusOK {
+		t.Fatalf("the update after it answered %d, want it through", response.StatusCode)
+	}
+}
+
 func TestRewriteReplacesTheStoredContent(t *testing.T) {
 	t.Parallel()
 

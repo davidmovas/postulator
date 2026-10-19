@@ -5,12 +5,20 @@ import (
 	"strings"
 )
 
-const keptSeparator = "\n\n"
+const (
+	keptSeparator = "\n\n"
+	htmlOpen      = "<!-- wp:html -->\n"
+	htmlClose     = "\n<!-- /wp:html -->"
+)
 
 func Keep(current string, written []string, ours string) (raw string, kept bool) {
-	client := clientBlocks(Parse(current), written)
+	body := Parse(current)
+	client := clientBlocks(body, written)
 	if len(client) == 0 {
 		return ours, false
+	}
+	if body.Kind == Blocks {
+		ours = htmlOpen + ours + htmlClose
 	}
 	at := insertionPoint(client)
 	parts := make([]string, 0, 3)
@@ -18,7 +26,7 @@ func Keep(current string, written []string, ours string) (raw string, kept bool)
 		parts = append(parts, before)
 	}
 	parts = append(parts, ours)
-	if after := joinRaw(client[at:]); after != "" {
+	if after := strings.TrimLeft(joinRaw(client[at:]), " \t\r\n"); after != "" {
 		parts = append(parts, after)
 	}
 	return strings.Join(parts, keptSeparator), true
@@ -28,13 +36,8 @@ func Client(current string, written []string) string {
 	return joinRaw(clientBlocks(Parse(current), written))
 }
 
-func ClientText(current string, written []string) bool {
-	for _, held := range clientBlocks(Parse(current), written) {
-		if held.Text() != "" {
-			return true
-		}
-	}
-	return false
+func HasClient(current string, written []string) bool {
+	return len(clientBlocks(Parse(current), written)) > 0
 }
 
 func Ours(stored, client string) []string {

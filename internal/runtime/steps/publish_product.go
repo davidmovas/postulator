@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
-	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -162,11 +161,17 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 	if err != nil {
 		return run.Result{}, err
 	}
+	theirs, previous := "", raw.Content
 	if draft.Kept != nil {
-		if raw.ContentHash != draft.Kept.Hash {
+		live := liveBody{raw: raw.Content, hash: raw.ContentHash, plugin: true}
+		held, same, guardErr := deps.guard(ctx, sc.Page.ID, draft.Kept, live, description)
+		if guardErr != nil {
+			return run.Result{}, guardErr
+		}
+		if !same {
 			return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
 		}
-		description, _ = block.Keep(draft.Kept.Raw, draft.Kept.Written, description)
+		description, theirs, previous = held.final, held.theirs, held.previous
 	}
 	kept, err := deps.keptFieldsOf(ctx, sc, true, field.SEOTitle, field.SEODescription, field.ProductShortDescription)
 	if err != nil {
@@ -196,11 +201,14 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 		}
 		return run.Result{}, err
 	}
+	if recordErr := recordOurBlocks(ctx, deps, sc, client, wp.TypeProduct, held.ID, description, theirs); recordErr != nil {
+		return run.Result{}, recordErr
+	}
 
 	stored := saved.written
 	result := PublishResult{
 		WPID: held.ID, URL: permalinkOf(wp.Item{Link: stored.Permalink}), Status: stored.Status, ContentHash: hash,
-		PreviousContent: raw.Content, PreviousContentHash: raw.ContentHash, PreviousProduct: &snapshot,
+		PreviousContent: previous, PreviousContentHash: wp.ContentHash(previous), PreviousProduct: &snapshot,
 		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findingsOfProduct(sc.Page, held, typed),
 		Mismatches: make([]pagemap.Mismatch, 0),
 	}
@@ -224,9 +232,6 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 		if recordErr := recordField(ctx, deps, sc, sc.Page.ID, key, value); recordErr != nil {
 			return run.Result{}, recordErr
 		}
-	}
-	if recordErr := recordOurBlocks(ctx, deps, sc, client, wp.TypeProduct, held.ID, description, draft.Kept); recordErr != nil {
-		return run.Result{}, recordErr
 	}
 	return publishedAs(result, "updated the product "+sc.Page.Path+" as "+strconv.FormatInt(held.ID, 10))
 }

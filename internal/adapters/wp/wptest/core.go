@@ -169,6 +169,10 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request, itemType s
 		s.fail(w, http.StatusNotFound, "rest_post_invalid_id", "Invalid post ID.")
 		return
 	}
+	if status, failed := s.takeUpdateFault(); failed {
+		s.fail(w, status, faultCode(status), "the injected fault fired")
+		return
+	}
 
 	body, ok := s.decodeBody(w, r)
 	if !ok {

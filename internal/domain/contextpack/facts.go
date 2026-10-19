@@ -465,7 +465,7 @@ func (s Snapshot) fieldFacts(page pagemap.Page, key field.Key, scope field.Scope
 	if key == field.Body {
 		if body, found := s.body(page.ID); found {
 			row.Current = body.Serialize()
-			row.Ours = row.Current != "" && !block.ClientText(row.Current, s.Written[page.ID])
+			row.Ours = row.Current != "" && !block.HasClient(row.Current, s.Written[page.ID])
 		}
 		return row
 	}
