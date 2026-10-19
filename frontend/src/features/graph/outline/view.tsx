@@ -105,6 +105,7 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                 key={held.id}
                 interactive={true}
                 selected={held.id === selectedId}
+                data-entity-row={preset}
                 className={cx(dim && "opacity-40")}
                 onClick={() => {
                     onPick(held.id);

@@ -9,12 +9,14 @@ import { relativeTime } from "../../../domain/format.js";
 import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
-import { presetIcon, presetTone } from "../../settings/types/labels.js";
+import { pageTypesOf } from "../../settings/tabs.js";
+import { presetIcon, presetLabel, presetTone } from "../../settings/types/labels.js";
 import { entityTypeLabel, formatScore } from "../labels.js";
-import type { GraphIndex } from "../model/index.js";
+import type { EntityType, GraphIndex } from "../model/index.js";
 import { presetOf, typeOf } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 import { AnchorsEditor } from "./anchors.js";
+import { EntityCard } from "./card.js";
 import { EntityFields } from "./fields.js";
 import { CanonicalPage } from "./page.js";
 import { Relations } from "./relations.js";
@@ -33,6 +35,29 @@ export interface InspectorProps {
     onRecompute: () => void;
     recomputing: boolean;
     audit: readonly PageAudit[] | null;
+}
+
+interface PageTypeLineProps {
+    siteId: string;
+    type: EntityType | null;
+}
+
+function PageTypeLine({ siteId, type }: PageTypeLineProps): ReactElement {
+    if (type === null) {
+        return <p className="text-2xs text-ink-faint">{copy.graph.inspector.typeNone}</p>;
+    }
+    const Icon = presetIcon(type.preset);
+    const role = presetLabel(type.preset);
+    return (
+        <div className="flex items-center gap-1.5 text-xs" data-entity-page-type={type.preset}>
+            <span className="text-ink-faint">{copy.graph.inspector.type}</span>
+            <Icon size={14} className={toneClasses[presetTone(type.preset)].ink} />
+            <span className="min-w-0 truncate text-ink">{type.name === role ? type.name : `${type.name} · ${role}`}</span>
+            <Link to={`${pageTypesOf(siteId)}&type=${encodeURIComponent(type.id)}`} className="ml-auto shrink-0 text-2xs">
+                {copy.graph.inspector.typeOpen}
+            </Link>
+        </div>
+    );
 }
 
 interface AuditRowsProps {
@@ -173,10 +198,16 @@ export function Inspector({
                             onPlanPage(entity.id);
                         }}
                     />
+                    {entity.canonicalPageId === null ? null : <PageTypeLine siteId={siteId} type={typeOf(index, entity.id)} />}
                 </section>
 
                 <section className="flex flex-col gap-1">
                     <EntityFields entity={entity} />
+                </section>
+
+                <section className="flex flex-col gap-1" data-entity-card={entity.id}>
+                    <SectionLabel>{copy.graph.entityCard.title}</SectionLabel>
+                    <EntityCard entity={entity} />
                 </section>
 
                 <section className="flex flex-col gap-1">

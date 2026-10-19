@@ -26,6 +26,20 @@
     "wait": 1400
   },
   {
+    "name": "graph-entity-card",
+    "route": "#/s/:siteId/graph?view=outline",
+    "height": 1600,
+    "wait": 1400,
+    "steps": [
+      {
+        "click": "[data-entity-row=hub]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
     "name": "pages",
     "route": "#/s/:siteId/pages",
     "wait": 1200
