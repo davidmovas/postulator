@@ -385,7 +385,7 @@
   },
   {
     "name": "pages-drawer-writer",
-    "route": "#/s/:siteId/pages?status=exists",
+    "route": "#/s/:siteId/pages?status=exists&prefix=/espresso-machines/&sort=path:asc",
     "wait": 1200,
     "height": 1400,
     "steps": [
