@@ -51,6 +51,17 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
     graph_recompute_scores: {},
     graph_propose_from_pages: {},
     graph_propose_related: { entityId: "e1" },
+    graph_propose_cards: {
+        cards: [
+            {
+                entityId: "e1",
+                definition: "Mugs made of fired clay.",
+                facts: [{ label: "Material", value: "Stoneware" }],
+                reason: "The category page says so.",
+            },
+            { entityId: "e2", facts: [] },
+        ],
+    },
     graph_apply_proposals: {
         entities: [
             { pageId: "p1", path: "/mugs/travel/", name: "Travel Mugs", kind: "topic", keywords: [{ text: "travel mugs" }], parent: "/mugs/" },

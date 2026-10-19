@@ -128,6 +128,27 @@ export const describeGraph: Describer = (tool, args) => {
             }
             return view(said.applyProposals(proposals.length), lines);
         }
+        case "graph_propose_cards": {
+            const cards = records(args, "cards");
+            const lines: Line[] = [line("note", said.proposeCardsBody)];
+            for (const card of cards) {
+                lines.push(line("target", [ref("entity", text(card, "entityId") ?? "")]));
+                const definition = text(card, "definition");
+                if (definition !== null) {
+                    lines.push(line("note", said.definition(definition)));
+                }
+                if (Array.isArray(card["facts"])) {
+                    const facts = records(card, "facts");
+                    lines.push(line("list", said.factsCount(facts.length)));
+                    lines.push(...facts.map((fact) => line("field", said.fact(text(fact, "label") ?? "", text(fact, "value") ?? ""))));
+                }
+                const reason = text(card, "reason");
+                if (reason !== null) {
+                    lines.push(line("note", said.proposeCardsReason(reason)));
+                }
+            }
+            return view(said.proposeCards(cards.length), lines);
+        }
         case "graph_propose_related": {
             const entity = text(args, "entityId");
             const lines: Line[] = [line("money", said.proposeBody)];

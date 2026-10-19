@@ -90,6 +90,27 @@ export const agent = {
             cutText: (count: number) => (count === 1 ? "1 long value shortened" : `${count} long values shortened`),
             cutPreview: "Too long to shorten, so the agent was given the opening of it only.",
             cutAsk: "Ask for a narrower slice if the agent needs the rest.",
+            explore: {
+                page: (path: string) => `the page ${path}`,
+                tree: (count: number, under: string, more: boolean) => {
+                    const pages = count === 1 ? "1 page" : `${count} pages`;
+                    const where = under === "" ? "at the top of the site" : `under ${under}`;
+                    return `${pages} ${where}${more ? ", more available" : ""}`;
+                },
+                links: (path: string, owed: number) =>
+                    `the links of ${path}, ${owed === 1 ? "1 link owed" : `${owed} links owed`}`,
+                gaps: (count: number, more: boolean) => {
+                    const pages = count === 0 ? "no page" : count === 1 ? "1 page" : `${count} pages`;
+                    return `${pages} with a gap${more ? ", more available" : ""}`;
+                },
+                pack: (path: string, size: string) => `what the writer reads for ${path}, ${size} tokens`,
+            },
+            cards: {
+                proposed: (count: number) =>
+                    count === 1 ? "proposed 1 card for review" : `proposed ${count} cards for review`,
+                written: (count: number) => (count === 1 ? "wrote 1 card" : `wrote ${count} cards`),
+                skipped: (count: number) => (count === 1 ? "1 left as it was" : `${count} left as they were`),
+            },
         },
     },
     states: {
@@ -255,6 +276,11 @@ export const agent = {
             proposeAround: "Only pairs that involve",
             applyProposals: (count: number) => (count === 1 ? "Write one proposed entity" : `Write ${count} proposed entities`),
             applyProposalsBody: "Each one is created, its page mapped to it and its edges proposed. Nothing is approved on its own.",
+            proposeCards: (count: number) =>
+                count === 1 ? "Accept the proposed card and write it" : `Accept ${count} proposed cards and write them`,
+            proposeCardsBody:
+                "Approving writes each card to its entity now; a part the agent left out stays as it is. In autonomous mode the same call only files the cards on the Graph screen for review.",
+            proposeCardsReason: (reason: string) => `Why: ${reason}`,
         },
         pages: {
             create: (path: string) => `Plan page ${path}`,

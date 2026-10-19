@@ -48,6 +48,21 @@ describe("the graph cards", () => {
     });
 });
 
+describe("the proposed cards", () => {
+    it("reads approving the call as accepting the cards, each with its entity and what it changes", () => {
+        const view = describeAction("graph_propose_cards", confirmableArgs["graph_propose_cards"] ?? {}, null, none);
+        const said = copy.agent.describe.graph;
+        expect(texts(view.title).join("")).toBe(said.proposeCards(2));
+        expect(view.lines.flatMap((line) => refs(line.parts))).toStrictEqual(["entity:e1", "entity:e2"]);
+        const written = view.lines.map((line) => texts(line.parts).join(""));
+        expect(written).toContain(said.proposeCardsBody);
+        expect(written).toContain(said.definition("Mugs made of fired clay."));
+        expect(written).toContain(said.fact("Material", "Stoneware"));
+        expect(written).toContain(said.proposeCardsReason("The category page says so."));
+        expect(written).toContain(said.factsCount(0));
+    });
+});
+
 describe("the run card", () => {
     it("lists the pages, the steps, the publish mode and the budget", () => {
         const view = describeAction("runs_start", confirmableArgs["runs_start"] ?? {}, null, none);

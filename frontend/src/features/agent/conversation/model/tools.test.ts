@@ -42,12 +42,35 @@ describe("resultSummary", () => {
     });
 
     it("says what a truncated or empty answer is", () => {
-        expect(resultSummary("pages_tree", { truncated: true, totalBytes: 40_000, preview: "…" })).toBe(
+        expect(resultSummary("sites_explore", { truncated: true, totalBytes: 40_000, preview: "…" })).toBe(
             "40 KB, shortened to fit",
         );
         expect(resultSummary("pages_delete", {})).toBe("done");
         expect(resultSummary("pages_delete", null)).toBe("done");
         expect(resultSummary("runs_cancel", { cancelled: true })).toBe("done");
+    });
+
+    it("says which view of the site's model the agent read", () => {
+        const page = { pageId: "p1", path: "/peptides/", title: "Peptides" };
+        expect(resultSummary("sites_explore", { view: "page", page: { page, trail: [] } })).toBe("the page /peptides/");
+        expect(
+            resultSummary("sites_explore", { view: "tree", tree: { parent: page, nodes: { items: [{}, {}], hasMore: true } } }),
+        ).toBe("2 pages under /peptides/, more available");
+        expect(resultSummary("sites_explore", { view: "tree", tree: { parent: null, nodes: { items: [{}], hasMore: false } } })).toBe(
+            "1 page at the top of the site",
+        );
+        expect(resultSummary("sites_explore", { view: "links", links: { page: { path: "/peptides/" }, required: [{}, {}, {}] } })).toBe(
+            "the links of /peptides/, 3 links owed",
+        );
+        expect(resultSummary("sites_explore", { view: "gaps", gaps: { items: [], hasMore: false } })).toBe("no page with a gap");
+        expect(resultSummary("sites_explore", { view: "pack", pack: { path: "/peptides/", tokens: 1840, text: "…" } })).toBe(
+            "what the writer reads for /peptides/, 1,840 tokens",
+        );
+    });
+
+    it("tells proposed cards from written ones", () => {
+        expect(resultSummary("graph_propose_cards", { proposals: [{}, {}], skipped: [] })).toBe("proposed 2 cards for review");
+        expect(resultSummary("graph_propose_cards", { entities: [{}], skipped: [{}] })).toBe("wrote 1 card, 1 left as it was");
     });
 
     it("never leaks JSON into the summary", () => {

@@ -293,7 +293,7 @@ describe("a round held back by the provider", () => {
         startTurn(conversationId);
         attachAssistant(conversationId, "a1", getTurn(conversationId).turnSeq);
         waiting(20_000, Date.now());
-        applyToolStarted({ conversationId, callId: "c-1", tool: "pages_tree", args: {} });
+        applyToolStarted({ conversationId, callId: "c-1", tool: "sites_explore", args: { view: "tree" } });
         expect(getTurn(conversationId).waiting).toBeNull();
     });
 
