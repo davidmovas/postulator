@@ -166,6 +166,7 @@ describe("the spend panel follows the ledger", () => {
 describe("the page model follows the observation", () => {
     const modelled = {
         model: keys.pages.model("p1"),
+        pack: keys.pages.pack("p1", ""),
         summary: keys.pages.summary("s1"),
         otherSummary: keys.pages.summary("s2"),
     } as const;
@@ -187,13 +188,13 @@ describe("the page model follows the observation", () => {
         );
     }
 
-    it("refreshes every page model and the site's summary when the site's pages change", () => {
+    it("refreshes every page model, what the writer sees and the site's summary when the site's pages change", () => {
         const client = seeded();
 
         fire("pages.changed", { siteId: "s1" });
         vi.advanceTimersByTime(usageCoalesceMs);
 
-        expect(refreshed(client)).toEqual(["model", "summary"]);
+        expect(refreshed(client)).toEqual(["model", "pack", "summary"]);
     });
 
     it("refreshes them when a run on the site completes", () => {
@@ -201,6 +202,19 @@ describe("the page model follows the observation", () => {
 
         fire("run.completed", { runId: "r1", succeeded: 1, failed: 0 }, "r1");
 
-        expect(refreshed(client)).toEqual(["model", "summary"]);
+        expect(refreshed(client)).toEqual(["model", "pack", "summary"]);
+    });
+
+    it.each([
+        ["settings.changed", {}],
+        ["templates.changed", {}],
+        ["graph.changed", { siteId: "s1" }],
+    ] as const)("refreshes what the writer sees, and only that of the model, on %s", (type, payload) => {
+        const client = seeded();
+
+        fire(type, payload);
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual(["pack"]);
     });
 });

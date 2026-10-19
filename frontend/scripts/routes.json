@@ -358,6 +358,32 @@
     ]
   },
   {
+    "name": "pages-drawer-writer",
+    "route": "#/s/:siteId/pages?status=exists",
+    "wait": 1200,
+    "height": 1400,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Writer\")"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
     "name": "pages-drawer-links",
     "route": "#/s/:siteId/pages",
     "wait": 1200,

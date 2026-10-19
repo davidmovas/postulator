@@ -98,6 +98,13 @@ describe("the page model lives under the page cache", () => {
         expect(isPrefix(keys.pages.root(), keys.pages.summary("s1"))).toBe(true);
     });
 
+    test("what the writer sees sits under its own handle, one entry per page and field", () => {
+        expect(isPrefix(keys.pages.packs(), keys.pages.pack("p1", ""))).toBe(true);
+        expect(isPrefix(keys.pages.root(), keys.pages.pack("p1", "seo_title"))).toBe(true);
+        expect(isPrefix(keys.pages.models(), keys.pages.pack("p1", ""))).toBe(false);
+        expect(keys.pages.pack("p1", "")).not.toEqual(keys.pages.pack("p1", "seo_title"));
+    });
+
     test("a model is not a page detail, so a detail refresh leaves it alone", () => {
         expect(isPrefix(keys.pages.details(), keys.pages.model("p1"))).toBe(false);
         expect(isPrefix(keys.pages.summaries(), keys.pages.model("s1"))).toBe(false);

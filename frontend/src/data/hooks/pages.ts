@@ -14,6 +14,7 @@ import {
     setPageType,
     unmapPage,
     updatePage,
+    writerPack,
 } from "../endpoints/pages.js";
 import { quietMeta } from "../client.js";
 import { keys } from "../keys.js";
@@ -61,6 +62,15 @@ export function useModelSummary(siteId: string | null) {
         queryKey: keys.pages.summary(siteId ?? ""),
         queryFn: ({ signal }) => modelSummary({ siteId: siteId ?? "" }, signal),
         enabled: siteId !== null && siteId !== "",
+    });
+}
+
+export function useWriterPack(pageId: string | null, field: string) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.pack(pageId ?? "", field),
+        queryFn: ({ signal }) => writerPack({ pageId: pageId ?? "", field, budget: 0 }, signal),
+        enabled: pageId !== null && pageId !== "",
+        quiet: ["INVALID"],
     });
 }
 

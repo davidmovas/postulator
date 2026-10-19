@@ -66,6 +66,8 @@ export const keys = {
         model: (pageId: string) => [scope, "pages", "model", pageId] as const,
         summaries: () => [scope, "pages", "summary"] as const,
         summary: (siteId: string) => [scope, "pages", "summary", siteId] as const,
+        packs: () => [scope, "pages", "pack"] as const,
+        pack: (pageId: string, field: string) => [scope, "pages", "pack", pageId, field] as const,
     },
     previews: {
         root: () => [scope, "preview"] as const,

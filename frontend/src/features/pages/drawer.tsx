@@ -28,12 +28,14 @@ import { PreviewTab } from "./preview/tab.js";
 import { PageReportPanel } from "./report.js";
 import { TemplatePanel } from "./template.js";
 import { TypePanel } from "./type.js";
+import { WriterTab } from "./writer/pane.js";
 
 const drawerWidth = 688;
 
 const tabs: readonly TabItem<PageTab>[] = [
     { key: "details", label: copy.pages.tabs.details },
     { key: "model", label: copy.pages.tabs.model },
+    { key: "writer", label: copy.pages.tabs.writer },
     { key: "links", label: copy.pages.tabs.links },
     { key: "mapping", label: copy.pages.tabs.mapping },
     { key: "report", label: copy.pages.tabs.report },
@@ -138,6 +140,9 @@ export function PageDrawer({
                     </TabPanel>
                     <TabPanel label={copy.pages.tabs.model} active={active === "model"}>
                         <PageModelTab pageId={page.id} siteId={siteId} search={search} />
+                    </TabPanel>
+                    <TabPanel label={copy.pages.tabs.writer} active={active === "writer"}>
+                        <WriterTab page={page} siteId={siteId} />
                     </TabPanel>
                     <TabPanel label={copy.pages.tabs.links} active={active === "links"}>
                         <div className="p-3">

@@ -59,7 +59,7 @@ export function narrowed(query: PagesQuery): boolean {
     return codec.carries(query, ["status", "entityId", "unmapped", "pathPrefix"]);
 }
 
-const pageTabs = ["details", "model", "links", "mapping", "report", "preview"] as const;
+const pageTabs = ["details", "model", "writer", "links", "mapping", "report", "preview"] as const;
 
 export type PageTab = (typeof pageTabs)[number];
 

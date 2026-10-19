@@ -1,4 +1,5 @@
 import { model } from "./model.js";
+import { writer } from "./writer.js";
 
 export const pages = {
     statuses: {
@@ -14,6 +15,7 @@ export const pages = {
     tabs: {
         details: "Details",
         model: "Model",
+        writer: "Writer",
         links: "Links",
         mapping: "Mapping",
         report: "Report",
@@ -227,6 +229,7 @@ export const pages = {
     },
     linkKind: (type: string, source: string) => (source === "" ? type : `${type} · ${source}`),
     model,
+    writer,
     create: {
         title: "Plan a page",
         body: "A planned page is a row in the map. It does not exist on WordPress until a run publishes it.",

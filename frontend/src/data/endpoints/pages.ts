@@ -15,3 +15,4 @@ export const setPageType = one(Pages.SetType);
 export const previewLink = one(Pages.PreviewLink);
 export const pageModel = one(Pages.Model);
 export const modelSummary = one(Pages.ModelSummary);
+export const writerPack = one(Pages.WriterPack);

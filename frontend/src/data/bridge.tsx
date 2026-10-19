@@ -61,6 +61,7 @@ function fanOutSite(client: QueryClient, siteId: string | null): void {
         client,
         keys.pages.tree(siteId),
         keys.pages.models(),
+        keys.pages.packs(),
         keys.pages.summary(siteId),
         keys.graph.full(siteId),
         keys.reports.site(siteId),
@@ -197,7 +198,13 @@ function handlersFor(client: QueryClient): Handlers {
                 invalidateBySite(client, keys.graph.entityLists(), siteId);
                 invalidateBySite(client, keys.graph.edgeLists(), siteId);
                 invalidateBySite(client, keys.pages.lists(), siteId);
-                invalidateAll(client, keys.graph.entityAll(), keys.graph.full(siteId), keys.reports.site(siteId));
+                invalidateAll(
+                    client,
+                    keys.graph.entityAll(),
+                    keys.graph.full(siteId),
+                    keys.reports.site(siteId),
+                    keys.pages.packs(),
+                );
             });
         },
         "pages.changed": (envelope) => {
@@ -209,6 +216,7 @@ function handlersFor(client: QueryClient): Handlers {
                     keys.pages.details(),
                     keys.pages.tree(siteId),
                     keys.pages.models(),
+                    keys.pages.packs(),
                     keys.pages.summary(siteId),
                     keys.reports.site(siteId),
                     keys.graph.entityAll(),
@@ -219,7 +227,7 @@ function handlersFor(client: QueryClient): Handlers {
         },
         "templates.changed": () => {
             coalesce("templates", () => {
-                invalidateAll(client, keys.templates.root(), keys.sites.typesAll());
+                invalidateAll(client, keys.templates.root(), keys.sites.typesAll(), keys.pages.packs());
             });
         },
         "sites.changed": (envelope) => {
@@ -230,7 +238,7 @@ function handlersFor(client: QueryClient): Handlers {
         },
         "settings.changed": () => {
             coalesce("settings", () => {
-                invalidateAll(client, keys.settings.values(), keys.models.root());
+                invalidateAll(client, keys.settings.values(), keys.models.root(), keys.pages.packs());
             });
         },
         "schedules.changed": () => {

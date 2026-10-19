@@ -16,6 +16,7 @@ import type {
     SchedulesModels,
     SchemaModels,
     SettingsModels,
+    SiteModelModels,
     SitesModels,
     SyncModels,
     TemplateDomainModels,
@@ -55,6 +56,10 @@ export type ModelLink = Wire<ObserveModels.LinkView>;
 export type ModelBlock = Wire<ObserveModels.BlockView>;
 export type ModelFinding = Wire<ObserveModels.FindingView>;
 export type ModelSummary = Wire<ObserveModels.Summary>;
+
+export type WriterPack = Wire<SiteModelModels.PackView>;
+export type WriterPackSection = Wire<SiteModelModels.Section>;
+export type WriterPackDrop = Wire<SiteModelModels.Drop>;
 
 export type Entity = Wire<GraphModels.Entity>;
 export type Edge = Wire<GraphModels.Edge>;

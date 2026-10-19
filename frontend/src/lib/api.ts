@@ -29,6 +29,7 @@ export type * as PageTypesModels from "../../bindings/github.com/davidmovas/post
 export type * as ReportsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/reports/models.js";
 export type * as RunsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/runs/models.js";
 export type * as SchedulesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/schedules/models.js";
+export type * as SiteModelModels from "../../bindings/github.com/davidmovas/postulator/internal/application/sitemodel/models.js";
 export type * as SitesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/sites/models.js";
 export type * as SyncModels from "../../bindings/github.com/davidmovas/postulator/internal/application/sync/models.js";
 export type * as TemplatesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/templates/models.js";
