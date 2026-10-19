@@ -444,7 +444,7 @@ under stage 1c in `DECISIONS.md`.
 
 #### 2a tasks
 
-**Status, 2026-10-18: planned.**
+**Status, 2026-10-19: 2a.0 to 2a.10 done** (`34e79f7` to `999ee7d`); **2a.11 to 2a.15 had not landed** when 2b opened, and the owner moved them into 2b as its Part 0 (0.1 to 0.5 below), with the heavy gate legs run once at 2b's close.
 
 **Part 0 settles the owner's ruling on name twins; Part 1 is the stage.** Execution: `superpowers:executing-plans`, one accountable owner, at most two agents at once and only on disjoint packages (F: `frontend/`; H: `cmd/postulator` and `internal/e2e`, after the Go has landed); every other Go package is the owner's. Every commit uses `git commit -- <paths>` with `gofmt -l` checked inside the commit command; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; the heavy legs run alone, one stand at a time.
 
@@ -531,19 +531,151 @@ under stage 1c in `DECISIONS.md`.
 - A fresh whole-branch review briefed with these decisions; its findings fixed or recorded; the whole gate of the global constraints; docs: `STATUS.md` (2a done, 2b next), `DECISIONS.md` (stage 2a), the spec (16.1, 16.5, 16.6, 16.7, 16.8), `CONTRACTS.md`, `ARCHITECTURE.md`, `CLAUDE.md`.
 - Commit `docs: stage 2a, page types and their scopes`.
 
-### 2b — the context pack and the writer that reads it
+### 2b — one read layer: the writer's pack and the agent's picture
 
-- **Touches.** `internal/domain/contextpack`, `internal/domain/content/{brief,draft,product,sanitize,linkcontext}.go`, `internal/runtime/steps/{generate_body,generate_meta,generate_fields,repair_links,insert_links,judge,ceiling,prompts}.go` and `prompts/*.tmpl`, `internal/application/content/*`, `internal/runtime/budget.go`, `internal/application/graph` (card proposals), `internal/application/tools/pages_context_pack.go`, `frontend/src/features/pages` (the "what the writer will see" pane).
-- **Migrations.** None; the input budget is a setting, `llm.inputBudget.<role>`.
-- **Steps.** `generate_fields` joins `StepName`; `generate_body` and `generate_meta` keep their names and consume the pack; the writer leaves the client's own paragraphs alone unless the scope's `rewrites` is on for the type and field, and a run may switch it on for chosen pages with the user's confirmation (the owner's answer 5); `insert_links` and `repair_links` take the field's policy; `Sanitize` keeps the links a field's policy allows; the ceiling gains the input budget.
-- **Tools.** `pages_context_pack`; the agent proposes entity cards through findings.
-- **Reuses.** 2a's type set and scopes, `template.Resolve`, `Structure`, `Assemble`, `InsertTarget`, `pagemap.Keywords`. **Rewrites.** `content.Brief` as the pack's writer view, the prompt templates.
-- **Exit.** Unit: pack builder priorities and `Fit` goldens (a pack over budget drops siblings before the trail, products before keywords). E2E on both stands: `TestTheWriterSeesTheFullPicture` (a generate run over a planned child on each stand; the prompt the fake provider received carries the trail, the listed products on the replica's hub, the field's instruction and policy, and the current title of an existing page). Owner sees: a "what the writer will see" pane per page and field.
+- **Goal (amended 2026-10-19).** The writer and the in-app agent share one root, the site model, and one layer of read functions over it, with two views: the writer's budgeted, prioritised pack per page and field, sent with every writing call; and the agent's site brief at a conversation's start plus one query tool for depth. Neither view computes anything the other computes differently. The agent's read tools over the model move here from stage 4.
+- **Touches.** `internal/domain/{contextpack,content,llm,finding,field,pagetype}`, `internal/application/{sitemodel,graph,agent,tools,content,runs}`, `internal/runtime/{budget,claim}.go` and `steps/{generate_body,generate_meta,generate_fields,repair_links,insert_links,validate,judge,ceiling,prompts,publish,publish_product,revert,preflight,resolve_context}.go` with `prompts/*.tmpl`, `internal/adapters/sqlite` (`Store.Read`, reads by ids, `FindingRepo.Settle`, migration 0064), `internal/adapters/wp` (`PostType.Supports`), `internal/transport/{agent,wails}`, `cmd/postulator`, `internal/e2e`, `frontend/src/features/{settings,pages,graph,templates,links,sites,imports,reports,agent,runs}`, `frontend/src/copy`.
+- **Migrations.** 0064, the conversation's stored brief; stage 3's move up by one (from 0065).
+- **Steps.** `generate_fields` joins `StepName`; `generate_body`, `generate_meta`, `repair_links` and the judge keep their names and artifacts and read the pack.
+- **Tools.** `sites_explore` (views `page`, `tree`, `links`, `gaps`, `pack`) replaces `pages_tree` and `reports_link_audit_page`; `graph_propose_cards`.
+- **Exit.** Below, per part.
+
+#### 2b tasks
+
+**Status, 2026-10-19: planned.**
+
+**Part 0 lands 2a's tail; Parts A to D are the stage.** Execution: `superpowers:executing-plans`, one accountable owner for every untagged Go package, at most two agents at once and only on disjoint packages (F: `frontend/`; H: `cmd/postulator` and `internal/e2e`). Every commit uses `git commit -- <paths>` with `gofmt -l` checked inside; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; a commit that regenerates `vocab.ts` carries the frontend copy, labels and icons it needs; F regenerates the bindings only at the owner's commit points; one stand up at a time and one heavy leg at a time, and a leg the memory guard or `0xc0000142` stops is listed for the owner, never retried in a loop.
+
+**Decided at the plan** (the owner's answers, then the review's; recorded in `DECISIONS.md` at the close, the spec amended in the same commits):
+1. **2a's tail is Part 0** (the owner): 2a.11 to 2a.14 land first, each committed and green on its own boundary; the heavy gate legs run once, at 2b's close, and one whole-branch review covers both.
+2. **`generate_fields` asks only for the fields `publish` can write today** (the owner): an enabled, AI-written text field with a writer, which in 2b is the excerpt where the page's post type supports one (`wp.PostType.Supports`, read from `/wp/v2/types` in edit context and decoded raw, its values being booleans or arrays). Every preset has the excerpt off, so by default the step asks for nothing and says so; stage 3 widens the set as its writers land. An `excerpt` scope is refused on the Product preset, `post_excerpt` being the product's short description, which stays in `generate_body`'s product answer until stage 3. Only the raw excerpt is read (the rendered one is WordPress's auto-excerpt); `publish` sends it and records it as current and base; its artifact keeps what it replaced; a revert puts that back and refuses an excerpt the client changed since.
+3. **With `rewrites` off the client's blocks are kept byte for byte and our sections go after them** (the owner): client blocks are the current body's blocks whose hash is not in `page_blocks_written`; the new part goes after the last client text block, else before the first dynamic block; with `rewrites` on the body is written whole. A run switches `rewrites` on for chosen pages only from the run-start dialog with its confirmation (autonomous mode confirms nothing), and the switch is kept in the run's params.
+4. **Our blocks are recorded.** `publish` and `publish_product` record in `page_blocks_written` the block hashes of the content the site stored (read back through the raw route), so a second run replaces our first article instead of keeping it as client text. With client text kept, the body is written through `PutRaw` against the `page_bodies` current hash the writer read; a conflict pauses the item; without the plugin such a page pauses and says why.
+5. **The checks read the right document**: our part carries no H1; `Structure` reads our part; `Compliance` and the owed links read the whole body, so a client link to the parent satisfies the owed one.
+6. **A single-value field** (title, SEO title and description, excerpt) of an existing page whose scope is disabled or not AI-written is neither generated nor sent; with `rewrites` off a non-empty value we did not write is kept; a scope's length limits, when set, replace the template's for that field in the prompt and the checks. A planned page's creation still sends its title.
+7. **Name twins live in `content.PlanLinks`** over `pagemap.Index`, so its five callers agree: a regular page and a term page of one name (title, H1 or term name under `graph.Key`) are one node; a target on the archive moves to the hub; a target that becomes the page itself is dropped and duplicates merge with `Required` OR-ed; the hub's pack lists its twin's products (from `page_terms`, never the archive's paginated grid) when its own listing is smaller; the brief counts the pair once.
+8. **The link form**: `LinkTarget.URL` stays the path; a new `Href` in the site's form is used only by the splice and the prompt; an explicit `linkUrlForm` wins; `auto` follows the majority of the site's raw contextual links that are not ours, else the renders' `url_form`, else relative.
+9. **A summary** is the SEO description, else the excerpt, else the body's first sentence (shortcodes skipped), else a sentence built from the page's structure (its type, H1, trail, listed products and children); it names its source; no model call.
+10. **The pack** (`contextpack.Build`, `Fit`): spec 16.7's sections and priorities, "category" reading as the hub and catalog roles; every section under a fixed heading with its token count; `Fit` trims the lowest-priority list from its tail (products and siblings by shared keywords, then score) and drops a section only when its first item does not fit; priority 1 is never dropped. In a run the pack is built over the claim (spec, type, scope, link context), so the prompt cannot owe what `Compliance` never checks.
+11. **The budget**: `llm.inputBudget.{writer,editor,linker,judge}` in tokens, 0 meaning the model's context window less the output ceiling, the system prompt, the answer schema and the reasoning allowance; `domain/llm.Tokens(text)` is `max(words × 2.2, runes / 3)` and `runtime/budget.go` calls it; the estimate prices each page's fitted pack; a budget below priority 1 is refused in preflight. The model-info reader is a required `steps.Deps` field.
+12. **The reads**: `contextpack` is pure over a snapshot; `application/sitemodel` is the only loader and the only caller of its read functions; a writer's pack reads the page's neighbourhood by ids inside one read-only transaction (`Store.Read`); the brief, the tree and the gaps read the whole site once per call; an in-memory list pages through `Keyset.Position`, then `Cut`. `contextpack` imports `content`; `content.Brief` gains plain context sections and never imports `contextpack`.
+13. **The agent's brief** is built once per conversation and stored (0064), rendered into the instructions after their static part, its bytes capped by a test; the volatile counts stay in the per-turn situation message; the cache key is `chat:<mode>:<siteId>`.
+14. **`sites_explore`** belongs to the `sites` group and the tools sent up front; its `tree` and `links` views carry every field `pages_tree` and `reports_link_audit_page` answered, which go; its `pack` view is fitted to the tool-result cap. Every field has a description, the closed ones enums; every commit moving the schemas logs the bytes.
+15. **Card proposals**: `graph_propose_cards` takes the agent's own text and is write risk; in confirm mode the person's approval of the call is the acceptance and applies the cards; in autonomous mode it files an `entity_card_proposed` finding per entity (Info; options `accept`, `ignore`) whose subject carries the proposal and the hash of the card it was made against; accepting refuses a card changed since; `FindingRepo.Settle` resolves and dismisses; `graph.AcceptCard` is the handler stage 4's `findings.Resolve` dispatches to; the list is cursor-paged.
+16. **The seeds** join `seed/superseded` before `generate_fields` enters their recipes, so an untouched built-in is refreshed.
+
+##### 0.1 — the bindings (2a.11)
+- `TemplatesService`: `ListPageTypes`, `CreatePageType`, `SavePageType`, `DeletePageType`, `SetScope` over `application/pagetypes`; `PagesService.SetType`; the page view's type with source and reason, the graph view's canonical page type; `internal/app/build_services.go`; the bound-method count from 120 to 126 in `docs/CONTRACTS.md`.
+- Commit `feat(wails): page types, scopes and a page's type are bound`.
+
+##### 0.2 — the screens (2a.12, agent F)
+- Settings → Page types and the scope drawer; the drawer's type selector with source and reason; the Graph screen's card editor and type; the templates editor without `pageKind` and `linkRules`; the Policies screen, its route, the Sites picker and Linking's policy meter removed; entity kinds out of graph, reports, imports and pages; the agent's cards and tool families without policies and with `pagetypes`; copy, labels, screen tests, `routes.json`.
+- Commits per screen, as 2a.12 named them.
+
+##### 0.3 — the harness (2a.13, agent H)
+- `cmd/postulator/harness*.go`: types and scopes seeded, a scope with a custom key, the former harness link rules as a scope edit; `TestTheSeededSiteCarriesPageTypes`; walk routes.
+- Commit `test(harness): the seeded site carries page types`.
+
+##### 0.4 — the e2e proof (2a.14, agent H)
+- `internal/e2e/pagetypes_test.go` `TestThePageTypesFollowTheSite` per 2a's exit list, on each stand in turn.
+- Commit `test(e2e): page types follow what each stand shows`.
+
+##### 0.5 — 2a's close
+- `task build` with no drift, `npm run typecheck`, `npm run test:run`, `golangci-lint run`, `go vet`, `gofmt -l .`, the comment check; docs: `STATUS.md` (2a landed), `DECISIONS.md` (stage 2a completed), the spec (16.1, 16.6), `CLAUDE.md` (the ceiling footgun's figures).
+- Commit `docs: stage 2a, page types and their scopes`.
+
+##### A.1 — `domain/llm.Tokens` and `domain/contextpack`
+- `domain/llm`: `Tokens(text string) int`; `runtime/budget.go` calls it.
+- `domain/contextpack`: `Snapshot` (pages, `Index`, `pagetype.Set`, the graph, identities, terms, fields, current bodies, renders, links, open findings, settings, `pagemap.Site`); `Facts(snapshot, pageID)` with the identity and type, the card, the trail (ancestors with summaries), children and siblings with what each covers, listed products with their facts, terms, keywords with volumes, anchors, link targets, links in and out by type, fields with their scopes, the regions' summary, notes and open findings; `Summary`, `LinkForm`, `Tree`, `Links`, `Gaps`, `Brief`.
+- Tests: the summary table (decision 9), the link-form table (decision 8), facts over a fixture snapshot with a hub, its twin category, products, children and siblings.
+- Commit `feat(contextpack): the read functions over the site model`.
+
+##### A.2 — `Build` and `Fit`
+- `Pack`, `Section` (name, priority, heading, items, tokens), `Build(facts, field, scope)`, `Fit(pack, budget) (Fitted, error)` per decision 10, `Fitted.Dropped`.
+- Tests: the priorities; the `Fit` goldens (siblings drop before the trail, products before keywords, a list trimmed from its tail, priority 1 kept, a budget below it refused).
+- Commit `feat(contextpack): the writer's pack and its fit to a budget`.
+
+##### A.3 — twins and the link form in the link plan
+- `content.PlanLinks` per decision 7, `content.Subject` carrying the form, `LinkTarget.Href`, the splice and `InsertTarget` writing `Href`; the five callers unchanged in signature.
+- Tests: `TestATargetPrefersTheHubOverItsTwinArchive`, `TestATwinThatIsThePageItselfIsDropped`, `TestOurLinksFollowTheSitesContextualForm`, the existing link tables green.
+- Commit `feat(content): a hub stands for its twin category and our links follow the site's form`.
+
+##### A.4 — `application/sitemodel`
+- `internal/adapters/sqlite`: `Store.Read` (a read-only transaction), `ListByIDs` on the page model's repositories; `internal/application/sitemodel`: its readers, `Snapshot`, `Pack(PackRequest{PageID, Field, Budget, Claim})`, `Brief(siteID)`, `Explore(ExploreRequest)`, paged per decision 12; `internal/app/build_*.go`.
+- Tests: a pack over the claim, the neighbourhood read, the paging of `gaps` to its end with no repeat.
+- Commit `feat(sitemodel): one read layer over the site model`.
+
+##### A.5 — the stand goldens (agent H for the capture)
+- `internal/e2e/capture_test.go` under `E2E_CAPTURE=1`, run first on a fresh stand: each stand's normalised reader rows into `internal/application/sitemodel/testdata/<stand>/`; `TestThePackOfEveryStandPage` goldens every page's pack per enabled field.
+- Commit `test(sitemodel): the pack of every page of both stands`.
+
+##### B.1 — the input budget
+- `llm.inputBudget.*` in `adapters/llm/tuning/settings.go` and the frontend's settings layout; `steps.Deps.Models` (required); the harnesses; `writerCeiling` beside the budget; the estimate per decision 11; preflight's refusal.
+- Commit `feat(llm): an input budget per role`.
+
+##### B.2 — the prompts around the pack
+- `content.Brief` with the pack's sections; `generate_body`, `generate_meta`, `repair_links`, the judge; the templates rewritten with every section under its heading, the stable part in the system prompt and a cache key only where that prefix reaches the provider's minimum; `TestEveryPromptExecutes`.
+- Commit `feat(steps): the writer, the linker and the judge read the pack`.
+
+##### B.3 — the field's rules and the client's text
+- Decisions 3 to 6: the scope's instruction, limits and policy as the field's rules; the kept client blocks; `page_blocks_written` recorded; `PutRaw` under the read hash; the checks over the right document; `StartRequest.Rewrite` in the run's params.
+- Tests: `TestTheClientsBlocksAreKeptWhenRewritesIsOff`, `TestTwoRunsLeaveOneCopyOfOurSections`, `TestAClientEditAfterTheReadPauses`, `TestARunSwitchesRewritesOnForChosenPages`, `TestADisabledFieldIsNeitherWrittenNorSent`.
+- Commit `feat(steps): the writer keeps the client's text unless its scope says otherwise`.
+
+##### B.4 — `generate_fields`
+- Decision 2; `wp.PostType.Supports`; `vocab.ts`, the blank recipe, the four tool enum tags, the seeds and `seed/superseded`, the ceiling with its bytes.
+- Tests: `TestGenerateFieldsAsksOnlyForWritableFields`, `TestTheExcerptIsWrittenAndReverted`, `TestAnExcerptScopeIsRefusedOnAProduct`.
+- Commit `feat(steps): generate_fields answers the fields publish can write`.
+
+##### B.5 — links the policy allows
+- `Sanitize(fragment, allow)` keeping a model link the policy and the plan allow; `insert_links` and `repair_links` placing what is still owed; `Compliance` and the audit owing contextual links only.
+- Tests: `TestSanitizeKeepsTheLinksThePolicyAllows`, `TestAWriterLinkCountsAsPlaced`.
+- Commit `feat(content): the writer may link where the policy allows`.
+
+##### B.6 — the e2e proof (agent H)
+- `internal/e2e/writer_test.go` `TestTheWriterSeesTheFullPicture` on each stand: a generate run over a planned child and one over `/peptides/`; the recorded request carries the trail, the hub's listed products, the field's instruction and policy, a current value and an empty target's built summary; `/lab-guides/` keeps its paragraph byte for byte; a paragraph edited through `wpCLI` after a sync pauses the run; the excerpt written and reverted on vanilla's posts.
+- Commit `test(e2e): the writer sees the full picture`.
+
+##### C.1 — the brief
+- Migration 0064; the conversation's brief built once from `sitemodel.Brief` (types with counts, the top two levels of the hub tree, content health, link health, orphans, findings by code); `chat.tmpl`'s instructions; the cache key; the byte cap test.
+- Commit `feat(agent): a site brief at the start of every conversation`.
+
+##### C.2 — `sites_explore`
+- The tool per decision 14; `pages_tree` and `reports_link_audit_page` removed with the frontend's tool labels; `groups.go`; the registry list; the ceiling with its bytes.
+- Commit `feat(tools): sites_explore, the site model for the agent`.
+
+##### C.3 — the system prompt
+- The model's vocabulary (types and roles, trails and parent reasons, link types, field scopes) and when to use each view.
+- Commit `feat(agent): the assistant reasons with the site model`.
+
+##### C.4 — card proposals
+- Decision 15: `finding.EntityCardProposed` and the option `accept`; `FindingRepo.Settle`; `graph.ProposeCards`, `AcceptCard`, `DismissCard`, `CardProposals`; `graph_propose_cards`; `task vocab` with its copy.
+- Commit `feat(graph): the agent proposes entity cards a person accepts`.
+
+##### C.5 — the agent's proof (agent H)
+- `internal/e2e/agent_test.go` `TestTheAgentSeesTheSite` on the replica over the scripted fake: the brief names the hub tree and the gaps; a `sites_explore` call per view answers from the model (a hub's trail, its listed products, its links by type, the orphans); a proposed card leaves the entity unchanged until accepted.
+- Commit `test(e2e): the agent sees the site`.
+
+##### D.1 — "What the writer will see" (agent F)
+- `PagesService.WriterPack` (127 methods); the Pages drawer's pane per field, section by section as `Fit` left it, with what was dropped for budget.
+- Commit `feat(pages): what the writer will see`.
+
+##### D.2 — card proposals and the rewrite switch (agent F)
+- `GraphService.CardProposals`, `AcceptCard`, `DismissCard` (130 methods); the Graph screen's proposals, edited and accepted; the run-start dialog's rewrite switch with its confirmation.
+- Commit `feat(graph): card proposals on the Graph screen`.
+
+##### D.3 — the harness and the walk (agent H)
+- Harness fixtures for the pane and the proposals; `routes.json`.
+- Commit `test(harness): the writer's pack and the card proposals`.
+
+##### G — the review and the gate
+- A fresh whole-branch review over 2a's tail and 2b; the whole gate of the global constraints; docs: `STATUS.md` (stage 2 done, stage 3 next), `DECISIONS.md` (stage 2b), the spec (16.1, 16.7, 16.8), `CONTRACTS.md`, `ARCHITECTURE.md`, `CLAUDE.md`.
+- Commit `docs: stage 2b, the full picture for the writer and the agent`.
 
 ## Stage 3 — editing: block operations, field writes through the registry, the pipeline over existing pages, revert
 
 - **Goal.** A run edits an existing page field by field and block by block, writes under the hash of what it read, never touches the deny list, and a revert puts back exactly what each field and block held.
-- **Touches.** `internal/domain/block` (operations), `internal/domain/field` (write side), `internal/application/edit` (the writers `CoreWriter`, `StoreWriter`, `PluginWriter` declared here; the field write use case), `internal/runtime/steps/{publish,publish_product,publish_seo,relink,relink_page,relink_neighbors,revert,revert_product,generate_images}.go`, `internal/adapters/wp/{items,woo,plugin,media}.go` (writers: excerpt, featured media, meta by key, upsells and cross-sells, image alt and title, variation description, the raw PUT reading the stored content), `wp-plugin/postulator-companion` (`PUT /meta/{id}`, `meta_write`), `wp-plugin/openapi.yaml`, migrations 0064 (the old `pages` columns dropped, down restores) and 0065 (`page_links.origin` dropped), `internal/domain/pagemap/observed.go` deleted, `internal/application/tools/pages_replace_links.go` deleted, `frontend/src/features/runs/panes/*` (per-field diffs), `frontend/src/features/pages` (blocks editable through a run, revert per field).
+- **Touches.** `internal/domain/block` (operations), `internal/domain/field` (write side), `internal/application/edit` (the writers `CoreWriter`, `StoreWriter`, `PluginWriter` declared here; the field write use case), `internal/runtime/steps/{publish,publish_product,publish_seo,relink,relink_page,relink_neighbors,revert,revert_product,generate_images}.go`, `internal/adapters/wp/{items,woo,plugin,media}.go` (writers: excerpt, featured media, meta by key, upsells and cross-sells, image alt and title, variation description, the raw PUT reading the stored content), `wp-plugin/postulator-companion` (`PUT /meta/{id}`, `meta_write`), `wp-plugin/openapi.yaml`, migrations 0065 (the old `pages` columns dropped, down restores) and 0066 (`page_links.origin` dropped), `internal/domain/pagemap/observed.go` deleted, `internal/application/tools/pages_replace_links.go` deleted, `frontend/src/features/runs/panes/*` (per-field diffs), `frontend/src/features/pages` (blocks editable through a run, revert per field).
 - **Behaviour.** `publish` creates a planned page once (status, parent and slug in that one call, recorded in the artifact: the owner's answer 1) and otherwise writes every produced field through the registry under a per-field checkpoint; `publish_product` folds into the registry writers (the store's fields first, the description last, the hash read after, as today); relink places links with `PlaceLink` on blocks; revert restores per field and per block (neighbours by block hash); media names stay neutral.
 - **Reuses.** The raw route's CAS, `InsertTarget`, the publish artifact shape extended per field, the revert run kind, `generate_images`. **Rewrites.** `publish.go` as the field writer, `revert.go` at field granularity.
 - **Exit.** Unit: `Serialize` byte-exact for untouched blocks (a property test over random bodies and operations); every operation on classic and block bodies, a `wp:paragraph` with `align` kept valid; the deny list refused at the use case and at the adapter; a recording transport proves no slug, parent, status, price, stock, SKU, category or variation attribute leaves on an update; a publish killed after its second field resumes at the third with no second model call; the PHP deny set in `openapi.yaml` includes `field.Denied`'s keys. E2E on both stands: `TestAnExistingPageIsEditedBlockByBlock` (a hub with an injected breadcrumb and grid on the replica gets its body between them, untouched blocks identical, links placed only in content, a revert restores the base; on vanilla a nested page's body is edited and its URL and parent unchanged); `TestAProductIsEditedThroughTheRegistry` (description, short description, a `meta_data` key, a variation description written and reverted; price, SKU, stock and categories untouched, proven on the wire); `TestAWriteAgainstAStaleHashPauses`. Owner sees: a run that edits existing pages, the diff per field, revert per field.
@@ -551,7 +683,7 @@ under stage 1c in `DECISIONS.md`.
 ## Stage 4 — reconciliation with the workbook, findings, the site map, agent tools over the model
 
 - **Goal.** A workbook reconciles with the site through persistent findings a person or the agent resolves; the site is one map; the agent works the whole loop through tools over the model.
-- **Touches.** `internal/domain/finding`, `internal/application/findings` (`List`, `Resolve`), `internal/domain/pagemap/match.go` (`MatchRow`), `internal/application/imports/{state,products,match,pages,views,summary}.go` (the matcher, findings that survive apply, `AnchorSeparator`'s description corrected), `internal/application/observe` (discrepancies as findings: `body_changed_on_site`, `field_changed_on_site`, `parent_differs`), `internal/application/graph` (entity card proposals through findings), `internal/application/tools/{pages_get,pages_fields_*,pages_blocks_*,findings_*,sites_update,templates_resolve_for_page}.go` and `groups.go`, `internal/application/reports/*` (site map read), `frontend/src/features/{findings,sitemap,imports}/*`, `frontend/src/features/agent/cards`.
+- **Touches.** `internal/domain/finding`, `internal/application/findings` (`List`, `Resolve`), `internal/domain/pagemap/match.go` (`MatchRow`), `internal/application/imports/{state,products,match,pages,views,summary}.go` (the matcher, findings that survive apply, `AnchorSeparator`'s description corrected), `internal/application/observe` (discrepancies as findings: `body_changed_on_site`, `field_changed_on_site`, `parent_differs`), `internal/application/tools/{pages_get,pages_fields_*,pages_blocks_*,findings_*,sites_update,templates_resolve_for_page}.go` and `groups.go` (the agent's read tools over the model, the site brief and the entity card proposals landed in 2b; stage 4 keeps the findings inbox, its resolution tools and the matcher), `internal/application/reports/*` (site map read), `frontend/src/features/{findings,sitemap,imports}/*`, `frontend/src/features/agent/cards`.
 - **Migrations.** None new beyond what stage 1 made; `findings` gains no column (its `subject` JSON carries the per-code shape).
 - **Tools.** `pages_get` answers the model; `pages_fields_get/set` and `pages_blocks_list/replace/insert_after/delete/place_link` (writes confirmable); `findings_list`, `findings_resolve`; `sites_update` carries the per-site settings; `templates_resolve_for_page` folds into `pages_get`; the deferred groups list and the ceiling refreshed.
 - **Reuses.** The import pipeline and its preview, `graph.Key`, the UI harness. **Rewrites.** `siteState.held` and `products.go`'s matcher into `MatchRow`; the import preview's row view (the match rule per row).
