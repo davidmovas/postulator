@@ -205,6 +205,21 @@ describe("the page model follows the observation", () => {
         expect(refreshed(client)).toEqual(["model", "pack", "summary"]);
     });
 
+    it("refreshes the site's card proposals, and only that site's, when its graph changes or a run on it completes", () => {
+        const client = seeded();
+        client.setQueryData(keys.graph.cards("s1"), { held: true });
+        client.setQueryData(keys.graph.cards("s2"), { held: true });
+        const stale = (siteId: string): boolean => client.getQueryState(keys.graph.cards(siteId))?.isInvalidated === true;
+
+        fire("graph.changed", { siteId: "s1" });
+        vi.advanceTimersByTime(usageCoalesceMs);
+        expect([stale("s1"), stale("s2")]).toEqual([true, false]);
+
+        client.setQueryData(keys.graph.cards("s1"), { held: true });
+        fire("run.completed", { runId: "r1", succeeded: 1, failed: 0 }, "r1");
+        expect([stale("s1"), stale("s2")]).toEqual([true, false]);
+    });
+
     it.each([
         ["settings.changed", {}],
         ["templates.changed", {}],

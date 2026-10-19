@@ -125,6 +125,10 @@ export const model = {
         titleDiffers: (planned: string, site: string) => `The plan says ${quoted(planned)}, the site says ${quoted(site)}.`,
         urlForms: (absolute: number, relative: number) =>
             `The site's pages mix link forms: ${absolute} absolute, ${relative} relative.`,
+        cardProposed: (name: string) =>
+            name === ""
+                ? "The agent proposed a card for an entity; accept or dismiss it on the Graph screen."
+                : `The agent proposed a card for ${name}; accept or dismiss it on the Graph screen.`,
         generic: "The observation flagged something here.",
     },
     fieldNames: {

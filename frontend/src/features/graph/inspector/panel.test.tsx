@@ -43,7 +43,9 @@ const { Inspector } = await import("./panel.js");
 
 const said = copy.graph.entityCard;
 
-function show(definition = "") {
+const reviewed: string[] = [];
+
+function show(definition = "", proposed: ReadonlySet<string> = new Set()) {
     const peptides = { ...entity({ id: "peptides", name: "Peptides" }), definition };
     const index = buildGraphIndex([peptides], [], [typedPage("peptides", "hub", "published")], [pageType("hub", "Category")]);
     return renderScreen(
@@ -60,6 +62,10 @@ function show(definition = "") {
             onRecompute={() => undefined}
             recomputing={false}
             audit={null}
+            proposed={proposed}
+            onReviewCard={(id) => {
+                reviewed.push(id);
+            }}
         />,
     );
 }
@@ -91,6 +97,21 @@ describe("the inspector's page type and card", () => {
         expect(updates).toStrictEqual([
             { id: "peptides", definition: null, facts: [{ label: "Storage", value: "Keep it cold" }], notes: null },
         ]);
+    });
+
+    it("says when a card proposal waits for the entity and opens it for review", () => {
+        reviewed.length = 0;
+        show("", new Set(["peptides"]));
+
+        expect(screen.getByText(copy.graph.cards.waitingFor)).toBeDefined();
+        fireEvent.click(screen.getByRole("button", { name: copy.graph.cards.review }));
+        expect(reviewed).toStrictEqual(["peptides"]);
+    });
+
+    it("says nothing of proposals when none waits for the entity", () => {
+        show("", new Set(["other"]));
+
+        expect(screen.queryByText(copy.graph.cards.waitingFor)).toBeNull();
     });
 
     it("edits the definition and a note", () => {

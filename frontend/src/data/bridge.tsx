@@ -64,6 +64,7 @@ function fanOutSite(client: QueryClient, siteId: string | null): void {
         keys.pages.packs(),
         keys.pages.summary(siteId),
         keys.graph.full(siteId),
+        keys.graph.cards(siteId),
         keys.reports.site(siteId),
     );
 }
@@ -202,6 +203,7 @@ function handlersFor(client: QueryClient): Handlers {
                     client,
                     keys.graph.entityAll(),
                     keys.graph.full(siteId),
+                    keys.graph.cards(siteId),
                     keys.reports.site(siteId),
                     keys.pages.packs(),
                 );

@@ -1,7 +1,18 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
-import { AddIcon, AddLinkIcon, Button, CalculateIcon, CloseIcon, CountBadge, Menu, PolylineIcon, Stars2Icon } from "../../ui/index.js";
+import {
+    AddIcon,
+    AddLinkIcon,
+    Button,
+    CalculateIcon,
+    CloseIcon,
+    CountBadge,
+    EditNoteIcon,
+    Menu,
+    PolylineIcon,
+    Stars2Icon,
+} from "../../ui/index.js";
 import type { MenuEntry } from "../../ui/index.js";
 import type { GraphIndex } from "./model/index.js";
 
@@ -11,10 +22,12 @@ export interface GraphActionsProps {
     connecting: boolean;
     reviewing: boolean;
     recomputing: boolean;
+    cardProposals: number;
     onCreate: () => void;
     onConnect: () => void;
     onStopConnect: () => void;
     onReview: () => void;
+    onReviewCards: () => void;
     onProposeFromPages: () => void;
     onProposeFromKeywords: () => void;
     onProposeRelated: () => void;
@@ -27,10 +40,12 @@ export function GraphActions({
     connecting,
     reviewing,
     recomputing,
+    cardProposals,
     onCreate,
     onConnect,
     onStopConnect,
     onReview,
+    onReviewCards,
     onProposeFromPages,
     onProposeFromKeywords,
     onProposeRelated,
@@ -53,6 +68,12 @@ export function GraphActions({
 
     return (
         <>
+            {cardProposals > 0 ? (
+                <Button variant="secondary" icon={EditNoteIcon} data-card-proposals-open={true} onClick={onReviewCards}>
+                    {copy.graph.cards.open}
+                    <CountBadge tone="info" count={cardProposals} className="ml-1" />
+                </Button>
+            ) : null}
             {proposed > 0 || reviewing ? (
                 <Button variant={reviewing ? "primary" : "secondary"} icon={PolylineIcon} aria-pressed={reviewing} onClick={onReview}>
                     {copy.graph.queue.open}

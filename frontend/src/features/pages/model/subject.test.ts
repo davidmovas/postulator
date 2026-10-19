@@ -42,6 +42,11 @@ describe("a finding's subject in words", () => {
         ["technical_detected", { reason: "cart" }, "Read as a technical page: Cart."],
         ["page_title_differs", { planned: "Mugs", site: "Ceramic mugs" }, "The plan says “Mugs”, the site says “Ceramic mugs”."],
         ["url_form_mixed", { absolute: 4, relative: 2 }, "The site's pages mix link forms: 4 absolute, 2 relative."],
+        [
+            "entity_card_proposed",
+            { entityId: "e1", name: "Peptides", base: "3f1a", definition: "Short chains.", facts: [], reason: "" },
+            "The agent proposed a card for Peptides; accept or dismiss it on the Graph screen.",
+        ],
     ])("words %s from the keys it carries", (code, subject, sentence) => {
         expect(findingSentence(code, subject)).toBe(sentence);
     });

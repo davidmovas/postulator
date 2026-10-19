@@ -2,13 +2,17 @@ import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { Cursor, List } from "../../lib/paging.js";
+import { quietMeta } from "../client.js";
 import {
+    acceptCard,
     addEdge,
     applyProposals,
     approveEdge,
     createEntity,
     deleteEntity,
+    dismissCard,
     getEntity,
+    listCardProposals,
     listEdges,
     listEntities,
     loadGraph,
@@ -24,7 +28,7 @@ import {
 import { keys } from "../keys.js";
 import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
 import type { EntitySort } from "../sorts.js";
-import type { Edge, EdgeFilter, Entity, EntityFilter } from "../types.js";
+import type { CardProposal, Edge, EdgeFilter, Entity, EntityFilter } from "../types.js";
 
 type EdgePages = InfiniteData<List<Edge>, Cursor | undefined>;
 type FullGraph = Awaited<ReturnType<typeof loadGraph>>;
@@ -228,4 +232,41 @@ export function useApplyProposals() {
 
 export function useRecomputeScores() {
     return useGraphBatch((request: Parameters<typeof recomputeScores>[0], signal?: AbortSignal) => recomputeScores(request, signal));
+}
+
+export const cardProposalsLimit = 100;
+
+export function useCardProposals(siteId: string | null) {
+    return useUnlockedInfinite<{ siteId: string }, CardProposal>({
+        queryKey: keys.graph.cards(siteId ?? ""),
+        fetch: listCardProposals,
+        filters: { siteId: siteId ?? "" },
+        sort: null,
+        limit: cardProposalsLimit,
+        enabled: siteId !== null && siteId !== "",
+    });
+}
+
+function useCardDecision<Request, Answer>(call: (request: Request) => Promise<Answer>, siteId: string) {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: call,
+        meta: quietMeta(["CONFLICT"]),
+        onSettled: () => {
+            void client.invalidateQueries({ queryKey: keys.graph.cards(siteId) });
+        },
+        onSuccess: () => {
+            void client.invalidateQueries({ queryKey: keys.graph.entityAll() });
+            void client.invalidateQueries({ queryKey: keys.graph.entityLists() });
+            void client.invalidateQueries({ queryKey: keys.graph.full(siteId) });
+        },
+    });
+}
+
+export function useAcceptCard(siteId: string) {
+    return useCardDecision((request: Parameters<typeof acceptCard>[0]) => acceptCard(request), siteId);
+}
+
+export function useDismissCard(siteId: string) {
+    return useCardDecision((request: Parameters<typeof dismissCard>[0]) => dismissCard(request), siteId);
 }

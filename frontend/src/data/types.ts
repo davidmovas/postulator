@@ -71,6 +71,9 @@ export type PreviewFromPagesResponse = Wire<GraphModels.PreviewFromPagesResponse
 export type ProposeFromKeywordsResponse = Wire<GraphModels.ProposeFromKeywordsResponse>;
 export type ApplyProposalsResponse = Wire<GraphModels.ApplyProposalsResponse>;
 export type EdgeFilter = ListFilter<GraphModels.ListEdgesRequest>;
+export type CardProposal = Wire<GraphModels.CardProposal>;
+export type ProposedCard = Wire<GraphModels.Card>;
+export type CardFact = Wire<GraphModels.Fact>;
 
 export type Template = Wire<TemplatesModels.Template>;
 export type TemplateOverride = Wire<TemplatesModels.Override>;

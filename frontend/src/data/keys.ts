@@ -85,6 +85,8 @@ export const keys = {
             [scope, "graph", "edges", filter, limitSegment(limit)] as const,
         fulls: () => [scope, "graph", "full"] as const,
         full: (siteId: string) => [scope, "graph", "full", siteId] as const,
+        cardLists: () => [scope, "graph", "cards"] as const,
+        cards: (siteId: string) => [scope, "graph", "cards", siteId] as const,
     },
     templates: {
         root: () => [scope, "templates"] as const,

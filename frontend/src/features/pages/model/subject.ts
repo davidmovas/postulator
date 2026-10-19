@@ -58,6 +58,8 @@ export function findingSentence(code: string, subject: Subject): string {
                 : said.titleDiffers(text(subject, "planned"), text(subject, "site"));
         case "url_form_mixed":
             return said.urlForms(count(subject, "absolute"), count(subject, "relative"));
+        case "entity_card_proposed":
+            return said.cardProposed(text(subject, "name"));
         default:
             return said.generic;
     }

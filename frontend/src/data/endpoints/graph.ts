@@ -1,6 +1,6 @@
 import { Graph } from "../../lib/api.js";
 import { listed, one } from "../call.js";
-import type { Edge, Entity } from "../types.js";
+import type { CardProposal, Edge, Entity } from "../types.js";
 
 export const loadGraph = one(Graph.LoadGraph);
 export const createEntity = one(Graph.CreateEntity);
@@ -19,3 +19,6 @@ export const proposeRelated = one(Graph.ProposeRelated);
 export const previewFromPages = one(Graph.PreviewFromPages);
 export const proposeFromKeywords = one(Graph.ProposeFromKeywords);
 export const applyProposals = one(Graph.ApplyProposals);
+export const listCardProposals = listed<Parameters<typeof Graph.CardProposals>[0], CardProposal>(Graph.CardProposals);
+export const acceptCard = one(Graph.AcceptCard);
+export const dismissCard = one(Graph.DismissCard);

@@ -6,7 +6,17 @@ import { Link } from "react-router";
 import { copy } from "../../../copy/index.js";
 import type { PageAudit } from "../../../data/types.js";
 import { relativeTime } from "../../../domain/format.js";
-import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
+import {
+    Button,
+    CloseIcon,
+    cx,
+    DeleteIcon,
+    EditNoteIcon,
+    IconButton,
+    SectionLabel,
+    SmartToyIcon,
+    toneClasses,
+} from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
 import { pageTypesOf } from "../../settings/tabs.js";
@@ -35,6 +45,8 @@ export interface InspectorProps {
     onRecompute: () => void;
     recomputing: boolean;
     audit: readonly PageAudit[] | null;
+    proposed: ReadonlySet<string>;
+    onReviewCard: (entityId: string) => void;
 }
 
 interface PageTypeLineProps {
@@ -124,6 +136,8 @@ export function Inspector({
     onRecompute,
     recomputing,
     audit,
+    proposed,
+    onReviewCard,
 }: InspectorProps): ReactElement {
     const entity = selectedId === null ? undefined : index.byId.get(selectedId);
     const rank = useMemo(() => {
@@ -207,6 +221,24 @@ export function Inspector({
 
                 <section className="flex flex-col gap-1" data-entity-card={entity.id}>
                     <SectionLabel>{copy.graph.entityCard.title}</SectionLabel>
+                    {proposed.has(entity.id) ? (
+                        <div
+                            className="flex items-center gap-2 rounded-md border border-hairline bg-inset px-2.5 py-1.5"
+                            data-card-proposal-waiting={entity.id}
+                        >
+                            <EditNoteIcon size={14} className={`shrink-0 ${toneClasses.info.ink}`} />
+                            <span className="min-w-0 flex-1 text-xs text-ink-soft">{copy.graph.cards.waitingFor}</span>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                    onReviewCard(entity.id);
+                                }}
+                            >
+                                {copy.graph.cards.review}
+                            </Button>
+                        </div>
+                    ) : null}
                     <EntityCard entity={entity} />
                 </section>
 

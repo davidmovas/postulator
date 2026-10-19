@@ -111,6 +111,15 @@ describe("the page model lives under the page cache", () => {
     });
 });
 
+describe("the card proposals of a site", () => {
+    test("sit under the graph, one list per site", () => {
+        expect(isPrefix(keys.graph.root(), keys.graph.cards("s1"))).toBe(true);
+        expect(isPrefix(keys.graph.cardLists(), keys.graph.cards("s1"))).toBe(true);
+        expect(isPrefix(keys.graph.entityLists(), keys.graph.cards("s1"))).toBe(false);
+        expect(keys.graph.cards("s1")).not.toEqual(keys.graph.cards("s2"));
+    });
+});
+
 describe("a template resolved for a page", () => {
     test("through a picked template, it is refreshed with the page's own resolution", () => {
         expect(isPrefix(keys.templates.resolved("p1"), keys.templates.resolvedWith("p1", "t1"))).toBe(true);

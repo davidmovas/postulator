@@ -40,6 +40,32 @@
     ]
   },
   {
+    "name": "graph-card-proposals",
+    "route": "#/s/:siteId/graph?view=outline",
+    "height": 1200,
+    "wait": 1400,
+    "steps": [
+      {
+        "click": "[data-card-proposals-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[data-card-proposal] button[title]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[data-card-proposal-waiting] button"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
     "name": "pages",
     "route": "#/s/:siteId/pages",
     "wait": 1200

@@ -3,8 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
+import { flatten } from "../../data/call.js";
 import { react } from "../../data/errors.js";
-import { useGraph, useRecomputeScores } from "../../data/hooks/graph.js";
+import { useCardProposals, useGraph, useRecomputeScores } from "../../data/hooks/graph.js";
 import { useLinkAudit } from "../../data/hooks/reports.js";
 import { usePageTypes } from "../../data/hooks/templates.js";
 import { pushToast } from "../../data/toasts.js";
@@ -29,6 +30,8 @@ import { EntityContextMenu } from "./actions/context-menu.js";
 import type { MenuTarget } from "./actions/context-menu.js";
 import type { MoveRequest } from "./actions/move-entity.js";
 import { Controls } from "./canvas/controls.js";
+import { CardProposalsDrawer } from "./cards/drawer.js";
+import { waitingEntities } from "./cards/model.js";
 import { Legend } from "./canvas/legend.js";
 import { GraphMap, pulseMs } from "./canvas/map.js";
 import type { MapHandle, Pulse } from "./canvas/map.js";
@@ -70,6 +73,9 @@ export function GraphScreen(): ReactElement {
     const search = searchOf(query);
     const graph = useGraph(siteId === "" ? null : siteId);
     const types = usePageTypes(siteId === "" ? null : siteId);
+    const cardProposals = useCardProposals(siteId === "" ? null : siteId);
+    const proposedCards = useMemo(() => flatten(cardProposals.data?.pages), [cardProposals.data]);
+    const waitingCards = useMemo(() => waitingEntities(proposedCards), [proposedCards]);
     const [session, patchSession] = useGraphSession(siteId);
     const [revealVersion, setRevealVersion] = useState(0);
     const [focusSearch, setFocusSearch] = useState(0);
@@ -403,6 +409,10 @@ export function GraphScreen(): ReactElement {
                     connecting={connectFrom !== null}
                     reviewing={session.queue}
                     recomputing={recompute.isPending}
+                    cardProposals={proposedCards.length}
+                    onReviewCards={() => {
+                        patchSession({ cards: true, cardFocus: null });
+                    }}
                     onCreate={() => {
                         setCreating({ parentId: entityId });
                     }}
@@ -455,6 +465,10 @@ export function GraphScreen(): ReactElement {
                         onRecompute={recomputeScores}
                         recomputing={recompute.isPending}
                         audit={auditPages}
+                        proposed={waitingCards}
+                        onReviewCard={(id) => {
+                            patchSession({ cards: true, cardFocus: id });
+                        }}
                     />
                 ) : undefined
             }
@@ -522,6 +536,15 @@ export function GraphScreen(): ReactElement {
                 onPlanningChange={setPlanning}
                 onSelect={select}
                 onReviewQueue={openQueue}
+            />
+            <CardProposalsDrawer
+                siteId={siteId}
+                open={session.cards}
+                focus={session.cardFocus}
+                onOpenChange={(next) => {
+                    patchSession(next ? { cards: true } : { cards: false, cardFocus: null });
+                }}
+                onReveal={revealEntity}
             />
         </Screen>
     );
