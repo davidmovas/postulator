@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 )
 
@@ -21,6 +22,11 @@ type expectedParent struct {
 	path   string
 	reason pagemap.ParentReason
 	method pagemap.ParentMethod
+}
+
+type expectedType struct {
+	preset pagetype.Preset
+	reason pagemap.TypeReason
 }
 
 type standModel struct {
@@ -32,8 +38,19 @@ type standModel struct {
 	unresolved      map[string]string
 	resolvedHubs    []string
 	redirected      map[string]string
+	types           map[string]expectedType
+	custom          string
 	trailsResolved  int
 }
+
+var (
+	typedEntity        = expectedType{preset: pagetype.Entity, reason: pagemap.TypeByDefault}
+	typedHub           = expectedType{preset: pagetype.Hub, reason: pagemap.TypeByListing}
+	typedProduct       = expectedType{preset: pagetype.Product, reason: pagemap.TypeByProduct}
+	typedStoreCategory = expectedType{preset: pagetype.StoreCategory, reason: pagemap.TypeByStoreCategory}
+	typedCatalog       = expectedType{preset: pagetype.Catalog, reason: pagemap.TypeByShop}
+	typedTechnical     = expectedType{preset: pagetype.Technical, reason: pagemap.TypeByTechnical}
+)
 
 func modelOf(t *testing.T, env environment) standModel {
 	t.Helper()
@@ -58,7 +75,19 @@ func modelOf(t *testing.T, env environment) standModel {
 			technicalCounts: []pagemap.TechnicalReason{
 				pagemap.TechnicalShop, pagemap.TechnicalCart, pagemap.TechnicalCheckout, pagemap.TechnicalAccount,
 			},
-			redirected:     map[string]string{"/checkout/": "/cart/"},
+			redirected: map[string]string{"/checkout/": "/cart/"},
+			types: map[string]expectedType{
+				"/guide/":                    typedEntity,
+				"/guide/setup/":              typedEntity,
+				"/product/powder/":           typedProduct,
+				"/product/coffee-beans/":     typedProduct,
+				"/product-category/koffein/": typedStoreCategory,
+				"/shop/":                     typedCatalog,
+				"/cart/":                     typedTechnical,
+				"/checkout/":                 typedTechnical,
+				"/my-account/":               typedTechnical,
+			},
+			custom:         "/guide/setup/",
 			trailsResolved: 1,
 		}
 	case "replica":
@@ -91,9 +120,27 @@ func modelOf(t *testing.T, env environment) standModel {
 			technicalCounts: []pagemap.TechnicalReason{
 				pagemap.TechnicalShop, pagemap.TechnicalCart, pagemap.TechnicalCheckout, pagemap.TechnicalAccount,
 			},
-			unresolved:     map[string]string{"/hello-world/": "/category/uncategorized/"},
-			resolvedHubs:   []string{"/peptides/", "/healing-peptides/", "/bpc-157/", "/tb-500/", "/reconstitution/"},
-			redirected:     map[string]string{"/checkout/": "/cart/"},
+			unresolved:   map[string]string{"/hello-world/": "/category/uncategorized/"},
+			resolvedHubs: []string{"/peptides/", "/healing-peptides/", "/bpc-157/", "/tb-500/", "/reconstitution/"},
+			redirected:   map[string]string{"/checkout/": "/cart/"},
+			types: map[string]expectedType{
+				"/":                           typedEntity,
+				"/peptides/":                  typedHub,
+				"/healing-peptides/":          typedHub,
+				"/bpc-157/":                   typedHub,
+				"/tb-500/":                    typedHub,
+				"/lab-guides/":                typedEntity,
+				"/reconstitution/":            typedEntity,
+				"/product/bpc-157-peptide/":   typedProduct,
+				"/product/bpc-157-capsules/":  typedProduct,
+				"/product-category/peptides/": typedStoreCategory,
+				"/product-category/peptides/healing-peptides/": typedStoreCategory,
+				"/shop/":       typedCatalog,
+				"/cart/":       typedTechnical,
+				"/checkout/":   typedTechnical,
+				"/my-account/": typedTechnical,
+			},
+			custom:         "/tb-500/",
 			trailsResolved: 7,
 		}
 	}

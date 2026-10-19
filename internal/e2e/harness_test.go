@@ -4,11 +4,13 @@ package e2e_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -180,6 +182,28 @@ func refuseTheSandbox(t *testing.T, path string, env environment) {
 			"whole sections of the site they run on, so they run only on a stand `task e2e:up` starts, "+
 			"vanilla on 8088 or replica on 8087", path, env.baseURL, env.project)
 	}
+}
+
+func wpCLI(t *testing.T, env environment, args ...string) string {
+	t.Helper()
+
+	parsed, err := url.Parse(env.baseURL)
+	if err != nil {
+		t.Fatalf("%s is not an address: %v", env.baseURL, err)
+	}
+	compose := filepath.Join(repoRoot(t), "docker", "e2e", "compose.yaml")
+	command := exec.CommandContext(context.WithoutCancel(t.Context()), "docker", append([]string{
+		"compose", "-p", env.project, "-f", compose,
+		"run", "--rm", "--no-deps", "-T", "--entrypoint", "wp", "bootstrap",
+	}, args...)...)
+	command.Env = append(os.Environ(), "WP_PORT="+parsed.Port())
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	output, err := command.Output()
+	if err != nil {
+		t.Fatalf("wp %s on the %s stand: %v: %s", strings.Join(args, " "), env.stand, err, stderr.String())
+	}
+	return strings.TrimSpace(string(output))
 }
 
 var companionProbe struct {
