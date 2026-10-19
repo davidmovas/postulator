@@ -11,12 +11,14 @@ answers landed on 2026-10-17, stage 1a (the plugin's reads, its client and the t
 same day, stage 1b (the page model, its storage and the observation) and **stage 1c (1b's gaps
 closed and the screens) on 2026-10-18, which closes stage 1**; **stage 2 (2a, page types and
 their scopes, and 2b, the read layer with the writer's pack and the agent's view) on 2026-10-19,
-its stand legs waiting for Docker**; stage 3, the field writers and the editable body, is next.
+its replica legs run on 2026-10-20 and vanilla's still owed**; stage 3, the field writers and the
+editable body, is next.
 
 ## Where we are
 
 **2026-10-19, stage 2b of the site model: one read layer, the writer's pack and the agent's
-view. Stage 2 is done; its stand legs wait for Docker.** The reasoning is under **stage 2b** in
+view. Stage 2 is done; the replica's stand legs ran on 2026-10-20, vanilla's are owed.** The
+reasoning is under **stage 2b** in
 `DECISIONS.md`, the task list under 2b in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
 
 - **Part 0, 2a's tail** (`c566586`, `ffb6d9f` to `814c8a1`, `0bc4a98`, `3242f6a`, `219e9b4`): page
@@ -343,6 +345,41 @@ docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now
 by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
 
 ## The gate
+
+**2026-10-20, on Windows, stage 2b's stand legs on the replica. Vanilla's are owed.**
+- **The replica, from a fresh reset:** the capture wrote `sitemodel/testdata/replica` (23 pages, 6
+  entities, 4 edges, 6 types, 20 bodies, 23 renders, 703 links, 9 open findings);
+  `TestThePackOfEveryStandPage/replica` goldens 23 packs, each within 3,000 tokens (`/peptides/`
+  849); `TestThePageTypesFollowTheSite`, `TestTheWriterSeesTheFullPicture` and
+  `TestTheAgentSeesTheSite` pass. Six fixes came out of them, listed under stage 2b in
+  `DECISIONS.md` (`e1a52eb` to `76d95f4`).
+- **`task e2e:full STAND=replica`** then ran from a fresh reset (487 s). Six tests passed or skipped
+  by design: the capture skips without `E2E_CAPTURE`, and the degraded loop skips while the plugin
+  is active. Four failed in the harness, on the types' templates and the fake's path match; they
+  were fixed in `1b45924` and pass on the same stand (198 s). No product code changed between
+  the two runs.
+- **A second whole run from a fresh reset was stopped** by the machine's memory during the reset,
+  before any test ran (0.6 GB of 15.8 GB free afterwards), and the stand was taken down.
+- **After the fixes:** `go test` of `contextpack`, `sitemodel` and `observe` green;
+  `golangci-lint` on `contextpack` and `sitemodel` and `task lint:e2e` 0 issues; `gofmt` silent;
+  `go vet -tags e2e` clean. `-race` over the two changed packages was not run again, memory
+  being short.
+- **Still owed**, one stand at a time:
+  ```
+  task e2e:reset STAND=replica
+  task e2e:full STAND=replica
+  task e2e:down STAND=replica
+  task e2e:reset STAND=vanilla
+  $env:E2E_CAPTURE='1'; task e2e:full STAND=vanilla -- -run TestTheStandModelIsCaptured
+  Remove-Item Env:E2E_CAPTURE
+  go test ./internal/application/sitemodel -run 'TestThePackOfEveryStandPage/vanilla' -update-packs
+  task e2e:reset STAND=vanilla
+  task e2e:full STAND=vanilla -- -v
+  task e2e:down STAND=vanilla
+  go test -race ./internal/domain/contextpack/ ./internal/application/sitemodel/
+  ```
+  Review vanilla's `packs.golden` before committing it with its `site.json`;
+  `TestTheAgentSeesTheSite` skips on vanilla.
 
 **2026-10-19, on Windows, at the close of stage 2b. Everything that runs without Docker is
 green; the stand legs wait for it.**

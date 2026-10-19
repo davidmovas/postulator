@@ -3429,3 +3429,41 @@ What stays open, each for the owner:
 - **A draft-mode run sends `status: draft` to an existing live page**, and **the canonical is written
   whenever a snippet field is**: both predate stage 2b and sit against the 2026-10-17 ruling that an
   existing page's status is never written.
+
+### What the replica found (2026-10-20)
+
+Docker came back after the close. On the replica, the capture, the exit tests and the whole suite
+found seven things, each fixed test first or in the harness:
+
+- **The capture's graph named no canonical page**, so every pack carried no link target:
+  `seedStandGraph` makes each mapped page its entity's canonical (`832de25`).
+- **A page's neighbours are the content beside it**: its siblings and children leave out technical
+  pages, and for a page that is not a term they leave out store categories
+  (`contextpack.beside`, `e1a52eb`). The hub's siblings had been the cart, the account page and its
+  own twin.
+- **A body's current value says what it holds beside text** (`93593a8`): a shortcode, a named block
+  or markup with no text reads as kept where it stands. Without this, a hub whose body is one
+  product-grid shortcode looked empty to the writer.
+- **Listed products come in one order** (`1d8e204`). Their links came back in store order, which
+  follows random ids, so two syncs gave the writer two orders and a different prompt prefix; they
+  are now ordered by address. The page's own order is not known: a render link stores no position,
+  because `render.Link.Position` is a content link's block index, and giving a render link the
+  same column would give it a second meaning.
+- **A page view fits a turn's tool result** (`6743148`). The replica's views ran 16.7 to 22 KB
+  against the 16,384-byte cap, so the agent got nothing back. Links in and out are now counted by
+  type with only the contextual ones listed, lists stop at fifteen, and
+  `TestEveryPageViewOfTheReplicaFitsATurnsToolResult` holds every captured page under the cap.
+- **Five suites predated 2a's template ruling.** An imported page has no template and the seeded
+  types carry none, so a run on "auto" was refused. The writer test gives the site the Hub template
+  as its default (`76d95f4`). The client, docker-site, hold and degraded suites give the Hub,
+  Entity and Product types the Hub, Guide and Product templates, as a client would in Settings
+  (`1b45924`).
+- **The scripted fake answered the wrong product.** Since the pack lists a page's siblings and
+  products, a reply matched by a bare path also matched a sibling's prompt. Every reply now matches
+  the page's own `Path:` line, which also ends the `/menu/` against `/menu/main-courses/` prefix
+  trap.
+
+Open with the owner: **a fresh site cannot start a run on "auto"** until a person gives its types,
+or the site, a template. The seeded writable types could point at the matching built-ins (Hub,
+Guide, Product), as the page kind once did; that is a seeding rule and a backfill, so it waits for
+a ruling.
