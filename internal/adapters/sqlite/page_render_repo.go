@@ -23,6 +23,8 @@ const (
 		FROM page_renders AS r JOIN pages AS p ON p.id = r.page_id WHERE p.site_id = ? ORDER BY r.page_id`
 	selectRendersForPages = `SELECT ` + renderColumns + ` FROM page_renders WHERE page_id IN `
 	orderRenders          = ` ORDER BY page_id`
+	selectURLForms        = `SELECT r.url_form FROM page_renders AS r JOIN pages AS p ON p.id = r.page_id
+		WHERE p.site_id = ? AND r.url_form <> '' ORDER BY r.page_id`
 )
 
 type PageRenderRepo struct {
@@ -96,6 +98,16 @@ func (r *PageRenderRepo) Get(ctx context.Context, pageID string) (render.Record,
 
 func (r *PageRenderRepo) ListBySite(ctx context.Context, siteID string) ([]render.Record, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectRendersBySite, []any{siteID}, scanRender, "list the site renders")
+}
+
+func (r *PageRenderRepo) URLForms(ctx context.Context, siteID string) ([]string, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectURLForms, []any{siteID}, scanText, "list the site's url forms")
+}
+
+func scanText(rows *sql.Rows) (string, error) {
+	var text string
+	err := rows.Scan(&text)
+	return text, err
 }
 
 func (r *PageRenderRepo) ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error) {

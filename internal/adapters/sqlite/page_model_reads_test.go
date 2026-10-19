@@ -83,6 +83,21 @@ func TestThePageModelIsReadByPageIDs(t *testing.T) {
 		t.Errorf("links to the hub = %+v, %v", to, err)
 	}
 
+	navigation := link(hub.ID, other.ID)
+	navigation.Type, navigation.Source = pagemap.LinkNavigation, pagemap.SourceRender
+	if err := links.ReplaceForPage(t.Context(), hub.ID, pagemap.SourceRender, []pagemap.PageLink{navigation}); err != nil {
+		t.Fatalf("ReplaceForPage hub: %v", err)
+	}
+	if got, err := links.ListContextual(t.Context(), owner.ID); err != nil || len(got) != 2 {
+		t.Errorf("contextual links = %+v, %v; want the two raw contextual links", got, err)
+	}
+	if err := renders.Put(t.Context(), render.Record{PageID: child.ID, Extraction: render.Extraction{Root: render.RootFound, URLForm: render.URLFormAbsolute}, ExtractedAt: sqlitetest.Stamp}); err != nil {
+		t.Fatalf("Put render: %v", err)
+	}
+	if got, err := renders.URLForms(t.Context(), owner.ID); err != nil || !slices.Equal(got, []string{render.URLFormAbsolute}) {
+		t.Errorf("url forms = %v, %v; want the one render that has one", got, err)
+	}
+
 	many := make([]string, 0, 1201)
 	for range 1200 {
 		many = append(many, id.New())
