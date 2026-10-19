@@ -273,6 +273,9 @@ func planChild(t *testing.T, core *app.Core, siteID string, parent pages.Page, p
 	if err != nil {
 		t.Fatalf("plan %s: %v", child.path, err)
 	}
+	if _, err = core.Pages.SetCanonical(t.Context(), pages.SetCanonicalRequest{EntityID: entityID, PageID: planted.Page.ID}); err != nil {
+		t.Fatalf("make %s the page of %s: %v", child.path, child.name, err)
+	}
 	if planted.Page.ParentPageID == nil || *planted.Page.ParentPageID != parent.ID {
 		t.Fatalf("%s sits under %v, want %s", child.path, planted.Page.ParentPageID, parent.Path)
 	}
