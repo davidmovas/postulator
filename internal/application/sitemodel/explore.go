@@ -275,25 +275,5 @@ func rows[T any](all []T, ref func(T) contextpack.Ref, req ExploreRequest) (pagi
 	case limit > exploreMaxLimit:
 		limit = exploreMaxLimit
 	}
-	start := 0
-	if req.Cursor != "" {
-		position, err := keyset.Position(req.Cursor)
-		if err != nil {
-			return paging.List[T]{}, errors.Wrap(err, errors.Invalid, "the cursor is not one this view issued")
-		}
-		after, ok := position.Values[0].(string)
-		if !ok {
-			return paging.List[T]{}, errors.New(errors.Invalid, "the cursor is not one this view issued").WithDetail("field", "cursor")
-		}
-		start = len(all)
-		for i := range all {
-			at := ref(all[i])
-			if at.Path > after || (at.Path == after && at.PageID > position.ID) {
-				start = i
-				break
-			}
-		}
-	}
-	end := min(len(all), start+limit+1)
-	return keyset.Cut(all[start:end], paging.Request{After: req.Cursor, Limit: limit})
+	return keyset.Page(all, paging.Request{After: req.Cursor, Limit: limit})
 }
