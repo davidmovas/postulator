@@ -34,6 +34,7 @@ func (c *Core) buildAgent(stores repos, llm llmParts, writing authoring, service
 			Calls:             stores.toolCalls,
 			Sites:             stores.sites,
 			Reports:           services.reports,
+			Briefs:            writing.siteModel,
 			Templates:         writing.templates,
 			Profiles:          llm.profiles,
 			LLM:               llm.client,

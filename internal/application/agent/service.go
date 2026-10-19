@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -24,6 +25,11 @@ type conversationStore interface {
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, id string) (domainagent.Conversation, error)
 	List(ctx context.Context, q domainagent.ConversationQuery, page paging.Request) (paging.List[domainagent.Conversation], error)
+	SetBrief(ctx context.Context, id, brief string) error
+}
+
+type briefReader interface {
+	Brief(ctx context.Context, siteID string) (contextpack.Brief, error)
 }
 
 type messageStore interface {
@@ -74,6 +80,7 @@ type Deps struct {
 	Calls             callStore
 	Sites             siteReader
 	Reports           overviewReader
+	Briefs            briefReader
 	Templates         templateReader
 	Profiles          profileResolver
 	LLM               completer

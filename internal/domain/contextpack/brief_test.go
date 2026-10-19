@@ -105,6 +105,19 @@ func TestABareSiteSaysSo(t *testing.T) {
 	}
 }
 
+func TestABriefOfPlannedPagesSaysNothingOfTheirText(t *testing.T) {
+	t.Parallel()
+
+	got := contextpack.Brief{Name: "New", BaseURL: "https://new.example.com", Overview: contextpack.Overview{
+		Pages: 1, Planned: 1, Unmapped: 1, Types: []contextpack.TypeCount{{Pages: 1, Planned: 1}},
+	}}.Text()
+	for _, want := range []string{"New (https://new.example.com): 1 page, all planned; 1 carries no entity.\n", "- No type: 1 page, 1 of them planned\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("Text =\n%s\nwant it to hold %q", got, want)
+		}
+	}
+}
+
 func TestTheBriefStaysShortOnABigSite(t *testing.T) {
 	t.Parallel()
 

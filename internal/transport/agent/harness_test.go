@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
@@ -20,6 +21,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/application/tools"
@@ -137,6 +139,36 @@ type wiring struct {
 	outer    func(next llmport.Client) llmport.Client
 }
 
+type wholeWindow struct{}
+
+func (wholeWindow) InputBudget(domainllm.Role) int {
+	return 0
+}
+
+func briefsOver(store *sqlite.Store, publisher application.Publisher, now clock.Clock) *sitemodel.Service {
+	siteRepo := sqlite.NewSiteRepo(store)
+	pageRepo := sqlite.NewPageRepo(store)
+	entityRepo := sqlite.NewEntityRepo(store)
+	edgeRepo := sqlite.NewEdgeRepo(store)
+	linkRepo := sqlite.NewPageLinkRepo(store)
+	templateRepo := sqlite.NewTemplateRepo(store)
+	types := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
+		UnitOfWork: store, Publisher: publisher, Clock: now,
+	})
+	audits := reports.New(reports.Deps{
+		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+		Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store), Sites: siteRepo,
+		Specs: templates.New(templateRepo, pageRepo, entityRepo, siteRepo, sqlite.NewPageTypeRepo(store), store, publisher, now), Types: types,
+	})
+	return sitemodel.New(sitemodel.Deps{
+		Budgets: wholeWindow{}, Audits: audits, Reader: store, Sites: siteRepo, Pages: pageRepo, Entities: entityRepo,
+		Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo,
+		Findings: sqlite.NewFindingRepo(store),
+	})
+}
+
 func build(t *testing.T, store *sqlite.Store, model *fake.Client, bus *applicationtest.Recorder,
 	allowed ...string) *harness {
 	t.Helper()
@@ -216,6 +248,7 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 			Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
 			Sites: siteRepo, Specs: templateService,
 		}),
+		Briefs:    briefsOver(store, bus, now),
 		Templates: templateService,
 		Profiles:  chatProfiles{},
 		LLM:       titler,

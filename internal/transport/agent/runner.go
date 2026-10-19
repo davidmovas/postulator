@@ -123,6 +123,13 @@ func (r *Runner) offered(built []tools.Tool) []llm.Tool {
 	return offered
 }
 
+func cacheKey(situation agentapp.SiteContext) string {
+	if situation.SiteID == "" {
+		return cacheFamily + situation.Mode
+	}
+	return cacheFamily + situation.Mode + ":" + situation.SiteID
+}
+
 func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *turn {
 	built := r.deps.Registry.Build(spec.Binding)
 	offered := r.offered(built)
@@ -148,7 +155,7 @@ func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *tu
 			},
 			Effort:   domainllm.EffortNone,
 			Tier:     domainllm.TierDefault,
-			CacheKey: cacheFamily + spec.Context.Mode,
+			CacheKey: cacheKey(spec.Context),
 		},
 		opening: []llm.Message{
 			{Role: llm.RoleDeveloper, Text: situation},

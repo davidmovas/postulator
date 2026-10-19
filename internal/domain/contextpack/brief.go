@@ -60,7 +60,11 @@ func (b Brief) render(fit shape) string {
 	o := b.Overview
 	out.WriteString("THE SITE\n")
 	out.WriteString(b.Name + " (" + b.BaseURL + "): " + countOf(o.Pages, "page", "pages") + ", " + presence(o) + "; " +
-		unmapped(o.Unmapped) + "; " + empty(o.Empty) + ".\n")
+		unmapped(o.Unmapped))
+	if o.OnSite > 0 {
+		out.WriteString("; " + empty(o.Empty))
+	}
+	out.WriteString(".\n")
 
 	out.WriteString("\nPAGE TYPES\n")
 	for i, kind := range o.Types {
@@ -68,7 +72,11 @@ func (b Brief) render(fit shape) string {
 			out.WriteString("- and " + strconv.Itoa(len(o.Types)-i) + " more types\n")
 			break
 		}
-		out.WriteString("- " + kind.Name + ": " + countOf(kind.Pages, "page", "pages"))
+		name := kind.Name
+		if name == "" {
+			name = "No type"
+		}
+		out.WriteString("- " + name + ": " + countOf(kind.Pages, "page", "pages"))
 		if kind.Planned > 0 {
 			out.WriteString(", " + strconv.Itoa(kind.Planned) + " of them planned")
 		}

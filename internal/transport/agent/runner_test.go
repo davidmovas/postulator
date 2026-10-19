@@ -650,6 +650,7 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeConfirm)
+	sqlitetest.Page(t, h.store, h.siteID, "/coffee/")
 	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: the tree")
 
 	sqlitetest.Page(t, h.store, h.siteID, "/coffee/fresh/")
@@ -661,12 +662,21 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 		t.Fatalf("the model was asked %d times, want three rounds", len(asked))
 	}
 
+	if !strings.Contains(asked[0].System, "THE SITE WHEN THIS CONVERSATION BEGAN") ||
+		!strings.Contains(asked[0].System, ": 1 page, all planned;") {
+		t.Fatalf("the instructions carry no brief of the site as the conversation found it: %q", asked[0].System)
+	}
+	stored, err := sqlite.NewConversationRepo(h.store).Get(t.Context(), conversation)
+	if err != nil || stored.Brief == "" || !strings.Contains(asked[0].System, strings.TrimSpace(stored.Brief)) {
+		t.Fatalf("the conversation keeps the brief %q, %v; want the one the instructions carry", stored.Brief, err)
+	}
+
 	names := h.registry.Names()
 	for index, req := range asked {
 		if req.System != asked[0].System || strings.Contains(req.System, " entities, ") {
 			t.Fatalf("round %d carries other instructions or the site in them: %q", index+1, req.System)
 		}
-		if req.CacheKey != "chat:confirm" || req.Effort != domainllm.EffortNone || req.Tier != domainllm.TierDefault {
+		if req.CacheKey != "chat:confirm:"+h.siteID || req.Effort != domainllm.EffortNone || req.Tier != domainllm.TierDefault {
 			t.Fatalf("round %d asks with %q, %q and %q", index+1, req.CacheKey, req.Effort, req.Tier)
 		}
 		if req.Meta.Step != agentrunner.ChatStep || req.Meta.Role != domainllm.RoleChat || req.Meta.ConversationID != conversation {
@@ -690,7 +700,7 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 	if opening.Role != llmport.RoleDeveloper || latest.Role != llmport.RoleDeveloper {
 		t.Fatalf("the turns open with %+v and %+v, want the site context as a developer message", opening, latest)
 	}
-	if !strings.Contains(opening.Text, "0 pages") || !strings.Contains(latest.Text, "1 pages") {
+	if !strings.Contains(opening.Text, "1 pages") || !strings.Contains(latest.Text, "2 pages") {
 		t.Fatalf("the contexts read %q and %q, want the page counts of their own turns", opening.Text, latest.Text)
 	}
 	if opening.Text == latest.Text {
@@ -832,6 +842,11 @@ func TestAConversationWithoutASiteStillAnswers(t *testing.T) {
 	outcome, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
 	if !ok || outcome.Status != string(domainagent.CallDenied) {
 		t.Fatalf("a site scoped tool in a siteless conversation = %+v", h.payload(events.AgentToolFinished))
+	}
+	for _, req := range h.model.Requests() {
+		if req.CacheKey != "chat:autonomous" || strings.Contains(req.System, "THE SITE WHEN THIS CONVERSATION BEGAN") {
+			t.Fatalf("a siteless round asks with %q and a brief: %q", req.CacheKey, req.System)
+		}
 	}
 }
 

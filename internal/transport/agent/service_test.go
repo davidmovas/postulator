@@ -64,6 +64,7 @@ func blocked(t *testing.T) (*agentapp.Service, string, *blockingRunner) {
 			Links: sqlite.NewPageLinkRepo(store), Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store),
 			Artifacts: sqlite.NewArtifactRepo(store), Sites: siteRepo, Specs: templateService,
 		}),
+		Briefs:    briefsOver(store, failingBus{}, now),
 		Templates: templateService,
 		Profiles:  chatProfiles{},
 		LLM:       &scriptedTitler{text: "a name the blocked turn never reaches"},

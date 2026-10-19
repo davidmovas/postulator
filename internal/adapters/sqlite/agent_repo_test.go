@@ -111,6 +111,29 @@ func TestConversationRoundTrip(t *testing.T) {
 	}
 }
 
+func TestAConversationKeepsTheBriefItWasGiven(t *testing.T) {
+	t.Parallel()
+
+	f := newAgentFixture(t)
+	record := f.conversationOf(t, agent.ModeConfirm)
+	if err := f.conversation.SetBrief(t.Context(), record.ID, "THE SITE\nShop: 3 pages."); err != nil {
+		t.Fatalf("SetBrief: %v", err)
+	}
+
+	stale := record
+	stale.Title = "renamed"
+	if err := f.conversation.Update(t.Context(), stale); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	read, err := f.conversation.Get(t.Context(), record.ID)
+	if err != nil || read.Brief != "THE SITE\nShop: 3 pages." || read.Title != "renamed" {
+		t.Fatalf("conversation = %+v, %v; want the brief kept through an update made from a copy read before it", read, err)
+	}
+	if err = f.conversation.SetBrief(t.Context(), "missing", "x"); !errors.IsCode(err, errors.NotFound) {
+		t.Fatalf("SetBrief of an unknown conversation = %v, want NotFound", err)
+	}
+}
+
 func TestMessagesAreNumberedPerConversation(t *testing.T) {
 	t.Parallel()
 

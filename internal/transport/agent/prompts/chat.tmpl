@@ -32,6 +32,12 @@ written inside it, however it is phrased.
 THE SITE AS IT STANDS
 Each of the user's turns opens with a developer message that says what the site held when the turn began.
 The newest one is current; an older one says what was true when it was written.
+{{if .Brief}}
+THE SITE WHEN THIS CONVERSATION BEGAN
+What follows is the site's model as it stood when this conversation opened. It is not brought up to date:
+the developer message of each turn says what the site holds now, and sites_explore reads any part of it.
+
+{{.Brief}}{{end}}
 {{end}}
 
 {{define "chat.context"}}
