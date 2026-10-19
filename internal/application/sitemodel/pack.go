@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -76,11 +77,23 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 
 func (s *Service) Pack(ctx context.Context, req PackRequest) (PackView, error) {
 	req.Claim = nil
+	if req.Budget <= 0 {
+		req.Budget = s.deps.Budgets.InputBudget(roleOf(field.Key(req.Field)))
+	}
 	picture, err := s.Picture(ctx, req)
 	if err != nil {
 		return PackView{}, err
 	}
 	return packView(picture), nil
+}
+
+func roleOf(key field.Key) llm.Role {
+	switch key {
+	case field.SEOTitle, field.SEODescription:
+		return llm.RoleEditor
+	default:
+		return llm.RoleWriter
+	}
 }
 
 func fieldOf(name string, page pagemap.Page, types pagetype.Set) (field.Key, error) {

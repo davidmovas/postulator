@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -71,7 +72,12 @@ type findingStore interface {
 	ListBySite(ctx context.Context, siteID string, status finding.Status) ([]finding.Finding, error)
 }
 
+type budgets interface {
+	InputBudget(role llm.Role) int
+}
+
 type Deps struct {
+	Budgets  budgets
 	Reader   reader
 	Sites    siteStore
 	Pages    pageStore

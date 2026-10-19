@@ -53,7 +53,7 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 	})
 
 	siteModel := sitemodel.New(sitemodel.Deps{
-		Reader: stores.store, Sites: stores.sites, Pages: stores.pages, Entities: stores.entities, Edges: stores.edges,
+		Budgets: llm.tuning, Reader: stores.store, Sites: stores.sites, Pages: stores.pages, Entities: stores.entities, Edges: stores.edges,
 		Types: pageTypes, Terms: stores.identities, Fields: stores.fields, Bodies: stores.bodies, Renders: stores.renders,
 		Links: stores.links, Findings: stores.findings,
 	})

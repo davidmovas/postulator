@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -33,14 +34,21 @@ type memory struct {
 	findings []finding.Finding
 	reads    int
 	asked    [][]string
+	budgets  map[domainllm.Role]int
 }
 
 func (m *memory) service() *sitemodel.Service {
 	return sitemodel.New(sitemodel.Deps{
 		Reader: m, Sites: siteReader{m}, Pages: pageReader{m}, Entities: entityReader{m}, Edges: edgeReader{m},
 		Types: typeReader{m}, Terms: termReader{m}, Fields: fieldReader{m}, Bodies: bodyReader{m},
-		Renders: renderReader{m}, Links: linkReader{m}, Findings: findingReader{m},
+		Renders: renderReader{m}, Links: linkReader{m}, Findings: findingReader{m}, Budgets: budgetReader{m},
 	})
+}
+
+type budgetReader struct{ m *memory }
+
+func (r budgetReader) InputBudget(role domainllm.Role) int {
+	return r.m.budgets[role]
 }
 
 func (m *memory) Read(ctx context.Context, fn func(context.Context) error) error {

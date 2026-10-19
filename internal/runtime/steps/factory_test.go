@@ -82,7 +82,7 @@ func (stubTuning) InputBudget(domainllm.Role) int {
 
 func siteModelOf(store *sqlite.Store, types *pagetypes.Service) *sitemodel.Service {
 	return sitemodel.New(sitemodel.Deps{
-		Reader: store, Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store), Entities: sqlite.NewEntityRepo(store),
+		Budgets: stubTuning{}, Reader: store, Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store), Entities: sqlite.NewEntityRepo(store),
 		Edges: sqlite.NewEdgeRepo(store), Types: types, Terms: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: sqlite.NewPageLinkRepo(store),
 		Findings: sqlite.NewFindingRepo(store),

@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
@@ -31,6 +32,10 @@ type ModelUseCase interface {
 	SummaryOf(ctx context.Context, req observe.SummaryRequest) (observe.Summary, error)
 }
 
+type PackUseCase interface {
+	Pack(ctx context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error)
+}
+
 type PagesService struct {
 	create       middleware.Handler[pages.CreateRequest, pages.CreateResponse]
 	update       middleware.Handler[pages.UpdateRequest, pages.UpdateResponse]
@@ -46,9 +51,10 @@ type PagesService struct {
 	setType      middleware.Handler[pages.SetTypeRequest, pages.SetTypeResponse]
 	model        middleware.Handler[observe.ModelRequest, observe.ModelView]
 	modelSummary middleware.Handler[observe.SummaryRequest, observe.Summary]
+	writerPack   middleware.Handler[sitemodel.PackRequest, sitemodel.PackView]
 }
 
-func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models Source[ModelUseCase]) *PagesService {
+func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models Source[ModelUseCase], packs Source[PackUseCase]) *PagesService {
 	return &PagesService{
 		create:       Wrap(logger, "pages.create", call(useCase, PagesUseCase.Create)),
 		update:       Wrap(logger, "pages.update", call(useCase, PagesUseCase.Update)),
@@ -64,7 +70,12 @@ func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models So
 		setType:      Wrap(logger, "pages.setType", call(useCase, PagesUseCase.SetType)),
 		model:        Wrap(logger, "pages.model", call(models, ModelUseCase.Model)),
 		modelSummary: Wrap(logger, "pages.modelSummary", call(models, ModelUseCase.SummaryOf)),
+		writerPack:   Wrap(logger, "pages.writerPack", call(packs, PackUseCase.Pack)),
 	}
+}
+
+func (s *PagesService) WriterPack(c context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error) {
+	return s.writerPack(c, req)
 }
 
 func (s *PagesService) Model(c context.Context, req observe.ModelRequest) (observe.ModelView, error) {

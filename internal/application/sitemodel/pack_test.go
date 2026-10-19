@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -197,6 +198,35 @@ func TestAPackIsFittedToItsBudget(t *testing.T) {
 	}
 	if len(fitted.Dropped) == 0 || fitted.Tokens > fitted.Budget || fitted.Built != whole.Built {
 		t.Errorf("fitted pack = %+v, want a drop under the budget", fitted)
+	}
+}
+
+func TestAPackOutOfARunTakesTheRolesBudget(t *testing.T) {
+	t.Parallel()
+
+	m := site1()
+	whole, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
+	if err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	m.budgets = map[domainllm.Role]int{domainllm.RoleWriter: whole.Tokens - 1, domainllm.RoleEditor: 4000}
+	fitted, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
+	if err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	if fitted.Budget != whole.Tokens-1 || len(fitted.Dropped) == 0 {
+		t.Errorf("the body's pack = budget %d, %d drops; want the writer's budget and a drop", fitted.Budget, len(fitted.Dropped))
+	}
+	meta, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "seo_title"})
+	if err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	if meta.Budget != 4000 {
+		t.Errorf("the SEO title's pack has budget %d, want the editor's 4000", meta.Budget)
+	}
+	asked, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Budget: 100000})
+	if err != nil || asked.Budget != 100000 {
+		t.Errorf("a budget asked for = %d, %v; want it kept", asked.Budget, err)
 	}
 }
 
