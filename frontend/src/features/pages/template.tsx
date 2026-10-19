@@ -37,7 +37,7 @@ export function TemplatePanel({ page, siteId }: TemplatePanelProps): ReactElemen
             { value: siteDefault, label: copy.pages.detail.templateDefaultOption },
             ...[...flatten(globals.data?.pages), ...flatten(locals.data?.pages)].map((template) => ({
                 value: template.id,
-                label: `${template.name} · ${template.pageKind}`,
+                label: template.name,
             })),
         ],
         [globals.data, locals.data],

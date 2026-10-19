@@ -6,12 +6,11 @@ import { IdentityDialog } from "./identity.js";
 
 export interface EditorDialogsProps {
     name: string;
-    pageKind: string;
     renaming: boolean;
     renameBusy: boolean;
     renameError: unknown;
     onRenameOpenChange: (open: boolean) => void;
-    onRename: (identity: { name: string; pageKind: string }) => void;
+    onRename: (name: string) => void;
     leaving: boolean;
     onLeaveOpenChange: (open: boolean) => void;
     onLeave: () => void;
@@ -23,7 +22,6 @@ export interface EditorDialogsProps {
 
 export function EditorDialogs({
     name,
-    pageKind,
     renaming,
     renameBusy,
     renameError,
@@ -42,7 +40,6 @@ export function EditorDialogs({
             <IdentityDialog
                 open={renaming}
                 name={name}
-                pageKind={pageKind}
                 busy={renameBusy}
                 error={renameError}
                 onOpenChange={onRenameOpenChange}

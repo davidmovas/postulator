@@ -21,8 +21,9 @@ import {
     toneClasses,
     VirtualRows,
 } from "../../../ui/index.js";
-import { entityIcon, kindTone } from "../labels.js";
+import { presetIcon, presetTone } from "../../settings/types/labels.js";
 import type { GraphIndex } from "../model/index.js";
+import { presetOf } from "../model/index.js";
 import { BulkDialog } from "./bulk.js";
 import type { BulkRequest } from "./bulk.js";
 import { Threshold } from "./thresholds.js";
@@ -46,7 +47,8 @@ interface NameProps {
 
 function Name({ id, index, onReveal }: NameProps): ReactElement {
     const held = index.byId.get(id);
-    const Icon = entityIcon(held?.kind ?? "");
+    const preset = presetOf(index, id);
+    const Icon = presetIcon(preset);
     return (
         <button
             type="button"
@@ -56,7 +58,7 @@ function Name({ id, index, onReveal }: NameProps): ReactElement {
                 onReveal(id);
             }}
         >
-            <Icon size={14} className={cx("shrink-0", toneClasses[kindTone(held?.kind ?? "")].ink)} />
+            <Icon size={14} className={cx("shrink-0", toneClasses[presetTone(preset)].ink)} />
             <span className="truncate">{held?.name ?? id}</span>
         </button>
     );

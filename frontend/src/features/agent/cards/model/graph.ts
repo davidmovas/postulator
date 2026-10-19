@@ -19,10 +19,6 @@ function entityFields(args: Args, renaming: boolean): Line[] {
     if (renaming && name !== null) {
         lines.push(line("field", said.renamed(name)));
     }
-    const kind = text(args, "kind");
-    if (kind !== null) {
-        lines.push(line("field", said.kind(kind)));
-    }
     const intent = text(args, "intent");
     if (intent !== null) {
         lines.push(line("field", said.intent(intent)));

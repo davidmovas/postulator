@@ -14,7 +14,7 @@ export function matches(template: Template, search: string): boolean {
     if (needle === "") {
         return true;
     }
-    return template.name.toLowerCase().includes(needle) || template.pageKind.toLowerCase().includes(needle);
+    return template.name.toLowerCase().includes(needle);
 }
 
 export function ordered(rows: readonly Template[], sort: TemplateSort): readonly Template[] {
@@ -34,15 +34,8 @@ export function filtered(rows: readonly Template[], query: TemplatesQuery): read
         if (query.scope !== "all" && template.scope !== query.scope) {
             return false;
         }
-        if (query.pageKind !== "" && template.pageKind !== query.pageKind) {
-            return false;
-        }
         return matches(template, query.search);
     });
-}
-
-export function kindsOf(rows: readonly Template[]): readonly string[] {
-    return [...new Set(rows.map((template) => template.pageKind).filter((kind) => kind !== ""))].sort();
 }
 
 export function namesIn(rows: readonly Template[], scope: string): readonly string[] {
@@ -52,7 +45,6 @@ export function namesIn(rows: readonly Template[], scope: string): readonly stri
 export interface TemplateRows {
     shown: readonly Template[];
     loaded: readonly Template[];
-    kinds: readonly string[];
     pending: boolean;
     error: unknown;
     hasMore: boolean;
@@ -69,12 +61,9 @@ export function useTemplateRows(siteId: string, query: TemplatesQuery): Template
     const localRows = useMemo(() => flatten(locals.data?.pages), [locals.data]);
     const loaded = useMemo(() => [...globalRows, ...localRows], [globalRows, localRows]);
     const shown = useMemo(() => ordered(filtered(loaded, query), sort), [loaded, query, sort]);
-    const kinds = useMemo(() => kindsOf(loaded), [loaded]);
-
     return {
         shown,
         loaded,
-        kinds,
         pending: globals.isPending || locals.isPending,
         error: globals.error ?? locals.error,
         hasMore: globals.hasNextPage || locals.hasNextPage,

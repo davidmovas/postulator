@@ -6,7 +6,6 @@ import { isArgs, line, listed, masked } from "./card.js";
 import { describeGraph } from "./graph.js";
 import { describeContent, describeImports, describeModels, describeSchedules, describeSync } from "./operations.js";
 import { describePages } from "./pages.js";
-import { describePolicies } from "./policies.js";
 import { describeRuns } from "./runs.js";
 import { describeSites } from "./sites.js";
 import { describeTemplates } from "./templates.js";
@@ -16,7 +15,6 @@ const describers: readonly Describer[] = [
     describeGraph,
     describePages,
     describeTemplates,
-    describePolicies,
     describeRuns,
     describeSync,
     describeImports,

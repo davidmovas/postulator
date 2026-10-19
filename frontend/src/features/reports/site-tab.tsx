@@ -9,6 +9,7 @@ import { usePageTree } from "../../data/hooks/pages.js";
 import { useLinkAudit, useSiteOverview } from "../../data/hooks/reports.js";
 import { useSite } from "../../data/hooks/sites.js";
 import { useSyncSite } from "../../data/hooks/sync.js";
+import { usePageTypes } from "../../data/hooks/templates.js";
 import { Banner, Button, EmptyState, MonitoringIcon, SkeletonRows } from "../../ui/index.js";
 import { auditCard, bars, coverageRows, driftRows, flattenTree, tiles } from "./model/site.js";
 import { Histogram, LinkAuditPanel } from "./panels.js";
@@ -26,15 +27,20 @@ export function SiteTab({ siteId }: SiteTabProps): ReactElement {
     const audit = useLinkAudit(key);
     const tree = usePageTree(key);
     const graph = useGraph(key);
+    const types = usePageTypes(key);
     const site = useSite(key);
     const sync = useSyncSite();
 
     const pages = useMemo(() => flattenTree(tree.data?.roots ?? null), [tree.data]);
     const drifted = useMemo(() => driftRows(pages), [pages]);
     const audits = useMemo(() => audit.data?.pages ?? [], [audit.data]);
+    const typeNames = useMemo(
+        () => new Map((types.data?.types ?? []).map((held) => [held.id, held.name] as const)),
+        [types.data],
+    );
     const coverage = useMemo(
-        () => coverageRows(graph.data?.entities ?? [], pages, audits),
-        [graph.data, pages, audits],
+        () => coverageRows(graph.data?.entities ?? [], pages, audits, typeNames),
+        [graph.data, pages, audits, typeNames],
     );
 
     if (overview.isPending) {

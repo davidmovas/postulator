@@ -6,10 +6,10 @@ import { useTools } from "../../data/hooks/tools.js";
 import type { Tool } from "../../data/types.js";
 import { Drawer, EmptyState, Input, SearchIcon, SectionLabel, SkeletonRows, StatusBadge, toneClasses } from "../../ui/index.js";
 import type { Family } from "./conversation/model/tools.js";
-import { familyOf, verbOf } from "./conversation/model/tools.js";
+import { families, familyOf, verbOf } from "./conversation/model/tools.js";
 import { familyIcon, familyLabel, riskLabel, riskTone } from "./labels.js";
 
-const familyOrder: readonly Family[] = ["sites", "graph", "pages", "templates", "policies", "runs", "sync", "reports", "imports", "models", "content", "schedules", "other"];
+const familyOrder: readonly Family[] = [...families, "other"];
 
 function grouped(tools: readonly Tool[], query: string): [Family, Tool[]][] {
     const needle = query.trim().toLowerCase();

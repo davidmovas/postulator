@@ -3,11 +3,13 @@ import type {
     CatalogModels,
     ContentModels,
     DtoModels,
+    FieldModels,
     GraphModels,
     ImportModels,
     LlmModels,
     ObserveModels,
     PagesModels,
+    PageTypesModels,
     ReportsModels,
     RunDomainModels,
     RunsModels,
@@ -67,12 +69,16 @@ export type EdgeFilter = ListFilter<GraphModels.ListEdgesRequest>;
 
 export type Template = Wire<TemplatesModels.Template>;
 export type TemplateOverride = Wire<TemplatesModels.Override>;
-export type LinkPolicy = Wire<TemplatesModels.LinkPolicy>;
 export type TemplateFilter = ListFilter<TemplatesModels.ListTemplatesRequest>;
-export type PolicyFilter = ListFilter<TemplatesModels.ListPoliciesRequest>;
 export type TemplateSpec = Wire<TemplateDomainModels.TemplateSpec>;
 export type TemplateSection = Wire<TemplateDomainModels.Section>;
-export type LinkRules = Wire<TemplateDomainModels.LinkRules>;
+export type LinkRules = Wire<FieldModels.LinkRules>;
+export type LinkPolicy = Wire<FieldModels.LinkPolicy>;
+export type PageType = Wire<PageTypesModels.Type>;
+export type FieldScope = Wire<PageTypesModels.Scope>;
+export type CatalogField = Wire<PageTypesModels.Field>;
+export type PageTypeList = Wire<PageTypesModels.ListResponse>;
+export type SetScopeRequest = Wire<PageTypesModels.SetScopeRequest>;
 export type MetaRules = Wire<TemplateDomainModels.MetaRules>;
 export type KeywordRules = Wire<TemplateDomainModels.KeywordRules>;
 export type StepSpec = Wire<TemplateDomainModels.StepSpec>;
@@ -141,7 +147,6 @@ export type RequiredLink = Wire<ReportsModels.RequiredLink>;
 export type ExtraLink = Wire<ReportsModels.ExtraLink>;
 export type LinkTotals = Wire<ReportsModels.LinkTotals>;
 export type LinkTypeCounts = Wire<ReportsModels.LinkTypeCounts>;
-export type LinkPolicySummary = Wire<ReportsModels.LinkPolicySummary>;
 export type JudgeResult = Wire<ContentModels.JudgeResponse>;
 export type JudgeReport = Wire<ContentModels.JudgeReport>;
 

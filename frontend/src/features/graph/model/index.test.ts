@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { edge, entity, potteryEdges, potteryEntities } from "./fixture.js";
-import { buildGraphIndex, nodeStateOf } from "./index.js";
+import { edge, entity, pageType, potteryEdges, potteryEntities, potteryPages, potteryTypes, typedPage } from "./fixture.js";
+import { buildGraphIndex, nodeStateOf, presetOf, typeOf } from "./index.js";
 
 const index = buildGraphIndex(potteryEntities, potteryEdges);
+const typed = buildGraphIndex(potteryEntities, potteryEdges, potteryPages, potteryTypes);
 
 describe("buildGraphIndex", () => {
     it("places every entity under its best approved parent, roots by score", () => {
@@ -34,19 +35,44 @@ describe("buildGraphIndex", () => {
     });
 
     it("flags the problems a node carries", () => {
-        expect(index.problems.get("travel")).toStrictEqual({ noPage: true, orphan: false, proposed: 0, multiParent: false });
-        expect(index.problems.get("kiln")).toStrictEqual({ noPage: true, orphan: true, proposed: 2, multiParent: false });
-        expect(index.problems.get("care")).toStrictEqual({ noPage: false, orphan: true, proposed: 0, multiParent: false });
-        expect(index.problems.get("stone")).toStrictEqual({ noPage: false, orphan: false, proposed: 1, multiParent: true });
-        expect(index.problems.get("mugs")).toStrictEqual({ noPage: false, orphan: false, proposed: 1, multiParent: false });
-        expect(index.problems.get("pottery")).toStrictEqual({ noPage: false, orphan: false, proposed: 0, multiParent: false });
+        expect(typed.problems.get("travel")).toStrictEqual({ noPage: true, orphan: false, proposed: 0, multiParent: false });
+        expect(typed.problems.get("kiln")).toStrictEqual({ noPage: true, orphan: true, proposed: 2, multiParent: false });
+        expect(typed.problems.get("care")).toStrictEqual({ noPage: false, orphan: true, proposed: 0, multiParent: false });
+        expect(typed.problems.get("stone")).toStrictEqual({ noPage: false, orphan: false, proposed: 1, multiParent: true });
+        expect(typed.problems.get("mugs")).toStrictEqual({ noPage: false, orphan: false, proposed: 1, multiParent: false });
+        expect(typed.problems.get("pottery")).toStrictEqual({ noPage: false, orphan: false, proposed: 0, multiParent: false });
+    });
+
+    it("calls a root an orphan unless its canonical page is a hub", () => {
+        expect(index.problems.get("pottery")?.orphan).toBe(true);
+        expect(typed.problems.get("pottery")?.orphan).toBe(false);
+        expect(typed.problems.get("teapots")?.orphan).toBe(false);
     });
 
     it("totals the problems for the site", () => {
-        expect(index.counts).toStrictEqual({
+        expect(typed.counts).toStrictEqual({
             total: 10, noPage: 2, orphan: 2, proposedEdges: 3, ai: 2, multiParent: 1,
-            states: { mismatch: 0, working: 0, published: 0, exists: 0, planned: 0, archived: 0, noPage: 10 },
+            states: { mismatch: 0, working: 0, published: 0, exists: 0, planned: 8, archived: 0, noPage: 2 },
         });
+    });
+
+    it("takes each entity's type from its canonical page", () => {
+        expect(typeOf(typed, "mugs")).toStrictEqual({ id: "type-hub", name: "Hub", preset: "hub" });
+        expect(typeOf(typed, "care")).toStrictEqual({ id: "type-entity", name: "Guide", preset: "entity" });
+        expect(presetOf(typed, "m350")).toBe("product");
+        expect(presetOf(typed, "travel")).toBe("untyped");
+        expect(typeOf(index, "mugs")).toBeNull();
+    });
+
+    it("ignores a page that is not canonical and a type the site does not list", () => {
+        const stray = buildGraphIndex(
+            [entity({ id: "mugs", name: "Mugs" })],
+            [],
+            [{ ...typedPage("mugs", "hub"), pageId: "another" }, typedPage("mugs", "catalog")],
+            [pageType("hub")],
+        );
+        expect(typeOf(stray, "mugs")).toBeNull();
+        expect(presetOf(stray, "mugs")).toBe("untyped");
     });
 
     it("lists related links from both ends, strongest first", () => {
@@ -103,10 +129,10 @@ describe("buildGraphIndex", () => {
 
 describe("node state", () => {
     const states = buildGraphIndex(potteryEntities, potteryEdges, [
-        { entityId: "pottery", pageId: "page-pottery", path: "/pottery/", status: "published", work: "", mismatch: false },
-        { entityId: "mugs", pageId: "page-mugs", path: "/pottery/mugs/", status: "published", work: "", mismatch: true },
-        { entityId: "stone", pageId: "page-stone", path: "/pottery/stone/", status: "exists", work: "running", mismatch: false },
-        { entityId: "care", pageId: "page-care", path: "/care/", status: "planned", work: "", mismatch: false },
+        { entityId: "pottery", pageId: "page-pottery", path: "/pottery/", status: "published", pageTypeId: null, work: "", mismatch: false },
+        { entityId: "mugs", pageId: "page-mugs", path: "/pottery/mugs/", status: "published", pageTypeId: null, work: "", mismatch: true },
+        { entityId: "stone", pageId: "page-stone", path: "/pottery/stone/", status: "exists", pageTypeId: null, work: "running", mismatch: false },
+        { entityId: "care", pageId: "page-care", path: "/care/", status: "planned", pageTypeId: null, work: "", mismatch: false },
     ]);
 
     it("reads the state of a node from its page", () => {

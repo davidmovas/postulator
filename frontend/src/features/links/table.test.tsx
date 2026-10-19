@@ -68,7 +68,7 @@ describe("the audit table", () => {
         expect(held.getByText(copy.links.cell.required(2))).toBeDefined();
     });
 
-    it("marks a page whose links the policy blocked as danger even with nothing missing", () => {
+    it("marks a page whose links are blocked as danger even with nothing missing", () => {
         table([row({ pageId: "p-blocked", path: "/blocked/", entityName: "Blocked", targets: 3, required: 1, satisfied: 3, blocked: 1 })]);
 
         expect(dotOf("/blocked/").className).toContain("bg-danger");

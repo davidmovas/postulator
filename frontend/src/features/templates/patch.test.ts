@@ -17,15 +17,6 @@ const base: JsonObject = {
     tone: "Authoritative and plain",
     length: { min: 1600, max: 2400 },
     keywordRules: { primaryInTitle: true, primaryInH1: true, primaryInFirstParagraph: true, maxDensity: 0.025 },
-    linkRules: {
-        upDepth: 1,
-        downLinks: true,
-        siblingMinWeight: 0.5,
-        maxLinks: 20,
-        maxPerTarget: 1,
-        parentLinkWithinParagraphs: 2,
-        childrenSection: true,
-    },
     metaRules: { titlePattern: "{primaryKeyword}", descriptionMax: 155 },
     images: { featured: true, inline: 0, source: "ai" },
     modelProfiles: {},
@@ -88,7 +79,7 @@ describe("patchBetween", () => {
 
     it("round-trips through apply", () => {
         const draft = draftFromJson(base);
-        const edited = { ...draft, lengthMin: 600, lengthMax: 900, downLinks: false };
+        const edited = { ...draft, lengthMin: 600, lengthMax: 900, featuredImage: false };
         const patch = patchObject(patchBetween(draft, edited));
         expect(layered(draft, patch)).toStrictEqual(edited);
     });
@@ -127,7 +118,7 @@ describe("layerAt", () => {
     });
 
     it("falls back to the template", () => {
-        expect(layerAt(paths.maxLinks, site, page)).toBe("global");
+        expect(layerAt(paths.descriptionMax, site, page)).toBe("global");
         expect(layerAt(profilePath("writer"), site, page)).toBe("global");
     });
 });

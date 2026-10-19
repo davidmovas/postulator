@@ -6,6 +6,7 @@ import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useGraph, useRecomputeScores } from "../../data/hooks/graph.js";
 import { useLinkAudit } from "../../data/hooks/reports.js";
+import { usePageTypes } from "../../data/hooks/templates.js";
 import { pushToast } from "../../data/toasts.js";
 import {
     AddLinkIcon,
@@ -68,6 +69,7 @@ export function GraphScreen(): ReactElement {
     const query = useMemo(() => readQuery(searchParams), [searchParams]);
     const search = searchOf(query);
     const graph = useGraph(siteId === "" ? null : siteId);
+    const types = usePageTypes(siteId === "" ? null : siteId);
     const [session, patchSession] = useGraphSession(siteId);
     const [revealVersion, setRevealVersion] = useState(0);
     const [focusSearch, setFocusSearch] = useState(0);
@@ -89,7 +91,10 @@ export function GraphScreen(): ReactElement {
     const auditPages = useMemo(() => (query.proof ? (audit.data?.pages ?? null) : null), [query.proof, audit.data]);
     const tint = useMemo(() => (auditPages === null ? null : tintByEntity(auditPages)), [auditPages]);
 
-    const index = useMemo(() => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? [], graph.data?.pages ?? []), [graph.data]);
+    const index = useMemo(
+        () => buildGraphIndex(graph.data?.entities ?? [], graph.data?.edges ?? [], graph.data?.pages ?? [], types.data?.types ?? []),
+        [graph.data, types.data],
+    );
     const previous = useRef(index);
 
     useEffect(() => {
@@ -163,9 +168,9 @@ export function GraphScreen(): ReactElement {
         [index, fold, session.order, setFold, select],
     );
 
-    const kinds = useMemo(() => new Set(query.kinds), [query.kinds]);
-    const lensActive = query.lens !== "all" || kinds.size > 0;
-    const matched = useMemo(() => (lensActive ? matchedSet(index, query.lens, kinds, query.states) : null), [index, query.lens, kinds, lensActive]);
+    const presets = useMemo(() => new Set<string>(query.presets), [query.presets]);
+    const lensActive = query.lens !== "all" || presets.size > 0;
+    const matched = useMemo(() => (lensActive ? matchedSet(index, query.lens, presets, query.states) : null), [index, query.lens, presets, lensActive]);
     const kept = useMemo(() => (query.isolate && matched !== null ? isolate(index, matched) : null), [index, matched, query.isolate]);
     const visible = useMemo(() => visibleRows(index, fold, session.order), [index, fold, session.order]);
     const rows = useMemo(() => pruneRows(visible, kept), [visible, kept]);

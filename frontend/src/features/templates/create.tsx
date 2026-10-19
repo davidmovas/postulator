@@ -8,7 +8,7 @@ import type { Template } from "../../data/types.js";
 import type { SegmentedOption, SelectOption } from "../../ui/index.js";
 import { Banner, Button, Drawer, Field, Input, Segmented, Select } from "../../ui/index.js";
 import { blankDraft } from "./blank.js";
-import { pageKindLabel, scopeLabel } from "./labels.js";
+import { scopeLabel } from "./labels.js";
 import { copyName } from "./naming.js";
 import { namesIn } from "./rows.js";
 import { specOf } from "./spec.js";
@@ -45,7 +45,6 @@ export function CreateTemplateDrawer({
     const [sourceId, setSourceId] = useState("");
     const [scope, setScope] = useState("site");
     const [name, setName] = useState("");
-    const [pageKind, setPageKind] = useState("");
 
     useEffect(() => {
         if (open) {
@@ -54,7 +53,6 @@ export function CreateTemplateDrawer({
             setSourceId(templates[0]?.id ?? "");
             setScope("site");
             setName("");
-            setPageKind("");
         }
     }, [open]);
 
@@ -67,7 +65,6 @@ export function CreateTemplateDrawer({
             return;
         }
         setName(copyName(picked.name, namesIn(templates, scope)));
-        setPageKind(picked.pageKind);
     };
 
     const submit = (): void => {
@@ -77,7 +74,6 @@ export function CreateTemplateDrawer({
                 scope,
                 siteId: scope === "site" ? siteId : undefined,
                 name: name.trim(),
-                pageKind: pageKind.trim(),
                 spec,
             },
             {
@@ -89,7 +85,7 @@ export function CreateTemplateDrawer({
         );
     };
 
-    const blocked = name.trim() === "" || pageKind.trim() === "" || (start === "copy" && source === null);
+    const blocked = name.trim() === "" || (start === "copy" && source === null);
     const formError = validationErrorOf(create.error);
 
     return (
@@ -153,7 +149,7 @@ export function CreateTemplateDrawer({
                                     placeholder={copy.templates.create.copyFrom}
                                     options={templates.map((held) => ({
                                         value: held.id,
-                                        label: `${held.name} · ${pageKindLabel(held.pageKind)} · ${scopeLabel(held.scope)}`,
+                                        label: `${held.name} · ${scopeLabel(held.scope)}`,
                                     }))}
                                     onValueChange={chooseSource}
                                 />
@@ -174,25 +170,6 @@ export function CreateTemplateDrawer({
                             value={name}
                             onChange={(event) => {
                                 setName(event.target.value);
-                            }}
-                        />
-                    )}
-                </Field>
-                <Field
-                    label={copy.templates.create.pageKind}
-                    hint={copy.templates.create.pageKindHint}
-                    required={true}
-                    error={fieldErrorOf(create.error, "pageKind")}
-                >
-                    {(control) => (
-                        <Input
-                            id={control.id}
-                            aria-describedby={control["aria-describedby"]}
-                            invalid={control.invalid}
-                            mono={true}
-                            value={pageKind}
-                            onChange={(event) => {
-                                setPageKind(event.target.value);
                             }}
                         />
                     )}

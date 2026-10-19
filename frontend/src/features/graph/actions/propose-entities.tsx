@@ -24,7 +24,6 @@ import {
 } from "../../../ui/index.js";
 import { everyPage } from "../../pages/pick/model.js";
 import { PageTree } from "../../pages/pick/tree.js";
-import { entityKindLabel } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
 
 const drawerWidth = 688;
@@ -335,11 +334,10 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
                                 </Button>
                             </div>
                         </div>
-                        <DenseTable columns="3rem minmax(0,1.6fr) 6rem minmax(0,1.4fr) minmax(0,1.4fr)" label={copy.graph.ai.reviewTitle(proposals.length)}>
+                        <DenseTable columns="3rem minmax(0,1.6fr) minmax(0,1.4fr) minmax(0,1.4fr)" label={copy.graph.ai.reviewTitle(proposals.length)}>
                             <TableHead>
                                 <span>{copy.graph.ai.columnKeep}</span>
                                 <span>{copy.graph.ai.columnName}</span>
-                                <span>{copy.graph.ai.columnKind}</span>
                                 <span>{copy.graph.ai.columnKeyword}</span>
                                 <span>{copy.graph.ai.columnPlace}</span>
                             </TableHead>
@@ -368,7 +366,6 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
                                             <span className="ml-1 text-2xs text-ink-faint">{copy.graph.ai.existing}</span>
                                         ) : null}
                                     </TableCell>
-                                    <TableCell muted={true}>{entityKindLabel(proposal.kind ?? "")}</TableCell>
                                     <TableCell muted={true} title={mainKeyword(keywordList(proposal.keywords))}>
                                         {mainKeyword(keywordList(proposal.keywords))}
                                     </TableCell>

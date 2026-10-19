@@ -18,12 +18,6 @@ describe("blankDraft", () => {
         expect(draft.lengthMax).toBeGreaterThanOrEqual(draft.lengthMin);
         expect(draft.maxDensity).toBeGreaterThanOrEqual(0);
         expect(draft.maxDensity).toBeLessThanOrEqual(1);
-        expect(draft.upDepth).toBeGreaterThanOrEqual(0);
-        expect(draft.siblingMinWeight).toBeGreaterThanOrEqual(0);
-        expect(draft.siblingMinWeight).toBeLessThanOrEqual(1);
-        expect(draft.maxLinks).toBeGreaterThanOrEqual(0);
-        expect(draft.maxPerTarget).toBeGreaterThanOrEqual(0);
-        expect(draft.parentLinkWithinParagraphs).toBeGreaterThanOrEqual(0);
         expect(draft.descriptionMax).toBeGreaterThanOrEqual(0);
         expect(draft.inlineImages).toBe(0);
         expect(draft.featuredImage).toBe(false);

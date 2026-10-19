@@ -17,7 +17,7 @@ import {
     StatusBadge,
     VerifiedIcon,
 } from "../../ui/index.js";
-import { pageKindLabel, roleLabel, scopeLabel, scopeTone, stepLabel } from "./labels.js";
+import { roleLabel, scopeLabel, scopeTone, stepLabel } from "./labels.js";
 import { layerAt, patchObject, paths } from "./patch.js";
 import { LayerBadge } from "./provenance.js";
 import { sentencesOf } from "./sentences.js";
@@ -102,9 +102,6 @@ export function TemplateDetail({
                 <div className="flex flex-wrap items-center gap-1.5">
                     <StatusBadge tone={scopeTone(template.scope)} dot={false}>
                         {scopeLabel(template.scope)}
-                    </StatusBadge>
-                    <StatusBadge tone="muted" dot={false}>
-                        {pageKindLabel(template.pageKind)}
                     </StatusBadge>
                     <StatusBadge tone="muted" dot={false}>
                         {copy.templates.versionLabel(template.version)}

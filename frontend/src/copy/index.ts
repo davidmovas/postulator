@@ -8,7 +8,8 @@ import { overview, readiness } from "./overview.js";
 import { pages } from "./pages.js";
 import { palette } from "./palette.js";
 import { reports } from "./reports.js";
-import { policies, templates } from "./templates.js";
+import { pageTypes } from "./pagetypes.js";
+import { templates } from "./templates.js";
 import { runs } from "./runs.js";
 import { schedules } from "./schedules.js";
 import { settings } from "./settings.js";
@@ -36,7 +37,7 @@ export const copy = {
     links,
     imports,
     templates,
-    policies,
+    pageTypes,
     toasts,
     errors: errorMessages,
 };

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { potteryEdges, potteryEntities } from "./fixture.js";
+import { potteryEdges, potteryEntities, potteryPages, potteryTypes, typedPage } from "./fixture.js";
 import { buildGraphIndex } from "./index.js";
 import { isolate, lensCounts, lenses, matchedSet } from "./lens.js";
 
-const index = buildGraphIndex(potteryEntities, potteryEdges);
+const index = buildGraphIndex(potteryEntities, potteryEdges, potteryPages, potteryTypes);
 
 function ids(set: ReadonlySet<string>): string[] {
     return [...set].sort();
@@ -19,9 +19,10 @@ describe("matchedSet", () => {
         expect(ids(matchedSet(index, "proposed", null))).toStrictEqual(["glazing", "kiln", "mugs", "stone", "teapots"]);
     });
 
-    it("narrows by kind and intersects with the lens", () => {
-        expect(ids(matchedSet(index, "all", new Set(["product"])))).toStrictEqual(["m350", "m500", "travel"]);
-        expect(ids(matchedSet(index, "noPage", new Set(["product"])))).toStrictEqual(["travel"]);
+    it("narrows by the canonical page's preset and intersects with the lens", () => {
+        expect(ids(matchedSet(index, "all", new Set(["product"])))).toStrictEqual(["m350", "m500"]);
+        expect(ids(matchedSet(index, "all", new Set(["untyped"])))).toStrictEqual(["kiln", "travel"]);
+        expect(ids(matchedSet(index, "noPage", new Set(["product"])))).toStrictEqual([]);
         expect(ids(matchedSet(index, "all", new Set()))).toHaveLength(10);
     });
 });
@@ -45,11 +46,16 @@ describe("isolate", () => {
 });
 
 describe("matchedSet over page states", () => {
-    const stated = buildGraphIndex(potteryEntities, potteryEdges, [
-        { entityId: "pottery", pageId: "p1", path: "/pottery/", status: "published", work: "", mismatch: false },
-        { entityId: "mugs", pageId: "p2", path: "/pottery/mugs/", status: "published", work: "", mismatch: true },
-        { entityId: "care", pageId: "p3", path: "/care/", status: "planned", work: "", mismatch: false },
-    ]);
+    const stated = buildGraphIndex(
+        potteryEntities,
+        potteryEdges,
+        [
+            typedPage("pottery", "hub", "published"),
+            { ...typedPage("mugs", "hub", "published"), mismatch: true },
+            typedPage("care", "entity", "planned"),
+        ],
+        potteryTypes,
+    );
 
     it("keeps only the nodes in the chosen states", () => {
         expect([...matchedSet(stated, "all", null, ["mismatch"])]).toStrictEqual(["mugs"]);
@@ -60,7 +66,7 @@ describe("matchedSet over page states", () => {
         expect(matchedSet(stated, "all", null, []).size).toBe(potteryEntities.length);
     });
 
-    it("asks for both the kind and the state", () => {
+    it("asks for both the preset and the state", () => {
         expect([...matchedSet(stated, "all", new Set(["hub"]), ["published"])]).toStrictEqual(["pottery"]);
     });
 });

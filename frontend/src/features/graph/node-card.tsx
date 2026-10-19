@@ -4,8 +4,10 @@ import type { Point } from "../../canvas/viewport.js";
 import { copy } from "../../copy/index.js";
 import { StatusBadge, toneClasses } from "../../ui/index.js";
 import type { Tone } from "../../ui/index.js";
-import { entityIcon, formatScore, entityKindLabel, kindTone } from "./labels.js";
+import { presetIcon, presetTone } from "../settings/types/labels.js";
+import { entityTypeLabel, formatScore } from "./labels.js";
 import type { GraphIndex } from "./model/index.js";
+import { presetOf, typeOf } from "./model/index.js";
 
 const cardWidth = 224;
 const offset = 14;
@@ -53,7 +55,8 @@ export function NodeCard({ index, hovered, hostWidth }: NodeCardProps): ReactEle
     if (entity === undefined) {
         return null;
     }
-    const Icon = entityIcon(entity.kind);
+    const preset = presetOf(index, hovered.id);
+    const Icon = presetIcon(preset);
     const flags = flagsOf(index, hovered.id);
     const left = hovered.at.x + offset + cardWidth > hostWidth ? hovered.at.x - offset - cardWidth : hovered.at.x + offset;
     return (
@@ -63,11 +66,11 @@ export function NodeCard({ index, hovered, hostWidth }: NodeCardProps): ReactEle
             style={{ left: `${Math.max(left, 0)}px`, top: `${hovered.at.y + offset}px`, width: `${cardWidth}px` }}
         >
             <div className="flex items-center gap-2">
-                <Icon size={14} className={toneClasses[kindTone(entity.kind)].ink} />
+                <Icon size={14} className={toneClasses[presetTone(preset)].ink} />
                 <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{entity.name}</span>
             </div>
             <div className="flex items-center gap-2 text-2xs text-ink-dim">
-                <span>{entityKindLabel(entity.kind)}</span>
+                <span>{entityTypeLabel(typeOf(index, hovered.id))}</span>
                 <span className="font-mono">{formatScore(entity.score)}</span>
             </div>
             {flags.length === 0 ? null : (

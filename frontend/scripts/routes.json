@@ -66,11 +66,6 @@
     "wait": 1200
   },
   {
-    "name": "templates-policies",
-    "route": "#/s/:siteId/templates/policies",
-    "wait": 1200
-  },
-  {
     "name": "schedules",
     "route": "#/s/:siteId/schedules",
     "wait": 1200

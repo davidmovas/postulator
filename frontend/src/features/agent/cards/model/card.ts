@@ -1,6 +1,6 @@
 import type { TemplateSpec } from "../../../../data/types.js";
 
-export type RefKind = "site" | "entity" | "page" | "template" | "policy" | "schedule" | "run" | "edge" | "mapping" | "item" | "override";
+export type RefKind = "site" | "entity" | "page" | "template" | "pagetype" | "schedule" | "run" | "edge" | "mapping" | "item" | "override";
 
 export interface Ref {
     kind: RefKind;

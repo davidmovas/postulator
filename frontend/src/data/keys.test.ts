@@ -31,7 +31,7 @@ describe("the limit is part of a list key", () => {
         expect(isPrefix(keys.sites.lists(), keys.sites.list({}, null, 25))).toBe(true);
         expect(isPrefix(keys.runs.lists(), keys.runs.list({}, null, 25))).toBe(true);
         expect(isPrefix(keys.templates.lists(), keys.templates.list({}, null, 25))).toBe(true);
-        expect(isPrefix(keys.policies.lists(), keys.policies.list({}, null, 25))).toBe(true);
+        expect(isPrefix(keys.sites.root(), keys.sites.types("s1"))).toBe(true);
         expect(isPrefix(keys.schedules.lists(), keys.schedules.list({}, 25))).toBe(true);
         expect(isPrefix(keys.graph.entityLists(), keys.graph.entities(filter, null, 25))).toBe(true);
         expect(isPrefix(keys.graph.edgeLists(), keys.graph.edges(filter, 25))).toBe(true);

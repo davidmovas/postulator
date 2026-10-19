@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useMemo } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { AdsClickIcon, cx, DescriptionIcon, LinkIcon, PreviewIcon, StatusBadge } from "../../../ui/index.js";
+import { AdsClickIcon, cx, DescriptionIcon, PreviewIcon, StatusBadge } from "../../../ui/index.js";
 import type { SpecDraft } from "../spec.js";
 import type { Skeleton, SkeletonSection } from "./model.js";
 import { skeletonOf } from "./model.js";
@@ -47,7 +47,7 @@ function TextLines({ share, words }: { share: number; words: number }): ReactEle
     );
 }
 
-function Section({ section, parentLink }: { section: SkeletonSection; parentLink: string | null }): ReactElement {
+function Section({ section }: { section: SkeletonSection }): ReactElement {
     return (
         <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-1.5">
@@ -58,12 +58,6 @@ function Section({ section, parentLink }: { section: SkeletonSection; parentLink
                     {section.required ? copy.templates.preview.required : copy.templates.preview.optional}
                 </span>
             </div>
-            {parentLink === null ? null : (
-                <span className="inline-flex items-center gap-1 self-start rounded-sm bg-info-soft px-1.5 py-0.5 text-2xs text-info">
-                    <LinkIcon size={11} />
-                    {parentLink}
-                </span>
-            )}
             <TextLines share={section.share} words={section.words} />
             {section.imageAfter ? <ImageSlot label={copy.templates.preview.inline} /> : null}
         </div>
@@ -80,7 +74,6 @@ function Footer({ skeleton }: { skeleton: Skeleton }): ReactElement {
                 <span className="font-mono">
                     {skeleton.lengthState === "unbounded" ? said.unbounded : said.range(skeleton.lengthMin, skeleton.lengthMax)}
                 </span>
-                <span className="font-mono">{said.links(skeleton.maxLinks)}</span>
                 <span className="font-mono">{said.images((skeleton.featured ? 1 : 0) + skeleton.inlineImages)}</span>
             </div>
             {tone === "warn" ? (
@@ -99,7 +92,6 @@ export interface PagePreviewProps {
 export function PagePreview({ draft }: PagePreviewProps): ReactElement {
     const said = copy.templates.preview;
     const skeleton = useMemo(() => skeletonOf(draft), [draft]);
-    const parentLink = skeleton.upDepth === 0 ? null : skeleton.parentLinkWithin === 0 ? said.noParentLink : said.parentLink(skeleton.parentLinkWithin);
 
     return (
         <div className="flex flex-col gap-3">
@@ -137,16 +129,8 @@ export function PagePreview({ draft }: PagePreviewProps): ReactElement {
                             {said.noSections}
                         </p>
                     ) : (
-                        skeleton.sections.map((section, index) => (
-                            <Section key={index} section={section} parentLink={index === 0 ? parentLink : null} />
-                        ))
+                        skeleton.sections.map((section, index) => <Section key={index} section={section} />)
                     )}
-                    {skeleton.childrenSection ? (
-                        <div className="flex items-center gap-1.5 rounded-sm border border-hairline bg-inset px-2 py-1.5 text-2xs text-ink-soft">
-                            <LinkIcon size={12} className="text-ink-faint" />
-                            {said.children}
-                        </div>
-                    ) : null}
                 </div>
             </div>
             <Footer skeleton={skeleton} />

@@ -5,7 +5,7 @@ import { Link } from "react-router";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useTestConnection } from "../../data/hooks/sites.js";
-import { usePolicy, useTemplate } from "../../data/hooks/templates.js";
+import { useTemplate } from "../../data/hooks/templates.js";
 import { isBrowsable, openExternal } from "../../data/host.js";
 import type { Reachability, Site } from "../../data/types.js";
 import { localAddress } from "../../domain/address.js";
@@ -39,7 +39,6 @@ function Row({ label, children }: { label: string; children: ReactNode }): React
 
 function Defaults({ site }: { site: Site }): ReactElement {
     const template = useTemplate(site.defaults.templateId ?? null);
-    const policy = usePolicy(site.defaults.linkPolicyId ?? null);
     const roles = Object.keys(site.defaults.modelProfiles ?? {}).length;
     const said = copy.sites.defaults;
 
@@ -49,9 +48,6 @@ function Defaults({ site }: { site: Site }): ReactElement {
             <dl className="flex flex-col gap-1.5">
                 <Row label={said.template}>
                     <Link to={`/s/${site.id}/templates`}>{template.data?.template.name ?? said.none}</Link>
-                </Row>
-                <Row label={said.linkPolicy}>
-                    <Link to={`/s/${site.id}/templates`}>{policy.data?.policy.name ?? said.none}</Link>
                 </Row>
                 <Row label={said.modelRoles}>
                     <Link to="/settings/models">{roles === 0 ? said.none : said.roles(roles)}</Link>

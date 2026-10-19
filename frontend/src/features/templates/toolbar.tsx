@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { copy } from "../../copy/index.js";
 import type { SegmentedOption, SelectOption } from "../../ui/index.js";
 import { Input, Segmented, Select, Toolbar } from "../../ui/index.js";
-import { pageKindLabel } from "./labels.js";
 import type { ScopeFilter, SortChoice, TemplatesQuery } from "./params.js";
 import { sortChoice, sorts } from "./params.js";
 
@@ -21,15 +20,12 @@ const sortOptions: readonly SelectOption<SortChoice>[] = [
     { value: "oldest", label: copy.templates.sortOptions.oldest },
 ];
 
-const anyKind = "*";
-
 export interface TemplateToolbarProps {
     query: TemplatesQuery;
-    kinds: readonly string[];
     onChange: (next: TemplatesQuery) => void;
 }
 
-export function TemplateToolbar({ query, kinds, onChange }: TemplateToolbarProps): ReactElement {
+export function TemplateToolbar({ query, onChange }: TemplateToolbarProps): ReactElement {
     const [search, setSearch] = useState(query.search);
 
     useEffect(() => {
@@ -42,11 +38,6 @@ export function TemplateToolbar({ query, kinds, onChange }: TemplateToolbarProps
             onChange({ ...query, search: trimmed });
         }
     };
-
-    const kindOptions: readonly SelectOption<string>[] = [
-        { value: anyKind, label: copy.templates.filters.anyPageKind },
-        ...kinds.map((kind) => ({ value: kind, label: pageKindLabel(kind) })),
-    ];
 
     return (
         <Toolbar label={copy.templates.title}>
@@ -76,16 +67,6 @@ export function TemplateToolbar({ query, kinds, onChange }: TemplateToolbarProps
                     onChange({ ...query, scope });
                 }}
             />
-            <div className="w-40">
-                <Select
-                    value={query.pageKind === "" ? anyKind : query.pageKind}
-                    options={kindOptions}
-                    aria-label={copy.templates.filters.pageKind}
-                    onValueChange={(pageKind) => {
-                        onChange({ ...query, pageKind: pageKind === anyKind ? "" : pageKind });
-                    }}
-                />
-            </div>
             <div className="ml-auto w-40">
                 <Select
                     value={sortChoice(query.sort)}

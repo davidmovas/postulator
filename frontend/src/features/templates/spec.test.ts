@@ -25,15 +25,6 @@ const hub: JsonObject = {
     tone: "Authoritative and plain",
     length: { min: 1600, max: 2400 },
     keywordRules: { primaryInTitle: true, primaryInH1: true, primaryInFirstParagraph: true, maxDensity: 0.025 },
-    linkRules: {
-        upDepth: 1,
-        downLinks: true,
-        siblingMinWeight: 0.5,
-        maxLinks: 20,
-        maxPerTarget: 1,
-        parentLinkWithinParagraphs: 2,
-        childrenSection: true,
-    },
     metaRules: { titlePattern: "{primaryKeyword} | {siteName}", descriptionMax: 155 },
     images: { featured: true, inline: 0, source: "ai" },
     modelProfiles: {},
@@ -52,7 +43,7 @@ describe("template spec drafts", () => {
         expect(draft.sections[1]?.include).toStrictEqual(["mugs"]);
         expect(draft.lengthMin).toBe(1600);
         expect(draft.maxDensity).toBe(0.025);
-        expect(draft.upDepth).toBe(1);
+        expect(draft.descriptionMax).toBe(155);
         expect(draft.imageSource).toBe("ai");
         expect(draft.profiles).toStrictEqual([]);
     });
@@ -107,6 +98,11 @@ describe("template spec drafts", () => {
 
     it("rebuilds the same document it read", () => {
         expect(specJsonOf(draftFromJson(hub))).toStrictEqual(hub);
+    });
+
+    it("writes no link rules, which live in the page types now", () => {
+        const stale = { ...hub, linkRules: { upDepth: 1, maxLinks: 20 } };
+        expect("linkRules" in specJsonOf(draftFromJson(stale))).toBe(false);
     });
 
     it("reads the product outputs, rebuilds them, and writes none where the spec had none", () => {

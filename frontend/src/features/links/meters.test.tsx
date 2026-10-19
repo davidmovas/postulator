@@ -22,11 +22,9 @@ const totals: LinkTotals = {
     byType: typed({ breadcrumb: 40, listing: 18, navigation: 120, contextual: 6, unknown: 2 }),
 };
 
-const policy = { id: "p1", name: "Default", forbidExternal: false, forbidSelf: true, anchorStrategy: "first" };
-
 describe("the audit strip", () => {
     it("counts the site's links by type, in words", () => {
-        render(<AuditStrip totals={totals} policy={policy} />);
+        render(<AuditStrip totals={totals} />);
 
         const strip = within(screen.getByRole("list", { name: copy.links.meters.byType }));
         for (const [label, count] of [
@@ -41,8 +39,14 @@ describe("the audit strip", () => {
         }
     });
 
+    it("says where the rules that decide what a page owes are kept", () => {
+        const { container } = render(<AuditStrip totals={totals} />);
+        expect(container.querySelector(`[title="${copy.links.meters.rulesFromTypes}"]`)).not.toBeNull();
+        expect(screen.queryByText(/policy/i)).toBeNull();
+    });
+
     it("says in one sentence that only contextual links settle what the graph owes", () => {
-        render(<AuditStrip totals={totals} policy={policy} />);
+        render(<AuditStrip totals={totals} />);
 
         const strip = within(screen.getByRole("list", { name: copy.links.meters.byType }));
         expect(strip.getByText("Contextual").closest("li")?.getAttribute("title")).toBe(copy.links.meters.contextualOnly);

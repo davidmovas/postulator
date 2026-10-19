@@ -3,26 +3,11 @@ import type { JsonObject } from "../../domain/merge-patch.js";
 import type { SpecPath } from "./patch.js";
 import { paths, touches } from "./patch.js";
 
-export type GroupKey = "sections" | "product" | "rules" | "models" | "recipe" | "overrides" | "policies";
+export type GroupKey = "sections" | "product" | "rules" | "models" | "recipe" | "overrides";
 
-export const groupKeys: readonly GroupKey[] = [
-    "sections",
-    "product",
-    "rules",
-    "models",
-    "recipe",
-    "overrides",
-    "policies",
-];
+export const groupKeys: readonly GroupKey[] = ["sections", "product", "rules", "models", "recipe", "overrides"];
 
-const ruleRoots: readonly SpecPath[] = [
-    paths.tone,
-    ["length"],
-    ["keywordRules"],
-    ["linkRules"],
-    ["metaRules"],
-    ["images"],
-];
+const ruleRoots: readonly SpecPath[] = [paths.tone, ["length"], ["keywordRules"], ["metaRules"], ["images"]];
 
 const watched: Readonly<Record<GroupKey, readonly SpecPath[]>> = {
     sections: [paths.sections],
@@ -31,7 +16,6 @@ const watched: Readonly<Record<GroupKey, readonly SpecPath[]>> = {
     models: [paths.profiles],
     recipe: [paths.recipe],
     overrides: [],
-    policies: [],
 };
 
 export const groupTitles: Readonly<Record<GroupKey, string>> = {
@@ -41,7 +25,6 @@ export const groupTitles: Readonly<Record<GroupKey, string>> = {
     models: copy.templates.models.title,
     recipe: copy.templates.recipe.title,
     overrides: copy.templates.editor.groups.overrides,
-    policies: copy.policies.title,
 };
 
 export function isGroup(candidate: string): candidate is GroupKey {

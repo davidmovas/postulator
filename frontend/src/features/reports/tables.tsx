@@ -20,7 +20,6 @@ import {
     TaskAltIcon,
 } from "../../ui/index.js";
 import { liveUrl } from "../pages/summary.js";
-import { entityKindLabel } from "../graph/labels.js";
 import { reasonLabel, reasonTone } from "./labels.js";
 import type { CoverageRow } from "./model/site.js";
 
@@ -48,7 +47,7 @@ export function CoverageTable({ siteId, rows }: CoverageTableProps): ReactElemen
                 <DenseTable columns={coverageGrid} label={copy.reports.coverage.title}>
                     <TableHead>
                         <span>{copy.reports.coverage.entity}</span>
-                        <span>{copy.reports.coverage.kind}</span>
+                        <span>{copy.reports.coverage.type}</span>
                         <span>{copy.reports.coverage.path}</span>
                         <span>{copy.reports.coverage.state}</span>
                         <span>{copy.reports.coverage.links}</span>
@@ -63,7 +62,7 @@ export function CoverageTable({ siteId, rows }: CoverageTableProps): ReactElemen
                             }}
                         >
                             <TableCell title={row.name}>{row.name}</TableCell>
-                            <TableCell muted={true}>{entityKindLabel(row.kind)}</TableCell>
+                            <TableCell muted={true}>{row.type === "" ? copy.pageTypes.untyped : row.type}</TableCell>
                             <TableCell mono={true} muted={true} title={row.path}>
                                 {row.path}
                             </TableCell>

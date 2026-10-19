@@ -9,7 +9,6 @@ import type {
     ModelCallFilter,
     PageFilter,
     PendingActionFilter,
-    PolicyFilter,
     RunFilter,
     ScheduleFilter,
     SiteFilter,
@@ -51,6 +50,8 @@ export const keys = {
             [scope, "sites", "list", filter, sortSegment(sort), limitSegment(limit)] as const,
         details: () => [scope, "sites", "detail"] as const,
         detail: (id: string) => [scope, "sites", "detail", id] as const,
+        typesAll: () => [scope, "sites", "types"] as const,
+        types: (siteId: string) => [scope, "sites", "types", siteId] as const,
     },
     pages: {
         root: () => [scope, "pages"] as const,
@@ -92,16 +93,6 @@ export const keys = {
         detail: (id: string) => [scope, "templates", "detail", id] as const,
         resolvedAll: () => [scope, "templates", "resolved"] as const,
         resolved: (pageId: string) => [scope, "templates", "resolved", pageId] as const,
-    },
-    policies: {
-        root: () => [scope, "policies"] as const,
-        lists: () => [scope, "policies", "list"] as const,
-        list: (filter: PolicyFilter, sort: Sort | null, limit?: number) =>
-            [scope, "policies", "list", filter, sortSegment(sort), limitSegment(limit)] as const,
-        details: () => [scope, "policies", "detail"] as const,
-        detail: (id: string) => [scope, "policies", "detail", id] as const,
-        effectives: () => [scope, "policies", "effective"] as const,
-        effective: (siteId: string) => [scope, "policies", "effective", siteId] as const,
     },
     runs: {
         root: () => [scope, "runs"] as const,

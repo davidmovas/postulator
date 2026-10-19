@@ -27,7 +27,6 @@ const { LinksScreen } = await import("./screen.js");
 function audited(rows: readonly PageAudit[]): LinkAudit {
     return {
         siteId: "s1",
-        policy: { id: "p1", name: "Default", forbidExternal: false, forbidSelf: true, anchorStrategy: "first" },
         totals: {
             pages: rows.length,
             audited: rows.length,

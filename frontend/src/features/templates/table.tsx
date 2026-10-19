@@ -16,9 +16,9 @@ import {
     TableRow,
     VerifiedIcon,
 } from "../../ui/index.js";
-import { pageKindLabel, scopeLabel, scopeTone } from "./labels.js";
+import { scopeLabel, scopeTone } from "./labels.js";
 
-const columns = "minmax(104px,1fr) 88px 96px 52px 64px 96px";
+const columns = "minmax(104px,1fr) 88px 52px 64px 96px";
 
 interface RowProps {
     template: Template;
@@ -61,7 +61,6 @@ function Row({ template, selected, isDefault, onSelect, onOpen }: RowProps): Rea
                     {scopeLabel(template.scope)}
                 </StatusBadge>
             </TableCell>
-            <TableCell muted={true}>{pageKindLabel(template.pageKind)}</TableCell>
             <TableCell mono={true} muted={true}>
                 {copy.templates.versionLabel(template.version)}
             </TableCell>
@@ -152,7 +151,6 @@ export function TemplateTable({
                 <TableHead>
                     <div>{copy.templates.columns.name}</div>
                     <div>{copy.templates.columns.scope}</div>
-                    <div>{copy.templates.columns.pageKind}</div>
                     <div>{copy.templates.columns.version}</div>
                     <div>{copy.templates.columns.default}</div>
                     <div className="text-right">{copy.templates.columns.updated}</div>

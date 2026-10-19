@@ -14,10 +14,10 @@ import type { Point, Size, Viewport } from "../../../canvas/viewport.js";
 import { copy } from "../../../copy/index.js";
 import { CallSplitIcon, LinkOffIcon } from "../../../ui/index.js";
 import type { Severity } from "../../links/model/audit.js";
-import { entityIcon, kindTone } from "../labels.js";
+import { presetIcon, presetTone } from "../../settings/types/labels.js";
 import type { FoldState, VisibleRow } from "../model/fold.js";
 import { childLimit, treeOf } from "../model/fold.js";
-import { nodeStateOf } from "../model/index.js";
+import { nodeStateOf, presetOf } from "../model/index.js";
 import type { GraphIndex, NodeState } from "../model/index.js";
 import { detailOf, labelled } from "../model/lod.js";
 import { move } from "../model/navigation.js";
@@ -470,7 +470,8 @@ export function GraphMap({
             const isSelected = node.id === selected;
             const isHovered = node.id === hovered;
             const isNeighbour = neighbours.has(node.id);
-            const tone = toneColor(colors, kindTone(held?.kind ?? ""));
+            const preset = presetOf(graph, node.id);
+            const tone = toneColor(colors, presetTone(preset));
             const showLabel = labelled(detail, node.depth, row.childCount, isSelected);
 
             const grade: Severity | null = proof === null ? null : (proof.get(node.id) ?? "muted");
@@ -517,7 +518,7 @@ export function GraphMap({
 
             if (showLabel) {
                 if (held !== undefined) {
-                    drawIcon(context, entityIcon(held.kind), node.x + padding, node.y + (nodeHeight - iconSize) / 2, iconSize, tone);
+                    drawIcon(context, presetIcon(preset), node.x + padding, node.y + (nodeHeight - iconSize) / 2, iconSize, tone);
                 }
                 context.fillStyle = dim ? colors.inkDim : colors.ink;
                 context.font = faces.label;
@@ -589,7 +590,8 @@ export function GraphMap({
             context.lineWidth = 1;
             context.stroke();
             if (size !== undefined && held !== undefined) {
-                drawIcon(context, entityIcon(held.kind), dragging.cursor.x + 10 + padding, dragging.cursor.y + 10 + (nodeHeight - iconSize) / 2, iconSize, toneColor(colors, kindTone(held.kind)));
+                const ghostPreset = presetOf(graph, ghost.id);
+                drawIcon(context, presetIcon(ghostPreset), dragging.cursor.x + 10 + padding, dragging.cursor.y + 10 + (nodeHeight - iconSize) / 2, iconSize, toneColor(colors, presetTone(ghostPreset)));
                 context.fillStyle = colors.ink;
                 context.font = faces.label;
                 context.textBaseline = "middle";

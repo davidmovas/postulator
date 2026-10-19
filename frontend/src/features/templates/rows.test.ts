@@ -2,15 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { Template } from "../../data/types.js";
 import { defaultQuery } from "./params.js";
-import { filtered, kindsOf, namesIn, ordered } from "./rows.js";
+import { filtered, namesIn, ordered } from "./rows.js";
 
-function template(name: string, scope: string, pageKind: string): Template {
+function template(name: string, scope: string): Template {
     return {
         id: name,
         scope,
         siteId: scope === "site" ? "site-1" : null,
         name,
-        pageKind,
         version: 1,
         spec: {} as Template["spec"],
         createdAt: "2026-09-01T00:00:00Z",
@@ -19,10 +18,10 @@ function template(name: string, scope: string, pageKind: string): Template {
 }
 
 const rows: readonly Template[] = [
-    template("Guide", "global", "guide"),
-    template("Hub", "global", "hub"),
-    template("Kiln care guide", "site", "guide"),
-    template("Product — spec table", "site", "product"),
+    template("Guide", "global"),
+    template("Hub", "global"),
+    template("Kiln care guide", "site"),
+    template("Product — spec table", "site"),
 ];
 
 describe("filtered", () => {
@@ -37,14 +36,7 @@ describe("filtered", () => {
         ]);
     });
 
-    it("keeps one page kind", () => {
-        expect(filtered(rows, { ...defaultQuery, pageKind: "guide" }).map((held) => held.name)).toEqual([
-            "Guide",
-            "Kiln care guide",
-        ]);
-    });
-
-    it("searches the name and the page kind, ignoring case", () => {
+    it("searches the name, ignoring case", () => {
         expect(filtered(rows, { ...defaultQuery, search: "KILN" }).map((held) => held.name)).toEqual([
             "Kiln care guide",
         ]);
@@ -52,11 +44,9 @@ describe("filtered", () => {
     });
 
     it("combines the facets", () => {
-        expect(
-            filtered(rows, { ...defaultQuery, scope: "global", pageKind: "guide", search: "gui" }).map(
-                (held) => held.name,
-            ),
-        ).toEqual(["Guide"]);
+        expect(filtered(rows, { ...defaultQuery, scope: "global", search: "gui" }).map((held) => held.name)).toEqual([
+            "Guide",
+        ]);
     });
 
     it("ignores surrounding space in the search", () => {
@@ -81,7 +71,7 @@ describe("ordered", () => {
     });
 
     it("sorts by when the template was made", () => {
-        const older = { ...template("Older", "site", "guide"), createdAt: "2026-01-01T00:00:00Z" };
+        const older = { ...template("Older", "site"), createdAt: "2026-01-01T00:00:00Z" };
         expect(ordered([...rows, older], { field: "createdAt", desc: false })[0].name).toBe("Older");
         expect(ordered([...rows, older], { field: "createdAt", desc: true }).at(-1)?.name).toBe("Older");
     });
@@ -90,12 +80,6 @@ describe("ordered", () => {
         const before = rows.map((held) => held.name);
         ordered(rows, { field: "name", desc: true });
         expect(rows.map((held) => held.name)).toEqual(before);
-    });
-});
-
-describe("kindsOf", () => {
-    it("lists every kind once, sorted, with the blanks dropped", () => {
-        expect(kindsOf([...rows, template("Nameless", "site", "")])).toEqual(["guide", "hub", "product"]);
     });
 });
 

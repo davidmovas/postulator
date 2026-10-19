@@ -18,7 +18,6 @@ import {
     cx,
     toneClasses,
 } from "../../ui/index.js";
-import { entityKindLabel } from "../graph/labels.js";
 import { actionLabel, actionTone, columnUseLabel, edgeKindLabel, productNote } from "./labels.js";
 import type { PreviewColumn } from "./preview.js";
 import { columnsBySheet, sheetsIn } from "./preview.js";
@@ -26,8 +25,8 @@ import { columnsBySheet, sheetsIn } from "./preview.js";
 type Segment = "pages" | "entities" | "groups" | "edges";
 
 const grids: Readonly<Record<Segment, string>> = {
-    pages: "minmax(0,2fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) 6rem",
-    entities: "minmax(0,1.8fr) 7rem minmax(0,1.4fr) 6rem",
+    pages: "minmax(0,2fr) minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,0.9fr) 6rem",
+    entities: "minmax(0,1.8fr) minmax(0,1.4fr) 6rem",
     groups: "minmax(0,2fr) minmax(0,1.6fr) 5rem",
     edges: "minmax(0,1.4fr) minmax(0,1.4fr) 7rem 6rem",
 };
@@ -189,12 +188,12 @@ export function StepPreview({ report, onBack, onNext }: StepPreviewProps): React
                                 <span>{copy.imports.preview.columnTitle}</span>
                                 <span>{copy.imports.preview.columnKeyword}</span>
                                 <span>{copy.imports.preview.columnEntity}</span>
+                                <span>{copy.imports.preview.columnType}</span>
                                 <span>{copy.imports.preview.columnAction}</span>
                             </>
                         ) : segment === "entities" ? (
                             <>
                                 <span>{copy.imports.preview.columnName}</span>
-                                <span>{copy.imports.preview.columnKind}</span>
                                 <span>{copy.imports.preview.columnKeyword}</span>
                                 <span>{copy.imports.preview.columnAction}</span>
                             </>
@@ -230,6 +229,7 @@ export function StepPreview({ report, onBack, onNext }: StepPreviewProps): React
                                       {keywordsLine(page.keywords)}
                                   </TableCell>
                                   <TableCell muted={true}>{page.entity ?? ""}</TableCell>
+                                  <TableCell muted={true}>{page.pageType ?? ""}</TableCell>
                                   <TableCell>
                                       <StatusBadge tone={actionTone(page.action)} dot={false}>
                                           {actionLabel(page.action)}
@@ -244,7 +244,6 @@ export function StepPreview({ report, onBack, onNext }: StepPreviewProps): React
                                     <TableCell title={trailOf([entity.parent ?? "", entity.name])}>
                                         {trailOf([entity.parent ?? "", entity.name])}
                                     </TableCell>
-                                    <TableCell muted={true}>{entityKindLabel(entity.kind)}</TableCell>
                                     <TableCell mono={true} muted={true} title={keywordsLine(entity.keywords)}>
                                         {keywordsLine(entity.keywords)}
                                     </TableCell>

@@ -7,7 +7,7 @@ import { StepPreview } from "./step-preview.js";
 
 type Entity = NonNullable<PreviewReport["entities"]>[number];
 
-function entity(part: Pick<Entity, "name" | "kind"> & Partial<Entity>): Entity {
+function entity(part: Pick<Entity, "name"> & Partial<Entity>): Entity {
     return { keywords: null, anchors: null, action: "create", ...part };
 }
 
@@ -25,6 +25,7 @@ const workbook: PreviewReport = {
             title: "Peptides",
             keywords: null,
             wpType: "page",
+            pageType: "Category",
             action: "create",
         },
         {
@@ -38,9 +39,9 @@ const workbook: PreviewReport = {
         },
     ],
     entities: [
-        entity({ sheet: "Catalog", name: "Peptides", kind: "hub" }),
-        entity({ sheet: "Catalog", name: "Research", kind: "hub" }),
-        entity({ sheet: "Compounds", name: "BPC-157", parent: "Peptides", kind: "product" }),
+        entity({ sheet: "Catalog", name: "Peptides" }),
+        entity({ sheet: "Catalog", name: "Research" }),
+        entity({ sheet: "Compounds", name: "BPC-157", parent: "Peptides" }),
     ],
     groups: [
         { sheet: "Catalog", path: ["Peptides", "BPC-157"], page: "/peptides/bpc-157/", rows: 3 },
@@ -86,6 +87,12 @@ describe("the preview of a workbook", () => {
         expect(screen.getByText(copy.imports.preview.columnSheet)).toBeDefined();
         expect(within(rowFor("/peptides/bpc-157/")).getByText("Compounds")).toBeDefined();
         expect(within(rowFor("/peptides/")).getByText("Catalog")).toBeDefined();
+    });
+
+    it("shows the page type the sheet gives a page by the site's own name", () => {
+        show(workbook);
+        expect(screen.getByText(copy.imports.preview.columnType)).toBeDefined();
+        expect(within(rowFor("/peptides/")).getByText("Category")).toBeDefined();
     });
 
     it("leaves the sheet out of a preview that read one sheet", () => {

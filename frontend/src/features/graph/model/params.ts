@@ -1,5 +1,6 @@
 import { choiceParam, flagParam, listParam, queryCodec } from "../../../data/params.js";
-import { entityKinds } from "../../../generated/vocab.js";
+import { presetRoles } from "../../settings/types/labels.js";
+import type { PresetRole } from "../../settings/types/labels.js";
 import { nodeStates } from "./index.js";
 import type { NodeState } from "./index.js";
 import type { Lens } from "./lens.js";
@@ -12,7 +13,7 @@ export type GraphView = (typeof graphViews)[number];
 export interface GraphQuery {
     view: GraphView;
     lens: Lens;
-    kinds: readonly string[];
+    presets: readonly PresetRole[];
     states: readonly NodeState[];
     isolate: boolean;
     proof: boolean;
@@ -21,7 +22,7 @@ export interface GraphQuery {
 const codec = queryCodec<GraphQuery>({
     view: choiceParam("view", graphViews, "map"),
     lens: choiceParam("lens", lenses, "all"),
-    kinds: listParam("kinds", entityKinds),
+    presets: listParam("types", presetRoles),
     states: listParam("states", nodeStates),
     isolate: flagParam("isolate"),
     proof: flagParam("proof"),

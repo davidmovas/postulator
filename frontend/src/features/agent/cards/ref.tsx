@@ -6,7 +6,7 @@ import { usePage } from "../../../data/hooks/pages.js";
 import { useRun } from "../../../data/hooks/runs.js";
 import { useSchedule } from "../../../data/hooks/schedules.js";
 import { useSite } from "../../../data/hooks/sites.js";
-import { usePolicy, useTemplate } from "../../../data/hooks/templates.js";
+import { useTemplate } from "../../../data/hooks/templates.js";
 import { cx, Skeleton } from "../../../ui/index.js";
 import type { Ref } from "./model/card.js";
 
@@ -57,11 +57,6 @@ function SiteRef({ id }: { id: string }): ReactElement {
     return <Resolved label={detail.data?.site.name ?? null} pending={detail.isPending} id={id} />;
 }
 
-function PolicyRef({ id }: { id: string }): ReactElement {
-    const detail = usePolicy(id);
-    return <Resolved label={detail.data?.policy.name ?? null} pending={detail.isPending} id={id} />;
-}
-
 function ScheduleRef({ id }: { id: string }): ReactElement {
     const detail = useSchedule(id);
     return <Resolved label={detail.data?.schedule.name ?? null} pending={detail.isPending} id={id} />;
@@ -83,8 +78,6 @@ export function RefLabel({ kind, id }: Ref): ReactElement {
             return <TemplateRef id={id} />;
         case "site":
             return <SiteRef id={id} />;
-        case "policy":
-            return <PolicyRef id={id} />;
         case "schedule":
             return <ScheduleRef id={id} />;
         case "run":

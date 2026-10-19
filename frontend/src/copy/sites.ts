@@ -18,7 +18,6 @@ export const sites = {
     defaults: {
         title: "Defaults",
         template: "Template",
-        linkPolicy: "Link policy",
         modelRoles: "Model roles",
         none: "None chosen",
         roles: (count: number) => (count === 1 ? "1 role set" : `${count} roles set`),
@@ -54,7 +53,7 @@ export const sites = {
     woo: "WooCommerce detected",
     deleteTitle: "Delete this site",
     deleteBody: (name: string) =>
-        `${name} goes, and with it twelve tables: its pages and their links, its entities, their anchors and their edges, its runs with their items, artifacts, step records and event log, its own templates, template overrides and link policies, its schedules, its saved import mappings and its agent conversations with their messages. None of it can be brought back, and the stored application password goes with it. Nothing on WordPress is touched: the pages stay on the site.`,
+        `${name} goes, and with it everything recorded for it: its pages and their links, its entities, their anchors and their edges, its runs with their items, artifacts, step records and event log, its own templates and template overrides, its page types and their field scopes, its schedules, its saved import mappings and its agent conversations with their messages. None of it can be brought back, and the stored application password goes with it. Nothing on WordPress is touched: the pages stay on the site.`,
     deleteConfirm: "Delete the site",
     plugin: {
         title: "Companion plugin",

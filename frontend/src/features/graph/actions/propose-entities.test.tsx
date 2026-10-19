@@ -15,12 +15,11 @@ interface Calls {
 const calls: Calls = { previewed: [], keyworded: [], applied: [] };
 
 const proposals: ProposedEntity[] = [
-    { pageId: "mugs", path: "/shop/mugs/", name: "Mugs", kind: "category", keywords: [{ text: "mugs" }], parent: "/shop/" },
+    { pageId: "mugs", path: "/shop/mugs/", name: "Mugs", keywords: [{ text: "mugs" }], parent: "/shop/" },
     {
         pageId: "travel",
         path: "/shop/mugs/travel/",
         name: "Travel Mugs",
-        kind: "topic",
         keywords: [{ text: "travel mugs" }],
         parent: "/shop/mugs/",
     },

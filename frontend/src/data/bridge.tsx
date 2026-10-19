@@ -212,12 +212,14 @@ function handlersFor(client: QueryClient): Handlers {
                     keys.pages.summary(siteId),
                     keys.reports.site(siteId),
                     keys.graph.entityAll(),
+                    keys.graph.full(siteId),
+                    keys.sites.types(siteId),
                 );
             });
         },
         "templates.changed": () => {
             coalesce("templates", () => {
-                invalidateAll(client, keys.templates.root(), keys.policies.root());
+                invalidateAll(client, keys.templates.root(), keys.sites.typesAll());
             });
         },
         "sites.changed": (envelope) => {

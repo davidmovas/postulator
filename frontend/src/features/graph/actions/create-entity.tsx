@@ -6,16 +6,10 @@ import { fieldErrorOf, formErrorOf } from "../../../data/errors.js";
 import { useCreateEntity } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
 import type { Keyword } from "../../../data/types.js";
-import { entityKinds } from "../../../generated/vocab.js";
-import { Button, ChipInput, Drawer, Field, Input, KeywordInput, Select, Textarea, toneClasses } from "../../../ui/index.js";
-import type { SelectOption } from "../../../ui/index.js";
-import { entityIcon, entityKindLabel, kindTone } from "../labels.js";
+import { Button, ChipInput, Drawer, Field, Input, KeywordInput, Textarea, toneClasses } from "../../../ui/index.js";
+import { presetIcon, presetTone } from "../../settings/types/labels.js";
 import type { GraphIndex } from "../model/index.js";
-
-const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({
-    value,
-    label: entityKindLabel(value),
-}));
+import { presetOf } from "../model/index.js";
 
 export interface CreateEntityDrawerProps {
     open: boolean;
@@ -29,17 +23,16 @@ export interface CreateEntityDrawerProps {
 export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId, onCreated }: CreateEntityDrawerProps): ReactElement {
     const create = useCreateEntity();
     const [name, setName] = useState("");
-    const [kind, setKind] = useState<string>(entityKinds[2]);
     const [intent, setIntent] = useState("");
     const [keywords, setKeywords] = useState<Keyword[]>([]);
     const [anchors, setAnchors] = useState<string[]>([]);
     const parent = parentId === null ? undefined : index.byId.get(parentId);
-    const ParentIcon = entityIcon(parent?.kind ?? "");
+    const parentPreset = presetOf(index, parentId ?? "");
+    const ParentIcon = presetIcon(parentPreset);
 
     useEffect(() => {
         if (open) {
             setName("");
-            setKind(parent === undefined ? entityKinds[0] : entityKinds[2]);
             setIntent("");
             setKeywords([]);
             setAnchors([]);
@@ -51,7 +44,6 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
         const created = await create.mutateAsync({
             siteId,
             name: name.trim(),
-            kind,
             intent: intent.trim(),
             keywords,
             anchors: anchors.map((text) => ({ text, source: "user", weight: 1 })),
@@ -110,7 +102,7 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
                         <span className="text-ink-dim">{copy.graph.create.noParent}</span>
                     ) : (
                         <span className="flex min-w-0 items-center gap-1.5 text-ink">
-                            <ParentIcon size={14} className={toneClasses[kindTone(parent.kind)].ink} />
+                            <ParentIcon size={14} className={toneClasses[presetTone(parentPreset)].ink} />
                             <span className="truncate">{parent.name}</span>
                         </span>
                     )}
@@ -125,11 +117,6 @@ export function CreateEntityDrawer({ open, onOpenChange, siteId, index, parentId
                                 setName(event.target.value);
                             }}
                         />
-                    )}
-                </Field>
-                <Field label={copy.graph.form.kind} error={fieldErrorOf(create.error, "kind")}>
-                    {(control) => (
-                        <Select id={control.id} aria-describedby={control["aria-describedby"]} invalid={control.invalid} value={kind} options={kindOptions} onValueChange={setKind} />
                     )}
                 </Field>
                 <Field label={copy.graph.form.keywords} hint={copy.graph.form.keywordsHint} error={fieldErrorOf(create.error, "keywords")}>

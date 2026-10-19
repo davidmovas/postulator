@@ -2,7 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { copy } from "../../copy/index.js";
 import type { ToolRowStatus } from "./conversation/model/transcript.js";
-import { toolStatusLabel, toolStatusTone } from "./labels.js";
+import { families } from "./conversation/model/tools.js";
+import { familyIcon, familyLabel, toolStatusLabel, toolStatusTone } from "./labels.js";
+
+describe("the tool families", () => {
+    it("names every family the tools come in, page types among them", () => {
+        expect(families).toContain("pagetypes");
+        expect(families).not.toContain("policies");
+        for (const family of [...families, "other" as const]) {
+            expect(familyLabel(family)).not.toBe(family);
+            expect(familyIcon(family)).toBeDefined();
+        }
+    });
+});
 
 describe("toolStatusLabel and toolStatusTone", () => {
     it("reads a refusal, a shortening and a failure as three different things", () => {

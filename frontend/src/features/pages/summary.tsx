@@ -13,6 +13,7 @@ import {
     Button,
     ChevronRightIcon,
     EditNoteIcon,
+    HubIcon,
     IconButton,
     LinkIcon,
     LinkOffIcon,
@@ -23,7 +24,6 @@ import {
     TaskAltIcon,
     VerifiedIcon,
 } from "../../ui/index.js";
-import { entityIcon } from "../graph/labels.js";
 import { DriftBadge, PageStatusBadge } from "./badges.js";
 
 const shownLinks = 6;
@@ -82,7 +82,6 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
     const generated = links.filter((held) => held.origin === "generated").length;
     const url = liveUrl(site.data?.site.baseUrl ?? "", page.path);
     const reachable = isBrowsable(url) && page.wpId !== null && page.status !== "archived";
-    const Icon = entityIcon(entity.data?.entity.kind ?? "");
     const canonical = entity.data?.entity.canonicalPageId === page.id;
 
     return (
@@ -139,7 +138,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                         </span>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <Icon size={16} className="shrink-0 text-accent" />
+                            <HubIcon size={16} className="shrink-0 text-accent" />
                             <Link
                                 to={`/s/${siteId}/graph/${page.entityId}`}
                                 className="min-w-0 flex-1 truncate text-sm"

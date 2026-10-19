@@ -25,12 +25,14 @@ export type * as SchemaModels from "../../bindings/github.com/davidmovas/postula
 export type * as CatalogModels from "../../bindings/github.com/davidmovas/postulator/internal/application/models/models.js";
 export type * as ObserveModels from "../../bindings/github.com/davidmovas/postulator/internal/application/observe/models.js";
 export type * as PagesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/pages/models.js";
+export type * as PageTypesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/pagetypes/models.js";
 export type * as ReportsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/reports/models.js";
 export type * as RunsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/runs/models.js";
 export type * as SchedulesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/schedules/models.js";
 export type * as SitesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/sites/models.js";
 export type * as SyncModels from "../../bindings/github.com/davidmovas/postulator/internal/application/sync/models.js";
 export type * as TemplatesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/templates/models.js";
+export type * as FieldModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/field/models.js";
 export type * as LlmModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/llm/models.js";
 export type * as RunDomainModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/run/models.js";
 export type * as TemplateDomainModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/template/models.js";

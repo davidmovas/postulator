@@ -1,10 +1,11 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
-import { entityKinds } from "../../generated/vocab.js";
 import { Button, cx, LinkIcon, Segmented, Switch, Toolbar, toneClasses } from "../../ui/index.js";
 import type { SegmentedOption } from "../../ui/index.js";
-import { entityIcon, entityKindLabel, kindTone, lensHint, lensLabel, stateHint, stateLabel, stateTone } from "./labels.js";
+import type { PresetRole } from "../settings/types/labels.js";
+import { presetIcon, presetLabel, presetRoles, presetTone } from "../settings/types/labels.js";
+import { lensHint, lensLabel, stateHint, stateLabel, stateTone } from "./labels.js";
 import { nodeStates } from "./model/index.js";
 import type { GraphIndex, NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
@@ -28,14 +29,14 @@ export interface GraphToolbarProps {
 }
 
 export function GraphToolbar({ index, query, proofBusy, focusSearch, onChange, onPick }: GraphToolbarProps): ReactElement {
-    const toggleKind = (kind: string): void => {
-        const held = new Set(query.kinds);
-        if (held.has(kind)) {
-            held.delete(kind);
+    const togglePreset = (preset: PresetRole): void => {
+        const held = new Set<PresetRole>(query.presets);
+        if (held.has(preset)) {
+            held.delete(preset);
         } else {
-            held.add(kind);
+            held.add(preset);
         }
-        onChange({ ...query, kinds: entityKinds.filter((known) => held.has(known)) });
+        onChange({ ...query, presets: presetRoles.filter((known) => held.has(known)) });
     };
 
     const toggleState = (state: NodeState): void => {
@@ -59,23 +60,24 @@ export function GraphToolbar({ index, query, proofBusy, focusSearch, onChange, o
                     onChange({ ...query, lens });
                 }}
             />
-            <div className="flex items-center gap-0.5" role="group" aria-label={copy.graph.lens.kinds}>
-                {entityKinds.map((kind) => {
-                    const Icon = entityIcon(kind);
-                    const active = query.kinds.includes(kind);
+            <div className="flex items-center gap-0.5" role="group" aria-label={copy.graph.lens.types}>
+                {presetRoles.map((preset) => {
+                    const Icon = presetIcon(preset);
+                    const active = query.presets.includes(preset);
                     return (
                         <button
-                            key={kind}
+                            key={preset}
                             type="button"
                             aria-pressed={active}
-                            title={entityKindLabel(kind)}
-                            aria-label={entityKindLabel(kind)}
+                            title={presetLabel(preset)}
+                            aria-label={presetLabel(preset)}
+                            data-graph-preset={preset}
                             className={cx(
                                 "flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-100",
-                                active ? `bg-raised ${toneClasses[kindTone(kind)].ink}` : "text-ink-faint hover:bg-inset hover:text-ink-dim",
+                                active ? `bg-raised ${toneClasses[presetTone(preset)].ink}` : "text-ink-faint hover:bg-inset hover:text-ink-dim",
                             )}
                             onClick={() => {
-                                toggleKind(kind);
+                                togglePreset(preset);
                             }}
                         >
                             <Icon size={14} />
@@ -129,7 +131,7 @@ export function GraphToolbar({ index, query, proofBusy, focusSearch, onChange, o
                 label={copy.graph.lens.isolate}
                 title={copy.graph.lens.isolateHint}
                 checked={query.isolate}
-                disabled={query.lens === "all" && query.kinds.length === 0}
+                disabled={query.lens === "all" && query.presets.length === 0}
                 onChange={(event) => {
                     onChange({ ...query, isolate: event.target.checked });
                 }}

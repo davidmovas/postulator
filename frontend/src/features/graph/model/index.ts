@@ -1,5 +1,13 @@
-import type { Edge, Entity, EntityPage } from "../../../data/types.js";
+import type { Edge, Entity, EntityPage, PageType } from "../../../data/types.js";
 import { entityLabels } from "../../../domain/entities.js";
+import type { PresetRole } from "../../settings/types/labels.js";
+import { roleOf } from "../../settings/types/labels.js";
+
+export interface EntityType {
+    id: string;
+    name: string;
+    preset: string;
+}
 
 export type NodeState = "mismatch" | "working" | "published" | "exists" | "planned" | "archived" | "noPage";
 
@@ -55,7 +63,39 @@ export interface GraphIndex {
     depth: ReadonlyMap<string, number>;
     problems: ReadonlyMap<string, EntityProblems>;
     pageState: ReadonlyMap<string, EntityPage>;
+    types: ReadonlyMap<string, EntityType>;
     counts: GraphCounts;
+}
+
+export function typeOf(index: GraphIndex, id: string): EntityType | null {
+    return index.types.get(id) ?? null;
+}
+
+export function presetOf(index: GraphIndex, id: string): PresetRole {
+    return roleOf(index.types.get(id)?.preset);
+}
+
+function canonicalTypes(
+    byId: ReadonlyMap<string, Entity>,
+    pages: readonly EntityPage[],
+    pageTypes: readonly PageType[],
+): Map<string, EntityType> {
+    const known = new Map<string, EntityType>();
+    for (const held of pageTypes) {
+        known.set(held.id, { id: held.id, name: held.name, preset: held.preset });
+    }
+    const out = new Map<string, EntityType>();
+    for (const page of pages) {
+        const owner = byId.get(page.entityId);
+        if (owner === undefined || owner.canonicalPageId !== page.pageId || page.pageTypeId === null) {
+            continue;
+        }
+        const found = known.get(page.pageTypeId);
+        if (found !== undefined) {
+            out.set(owner.id, found);
+        }
+    }
+    return out;
 }
 
 export function nodeStateOf(index: GraphIndex, id: string): NodeState {
@@ -156,6 +196,7 @@ export function buildGraphIndex(
     entities: readonly Entity[],
     edges: readonly Edge[],
     pages: readonly EntityPage[] = [],
+    pageTypes: readonly PageType[] = [],
 ): GraphIndex {
     const pageState = new Map<string, EntityPage>();
     for (const state of pages) {
@@ -169,6 +210,7 @@ export function buildGraphIndex(
     for (const held of entities) {
         byId.set(held.id, held);
     }
+    const types = canonicalTypes(byId, pages, pageTypes);
 
     const edgeById = new Map<string, Edge>();
     const approvedParents = new Map<string, string[]>();
@@ -280,7 +322,7 @@ export function buildGraphIndex(
         const approved = approvedParents.get(held.id) ?? [];
         const flags: EntityProblems = {
             noPage: held.canonicalPageId === null,
-            orphan: approved.length === 0 && held.kind !== "hub",
+            orphan: approved.length === 0 && types.get(held.id)?.preset !== "hub",
             proposed: proposedTouches.get(held.id) ?? 0,
             multiParent: approved.length > 1,
         };
@@ -309,6 +351,7 @@ export function buildGraphIndex(
         depth,
         problems,
         pageState,
+        types,
         counts,
     };
     for (const id of byId.keys()) {

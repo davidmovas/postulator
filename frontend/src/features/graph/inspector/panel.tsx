@@ -9,8 +9,10 @@ import { relativeTime } from "../../../domain/format.js";
 import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
-import { entityIcon, formatScore, entityKindLabel, kindTone } from "../labels.js";
+import { presetIcon, presetTone } from "../../settings/types/labels.js";
+import { entityTypeLabel, formatScore } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
+import { presetOf, typeOf } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 import { AnchorsEditor } from "./anchors.js";
 import { EntityFields } from "./fields.js";
@@ -126,16 +128,17 @@ export function Inspector({
         );
     }
 
-    const Icon = entityIcon(entity.kind);
+    const preset = presetOf(index, entity.id);
+    const Icon = presetIcon(preset);
 
     return (
         <section aria-label={copy.graph.inspector.title} className="flex h-full min-h-0 flex-col bg-panel">
             <header className="flex items-start gap-2 border-b border-hairline p-3">
-                <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[kindTone(entity.kind)].ink}`} />
+                <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[presetTone(preset)].ink}`} />
                 <div className="min-w-0 flex-1">
                     <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
                     <p className="flex items-center gap-2 text-2xs text-ink-dim">
-                        <span>{entityKindLabel(entity.kind)}</span>
+                        <span data-entity-type={preset}>{entityTypeLabel(typeOf(index, entity.id))}</span>
                         <span className="font-mono">{formatScore(entity.score)}</span>
                         <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
                     </p>

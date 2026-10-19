@@ -84,7 +84,6 @@ export const empty = {
     runEvents: "No steps have been recorded yet for this run.",
     artifacts: "This item produced no artifacts yet.",
     templates: "No templates yet. Create one or let the agent draft it for you.",
-    policies: "No link policies yet. The built-in defaults apply until you add one.",
     overrides: "No overrides. Every page uses the template as written.",
     schedules: "No schedules yet. Add one to generate or sync on a timer.",
     mappings: "No saved column mappings for this site yet.",

@@ -47,13 +47,6 @@ export interface SpecDraft {
     primaryInFirstParagraph: boolean;
     maxDensity: number;
     requiredKeywords: number | null;
-    upDepth: number;
-    downLinks: boolean;
-    siblingMinWeight: number;
-    maxLinks: number;
-    maxPerTarget: number;
-    parentLinkWithinParagraphs: number;
-    childrenSection: boolean;
     titlePattern: string;
     descriptionMax: number;
     featuredImage: boolean;
@@ -199,7 +192,6 @@ export function draftFromJson(value: JsonValue): SpecDraft {
     const root = isJsonObject(value) ? value : null;
     const length = branch(root, "length");
     const keywords = branch(root, "keywordRules");
-    const links = branch(root, "linkRules");
     const meta = branch(root, "metaRules");
     const images = branch(root, "images");
     return {
@@ -212,13 +204,6 @@ export function draftFromJson(value: JsonValue): SpecDraft {
         primaryInFirstParagraph: flag(keywords, "primaryInFirstParagraph"),
         maxDensity: count(keywords, "maxDensity"),
         requiredKeywords: countOrNone(keywords, "requiredKeywords"),
-        upDepth: count(links, "upDepth"),
-        downLinks: flag(links, "downLinks"),
-        siblingMinWeight: count(links, "siblingMinWeight"),
-        maxLinks: count(links, "maxLinks"),
-        maxPerTarget: count(links, "maxPerTarget"),
-        parentLinkWithinParagraphs: count(links, "parentLinkWithinParagraphs"),
-        childrenSection: flag(links, "childrenSection"),
         titlePattern: text(meta, "titlePattern"),
         descriptionMax: count(meta, "descriptionMax"),
         featuredImage: flag(images, "featured"),
@@ -270,15 +255,6 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         tone: draft.tone,
         length: { min: draft.lengthMin, max: draft.lengthMax },
         keywordRules,
-        linkRules: {
-            upDepth: draft.upDepth,
-            downLinks: draft.downLinks,
-            siblingMinWeight: draft.siblingMinWeight,
-            maxLinks: draft.maxLinks,
-            maxPerTarget: draft.maxPerTarget,
-            parentLinkWithinParagraphs: draft.parentLinkWithinParagraphs,
-            childrenSection: draft.childrenSection,
-        },
         metaRules: { titlePattern: draft.titlePattern, descriptionMax: draft.descriptionMax },
         images: { featured: draft.featuredImage, inline: draft.inlineImages, source: draft.imageSource },
         modelProfiles: profiles,

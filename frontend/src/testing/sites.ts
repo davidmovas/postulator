@@ -30,7 +30,7 @@ export function aSite(overrides: Partial<Site> = {}): Site {
         allowInsecure: false,
         plugin: { installed: true, version: "1.4.1", capabilities: ["raw", "preview"], seoPlugin: "rankmath" },
         commerce: "ready",
-        defaults: { templateId: null, linkPolicyId: null, modelProfiles: null },
+        defaults: { templateId: null, modelProfiles: null },
         settings: siteSettings(),
         createdAt: "2026-10-01T09:00:00Z",
         updatedAt: "2026-10-18T07:00:00Z",

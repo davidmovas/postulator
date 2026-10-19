@@ -4,8 +4,10 @@ import { copy } from "../../../copy/index.js";
 import { useApproveEdge, useRejectEdge } from "../../../data/hooks/graph.js";
 import type { Entity } from "../../../data/types.js";
 import { Button, CheckIcon, CloseIcon, IconButton, toneClasses } from "../../../ui/index.js";
-import { entityIcon, formatScore, kindTone } from "../labels.js";
+import { presetIcon, presetTone } from "../../settings/types/labels.js";
+import { formatScore } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
+import { presetOf } from "../model/index.js";
 
 const childrenShown = 10;
 
@@ -21,7 +23,8 @@ interface RowProps {
 
 function Row({ id, index, note, tone, edgeId, proposed, onPick }: RowProps): ReactElement {
     const held = index.byId.get(id);
-    const Icon = entityIcon(held?.kind ?? "");
+    const preset = presetOf(index, id);
+    const Icon = presetIcon(preset);
     const approve = useApproveEdge();
     const reject = useRejectEdge();
     return (
@@ -33,7 +36,7 @@ function Row({ id, index, note, tone, edgeId, proposed, onPick }: RowProps): Rea
                     onPick(id);
                 }}
             >
-                <Icon size={14} className={toneClasses[kindTone(held?.kind ?? "")].ink} />
+                <Icon size={14} className={toneClasses[presetTone(preset)].ink} />
                 <span className="flex-1 truncate">{held?.name ?? id}</span>
                 {note === undefined ? null : <span className={`font-mono text-2xs ${tone === "info" ? "text-info" : "text-ink-faint"}`}>{note}</span>}
             </button>

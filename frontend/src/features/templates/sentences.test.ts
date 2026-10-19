@@ -17,15 +17,6 @@ const base: JsonObject = {
     tone: "Authoritative and plain",
     length: { min: 1600, max: 2400 },
     keywordRules: { primaryInTitle: true, primaryInH1: true, primaryInFirstParagraph: true, maxDensity: 0.025 },
-    linkRules: {
-        upDepth: 1,
-        downLinks: true,
-        siblingMinWeight: 0.5,
-        maxLinks: 20,
-        maxPerTarget: 1,
-        parentLinkWithinParagraphs: 2,
-        childrenSection: true,
-    },
     metaRules: { titlePattern: "{primaryKeyword}", descriptionMax: 155 },
     images: { featured: true, inline: 0, source: "ai" },
     modelProfiles: {},
@@ -94,14 +85,10 @@ describe("sentencesOf", () => {
         ]);
     });
 
-    it("renders keyword and link rules as prose", () => {
+    it("renders keyword and meta rules as prose", () => {
         expect(
-            sentencesOf(draft, { keywordRules: { maxDensity: 0.015 }, linkRules: { maxLinks: 8, downLinks: false } }),
-        ).toStrictEqual([
-            "caps keyword density at 1.5%",
-            "stops linking down to child pages",
-            "allows at most 8 internal links",
-        ]);
+            sentencesOf(draft, { keywordRules: { maxDensity: 0.015 }, metaRules: { descriptionMax: 140 } }),
+        ).toStrictEqual(["caps keyword density at 1.5%", "caps the meta description at 140 characters"]);
     });
 
     it("names the sections a replacement leaves behind", () => {

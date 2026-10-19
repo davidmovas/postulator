@@ -1,4 +1,4 @@
-import { nodeStateOf } from "./index.js";
+import { nodeStateOf, presetOf } from "./index.js";
 import type { GraphIndex, NodeState } from "./index.js";
 
 export const lenses = ["all", "noPage", "proposed", "orphan", "ai"] as const;
@@ -24,14 +24,14 @@ function matchesLens(index: GraphIndex, lens: Lens, id: string): boolean {
 export function matchedSet(
     index: GraphIndex,
     lens: Lens,
-    kinds: ReadonlySet<string> | null,
+    presets: ReadonlySet<string> | null,
     states: readonly NodeState[] = [],
 ): ReadonlySet<string> {
     const out = new Set<string>();
-    const anyKind = kinds === null || kinds.size === 0;
+    const anyPreset = presets === null || presets.size === 0;
     const wanted = new Set<NodeState>(states);
     for (const held of index.byId.values()) {
-        if (!anyKind && !kinds.has(held.kind)) {
+        if (!anyPreset && !presets.has(presetOf(index, held.id))) {
             continue;
         }
         if (wanted.size > 0 && !wanted.has(nodeStateOf(index, held.id))) {

@@ -6,7 +6,6 @@ import type { Layer } from "../patch.js";
 import type { SpecDraft } from "../spec.js";
 import { ModelsGroup } from "./models.js";
 import { OverridesGroup } from "./overrides.js";
-import { PoliciesGroup } from "./policies.js";
 import { ProductGroup } from "./product.js";
 import { RecipeGroup } from "./recipe.js";
 import { RulesGroup } from "./rules.js";
@@ -15,7 +14,6 @@ import { SectionsGroup } from "./sections.js";
 export interface GroupViewProps {
     group: GroupKey;
     layer: Layer;
-    siteId: string;
     draft: SpecDraft;
     below: SpecDraft;
     siteOverride: TemplateOverride | null;
@@ -27,7 +25,6 @@ export interface GroupViewProps {
 export function GroupView({
     group,
     layer,
-    siteId,
     draft,
     below,
     siteOverride,
@@ -57,7 +54,5 @@ export function GroupView({
                     onChange={onChange}
                 />
             );
-        default:
-            return <PoliciesGroup siteId={siteId} />;
     }
 }

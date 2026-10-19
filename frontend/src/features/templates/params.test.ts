@@ -8,8 +8,13 @@ describe("readQuery", () => {
         { name: "an empty search is the default query", raw: "", want: defaultQuery },
         {
             name: "every facet round-trips",
-            raw: "scope=site&kind=guide&q=kiln&sort=name:desc",
-            want: { scope: "site", pageKind: "guide", search: "kiln", sort: { field: "name", desc: true } },
+            raw: "scope=site&q=kiln&sort=name:desc",
+            want: { scope: "site", search: "kiln", sort: { field: "name", desc: true } },
+        },
+        {
+            name: "the page kind a template once carried is no facet any more",
+            raw: "kind=guide&q=kiln",
+            want: { ...defaultQuery, search: "kiln" },
         },
         {
             name: "an unknown scope falls back to all",
@@ -39,7 +44,6 @@ describe("writeQuery", () => {
     it("survives a round trip", () => {
         const query: TemplatesQuery = {
             scope: "global",
-            pageKind: "hub",
             search: "mug",
             sort: { field: "createdAt", desc: true },
         };
@@ -50,15 +54,14 @@ describe("writeQuery", () => {
     it("writes every facet under its own key, in the order the address has always had", () => {
         const query: TemplatesQuery = {
             scope: "global",
-            pageKind: "hub",
             search: "mug kiln",
             sort: { field: "createdAt", desc: true },
         };
-        expect(searchOf(query)).toBe("?scope=global&kind=hub&q=mug+kiln&sort=createdAt%3Adesc");
+        expect(searchOf(query)).toBe("?scope=global&q=mug+kiln&sort=createdAt%3Adesc");
     });
 
     it("never carries the action the palette sends", () => {
-        expect(writeQuery(readQuery(new URLSearchParams("action=new&kind=guide"))).toString()).toBe("kind=guide");
+        expect(writeQuery(readQuery(new URLSearchParams("action=new&q=kiln"))).toString()).toBe("q=kiln");
     });
 });
 
@@ -66,7 +69,6 @@ describe("narrowed", () => {
     it("knows when a filter hides rows", () => {
         expect(narrowed(defaultQuery)).toBe(false);
         expect(narrowed({ ...defaultQuery, search: "kiln" })).toBe(true);
-        expect(narrowed({ ...defaultQuery, pageKind: "guide" })).toBe(true);
         expect(narrowed({ ...defaultQuery, scope: "global" })).toBe(true);
         expect(narrowed({ ...defaultQuery, sort: sorts.newest })).toBe(false);
     });

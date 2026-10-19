@@ -6,8 +6,9 @@ describe("familyOf and verbOf", () => {
     it("reads the family off the prefix and the verb off the rest", () => {
         expect(familyOf("graph_list_entities")).toBe("graph");
         expect(verbOf("graph_list_entities")).toBe("list entities");
-        expect(familyOf("policies_effective")).toBe("policies");
-        expect(verbOf("policies_effective")).toBe("effective");
+        expect(familyOf("pagetypes_set_scope")).toBe("pagetypes");
+        expect(verbOf("pagetypes_set_scope")).toBe("set scope");
+        expect(familyOf("policies_effective")).toBe("other");
         expect(familyOf("content_judge_page")).toBe("content");
         expect(verbOf("content_judge_page")).toBe("judge page");
     });
@@ -30,6 +31,7 @@ describe("resultSummary", () => {
         expect(resultSummary("pages_list", { items: [{}, {}, {}], hasMore: true })).toBe("3 pages, more available");
         expect(resultSummary("graph_list_entities", { items: [], hasMore: false })).toBe("no entities");
         expect(resultSummary("sites_list", { items: [{}], hasMore: false })).toBe("1 site");
+        expect(resultSummary("pagetypes_list", { items: [{}, {}], hasMore: false })).toBe("2 page types");
     });
 
     it("names the record a read or a write answered with", () => {
@@ -62,6 +64,8 @@ describe("toolLabel", () => {
         expect(toolLabel("graph_create_entity")).toBe("Create entity");
         expect(toolLabel("sites_get")).toBe("Get site");
         expect(toolLabel("schedules_search")).toBe("Search schedules");
+        expect(toolLabel("pagetypes_list")).toBe("List page types");
+        expect(toolLabel("pagetypes_save")).toBe("Save page type");
     });
 
     it("spells out a tool of no known family and carries no underscore", () => {
