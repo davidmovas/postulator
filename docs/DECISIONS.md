@@ -3430,10 +3430,10 @@ What stays open, each for the owner:
   whenever a snippet field is**: both predate stage 2b and sit against the 2026-10-17 ruling that an
   existing page's status is never written.
 
-### What the replica found (2026-10-20)
+### What the stands found (2026-10-20)
 
-Docker came back after the close. On the replica, the capture, the exit tests and the whole suite
-found seven things, each fixed test first or in the harness:
+Docker came back after the close. The captures, the exit tests and the whole suite on each stand
+found nine things, each fixed test first or in the harness:
 
 - **The capture's graph named no canonical page**, so every pack carried no link target:
   `seedStandGraph` makes each mapped page its entity's canonical (`832de25`).
@@ -3462,6 +3462,15 @@ found seven things, each fixed test first or in the harness:
   products, a reply matched by a bare path also matched a sibling's prompt. Every reply now matches
   the page's own `Path:` line, which also ends the `/menu/` against `/menu/main-courses/` prefix
   trap.
+- **A shortcode block is named by its own tag** (`15b8d66`). Vanilla's golden showed the account
+  page as `core/shortcode` where the writer needed `woocommerce_my_account`, and the replica's
+  golden had carried the same line unnoticed. `Body.ShortcodesAt` holds the classic and editor
+  rule once, for `Shortcodes` and the pack.
+- **The writer test's planned child is its entity's page** (`07d4b70`): `planChild` created the
+  page without making it the canonical one, as an import or a graph apply would, so the link plan
+  blocked it and vanilla's `/guide/setup/` owed its child nothing.
+
+Both stands then ran their whole suites green from fresh resets on the final code.
 
 Open with the owner: **a fresh site cannot start a run on "auto"** until a person gives its types,
 or the site, a template. The seeded writable types could point at the matching built-ins (Hub,
