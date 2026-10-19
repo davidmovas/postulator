@@ -95,16 +95,17 @@ export function EntityCard({ entity }: EntityCardProps): ReactElement {
                     {draft.facts.map((fact, at) => (
                         <li key={at} className="flex flex-col gap-0.5" data-card-fact={at}>
                             <div className="flex items-center gap-1.5">
-                                <Input
-                                    aria-label={`${said.factLabel} ${at + 1}`}
-                                    placeholder={said.factLabel}
-                                    invalid={shown.facts.has(at)}
-                                    className="w-2/5"
-                                    value={fact.label}
-                                    onChange={(event) => {
-                                        editFact(at, { ...fact, label: event.target.value });
-                                    }}
-                                />
+                                <div className="w-2/5 shrink-0">
+                                    <Input
+                                        aria-label={`${said.factLabel} ${at + 1}`}
+                                        placeholder={said.factLabel}
+                                        invalid={shown.facts.has(at)}
+                                        value={fact.label}
+                                        onChange={(event) => {
+                                            editFact(at, { ...fact, label: event.target.value });
+                                        }}
+                                    />
+                                </div>
                                 <Input
                                     aria-label={`${said.factValue} ${at + 1}`}
                                     placeholder={said.factValue}
