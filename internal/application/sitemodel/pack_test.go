@@ -241,6 +241,13 @@ func TestAPackOutOfARunTakesTheRolesBudget(t *testing.T) {
 	if meta.Budget != 4000 {
 		t.Errorf("the SEO title's pack has budget %d, want the editor's 4000", meta.Budget)
 	}
+	excerpt, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "excerpt"})
+	if err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	if excerpt.Budget != 4000 {
+		t.Errorf("the excerpt's pack has budget %d, want the editor's 4000, as generate_fields writes it", excerpt.Budget)
+	}
 	asked, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Budget: 100000})
 	if err != nil || asked.Budget != 100000 {
 		t.Errorf("a budget asked for = %d, %v; want it kept", asked.Budget, err)

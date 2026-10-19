@@ -89,7 +89,7 @@ func (s *Service) Pack(ctx context.Context, req PackRequest) (PackView, error) {
 
 func roleOf(key field.Key) llm.Role {
 	switch key {
-	case field.SEOTitle, field.SEODescription:
+	case field.SEOTitle, field.SEODescription, field.Excerpt:
 		return llm.RoleEditor
 	default:
 		return llm.RoleWriter
