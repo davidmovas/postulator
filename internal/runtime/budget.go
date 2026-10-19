@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	tokensPerWord       = 2.2
 	promptOverhead      = 800
 	fallbackTargetWords = 800
 	inputShareOfOutput  = 0.5
@@ -209,7 +208,7 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 	}
 
 	usage := usageOf(
-		outputOf(def, int(float64(targetWords(target.Spec, target.Page.WPType))*tokensPerWord)),
+		outputOf(def, llm.WordTokens(targetWords(target.Spec, target.Page.WPType))),
 		reasoningOf(info, e.deps.Tuning.Effort(def.Role)),
 	)
 	priced.tokens += usage.Total * calls
