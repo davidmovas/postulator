@@ -276,13 +276,17 @@ func (s Snapshot) products(page pagemap.Page) (pages []pagemap.Page, from string
 }
 
 func (s Snapshot) listed(pageID string) []pagemap.Page {
-	out := make([]pagemap.Page, 0)
-	seen := make(map[string]struct{})
+	links := make([]pagemap.PageLink, 0)
 	for i := range s.Links {
-		link := s.Links[i]
-		if link.FromPageID != pageID || link.Type != pagemap.LinkListing || link.ToPageID == nil {
-			continue
+		if s.Links[i].FromPageID == pageID && s.Links[i].Type == pagemap.LinkListing && s.Links[i].ToPageID != nil {
+			links = append(links, s.Links[i])
 		}
+	}
+	slices.SortStableFunc(links, func(a, b pagemap.PageLink) int { return cmp.Compare(a.ToURL, b.ToURL) })
+	out := make([]pagemap.Page, 0, len(links))
+	seen := make(map[string]struct{}, len(links))
+	for i := range links {
+		link := links[i]
 		if _, dup := seen[*link.ToPageID]; dup {
 			continue
 		}

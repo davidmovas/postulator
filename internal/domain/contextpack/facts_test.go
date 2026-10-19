@@ -85,6 +85,33 @@ func TestAnEmptyPageIsSummarisedFromItsStructure(t *testing.T) {
 	}
 }
 
+func TestListedProductsComeInOneOrderWhateverOrderTheLinksWereStoredIn(t *testing.T) {
+	t.Parallel()
+
+	stored := replicaLike()
+	reversed := replicaLike()
+	reversed.links[3], reversed.links[4] = reversed.links[4], reversed.links[3]
+	orders := make([][]string, 0, 2)
+	for _, f := range []fixture{stored, reversed} {
+		s := f.snapshot(t)
+		facts, err := s.Facts("healing", planFor(t, s, "healing"))
+		if err != nil {
+			t.Fatalf("Facts: %v", err)
+		}
+		if facts.ListedFrom != "listing" || len(facts.Products) != 2 {
+			t.Fatalf("products from %q = %d, want the healing hub's two listed products", facts.ListedFrom, len(facts.Products))
+		}
+		got := make([]string, 0, len(facts.Products))
+		for _, product := range facts.Products {
+			got = append(got, product.Path)
+		}
+		orders = append(orders, got)
+	}
+	if !slices.Equal(orders[0], orders[1]) {
+		t.Errorf("products = %v stored one way and %v the other, want one order", orders[0], orders[1])
+	}
+}
+
 func TestTheNeighboursAreTheContentBesideAPage(t *testing.T) {
 	t.Parallel()
 
@@ -201,7 +228,7 @@ func TestAHubListsItsTwinsProductsWhenItsOwnListingIsSmaller(t *testing.T) {
 		},
 		{
 			name: "the hub's own listing when it holds as many", fixture: larger, from: "listing", twin: true,
-			products: []string{"BPC-157 5 mg", "BPC-157 10 mg", "TB-500", "GHK-Cu"},
+			products: []string{"BPC-157 10 mg", "BPC-157 5 mg", "GHK-Cu", "TB-500"},
 		},
 	}
 	for _, tc := range cases {
