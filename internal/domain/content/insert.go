@@ -93,7 +93,7 @@ func insert(doc *Document, lc LinkContext, policy field.LinkPolicy, wanted []Lin
 			if maxLinks > 0 && placed >= maxLinks {
 				break
 			}
-			placement, outcome, detail := insertOne(doc, target, policy, inserted)
+			placement, outcome, detail := insertOne(doc, lc, target, policy, inserted)
 			if outcome != OutcomeInserted {
 				if inserted == 0 {
 					result.Decisions = append(result.Decisions, Decision{
@@ -129,7 +129,7 @@ func anchorOrder(target LinkTarget, strategy field.AnchorStrategy, placed int) [
 	return append(slices.Clone(target.Anchors[shift:]), target.Anchors[:shift]...)
 }
 
-func insertOne(doc *Document, target LinkTarget, policy field.LinkPolicy, placed int) (Placement, Outcome, string) {
+func insertOne(doc *Document, lc LinkContext, target LinkTarget, policy field.LinkPolicy, placed int) (Placement, Outcome, string) {
 	limit := policy.Rules.ParentLinkWithinParagraphs
 	restricted := target.Relation == RelationUp && limit > 0
 
@@ -153,7 +153,7 @@ func insertOne(doc *Document, target LinkTarget, policy field.LinkPolicy, placed
 			if !matched {
 				continue
 			}
-			splice(node, start, end, target.URL)
+			splice(node, start, end, lc.Href(target))
 			return Placement{Target: target, Anchor: node.Data[start:end], ParagraphIndex: index},
 				OutcomeInserted, ""
 		}

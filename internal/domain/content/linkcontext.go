@@ -50,7 +50,15 @@ type LinkContext struct {
 	PageURL  string       `json:"pageUrl"`
 	EntityID string       `json:"entityId"`
 	Site     pagemap.Site `json:"site"`
+	Absolute bool         `json:"absolute,omitempty"`
 	Targets  []LinkTarget `json:"targets"`
+}
+
+func (c LinkContext) Href(target LinkTarget) string {
+	if c.Absolute {
+		return c.Site.URL(target.URL)
+	}
+	return target.URL
 }
 
 type LinkPlan struct {
@@ -82,13 +90,14 @@ type Subject struct {
 	PageID   string
 	PagePath string
 	EntityID string
+	Absolute bool
 }
 
 func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy field.LinkPolicy) LinkPlan {
 	plan := LinkPlan{
 		Context: LinkContext{
 			PageID: subject.PageID, PageURL: subject.PagePath, EntityID: subject.EntityID,
-			Site: subject.Site, Targets: make([]LinkTarget, 0),
+			Site: subject.Site, Absolute: subject.Absolute, Targets: make([]LinkTarget, 0),
 		},
 		Blocked: make([]BlockedTarget, 0),
 	}
@@ -123,9 +132,43 @@ func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy field
 	}
 	walk.siblings(subject.EntityID, policy.Rules.SiblingMinWeight)
 
-	plan.Context.Targets = walk.targets
+	plan.Context.Targets = settle(walk.targets, index, plan.Context.PageID)
 	plan.Blocked = walk.blocked
 	return plan
+}
+
+func settle(targets []LinkTarget, index pagemap.Index, selfID string) []LinkTarget {
+	out := make([]LinkTarget, 0, len(targets))
+	at := make(map[string]int, len(targets))
+	for i := range targets {
+		target := targets[i]
+		if page, found := index.ByID(target.PageID); found {
+			if hub, twin := index.HubTwin(page); twin {
+				target.PageID, target.URL = hub.ID, hub.Path
+			}
+		}
+		if target.PageID == selfID {
+			continue
+		}
+		if held, dup := at[target.PageID]; dup {
+			out[held] = merged(out[held], target)
+			continue
+		}
+		at[target.PageID] = len(out)
+		out = append(out, target)
+	}
+	return out
+}
+
+func merged(kept, other LinkTarget) LinkTarget {
+	kept.Required = kept.Required || other.Required
+	kept.Weight = max(kept.Weight, other.Weight)
+	for _, anchor := range other.Anchors {
+		if !slices.Contains(kept.Anchors, anchor) {
+			kept.Anchors = append(kept.Anchors, anchor)
+		}
+	}
+	return kept
 }
 
 type planner struct {
