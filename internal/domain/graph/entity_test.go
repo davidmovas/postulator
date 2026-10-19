@@ -94,6 +94,45 @@ func TestNewEntityCleansItsCard(t *testing.T) {
 	}
 }
 
+func TestACardsHashMovesOnlyWithItsDefinitionAndFacts(t *testing.T) {
+	t.Parallel()
+
+	carded := validEntity()
+	carded.Definition = "A peptide."
+	carded.Facts = []graph.Fact{{Label: "Form", Value: "Powder"}}
+	base := carded.CardHash()
+
+	renamed := carded
+	renamed.Name, renamed.Intent = "Another name", "buy"
+	cases := []struct {
+		name  string
+		entry graph.Entity
+		same  bool
+	}{
+		{name: "the name and intent are not the card", entry: renamed, same: true},
+		{name: "a new definition", entry: func() graph.Entity { e := carded; e.Definition = "A protein."; return e }()},
+		{name: "a new fact", entry: func() graph.Entity {
+			e := carded
+			e.Facts = []graph.Fact{{Label: "Form", Value: "Powder"}, {Label: "Purity", Value: "99%"}}
+			return e
+		}()},
+		{name: "a fact's value", entry: func() graph.Entity { e := carded; e.Facts = []graph.Fact{{Label: "Form", Value: "Liquid"}}; return e }()},
+		{name: "a definition split into a fact", entry: func() graph.Entity {
+			e := carded
+			e.Definition, e.Facts = "", []graph.Fact{{Label: "A peptide.", Value: "Form"}}
+			return e
+		}()},
+	}
+	for _, tc := range cases {
+		if got := tc.entry.CardHash() == base; got != tc.same {
+			t.Errorf("%s: the hash held = %t, want %t", tc.name, got, tc.same)
+		}
+	}
+	if len(base) != 64 {
+		t.Errorf("CardHash = %q, want a sha256 in hex", base)
+	}
+}
+
 func TestNewEntityWithoutKeywordsCarriesAnEmptyList(t *testing.T) {
 	t.Parallel()
 

@@ -90,7 +90,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	return useCases{
 		sites: sites.New(stores.sites, stores.secrets, stores.store, writing.pageTypes, writing.wordpress, c.Events, stores.now),
 		graph: graph.New(graph.Deps{
-			Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages,
+			Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
 			Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,
 			Publisher: c.Events, Clock: stores.now,
 		}),

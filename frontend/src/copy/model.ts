@@ -254,6 +254,7 @@ export const model = {
         page_title_differs: "Title differs from the plan",
         page_h1_differs: "H1 differs from the plan",
         url_form_mixed: "Mixed link forms",
+        entity_card_proposed: "Card proposed",
     },
     severities: {
         info: "Note",

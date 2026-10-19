@@ -163,7 +163,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{
-			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo,
+			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store),
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Pages:     pagesService,
@@ -324,6 +324,36 @@ const minimalSpec = `{"sections":[{"heading":"Overview","intent":"what it is","t
 	`"keywordRules":{"primaryInTitle":true,"primaryInH1":true,"primaryInFirstParagraph":true,"maxDensity":0.02},` +
 	`"metaRules":{"titlePattern":"{primaryKeyword}","descriptionMax":155},` +
 	`"images":{"featured":false,"inline":0,"source":"ai"}}`
+
+func TestAProposedCardWaitsForAPersonUnlessTheCallWasApproved(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, seeded := wired(t)
+	args := json.RawMessage(`{"cards":[{"entityId":"` + seeded.entity + `","definition":"Brewed from roasted beans.","reason":"the hub's text"}]}`)
+
+	binding.Mode = domainagent.ModeAutonomous
+	filed, err := registry.Call(t.Context(), binding, "graph_propose_cards", args)
+	if err != nil {
+		t.Fatalf("propose: %v", err)
+	}
+	proposed, ok := filed.(graph.ProposeCardsResponse)
+	if !ok || len(proposed.Proposals) != 1 || proposed.Proposals[0].Proposed.Definition != "Brewed from roasted beans." {
+		t.Fatalf("an autonomous call = %+v, want one proposal filed", filed)
+	}
+	read, err := registry.Call(t.Context(), binding, "graph_get_entity", json.RawMessage(`{"id":"`+seeded.entity+`"}`))
+	if held, isEntity := read.(graph.GetEntityResponse); err != nil || !isEntity || held.Entity.Definition != "" {
+		t.Fatalf("the entity after a proposal = %+v, %v; want nothing written", read, err)
+	}
+
+	binding.Mode, binding.Approved = domainagent.ModeConfirm, true
+	written, err := registry.Call(t.Context(), binding, "graph_propose_cards", args)
+	if err != nil {
+		t.Fatalf("an approved call: %v", err)
+	}
+	if applied, isApplied := written.(graph.ApplyCardsResponse); !isApplied || len(applied.Entities) != 1 || applied.Entities[0].Definition != "Brewed from roasted beans." {
+		t.Errorf("an approved call = %+v, want the card written, the approval being the acceptance", written)
+	}
+}
 
 func TestATemplateToolSaysHowManyKeywordsThePageMustUse(t *testing.T) {
 	t.Parallel()

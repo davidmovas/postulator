@@ -17,6 +17,8 @@ const (
 	selectRaised    = `SELECT id, status, subject FROM findings WHERE site_id = ? AND code = ? AND subject_key = ?`
 	raiseAgain      = `UPDATE findings SET severity = ?, subject = ?, options = ?, status = ?, resolution = '', resolved_by = '', updated_at = ? WHERE id = ?`
 	clearFinding    = `UPDATE findings SET status = ?, resolution = ?, resolved_by = ?, updated_at = ? WHERE site_id = ? AND code = ? AND subject_key = ? AND status = ?`
+	settleFinding   = `UPDATE findings SET status = ?, resolution = ?, resolved_by = ?, updated_at = ? WHERE id = ? AND status = ?`
+	selectFinding   = `SELECT ` + findingColumns + ` FROM findings WHERE id = ?`
 	findingOrder    = ` ORDER BY created_at, id`
 	selectFindings  = `SELECT ` + findingColumns + ` FROM findings`
 	selectOpenOfOne = selectFindings + ` WHERE site_id = ? AND code = ? AND status = ?` + findingOrder
@@ -80,6 +82,29 @@ func (r *FindingRepo) Clear(ctx context.Context, siteID string, code finding.Cod
 		string(finding.Resolved), resolution, resolvedBy, formatTime(at), siteID, string(code), subjectKey, string(finding.Open),
 	}, nil, "clear the finding")
 	return err
+}
+
+func (r *FindingRepo) Get(ctx context.Context, id string) (finding.Finding, error) {
+	return selectOne(ctx, r.store.execFrom(ctx), selectFinding, []any{id}, scanFinding,
+		errors.New(errors.NotFound, "finding not found").WithDetail("findingId", id), "read the finding")
+}
+
+func (r *FindingRepo) Settle(ctx context.Context, id string, status finding.Status, resolution, resolvedBy string, at time.Time) error {
+	if status != finding.Resolved && status != finding.Dismissed {
+		return errors.New(errors.Invalid, "a finding is settled as resolved or dismissed").WithDetail("status", string(status))
+	}
+	return r.store.Do(ctx, func(c context.Context) error {
+		affected, err := execWrite(c, r.store.writeFrom(c), settleFinding, []any{
+			string(status), resolution, resolvedBy, formatTime(at), id, string(finding.Open),
+		}, nil, "settle the finding")
+		if err != nil || affected > 0 {
+			return err
+		}
+		if _, getErr := r.Get(c, id); getErr != nil {
+			return getErr
+		}
+		return errors.New(errors.Conflict, "the finding is no longer open").WithDetail("findingId", id)
+	})
 }
 
 func (r *FindingRepo) OpenBySite(ctx context.Context, siteID string, code finding.Code) ([]finding.Finding, error) {

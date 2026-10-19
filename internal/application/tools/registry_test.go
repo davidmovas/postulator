@@ -47,6 +47,7 @@ func registered() []string {
 		"graph_preview_from_pages",
 		"graph_propose_from_keywords",
 		"graph_apply_proposals",
+		"graph_propose_cards",
 		"pages_list",
 		"pages_get",
 		"pages_preview_link",
@@ -163,7 +164,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 62380
+	schemaCeilingBytes = 63220
 	charactersPerToken = 4
 	widestLogged       = 8
 )

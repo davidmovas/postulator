@@ -28,6 +28,7 @@ func factories() []factory {
 		graphPreviewFromPages,
 		graphProposeFromKeywords,
 		graphApplyProposals,
+		graphProposeCards,
 		pagesList,
 		pagesGet,
 		pagesPreviewLink,

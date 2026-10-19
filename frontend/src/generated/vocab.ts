@@ -87,6 +87,7 @@ export const findingCodes = [
     "page_title_differs",
     "page_h1_differs",
     "url_form_mixed",
+    "entity_card_proposed",
 ] as const;
 export type FindingCode = (typeof findingCodes)[number];
 

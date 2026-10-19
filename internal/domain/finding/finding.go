@@ -26,6 +26,7 @@ const (
 	PageTitleDiffers   Code = "page_title_differs"
 	PageH1Differs      Code = "page_h1_differs"
 	URLFormMixed       Code = "url_form_mixed"
+	EntityCardProposed Code = "entity_card_proposed"
 )
 
 type Severity string
@@ -57,6 +58,7 @@ type Option string
 
 const (
 	Ignore         Option = "ignore"
+	Accept         Option = "accept"
 	AcceptSite     Option = "accept_site"
 	AcceptWorkbook Option = "accept_workbook"
 	KeepBoth       Option = "keep_both"
@@ -92,6 +94,7 @@ var rules = map[Code]rule{
 	PageTitleDiffers:   {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
 	PageH1Differs:      {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
 	URLFormMixed:       {Info, []Option{Ignore}},
+	EntityCardProposed: {Info, []Option{Accept, Ignore}},
 }
 
 func (c Code) Valid() bool {
@@ -172,4 +175,8 @@ func SubjectPageField(pageID, key string) string {
 
 func SubjectCrumb(pageID, path string) string {
 	return "page:" + pageID + ":crumb:" + path
+}
+
+func SubjectEntityCard(entityID string) string {
+	return "entity:" + entityID + ":card"
 }

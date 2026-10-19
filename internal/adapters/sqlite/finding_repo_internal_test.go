@@ -121,6 +121,42 @@ func TestFindingRepoUpsertFollowsTheLifecycle(t *testing.T) {
 	}
 }
 
+func TestAPersonSettlesAnOpenFindingOnce(t *testing.T) {
+	t.Parallel()
+
+	store := findingStore(t)
+	repo := NewFindingRepo(store)
+	proposed := newFinding(t, "s1", nil, finding.EntityCardProposed, finding.SubjectEntityCard("e1"), `{"entityId":"e1"}`, findingStamp)
+	if err := repo.Upsert(t.Context(), proposed); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+	read, err := repo.Get(t.Context(), proposed.ID)
+	if err != nil || !reflect.DeepEqual(read, proposed) {
+		t.Fatalf("Get = %+v, %v; want %+v", read, err, proposed)
+	}
+
+	later := findingStamp.Add(time.Hour)
+	if err = repo.Settle(t.Context(), proposed.ID, finding.Resolved, "accepted", "person", later); err != nil {
+		t.Fatalf("Settle: %v", err)
+	}
+	settled, err := repo.Get(t.Context(), proposed.ID)
+	if err != nil || settled.Status != finding.Resolved || settled.Resolution != "accepted" || settled.ResolvedBy != "person" || !settled.UpdatedAt.Equal(later) {
+		t.Fatalf("after Settle = %+v, %v", settled, err)
+	}
+	if err = repo.Settle(t.Context(), proposed.ID, finding.Dismissed, "ignored", "person", later); !errors.IsCode(err, errors.Conflict) {
+		t.Errorf("settling a settled finding = %v, want Conflict", err)
+	}
+	if err = repo.Settle(t.Context(), "missing", finding.Dismissed, "ignored", "person", later); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("settling an unknown finding = %v, want NotFound", err)
+	}
+	if err = repo.Settle(t.Context(), proposed.ID, finding.Open, "", "person", later); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("settling a finding open = %v, want Invalid", err)
+	}
+	if _, err = repo.Get(t.Context(), "missing"); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("Get of an unknown finding = %v, want NotFound", err)
+	}
+}
+
 func TestFindingRepoListsBySiteStatusCodeAndPage(t *testing.T) {
 	t.Parallel()
 

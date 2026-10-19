@@ -31,6 +31,7 @@ func TestANewFindingTakesItsCodesSeverityAndOptions(t *testing.T) {
 		finding.PageTitleDiffers:   {finding.Warning, []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}},
 		finding.PageH1Differs:      {finding.Warning, []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}},
 		finding.URLFormMixed:       {finding.Info, []finding.Option{finding.Ignore}},
+		finding.EntityCardProposed: {finding.Info, []finding.Option{finding.Accept, finding.Ignore}},
 	}
 	at := time.Date(2026, time.October, 17, 12, 0, 0, 0, time.UTC)
 	page := "page-1"
