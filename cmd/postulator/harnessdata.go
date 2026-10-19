@@ -5,6 +5,7 @@ package main
 import (
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -49,7 +50,15 @@ type seedEntity struct {
 	Parent  string
 	Path    string
 	Title   string
+	H1      string
 	Status  string
+}
+
+func (e *seedEntity) heading() string {
+	if e.H1 != "" {
+		return e.H1
+	}
+	return e.Title
 }
 
 type seedEdge struct {
@@ -75,7 +84,7 @@ const (
 
 func seedEntities() []seedEntity {
 	return []seedEntity{
-		{Name: "Espresso machines", Intent: "commercial", Keyword: "espresso machines", Anchor: "espresso machines", Path: "/espresso-machines/", Title: "Espresso machines: every type explained", Status: statusPublished},
+		{Name: "Espresso machines", Intent: "commercial", Keyword: "espresso machines", Anchor: "espresso machines", Path: hubPath, Title: "Espresso machines: every type explained", H1: storeCategoryName, Status: statusPublished},
 		{Name: "Espresso machines under $500", Intent: "commercial", Keyword: "best espresso machine under 500", Anchor: "espresso machines under $500", Parent: "Espresso machines", Path: "/espresso-machines/under-500/", Title: "The best espresso machines under $500", Status: statusPublished},
 		{Name: "Semi-automatic espresso machines", Intent: "commercial", Keyword: "semi automatic espresso machine", Anchor: "semi-automatic machines", Parent: "Espresso machines", Path: "/espresso-machines/semi-automatic/", Title: "Semi-automatic espresso machines, and who they suit", Status: statusPublished},
 		{Name: "Super-automatic espresso machines", Intent: "commercial", Keyword: "super automatic espresso machine", Anchor: "super-automatic machines", Parent: "Espresso machines", Path: "/espresso-machines/super-automatic/", Title: "Super-automatic espresso machines: bean to cup at home", Status: statusPublished},
@@ -210,7 +219,33 @@ func harnessLinks() field.LinkPolicy {
 const (
 	subtitleKey   = "hero_subtitle"
 	subtitleLabel = "Hero subtitle"
+
+	hubPath           = "/espresso-machines/"
+	hubBodyPhrase     = "four kinds of machine sit on this bench"
+	storeCategoryID   = 100000
+	storeCategoryName = "Espresso machines"
+	storeCategorySlug = "espresso-machines"
+	storeCategoryPath = "/product-category/" + storeCategorySlug + "/"
+
+	proposedDefinition = "An espresso machine forces water at about nine bar through a puck of finely ground coffee; " +
+		"the boiler, the group and the pump decide how steady that shot is."
+	proposedReason = "Read from the hub's own text and the machines the store sells under it."
 )
+
+func seedBodies() map[string]string {
+	return map[string]string{
+		hubPath: "<p>Single boilers, heat exchangers, dual boilers and levers: " + hubBodyPhrase +
+			", and each one asks something different of the person pulling the shot.</p>\n\n" +
+			"<p>Start with the boiler, because it decides whether you can steam milk while the next shot runs.</p>",
+	}
+}
+
+func proposedFacts() []graph.Fact {
+	return []graph.Fact{
+		{Label: "Pressure", Value: "About nine bar at the puck"},
+		{Label: "Group", Value: "58 mm on every machine we keep"},
+	}
+}
 
 func seedSubtitles() map[string]string {
 	return map[string]string{

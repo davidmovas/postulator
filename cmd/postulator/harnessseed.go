@@ -190,16 +190,41 @@ func productDraftOf() string {
 }
 
 func stockTheStore(site *wptest.Server) {
+	site.Restore(wptest.Item{
+		Type: wptest.TypeProductCategory, ID: storeCategoryID, Title: storeCategoryName, Slug: storeCategorySlug,
+		Status: "publish", Content: "Every espresso machine the bench sells.",
+	})
 	site.Seed(wptest.Item{
 		Type: wptest.TypeProduct, Title: productName, Slug: productSlug, Status: "publish",
 		Content:      "<p>A single boiler machine with a commercial portafilter.</p>",
 		Excerpt:      "<p>Single boiler, 58 mm.</p>",
 		RegularPrice: "449", SKU: "GCP-2024",
+		Categories: []int64{storeCategoryID}, Terms: storeTermsOf(productPath),
 		Attributes: []wptest.Attribute{
 			{Name: "Boiler", Options: []string{"Single"}, Visible: true},
 			{Name: "Form", Options: []string{}, Position: 1},
 		},
 	})
+}
+
+func storeTermsOf(path string) []wptest.Term {
+	if path != productPath {
+		return nil
+	}
+	return []wptest.Term{{Taxonomy: wptest.TypeProductCategory, Name: storeCategoryName, Slug: storeCategorySlug, ID: storeCategoryID}}
+}
+
+func seedCardProposal(ctx context.Context, core *app.Core, siteID string, entities map[string]string) error {
+	proposed, err := core.Graph.ProposeCards(ctx, graph.ProposeCardsRequest{SiteID: siteID, Cards: []graph.CardInput{{
+		EntityID: entities[productHub], Definition: proposedDefinition, Facts: proposedFacts(), Reason: proposedReason,
+	}}})
+	if err != nil {
+		return err
+	}
+	if len(proposed.Proposals) != 1 {
+		return errors.New(errors.Conflict, "the card proposal for "+productHub+" was not filed").WithDetail("skipped", proposed.Skipped)
+	}
+	return nil
 }
 
 func seedProduct(ctx context.Context, core *app.Core, siteID string, entities map[string]string,
@@ -384,6 +409,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	}
 	if productErr := seedProduct(ctx, core, siteID, entities, pagesByPath); productErr != nil {
 		return productErr
+	}
+	if cardErr := seedCardProposal(ctx, core, siteID, entities); cardErr != nil {
+		return cardErr
 	}
 	if key != "" {
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})
@@ -608,7 +636,7 @@ func seedPages(ctx context.Context, core *app.Core, siteID string, entities map[
 		entity := &declared[index]
 		owner := entities[entity.Name]
 		created, err := core.Pages.Create(ctx, pages.CreateRequest{
-			SiteID: siteID, Path: entity.Path, WPType: "page", Title: entity.Title, H1: entity.Title,
+			SiteID: siteID, Path: entity.Path, WPType: "page", Title: entity.Title, H1: entity.heading(),
 			MetaTitle:       entity.Title + " | " + siteName,
 			MetaDescription: "What we know about " + entity.Keyword + " after a few hundred shots on the bench.",
 			Status:          entity.Status, EntityID: &owner,

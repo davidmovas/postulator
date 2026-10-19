@@ -99,7 +99,11 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 			continue
 		}
 
-		body, bodyErr := restoredContent(page, bodies[page.ID])
+		generated, held := bodies[page.ID]
+		if !held {
+			generated = seedBodies()[page.Path]
+		}
+		body, bodyErr := restoredContent(page, generated)
 		if bodyErr != nil {
 			return bodyErr
 		}
@@ -107,7 +111,7 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 			Type: page.WPType, Title: page.Title, H1: page.H1, Slug: slugOf(page.Path),
 			Content: body, Status: wpStatus(page.Status), Modified: time.Now().UTC(),
 			Parent: wpByPath[parentOf(page.Path)], Crumbs: crumbsOf(page.Path, page.Title, titles),
-			Meta: customMetaOf(page.Path),
+			Meta: customMetaOf(page.Path), Terms: storeTermsOf(page.Path),
 		}
 		if page.WPID != nil {
 			item.ID = *page.WPID

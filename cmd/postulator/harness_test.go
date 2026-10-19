@@ -4,10 +4,12 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/field"
@@ -157,8 +160,8 @@ func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 		cursor = string(page.Next)
 	}
 
-	if total != 65 {
-		t.Errorf("pages = %d, want 65", total)
+	if total != 66 {
+		t.Errorf("pages = %d, want 66", total)
 	}
 	if mapped != 47 {
 		t.Errorf("mapped pages = %d, want 47", mapped)
@@ -1124,6 +1127,81 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 		}) {
 			t.Errorf("%s holds the fields %+v, want its %s read as %q", path, model.Fields, subtitleKey, subtitle)
 		}
+	}
+}
+
+func TestTheSeededHubShowsTheWriterItsPictureAndTheGraphAProposal(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	logger, err := app.Logger()
+	if err != nil {
+		t.Fatalf("Logger: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := logger.Close(); closeErr != nil {
+			t.Errorf("close the logger: %v", closeErr)
+		}
+	})
+	var (
+		pagesService *wails.PagesService
+		graphService *wails.GraphService
+	)
+	for _, service := range core.Services(logger) {
+		switch bound := service.Instance().(type) {
+		case *wails.PagesService:
+			pagesService = bound
+		case *wails.GraphService:
+			graphService = bound
+		}
+	}
+	if pagesService == nil || graphService == nil {
+		t.Fatal("the core binds no pages or graph service")
+	}
+
+	held := pagesByPath(t, core, siteID)
+	if term, found := held[storeCategoryPath]; !found || term.WPType != "product_cat" || term.WPID == nil || *term.WPID != storeCategoryID {
+		t.Fatalf("the store category %s is %+v, want the term the hub twins with", storeCategoryPath, term)
+	}
+	pack, err := pagesService.WriterPack(t.Context(), sitemodel.PackRequest{PageID: held[hubPath].ID, Field: string(field.Body)})
+	if err != nil {
+		t.Fatalf("WriterPack of %s: %v", hubPath, err)
+	}
+	shown := make(map[string]string, len(pack.Sections))
+	for index := range pack.Sections {
+		section := &pack.Sections[index]
+		shown[section.Heading] = strings.Join(append(slices.Clone(section.Lines), section.Items...), "\n")
+	}
+	for heading, want := range map[string]string{
+		"The field's current value (the client's)":            hubBodyPhrase,
+		"Its other fields":                                    "- Title: Espresso machines: every type explained",
+		"Products of its store category " + storeCategoryName: "- " + productName + " (" + productPath + ")",
+	} {
+		if !strings.Contains(shown[heading], want) {
+			t.Errorf("the writer's pack of %s shows %q under %q, want %q in it; it holds %v", hubPath, shown[heading], heading, want,
+				slices.Sorted(maps.Keys(shown)))
+		}
+	}
+	if pack.Tokens == 0 || len(pack.Dropped) != 0 {
+		t.Errorf("the pack carries %d tokens and dropped %+v, want a whole pack", pack.Tokens, pack.Dropped)
+	}
+
+	proposals, err := graphService.CardProposals(t.Context(), graph.CardProposalsRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("CardProposals: %v", err)
+	}
+	if len(proposals.Items) != 1 {
+		t.Fatalf("open card proposals = %d, want 1", len(proposals.Items))
+	}
+	proposal := proposals.Items[0]
+	if proposal.Name != productHub || proposal.Current.Definition != "" || proposal.Proposed.Definition != proposedDefinition ||
+		len(proposal.Proposed.Facts) != len(proposedFacts()) || proposal.Changed {
+		t.Errorf("the proposal is %+v, want the seeded card for %s against its empty card", proposal, productHub)
 	}
 }
 
