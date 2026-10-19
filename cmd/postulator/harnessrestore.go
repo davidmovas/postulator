@@ -107,6 +107,7 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 			Type: page.WPType, Title: page.Title, H1: page.H1, Slug: slugOf(page.Path),
 			Content: body, Status: wpStatus(page.Status), Modified: time.Now().UTC(),
 			Parent: wpByPath[parentOf(page.Path)], Crumbs: crumbsOf(page.Path, page.Title, titles),
+			Meta: customMetaOf(page.Path),
 		}
 		if page.WPID != nil {
 			item.ID = *page.WPID
@@ -114,6 +115,14 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 		wpByPath[page.Path] = site.Restore(item)[0].ID
 	}
 	return nil
+}
+
+func customMetaOf(path string) map[string]string {
+	subtitle, held := seedSubtitles()[path]
+	if !held {
+		return nil
+	}
+	return map[string]string{subtitleKey: subtitle}
 }
 
 func crumbsOf(path, title string, titles map[string]string) []wptest.Crumb {

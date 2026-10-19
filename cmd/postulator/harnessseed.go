@@ -18,12 +18,15 @@ import (
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -357,6 +360,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if err != nil {
 		return err
 	}
+	if typeErr := seedPageTypes(ctx, core, siteID, pagesByPath); typeErr != nil {
+		return typeErr
+	}
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
 	script.onSite(siteID)
 
@@ -646,6 +652,60 @@ func seedPages(ctx context.Context, core *app.Core, siteID string, entities map[
 		}
 	}
 	return byPath, nil
+}
+
+func seedPageTypes(ctx context.Context, core *app.Core, siteID string, byPath map[string]string) error {
+	listed, err := core.PageTypes.List(ctx, pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		return err
+	}
+	byPreset := make(map[pagetype.Preset]pagetypes.Type, len(listed.Types))
+	for index := range listed.Types {
+		preset := pagetype.Preset(listed.Types[index].Preset)
+		if _, held := byPreset[preset]; !held {
+			byPreset[preset] = listed.Types[index]
+		}
+	}
+
+	for _, declared := range seedTypes() {
+		kind, seeded := byPreset[declared.Preset]
+		if !seeded {
+			return errors.New(errors.NotFound, "the site was created without a "+declared.Preset.DefaultName()+" type")
+		}
+		pageID, known := byPath[declared.Path]
+		if !known {
+			return errors.New(errors.NotFound, "the harness seeded no page at "+declared.Path)
+		}
+		if _, setErr := core.Pages.SetType(ctx, pages.SetTypeRequest{PageID: pageID, PageTypeID: kind.ID}); setErr != nil {
+			return setErr
+		}
+	}
+
+	hub := byPreset[pagetype.Hub]
+	body, found := scopeOf(hub, field.Body)
+	if !found {
+		return errors.New(errors.NotFound, "the Hub type carries no body scope")
+	}
+	if _, err = core.PageTypes.SetScope(ctx, pagetypes.SetScopeRequest{
+		PageTypeID: hub.ID, Field: body.Field, Enabled: body.Enabled, AIWrites: body.AIWrites, Instruction: body.Instruction,
+		MinLength: body.MinLength, MaxLength: body.MaxLength, Rewrites: body.Rewrites, Links: harnessLinks(),
+	}); err != nil {
+		return err
+	}
+	_, err = core.PageTypes.SetScope(ctx, pagetypes.SetScopeRequest{
+		PageTypeID: hub.ID, Field: string(field.Instance(field.Meta, subtitleKey)), Enabled: true,
+		Links: field.NoLinks(), Label: subtitleLabel, Provider: string(field.ProviderPlugin),
+	})
+	return err
+}
+
+func scopeOf(kind pagetypes.Type, key field.Key) (pagetypes.Scope, bool) {
+	for index := range kind.Scopes {
+		if kind.Scopes[index].Field == string(key) {
+			return kind.Scopes[index], true
+		}
+	}
+	return pagetypes.Scope{}, false
 }
 
 func seedTemplates(ctx context.Context, core *app.Core, siteID string) (string, error) {

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -19,12 +20,16 @@ import (
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -1041,6 +1046,84 @@ func TestTheSeededSiteIsObservedIntoTheModel(t *testing.T) {
 	}
 	if shown == 0 {
 		t.Fatal("the seed holds no nested published page to read as the model")
+	}
+}
+
+func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	typed, err := core.PageTypes.List(t.Context(), pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("List page types: %v", err)
+	}
+	byPreset := make(map[pagetype.Preset]pagetypes.Type, len(typed.Types))
+	for index := range typed.Types {
+		preset := pagetype.Preset(typed.Types[index].Preset)
+		if _, twice := byPreset[preset]; twice {
+			t.Errorf("the site carries two %s types", preset)
+		}
+		byPreset[preset] = typed.Types[index]
+	}
+	for _, preset := range pagetype.Presets() {
+		if kind, held := byPreset[preset]; !held || kind.Name != preset.DefaultName() {
+			t.Errorf("the %s type is %+v, want it seeded as %q", preset, kind, preset.DefaultName())
+		}
+	}
+
+	type typedPage struct {
+		path   string
+		preset pagetype.Preset
+		source pagemap.TypeSource
+		reason pagemap.TypeReason
+	}
+	cases := make([]typedPage, 0, len(seedTypes())+1)
+	for _, declared := range seedTypes() {
+		cases = append(cases, typedPage{declared.Path, declared.Preset, pagemap.TypeSourceManual, pagemap.TypeByUser})
+	}
+	cases = append(cases, typedPage{productPath, pagetype.Product, pagemap.TypeSourceAuto, pagemap.TypeByProduct})
+
+	held := pagesByPath(t, core, siteID)
+	for _, want := range cases {
+		page, found := held[want.path]
+		if !found {
+			t.Errorf("the seed holds no page at %s", want.path)
+			continue
+		}
+		kind, typedAs := byPreset[want.preset], ""
+		if page.PageTypeID != nil {
+			typedAs = *page.PageTypeID
+		}
+		if typedAs != kind.ID || page.TypeSource != string(want.source) || page.TypeReason != string(want.reason) {
+			t.Errorf("%s is typed %q by %q %q, want %s (%s) by %s %s", want.path, typedAs, page.TypeSource, page.TypeReason,
+				kind.Name, kind.ID, want.source, want.reason)
+		}
+	}
+
+	hub := byPreset[pagetype.Hub]
+	if body, found := scopeOf(hub, field.Body); !found || !body.Stored || !body.Enabled || !body.AIWrites || body.Links != harnessLinks() {
+		t.Errorf("the Hub type's body scope is %+v, want the harness's link rules with rotating anchors %+v", body, harnessLinks())
+	}
+
+	custom, found := scopeOf(hub, field.Instance(field.Meta, subtitleKey))
+	if !found || !custom.Stored || !custom.Enabled || custom.AIWrites || custom.Label != subtitleLabel || custom.Provider != string(field.ProviderPlugin) {
+		t.Errorf("the Hub type's custom scope is %+v, want %s named %q, read through the plugin", custom, subtitleKey, subtitleLabel)
+	}
+	for path, subtitle := range seedSubtitles() {
+		model, modelErr := core.Observe.Page(t.Context(), held[path].ID)
+		if modelErr != nil {
+			t.Fatalf("Page model of %s: %v", path, modelErr)
+		}
+		if !slices.ContainsFunc(model.Fields, func(value field.Value) bool {
+			return value.Key == field.Instance(field.Meta, subtitleKey) && value.Current == subtitle
+		}) {
+			t.Errorf("%s holds the fields %+v, want its %s read as %q", path, model.Fields, subtitleKey, subtitle)
+		}
 	}
 }
 

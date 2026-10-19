@@ -5,7 +5,9 @@ package main
 import (
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -169,6 +171,51 @@ func seedLoosePages() []seedPage {
 		{Path: "/shipping-and-returns/", Title: "Shipping and returns", Status: statusPublished},
 		{Path: "/privacy-policy/", Title: "Privacy policy", Status: statusPublished},
 		{Path: "/terms/", Title: "Terms of sale", Status: statusPublished},
+	}
+}
+
+type seedTyped struct {
+	Path   string
+	Preset pagetype.Preset
+}
+
+func seedTypes() []seedTyped {
+	return []seedTyped{
+		{Path: "/espresso-machines/", Preset: pagetype.Hub},
+		{Path: "/grinders/", Preset: pagetype.Hub},
+		{Path: "/brewing/", Preset: pagetype.Hub},
+		{Path: "/brewing/portafilter/", Preset: pagetype.Hub},
+		{Path: "/milk-drinks/", Preset: pagetype.Hub},
+		{Path: "/beans/", Preset: pagetype.Hub},
+		{Path: "/accessories/", Preset: pagetype.Hub},
+		{Path: "/home-roasting/", Preset: pagetype.Hub},
+		{Path: "/accessories/tampers/", Preset: pagetype.Product},
+		{Path: "/accessories/distribution-tools/", Preset: pagetype.Product},
+		{Path: "/accessories/scales/", Preset: pagetype.Product},
+		{Path: "/accessories/knock-boxes/", Preset: pagetype.Product},
+	}
+}
+
+func harnessLinks() field.LinkPolicy {
+	return field.LinkPolicy{
+		Links: true,
+		Rules: field.LinkRules{
+			UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.6, MaxLinks: 10, MaxPerTarget: 1,
+			ParentLinkWithinParagraphs: 2, ChildrenSection: true,
+		},
+		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorRotate,
+	}
+}
+
+const (
+	subtitleKey   = "hero_subtitle"
+	subtitleLabel = "Hero subtitle"
+)
+
+func seedSubtitles() map[string]string {
+	return map[string]string{
+		"/espresso-machines/": "Every machine we have pulled a shot on, and the one we would buy again",
+		"/grinders/":          "The part of the bench that decides the cup",
 	}
 }
 
