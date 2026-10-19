@@ -51,6 +51,22 @@ func TestASummaryFallsFromMetaToExcerptToBodyToStructure(t *testing.T) {
 	}
 }
 
+func TestASummaryReadsAFieldsTextNotItsMarkup(t *testing.T) {
+	t.Parallel()
+
+	f := replicaLike()
+	f.fields["bpc-5"] = values("bpc-5", "product_short_description", "<p>Single boiler, <strong>58&nbsp;mm</strong>.</p>\n<p>Second.</p>")
+	f.fields["guides"] = values("guides", "seo_description", "Guides &amp; handling notes.")
+	s := f.snapshot(t)
+	cases := map[string]string{"bpc-5": "Single boiler, 58 mm. Second.", "guides": "Guides & handling notes."}
+	for pageID, want := range cases {
+		page, _ := s.Index.ByID(pageID)
+		if got := s.Summary(page).Text; got != want {
+			t.Errorf("Summary(%s) = %q, want %q", pageID, got, want)
+		}
+	}
+}
+
 func TestAnEmptyPageIsSummarisedFromItsStructure(t *testing.T) {
 	t.Parallel()
 

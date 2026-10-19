@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
@@ -96,6 +97,11 @@ func namesOf(pages []pagemap.Page) string {
 }
 
 func clean(text string) string {
+	if strings.ContainsAny(text, "<&") {
+		if doc, err := content.Parse(text); err == nil {
+			return doc.Text()
+		}
+	}
 	return strings.Join(strings.Fields(text), " ")
 }
 
