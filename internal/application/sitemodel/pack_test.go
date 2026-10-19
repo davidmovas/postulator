@@ -27,14 +27,24 @@ func typeOf(preset pagetype.Preset) string {
 	return "type-" + string(preset)
 }
 
-func presetSet() pagetype.Set {
+func presetTypes() []pagetype.Type {
 	kinds := make([]pagetype.Type, 0, len(pagetype.Presets()))
-	scopes := make([]field.Scope, 0, len(pagetype.Presets())*4)
 	for _, preset := range pagetype.Presets() {
 		kinds = append(kinds, pagetype.Type{ID: typeOf(preset), SiteID: siteID, Name: preset.DefaultName(), Preset: preset})
+	}
+	return kinds
+}
+
+func presetScopes() []field.Scope {
+	scopes := make([]field.Scope, 0, len(pagetype.Presets())*4)
+	for _, preset := range pagetype.Presets() {
 		scopes = append(scopes, pagetype.DefaultScopes(preset, typeOf(preset))...)
 	}
-	return pagetype.NewSet(kinds, scopes)
+	return scopes
+}
+
+func presetSet() pagetype.Set {
+	return pagetype.NewSet(presetTypes(), presetScopes())
 }
 
 func sitePage(id, path, title string, wpID int64, wpType pagemap.WPType, preset pagetype.Preset, parent string) pagemap.Page {
