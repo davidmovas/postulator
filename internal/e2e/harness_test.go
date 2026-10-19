@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -187,12 +188,20 @@ func refuseTheSandbox(t *testing.T, path string, env environment) {
 func wpCLI(t *testing.T, env environment, args ...string) string {
 	t.Helper()
 
+	output, err := wpRun(context.WithoutCancel(t.Context()), repoRoot(t), env, args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return output
+}
+
+func wpRun(ctx context.Context, root string, env environment, args ...string) (string, error) {
 	parsed, err := url.Parse(env.baseURL)
 	if err != nil {
-		t.Fatalf("%s is not an address: %v", env.baseURL, err)
+		return "", fmt.Errorf("%s is not an address: %w", env.baseURL, err)
 	}
-	compose := filepath.Join(repoRoot(t), "docker", "e2e", "compose.yaml")
-	command := exec.CommandContext(context.WithoutCancel(t.Context()), "docker", append([]string{
+	compose := filepath.Join(root, "docker", "e2e", "compose.yaml")
+	command := exec.CommandContext(ctx, "docker", append([]string{
 		"compose", "-p", env.project, "-f", compose,
 		"run", "--rm", "--no-deps", "-T", "--entrypoint", "wp", "bootstrap",
 	}, args...)...)
@@ -201,9 +210,9 @@ func wpCLI(t *testing.T, env environment, args ...string) string {
 	command.Stderr = &stderr
 	output, err := command.Output()
 	if err != nil {
-		t.Fatalf("wp %s on the %s stand: %v: %s", strings.Join(args, " "), env.stand, err, stderr.String())
+		return "", fmt.Errorf("wp %s on the %s stand: %w: %s", strings.Join(args, " "), env.stand, err, stderr.String())
 	}
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(string(output)), nil
 }
 
 var companionProbe struct {
