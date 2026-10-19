@@ -139,6 +139,8 @@ export function CardProposalItem({ siteId, proposal, focused, onReveal }: CardPr
 
             {refusal === "changed" ? (
                 <Banner tone="danger" title={said.refusedChanged} />
+            ) : refusal === "replaced" ? (
+                <Banner tone="warn" title={said.refusedReplaced} />
             ) : refusal === "settled" ? (
                 <Banner tone="info" title={said.refusedSettled} />
             ) : refused !== null ? (
@@ -172,7 +174,7 @@ export function CardProposalItem({ siteId, proposal, focused, onReveal }: CardPr
                     onClick={() => {
                         dismiss.reset();
                         accept.mutate(
-                            { findingId: proposal.findingId },
+                            { findingId: proposal.findingId, proposalHash: proposal.proposalHash },
                             {
                                 onSuccess: () => {
                                     pushToast("info", said.accepted(proposal.name));

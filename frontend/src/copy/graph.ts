@@ -406,6 +406,8 @@ export const graph = {
         refusedChanged:
             "Nothing was written: the card was edited after this proposal was made. Dismiss the proposal, or edit the card yourself.",
         refusedSettled: "This proposal was already accepted or dismissed.",
+        refusedReplaced:
+            "Nothing was written: the agent proposed this card again since you saw it. The list now shows the new proposal; review it before you accept.",
         waitingFor: "A card proposal waits for this entity.",
         review: "Review it",
     },

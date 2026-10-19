@@ -50,9 +50,10 @@ sections in priority order with their token counts, as `Fit` left them under the
 budget, and what it dropped), resolved through the service's third source, and the three card
 proposal methods: `GraphService.CardProposals{siteId, cursor?, limit?}` pages the open
 `entity_card_proposed` findings (each with the card as it is, the card proposed, the reason and
-`changed` when the card moved since), `AcceptCard{findingId}` writes the proposed card and settles
-the finding, refusing with `Conflict` and the reason `card_changed` a card that moved since it was
-proposed, and `DismissCard{findingId}` settles it dismissed, so the same proposal never reopens. `TemplatesService.ListPageTypes{siteId}` answers the site's
+`changed` when the card moved since, and the `proposalHash` it was shown with),
+`AcceptCard{findingId, proposalHash}` writes the proposed card and settles the finding, refusing
+with `Conflict` and the reason `card_changed` a card that moved since it was proposed and with
+`proposal_changed` a proposal filed again since it was shown, and `DismissCard{findingId}` settles it dismissed, so the same proposal never reopens. `TemplatesService.ListPageTypes{siteId}` answers the site's
 types with every scope (stored or the preset's default) and the field catalog;
 `CreatePageType{siteId, name, preset, templateId?}`, `SavePageType{id, name?, templateId?}`,
 `DeletePageType{id, reassignTo}` (the last type of a preset is refused) and

@@ -54,6 +54,7 @@ const { CardProposalsDrawer } = await import("./drawer.js");
 function peptides(overrides: Partial<CardProposal> = {}): CardProposal {
     return {
         findingId: "f-peptides",
+        proposalHash: "seen-peptides",
         entityId: "e-peptides",
         name: "Peptides",
         current: { definition: "Short chains of amino acids.", facts: [{ label: "Storage", value: "Keep cold" }] },
@@ -133,7 +134,7 @@ describe("the card proposals on the Graph screen", () => {
         fireEvent.click(proposal.getByRole("button", { name: said.accept }));
         fireEvent.click(proposal.getByRole("button", { name: said.dismiss }));
 
-        expect(held.accepted).toStrictEqual([{ findingId: "f-peptides" }]);
+        expect(held.accepted).toStrictEqual([{ findingId: "f-peptides", proposalHash: "seen-peptides" }]);
         expect(held.dismissed).toStrictEqual([{ findingId: "f-peptides" }]);
     });
 

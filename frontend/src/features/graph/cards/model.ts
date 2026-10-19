@@ -53,11 +53,14 @@ export function waitingEntities(proposals: readonly CardProposal[]): ReadonlySet
     return new Set(proposals.map((proposal) => proposal.entityId));
 }
 
-export type Refusal = "changed" | "settled" | "other";
+export type Refusal = "changed" | "replaced" | "settled" | "other";
 
 export function refusalOf(code: string, reason: unknown): Refusal {
     if (code !== "CONFLICT") {
         return "other";
     }
-    return reason === "card_changed" ? "changed" : "settled";
+    if (reason === "card_changed") {
+        return "changed";
+    }
+    return reason === "proposal_changed" ? "replaced" : "settled";
 }

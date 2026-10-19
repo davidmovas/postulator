@@ -6,6 +6,7 @@ import { currentFacts, definitionMoves, proposedFacts, refusalOf, waitingEntitie
 function proposal(overrides: Partial<CardProposal> = {}): CardProposal {
     return {
         findingId: "f1",
+        proposalHash: "seen-f1",
         entityId: "e1",
         name: "Peptides",
         current: {
@@ -68,6 +69,7 @@ describe("a card proposal set against the card", () => {
 describe("why an accept was refused", () => {
     it.each([
         ["CONFLICT", "card_changed", "changed"],
+        ["CONFLICT", "proposal_changed", "replaced"],
         ["CONFLICT", undefined, "settled"],
         ["NOT_FOUND", undefined, "other"],
     ] as const)("reads %s with reason %s as %s", (code, reason, want) => {

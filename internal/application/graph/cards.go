@@ -20,9 +20,10 @@ const (
 	ResolutionIgnored  = "ignored"
 	ResolvedByPerson   = "person"
 
-	ReasonCardUnchanged = "unchanged"
-	ReasonCardDismissed = "dismissed"
-	ReasonCardChanged   = "card_changed"
+	ReasonCardUnchanged   = "unchanged"
+	ReasonCardDismissed   = "dismissed"
+	ReasonCardChanged     = "card_changed"
+	ReasonProposalChanged = "proposal_changed"
 
 	maxCardsPerCall = 50
 )
@@ -40,14 +41,15 @@ type Card struct {
 }
 
 type CardProposal struct {
-	FindingID string   `json:"findingId"`
-	EntityID  string   `json:"entityId"`
-	Name      string   `json:"name"`
-	Current   Card     `json:"current"`
-	Proposed  Card     `json:"proposed"`
-	Reason    string   `json:"reason"`
-	Changed   bool     `json:"changed"`
-	CreatedAt dto.Time `json:"createdAt"`
+	FindingID    string   `json:"findingId"`
+	ProposalHash string   `json:"proposalHash"`
+	EntityID     string   `json:"entityId"`
+	Name         string   `json:"name"`
+	Current      Card     `json:"current"`
+	Proposed     Card     `json:"proposed"`
+	Reason       string   `json:"reason"`
+	Changed      bool     `json:"changed"`
+	CreatedAt    dto.Time `json:"createdAt"`
 }
 
 type CardSkip struct {
@@ -76,7 +78,8 @@ type ApplyCardsResponse struct {
 }
 
 type AcceptCardRequest struct {
-	FindingID string `json:"findingId"`
+	FindingID    string `json:"findingId"`
+	ProposalHash string `json:"proposalHash"`
 }
 
 type AcceptCardResponse struct {
@@ -181,12 +184,19 @@ func (s *Service) ApplyCards(ctx context.Context, req ApplyCardsRequest) (ApplyC
 }
 
 func (s *Service) AcceptCard(ctx context.Context, req AcceptCardRequest) (AcceptCardResponse, error) {
+	if strings.TrimSpace(req.ProposalHash) == "" {
+		return AcceptCardResponse{}, errors.New(errors.Invalid, "name the proposal as it was shown").WithDetail("field", "proposalHash")
+	}
 	var written graphdomain.Entity
 	now := s.now()
 	err := s.uow.Do(ctx, func(c context.Context) error {
 		held, subject, err := s.openProposal(c, req.FindingID)
 		if err != nil {
 			return err
+		}
+		if subject.hash() != req.ProposalHash {
+			return errors.New(errors.Conflict, "the proposal changed since it was shown; review it again").
+				WithDetail("reason", ReasonProposalChanged).WithDetail("findingId", held.ID)
 		}
 		current, err := s.entities.Get(c, subject.EntityID)
 		if err != nil {
@@ -376,6 +386,14 @@ func (s *Service) openProposal(ctx context.Context, findingID string) (finding.F
 	return held, subject, err
 }
 
+func (c cardSubject) hash() string {
+	facts := make([]graphdomain.Fact, 0, len(c.Facts))
+	for _, fact := range c.Facts {
+		facts = append(facts, graphdomain.Fact(fact))
+	}
+	return graphdomain.Entity{Definition: c.Definition, Facts: facts}.CardHash()
+}
+
 func subjectOf(held finding.Finding) (cardSubject, error) {
 	var subject cardSubject
 	if err := json.Unmarshal(held.Subject, &subject); err != nil {
@@ -398,7 +416,7 @@ func (s *Service) proposalView(ctx context.Context, held finding.Finding) (CardP
 	}
 	view := entityView(current)
 	return CardProposal{
-		FindingID: held.ID, EntityID: current.ID, Name: current.Name,
+		FindingID: held.ID, ProposalHash: subject.hash(), EntityID: current.ID, Name: current.Name,
 		Current:  Card{Definition: view.Definition, Facts: view.Facts},
 		Proposed: Card{Definition: subject.Definition, Facts: subject.Facts},
 		Reason:   subject.Reason, Changed: current.CardHash() != subject.Base, CreatedAt: dto.NewTime(held.CreatedAt),

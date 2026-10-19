@@ -68,7 +68,8 @@ func TestAProposedCardIsWrittenOnlyOnceAccepted(t *testing.T) {
 	}
 
 	h.recorder.Reset()
-	accepted, err := h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: proposed.Proposals[0].FindingID})
+	shown := graph.AcceptCardRequest{FindingID: proposed.Proposals[0].FindingID, ProposalHash: proposed.Proposals[0].ProposalHash}
+	accepted, err := h.service.AcceptCard(t.Context(), shown)
 	if err != nil || accepted.Entity.Definition != "A peptide studied for tissue repair." || len(accepted.Entity.Facts) != 1 {
 		t.Fatalf("AcceptCard = %+v, %v", accepted, err)
 	}
@@ -79,7 +80,7 @@ func TestAProposedCardIsWrittenOnlyOnceAccepted(t *testing.T) {
 	if err != nil || settled.Status != finding.Resolved || settled.Resolution != graph.ResolutionAccepted || settled.ResolvedBy != graph.ResolvedByPerson {
 		t.Errorf("the finding after accepting = %+v, %v", settled, err)
 	}
-	if _, err = h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: proposed.Proposals[0].FindingID}); !errors.IsCode(err, errors.Conflict) {
+	if _, err = h.service.AcceptCard(t.Context(), shown); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("accepting twice = %v, want Conflict", err)
 	}
 	if listed, err = h.service.CardProposals(t.Context(), graph.CardProposalsRequest{SiteID: h.siteID}); err != nil || len(listed.Items) != 0 {
@@ -104,13 +105,37 @@ func TestACardThatChangedSinceItsProposalIsRefused(t *testing.T) {
 	if err != nil || len(listed.Items) != 1 || !listed.Items[0].Changed {
 		t.Errorf("the listed proposal = %+v, %v; want it marked as changed since", listed.Items, err)
 	}
-	_, err = h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: proposed.Proposals[0].FindingID})
+	_, err = h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: proposed.Proposals[0].FindingID, ProposalHash: proposed.Proposals[0].ProposalHash})
 	if !errors.IsCode(err, errors.Conflict) || reasonOf(err) != graph.ReasonCardChanged {
 		t.Errorf("accepting a stale proposal = %v, want Conflict with %s", err, graph.ReasonCardChanged)
 	}
 	held, err := h.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: entityID})
 	if err != nil || held.Entity.Definition != "Written by a person." {
 		t.Errorf("the person's definition = %q, %v; want it kept", held.Entity.Definition, err)
+	}
+}
+
+func TestAcceptingWritesOnlyTheProposalThePersonSaw(t *testing.T) {
+	t.Parallel()
+
+	h, entityID := carded(t)
+	seen, err := h.service.ProposeCards(t.Context(), graph.ProposeCardsRequest{SiteID: h.siteID, Cards: []graph.CardInput{cardOf(entityID, "A peptide.")}})
+	if err != nil {
+		t.Fatalf("ProposeCards: %v", err)
+	}
+	if _, err = h.service.ProposeCards(t.Context(), graph.ProposeCardsRequest{SiteID: h.siteID, Cards: []graph.CardInput{cardOf(entityID, "Something else entirely.")}}); err != nil {
+		t.Fatalf("ProposeCards again: %v", err)
+	}
+	_, err = h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: seen.Proposals[0].FindingID, ProposalHash: seen.Proposals[0].ProposalHash})
+	if !errors.IsCode(err, errors.Conflict) || reasonOf(err) != graph.ReasonProposalChanged {
+		t.Errorf("accepting the proposal as it was first seen = %v, want Conflict with %s", err, graph.ReasonProposalChanged)
+	}
+	held, err := h.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: entityID})
+	if err != nil || held.Entity.Definition != "" {
+		t.Errorf("the entity = %+v, %v; want nothing written", held.Entity, err)
+	}
+	if _, err = h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: seen.Proposals[0].FindingID}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("accepting without saying which proposal = %v, want Invalid", err)
 	}
 }
 
@@ -184,7 +209,7 @@ func TestACardProposalRefusesWhatItCannotWrite(t *testing.T) {
 			}
 		})
 	}
-	if _, err := h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: "missing"}); !errors.IsCode(err, errors.NotFound) {
+	if _, err := h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: "missing", ProposalHash: "seen"}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("accepting an unknown proposal = %v, want NotFound", err)
 	}
 	if _, err := h.service.CardProposals(t.Context(), graph.CardProposalsRequest{}); !errors.IsCode(err, errors.Invalid) {

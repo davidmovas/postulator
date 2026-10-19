@@ -187,7 +187,7 @@ func assertACardWaitsForAPerson(t *testing.T, core *app.Core, conversation, site
 	if filed.Proposed.Definition != autonomousDefinition {
 		t.Fatalf("the filed proposal is %+v, want the definition the agent proposed", filed)
 	}
-	if _, err := core.Graph.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: filed.FindingID}); err != nil {
+	if _, err := core.Graph.AcceptCard(t.Context(), graph.AcceptCardRequest{FindingID: filed.FindingID, ProposalHash: filed.ProposalHash}); err != nil {
 		t.Fatalf("accept the proposed card: %v", err)
 	}
 	if held := entityOf(t, core, entityID); held.Definition != autonomousDefinition || len(held.Facts) == 0 {
