@@ -14,6 +14,10 @@ const tierLabels = {
 const flexHelp =
     "Standard answers at once. Flex is half price but may take minutes longer, and a flex call that has not answered in time is sent again at the standard price.";
 
+function budgetHelp(call: string): string {
+    return `The most tokens of the site's picture ${call} may carry; the sections the writer needs least are cut first to fit. 0 means the model's context window, less what the call itself carries. A budget too small to carry the page and the field's rules is refused before a run starts.`;
+}
+
 export const settings = {
     title: "Settings",
     tabs: {
@@ -39,9 +43,10 @@ export const settings = {
         rows: "rows",
         characters: "characters",
         bytes: "bytes",
+        tokens: "tokens",
     },
     sections: {
-        reasoning: "Reasoning and speed",
+        reasoning: "Reasoning, speed and input",
         modelCalls: "Model calls",
         endpoints: "Endpoints",
         images: "Images",
@@ -164,6 +169,22 @@ export const settings = {
         "llm.effort.writer": {
             label: "Reasoning when writing the body",
             help: "How long the model thinks before it writes a page. More reasoning writes more carefully and costs more, because thinking is paid for like written text. None writes straight away.",
+        },
+        "llm.inputBudget.editor": {
+            label: "Input budget when editing",
+            help: budgetHelp("a call that writes a page's search title and description"),
+        },
+        "llm.inputBudget.judge": {
+            label: "Input budget when judging quality",
+            help: budgetHelp("a call that scores a page"),
+        },
+        "llm.inputBudget.linker": {
+            label: "Input budget when placing links",
+            help: budgetHelp("a call that writes a sentence carrying a link"),
+        },
+        "llm.inputBudget.writer": {
+            label: "Input budget when writing the body",
+            help: budgetHelp("a call that writes a page's body or its excerpt"),
         },
         "llm.flexPatience": {
             label: "Longest wait for a flex answer",
@@ -316,7 +337,7 @@ export const settings = {
             structured: "JSON",
             images: "Images",
             reasoning: "Reasoning",
-            reasoningHint: "How long it thinks is chosen per job under Reasoning and speed.",
+            reasoningHint: "How long it thinks is chosen per job under Reasoning, speed and input.",
             add: "Add a model",
             edit: "Edit",
             disable: "Disable",
