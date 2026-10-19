@@ -286,10 +286,11 @@ func bodyLines(body block.Body) []string {
 			out = append(out, text)
 			continue
 		}
+		tags := body.ShortcodesAt(i)
 		switch {
 		case strings.TrimSpace(held.Raw) == "":
-		case held.Kind == block.Shortcode:
-			out = append(out, "(a ["+held.Name+"] shortcode, kept where it stands)")
+		case len(tags) > 0:
+			out = append(out, "(a ["+tags[0]+"] shortcode, kept where it stands)")
 		case held.Name != "":
 			out = append(out, "(a "+held.Name+" block, kept where it stands)")
 		default:

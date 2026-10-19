@@ -257,7 +257,7 @@ ITS OTHER FIELDS
 - Title: Lab Guides
 --- fits in 3000 tokens
 
-=== /my-account/ · Technical · body · 443 tokens
+=== /my-account/ · Technical · body · 445 tokens
 THE PAGE
 Path: /my-account/
 Title: My account
@@ -271,7 +271,7 @@ The current value is the client's: keep it as it stands and write only what it l
 Links: none in this field
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
-(a [core/shortcode] shortcode, kept where it stands)
+(a [woocommerce_my_account] shortcode, kept where it stands)
 
 THE TRAIL, NEAREST PARENT FIRST
 The parent comes from the page's JSON-LD breadcrumb.

@@ -104,20 +104,40 @@ func TestBuildOrdersTheSectionsByPriority(t *testing.T) {
 func TestTheCurrentBodyNamesWhatItHoldsBesideText(t *testing.T) {
 	t.Parallel()
 
-	f := replicaLike()
-	f.bodies["healing"] = block.Snapshot{
-		PageID: "healing", Side: block.Current, Kind: block.Classic, ObservedAt: stamp,
-		Raw: "<p>Peptides that help repair.</p>\n\n[products limit=\"4\"]",
+	cases := []struct {
+		name string
+		kind block.Kind
+		raw  string
+		want []string
+	}{
+		{
+			name: "a classic body's shortcode", kind: block.Classic,
+			raw:  "<p>Peptides that help repair.</p>\n\n[products limit=\"4\"]",
+			want: []string{"Peptides that help repair.", "(a [products] shortcode, kept where it stands)"},
+		},
+		{
+			name: "a shortcode block", kind: block.Blocks,
+			raw:  "<!-- wp:shortcode -->[woocommerce_my_account]<!-- /wp:shortcode -->",
+			want: []string{"(a [woocommerce_my_account] shortcode, kept where it stands)"},
+		},
 	}
-	s := f.snapshot(t)
-	facts, err := s.Facts("healing", planFor(t, s, "healing"))
-	if err != nil {
-		t.Fatalf("Facts: %v", err)
-	}
-	body, _ := facts.Field(field.Body)
-	current := sectionOf(t, contextpack.Build(facts, body.Scope), contextpack.SectionCurrent)
-	if want := []string{"Peptides that help repair.", "(a [products] shortcode, kept where it stands)"}; !slices.Equal(current.Lines, want) {
-		t.Errorf("the current value = %q, want %q", current.Lines, want)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := replicaLike()
+			f.bodies["healing"] = block.Snapshot{PageID: "healing", Side: block.Current, Kind: tc.kind, ObservedAt: stamp, Raw: tc.raw}
+			s := f.snapshot(t)
+			facts, err := s.Facts("healing", planFor(t, s, "healing"))
+			if err != nil {
+				t.Fatalf("Facts: %v", err)
+			}
+			body, _ := facts.Field(field.Body)
+			current := sectionOf(t, contextpack.Build(facts, body.Scope), contextpack.SectionCurrent)
+			if !slices.Equal(current.Lines, tc.want) {
+				t.Errorf("the current value = %q, want %q", current.Lines, tc.want)
+			}
+		})
 	}
 }
 

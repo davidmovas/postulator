@@ -119,16 +119,22 @@ func (b Body) DynamicOnly() bool {
 }
 
 func (b Body) Shortcodes() []string {
-	out := make([]string, 0)
+	out := make([]string, 0, len(b.Blocks))
 	for i := range b.Blocks {
-		switch {
-		case b.Blocks[i].Kind == Shortcode && b.Kind == Classic:
-			out = append(out, b.Blocks[i].Name)
-		case b.Blocks[i].Kind == Shortcode:
-			out = append(out, shortcodeTags(b.Blocks[i].Raw)...)
-		}
+		out = append(out, b.ShortcodesAt(i)...)
 	}
 	return out
+}
+
+func (b Body) ShortcodesAt(i int) []string {
+	switch {
+	case b.Blocks[i].Kind != Shortcode:
+		return nil
+	case b.Kind == Classic:
+		return []string{b.Blocks[i].Name}
+	default:
+		return shortcodeTags(b.Blocks[i].Raw)
+	}
 }
 
 func (b Body) BlockNames() []string {
