@@ -233,8 +233,9 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 		t.Fatalf("a second import of the sheet = %+v (%v), want nothing to do", again.Counts, err)
 	}
 
+	products := []string{stored[liquidPath].ID, stored[capsulePath].ID}
 	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
-		SiteID: siteID, PageIDs: []string{stored[liquidPath].ID, stored[capsulePath].ID},
+		SiteID: siteID, PageIDs: products, Rewrite: products,
 		TemplateID: productTemplate(t, core), PublishMode: string(run.PublishLive), Recipe: recipe(),
 	})
 	if err != nil {
