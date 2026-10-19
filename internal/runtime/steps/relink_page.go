@@ -167,11 +167,11 @@ func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, 
 
 func writeRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run.StepContext, work pageRelink,
 	body siteBody, pages []pagemap.Page) (run.Result, error) {
-	linked, err := body.doc.Render()
+	linked, err := body.spliced(ctx, deps, sc.Page)
 	if err != nil {
 		return run.Result{}, err
 	}
-	hash, err := body.put(ctx, client, sc.Page, linked)
+	hash, err := body.put(ctx, client, sc.Page, linked.raw)
 	if err != nil {
 		if errors.IsCode(err, errors.Conflict) {
 			return needsHuman("the page " + sc.Page.Path + " changed on the site while it was being relinked: " +
@@ -180,7 +180,7 @@ func writeRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *ru
 		return run.Result{}, err
 	}
 	work.published.ContentHash = hash
-	if recordErr := recordBody(ctx, deps, sc.Page.ID, linked); recordErr != nil {
+	if recordErr := recordSpliced(ctx, deps, sc.Page.ID, sc.Run.ID, linked); recordErr != nil {
 		return run.Result{}, recordErr
 	}
 

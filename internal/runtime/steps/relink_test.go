@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -116,6 +117,28 @@ func TestRelinkAddsTheMissingEdgeToANeighbor(t *testing.T) {
 	links := recorder.byPage["page-parent"]
 	if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != "page-child" {
 		t.Fatalf("the recorded links are %+v", links)
+	}
+}
+
+func TestARelinkChangesOnlyTheBlockItLinksAndKeepsOurBlocksOurs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		theirs = "<p>Fresh &amp; roasted&nbsp;daily, <em class='x'>always</em>.</p>"
+		ours   = "<p>We roast every espresso blend we sell.</p>"
+	)
+	deps, server, _, wpID := relinkDeps(t, theirs+"\n\n"+ours)
+	log := &bodyLog{written: map[string][]string{"page-parent": {block.Hash(ours)}}}
+	deps.Bodies = log
+	runRelink(t, deps)
+
+	stored, _ := server.Lookup(wpID)
+	linked := `<p>We roast every <a href="/coffee/espresso/">espresso</a> blend we sell.</p>`
+	if stored.Content != theirs+"\n\n"+linked {
+		t.Fatalf("the parent holds %q, want the client's block byte for byte and only ours linked", stored.Content)
+	}
+	if written := log.ours("page-parent"); len(written) != 1 || written[0] != block.Hash(linked) {
+		t.Errorf("ours = %v, want the linked block recorded as ours in place of the one it replaced", written)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -38,6 +39,40 @@ func readSiteBody(ctx context.Context, client *wp.Client, page pagemap.Page,
 
 func (b siteBody) put(ctx context.Context, client *wp.Client, page pagemap.Page, rendered string) (string, error) {
 	return client.PutRaw(ctx, onSiteType(page), *page.WPID, rendered, b.raw.ContentHash)
+}
+
+type splicedBody struct {
+	raw  string
+	ours []string
+}
+
+func (b siteBody) spliced(ctx context.Context, deps Deps, page pagemap.Page) (splicedBody, error) {
+	rendered, err := b.doc.Render()
+	if err != nil {
+		return splicedBody{}, err
+	}
+	var written []string
+	if deps.Bodies != nil {
+		held, listErr := deps.Bodies.ListWritten(ctx, page.ID)
+		if listErr != nil {
+			return splicedBody{}, listErr
+		}
+		for i := range held {
+			written = append(written, held[i].BlockHash)
+		}
+	}
+	raw, ours := block.Splice(b.raw.Content, rendered, written)
+	return splicedBody{raw: raw, ours: ours}, nil
+}
+
+func recordSpliced(ctx context.Context, deps Deps, pageID, runID string, body splicedBody) error {
+	if err := recordBody(ctx, deps, pageID, body.raw); err != nil {
+		return err
+	}
+	if deps.Bodies == nil {
+		return nil
+	}
+	return deps.Bodies.ReplaceWritten(ctx, pageID, body.ours, runID, deps.now())
 }
 
 func backfill(doc *content.Document, lc content.LinkContext, policy field.LinkPolicy,

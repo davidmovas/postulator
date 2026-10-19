@@ -108,6 +108,7 @@ type neighborhood struct {
 	index    pagemap.Index
 	graph    graph.Graph
 	types    pagetype.Set
+	runID    string
 	absolute bool
 }
 
@@ -156,7 +157,7 @@ func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighb
 
 	return neighborhood{
 		client: client, lc: lc, entity: entity, page: sc.Page, site: pagemap.NewSite(owner.BaseURL),
-		index: pagemap.NewIndex(pages), graph: built, types: types, absolute: absolute,
+		index: pagemap.NewIndex(pages), graph: built, types: types, runID: sc.Run.ID, absolute: absolute,
 	}, nil
 }
 
@@ -306,11 +307,11 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 		return outcome, nil
 	}
 
-	updated, err := body.doc.Render()
+	updated, err := body.spliced(ctx, deps, neighbor)
 	if err != nil {
 		return skip(outcome, ReasonNeighborUnreadable), nil
 	}
-	hash, err := body.put(ctx, n.client, neighbor, updated)
+	hash, err := body.put(ctx, n.client, neighbor, updated.raw)
 	if err != nil {
 		if errors.IsCode(err, errors.Conflict) {
 			outcome.Outcome = OutcomeConflict
@@ -324,7 +325,7 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 	outcome.Anchor = anchor
 	outcome.Sentence = sentence
 	outcome.Before = NeighborBefore{Hash: body.raw.ContentHash, HTML: body.raw.Content}
-	if recordErr := recordBody(ctx, deps, neighbor.ID, updated); recordErr != nil {
+	if recordErr := recordSpliced(ctx, deps, neighbor.ID, n.runID, updated); recordErr != nil {
 		return NeighborResult{}, recordErr
 	}
 	if adoptErr := adopt(ctx, deps, neighbor, n.index, n.site, body.doc, hash); adoptErr != nil {
