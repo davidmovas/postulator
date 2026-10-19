@@ -14,6 +14,15 @@ catalog and the context pack, is next.
 
 ## Where we are
 
+**2026-10-19, stage 2a of the site model landed in full** (its last five tasks as stage 2b's Part
+0; the reasoning under stage 2a in `DECISIONS.md`). The client names his page types over six
+presets in Settings → Page types, enables fields per type with an instruction, limits, a rewrites
+switch and the link policy, and a page's type shows with its source and reason in the drawer;
+the entity card (definition, facts, notes) is edited on the Graph screen; the Policies screen and
+every entity kind are gone. `task build` is green with no generated drift, `npm run typecheck`
+clean, 1663 vitest tests in 157 files. `TestThePageTypesFollowTheSite` waits for the stands at 2b's
+gate.
+
 **2026-10-18, stage 1c of the site model: 1b's gaps closed and the screens. Stage 1 is done.**
 The reasoning is under **stage 1c** in `DECISIONS.md`; the task list is under 1c in
 `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.

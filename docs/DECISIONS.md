@@ -3240,3 +3240,30 @@ and what was decided while building.
   every tool resends them; the four tools cost 3,953 bytes, and the schemas stand at 61,437 bytes
   for 91 tools against 63,932 for 93 at the stage's start. The scope tool's `field` is the
   scopable keys' enum, and a custom field comes as `metaKey`, which no enum can list.
+
+### Its tail, landed as stage 2b's Part 0 (2026-10-19)
+
+2a.11 to 2a.15 had not landed when 2b opened: `TemplatesService` bound no type or scope, and the
+frontend still called the six policy methods Go no longer had, so `task build` failed. The owner
+moved them into 2b as its Part 0, the heavy gate legs run once at 2b's close.
+
+- **The bindings** (`c566586`): `TemplatesService` takes the page-type use case as a second
+  source, as `PagesService` does the model, and binds `ListPageTypes`, `CreatePageType`,
+  `SavePageType`, `DeletePageType` and `SetScope`; `PagesService.SetType` is a person's choice; the
+  graph's page states name each mapped page's type. The six policy methods out and six methods in
+  leave the count at 126.
+- **The screens** (agent F, `ffb6d9f` to `814c8a1`): Settings → Page types at
+  `/settings/types?site=`, a scope drawer per type with the link policy editor that the Policies
+  screen had; the drawer's type panel; the Graph inspector's card editor; the canonical page's
+  preset colours and filters the graph where the entity kind did, an entity without a typed page
+  showing "No page type", and an orphan being a root entity whose canonical page is not a Hub.
+  The import field is `page_type`. A page-type reference in an agent card resolves through the
+  site's `ListPageTypes`, there being no binding for one type by id.
+- **The harness** (agent H, `0bc4a98`) types its seven root hubs and Portafilter Hub and its four
+  accessories Product by hand, as the client would, because the fake site shows no listing and the
+  observation would type them Entity; the Hub body scope carries the former harness rules and a
+  `meta:hero_subtitle` custom field is read on the first sync. The 2a.13 text said six roots; the
+  harness data has seven.
+- **The e2e proof** (agent H, `3242f6a`), `TestThePageTypesFollowTheSite`, compiles, vets and lints
+  under the `e2e` tag; it runs at 2b's gate with the stands, Docker having been off when it was
+  written.
