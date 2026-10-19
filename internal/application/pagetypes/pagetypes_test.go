@@ -280,6 +280,11 @@ func TestAScopeIsRefusedWhenTheDenyListOrTheRoleForbidsIt(t *testing.T) {
 	if _, err = h.service.SetScope(t.Context(), pagetypes.SetScopeRequest{PageTypeID: store.ID, Field: "body", Instruction: "kept for later", Links: field.NoLinks()}); err != nil {
 		t.Errorf("an instruction on a disabled read-only scope: %v", err)
 	}
+	product := h.typeOf(t, h.siteID, pagetype.Product)
+	_, err = h.service.SetScope(t.Context(), pagetypes.SetScopeRequest{PageTypeID: product.ID, Field: "excerpt", Enabled: true, AIWrites: true, Links: field.NoLinks()})
+	if name, reason := reasonOf(t, err); name != "field" || reason != "excerpt_is_short_description" {
+		t.Errorf("an excerpt on a product = %v (%s %s), want it refused: a product's excerpt is its short description", err, name, reason)
+	}
 
 	custom, err := h.service.SetScope(t.Context(), pagetypes.SetScopeRequest{
 		PageTypeID: hub.ID, Field: "meta:spec_sheet", Enabled: true, Label: "Spec sheet", Provider: "plugin", Links: field.NoLinks(),

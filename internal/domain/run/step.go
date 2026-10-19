@@ -8,6 +8,7 @@ const (
 	StepResolveContext  StepName = "resolve_context"
 	StepGenerateBody    StepName = "generate_body"
 	StepGenerateMeta    StepName = "generate_meta"
+	StepGenerateFields  StepName = "generate_fields"
 	StepInsertLinks     StepName = "insert_links"
 	StepRepairLinks     StepName = "repair_links"
 	StepGenerateImages  StepName = "generate_images"
@@ -33,7 +34,7 @@ const (
 )
 
 var stepNames = []StepName{
-	StepResolveContext, StepGenerateBody, StepGenerateMeta, StepInsertLinks, StepRepairLinks,
+	StepResolveContext, StepGenerateBody, StepGenerateMeta, StepGenerateFields, StepInsertLinks, StepRepairLinks,
 	StepGenerateImages, StepValidate, StepJudge, StepPublish, StepRelinkNeighbors, StepSyncBack,
 	StepReport,
 }

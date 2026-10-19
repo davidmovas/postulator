@@ -24,6 +24,7 @@
       {"name": "resolve_context", "enabled": true},
       {"name": "generate_body", "enabled": true},
       {"name": "generate_meta", "enabled": true},
+      {"name": "generate_fields", "enabled": true},
       {"name": "insert_links", "enabled": true},
       {"name": "repair_links", "enabled": true},
       {"name": "generate_images", "enabled": true},

@@ -36,7 +36,7 @@ func TestSeedShipsFiveValidGlobalTemplates(t *testing.T) {
 func TestSeedRecipesUseTheStepCatalogue(t *testing.T) {
 	t.Parallel()
 
-	catalog := []string{"resolve_context", "generate_body", "generate_meta", "insert_links", "repair_links", "generate_images", "validate", "judge", "publish", "relink_neighbors", "sync_back", "report"}
+	catalog := []string{"resolve_context", "generate_body", "generate_meta", "generate_fields", "insert_links", "repair_links", "generate_images", "validate", "judge", "publish", "relink_neighbors", "sync_back", "report"}
 	seeds := template.Seed()
 	for i := range seeds {
 		steps := make([]string, 0, len(seeds[i].Spec.Recipe))

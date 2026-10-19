@@ -1,8 +1,10 @@
 package wp
 
 import (
+	"bytes"
 	"cmp"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"slices"
@@ -18,8 +20,13 @@ type PostType struct {
 	RestBase      string
 	RestNamespace string
 	Taxonomies    []string
+	Supports      []string
 	Hierarchical  bool
 	Viewable      bool
+}
+
+func (p PostType) Has(feature string) bool {
+	return slices.Contains(p.Supports, feature)
 }
 
 type Term struct {
@@ -37,13 +44,25 @@ type SiteSettings struct {
 }
 
 type postTypePayload struct {
-	Name          string   `json:"name"`
-	Slug          string   `json:"slug"`
-	RestBase      string   `json:"rest_base"`
-	RestNamespace string   `json:"rest_namespace"`
-	Taxonomies    []string `json:"taxonomies"`
-	Hierarchical  bool     `json:"hierarchical"`
-	Viewable      bool     `json:"viewable"`
+	Supports      map[string]json.RawMessage `json:"supports"`
+	Name          string                     `json:"name"`
+	Slug          string                     `json:"slug"`
+	RestBase      string                     `json:"rest_base"`
+	RestNamespace string                     `json:"rest_namespace"`
+	Taxonomies    []string                   `json:"taxonomies"`
+	Hierarchical  bool                       `json:"hierarchical"`
+	Viewable      bool                       `json:"viewable"`
+}
+
+func supported(features map[string]json.RawMessage) []string {
+	out := make([]string, 0, len(features))
+	for name, value := range features {
+		if trimmed := bytes.TrimSpace(value); !bytes.Equal(trimmed, []byte("false")) && !bytes.Equal(trimmed, []byte("null")) {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 type embedded struct {
@@ -104,6 +123,7 @@ func (c *Client) PostTypes(ctx context.Context) ([]PostType, error) {
 			RestBase:      described.RestBase,
 			RestNamespace: described.RestNamespace,
 			Taxonomies:    taxonomies,
+			Supports:      supported(described.Supports),
 			Hierarchical:  described.Hierarchical,
 			Viewable:      described.Viewable,
 		})

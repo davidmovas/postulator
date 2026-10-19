@@ -27,7 +27,7 @@ func steps(names ...string) []template.StepSpec {
 
 func GenerateRecipe() []template.StepSpec {
 	return steps(
-		string(StepResolveContext), string(StepGenerateBody), string(StepGenerateMeta),
+		string(StepResolveContext), string(StepGenerateBody), string(StepGenerateMeta), string(StepGenerateFields),
 		string(StepInsertLinks), string(StepRepairLinks), string(StepGenerateImages), string(StepValidate),
 		string(StepJudge), string(StepPublish), string(StepRelinkNeighbors), string(StepSyncBack), string(StepReport),
 	)

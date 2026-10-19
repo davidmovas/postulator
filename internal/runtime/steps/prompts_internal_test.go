@@ -75,6 +75,10 @@ func TestEveryPromptExecutes(t *testing.T) {
 			SiteName: "Lab", Canonical: "https://lab.example.com/peptides/", Pattern: "Peptides | Lab",
 			Picture: fullPicture, Description: []string{"Field: SEO description", "Length: at most 155 characters"},
 		},
+		NameGenerateFields: fieldsPrompt{
+			Page: page, Picture: fullPicture,
+			Asked: []askedField{{Key: "excerpt", Name: "Excerpt", Rules: []string{"Field: Excerpt", "Length: at most 160 characters"}}},
+		},
 		NameRepairLinks: repairPrompt{
 			Page: page, Entity: entity, Phrase: "home", Why: "the parent", Paragraph: "Peptides are short chains.",
 			Identity: "Peptides (/peptides/, Hub)", About: "Home (/): Entity for Home",

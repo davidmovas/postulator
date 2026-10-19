@@ -170,6 +170,18 @@ func (r renderedText) value() string {
 	return r.Rendered
 }
 
+type rawText struct {
+	Raw      *string `json:"raw"`
+	Rendered string  `json:"rendered"`
+}
+
+func (r rawText) value() string {
+	if r.Raw != nil {
+		return *r.Raw
+	}
+	return r.Rendered
+}
+
 type metaBag map[string]any
 
 func (m *metaBag) UnmarshalJSON(data []byte) error {
@@ -190,7 +202,7 @@ func (m *metaBag) UnmarshalJSON(data []byte) error {
 type itemPayload struct {
 	Title         renderedText `json:"title"`
 	Content       renderedText `json:"content"`
-	Excerpt       renderedText `json:"excerpt"`
+	Excerpt       rawText      `json:"excerpt"`
 	Meta          metaBag      `json:"meta"`
 	Type          string       `json:"type"`
 	Slug          string       `json:"slug"`

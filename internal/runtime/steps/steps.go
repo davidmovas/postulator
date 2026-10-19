@@ -21,6 +21,7 @@ func all(deps Deps) []run.StepDef {
 		ResolveContext(deps),
 		GenerateBody(deps),
 		GenerateMeta(deps),
+		GenerateFields(deps),
 		InsertLinks(deps),
 		RepairLinks(deps),
 		GenerateImages(deps),

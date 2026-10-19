@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -19,8 +20,11 @@ const (
 	OutcomeRestored  = "restored"
 	OutcomeNeedsHand = "needs_human"
 
-	CodeRevertNeedsHuman = "revert_needs_human"
-	CodeRevertMetaKept   = "revert_meta_kept"
+	CodeRevertNeedsHuman  = "revert_needs_human"
+	CodeRevertMetaKept    = "revert_meta_kept"
+	CodeRevertExcerptKept = "revert_excerpt_kept"
+
+	ReasonRevertExcerptEdited = "the excerpt changed on the site since the run wrote it, so the owner's edit is kept"
 
 	ReasonRevertNoRecord = "the run kept no record of what it published to this page, " +
 		"so there is nothing to put back"
@@ -253,6 +257,38 @@ func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	result.Detail = detail
 	if reason, back := putTheMetaBack(ctx, work); !back {
 		result.Findings = append(result.Findings, metaKept(work.page, work.published.SEOApplied, reason))
+	}
+	if reason, back := putTheExcerptBack(ctx, deps, sc, work); !back {
+		result.Findings = append(result.Findings, content.Finding{
+			Severity: content.SeverityWarn, Code: CodeRevertExcerptKept,
+			Message: "the excerpt of " + work.page.Path + " was not put back: " + reason,
+			Details: map[string]any{"pageId": work.page.ID, "path": work.page.Path, "reason": reason},
+		})
+	}
+	return "", true
+}
+
+func putTheExcerptBack(ctx context.Context, deps Deps, sc *run.StepContext, work revertWork) (string, bool) {
+	if work.published.PreviousExcerpt == nil {
+		return "", true
+	}
+	itemType, err := itemTypeOf(work.page)
+	if err != nil {
+		return err.Error(), false
+	}
+	held, err := work.client.GetItem(ctx, itemType, work.published.WPID)
+	if err != nil {
+		return err.Error(), false
+	}
+	if held.Excerpt != work.published.Excerpt {
+		return ReasonRevertExcerptEdited, false
+	}
+	previous := *work.published.PreviousExcerpt
+	if _, err = work.client.UpdateItem(ctx, itemType, work.published.WPID, wp.UpdateItem{Excerpt: &previous}); err != nil {
+		return err.Error(), false
+	}
+	if recordErr := recordField(ctx, deps, sc, work.page.ID, field.Excerpt, previous); recordErr != nil {
+		return recordErr.Error(), false
 	}
 	return "", true
 }

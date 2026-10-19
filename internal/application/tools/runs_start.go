@@ -13,7 +13,7 @@ const runsStartName = "runs_start"
 type runsStartArgs struct {
 	PageIDs     []string `json:"pageIds" description:"Page ids"`
 	TemplateID  string   `json:"templateId,omitempty" description:"Template id to move pages to; default their own"`
-	Steps       []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Steps in order; default the template's recipe"`
+	Steps       []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Steps in order; default the template's recipe"`
 	PublishMode string   `json:"publishMode,omitempty" enum:"draft,publish" description:"Default draft"`
 	Kind        string   `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,custom" description:"Run purpose; default from the steps"`
 	MaxUSD      float64  `json:"maxUsd,omitempty" minimum:"0" description:"Dollar ceiling; default configured"`

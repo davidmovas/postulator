@@ -63,6 +63,12 @@ func TestPostTypesNameTheRestBaseOfEveryType(t *testing.T) {
 	if got := byName["post"].Taxonomies; !slices.Equal(got, []string{"category", "post_tag"}) {
 		t.Errorf("post taxonomies = %v", got)
 	}
+	if post := byName["post"]; !post.Has("excerpt") || !post.Has("editor") || post.Has("trackbacks") {
+		t.Errorf("post supports = %v, want the excerpt and an editor given as an array, and nothing switched off", post.Supports)
+	}
+	if byName["page"].Has("excerpt") {
+		t.Errorf("page supports = %v, want no excerpt", byName["page"].Supports)
+	}
 
 	if _, err := client.PostTypes(t.Context()); err != nil {
 		t.Fatalf("PostTypes again: %v", err)

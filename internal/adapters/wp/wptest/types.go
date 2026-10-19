@@ -20,6 +20,7 @@ type PostType struct {
 	Name         string
 	RestBase     string
 	Taxonomies   []string
+	Supports     []string
 	Hierarchical bool
 	Viewable     bool
 }
@@ -66,14 +67,29 @@ func (s *Server) SetPrivacyPage(id int64) {
 
 func (s *Server) builtinTypes() []PostType {
 	types := []PostType{
-		{Slug: "attachment", Name: "Media", RestBase: "media", Viewable: true},
-		{Slug: TypePage, Name: "Pages", RestBase: "pages", Hierarchical: true, Viewable: true},
-		{Slug: TypePost, Name: "Posts", RestBase: "posts", Taxonomies: []string{"category", "post_tag"}, Viewable: true},
+		{Slug: "attachment", Name: "Media", RestBase: "media", Supports: []string{"title", "author"}, Viewable: true},
+		{Slug: TypePage, Name: "Pages", RestBase: "pages", Supports: []string{"title", "editor", "page-attributes", "thumbnail"}, Hierarchical: true, Viewable: true},
+		{Slug: TypePost, Name: "Posts", RestBase: "posts", Taxonomies: []string{"category", "post_tag"},
+			Supports: []string{"title", "editor", "excerpt", "thumbnail"}, Viewable: true},
 	}
 	if !s.noCommerce {
-		types = append(types, PostType{Slug: TypeProduct, Name: "Products", RestBase: "product", Taxonomies: []string{"product_cat", "product_tag"}, Viewable: true})
+		types = append(types, PostType{Slug: TypeProduct, Name: "Products", RestBase: "product", Taxonomies: []string{"product_cat", "product_tag"},
+			Supports: []string{"title", "editor", "excerpt", "thumbnail"}, Viewable: true})
 	}
 	return types
+}
+
+func supportsPayload(supports []string) map[string]any {
+	payload := make(map[string]any, len(supports))
+	for _, name := range supports {
+		if name == "editor" {
+			payload[name] = []any{map[string]any{"notes": true}}
+			continue
+		}
+		payload[name] = true
+	}
+	payload["trackbacks"] = false
+	return payload
 }
 
 func (s *Server) builtinTaxonomies() []Taxonomy {
@@ -145,6 +161,7 @@ func (s *Server) handleTypes(w http.ResponseWriter, _ *http.Request) {
 			"rest_base":      postType.RestBase,
 			"rest_namespace": "wp/v2",
 			"taxonomies":     taxonomies,
+			"supports":       supportsPayload(postType.Supports),
 			"hierarchical":   postType.Hierarchical,
 			"viewable":       postType.Viewable,
 		}

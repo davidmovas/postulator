@@ -34,6 +34,8 @@ type PublishResult struct {
 	ContentHash         string             `json:"contentHash"`
 	PreviousContent     string             `json:"previousContent"`
 	PreviousContentHash string             `json:"previousContentHash"`
+	Excerpt             string             `json:"excerpt,omitempty"`
+	PreviousExcerpt     *string            `json:"previousExcerpt,omitempty"`
 	SEOApplied          []string           `json:"seoApplied"`
 	Skipped             []string           `json:"skipped"`
 	Findings            []content.Finding  `json:"findings"`
@@ -126,9 +128,16 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 		}
 	}
 
+	answered, _, err := decodeArtifact[Fields](sc, run.ArtifactFields)
+	if err != nil {
+		return run.Result{}, err
+	}
 	asked := itemRequest(sc, draft, final, placed.wpID, featured.FeaturedID)
 	asked.existing, asked.found = existing, found
 	asked.viaRaw, asked.keepTitle = keeping != nil, kept[field.Title]
+	if excerpt, written := answered.Value(field.Excerpt); written {
+		asked.excerpt = &excerpt
+	}
 	written, mismatches, err := writeItem(ctx, client, itemType, sc, asked)
 	if err != nil {
 		return run.Result{}, err
@@ -143,6 +152,10 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 		PreviousContent: replaced.Content, PreviousContentHash: replaced.ContentHash,
 		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: driftFindings(sc.Page),
 		Mismatches: mismatches,
+	}
+	if asked.excerpt != nil {
+		previous := existing.Excerpt
+		result.Excerpt, result.PreviousExcerpt = *asked.excerpt, &previous
 	}
 	seo, err := applySEO(ctx, client, sc, itemType, written.ID, found, kept)
 	if err != nil {
@@ -163,6 +176,11 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, written.ID, final, keeping); recordErr != nil {
 		return run.Result{}, recordErr
 	}
+	if asked.excerpt != nil {
+		if recordErr := recordField(ctx, deps, sc, sc.Page.ID, field.Excerpt, *asked.excerpt); recordErr != nil {
+			return run.Result{}, recordErr
+		}
+	}
 	return publishedAs(result, verb(found)+" "+sc.Page.Path+" as "+strconv.FormatInt(written.ID, 10))
 }
 
@@ -180,6 +198,7 @@ type writeRequest struct {
 	slug      string
 	status    string
 	parent    int64
+	excerpt   *string
 	featured  int64
 	found     bool
 	created   bool
@@ -218,6 +237,9 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 		in := wp.CreateItem{
 			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status,
 		}
+		if req.excerpt != nil {
+			in.Excerpt = *req.excerpt
+		}
 		if itemType == wp.TypePage {
 			in.Parent = &req.parent
 		}
@@ -227,7 +249,7 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 		return client.CreateItem(ctx, itemType, in)
 	}
 
-	in := wp.UpdateItem{Status: &req.status}
+	in := wp.UpdateItem{Status: &req.status, Excerpt: req.excerpt}
 	if !req.keepTitle {
 		in.Title = &req.title
 	}

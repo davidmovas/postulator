@@ -170,6 +170,15 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 	if calls == 0 {
 		return nil
 	}
+	if def.Price.Applies != nil {
+		applies, appliesErr := def.Price.Applies(ctx, *target)
+		if appliesErr != nil {
+			return appliesErr
+		}
+		if !applies {
+			return nil
+		}
+	}
 	if def.Price.Unpriced {
 		priced.add(run.EstimateFinding{
 			Severity: content.SeverityWarn, Code: CodeUnpricedStep,

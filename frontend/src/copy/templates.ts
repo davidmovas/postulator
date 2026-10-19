@@ -371,6 +371,7 @@ export const templates = {
         resolve_context: "Work out what this page may link to",
         generate_body: "Write the body",
         generate_meta: "Write the title and description",
+        generate_fields: "Write the excerpt and the other short fields the page type enables",
         insert_links: "Insert the internal links",
         repair_links: "Repair the links the checks refused",
         generate_images: "Make the images",

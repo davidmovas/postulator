@@ -187,6 +187,7 @@ const artifactIcons: Readonly<Record<ArtifactKind, IconComponent>> = {
     draft: DescriptionIcon,
     body_html: VisibilityIcon,
     meta: DescriptionIcon,
+    fields: DescriptionIcon,
     images: ShieldIcon,
     validation_report: LinkIcon,
     judge_report: GavelIcon,
