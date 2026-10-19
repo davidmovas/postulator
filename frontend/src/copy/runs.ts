@@ -414,6 +414,12 @@ export const runs = {
             specifications: "Attributes",
             unstated: "not stated",
         },
+        fields: {
+            written: "Written",
+            skipped: "Not asked for",
+            none: "No field was asked for: no enabled field this step writes is set to be written by the model.",
+            empty: "empty",
+        },
         images: {
             featured: "Featured image",
             problems: "What the step could not do",

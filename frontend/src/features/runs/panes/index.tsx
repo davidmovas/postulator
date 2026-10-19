@@ -11,6 +11,7 @@ import { retentionIcon, stepLabel } from "../labels.js";
 import {
     artifactBodyHtml,
     artifactDraft,
+    artifactFields,
     artifactFinalReport,
     artifactImages,
     artifactJudgeReport,
@@ -22,7 +23,7 @@ import {
     artifactSyncResult,
     artifactValidationReport,
 } from "../statuses.js";
-import { BodyPane, DraftPane, ImagesPane, MetaPane } from "./content.js";
+import { BodyPane, DraftPane, FieldsPane, ImagesPane, MetaPane } from "./content.js";
 import { JudgePane } from "./judge.js";
 import { LinkContextPane, ValidationPane } from "./links.js";
 import { FinalPane, PublishPane, RelinkPane, RevertPane, SyncPane } from "./publish.js";
@@ -43,6 +44,8 @@ function Payload({ itemId, kind, pageId, payload }: PayloadProps): ReactElement 
             return <DraftPane payload={payload} />;
         case artifactMeta:
             return <MetaPane payload={payload} />;
+        case artifactFields:
+            return <FieldsPane payload={payload} />;
         case artifactImages:
             return <ImagesPane payload={payload} />;
         case artifactValidationReport:

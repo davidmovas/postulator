@@ -178,6 +178,42 @@ export function metaView(held: unknown): MetaView | null {
     };
 }
 
+export interface FieldValueView {
+    key: string;
+    value: string;
+}
+
+export interface FieldSkipView {
+    key: string;
+    reason: string;
+}
+
+export interface FieldsView {
+    values: readonly FieldValueView[];
+    skipped: readonly FieldSkipView[];
+}
+
+export function fieldsView(held: unknown): FieldsView | null {
+    if (record(held) === null) {
+        return null;
+    }
+    const values: FieldValueView[] = [];
+    for (const entry of listAt(held, "values")) {
+        const key = stringAt(entry, "key");
+        if (key !== "") {
+            values.push({ key, value: stringAt(entry, "value") });
+        }
+    }
+    const skipped: FieldSkipView[] = [];
+    for (const entry of listAt(held, "skipped")) {
+        const key = stringAt(entry, "key");
+        if (key !== "") {
+            skipped.push({ key, reason: stringAt(entry, "reason") });
+        }
+    }
+    return { values, skipped };
+}
+
 export interface PlacedImageView {
     role: string;
     url: string;

@@ -41,6 +41,7 @@ export const artifactLinkContext: ArtifactKind = "link_context";
 export const artifactDraft: ArtifactKind = "draft";
 export const artifactBodyHtml: ArtifactKind = "body_html";
 export const artifactMeta: ArtifactKind = "meta";
+export const artifactFields: ArtifactKind = "fields";
 export const artifactImages: ArtifactKind = "images";
 export const artifactValidationReport: ArtifactKind = "validation_report";
 export const artifactJudgeReport: ArtifactKind = "judge_report";
