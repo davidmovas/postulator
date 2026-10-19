@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
@@ -35,6 +36,7 @@ type memory struct {
 	reads    int
 	asked    [][]string
 	budgets  map[domainllm.Role]int
+	audit    reports.LinkAuditResponse
 }
 
 func (m *memory) service() *sitemodel.Service {
@@ -42,7 +44,26 @@ func (m *memory) service() *sitemodel.Service {
 		Reader: m, Sites: siteReader{m}, Pages: pageReader{m}, Entities: entityReader{m}, Edges: edgeReader{m},
 		Types: typeReader{m}, Terms: termReader{m}, Fields: fieldReader{m}, Bodies: bodyReader{m},
 		Renders: renderReader{m}, Links: linkReader{m}, Findings: findingReader{m}, Budgets: budgetReader{m},
+		Audits: auditReader{m},
 	})
+}
+
+type auditReader struct{ m *memory }
+
+func (r auditReader) LinkAudit(_ context.Context, req reports.LinkAuditRequest) (reports.LinkAuditResponse, error) {
+	if req.SiteID != r.m.site.ID {
+		return reports.LinkAuditResponse{}, errors.New(errors.NotFound, "no such site")
+	}
+	return r.m.audit, nil
+}
+
+func (r auditReader) LinkAuditPage(_ context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error) {
+	for i := range r.m.audit.Pages {
+		if r.m.audit.Pages[i].PageID == req.PageID {
+			return reports.LinkAuditPageResponse{Page: r.m.audit.Pages[i]}, nil
+		}
+	}
+	return reports.LinkAuditPageResponse{Page: reports.PageAudit{PageID: req.PageID}}, nil
 }
 
 type budgetReader struct{ m *memory }

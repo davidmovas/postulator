@@ -3,6 +3,7 @@ package sitemodel
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
@@ -76,8 +77,14 @@ type budgets interface {
 	InputBudget(role llm.Role) int
 }
 
+type audits interface {
+	LinkAudit(ctx context.Context, req reports.LinkAuditRequest) (reports.LinkAuditResponse, error)
+	LinkAuditPage(ctx context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error)
+}
+
 type Deps struct {
 	Budgets  budgets
+	Audits   audits
 	Reader   reader
 	Sites    siteStore
 	Pages    pageStore

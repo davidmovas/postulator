@@ -11,7 +11,7 @@ type Group struct {
 }
 
 var groups = []Group{
-	{Name: "sites", Description: "WordPress sites: register, change or delete one and set its defaults."},
+	{Name: "sites", Description: "WordPress sites: register, change or delete one and set its defaults, and explore a site's model."},
 	{Name: "graph", Description: "The entity graph: entities, keywords, anchors, parent and related edges, " +
 		"proposals from pages or keywords, authority scores."},
 	{Name: "pages", Description: "The page map: plan, change or delete pages, map them to entities, " +
@@ -29,8 +29,8 @@ var groups = []Group{
 }
 
 var orienting = []string{
-	"sites_list", "sites_get", "reports_site_overview", "graph_list_entities", "pages_list", "pages_get",
-	"pages_tree", "runs_list", "runs_get", "templates_list",
+	"sites_list", "sites_get", "sites_explore", "reports_site_overview", "graph_list_entities", "pages_list", "pages_get",
+	"runs_list", "runs_get", "templates_list",
 }
 
 func OnDemand(name string) (Group, bool) {

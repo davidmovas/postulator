@@ -192,6 +192,25 @@ export const scopableFieldKeys: readonly FieldKey[] = [
     "cross_sells",
 ];
 
+export const packFieldKeys: readonly FieldKey[] = [
+    "title",
+    "excerpt",
+    "body",
+    "seo_title",
+    "seo_description",
+    "product_description",
+    "product_short_description",
+    "variation_description",
+    "image_alt",
+    "image_title",
+];
+
+export const exploreViews = ["page", "tree", "links", "gaps", "pack"] as const;
+export type ExploreView = (typeof exploreViews)[number];
+
+export const siteGaps = ["planned", "empty", "unmapped", "orphan", "missing_links", "findings"] as const;
+export type SiteGap = (typeof siteGaps)[number];
+
 export const fieldProviders = ["", "plugin", "store"] as const;
 export type FieldProvider = (typeof fieldProviders)[number];
 

@@ -19,6 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -35,21 +36,23 @@ type actionStore interface {
 }
 
 type Deps struct {
-	Sites     *sites.Service
-	Graph     *graph.Service
-	Pages     *pages.Service
-	PageTypes *pagetypes.Service
-	Templates *templates.Service
-	Runs      *runs.Service
-	Sync      *sync.Service
-	Reports   *reports.Service
-	Imports   *imports.Service
-	Models    *models.Service
-	Content   *content.Service
-	Schedules *schedules.Service
-	Actions   actionStore
-	Publisher application.Publisher
-	Clock     clock.Clock
+	Sites       *sites.Service
+	Graph       *graph.Service
+	Pages       *pages.Service
+	PageTypes   *pagetypes.Service
+	Templates   *templates.Service
+	Runs        *runs.Service
+	Sync        *sync.Service
+	Reports     *reports.Service
+	Imports     *imports.Service
+	Models      *models.Service
+	Content     *content.Service
+	Schedules   *schedules.Service
+	SiteModel   *sitemodel.Service
+	ResultBytes func() int
+	Actions     actionStore
+	Publisher   application.Publisher
+	Clock       clock.Clock
 }
 
 type factory func(Deps) Tool

@@ -26,6 +26,7 @@ type authoring struct {
 	templates *templates.Service
 	pageTypes *pagetypes.Service
 	siteModel *sitemodel.Service
+	reports   *reports.Service
 	wordpress *registry.Registry
 	content   *content.Service
 }
@@ -52,16 +53,22 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 	})
 
+	reportsService := reports.New(reports.Deps{
+		Entities: stores.entities, Edges: stores.edges, Pages: stores.pages, Links: stores.links,
+		Runs: stores.runs, Items: stores.items, Artifacts: stores.artifacts,
+		Sites: stores.sites, Specs: templateService, Types: pageTypes,
+	})
 	siteModel := sitemodel.New(sitemodel.Deps{
-		Budgets: llm.tuning, Reader: stores.store, Sites: stores.sites, Pages: stores.pages, Entities: stores.entities, Edges: stores.edges,
-		Types: pageTypes, Terms: stores.identities, Fields: stores.fields, Bodies: stores.bodies, Renders: stores.renders,
-		Links: stores.links, Findings: stores.findings,
+		Budgets: llm.tuning, Audits: reportsService, Reader: stores.store, Sites: stores.sites, Pages: stores.pages,
+		Entities: stores.entities, Edges: stores.edges, Types: pageTypes, Terms: stores.identities, Fields: stores.fields,
+		Bodies: stores.bodies, Renders: stores.renders, Links: stores.links, Findings: stores.findings,
 	})
 
 	return authoring{
 		templates: templateService,
 		pageTypes: pageTypes,
 		siteModel: siteModel,
+		reports:   reportsService,
 		wordpress: wordpress,
 		content: content.New(content.Deps{
 			Pages: stores.pages, Entities: stores.entities, Edges: stores.edges, Specs: templateService,
@@ -103,13 +110,9 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		}),
 		models: models.New(llm.catalog, stores.overrides, llm.profiles, llm.ledger, stores.secrets, llm.client,
 			c.Events, stores.now),
-		runs: runsService,
-		sync: sync.New(running.engine, stores.sites, writing.wordpress, packer{}, stores.now),
-		reports: reports.New(reports.Deps{
-			Entities: stores.entities, Edges: stores.edges, Pages: stores.pages, Links: stores.links,
-			Runs: stores.runs, Items: stores.items, Artifacts: stores.artifacts,
-			Sites: stores.sites, Specs: writing.templates, Types: writing.pageTypes,
-		}),
+		runs:    runsService,
+		sync:    sync.New(running.engine, stores.sites, writing.wordpress, packer{}, stores.now),
+		reports: writing.reports,
 		schedules: schedules.New(schedules.Deps{
 			Schedules: stores.schedules, Pages: stores.pages, Sites: stores.sites, Runs: runsService,
 			RunReader: stores.runs, Publisher: c.Events, Clock: stores.now,

@@ -56,8 +56,11 @@ func catalog() []vocabulary {
 			export: "fieldKeys", tsType: "FieldKey", pkg: "internal/domain/field", typeName: "Key",
 			derived: []derivation{
 				{export: "scopableFieldKeys", keep: func(value string) bool { return field.CheckScope(field.Key(value)) == nil }},
+				{export: "packFieldKeys", keep: packable},
 			},
 		},
+		{export: "exploreViews", tsType: "ExploreView", pkg: "internal/application/sitemodel", typeName: "View"},
+		{export: "siteGaps", tsType: "SiteGap", pkg: "internal/domain/contextpack", typeName: "Gap"},
 		{export: "fieldProviders", tsType: "FieldProvider", pkg: "internal/domain/field", typeName: "Provider"},
 		{export: "edgeKinds", tsType: "EdgeKind", pkg: "internal/domain/graph", typeName: "EdgeKind"},
 		{export: "edgeStatuses", tsType: "EdgeStatus", pkg: "internal/domain/graph", typeName: "EdgeStatus"},
@@ -174,4 +177,9 @@ func catalog() []vocabulary {
 		{export: "siteSortFields", tsType: "SiteSortField", pkg: "internal/domain/site", typeName: "Sort"},
 		{export: "templateSortFields", tsType: "TemplateSortField", pkg: "internal/domain/template", typeName: "Sort"},
 	}
+}
+
+func packable(value string) bool {
+	spec, known := field.Lookup(field.Key(value))
+	return known && spec.Text && field.CheckScope(field.Key(value)) == nil
 }

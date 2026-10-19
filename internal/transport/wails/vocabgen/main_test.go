@@ -125,6 +125,10 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 			"title", "excerpt", "body", "seo_title", "seo_description", "product_description",
 			"product_short_description", "variation_description", "image_alt", "image_title", "upsells", "cross_sells",
 		},
+		"packFieldKeys": {
+			"title", "excerpt", "body", "seo_title", "seo_description", "product_description",
+			"product_short_description", "variation_description", "image_alt", "image_title",
+		},
 	}
 
 	seen := make(map[string][]string)

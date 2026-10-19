@@ -33,7 +33,7 @@ type Ref struct {
 	Type    string          `json:"type"`
 	Preset  pagetype.Preset `json:"preset"`
 	OnSite  bool            `json:"onSite"`
-	Summary Summary         `json:"summary"`
+	Summary Summary         `json:"summary,omitzero"`
 }
 
 type Product struct {
@@ -150,6 +150,10 @@ func (s Snapshot) Facts(pageID string, plan content.LinkContext) (Facts, error) 
 		facts.Root, facts.Regions, facts.Generated = record.Root, slices.Clone(record.Regions), record.WordsGenerated
 	}
 	return facts, nil
+}
+
+func (s Snapshot) Ref(page pagemap.Page) Ref {
+	return s.ref(page, false)
 }
 
 func (s Snapshot) ref(page pagemap.Page, summarized bool) Ref {

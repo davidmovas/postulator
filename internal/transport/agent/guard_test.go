@@ -152,7 +152,7 @@ func TestAToolOutsideTheAllowListIsDenied(t *testing.T) {
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done",
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done",
 		[]string{"sites_list"}, stream)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestAnOversizedToolResultIsCappedBeforeItReachesTheModel(t *testing.T) {
 	b := newBareRunner(t, 120)
 	stream := &recordingStream{}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)); err != nil {
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -243,7 +243,7 @@ func TestASiteScopedToolInASiteLessConversationIsDenied(t *testing.T) {
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
 
-	spec := b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)
+	spec := b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)
 	spec.Binding.SiteID = ""
 
 	if _, err := b.runner.Run(t.Context(), spec); err != nil {
@@ -264,7 +264,7 @@ func TestALoopLimitEndsTheTurnAsAnExhaustedBudget(t *testing.T) {
 
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
-	script := strings.Repeat("TOOL:pages_tree{}\n", 8)
+	script := strings.Repeat("TOOL:pages_list{}\n", 8)
 
 	_, err := b.runner.Run(t.Context(), b.spec(script+"FAKE: done", nil, stream))
 	if !errors.IsCode(err, errors.BudgetExceeded) {
@@ -314,7 +314,7 @@ func TestTheFenceWrapsTheModelCopyAndTheLedgerKeepsTheRaw(t *testing.T) {
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream)); err != nil {
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -322,7 +322,7 @@ func TestTheFenceWrapsTheModelCopyAndTheLedgerKeepsTheRaw(t *testing.T) {
 	if len(settled) != 1 {
 		t.Fatalf("the outcomes are %+v", settled)
 	}
-	if outcome := decode(t, settled[0].Result); outcome["untrustedContent"] != nil || outcome["roots"] == nil {
+	if outcome := decode(t, settled[0].Result); outcome["untrustedContent"] != nil || outcome["items"] == nil {
 		t.Fatalf("the audited result is %v; the audit records what the tool answered", outcome)
 	}
 
@@ -364,7 +364,7 @@ func TestAStreamFailureKeepsTheAnswerAndSaysTheRecordIsIncomplete(t *testing.T) 
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{err: errors.New(errors.External, "the bus is gone")}
 
-	result, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_tree{}\nFAKE: done", nil, stream))
+	result, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream))
 	if err != nil {
 		t.Fatalf("a turn that answered must not fail because its audit could not be written: %v", err)
 	}

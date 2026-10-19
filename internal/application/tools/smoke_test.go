@@ -24,11 +24,13 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	domainrun "github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -187,10 +189,66 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 			Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry(), pagesService),
 			RunReader: runRepo, Publisher: bus, Clock: now,
 		}),
-		Actions:   sqlite.NewPendingActionRepo(store),
-		Publisher: bus,
-		Clock:     now,
+		SiteModel: sitemodel.New(sitemodel.Deps{
+			Budgets: wholeWindow{}, Audits: reportsService, Reader: store, Sites: siteRepo, Pages: pageRepo,
+			Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
+			Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
+			Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
+		}),
+		ResultBytes: func() int { return 16384 },
+		Actions:     sqlite.NewPendingActionRepo(store),
+		Publisher:   bus,
+		Clock:       now,
 	}), tools.Binding{SiteID: owner.ID, ConversationID: conversation.ID}, seeded
+}
+
+type wholeWindow struct{}
+
+func (wholeWindow) InputBudget(domainllm.Role) int {
+	return 0
+}
+
+func TestSitesExploreAnswersEveryViewOverTheStore(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, seeded := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+	calls := map[string]string{
+		"page":  `{"view":"page","path":"/coffee/"}`,
+		"tree":  `{"view":"tree"}`,
+		"links": `{"view":"links","pageId":"` + seeded.page + `"}`,
+		"gaps":  `{"view":"gaps","limit":10}`,
+		"pack":  `{"view":"pack","path":"/coffee/"}`,
+	}
+	for view, args := range calls {
+		t.Run(view, func(t *testing.T) {
+			t.Parallel()
+
+			out, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(args))
+			if err != nil {
+				t.Fatalf("sites_explore %s: %v", view, err)
+			}
+			answered, ok := out.(sitemodel.ExploreResponse)
+			if !ok || string(answered.View) != view {
+				t.Fatalf("sites_explore %s answered %+v", view, out)
+			}
+		})
+	}
+	tree, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(`{"view":"tree"}`))
+	if err != nil {
+		t.Fatalf("tree: %v", err)
+	}
+	listed, ok := tree.(sitemodel.ExploreResponse)
+	if !ok || len(listed.Tree.Nodes.Items) != 1 || listed.Tree.Nodes.Items[0].Page.Path != "/coffee/" {
+		t.Errorf("the tree's top = %+v, want the one seeded page", tree)
+	}
+	pack, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(`{"view":"pack","path":"/coffee/"}`))
+	if err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	if got, ok := pack.(sitemodel.ExploreResponse); !ok || got.Pack.Budget != 16384/4 || !strings.Contains(got.Pack.Text, "/coffee/") {
+		t.Errorf("pack = %+v, want the writer's pack fitted to a quarter of the tool-result cap in tokens", pack)
+	}
 }
 
 func TestEveryReadToolRunsAgainstTheRealUseCases(t *testing.T) {
@@ -350,6 +408,8 @@ func argumentsFor(name string) json.RawMessage {
 		return json.RawMessage(`{"name":"Guide","spec":` + minimalSpec + `}`)
 	case "templates_update":
 		return json.RawMessage(`{"id":"t1","spec":` + minimalSpec + `}`)
+	case "sites_explore":
+		return json.RawMessage(`{"view":"gaps"}`)
 	default:
 		return json.RawMessage(`{}`)
 	}

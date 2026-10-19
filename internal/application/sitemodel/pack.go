@@ -45,24 +45,9 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 	}
 	var picture Picture
 	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
-		snapshot, page, err := s.around(c, req.PageID)
+		facts, scope, plan, err := s.read(c, req.PageID, req.Field, req.Claim)
 		if err != nil {
 			return err
-		}
-		key, err := fieldOf(req.Field, page, snapshot.Types)
-		if err != nil {
-			return err
-		}
-		scope, plan := s.claimed(snapshot, page, key, req.Claim)
-		if fillErr := s.fill(c, &snapshot, page, plan); fillErr != nil {
-			return fillErr
-		}
-		facts, err := snapshot.Facts(page.ID, plan)
-		if err != nil {
-			return err
-		}
-		if req.Claim != nil && req.Claim.Type != nil {
-			facts.Page.Type, facts.Page.Preset = req.Claim.Type.Name, req.Claim.Type.Preset
 		}
 		pack := contextpack.Build(facts, scope)
 		fitted, err := contextpack.Fit(pack, req.Budget)
@@ -73,6 +58,29 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 		return nil
 	})
 	return picture, err
+}
+
+func (s *Service) read(ctx context.Context, pageID, fieldName string, claim *Claim) (contextpack.Facts, field.Scope, content.LinkContext, error) {
+	snapshot, page, err := s.around(ctx, pageID)
+	if err != nil {
+		return contextpack.Facts{}, field.Scope{}, content.LinkContext{}, err
+	}
+	key, err := fieldOf(fieldName, page, snapshot.Types)
+	if err != nil {
+		return contextpack.Facts{}, field.Scope{}, content.LinkContext{}, err
+	}
+	scope, plan := s.claimed(snapshot, page, key, claim)
+	if fillErr := s.fill(ctx, &snapshot, page, plan); fillErr != nil {
+		return contextpack.Facts{}, field.Scope{}, content.LinkContext{}, fillErr
+	}
+	facts, err := snapshot.Facts(page.ID, plan)
+	if err != nil {
+		return contextpack.Facts{}, field.Scope{}, content.LinkContext{}, err
+	}
+	if claim != nil && claim.Type != nil {
+		facts.Page.Type, facts.Page.Preset = claim.Type.Name, claim.Type.Preset
+	}
+	return facts, scope, plan, nil
 }
 
 func (s *Service) Pack(ctx context.Context, req PackRequest) (PackView, error) {

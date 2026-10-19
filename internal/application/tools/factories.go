@@ -4,6 +4,7 @@ func factories() []factory {
 	return []factory{
 		sitesList,
 		sitesGet,
+		sitesExplore,
 		sitesCreate,
 		sitesUpdate,
 		sitesDelete,
@@ -36,7 +37,6 @@ func factories() []factory {
 		pagesMapToEntity,
 		pagesUnmap,
 		pagesSetCanonical,
-		pagesTree,
 		pagesReplaceLinks,
 		pagetypesList,
 		pagetypesSave,
@@ -68,7 +68,6 @@ func factories() []factory {
 		reportsPage,
 		reportsRun,
 		reportsLinkAudit,
-		reportsLinkAuditPage,
 		importsInspect,
 		importsPreview,
 		importsApply,

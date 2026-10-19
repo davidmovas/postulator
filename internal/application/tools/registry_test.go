@@ -23,6 +23,7 @@ func registered() []string {
 	return []string{
 		"sites_list",
 		"sites_get",
+		"sites_explore",
 		"sites_create",
 		"sites_update",
 		"sites_delete",
@@ -55,7 +56,6 @@ func registered() []string {
 		"pages_map_to_entity",
 		"pages_unmap",
 		"pages_set_canonical",
-		"pages_tree",
 		"pages_replace_links",
 		"pagetypes_list",
 		"pagetypes_save",
@@ -87,7 +87,6 @@ func registered() []string {
 		"reports_page",
 		"reports_run",
 		"reports_link_audit",
-		"reports_link_audit_page",
 		"imports_inspect",
 		"imports_preview",
 		"imports_apply",
@@ -164,7 +163,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 61560
+	schemaCeilingBytes = 62380
 	charactersPerToken = 4
 	widestLogged       = 8
 )
@@ -380,7 +379,7 @@ func TestASiteScopedToolRefusesAConversationWithoutASite(t *testing.T) {
 	t.Parallel()
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
-	_, err := registry.Call(t.Context(), tools.Binding{Mode: agent.ModeAutonomous}, "pages_tree", nil)
+	_, err := registry.Call(t.Context(), tools.Binding{Mode: agent.ModeAutonomous}, "sites_explore", nil)
 	if !errors.IsCode(err, errors.Unauthorized) {
 		t.Fatalf("Call without a site = %v, want unauthorized", err)
 	}
@@ -404,7 +403,7 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 		switch tool.Def.Name {
 		case "pages_delete":
 			proposed = tool
-		case "pages_tree":
+		case "sites_explore":
 			read = tool
 		}
 	}
@@ -434,7 +433,7 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	}
 
 	if read.Authorize == nil {
-		t.Fatal("pages_tree is site scoped and must authorize")
+		t.Fatal("sites_explore is site scoped and must authorize")
 	}
 	if len(actions.actions) != 1 {
 		t.Fatal("a read tool must not propose anything")
