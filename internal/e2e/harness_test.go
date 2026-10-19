@@ -76,8 +76,8 @@ func replies() []fake.Reply {
 	out := make([]fake.Reply, 0, 2*len(generated)+2)
 	for _, page := range generated {
 		out = append(out,
-			fake.Reply{Step: steps.NameGenerateBody, Match: page.path, Text: draftOf(page.keyword)},
-			fake.Reply{Step: steps.NameGenerateMeta, Match: page.path, Text: metaOf(page.keyword)},
+			fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + page.path + "\n", Text: draftOf(page.keyword)},
+			fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + page.path + "\n", Text: metaOf(page.keyword)},
 		)
 	}
 	return append(out,

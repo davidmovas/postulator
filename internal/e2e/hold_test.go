@@ -69,7 +69,7 @@ func TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated(t *testing.T
 	parentBody := &firstDraftsFail{}
 	script := append([]fake.Reply{
 		{Step: steps.NameGenerateBody, Match: "Path: " + heldChild + "\n", Text: draftOf(childTopic)},
-		{Step: steps.NameGenerateMeta, Match: heldChild, Text: metaOf(childTopic)},
+		{Step: steps.NameGenerateMeta, Match: "Path: " + heldChild + "\n", Text: metaOf(childTopic)},
 		{Step: steps.NameGenerateBody, Match: "Path: " + heldParent + "\n", Make: parentBody.reply},
 	}, replies()...)
 	core := openCoreWith(t, fake.NewScripted(script...))
@@ -82,6 +82,7 @@ func TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated(t *testing.T
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
+	templateTheTypes(t, core, siteID)
 
 	synced, err := core.Sync.SyncSite(t.Context(), appsync.SyncSiteRequest{SiteID: siteID})
 	if err != nil {

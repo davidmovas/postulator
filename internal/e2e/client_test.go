@@ -288,6 +288,7 @@ func TestTheClientLoopFromTheSamples(t *testing.T) {
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
+	templateTheTypes(t, core, siteID)
 
 	assertEverySheetIsNamed(t, core, siteID)
 	assertTheIndentTreeIsRead(t, core, siteID)

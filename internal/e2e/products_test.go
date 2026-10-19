@@ -16,12 +16,14 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	appsync "github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -155,6 +157,26 @@ func templateNamed(t *testing.T, core *app.Core, name string) string {
 	return ""
 }
 
+func templateTheTypes(t *testing.T, core *app.Core, siteID string) {
+	t.Helper()
+
+	listed, err := core.PageTypes.List(t.Context(), pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("list the page types: %v", err)
+	}
+	shipped := map[pagetype.Preset]string{pagetype.Hub: "Hub", pagetype.Entity: "Guide", pagetype.Product: "Product"}
+	for i := range listed.Types {
+		name, writable := shipped[pagetype.Preset(listed.Types[i].Preset)]
+		if !writable {
+			continue
+		}
+		templateID := templateNamed(t, core, name)
+		if _, err = core.PageTypes.Save(t.Context(), pagetypes.SaveRequest{ID: listed.Types[i].ID, TemplateID: &templateID}); err != nil {
+			t.Fatalf("give the %s type the %s template: %v", listed.Types[i].Name, name, err)
+		}
+	}
+}
+
 func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	live := newSite(t)
 	requirePlugin(t, live.env, true)
@@ -170,10 +192,10 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	liquidPath, capsulePath := "/product/"+liquid.Slug+"/", "/product/"+capsule.Slug+"/"
 
 	core := openCoreWith(t, fake.NewScripted(append(replies(),
-		fake.Reply{Step: steps.NameGenerateBody, Match: liquidPath, Text: productAnswer("mak liquid")},
-		fake.Reply{Step: steps.NameGenerateMeta, Match: liquidPath, Text: metaOf("mak liquid")},
-		fake.Reply{Step: steps.NameGenerateBody, Match: capsulePath, Text: productAnswer("mak capsule")},
-		fake.Reply{Step: steps.NameGenerateMeta, Match: capsulePath, Text: metaOf("mak capsule")},
+		fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + liquidPath + "\n", Text: productAnswer("mak liquid")},
+		fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + liquidPath + "\n", Text: metaOf("mak liquid")},
+		fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + capsulePath + "\n", Text: productAnswer("mak capsule")},
+		fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + capsulePath + "\n", Text: metaOf("mak capsule")},
 	)...))
 	owner, err := core.Sites.Create(t.Context(), sites.CreateRequest{
 		Name: "Docker Store", BaseURL: live.env.baseURL, Username: live.env.user, Password: live.env.pass,
