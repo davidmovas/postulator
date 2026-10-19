@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	linkColumns        = `id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, region, source, position, ours, observed_at`
-	insertLink         = `INSERT INTO page_links (` + linkColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	linkColumns        = `id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, region, source, position, ours, absolute, observed_at`
+	insertLink         = `INSERT INTO page_links (` + linkColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	deleteLinksForPage = `DELETE FROM page_links WHERE from_page_id = ? AND source = ?`
 	selectLinksForPage = `SELECT ` + linkColumns + ` FROM page_links WHERE from_page_id = ? ORDER BY observed_at, id`
 	selectLinksBySite  = `SELECT ` + linkColumns + ` FROM page_links WHERE site_id = ? ORDER BY from_page_id, id`
@@ -51,7 +51,8 @@ func (r *PageLinkRepo) ReplaceForPage(ctx context.Context, pageID string, source
 			link := &links[i]
 			if _, err := execWrite(c, r.store.writeFrom(c), insertLink, []any{
 				link.ID, link.SiteID, link.FromPageID, nullString(link.ToPageID), link.ToURL, link.AnchorText, string(link.Origin),
-				string(link.Type), link.Region, string(link.Source), nullPosition(link.Position), boolInt(link.Ours), formatTime(link.ObservedAt),
+				string(link.Type), link.Region, string(link.Source), nullPosition(link.Position), boolInt(link.Ours),
+				boolInt(link.Absolute), formatTime(link.ObservedAt),
 			}, nil, "insert a page link"); err != nil {
 				return err
 			}
@@ -89,12 +90,14 @@ func scanPageLink(rows *sql.Rows) (pagemap.PageLink, error) {
 		source     string
 		position   sql.NullInt64
 		ours       int64
+		absolute   int64
 		observedAt string
 	)
 	if err := rows.Scan(&l.ID, &l.SiteID, &l.FromPageID, &toPageID, &l.ToURL, &l.AnchorText, &origin,
-		&linkType, &l.Region, &source, &position, &ours, &observedAt); err != nil {
+		&linkType, &l.Region, &source, &position, &ours, &absolute, &observedAt); err != nil {
 		return pagemap.PageLink{}, err
 	}
+	l.Absolute = absolute == 1
 	l.ToPageID = optString(toPageID)
 	l.Origin = pagemap.LinkOrigin(origin)
 	l.Type = pagemap.LinkType(linkType)

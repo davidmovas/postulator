@@ -1,8 +1,6 @@
 package contextpack
 
 import (
-	"strings"
-
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -18,7 +16,7 @@ func LinkForm(setting site.URLForm, links []pagemap.PageLink, renderForms []stri
 		if link.Type != pagemap.LinkContextual || link.Source != pagemap.SourceRaw || link.Ours || link.ToPageID == nil {
 			continue
 		}
-		if absoluteHref(link.ToURL) {
+		if link.Absolute {
 			absolute++
 		} else {
 			relative++
@@ -38,9 +36,4 @@ func LinkForm(setting site.URLForm, links []pagemap.PageLink, renderForms []stri
 		return site.URLFormAbsolute
 	}
 	return site.URLFormRelative
-}
-
-func absoluteHref(href string) bool {
-	lower := strings.ToLower(strings.TrimSpace(href))
-	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "//")
 }

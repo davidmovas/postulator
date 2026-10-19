@@ -220,20 +220,20 @@ func TestAnUnknownPageHasNoFacts(t *testing.T) {
 func TestOurLinksFollowTheSitesContextualFormInTheSnapshot(t *testing.T) {
 	t.Parallel()
 
+	stored := func(id, to, path string, absolute bool) pagemap.PageLink {
+		link := contextual(id, "x", to, path, id)
+		link.Absolute = absolute
+		return link
+	}
 	relative := []pagemap.PageLink{
-		contextual("a", "x", "y", "/bpc-157/", "a"), contextual("b", "x", "z", "/tb-500/", "b"),
-		contextual("c", "x", "y", "https://shop.example.com/bpc-157/", "c"),
+		stored("a", "y", "/bpc-157/", false), stored("b", "z", "/tb-500/", false), stored("c", "y", "/bpc-157/", true),
 	}
-	absolute := []pagemap.PageLink{
-		contextual("a", "x", "y", "https://shop.example.com/bpc-157/", "a"), contextual("b", "x", "z", "//shop.example.com/tb-500/", "b"),
-	}
-	ours := []pagemap.PageLink{
-		contextual("a", "x", "y", "https://shop.example.com/bpc-157/", "a"), contextual("b", "x", "z", "https://shop.example.com/tb-500/", "b"),
-	}
+	absolute := []pagemap.PageLink{stored("a", "y", "/bpc-157/", true), stored("b", "z", "/tb-500/", true)}
+	ours := []pagemap.PageLink{stored("a", "y", "/bpc-157/", true), stored("b", "z", "/tb-500/", true)}
 	for i := range ours {
 		ours[i].Ours = true
 	}
-	navigation := []pagemap.PageLink{contextual("a", "x", "y", "https://shop.example.com/", "a")}
+	navigation := []pagemap.PageLink{stored("a", "y", "/", true)}
 	navigation[0].Type = pagemap.LinkNavigation
 
 	cases := []struct {

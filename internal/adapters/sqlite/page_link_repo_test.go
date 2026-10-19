@@ -31,7 +31,7 @@ func TestPageLinkRepoReplaceForPage(t *testing.T) {
 		{ID: id.New(), SiteID: owner.ID, FromPageID: from.ID, ToPageID: &to.ID, ToURL: "/shop/shoes/", AnchorText: "shoes", Origin: pagemap.OriginGenerated,
 			Type: pagemap.LinkContextual, Region: "content", Source: pagemap.SourceRaw, Position: &position, Ours: true, ObservedAt: sqlitetest.Stamp},
 		{ID: id.New(), SiteID: owner.ID, FromPageID: from.ID, ToURL: "https://elsewhere.example.com/", AnchorText: "elsewhere", Origin: pagemap.OriginObserved,
-			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, ObservedAt: sqlitetest.Stamp.Add(time.Second)},
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Absolute: true, ObservedAt: sqlitetest.Stamp.Add(time.Second)},
 	}
 	if err = repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, links); err != nil {
 		t.Fatalf("ReplaceForPage: %v", err)

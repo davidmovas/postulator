@@ -52,7 +52,7 @@ func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID,
 			ToURL: path, AnchorText: found[i].Anchor, Origin: pagemap.OriginObserved,
-			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, ObservedAt: at,
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Absolute: pagemap.AbsoluteHref(found[i].Href), ObservedAt: at,
 		}
 		if target, ok := index.ByPath(path); ok {
 			link.ToPageID = &target.ID

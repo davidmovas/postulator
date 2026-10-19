@@ -380,7 +380,8 @@ func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, body block.B
 			link := pagemap.PageLink{
 				ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: found.Anchor,
 				Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Region: string(regionContent),
-				Source: pagemap.SourceRaw, Position: &position, Ours: blockOurs || wasGenerated, ObservedAt: a.now,
+				Source: pagemap.SourceRaw, Position: &position, Ours: blockOurs || wasGenerated,
+				Absolute: pagemap.AbsoluteHref(found.Href), ObservedAt: a.now,
 			}
 			if wasGenerated {
 				link.Origin = pagemap.OriginGenerated
@@ -423,7 +424,7 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: it.Links[i].Anchor,
 			Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Region: string(regionContent),
-			Source: pagemap.SourceRaw, Ours: wasGenerated, ObservedAt: a.now,
+			Source: pagemap.SourceRaw, Ours: wasGenerated, Absolute: pagemap.AbsoluteHref(it.Links[i].Href), ObservedAt: a.now,
 		}
 		if wasGenerated {
 			link.Origin = pagemap.OriginGenerated

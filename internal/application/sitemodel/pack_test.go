@@ -63,7 +63,11 @@ func edge(id, child, parent string) graph.Edge {
 }
 
 func link(id, from, to, href string, kind pagemap.LinkType, source pagemap.LinkSource) pagemap.PageLink {
-	return pagemap.PageLink{ID: id, SiteID: siteID, FromPageID: from, ToPageID: new(to), ToURL: href, Type: kind, Source: source, ObservedAt: stamp}
+	path, _ := pagemap.NewSite("https://shop.example.com").Resolve(href)
+	return pagemap.PageLink{
+		ID: id, SiteID: siteID, FromPageID: from, ToPageID: new(to), ToURL: path, Type: kind, Source: source,
+		Absolute: pagemap.AbsoluteHref(href), ObservedAt: stamp,
+	}
 }
 
 func site1() *memory {

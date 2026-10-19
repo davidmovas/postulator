@@ -6,6 +6,11 @@ import (
 	"unicode"
 )
 
+func AbsoluteHref(href string) bool {
+	lower := strings.ToLower(strings.TrimSpace(href))
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "//")
+}
+
 func NormalizePath(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {

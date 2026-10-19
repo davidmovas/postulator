@@ -152,6 +152,7 @@ type PageLink struct {
 	Source     LinkSource
 	Position   *int
 	Ours       bool
+	Absolute   bool
 	ObservedAt time.Time
 }
 

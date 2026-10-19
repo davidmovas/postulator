@@ -33,7 +33,7 @@ var (
 	start   = time.Date(2026, time.October, 17, 12, 0, 0, 0, time.UTC)
 	earlier = start.Add(-24 * time.Hour)
 
-	tb500Raw   = "TB-500 is a synthetic fragment of thymosin beta-4.\n\nCompare it with <a href=\"/bpc-157/\">BPC-157</a> before you order."
+	tb500Raw   = "TB-500 is a synthetic fragment of thymosin beta-4.\n\nCompare it with <a href=\"" + baseURL + "/bpc-157/\">BPC-157</a> before you order."
 	homeRaw    = "Research peptides for the laboratory."
 	bpcRaw     = `[products category="healing-peptides" limit="4"]`
 	accountRaw = "[woocommerce_my_account]"
@@ -273,8 +273,9 @@ func TestTheFirstObservationWalksTheWholeSite(t *testing.T) {
 	}
 	links := s.stores.links[tb500.ID][pagemap.SourceRaw]
 	bpc := s.pageAt(t, "/bpc-157/")
-	if len(links) != 1 || links[0].Type != pagemap.LinkContextual || links[0].ToPageID == nil || *links[0].ToPageID != bpc.ID || links[0].Position == nil || *links[0].Position != 1 {
-		t.Errorf("tb-500 raw links = %+v", links)
+	if len(links) != 1 || links[0].Type != pagemap.LinkContextual || links[0].ToPageID == nil || *links[0].ToPageID != bpc.ID ||
+		links[0].Position == nil || *links[0].Position != 1 || links[0].ToURL != "/bpc-157/" || !links[0].Absolute {
+		t.Errorf("tb-500 raw links = %+v, want the absolute href kept as its form beside the path", links)
 	}
 
 	product := s.pageAt(t, "/product/bpc-157-peptide/")
