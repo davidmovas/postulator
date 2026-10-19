@@ -9,10 +9,49 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 run is under **The gate**. **The site-model redesign is underway**: stage 0 and the owner's
 answers landed on 2026-10-17, stage 1a (the plugin's reads, its client and the two stands) the
 same day, stage 1b (the page model, its storage and the observation) and **stage 1c (1b's gaps
-closed and the screens) on 2026-10-18, which closes stage 1**; stage 2, page types, the field
-catalog and the context pack, is next.
+closed and the screens) on 2026-10-18, which closes stage 1**; **stage 2 (2a, page types and
+their scopes, and 2b, the read layer with the writer's pack and the agent's view) on 2026-10-19,
+its stand legs waiting for Docker**; stage 3, the field writers and the editable body, is next.
 
 ## Where we are
+
+**2026-10-19, stage 2b of the site model: one read layer, the writer's pack and the agent's
+view. Stage 2 is done; its stand legs wait for Docker.** The reasoning is under **stage 2b** in
+`DECISIONS.md`, the task list under 2b in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **Part 0, 2a's tail** (`c566586`, `ffb6d9f` to `814c8a1`, `0bc4a98`, `3242f6a`, `219e9b4`): page
+  types and scopes bound and on screen, policies and entity kinds gone from every screen.
+- **The read layer** (`02d3c78` to `2e494a1`, `b6b6e08`, `7737de6`): `domain/contextpack` reads a
+  snapshot of the model (a page's facts, its summary, the site's link form, the overview, gaps and
+  tree) and builds the writer's pack, fitted to a budget by priority; `application/sitemodel`
+  alone loads snapshots, a page's neighbourhood by ids inside one read-only `Store.Read`, and reads
+  the link audit through `reports`. Name twins and the site's link form live in `PlanLinks`.
+- **The writer** (`327c065`, `984af71`, `b016f50`, `a08f9ce`, `6abd188`): `generate_body`,
+  `generate_meta`, `repair_links` and the judge read the pack under `llm.inputBudget.<role>`,
+  refused in preflight when too small; with `rewrites` off the client's blocks are kept byte for
+  byte and ours added after them; a run may rewrite pages the person confirms at its start;
+  `generate_fields` writes the excerpt; `Sanitize` keeps a writer's link the policy allows.
+- **The agent** (`fef0134`, `62569de`, `42ce38b`, `905a895`, `f138c89`): a conversation on a site
+  opens with the site's brief, kept per conversation (0064, cache key `chat:<mode>:<siteId>`);
+  `sites_explore` (views page, tree, links, gaps, pack) replaces `pages_tree` and
+  `reports_link_audit_page`; the instructions teach the model's words; `graph_propose_cards`
+  files card proposals a person accepts on the Graph screen.
+- **The screens** (agent F, `dc79c7b`, `09b1472`, `d88b5ef`, `53a1aee`, `6c36e21`, `4fb5f0e`,
+  `e977d91`): the Pages drawer's Writer tab shows the pack as `Fit` left it and what it dropped;
+  input budgets in Settings → Models; the run start's confirmed rewrite switch; the run report's
+  fields; card proposals on the Graph screen; the agent's cards for `sites_explore` and proposals.
+- **The proofs** (agent H, `ff8b74c`, `e2789f0`, `cba2801`, `d3bc27a`; `676133b`):
+  `TestTheWriterSeesTheFullPicture`, the stand capture, `TestTheAgentSeesTheSite` and
+  `TestThePackOfEveryStandPage` compile, vet and lint; the harness seeds a writer pack and a card
+  proposal.
+- **The closing reviews** (`6fa8f1b` to `16515ed`): two whole-branch reviews found the writer
+  could still lose the client's content with rewrites off; every finding was closed with a test
+  that failed first (the guard on the client's own blocks for every write over an existing page,
+  a block-editor part of its own, relinks that splice, our blocks found by aligned renders, the
+  fields' live values, a card accepted as shown, twins as pages, the link's href form in 0065).
+  What stays open is listed under "What stays open" in `DECISIONS.md`.
+- The tool schemas went from 61,437 to 63,107 bytes (ceiling 63,120); `PagesService.WriterPack`
+  and the three card methods take the bound methods to 130.
 
 **2026-10-19, stage 2a of the site model landed in full** (its last five tasks as stage 2b's Part
 0; the reasoning under stage 2a in `DECISIONS.md`). The client names his page types over six
@@ -305,6 +344,30 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
+**2026-10-19, on Windows, at the close of stage 2b. Everything that runs without Docker is
+green; the stand legs wait for it.**
+- **Run and green on the final code:** `gofmt -l .` silent; the comment check; `go vet ./...`,
+  `go vet -tags e2e` and `go vet -tags uiharness` clean; `golangci-lint run`, its `uiharness` build
+  and `task lint:e2e` (alone) 0 issues; `task build` green in 90 s with no generated drift;
+  `go test -race` in five groups (kernel and domain, application, adapters, runtime, transport with
+  app and cmd) all green, the groups the closing fixes touched run again after them;
+  `go run ./cmd/covergate` 88.44% on domain and application and 88.37% overall, every kernel
+  package at 96% or more; `npm run typecheck` clean; `npm run test:run` **1728 tests in 162
+  files** with two workers; `task ui:lint` green (the harness's tests in 129 s).
+- **Not run, Docker being down for the whole stage**, one stand at a time, the replica first:
+  ```
+  task e2e:reset STAND=replica
+  $env:E2E_CAPTURE='1'; task e2e:full STAND=replica -- -run TestTheStandModelIsCaptured
+  Remove-Item Env:E2E_CAPTURE
+  go test ./internal/application/sitemodel -run TestThePackOfEveryStandPage -update-packs
+  task e2e:full STAND=replica -- -run 'TestThePageTypesFollowTheSite|TestTheWriterSeesTheFullPicture|TestTheAgentSeesTheSite' -v
+  task e2e:full STAND=replica
+  task e2e:down STAND=replica
+  ```
+  then the same with `STAND=vanilla` (`TestTheAgentSeesTheSite` skips there). Review the two
+  `packs.golden` files before committing them; the agent test prints the replica's brief and the
+  hub's pack.
+
 **2026-10-18, on Windows, at the close of stage 1c. Partial: the machine ran out of memory before
 the heavy legs.**
 - **Run and green on the final code:** `gofmt -l .` silent; the comment check; `go vet ./...`,
@@ -492,7 +555,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 and 1 done (1c on 2026-10-18), stage 2 next |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 2 done (2b on 2026-10-19, its stand legs waiting for Docker), stage 3 next |
 
 ## Known gaps
 
@@ -588,14 +651,16 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Stage 2 of the site model**: page types named by the client over presets, the field
-   catalog and per-type scopes with their UI, and the context pack the writer, the linker and the
-   judge work from (migrations from 0058). What stage 1 hands it: the parent tree is acyclic and
-   follows the breadcrumbs with a reason and a method per page; `Index.ByName` reads
-   `Observed.Title`/`H1`, which stage 3 drops, so it must move onto the `title` field then; the
-   front page may become editable through a scope, the start's refusal of `/` standing until then;
-   `url_form` still follows the theme rather than the contextual links; the owner's answer on name
-   twins (under stage 1c in `DECISIONS.md`) may change one rule of the derivation.
+1. **Stage 2's stand legs** (the commands under **The gate**), then **stage 3 of the site model**:
+   the field writers and the editable body (migrations from 0066). What stage 2 hands it:
+   `generate_fields` asks only for the excerpt, and widens as each field writer lands; the
+   product's short description stays in `generate_body` until then; every write over an existing
+   page goes through the client-block guard in `steps/kept.go`, and a new writer must too;
+   `page_blocks_written` must be recorded straight after every raw write; nothing writes a body by
+   re-rendering it whole (`block.Splice`); `Index.ByName` still reads `Observed.Title`/`H1`, which
+   stage 3 drops; the open items under "What stays open" in `DECISIONS.md` (a draft run's status
+   on a live page, the canonical, a relink's lost answer, the agent typing a page into a rewriting
+   type) wait for the owner.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
