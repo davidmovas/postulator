@@ -57,11 +57,16 @@ func ResolveContext(deps Deps) run.StepDef {
 					WithDetail("entityId", entity.ID)
 			}
 
+			absolute, err := deps.Pictures.Absolute(ctx, sc.Run.SiteID)
+			if err != nil {
+				return run.Result{}, err
+			}
 			plan := content.PlanLinks(g, pagemap.NewIndex(pages), content.Subject{
 				Site:     pagemap.NewSite(owner.BaseURL),
 				PageID:   sc.Page.ID,
 				PagePath: sc.Page.Path,
 				EntityID: entity.ID,
+				Absolute: absolute,
 			}, policy)
 			blob, err := encode(plan.Context, "link context")
 			if err != nil {

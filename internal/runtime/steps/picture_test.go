@@ -67,6 +67,7 @@ type pictureStub struct {
 	written  map[string][]string
 	links    []pagemap.PageLink
 	asked    []sitemodel.PackRequest
+	absolute bool
 }
 
 func (p *pictureStub) Picture(ctx context.Context, req sitemodel.PackRequest) (sitemodel.Picture, error) {
@@ -120,6 +121,10 @@ func (p *pictureStub) Picture(ctx context.Context, req sitemodel.PackRequest) (s
 		return sitemodel.Picture{}, err
 	}
 	return sitemodel.Picture{Facts: facts, Pack: pack, Fitted: fitted, Links: plan, Scope: scope}, nil
+}
+
+func (p *pictureStub) Absolute(context.Context, string) (bool, error) {
+	return p.absolute, nil
 }
 
 func (p *pictureStub) requests() []sitemodel.PackRequest {

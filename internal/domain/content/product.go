@@ -76,7 +76,7 @@ func AssembleProduct(answer ProductAnswer, brief Brief) (ContentDraft, *Document
 
 	product := ProductDraft{Specifications: make([]Specification, 0, len(brief.Product.Specifications))}
 	if brief.Product.ShortDescription {
-		short, stripped := Sanitize(answer.ShortDescription)
+		short, stripped := Sanitize(answer.ShortDescription, nil)
 		if strings.TrimSpace(short) == "" {
 			return ContentDraft{}, nil, incomplete("the model left the short description empty", nil)
 		}

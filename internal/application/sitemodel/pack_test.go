@@ -154,6 +154,23 @@ func TestAPackFollowsTheSitesLinkForm(t *testing.T) {
 	}
 }
 
+func TestTheSitesLinkFormIsReadForTheLinkPlans(t *testing.T) {
+	t.Parallel()
+
+	absolute, err := site1().service().Absolute(t.Context(), siteID)
+	if err != nil || !absolute {
+		t.Errorf("Absolute = %t, %v; want the client's absolute links followed", absolute, err)
+	}
+	relative := site1()
+	relative.site.Settings.LinkURLForm = site.URLFormRelative
+	if absolute, err = relative.service().Absolute(t.Context(), siteID); err != nil || absolute {
+		t.Errorf("Absolute = %t, %v; want the setting's relative form", absolute, err)
+	}
+	if _, err = site1().service().Absolute(t.Context(), "elsewhere"); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("Absolute of an unknown site = %v, want NotFound", err)
+	}
+}
+
 func TestAPackIsBuiltOverTheClaim(t *testing.T) {
 	t.Parallel()
 

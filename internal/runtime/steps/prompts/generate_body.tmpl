@@ -4,10 +4,12 @@ Write in English. Write in a {{if .Spec.Tone}}{{.Spec.Tone}}{{else}}clear and fa
 Return one JSON object with the fields title, h1, sections and summary{{if .Brief.Product}}, shortDescription and specifications{{end}}. Every section carries slot, heading
 and html. The slot is the number of the section in the brief below, or 0 for a section of your own. The
 heading is the heading the brief gives, exactly as written. The html field holds only body markup:
-paragraphs, lists, tables and inline emphasis. It never holds a heading tag, a script, a style, an iframe or
-an anchor.
-You may not invent links. Internal links are added by a later step, which needs the exact phrases listed
-under REQUIRED PHRASES to appear verbatim in the body text, where the brief says.
+paragraphs, lists, tables, inline emphasis and links. It never holds a heading tag, a script, a style, an
+iframe, a class or an id.
+You may link only to a page listed under PAGES THIS FIELD LINKS TO, with the href exactly as listed and one
+of its anchors as the link text, where the sentence gives the reader a reason to go there, and at most once
+to each page; any other link is removed. A later step places every link that is still owed, and needs the
+exact phrases listed under REQUIRED PHRASES to appear verbatim in the body text, where the brief says.
 The full picture of the page comes first: what the page is, the rules of the field you write, its entity,
 what the field holds now, where the page sits on the site, the pages it links to, the products it lists and
 the pages beside and below it. Use it to write with the whole site in view: name what the page's neighbours

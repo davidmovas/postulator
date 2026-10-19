@@ -100,14 +100,15 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 }
 
 type neighborhood struct {
-	client *wp.Client
-	lc     content.LinkContext
-	entity graph.Entity
-	page   pagemap.Page
-	site   pagemap.Site
-	index  pagemap.Index
-	graph  graph.Graph
-	types  pagetype.Set
+	client   *wp.Client
+	lc       content.LinkContext
+	entity   graph.Entity
+	page     pagemap.Page
+	site     pagemap.Site
+	index    pagemap.Index
+	graph    graph.Graph
+	types    pagetype.Set
+	absolute bool
 }
 
 func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighborhood, error) {
@@ -148,10 +149,14 @@ func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighb
 	if err != nil {
 		return neighborhood{}, err
 	}
+	absolute, err := deps.Pictures.Absolute(ctx, sc.Run.SiteID)
+	if err != nil {
+		return neighborhood{}, err
+	}
 
 	return neighborhood{
 		client: client, lc: lc, entity: entity, page: sc.Page, site: pagemap.NewSite(owner.BaseURL),
-		index: pagemap.NewIndex(pages), graph: built, types: types,
+		index: pagemap.NewIndex(pages), graph: built, types: types, absolute: absolute,
 	}, nil
 }
 
@@ -277,7 +282,7 @@ func (n neighborhood) owedBy(neighbor pagemap.Page) (owed owedLink, standDown st
 func (n neighborhood) planOf(neighbor pagemap.Page) (content.LinkContext, field.LinkPolicy) {
 	policy := n.types.Policy(neighbor)
 	plan := content.PlanLinks(n.graph, n.index, content.Subject{
-		Site: n.site, PageID: neighbor.ID, PagePath: neighbor.Path, EntityID: *neighbor.EntityID,
+		Site: n.site, PageID: neighbor.ID, PagePath: neighbor.Path, EntityID: *neighbor.EntityID, Absolute: n.absolute,
 	}, policy)
 	return plan.Context, policy
 }

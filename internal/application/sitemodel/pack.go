@@ -188,6 +188,19 @@ func (s *Service) base(ctx context.Context, siteID string) (contextpack.Snapshot
 	}, nil
 }
 
+func (s *Service) Absolute(ctx context.Context, siteID string) (bool, error) {
+	var absolute bool
+	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
+		owner, err := s.deps.Sites.Get(c, siteID)
+		if err != nil {
+			return err
+		}
+		absolute, err = s.absolute(c, owner)
+		return err
+	})
+	return absolute, err
+}
+
 func (s *Service) absolute(ctx context.Context, owner site.Site) (bool, error) {
 	contextual, err := s.deps.Links.ListContextual(ctx, owner.ID)
 	if err != nil {

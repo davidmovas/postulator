@@ -47,6 +47,7 @@ type Brief struct {
 	Phrases        []BriefPhrase  `json:"phrases"`
 	Children       []string       `json:"children"`
 	Product        *BriefProduct  `json:"product,omitempty"`
+	Links          *LinkAllowance `json:"-"`
 }
 
 func RequiredKeywords(keywords keyword.List, rules template.KeywordRules) keyword.List {
