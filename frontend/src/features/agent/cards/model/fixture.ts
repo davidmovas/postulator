@@ -78,7 +78,6 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
         enabled: true,
         instruction: "Open with what the category covers.",
         maxLength: 6000,
-        rewrites: false,
         links: {
             links: true,
             rules: { upDepth: 1, downLinks: true, siblingMinWeight: 0.5, maxLinks: 20, maxPerTarget: 1, parentLinkWithinParagraphs: 2, childrenSection: true },

@@ -327,8 +327,6 @@ export const agent = {
             noMinimum: "No shortest length",
             maxLength: (count: number) => `At most ${count} characters`,
             noMaximum: "No longest length",
-            rewrites: "Rewrites what the page already has, the client's own text included",
-            keepsClientText: "Keeps the client's own text and adds after it",
             label: (label: string) => `Label "${label}"`,
             provider: (provider: string) => `Stored by ${provider}`,
             links: "Carries contextual links",

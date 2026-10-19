@@ -140,7 +140,6 @@ describe("the page type cards", () => {
         const joined = joinedOf("pagetypes_set_scope");
         expect(joined).toContain("Open with what the category covers.");
         expect(joined).toContain("At most 6000 characters");
-        expect(joined).toContain(copy.agent.describe.pagetypes.keepsClientText);
         expect(joined).toContain("At most 20 links");
         expect(joined).toContain(`Anchors: ${copy.pageTypes.anchors.rotate}`);
         expect(joined).not.toMatch(/[{}[\]]/);

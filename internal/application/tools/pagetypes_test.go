@@ -23,6 +23,34 @@ func called[T any](t *testing.T, registry *tools.Registry, binding tools.Binding
 	return answer
 }
 
+func TestTheAgentCannotLetARunRewriteTheOwnersText(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, seeded := wired(t)
+	def, found := registry.Lookup("pagetypes_set_scope")
+	if !found {
+		t.Fatal("pagetypes_set_scope is not registered")
+	}
+	if _, offered := def.Schema.Properties["rewrites"]; offered {
+		t.Error("pagetypes_set_scope offers rewrites, which only a person may switch on, in the page type's screen or the run start")
+	}
+	binding.Mode = domainagent.ModeAutonomous
+	listed := called[pagetypes.ListResponse](t, registry, binding, "pagetypes_list", `{"siteId":"`+seeded.site+`"}`)
+	for i := range listed.Types {
+		typeID := listed.Types[i].ID
+		_, err := registry.Call(t.Context(), binding, "pagetypes_set_scope",
+			json.RawMessage(`{"pageTypeId":"`+typeID+`","field":"body","rewrites":true}`))
+		after := called[pagetypes.ListResponse](t, registry, binding, "pagetypes_list", `{"siteId":"`+seeded.site+`"}`)
+		for j := range after.Types {
+			for _, scope := range after.Types[j].Scopes {
+				if scope.Rewrites {
+					t.Fatalf("after a call naming rewrites (%v) the %s scope of %s rewrites", err, scope.Field, after.Types[j].Name)
+				}
+			}
+		}
+	}
+}
+
 func TestThePageTypeToolsSaveTypesScopesAndAPagesType(t *testing.T) {
 	t.Parallel()
 

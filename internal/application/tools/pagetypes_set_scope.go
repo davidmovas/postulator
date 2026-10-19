@@ -18,7 +18,6 @@ type pagetypesSetScopeArgs struct {
 	Instruction *string           `json:"instruction,omitempty" description:"What the writer is told about the field"`
 	MinLength   *int              `json:"minLength,omitempty" minimum:"0" description:"Fewest characters; 0 for none"`
 	MaxLength   *int              `json:"maxLength,omitempty" minimum:"0" description:"Most characters; 0 for none"`
-	Rewrites    *bool             `json:"rewrites,omitempty" description:"Rewrite a value the site already has; default off"`
 	Links       *field.LinkPolicy `json:"links,omitempty" description:"Whole new link policy"`
 	Label       *string           `json:"label,omitempty" description:"A custom field's label"`
 	Provider    *string           `json:"provider,omitempty" description:"Where a custom field is stored: plugin or store"`
@@ -51,9 +50,6 @@ func (in *pagetypesSetScopeArgs) over(current pagetypes.Scope) pagetypes.SetScop
 	}
 	if in.MaxLength != nil {
 		next.MaxLength = *in.MaxLength
-	}
-	if in.Rewrites != nil {
-		next.Rewrites = *in.Rewrites
 	}
 	if in.Links != nil {
 		next.Links = *in.Links

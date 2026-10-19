@@ -84,10 +84,6 @@ function scopeLines(args: Args): Line[] {
     if (most !== null) {
         lines.push(line("rule", most === 0 ? said.noMaximum : said.maxLength(most)));
     }
-    const rewrites = flag(args, "rewrites");
-    if (rewrites !== null) {
-        lines.push(rewrites ? line("warn", said.rewrites, "warn") : line("field", said.keepsClientText));
-    }
     const label = text(args, "label");
     if (label !== null) {
         lines.push(line("field", said.label(label)));
