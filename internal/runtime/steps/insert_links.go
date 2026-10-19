@@ -25,6 +25,9 @@ func InsertLinks(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			if lc, err = unlinkedByClient(sc, lc); err != nil {
+				return run.Result{}, err
+			}
 			result := content.InsertLinks(doc, lc, sc.Links)
 
 			body, err := doc.Render()

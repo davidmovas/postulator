@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
@@ -101,6 +102,7 @@ type Facts struct {
 	Outbound     []LinkRef               `json:"outbound"`
 	Inbound      []LinkRef               `json:"inbound"`
 	Fields       []FieldFacts            `json:"fields"`
+	Written      []string                `json:"written"`
 	Root         render.RootState        `json:"root"`
 	Regions      []render.Region         `json:"regions"`
 	Generated    int                     `json:"generated"`
@@ -130,7 +132,8 @@ func (s Snapshot) Facts(pageID string, plan content.LinkContext) (Facts, error) 
 		Trail: s.refs(s.trail(page), true), Children: s.refs(s.ranked(page, s.children(page)), true),
 		Siblings: s.refs(s.ranked(page, s.siblings(page)), true), Terms: slices.Clone(s.Terms[page.ID]),
 		Targets: s.targets(plan), Outbound: s.outbound(page.ID), Inbound: s.inbound(page.ID),
-		Fields: s.fields(page, kind), Notes: slices.Clone(page.Notes), Findings: s.findings(page.ID),
+		Fields: s.fields(page, kind), Written: slices.Clone(s.Written[page.ID]), Notes: slices.Clone(page.Notes),
+		Findings: s.findings(page.ID),
 	}
 	if entity, mapped := s.entity(page); mapped {
 		facts.Keywords = pagemap.Keywords(page, entity)
@@ -458,6 +461,7 @@ func (s Snapshot) fieldFacts(page pagemap.Page, key field.Key, scope field.Scope
 	if key == field.Body {
 		if body, found := s.body(page.ID); found {
 			row.Current = body.Serialize()
+			row.Ours = row.Current != "" && !block.ClientText(row.Current, s.Written[page.ID])
 		}
 		return row
 	}

@@ -170,8 +170,8 @@ func (s *Service) base(ctx context.Context, siteID string) (contextpack.Snapshot
 	}
 	return contextpack.Snapshot{
 		Site: pagemap.NewSite(owner.BaseURL), Absolute: absolute, Index: pagemap.NewIndex(pages), Types: types, Graph: g,
-		Terms: terms, Fields: map[string][]field.Value{}, Bodies: map[string]block.Snapshot{}, Renders: map[string]render.Record{},
-		Links: []pagemap.PageLink{}, Findings: []finding.Finding{},
+		Terms: terms, Fields: map[string][]field.Value{}, Bodies: map[string]block.Snapshot{}, Written: map[string][]string{},
+		Renders: map[string]render.Record{}, Links: []pagemap.PageLink{}, Findings: []finding.Finding{},
 	}, nil
 }
 
@@ -207,6 +207,13 @@ func (s *Service) fill(ctx context.Context, snapshot *contextpack.Snapshot, page
 	}
 	for i := range bodies {
 		snapshot.Bodies[bodies[i].PageID] = bodies[i]
+	}
+	written, err := s.deps.Bodies.ListWritten(ctx, page.ID)
+	if err != nil {
+		return err
+	}
+	for i := range written {
+		snapshot.Written[page.ID] = append(snapshot.Written[page.ID], written[i].BlockHash)
 	}
 	renders, err := s.deps.Renders.ListForPages(ctx, ids)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -13,6 +14,7 @@ import (
 const (
 	CapabilitySEOMeta  = "seo_meta"
 	CodeSEOMetaSkipped = "seo_meta_skipped"
+	CodeSEOMetaKept    = "seo_meta_kept"
 
 	ReasonNoSEOWriter = "the companion plugin on this site cannot write SEO meta"
 )
@@ -31,7 +33,8 @@ func (r *PublishResult) took(seo seoWrite) {
 	r.Findings = append(r.Findings, seo.findings...)
 }
 
-func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64, updating bool) (seoWrite, error) {
+func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64, updating bool,
+	kept keptFields) (seoWrite, error) {
 	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
 	if err != nil {
 		return seoWrite{}, err
@@ -41,6 +44,15 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemT
 			return metaPurged(sc.Page), nil
 		}
 		return noMetaGenerated(), nil
+	}
+	if kept[field.SEOTitle] {
+		meta.Title, meta.OGTitle = "", ""
+	}
+	if kept[field.SEODescription] {
+		meta.Description, meta.OGDescription = "", ""
+	}
+	if kept.all(field.SEOTitle, field.SEODescription) {
+		return snippetKept(), nil
 	}
 
 	capabilities, err := client.Capabilities(ctx)
@@ -99,6 +111,10 @@ func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.C
 
 func noMetaGenerated() seoWrite {
 	return seoWrite{applied: []string{}, skipped: []string{CodeSEOMetaSkipped}}
+}
+
+func snippetKept() seoWrite {
+	return seoWrite{applied: []string{}, skipped: []string{CodeSEOMetaKept}}
 }
 
 func metaPurged(page pagemap.Page) seoWrite {

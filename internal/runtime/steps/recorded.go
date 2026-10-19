@@ -7,7 +7,8 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, body, title string, seoApplied []string) error {
+func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, body, title string, seoApplied []string,
+	kept keptFields) error {
 	now := deps.now()
 	if err := recordBody(ctx, deps, pageID, body); err != nil {
 		return err
@@ -30,6 +31,9 @@ func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, 
 	for key, value := range map[field.Key]string{
 		field.SEOTitle: meta.Title, field.SEODescription: meta.Description, field.SEOCanonical: meta.Canonical,
 	} {
+		if kept[key] {
+			continue
+		}
 		if recordErr := deps.Fields.Record(ctx, pageID, key, value, sc.Run.ID, now); recordErr != nil {
 			return recordErr
 		}

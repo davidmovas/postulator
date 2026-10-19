@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -99,9 +100,35 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if err != nil {
 		return run.Result{}, err
 	}
+	keeping := keptOf(draft, found)
+	if keeping != nil {
+		switch {
+		case replaced.ContentHash == "":
+			return needsHuman(sc.Page.Path + ": " + ReasonKeptNeedsPlugin), nil
+		case replaced.ContentHash != keeping.Hash:
+			return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
+		}
+	}
+	final, err := composedBody(keeping, rendered)
+	if err != nil {
+		return run.Result{}, err
+	}
+	kept, err := deps.keptFieldsOf(ctx, sc, found, field.Title, field.SEOTitle, field.SEODescription)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if keeping != nil {
+		if _, putErr := client.PutRaw(ctx, itemType, existing.ID, final, keeping.Hash); putErr != nil {
+			if errors.IsCode(putErr, errors.Conflict) {
+				return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
+			}
+			return run.Result{}, putErr
+		}
+	}
 
-	asked := itemRequest(sc, draft, rendered, placed.wpID, featured.FeaturedID)
+	asked := itemRequest(sc, draft, final, placed.wpID, featured.FeaturedID)
 	asked.existing, asked.found = existing, found
+	asked.viaRaw, asked.keepTitle = keeping != nil, kept[field.Title]
 	written, mismatches, err := writeItem(ctx, client, itemType, sc, asked)
 	if err != nil {
 		return run.Result{}, err
@@ -112,12 +139,12 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 
 	result := PublishResult{
 		WPID: written.ID, URL: written.Link, Status: written.Status,
-		ContentHash: wp.ContentHash(rendered), Created: !found,
+		ContentHash: wp.ContentHash(final), Created: !found,
 		PreviousContent: replaced.Content, PreviousContentHash: replaced.ContentHash,
 		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: driftFindings(sc.Page),
 		Mismatches: mismatches,
 	}
-	seo, err := applySEO(ctx, client, sc, itemType, written.ID, found)
+	seo, err := applySEO(ctx, client, sc, itemType, written.ID, found, kept)
 	if err != nil {
 		return run.Result{}, err
 	}
@@ -126,22 +153,38 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	if recordErr := record(ctx, deps, sc, written, result); recordErr != nil {
 		return run.Result{}, recordErr
 	}
-	if recordErr := recordWritten(ctx, deps, sc, sc.Page.ID, rendered, written.Title, seo.applied); recordErr != nil {
+	title := written.Title
+	if kept[field.Title] {
+		title = ""
+	}
+	if recordErr := recordWritten(ctx, deps, sc, sc.Page.ID, final, title, seo.applied, kept); recordErr != nil {
+		return run.Result{}, recordErr
+	}
+	if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, written.ID, final, keeping); recordErr != nil {
 		return run.Result{}, recordErr
 	}
 	return publishedAs(result, verb(found)+" "+sc.Page.Path+" as "+strconv.FormatInt(written.ID, 10))
 }
 
+func keptOf(draft content.ContentDraft, found bool) *content.KeptBody {
+	if !found {
+		return nil
+	}
+	return draft.Kept
+}
+
 type writeRequest struct {
-	existing wp.Item
-	title    string
-	content  string
-	slug     string
-	status   string
-	parent   int64
-	featured int64
-	found    bool
-	created  bool
+	existing  wp.Item
+	title     string
+	content   string
+	slug      string
+	status    string
+	parent    int64
+	featured  int64
+	found     bool
+	created   bool
+	viaRaw    bool
+	keepTitle bool
 }
 
 func itemRequest(sc *run.StepContext, draft content.ContentDraft, rendered string, parent, featured int64) writeRequest {
@@ -184,7 +227,13 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 		return client.CreateItem(ctx, itemType, in)
 	}
 
-	in := wp.UpdateItem{Title: &req.title, Content: &req.content, Status: &req.status}
+	in := wp.UpdateItem{Status: &req.status}
+	if !req.keepTitle {
+		in.Title = &req.title
+	}
+	if !req.viaRaw {
+		in.Content = &req.content
+	}
 	if req.featured != 0 {
 		in.FeaturedMedia = &req.featured
 	}
@@ -194,6 +243,9 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap.Mismatch {
 	checked := sc.Page
 	checked.Title = asked.title
+	if asked.keepTitle && !asked.created {
+		checked.Title = written.Title
+	}
 	checked.H1 = ""
 	checked.Status = statusOf(sc.Run.PublishMode)
 	checked.Observed = observedOf(written)

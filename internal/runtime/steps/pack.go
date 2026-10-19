@@ -54,9 +54,13 @@ func (d Deps) pictureOf(ctx context.Context, sc *run.StepContext, key field.Key,
 	if err != nil {
 		return sitemodel.Picture{}, err
 	}
-	scope, _ := set.Scope(sc.Type.ID, key)
-	if key == pagetype.LinkField(sc.Type.Preset) {
+	kind := claimedType(set, sc)
+	scope, _ := set.Scope(kind.ID, key)
+	if key == pagetype.LinkField(kind.Preset) {
 		scope.Links = sc.Links
+	}
+	if key == pageKey(sc.Page) && sc.Rewrites(sc.Page.ID) {
+		scope.Rewrites = true
 	}
 	claim := &sitemodel.Claim{Scope: scope, Links: links}
 	if sc.Type.ID != "" || sc.Type.Name != "" {

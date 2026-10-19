@@ -27,6 +27,7 @@ type memory struct {
 	terms    map[string][]pagemap.Term
 	fields   map[string][]field.Value
 	bodies   []block.Snapshot
+	written  []block.Written
 	renders  []render.Record
 	links    []pagemap.PageLink
 	findings []finding.Finding
@@ -140,6 +141,16 @@ func (r bodyReader) ListCurrent(_ context.Context, ids []string) ([]block.Snapsh
 
 func (r bodyReader) ListBySite(context.Context, string) ([]block.Snapshot, error) {
 	return slices.Clone(r.m.bodies), nil
+}
+
+func (r bodyReader) ListWritten(_ context.Context, pageID string) ([]block.Written, error) {
+	out := make([]block.Written, 0)
+	for i := range r.m.written {
+		if r.m.written[i].PageID == pageID {
+			out = append(out, r.m.written[i])
+		}
+	}
+	return out, nil
 }
 
 type renderReader struct{ m *memory }

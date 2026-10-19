@@ -73,6 +73,25 @@ func TestATwinThatIsThePageItselfIsDropped(t *testing.T) {
 	}
 }
 
+func TestATargetTheClientAlreadyLinksIsNotOwedAgain(t *testing.T) {
+	t.Parallel()
+
+	fixture := twinFixture(t)
+	plan := content.PlanLinks(fixture.g, fixture.index, content.Subject{
+		Site: pagemap.NewSite("https://shop.example.com"), PageID: "page-bpc", PagePath: "/bpc-157/", EntityID: "bpc",
+	}, twinPolicy())
+	theirs, err := content.Parse(`<p>See our <a href="https://shop.example.com/peptides/">peptides</a>.</p>`)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if left := plan.Context.Unlinked(theirs); len(left.Targets) != 0 {
+		t.Errorf("targets left = %v, want the hub the client links already gone", urls(left.Targets))
+	}
+	if left := plan.Context.Unlinked(nil); len(left.Targets) != len(plan.Context.Targets) {
+		t.Errorf("no document removed %d targets", len(plan.Context.Targets)-len(left.Targets))
+	}
+}
+
 func TestOurLinksFollowTheSitesContextualForm(t *testing.T) {
 	t.Parallel()
 

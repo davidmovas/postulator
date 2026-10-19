@@ -59,10 +59,12 @@ type unitOfWork interface {
 
 type bodyRecorder interface {
 	Record(ctx context.Context, pageID, raw string, at time.Time) error
+	ReplaceWritten(ctx context.Context, pageID string, hashes []string, runID string, at time.Time) error
 }
 
 type fieldRecorder interface {
 	Record(ctx context.Context, pageID string, key field.Key, value, runID string, at time.Time) error
+	ListForPage(ctx context.Context, pageID string) ([]field.Value, error)
 }
 
 type typeSets interface {

@@ -80,6 +80,10 @@ func RepairLinks(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			open, err := unlinkedByClient(sc, lc)
+			if err != nil {
+				return run.Result{}, err
+			}
 			policy := sc.Links
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {
@@ -95,7 +99,7 @@ func RepairLinks(deps Deps) run.StepDef {
 			settled := make(map[string]struct{})
 			tokens, written := 0, 0
 
-			result := content.InsertLinks(doc, lc, policy)
+			result := content.InsertLinks(doc, open, policy)
 			for {
 				owed, ok := nextOwed(doc, result, policy, sc.Spec, pagemap.Keywords(sc.Page, entity).Main(), settled)
 				if !ok {
@@ -116,7 +120,7 @@ func RepairLinks(deps Deps) run.StepDef {
 					return run.Result{}, placeErr
 				}
 				written++
-				result = content.InsertLinks(doc, lc, policy)
+				result = content.InsertLinks(doc, open, policy)
 			}
 
 			body, err := doc.Render()

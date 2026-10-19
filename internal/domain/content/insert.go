@@ -262,6 +262,20 @@ func paragraphOf(doc *Document, node *html.Node) int {
 	return paragraphIndexOf(doc.Paragraphs(), node)
 }
 
+func (c LinkContext) Unlinked(linked *Document) LinkContext {
+	if linked == nil {
+		return c
+	}
+	out := c
+	out.Targets = make([]LinkTarget, 0, len(c.Targets))
+	for i := range c.Targets {
+		if len(existingFor(linked, c, c.Targets[i])) == 0 {
+			out.Targets = append(out.Targets, c.Targets[i])
+		}
+	}
+	return out
+}
+
 func existingFor(doc *Document, lc LinkContext, target LinkTarget) []*html.Node {
 	out := make([]*html.Node, 0, 1)
 	wanted, ok := canonicalPath(target.URL)

@@ -33,6 +33,55 @@ func startedWith(t *testing.T, fixture *fixture, req runs.StartRequest) []string
 	return enabledNames(fixture.engine.queued.Recipe)
 }
 
+func TestARunSwitchesRewritesOnForChosenPages(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+	chosen := fixture.pages[0]
+	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{chosen}, Rewrite: []string{chosen},
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	params := run.ParamsFor(fixture.engine.queued.Recipe, string(run.StepGenerateBody))
+	if listed, held := params["rewrite"].([]string); !held || !slices.Equal(listed, []string{chosen}) {
+		t.Errorf("generate_body's params = %v, want the page whose client text may be rewritten", params)
+	}
+
+	cases := []struct {
+		name string
+		req  runs.StartRequest
+	}{
+		{name: "a page the run does not write", req: runs.StartRequest{PageIDs: []string{chosen}, Rewrite: []string{"elsewhere"}}},
+		{name: "a run that writes no body", req: runs.StartRequest{
+			PageIDs: []string{chosen}, Rewrite: []string{chosen}, Kind: string(run.KindRelink),
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			refused := newFixture(t)
+			refused.specs.siteID = refused.siteID
+			tc.req.SiteID = refused.siteID
+			if tc.req.PageIDs[0] == chosen {
+				tc.req.PageIDs = []string{refused.pages[0]}
+				if tc.req.Rewrite[0] == chosen {
+					tc.req.Rewrite = []string{refused.pages[0]}
+				}
+			}
+			_, err := refused.service.Start(t.Context(), tc.req)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Start(%+v) = %v, want Invalid", tc.req, err)
+			}
+			if kernel, typed := stderrors.AsType[*errors.Error](err); !typed || kernel.Details["field"] != "rewrite" {
+				t.Errorf("the refusal %v does not name the rewrite field", err)
+			}
+		})
+	}
+}
+
 func TestAKindWithARecipeOfItsOwnNeverTakesTheTemplates(t *testing.T) {
 	t.Parallel()
 

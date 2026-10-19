@@ -43,7 +43,14 @@ type ContentDraft struct {
 	Sections []DraftSection `json:"sections"`
 	Summary  string         `json:"summary"`
 	Product  *ProductDraft  `json:"product,omitempty"`
+	Kept     *KeptBody      `json:"kept,omitempty"`
 	Findings []Finding      `json:"findings,omitempty"`
+}
+
+type KeptBody struct {
+	Raw     string   `json:"raw"`
+	Hash    string   `json:"hash"`
+	Written []string `json:"written"`
 }
 
 type RepairRequest struct {

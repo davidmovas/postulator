@@ -92,6 +92,7 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			draft.Kept = keptBody(sc, seen)
 			encoded, err := encode(draft, "content draft")
 			if err != nil {
 				return run.Result{}, err

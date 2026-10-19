@@ -19,6 +19,7 @@ type Snapshot struct {
 	Terms    map[string][]pagemap.Term
 	Fields   map[string][]field.Value
 	Bodies   map[string]block.Snapshot
+	Written  map[string][]string
 	Renders  map[string]render.Record
 	Links    []pagemap.PageLink
 	Findings []finding.Finding

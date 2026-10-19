@@ -131,6 +131,9 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	}
 
 	chosen := slices.Clone(targets)
+	if recipe, err = withRewrite(recipe, req.Rewrite, chosen); err != nil {
+		return planned{}, err
+	}
 	added := make([]AddedPage, 0)
 	if kind.PageScoped() && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
 		if added, err = s.ancestors(ctx, siteID, targets); err != nil {
@@ -317,6 +320,34 @@ func (s *Service) mapped(ctx context.Context, targets []string) error {
 	return invalid("a run plans a page's links from the entity it is mapped to, and nothing is mapped to "+
 		strings.Join(unmapped, ", ")+"; map each of them on the Graph screen first", "pageIds").
 		WithDetail("paths", unmapped)
+}
+
+func withRewrite(recipe []template.StepSpec, rewrite, chosen []string) ([]template.StepSpec, error) {
+	if len(rewrite) == 0 {
+		return recipe, nil
+	}
+	for _, pageID := range rewrite {
+		if !slices.Contains(chosen, pageID) {
+			return nil, invalid("a page whose own text may be rewritten must be one of the pages the run writes", "rewrite").
+				WithDetail("pageId", pageID)
+		}
+	}
+	at := slices.IndexFunc(recipe, func(step template.StepSpec) bool {
+		return step.Enabled && step.Name == string(run.StepGenerateBody)
+	})
+	if at < 0 {
+		return nil, invalid("the run writes no body, so it has no client text to rewrite", "rewrite")
+	}
+	out := slices.Clone(recipe)
+	params := make(map[string]any, len(out[at].Params)+1)
+	for key, value := range out[at].Params {
+		params[key] = value
+	}
+	listed := slices.Clone(rewrite)
+	slices.Sort(listed)
+	params[run.ParamRewrite] = slices.Compact(listed)
+	out[at].Params = params
+	return out, nil
 }
 
 func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]template.StepSpec, error) {

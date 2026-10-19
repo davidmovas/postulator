@@ -14,6 +14,7 @@ type StartRequest struct {
 	PublishMode string              `json:"publishMode,omitempty"`
 	Kind        string              `json:"kind,omitempty"`
 	Budget      run.Budget          `json:"budget"`
+	Rewrite     []string            `json:"rewrite,omitempty"`
 }
 
 type StartResponse struct {

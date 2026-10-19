@@ -64,14 +64,18 @@ func Validate(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
+			whole, err := wholeBody(doc, draft.Kept)
+			if err != nil {
+				return run.Result{}, err
+			}
 			keywords := pagemap.Keywords(sc.Page, entity)
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
-				Compliance: content.Compliance(doc, lc, policy, sc.Page.ID),
+				Compliance: content.Compliance(whole, lc, policy, sc.Page.ID),
 				Structure:  content.Structure(doc, keywords, sc.Spec),
 				Links:      links,
 			}
-			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(doc, lc, live, sc.Page.ID)...)
+			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(whole, lc, live, sc.Page.ID)...)
 			report.Compliance.Score = content.ScoreOf(report.Compliance.Items)
 			if drafted {
 				report.Structure.Items = append(report.Structure.Items, draft.Findings...)

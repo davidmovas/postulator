@@ -231,6 +231,23 @@ func Plan(registry *Registry, kind Kind, recipe []template.StepSpec, deadline ti
 	return Definition{Kind: kind, Steps: steps, Deadline: deadline}, nil
 }
 
+const ParamRewrite = "rewrite"
+
+func (c *StepContext) Rewrites(pageID string) bool {
+	listed, held := c.Param(ParamRewrite)
+	if !held {
+		return false
+	}
+	switch pages := listed.(type) {
+	case []string:
+		return slices.Contains(pages, pageID)
+	case []any:
+		return slices.Contains(pages, any(pageID))
+	default:
+		return false
+	}
+}
+
 func ParamsFor(recipe []template.StepSpec, step string) map[string]any {
 	for _, spec := range recipe {
 		if spec.Name == step {

@@ -64,6 +64,7 @@ type pictureStub struct {
 	types    typeSource
 	fields   map[string][]field.Value
 	bodies   map[string]block.Snapshot
+	written  map[string][]string
 	links    []pagemap.PageLink
 	asked    []sitemodel.PackRequest
 }
@@ -96,7 +97,7 @@ func (p *pictureStub) Picture(ctx context.Context, req sitemodel.PackRequest) (s
 	}
 	snapshot := contextpack.Snapshot{
 		Site: pagemap.NewSite("https://shop.example.com"), Index: pagemap.NewIndex(pages), Types: types, Graph: g,
-		Fields: p.fields, Bodies: p.bodies, Links: p.links,
+		Fields: p.fields, Bodies: p.bodies, Written: p.written, Links: p.links,
 	}
 	plan := content.LinkContext{PageID: req.PageID}
 	if req.Claim != nil && req.Claim.Links != nil {

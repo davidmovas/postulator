@@ -143,13 +143,18 @@ func (s typesStub) Set(_ context.Context, siteID string) (pagetype.Set, error) {
 	product := pagetype.DefaultScope(pagetype.Product, field.ProductDescription, "type-product")
 	product.Links = linksOf(fallback)
 	scopes := []field.Scope{scopeWith("type-entity", fallback), product}
+	for _, key := range []field.Key{field.SEOTitle, field.SEODescription} {
+		scopes = append(scopes, pagetype.DefaultScope(pagetype.Entity, key, "type-entity"), pagetype.DefaultScope(pagetype.Product, key, "type-product"))
+	}
+	scopes = append(scopes, pagetype.DefaultScope(pagetype.Product, field.ProductShortDescription, "type-product"))
 	for pageID, rules := range s.perPage {
 		if rules == (field.LinkRules{}) {
 			rules = s.rules
 		}
 		kind := pagetype.Type{ID: "type-" + pageID, SiteID: siteID, Name: pageID, Preset: pagetype.Entity, CreatedAt: time.Unix(1, 0)}
 		types = append(types, kind)
-		scopes = append(scopes, scopeWith(kind.ID, rules))
+		scopes = append(scopes, scopeWith(kind.ID, rules),
+			pagetype.DefaultScope(pagetype.Entity, field.SEOTitle, kind.ID), pagetype.DefaultScope(pagetype.Entity, field.SEODescription, kind.ID))
 	}
 	return pagetype.NewSet(types, scopes), nil
 }
