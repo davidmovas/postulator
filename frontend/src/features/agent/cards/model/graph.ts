@@ -27,6 +27,26 @@ function entityFields(args: Args, renaming: boolean): Line[] {
     if (keywords.length > 0) {
         lines.push(line("target", said.keywords(keywordsLine(keywords))));
     }
+    lines.push(...cardLines(args));
+    return lines;
+}
+
+function cardLines(args: Args): Line[] {
+    const lines: Line[] = [];
+    if (typeof args["definition"] === "string") {
+        const definition = text(args, "definition");
+        lines.push(line("note", definition === null ? said.noDefinition : said.definition(definition)));
+    }
+    if (Array.isArray(args["facts"])) {
+        const facts = records(args, "facts");
+        lines.push(line("list", said.factsCount(facts.length)));
+        lines.push(...facts.map((fact) => line("field", said.fact(text(fact, "label") ?? "", text(fact, "value") ?? ""))));
+    }
+    if (Array.isArray(args["notes"])) {
+        const notes = records(args, "notes");
+        lines.push(line("list", said.notesCount(notes.length)));
+        lines.push(...notes.map((note) => line("note", said.note(text(note, "label") ?? ""))));
+    }
     return lines;
 }
 

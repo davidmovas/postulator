@@ -32,6 +32,10 @@ function pageFields(args: Args): Line[] {
     if (template !== null) {
         lines.push(line("target", [`${said.template} `, ref("template", template)]));
     }
+    const pageType = text(args, "pageTypeId");
+    if (pageType !== null) {
+        lines.push(line("target", [`${said.pageType} `, ref("pagetype", pageType)]));
+    }
     return lines;
 }
 
