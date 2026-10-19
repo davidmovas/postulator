@@ -135,6 +135,35 @@ func TestThePackOfEveryStandPage(t *testing.T) {
 	}
 }
 
+const toolResultCap = 16384
+
+func TestEveryPageViewOfTheReplicaFitsATurnsToolResult(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(filepath.Join("testdata", "replica", "site.json"))
+	if err != nil {
+		t.Fatalf("read the replica's capture: %v", err)
+	}
+	m := captured(t, raw)
+	for i := range m.pages {
+		page := &m.pages[i]
+		if page.Status == pagemap.StatusArchived {
+			continue
+		}
+		answered, err := m.service().Explore(t.Context(), sitemodel.ExploreRequest{SiteID: m.site.ID, View: sitemodel.ViewPage, PageID: page.ID})
+		if err != nil {
+			t.Fatalf("the page view of %s: %v", page.Path, err)
+		}
+		encoded, err := json.Marshal(answered)
+		if err != nil {
+			t.Fatalf("encode: %v", err)
+		}
+		if len(encoded) > toolResultCap {
+			t.Errorf("the page view of %s is %d bytes, over a turn's %d-byte tool result", page.Path, len(encoded), toolResultCap)
+		}
+	}
+}
+
 func TestAStandCaptureLoadsBackIntoTheModel(t *testing.T) {
 	t.Parallel()
 

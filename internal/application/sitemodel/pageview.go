@@ -8,7 +8,36 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/render"
 )
 
-const pageListLimit = 25
+const pageListLimit = 15
+
+type LinkView struct {
+	Anchor string `json:"anchor"`
+	Path   string `json:"path"`
+	Ours   bool   `json:"ours"`
+}
+
+type LinksView struct {
+	ByType     map[pagemap.LinkType]int `json:"byType"`
+	Contextual []LinkView               `json:"contextual"`
+}
+
+func linksView(links []contextpack.LinkRef, name string, more map[string]int) LinksView {
+	view := LinksView{ByType: make(map[pagemap.LinkType]int), Contextual: []LinkView{}}
+	contextual := make([]LinkView, 0, len(links))
+	for i := range links {
+		view.ByType[links[i].Type]++
+		if links[i].Type != pagemap.LinkContextual {
+			continue
+		}
+		path := links[i].URL
+		if links[i].Page != nil {
+			path = links[i].Page.Path
+		}
+		contextual = append(contextual, LinkView{Anchor: links[i].Anchor, Path: path, Ours: links[i].Ours})
+	}
+	view.Contextual = capped(contextual, name, more)
+	return view
+}
 
 type FactView struct {
 	Label string `json:"label"`
@@ -60,8 +89,8 @@ type PageView struct {
 	Terms        []pagemap.Term          `json:"terms"`
 	Keywords     keyword.List            `json:"keywords"`
 	Targets      []contextpack.Target    `json:"targets"`
-	Outbound     []contextpack.LinkRef   `json:"outbound"`
-	Inbound      []contextpack.LinkRef   `json:"inbound"`
+	Outbound     LinksView               `json:"outbound"`
+	Inbound      LinksView               `json:"inbound"`
 	Fields       []FieldView             `json:"fields"`
 	Root         render.RootState        `json:"root"`
 	Regions      []render.Region         `json:"regions"`
@@ -80,8 +109,8 @@ func pageView(facts contextpack.Facts) PageView {
 		Children: capped(facts.Children, "children", more), Siblings: capped(facts.Siblings, "siblings", more),
 		Products: capped(facts.Products, "products", more), ListedFrom: facts.ListedFrom, Twin: facts.Twin,
 		Terms: capped(facts.Terms, "terms", more), Keywords: capped(facts.Keywords, "keywords", more),
-		Targets: capped(facts.Targets, "targets", more), Outbound: capped(facts.Outbound, "outbound", more),
-		Inbound: capped(facts.Inbound, "inbound", more), Fields: make([]FieldView, 0, len(facts.Fields)),
+		Targets: capped(facts.Targets, "targets", more), Outbound: linksView(facts.Outbound, "outbound", more),
+		Inbound: linksView(facts.Inbound, "inbound", more), Fields: make([]FieldView, 0, len(facts.Fields)),
 		Root: facts.Root, Regions: capped(facts.Regions, "regions", more), Generated: facts.Generated,
 		Notes: capped(facts.Notes, "notes", more), Findings: make([]FindingView, 0, len(facts.Findings)), More: more,
 	}
