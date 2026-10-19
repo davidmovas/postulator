@@ -3363,3 +3363,69 @@ and what was decided while building.
   in `STATUS.md`. `TestThePackOfEveryStandPage` skips, naming the capture, until a capture exists.
 - **The excerpt's e2e on vanilla's posts** was left out of `TestTheWriterSeesTheFullPicture`; the
   write and the revert are proved against `wptest`.
+
+### What the whole-branch review found, and how it was closed
+
+The gate's fresh review found that with `rewrites` off the writer could still lose a client's
+content; every finding was closed with a test that failed first.
+
+- **The guard is the client's blocks, not the body's hash.** A body of client blocks without text
+  (a product grid, a gallery, a form) was written whole: any block we did not write is now the
+  client's (`block.HasClient`). An existing page with rewrites off always carries what the writer
+  read, a body that was all ours included, so an owner's edit after the last sync pauses the item
+  (`client_changed`). Publish reads the site's body fresh with the blocks recorded as ours,
+  requires the client's blocks on it to equal those the writer read, composes over the site's
+  current bytes, writes through the raw route against the hash just read and records our blocks
+  straight after, so a retry after a partial publish composes the same body again and the revert
+  record keeps the body the writer read. Without the plugin only a body with no client block is
+  written. A planned page that finds a stranger's page by its slug pauses (`slug_taken`).
+- **In a block-editor body our part is one `core/html` block**, so it can never fuse with a client's
+  freeform span into one block recorded as ours; a freeform span that is a lone shortcode parses
+  as a shortcode.
+- **A relink splices** (`block.Splice`): it keeps the original bytes of every block whose render is
+  unchanged, takes from the new render only the blocks the link changed or added, and carries
+  `page_blocks_written` forward. Before, it wrote the whole re-rendered body, rewriting the bytes of
+  blocks it never touched.
+- **Validate judges our links only** (`content.ComplianceOf`); what the page owes is still met by
+  the whole body.
+- **The confirmed rewrite reaches every step**, and **the agent can no longer switch a scope to
+  rewrite** (`pagetypes_set_scope` lost `rewrites`; the schemas went to 63,107 bytes, ceiling
+  63,120).
+- **A card is accepted only as it was shown** (`proposalHash`, `proposal_changed`).
+- **A store category's twin is a page**, never a post or a custom-type item.
+- **A link keeps its href's form** (`page_links.absolute`, migration 0065), which the auto link form
+  counts; stage 3's migrations therefore start at 0066.
+- One claim was wrong: the review read a stale `CLAUDE.md` and reported the old ceiling.
+
+A second review of those fixes found the guard still hung on the draft, and four more holes:
+
+- **Every write over an existing page is guarded** unless the scope or the run's confirmed pages
+  say it rewrites: a page planned when the writer ran and synced before publish counts as read
+  empty, so a client block on the site pauses it. A pause for the client's edit says to regenerate
+  after a sync, the only way the writer reads the page again.
+- **A write whose answer was lost is recognised** on the retry: the site holds exactly what we would
+  have composed over what the writer read, so our blocks are claimed and the item completes.
+- **A planned page adopts a page found by its slug only when this run created it**; any other,
+  blank or not, pauses with a remedy that works (another slug, or mapping that page).
+- **Splice and Ours align blocks by their normalised render** (a longest common subsequence), so a
+  relink of several blocks keeps every block between them, and only blocks matching the part we
+  inserted are claimed as ours: a client block the save changed, or one an unclosed tag merged with
+  ours, stays the client's.
+- **The single-value fields are guarded by their live value**: with rewrites off, a title, an
+  excerpt, an SEO title or description or a short description the owner changed since the model
+  read it is kept.
+
+What stays open, each for the owner:
+
+- **A relink whose answer was lost** finds its link placed on the retry and records nothing, so the
+  block it rewrote reads as the client's on the next run: a second copy of our text is possible,
+  a loss is not.
+- **`adopt` records the links of our own writes as not ours**, so the auto link form counts them; our
+  links are written in the site's form, so the count leans the way it already leant. Links stored
+  before 0065 read as relative until a full walk reads them again.
+- **The agent may type a page into a type whose scope rewrites** (`pages_update`, `pagetypes_delete`'s
+  reassignment), and a run then rewrites it without the start dialog: the scope is the person's
+  standing switch, so this was left as it is.
+- **A draft-mode run sends `status: draft` to an existing live page**, and **the canonical is written
+  whenever a snippet field is**: both predate stage 2b and sit against the 2026-10-17 ruling that an
+  existing page's status is never written.
