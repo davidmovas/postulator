@@ -28,8 +28,11 @@ func TestATwinIsTheOneRegularPageAndTheTermsOfItsName(t *testing.T) {
 	oils := twinPage("oils-term", "/product-category/oils/", "Oils", pagemap.WPProductCategory, 23)
 	archived := twinPage("archived", "/old-blends/", "Blends", pagemap.WPPage, 13)
 	archived.Status = pagemap.StatusArchived
+	teas := twinPage("teas", "/teas/", "Teas", pagemap.WPPage, 14)
+	moreTeas := twinPage("more-teas", "/teas-again/", "Teas", pagemap.WPPage, 15)
+	teaTerm := twinPage("teas-term", "/product-category/teas/", "Teas", pagemap.WPProductCategory, 24)
 
-	index := pagemap.NewIndex([]pagemap.Page{hub, term, product, planned, guideTerm, lone, first, second, oils, archived})
+	index := pagemap.NewIndex([]pagemap.Page{hub, term, product, planned, guideTerm, lone, first, second, oils, archived, teas, moreTeas, teaTerm})
 
 	cases := []struct {
 		name     string
@@ -40,7 +43,8 @@ func TestATwinIsTheOneRegularPageAndTheTermsOfItsName(t *testing.T) {
 		{name: "a hub page stands for its category; a product of the name does not", term: term, wantHub: "hub", wantSeen: true},
 		{name: "a planned hub stands for its category", term: guideTerm, wantHub: "planned", wantSeen: true},
 		{name: "a category with no page of its name has no twin", term: lone},
-		{name: "two pages of one name are no twin", term: oils},
+		{name: "a post of the category's name is never its twin", term: oils, wantHub: "first", wantSeen: true},
+		{name: "two pages of one name are no twin", term: teaTerm},
 		{name: "a regular page has no hub twin", term: hub},
 	}
 	for _, tc := range cases {
@@ -65,5 +69,8 @@ func TestATwinIsTheOneRegularPageAndTheTermsOfItsName(t *testing.T) {
 	}
 	if terms := index.TermTwins(product); len(terms) != 0 {
 		t.Errorf("TermTwins(product) = %+v, want none for a product", terms)
+	}
+	if terms := index.TermTwins(second); len(terms) != 0 {
+		t.Errorf("TermTwins(post) = %+v, want none for a post", terms)
 	}
 }

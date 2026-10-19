@@ -35,7 +35,7 @@ func (i Index) TermTwins(page Page) []Page {
 }
 
 func twinnable(page Page) bool {
-	return page.WPType.core() && page.Status != StatusArchived
+	return page.WPType == WPPage && page.Status != StatusArchived
 }
 
 func sharesName(page, other Page) bool {
