@@ -38,15 +38,21 @@ func TestARunSwitchesRewritesOnForChosenPages(t *testing.T) {
 
 	fixture := newFixture(t)
 	fixture.specs.siteID = fixture.siteID
+	fixture.specs.spec = template.TemplateSpec{Recipe: []template.StepSpec{
+		{Name: "generate_body", Enabled: true}, {Name: "generate_meta", Enabled: true},
+		{Name: "repair_links", Enabled: true}, {Name: "publish", Enabled: true},
+	}}
 	chosen := fixture.pages[0]
 	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
 		SiteID: fixture.siteID, PageIDs: []string{chosen}, Rewrite: []string{chosen},
 	}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	params := run.ParamsFor(fixture.engine.queued.Recipe, string(run.StepGenerateBody))
-	if listed, held := params["rewrite"].([]string); !held || !slices.Equal(listed, []string{chosen}) {
-		t.Errorf("generate_body's params = %v, want the page whose client text may be rewritten", params)
+	for _, step := range []run.StepName{run.StepGenerateBody, run.StepGenerateMeta, run.StepRepairLinks, run.StepPublish} {
+		params := run.ParamsFor(fixture.engine.queued.Recipe, string(step))
+		if listed, held := params["rewrite"].([]string); !held || !slices.Equal(listed, []string{chosen}) {
+			t.Errorf("%s's params = %v, want the page whose client text may be rewritten, as every step of the run reads it", step, params)
+		}
 	}
 
 	cases := []struct {

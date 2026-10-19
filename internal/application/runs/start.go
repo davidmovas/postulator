@@ -332,21 +332,27 @@ func withRewrite(recipe []template.StepSpec, rewrite, chosen []string) ([]templa
 				WithDetail("pageId", pageID)
 		}
 	}
-	at := slices.IndexFunc(recipe, func(step template.StepSpec) bool {
+	writes := slices.ContainsFunc(recipe, func(step template.StepSpec) bool {
 		return step.Enabled && step.Name == string(run.StepGenerateBody)
 	})
-	if at < 0 {
+	if !writes {
 		return nil, invalid("the run writes no body, so it has no client text to rewrite", "rewrite")
-	}
-	out := slices.Clone(recipe)
-	params := make(map[string]any, len(out[at].Params)+1)
-	for key, value := range out[at].Params {
-		params[key] = value
 	}
 	listed := slices.Clone(rewrite)
 	slices.Sort(listed)
-	params[run.ParamRewrite] = slices.Compact(listed)
-	out[at].Params = params
+	listed = slices.Compact(listed)
+	out := slices.Clone(recipe)
+	for at := range out {
+		if !out[at].Enabled {
+			continue
+		}
+		params := make(map[string]any, len(out[at].Params)+1)
+		for key, value := range out[at].Params {
+			params[key] = value
+		}
+		params[run.ParamRewrite] = slices.Clone(listed)
+		out[at].Params = params
+	}
 	return out, nil
 }
 
