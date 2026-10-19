@@ -16,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -24,6 +25,7 @@ import (
 type authoring struct {
 	templates *templates.Service
 	pageTypes *pagetypes.Service
+	siteModel *sitemodel.Service
 	wordpress *registry.Registry
 	content   *content.Service
 }
@@ -53,6 +55,11 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 	return authoring{
 		templates: templateService,
 		pageTypes: pageTypes,
+		siteModel: sitemodel.New(sitemodel.Deps{
+			Reader: stores.store, Sites: stores.sites, Pages: stores.pages, Entities: stores.entities, Edges: stores.edges,
+			Types: pageTypes, Terms: stores.identities, Fields: stores.fields, Bodies: stores.bodies, Renders: stores.renders,
+			Links: stores.links, Findings: stores.findings,
+		}),
 		wordpress: wordpress,
 		content: content.New(content.Deps{
 			Pages: stores.pages, Entities: stores.entities, Edges: stores.edges, Specs: templateService,

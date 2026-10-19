@@ -33,6 +33,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -121,6 +122,7 @@ type kit struct {
 	Imports         *imports.Service
 	Templates       *templates.Service
 	PageTypes       *pagetypes.Service
+	SiteModel       *sitemodel.Service
 	Content         *content.Service
 	LLM             llmport.Client
 	Catalog         *catalog.Catalog
@@ -228,6 +230,7 @@ func (c *Core) assemble(ctx context.Context, store *sqlite.Store, key []byte) (k
 		Imports:         services.imports,
 		Templates:       writing.templates,
 		PageTypes:       writing.pageTypes,
+		SiteModel:       writing.siteModel,
 		Content:         writing.content,
 		LLM:             llm.client,
 		Catalog:         llm.catalog,
