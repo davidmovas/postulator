@@ -134,6 +134,12 @@ func productAnswer(keyword string) string {
 func productTemplate(t *testing.T, core *app.Core) string {
 	t.Helper()
 
+	return templateNamed(t, core, "Product")
+}
+
+func templateNamed(t *testing.T, core *app.Core, name string) string {
+	t.Helper()
+
 	listed, err := core.Templates.ListTemplates(t.Context(), templates.ListTemplatesRequest{
 		Scope: "global", ListRequest: dto.ListRequest{Limit: 20},
 	})
@@ -141,11 +147,11 @@ func productTemplate(t *testing.T, core *app.Core) string {
 		t.Fatalf("list the templates: %v", err)
 	}
 	for i := range listed.Items {
-		if listed.Items[i].Name == "Product" {
+		if listed.Items[i].Name == name {
 			return listed.Items[i].ID
 		}
 	}
-	t.Fatal("the shipped product template is missing")
+	t.Fatalf("the shipped %s template is missing", name)
 	return ""
 }
 

@@ -143,6 +143,10 @@ func TestTheWriterSeesTheFullPicture(t *testing.T) {
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
+	hub := templateNamed(t, core, "Hub")
+	if _, err = core.Sites.Update(t.Context(), sites.UpdateRequest{ID: siteID, Defaults: &sites.Defaults{TemplateID: &hub}}); err != nil {
+		t.Fatalf("give the site its default template: %v", err)
+	}
 	runSync(t, core, siteID)
 
 	stored := pagesByPath(t, core.Pages, siteID)
