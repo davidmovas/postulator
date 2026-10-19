@@ -112,7 +112,7 @@ func TestEveryServiceRefusesWhileTheApplicationIsLocked(t *testing.T) {
 		wails.NewSitesService(logger, refused[wails.SitesUseCase]()),
 		wails.NewGraphService(logger, refused[wails.GraphUseCase]()),
 		wails.NewPagesService(logger, refused[wails.PagesUseCase](), refused[wails.ModelUseCase]()),
-		wails.NewTemplatesService(logger, refused[wails.TemplatesUseCase]()),
+		wails.NewTemplatesService(logger, refused[wails.TemplatesUseCase](), refused[wails.PageTypesUseCase]()),
 		wails.NewRunsService(logger, refused[wails.RunsUseCase]()),
 		wails.NewSyncService(logger, refused[wails.SyncUseCase]()),
 		wails.NewReportsService(logger, refused[wails.ReportsUseCase](), refused[wails.JudgeUseCase]()),

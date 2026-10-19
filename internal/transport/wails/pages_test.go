@@ -58,6 +58,10 @@ func (f pagesFake) ReplaceLinks(context.Context, pages.ReplaceLinksRequest) (pag
 	return answer[pages.ReplaceLinksResponse](f.mode)
 }
 
+func (f pagesFake) SetType(context.Context, pages.SetTypeRequest) (pages.SetTypeResponse, error) {
+	return answer[pages.SetTypeResponse](f.mode)
+}
+
 type pageModelsFake struct{ mode failure }
 
 func (f pageModelsFake) Model(context.Context, observe.ModelRequest) (observe.ModelView, error) {
@@ -76,7 +80,8 @@ func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, pagesService(missing), []string{
-		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
+		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "ReplaceLinks", "SetCanonical",
+		"SetType", "Tree", "Unmap", "Update",
 	})
 	assertEveryMethodConverts(t, pagesService(missing), missingBody)
 	assertEveryMethodConverts(t, pagesService(panicking), panicBody)

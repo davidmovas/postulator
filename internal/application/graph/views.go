@@ -57,12 +57,13 @@ type Edge struct {
 }
 
 type EntityPage struct {
-	EntityID string `json:"entityId"`
-	PageID   string `json:"pageId"`
-	Path     string `json:"path"`
-	Status   string `json:"status"`
-	Work     string `json:"work"`
-	Mismatch bool   `json:"mismatch"`
+	EntityID   string  `json:"entityId"`
+	PageID     string  `json:"pageId"`
+	Path       string  `json:"path"`
+	Status     string  `json:"status"`
+	PageTypeID *string `json:"pageTypeId"`
+	Work       string  `json:"work"`
+	Mismatch   bool    `json:"mismatch"`
 }
 
 func entityView(e graphdomain.Entity) Entity {

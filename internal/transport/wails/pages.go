@@ -23,6 +23,7 @@ type PagesUseCase interface {
 	SetCanonical(ctx context.Context, req pages.SetCanonicalRequest) (pages.SetCanonicalResponse, error)
 	ReplaceLinks(ctx context.Context, req pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error)
 	PreviewLink(ctx context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error)
+	SetType(ctx context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error)
 }
 
 type ModelUseCase interface {
@@ -42,6 +43,7 @@ type PagesService struct {
 	setCanonical middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
 	replaceLinks middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
 	previewLink  middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
+	setType      middleware.Handler[pages.SetTypeRequest, pages.SetTypeResponse]
 	model        middleware.Handler[observe.ModelRequest, observe.ModelView]
 	modelSummary middleware.Handler[observe.SummaryRequest, observe.Summary]
 }
@@ -59,6 +61,7 @@ func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models So
 		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
 		replaceLinks: Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
 		previewLink:  Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
+		setType:      Wrap(logger, "pages.setType", call(useCase, PagesUseCase.SetType)),
 		model:        Wrap(logger, "pages.model", call(models, ModelUseCase.Model)),
 		modelSummary: Wrap(logger, "pages.modelSummary", call(models, ModelUseCase.SummaryOf)),
 	}
@@ -114,4 +117,8 @@ func (s *PagesService) ReplaceLinks(c context.Context, req pages.ReplaceLinksReq
 
 func (s *PagesService) PreviewLink(c context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error) {
 	return s.previewLink(c, req)
+}
+
+func (s *PagesService) SetType(c context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error) {
+	return s.setType(c, req)
 }

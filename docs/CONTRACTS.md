@@ -30,8 +30,8 @@ the composition root binds the two.
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity` |
-| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink Model ModelSummary` |
-| `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink SetType Model ModelSummary` |
+| `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
@@ -43,7 +43,14 @@ the composition root binds the two.
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and twenty-six methods. `PagesService.Model{pageId}` answers a page as the model
+A hundred and twenty-six methods: stage 2a took the six policy methods out and put five page-type
+methods and `PagesService.SetType` in. `TemplatesService.ListPageTypes{siteId}` answers the site's
+types with every scope (stored or the preset's default) and the field catalog;
+`CreatePageType{siteId, name, preset, templateId?}`, `SavePageType{id, name?, templateId?}`,
+`DeletePageType{id, reassignTo}` (the last type of a preset is refused) and
+`SetScope{pageTypeId, field, …}` change them, resolving `application/pagetypes` through the
+service's second source; `PagesService.SetType{pageId, pageTypeId}` types a page as the user's.
+`GraphService.LoadGraph` names each mapped page's `pageTypeId`. `PagesService.Model{pageId}` answers a page as the model
 (`observe.ModelView`: identity, the parent with its reason and method, the render's root, regions
 and trails with each crumb's link, redirect and page, typed links, the blocks read-only, the open
 findings) and `ModelSummary{siteId}` the site's (`observe.Summary`); both resolve

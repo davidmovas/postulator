@@ -250,10 +250,12 @@ func TestLoadGraphCarriesTheStateOfEveryMappedPage(t *testing.T) {
 
 	repo := sqlite.NewPageRepo(h.store)
 	wpID := int64(42)
+	hubType := id.New()
 	pages := []pagemap.Page{
 		{
 			ID: id.New(), SiteID: h.siteID, Path: "/components/", Slug: "components", WPType: pagemap.WPPage,
-			Status: pagemap.StatusPublished, EntityID: &hub.ID, WPID: &wpID,
+			Status: pagemap.StatusPublished, EntityID: &hub.ID, WPID: &wpID, PageTypeID: &hubType,
+			TypeSource: pagemap.TypeSourceManual, TypeReason: pagemap.TypeByUser,
 			Observed:  pagemap.Observed{Link: "https://shop.example.com/components/", Slug: "components", Status: "publish"},
 			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 		},
@@ -284,6 +286,9 @@ func TestLoadGraphCarriesTheStateOfEveryMappedPage(t *testing.T) {
 	}
 	if state := byEntity[hub.ID]; state.Status != "published" || state.Mismatch {
 		t.Errorf("the hub page state = %+v, want a published page the site agrees with", state)
+	}
+	if state := byEntity[hub.ID]; state.PageTypeID == nil || *state.PageTypeID != hubType {
+		t.Errorf("the hub page state = %+v, want the canonical page's type %s", state, hubType)
 	}
 	flat := byEntity[topic.ID]
 	if !flat.Mismatch || flat.Path != "/components/batteries/range/" {

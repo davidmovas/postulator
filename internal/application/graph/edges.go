@@ -94,12 +94,13 @@ func (s *Service) pageStates(ctx context.Context, siteID string) ([]EntityPage, 
 			continue
 		}
 		states = append(states, EntityPage{
-			EntityID: *pages[i].EntityID,
-			PageID:   pages[i].ID,
-			Path:     pages[i].Path,
-			Status:   string(pages[i].Status),
-			Work:     working[pages[i].ID],
-			Mismatch: len(pages[i].Mismatches()) > 0,
+			EntityID:   *pages[i].EntityID,
+			PageID:     pages[i].ID,
+			Path:       pages[i].Path,
+			Status:     string(pages[i].Status),
+			PageTypeID: pages[i].PageTypeID,
+			Work:       working[pages[i].ID],
+			Mismatch:   len(pages[i].Mismatches()) > 0,
 		})
 	}
 	return states, nil

@@ -46,6 +46,7 @@ type Deps struct {
 	Pages      Source[PagesUseCase]
 	PageModels Source[ModelUseCase]
 	Templates  Source[TemplatesUseCase]
+	PageTypes  Source[PageTypesUseCase]
 	Runs       Source[RunsUseCase]
 	Sync       Source[SyncUseCase]
 	Reports    Source[ReportsUseCase]
@@ -65,7 +66,7 @@ func Services(logger *zap.Logger, build BuildInfo, deps Deps) []application.Serv
 		bind(NewSitesService(logger, deps.Sites)),
 		bind(NewGraphService(logger, deps.Graph)),
 		bind(NewPagesService(logger, deps.Pages, deps.PageModels)),
-		bind(NewTemplatesService(logger, deps.Templates)),
+		bind(NewTemplatesService(logger, deps.Templates, deps.PageTypes)),
 		bind(NewRunsService(logger, deps.Runs)),
 		bind(NewSyncService(logger, deps.Sync)),
 		bind(NewReportsService(logger, deps.Reports, deps.Judge)),

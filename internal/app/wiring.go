@@ -41,6 +41,7 @@ func (c *Core) Services(logger *log.Logger) []application.Service {
 		Pages:      live(c, func(c *Core) wails.PagesUseCase { return c.Pages }),
 		PageModels: live(c, func(c *Core) wails.ModelUseCase { return c.Observe }),
 		Templates:  live(c, func(c *Core) wails.TemplatesUseCase { return c.Templates }),
+		PageTypes:  live(c, func(c *Core) wails.PageTypesUseCase { return c.PageTypes }),
 		Runs:       live(c, func(c *Core) wails.RunsUseCase { return c.Runs }),
 		Sync:       live(c, func(c *Core) wails.SyncUseCase { return c.Sync }),
 		Reports:    live(c, func(c *Core) wails.ReportsUseCase { return c.Reports }),
