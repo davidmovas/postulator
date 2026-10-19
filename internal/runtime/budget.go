@@ -211,6 +211,14 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 		outputOf(def, llm.WordTokens(targetWords(target.Spec, target.Page.WPType))),
 		reasoningOf(info, e.deps.Tuning.Effort(def.Role)),
 	)
+	if def.Price.Input != nil {
+		pack, packErr := def.Price.Input(ctx, *target)
+		if packErr != nil && !errors.IsCode(packErr, errors.Invalid) {
+			return packErr
+		}
+		usage.Input += pack
+		usage.Total += pack
+	}
 	priced.tokens += usage.Total * calls
 	priced.usd += llm.Cost(usage, info, e.deps.Tuning.Tier(def.Role)) * float64(calls)
 	return nil

@@ -20,12 +20,13 @@ type JudgeReport = appcontent.JudgeReport
 
 func Judge(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameJudge,
-		Role:     domainllm.RoleJudge,
-		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
-		Produces: []run.ArtifactKind{run.ArtifactJudgeReport},
-		Retry:    run.RetryPolicy{Max: 2},
-		Price:    run.Price{OutputTokens: appcontent.JudgeTokens},
+		Name:      NameJudge,
+		Role:      domainllm.RoleJudge,
+		Requires:  []run.ArtifactKind{run.ArtifactBodyHTML},
+		Produces:  []run.ArtifactKind{run.ArtifactJudgeReport},
+		Retry:     run.RetryPolicy{Max: 2},
+		Price:     run.Price{OutputTokens: appcontent.JudgeTokens, Input: packInput(deps, domainllm.RoleJudge, pageKey)},
+		Preflight: inputPreflight(deps, domainllm.RoleJudge, pageKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			report, tokens, err := judgement(ctx, deps, sc)
 			if err != nil {
@@ -85,8 +86,17 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	}
 
 	var targets []content.LinkTarget
+	var links *content.LinkContext
 	if lc, lcErr := linkContextOf(sc); lcErr == nil {
-		targets = lc.Targets
+		targets, links = lc.Targets, &lc
+	}
+	call, err := modelFor(ctx, deps, sc, NameJudge, domainllm.RoleJudge)
+	if err != nil {
+		return JudgeReport{}, 0, err
+	}
+	seen, err := deps.pictureOf(ctx, sc, bodyField(sc), links, deps.inputBudget(ctx, call, appcontent.JudgeTokens))
+	if err != nil {
+		return JudgeReport{}, 0, err
 	}
 
 	body, err := doc.Render()
@@ -101,7 +111,8 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	assessed, err := deps.Content.Assess(ctx, appcontent.AssessRequest{
 		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: body,
 		Snippet:    appcontent.Snippet{Title: snippet.Title, Description: snippet.Description},
-		HasSnippet: hasSnippet, Product: draft.Product, Targets: targets, Call: callMeta(sc, NameJudge, domainllm.RoleJudge),
+		HasSnippet: hasSnippet, Product: draft.Product, Targets: targets, Picture: appcontent.JudgedPicture(seen.Fitted),
+		Call: callMeta(sc, NameJudge, domainllm.RoleJudge),
 	})
 	return assessed.Report, assessed.Tokens, err
 }

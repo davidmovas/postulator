@@ -18,6 +18,7 @@ import (
 )
 
 type Claim struct {
+	Type  *pagetype.Type
 	Scope field.Scope
 	Links *content.LinkContext
 }
@@ -58,6 +59,9 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 		facts, err := snapshot.Facts(page.ID, plan)
 		if err != nil {
 			return err
+		}
+		if req.Claim != nil && req.Claim.Type != nil {
+			facts.Page.Type, facts.Page.Preset = req.Claim.Type.Name, req.Claim.Type.Preset
 		}
 		pack := contextpack.Build(facts, scope)
 		fitted, err := contextpack.Fit(pack, req.Budget)

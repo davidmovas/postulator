@@ -52,18 +52,20 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 	})
 
+	siteModel := sitemodel.New(sitemodel.Deps{
+		Reader: stores.store, Sites: stores.sites, Pages: stores.pages, Entities: stores.entities, Edges: stores.edges,
+		Types: pageTypes, Terms: stores.identities, Fields: stores.fields, Bodies: stores.bodies, Renders: stores.renders,
+		Links: stores.links, Findings: stores.findings,
+	})
+
 	return authoring{
 		templates: templateService,
 		pageTypes: pageTypes,
-		siteModel: sitemodel.New(sitemodel.Deps{
-			Reader: stores.store, Sites: stores.sites, Pages: stores.pages, Entities: stores.entities, Edges: stores.edges,
-			Types: pageTypes, Terms: stores.identities, Fields: stores.fields, Bodies: stores.bodies, Renders: stores.renders,
-			Links: stores.links, Findings: stores.findings,
-		}),
+		siteModel: siteModel,
 		wordpress: wordpress,
 		content: content.New(content.Deps{
 			Pages: stores.pages, Entities: stores.entities, Edges: stores.edges, Specs: templateService,
-			Types: pageTypes, Profiles: llm.profiles, Raw: rawContent{clients: wordpress}, LLM: llm.client,
+			Types: pageTypes, Profiles: llm.profiles, Raw: rawContent{clients: wordpress}, Pictures: siteModel, LLM: llm.client,
 		}),
 	}
 }

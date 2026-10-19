@@ -7,8 +7,10 @@ import (
 
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	port "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
@@ -171,6 +173,21 @@ func edges() []graph.Edge {
 	}}
 }
 
+type pictureStub struct {
+	err error
+}
+
+func (p pictureStub) Picture(_ context.Context, req sitemodel.PackRequest) (sitemodel.Picture, error) {
+	if p.err != nil {
+		return sitemodel.Picture{}, p.err
+	}
+	return sitemodel.Picture{Fitted: contextpack.Fitted{Sections: []contextpack.Section{
+		{Name: contextpack.SectionPage, Heading: "The page", Priority: 1, Lines: []string{"Path: /coffee/espresso/ of " + req.PageID}},
+		{Name: contextpack.SectionCurrent, Heading: "The field's current value", Priority: 2, Lines: []string{"the body itself"}},
+		{Name: contextpack.SectionTrail, Heading: "The trail, nearest parent first", Priority: 3, Items: []string{"- Coffee (/coffee/)"}},
+	}}}, nil
+}
+
 func newService(model *llmStub, mutate func(*appcontent.Deps)) *appcontent.Service {
 	deps := appcontent.Deps{
 		Pages:    pageStub{items: pages()},
@@ -180,12 +197,38 @@ func newService(model *llmStub, mutate func(*appcontent.Deps)) *appcontent.Servi
 		Types:    typesStub{},
 		Profiles: profileStub{},
 		Raw:      rawStub{body: "<h1>Espresso</h1><p>Espresso is a way to make coffee.</p>"},
+		Pictures: pictureStub{},
 		LLM:      model,
 	}
 	if mutate != nil {
 		mutate(&deps)
 	}
 	return appcontent.New(deps)
+}
+
+func TestTheJudgeReadsThePictureButNotTheBodyTwice(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+	if _, err := newService(model, nil).Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	prompt := model.last.Messages[len(model.last.Messages)-1].Text
+	for _, want := range []string{"THE FULL PICTURE", "THE PAGE\nPath: /coffee/espresso/ of page-child", "THE TRAIL, NEAREST PARENT FIRST\n- Coffee (/coffee/)"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("the judge's prompt lacks %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "the body itself") {
+		t.Errorf("the judge's prompt carries the current value beside the body:\n%s", prompt)
+	}
+
+	failing := newService(model, func(deps *appcontent.Deps) {
+		deps.Pictures = pictureStub{err: errors.New(errors.NotFound, "no such page")}
+	})
+	if _, err := failing.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("Judge without a picture = %v, want the read layer's refusal", err)
+	}
 }
 
 func TestJudgeAuditsTheLivePage(t *testing.T) {

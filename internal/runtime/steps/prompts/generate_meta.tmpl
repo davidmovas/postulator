@@ -4,10 +4,18 @@ Write in English. Return one JSON object with the fields title, description, can
 ogDescription. Write plain text: no markup, no quotation marks around a field, no emoji.
 The title reads as a page title, not as a sentence. The description is one sentence that says what the page
 answers and why the reader should open it, and it never repeats the title verbatim.
-Never invent a fact that the draft does not carry.
+Never invent a fact that the draft or the picture does not carry.
 {{end}}
 
 {{define "generate_meta.user"}}
+THE FULL PICTURE
+What the site and its owner hold about the page, the most important first. The field's rules below are the SEO title's.
+
+{{if .Picture}}{{.Picture}}{{else}}Nothing is known of the page beyond what follows.
+{{end}}{{if .Description}}
+THE SEO DESCRIPTION'S RULES
+{{range .Description}}{{.}}
+{{end}}{{end}}
 PAGE
 Path: {{.Page.Path}}
 Site: {{.SiteName}}

@@ -105,6 +105,9 @@ type Deps struct {
 	WordPress     siteClients
 	Types         typeSets
 	Profiles      profileResolver
+	Tuning        stepTuning
+	Models        modelInfo
+	Pictures      pictures
 	Content       judgeService
 	LLM           llm.Client
 	ImageProvider ImageProvider

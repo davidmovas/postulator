@@ -5,11 +5,13 @@ particular paragraph, so the phrase has to be present in running text first.
 Return one JSON object with a single field, sentence. The sentence is plain text, at most forty words, in
 English, and it contains the requested phrase verbatim, with the same spelling and spacing.
 Write nothing else: no markup, no heading, no list, no quotation marks around the sentence.
+When the page the phrase will link to is described, the sentence gives the reader a reason to go there that
+fits what that page covers.
 {{end}}
 
 {{define "repair_links.user"}}
 PAGE
-Path: {{.Page.Path}}
+{{if .Identity}}{{.Identity}}{{else}}Path: {{.Page.Path}}{{end}}
 Topic: {{.Entity.Name}}
 
 PHRASE TO INCLUDE
@@ -17,7 +19,10 @@ PHRASE TO INCLUDE
 
 WHY
 {{.Why}}
-
+{{if .About}}
+WHERE THE LINK LEADS
+{{.About}}
+{{end}}
 CONTEXT
 This sentence is appended to the paragraph below. Continue its line of thought.
 {{if .Paragraph}}{{.Paragraph}}{{else}}The page has no paragraph yet; write an opening sentence for the topic.{{end}}

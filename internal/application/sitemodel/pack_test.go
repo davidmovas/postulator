@@ -161,14 +161,15 @@ func TestAPackIsBuiltOverTheClaim(t *testing.T) {
 		{EntityID: "x", PageID: "far", URL: "/far-away/", Anchors: []string{"far away"}, Relation: content.RelationSibling},
 	}}
 	scope := field.Scope{Key: field.Body, Enabled: true, Instruction: "Written from the claim.", Links: field.NoLinks()}
+	claimedType := pagetype.Type{ID: "type-claimed", SiteID: siteID, Name: "Pillar", Preset: pagetype.Hub}
 	picture, err := m.service().Picture(t.Context(), sitemodel.PackRequest{
-		PageID: "hub", Field: "body", Claim: &sitemodel.Claim{Scope: scope, Links: &claimed},
+		PageID: "hub", Field: "body", Claim: &sitemodel.Claim{Type: &claimedType, Scope: scope, Links: &claimed},
 	})
 	if err != nil {
 		t.Fatalf("Picture: %v", err)
 	}
 	text := picture.Fitted.Text()
-	if !strings.Contains(text, "Written from the claim.") || !strings.Contains(text, "/far-away/") {
+	if !strings.Contains(text, "Written from the claim.") || !strings.Contains(text, "/far-away/") || !strings.Contains(text, "Page type: Pillar, a hub") {
 		t.Errorf("the pack does not carry the claim:\n%s", text)
 	}
 	if strings.Contains(text, "/bpc-157/ (") {

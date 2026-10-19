@@ -217,19 +217,19 @@ func unitEdges() []graph.Edge {
 }
 
 func unitDeps() steps.Deps {
-	return steps.Deps{
+	return pictured(steps.Deps{
 		Entities: entityList{items: unitEntities()},
 		Edges:    edgeList{items: unitEdges()},
 		Pages: pageList{items: []pagemap.Page{
-			{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPublished},
-			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},
+			{ID: "page-parent", SiteID: "site", Path: "/coffee/", Title: "Coffee", WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("parent")},
+			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", Title: "Espresso", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child")},
 		}},
 		Sites:    siteStub{},
 		Types:    typesStub{},
 		Profiles: profileStub{},
 		LLM:      llmStub{reply: goodDraft},
 		Clock:    clock.NewFake(sqlitetest.Stamp),
-	}
+	})
 }
 
 func pointer(value string) *string {
@@ -1424,7 +1424,7 @@ func TestTheWriterPromptNamesThePageTypeAndNoKind(t *testing.T) {
 		absent               []string
 	}{
 		{name: "a typed page", typeName: "Category", want: "Page type: Category\n", absent: []string{"Kind:"}},
-		{name: "an untyped page", absent: []string{"Page type:", "Kind:"}},
+		{name: "an untyped claim names the model's type", want: "Page type: Entity, an article", absent: []string{"Kind:"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1639,6 +1639,11 @@ func TestTheWriterReadsTheNotesOfThePageAsContext(t *testing.T) {
 			deps.LLM = recorder
 			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
 			sc.Page.Notes = tc.notes
+			deps.Pages = pageList{items: []pagemap.Page{
+				{ID: "page-parent", SiteID: "site", Path: "/coffee/", Title: "Coffee", WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("parent")},
+				sc.Page,
+			}}
+			deps = pictured(deps)
 
 			if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
 				t.Fatalf("GenerateBody: %v", err)
@@ -1684,7 +1689,7 @@ func TestAPromptNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 				_, err := steps.GenerateBody(deps).Run(t.Context(), sc)
 				return err
 			},
-			want: []string{"Name: Coffee Espresso\n"},
+			want: []string{"Entity: Coffee Espresso\n"},
 		},
 		{
 			name: "the meta writer and its title pattern",
@@ -1704,6 +1709,7 @@ func TestAPromptNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 
 			deps := unitDeps()
 			deps.Entities = entityList{items: sharedNameEntities()}
+			deps = pictured(deps)
 			recorder := &promptRecorder{reply: goodDraft}
 			deps.LLM = recorder
 

@@ -34,6 +34,14 @@ func (p *Policy) Tier(role llm.Role) llm.ServiceTier {
 	return llm.TierDefault
 }
 
+func (p *Policy) InputBudget(role llm.Role) int {
+	setting, budgeted := inputBudgetSettings[role]
+	if !budgeted {
+		return 0
+	}
+	return setting.Get(p.values)
+}
+
 func (p *Policy) FlexPatience() time.Duration {
 	return flexPatienceSetting.Get(p.values)
 }

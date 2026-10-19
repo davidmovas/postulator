@@ -15,7 +15,12 @@ each, each naming the band it belongs to. List at most five suggestions, each an
 {{end}}
 
 {{define "judge.user"}}
-PAGE
+{{if .Picture}}THE FULL PICTURE
+What the site and its owner hold about the page. Judge the body against it: a body that contradicts the
+picture, repeats what the page's neighbours cover or misses what the page type asks for loses its band.
+
+{{.Picture}}
+{{end}}PAGE
 Path: {{.Page.Path}}
 Topic: {{.Entity.Name}}
 Primary keyword: {{.Keywords.Main}}

@@ -149,6 +149,10 @@ func termsLine(f Facts) string {
 	return strings.Join(parts, "; ")
 }
 
+func FieldRules(f Facts, scope field.Scope) []string {
+	return rulesSection(f, scope).Lines
+}
+
 func rulesSection(f Facts, scope field.Scope) Section {
 	lines := []string{"Field: " + FieldName(scope.Key)}
 	if instruction := strings.TrimSpace(scope.Instruction); instruction != "" {

@@ -6,6 +6,8 @@ import (
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -28,16 +30,30 @@ type bodyPrompt struct {
 	Spec    template.TemplateSpec
 	Brief   content.Brief
 	Product bool
+	Picture string
+}
+
+func bodyField(sc *run.StepContext) field.Key {
+	return pageKey(sc.Page)
+}
+
+func bodySchema(product bool) string {
+	if product {
+		return schemaText[content.ProductAnswer]()
+	}
+	return schemaText[content.DraftAnswer]()
 }
 
 func GenerateBody(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameGenerateBody,
-		Role:     domainllm.RoleWriter,
-		Requires: []run.ArtifactKind{run.ArtifactLinkContext},
-		Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  writerTimeout,
+		Name:      NameGenerateBody,
+		Role:      domainllm.RoleWriter,
+		Requires:  []run.ArtifactKind{run.ArtifactLinkContext},
+		Produces:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   writerTimeout,
+		Price:     run.Price{Input: packInput(deps, domainllm.RoleWriter, pageKey)},
+		Preflight: inputPreflight(deps, domainllm.RoleWriter, pageKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {
@@ -53,9 +69,18 @@ func GenerateBody(deps Deps) run.StepDef {
 			}
 
 			brief := content.NewBrief(sc.Spec, sc.Links.Rules, sc.Page, entity, lc)
-			request, err := stepRequest(sc, call, bodyPrompt{
+			prompt := bodyPrompt{
 				Page: sc.Page, Type: sc.Type.Name, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
-			}, writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts))
+			}
+			ceiling := writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts)
+			seen, err := deps.fitted(ctx, sc, call, bodyField(sc), &lc, ceiling, func() (string, string, error) {
+				return prompts.Render(NameGenerateBody, prompt)
+			}, bodySchema(prompt.Product))
+			if err != nil {
+				return run.Result{}, err
+			}
+			prompt.Picture = picture(seen.Fitted, contextpack.SectionKeywords)
+			request, err := stepRequest(sc, call, prompt, ceiling)
 			if err != nil {
 				return run.Result{}, err
 			}

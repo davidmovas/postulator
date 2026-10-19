@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pagetypes"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -73,6 +74,19 @@ func (stubTuning) Effort(domainllm.Role) domainllm.ReasoningEffort {
 
 func (stubTuning) Tier(domainllm.Role) domainllm.ServiceTier {
 	return domainllm.TierDefault
+}
+
+func (stubTuning) InputBudget(domainllm.Role) int {
+	return 0
+}
+
+func siteModelOf(store *sqlite.Store, types *pagetypes.Service) *sitemodel.Service {
+	return sitemodel.New(sitemodel.Deps{
+		Reader: store, Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store), Entities: sqlite.NewEntityRepo(store),
+		Edges: sqlite.NewEdgeRepo(store), Types: types, Terms: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: sqlite.NewPageLinkRepo(store),
+		Findings: sqlite.NewFindingRepo(store),
+	})
 }
 
 type recorder struct {
@@ -295,6 +309,9 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 		Sites:    sqlite.NewSiteRepo(f.store),
 		Types:    f.types,
 		Profiles: stubProfiles{},
+		Tuning:   stubTuning{},
+		Models:   stubCatalog{},
+		Pictures: siteModelOf(f.store, f.types),
 		LLM:      f.llm,
 	}); err != nil {
 		t.Fatalf("register the steps: %v", err)

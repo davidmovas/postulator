@@ -95,6 +95,7 @@ func TestResolveContextPreflightNamesWhatTheGraphLacks(t *testing.T) {
 			deps: func(d steps.Deps) steps.Deps {
 				d.Entities = entityList{items: orphaned}
 				d.Edges = edgeList{items: orphanedEdges}
+				d.Pages = pageList{items: []pagemap.Page{homeless}}
 				return d
 			},
 			targets: []pagemap.Page{homeless},

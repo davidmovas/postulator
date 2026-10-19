@@ -3,11 +3,14 @@ package content
 import (
 	"context"
 	"html"
+	"slices"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -19,6 +22,14 @@ const (
 
 	JudgeTokens = 1024
 )
+
+func JudgedPicture(fitted contextpack.Fitted) string {
+	kept := fitted
+	kept.Sections = slices.DeleteFunc(slices.Clone(fitted.Sections), func(section contextpack.Section) bool {
+		return section.Name == contextpack.SectionCurrent || section.Name == contextpack.SectionKeywords
+	})
+	return kept.Text()
+}
 
 type judgeAnswer struct {
 	Score       float64  `json:"score" description:"The overall quality of the page between 0 and 1"`
@@ -42,7 +53,7 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 	system, user, err := render(NameJudge, judgePrompt{
 		Page: req.Page, Entity: req.Entity, Keywords: pagemap.Keywords(req.Page, req.Entity), Spec: req.Spec, Body: req.Body,
 		Meta: req.Snippet, HasMeta: req.HasSnippet, Targets: req.Targets,
-		Store: req.Page.WPType == pagemap.WPProduct, Product: req.Product,
+		Store: req.Page.WPType == pagemap.WPProduct, Product: req.Product, Picture: req.Picture,
 	})
 	if err != nil {
 		return AssessResponse{}, err
@@ -108,11 +119,17 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 		return JudgeResponse{}, err
 	}
 
+	seen, err := s.deps.Pictures.Picture(ctx, sitemodel.PackRequest{PageID: page.ID})
+	if err != nil {
+		return JudgeResponse{}, err
+	}
+
 	assessed, err := s.Assess(ctx, AssessRequest{
 		SiteID: page.SiteID, Page: page, Entity: entity, Spec: resolved.Spec, Body: body,
 		Snippet:    Snippet{Title: page.MetaTitle, Description: page.MetaDescription},
 		HasSnippet: page.MetaTitle != "" || page.MetaDescription != "",
 		Targets:    targets,
+		Picture:    JudgedPicture(seen.Fitted),
 		Call:       llm.CallMeta{Step: domainllm.StepJudge},
 	})
 	if err != nil {

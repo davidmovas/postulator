@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -43,6 +44,10 @@ type rawReader interface {
 	RawContent(ctx context.Context, siteID string, wpID int64, wpType string) (string, error)
 }
 
+type pictures interface {
+	Picture(ctx context.Context, req sitemodel.PackRequest) (sitemodel.Picture, error)
+}
+
 type Deps struct {
 	Pages    pageStore
 	Entities entityStore
@@ -51,6 +56,7 @@ type Deps struct {
 	Types    typeSets
 	Profiles profileResolver
 	Raw      rawReader
+	Pictures pictures
 	LLM      llm.Client
 }
 
@@ -78,4 +84,5 @@ type judgePrompt struct {
 	Store    bool
 	Product  *contentdomain.ProductDraft
 	Targets  []contentdomain.LinkTarget
+	Picture  string
 }

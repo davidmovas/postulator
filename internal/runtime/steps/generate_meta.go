@@ -6,6 +6,8 @@ import (
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -41,25 +43,28 @@ type Meta struct {
 }
 
 type metaPrompt struct {
-	Page      pagemap.Page
-	Entity    graph.Entity
-	Keywords  keyword.List
-	Spec      template.TemplateSpec
-	Draft     content.ContentDraft
-	SiteName  string
-	Canonical string
-	Pattern   string
+	Page        pagemap.Page
+	Entity      graph.Entity
+	Keywords    keyword.List
+	Spec        template.TemplateSpec
+	Draft       content.ContentDraft
+	SiteName    string
+	Canonical   string
+	Pattern     string
+	Picture     string
+	Description []string
 }
 
 func GenerateMeta(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameGenerateMeta,
-		Role:     domainllm.RoleEditor,
-		Requires: []run.ArtifactKind{run.ArtifactDraft},
-		Produces: []run.ArtifactKind{run.ArtifactMeta},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  editorTimeout,
-		Price:    run.Price{OutputTokens: metaTokens},
+		Name:      NameGenerateMeta,
+		Role:      domainllm.RoleEditor,
+		Requires:  []run.ArtifactKind{run.ArtifactDraft},
+		Produces:  []run.ArtifactKind{run.ArtifactMeta},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   editorTimeout,
+		Price:     run.Price{OutputTokens: metaTokens, Input: packInput(deps, domainllm.RoleEditor, seoTitleKey)},
+		Preflight: inputPreflight(deps, domainllm.RoleEditor, seoTitleKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			draft, err := draftOf(sc)
 			if err != nil {
@@ -80,14 +85,28 @@ func GenerateMeta(deps Deps) run.StepDef {
 
 			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
 			keywords := pagemap.Keywords(sc.Page, entity)
-			request, err := stepRequest(sc, call, metaPrompt{
+			prompt := metaPrompt{
 				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
 				SiteName:  owner.Name,
 				Canonical: canonical,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
 					PrimaryKeyword: keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
 				}),
-			}, metaTokens)
+			}
+			seen, err := deps.fitted(ctx, sc, call, field.SEOTitle, nil, metaTokens, func() (string, string, error) {
+				return prompts.Render(NameGenerateMeta, prompt)
+			}, schemaText[metaAnswer]())
+			if err != nil {
+				return run.Result{}, err
+			}
+			prompt.Picture = picture(seen.Fitted, contextpack.SectionTargets)
+			if description, held := seen.Facts.Field(field.SEODescription); held {
+				prompt.Description = contextpack.FieldRules(seen.Facts, description.Scope)
+				if current := strings.TrimSpace(description.Current); current != "" {
+					prompt.Description = append(prompt.Description, "Its current value: "+current)
+				}
+			}
+			request, err := stepRequest(sc, call, prompt, metaTokens)
 			if err != nil {
 				return run.Result{}, err
 			}

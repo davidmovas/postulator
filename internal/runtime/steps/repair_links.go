@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -36,6 +38,8 @@ type repairPrompt struct {
 	Phrase    string
 	Why       string
 	Paragraph string
+	Identity  string
+	About     string
 }
 
 type owedPhrase struct {
@@ -86,7 +90,7 @@ func RepairLinks(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			linker := sentenceWriter{deps: deps, sc: sc, entity: entity, call: call, tries: iterationsOf(sc)}
+			linker := &sentenceWriter{deps: deps, sc: sc, entity: entity, call: call, links: lc, tries: iterationsOf(sc)}
 			findings := make([]content.Finding, 0)
 			settled := make(map[string]struct{})
 			tokens, written := 0, 0
@@ -239,10 +243,49 @@ type sentenceWriter struct {
 	sc     *run.StepContext
 	entity graph.Entity
 	call   modelCall
+	links  content.LinkContext
 	tries  int
+	seen   *sitemodel.Picture
 }
 
-func (w sentenceWriter) write(ctx context.Context, doc *content.Document, owed owedPhrase) (sentence string, used int, err error) {
+func (w *sentenceWriter) picture(ctx context.Context) (sitemodel.Picture, error) {
+	if w.seen != nil {
+		return *w.seen, nil
+	}
+	seen, err := w.deps.pictureOf(ctx, w.sc, bodyField(w.sc), &w.links, w.deps.inputBudget(ctx, w.call, repairTokens))
+	if err != nil {
+		return sitemodel.Picture{}, err
+	}
+	w.seen = &seen
+	return seen, nil
+}
+
+func identityOf(facts contextpack.Facts) string {
+	identity := facts.Page.Title + " (" + facts.Page.Path
+	if facts.Page.Type != "" {
+		identity += ", " + facts.Page.Type
+	}
+	return identity + ")"
+}
+
+func aboutOf(facts contextpack.Facts, path string) string {
+	for i := range facts.Targets {
+		if target := &facts.Targets[i]; target.Path == path {
+			about := target.Title + " (" + target.Path + ")"
+			if target.Summary.Text != "" {
+				about += ": " + target.Summary.Text
+			}
+			return about
+		}
+	}
+	return ""
+}
+
+func (w *sentenceWriter) write(ctx context.Context, doc *content.Document, owed owedPhrase) (sentence string, used int, err error) {
+	seen, err := w.picture(ctx)
+	if err != nil {
+		return "", used, err
+	}
 	for range w.tries {
 		if err := ctx.Err(); err != nil {
 			return "", used, stoppedWhileWriting(err, owed)
@@ -250,6 +293,7 @@ func (w sentenceWriter) write(ctx context.Context, doc *content.Document, owed o
 
 		request, renderErr := stepRequest(w.sc, w.call, repairPrompt{
 			Page: w.sc.Page, Entity: w.entity, Phrase: owed.text, Why: owed.why, Paragraph: contextParagraph(doc, owed.index),
+			Identity: identityOf(seen.Facts), About: aboutOf(seen.Facts, owed.url),
 		}, repairTokens)
 		if renderErr != nil {
 			return "", used, renderErr

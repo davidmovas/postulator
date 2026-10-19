@@ -17,6 +17,7 @@ type AssessRequest struct {
 	Snippet    Snippet
 	Product    *contentdomain.ProductDraft
 	Targets    []contentdomain.LinkTarget
+	Picture    string
 	Call       llm.CallMeta
 	HasSnippet bool
 }
