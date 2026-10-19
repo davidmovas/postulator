@@ -271,14 +271,32 @@ func currentSection(f Facts, key field.Key) Section {
 	if row.Ours {
 		owner = "written by us before"
 	}
-	text := row.Current
+	lines := []string{strings.TrimSpace(row.Current)}
 	if key == field.Body || key == field.ProductDescription {
-		text = strings.Join(block.Parse(row.Current).TextBlocks(), "\n")
+		lines = bodyLines(block.Parse(row.Current))
 	}
-	return Section{
-		Name: SectionCurrent, Heading: "The field's current value (" + owner + ")", Priority: 2,
-		Lines: []string{strings.TrimSpace(text)},
+	return Section{Name: SectionCurrent, Heading: "The field's current value (" + owner + ")", Priority: 2, Lines: lines}
+}
+
+func bodyLines(body block.Body) []string {
+	out := make([]string, 0, len(body.Blocks))
+	for i := range body.Blocks {
+		held := &body.Blocks[i]
+		if text := strings.TrimSpace(held.Text()); text != "" {
+			out = append(out, text)
+			continue
+		}
+		switch {
+		case strings.TrimSpace(held.Raw) == "":
+		case held.Kind == block.Shortcode:
+			out = append(out, "(a ["+held.Name+"] shortcode, kept where it stands)")
+		case held.Name != "":
+			out = append(out, "(a "+held.Name+" block, kept where it stands)")
+		default:
+			out = append(out, "(markup with no text, kept where it stands)")
+		}
 	}
+	return out
 }
 
 func keywordsSection(f Facts) Section {

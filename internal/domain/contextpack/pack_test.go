@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -98,6 +99,26 @@ func TestBuildOrdersTheSectionsByPriority(t *testing.T) {
 		t.Errorf("pack counts %d tokens, its sections %d", pack.Tokens, total)
 	}
 	golden(t, "hub.body.txt", contextpack.Fitted{Sections: pack.Sections}.Text())
+}
+
+func TestTheCurrentBodyNamesWhatItHoldsBesideText(t *testing.T) {
+	t.Parallel()
+
+	f := replicaLike()
+	f.bodies["healing"] = block.Snapshot{
+		PageID: "healing", Side: block.Current, Kind: block.Classic, ObservedAt: stamp,
+		Raw: "<p>Peptides that help repair.</p>\n\n[products limit=\"4\"]",
+	}
+	s := f.snapshot(t)
+	facts, err := s.Facts("healing", planFor(t, s, "healing"))
+	if err != nil {
+		t.Fatalf("Facts: %v", err)
+	}
+	body, _ := facts.Field(field.Body)
+	current := sectionOf(t, contextpack.Build(facts, body.Scope), contextpack.SectionCurrent)
+	if want := []string{"Peptides that help repair.", "(a [products] shortcode, kept where it stands)"}; !slices.Equal(current.Lines, want) {
+		t.Errorf("the current value = %q, want %q", current.Lines, want)
+	}
 }
 
 func TestAProductListIsLessUrgentOnAnArticle(t *testing.T) {
