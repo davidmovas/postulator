@@ -12,9 +12,10 @@ interface Held {
     accepted: unknown[];
     dismissed: unknown[];
     acceptError: unknown;
+    dismissError: unknown;
 }
 
-const held: Held = { proposals: [], accepted: [], dismissed: [], acceptError: null };
+const held: Held = { proposals: [], accepted: [], dismissed: [], acceptError: null, dismissError: null };
 
 function refused(code: string, message: string, details?: Record<string, unknown>): Error {
     return Object.assign(new Error(message), { cause: { code, message, details } });
@@ -44,7 +45,7 @@ vi.mock("../../../data/hooks/graph.js", () => ({
         },
         reset: () => undefined,
         isPending: false,
-        error: null,
+        error: held.dismissError,
     }),
 }));
 
@@ -99,6 +100,7 @@ beforeEach(() => {
     held.accepted = [];
     held.dismissed = [];
     held.acceptError = null;
+    held.dismissError = null;
     revealed.length = 0;
     Element.prototype.scrollIntoView = () => undefined;
 });
@@ -156,6 +158,13 @@ describe("the card proposals on the Graph screen", () => {
 
     it("says a proposal was already settled", () => {
         held.acceptError = refused("CONFLICT", "the proposal is settled");
+        drawer();
+
+        expect(within(proposalOf("e-peptides")).getByText(said.refusedSettled)).toBeDefined();
+    });
+
+    it("says a proposal another hand settled first was already settled when it is dismissed", () => {
+        held.dismissError = refused("CONFLICT", "the proposal is already settled");
         drawer();
 
         expect(within(proposalOf("e-peptides")).getByText(said.refusedSettled)).toBeDefined();

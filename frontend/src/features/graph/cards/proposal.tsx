@@ -144,7 +144,11 @@ export function CardProposalItem({ siteId, proposal, focused, onReveal }: CardPr
             ) : refused !== null ? (
                 <Banner tone="danger" title={refused.message} />
             ) : null}
-            {dismissFailed === null ? null : <Banner tone="danger" title={dismissFailed.message} />}
+            {dismissFailed === null ? null : dismissFailed.code === "CONFLICT" ? (
+                <Banner tone="info" title={said.refusedSettled} />
+            ) : (
+                <Banner tone="danger" title={dismissFailed.message} />
+            )}
 
             <footer className="flex justify-end gap-2">
                 <Button
