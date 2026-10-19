@@ -29,7 +29,7 @@ the composition root binds the two.
 |---|---|
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
-| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity` |
+| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard` |
 | `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink SetType Model ModelSummary WriterPack` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
@@ -43,11 +43,16 @@ the composition root binds the two.
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and twenty-seven methods: stage 2a took the six policy methods out and put five page-type
+A hundred and thirty methods: stage 2a took the six policy methods out and put five page-type
 methods and `PagesService.SetType` in, and 2b adds `PagesService.WriterPack{pageId, field?, budget?}`,
 exactly what the writer would be sent for a page and field (`application/sitemodel`'s pack: its
 sections in priority order with their token counts, as `Fit` left them under the role's input
-budget, and what it dropped), resolved through the service's third source. `TemplatesService.ListPageTypes{siteId}` answers the site's
+budget, and what it dropped), resolved through the service's third source, and the three card
+proposal methods: `GraphService.CardProposals{siteId, cursor?, limit?}` pages the open
+`entity_card_proposed` findings (each with the card as it is, the card proposed, the reason and
+`changed` when the card moved since), `AcceptCard{findingId}` writes the proposed card and settles
+the finding, refusing with `Conflict` and the reason `card_changed` a card that moved since it was
+proposed, and `DismissCard{findingId}` settles it dismissed, so the same proposal never reopens. `TemplatesService.ListPageTypes{siteId}` answers the site's
 types with every scope (stored or the preset's default) and the field catalog;
 `CreatePageType{siteId, name, preset, templateId?}`, `SavePageType{id, name?, templateId?}`,
 `DeletePageType{id, reassignTo}` (the last type of a preset is refused) and
