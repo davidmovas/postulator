@@ -98,6 +98,7 @@ func storeContext(t *testing.T, wpID int64) *run.StepContext {
 	sc.Page.WPID = &wpID
 	sc.Page.Status = pagemap.StatusPublished
 	sc.Page.Observed = pagemap.Observed{Title: "Espresso Machine", Slug: "espresso-machine", Status: "publish"}
+	rewritten(sc)
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is for", TargetWords: 30},
 		Specifications:   []template.ProductSpecification{{Name: "Form"}, {Name: "Origin"}, {Name: "Size"}},

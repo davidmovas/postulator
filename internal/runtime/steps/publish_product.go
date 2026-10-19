@@ -161,19 +161,27 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 	if err != nil {
 		return run.Result{}, err
 	}
-	theirs, previous := "", raw.Content
-	if draft.Kept != nil {
-		live := liveBody{raw: raw.Content, hash: raw.ContentHash, plugin: true}
-		held, same, guardErr := deps.guard(ctx, sc.Page.ID, draft.Kept, live, description)
+	theirs, part, previous := "", description, raw.Content
+	keeping, err := deps.keepingOf(ctx, sc, draft, true)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if keeping != nil {
+		onSite := liveBody{raw: raw.Content, hash: raw.ContentHash, plugin: true}
+		guarded, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, onSite, description)
 		if guardErr != nil {
 			return run.Result{}, guardErr
 		}
 		if !same {
 			return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
 		}
-		description, theirs, previous = held.final, held.theirs, held.previous
+		description, theirs, part, previous = guarded.final, guarded.theirs, guarded.part, guarded.previous
 	}
-	kept, err := deps.keptFieldsOf(ctx, sc, true, field.SEOTitle, field.SEODescription, field.ProductShortDescription)
+	live := map[field.Key]string{field.ProductShortDescription: held.ShortDescription}
+	if seoErr := liveSnippet(ctx, client, wp.TypeProduct, held.ID, true, live); seoErr != nil {
+		return run.Result{}, seoErr
+	}
+	kept, err := deps.keptFieldsOf(ctx, sc, true, live, field.SEOTitle, field.SEODescription, field.ProductShortDescription)
 	if err != nil {
 		return run.Result{}, err
 	}
@@ -201,7 +209,7 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 		}
 		return run.Result{}, err
 	}
-	if recordErr := recordOurBlocks(ctx, deps, sc, client, wp.TypeProduct, held.ID, description, theirs); recordErr != nil {
+	if recordErr := recordOurBlocks(ctx, deps, sc, client, wp.TypeProduct, held.ID, description, theirs, part); recordErr != nil {
 		return run.Result{}, recordErr
 	}
 

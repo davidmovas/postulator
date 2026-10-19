@@ -14,12 +14,16 @@ import (
 
 const (
 	ReasonClientChanged = "the page changed on the site after the writer read it, and its owner's text is kept, " +
-		"so nothing was written; sync the site and run the page again"
+		"so nothing was written; sync the site, then regenerate the page so the writer reads it again"
 	ReasonKeptNeedsPlugin = "the page holds its owner's own text, which is kept as it stands, and only the companion " +
 		"plugin's raw route can write beside it without changing it; install the plugin or let the run rewrite the page"
-	ReasonSlugTaken = "the site already holds a page under this page's slug, with text the writer never read; " +
-		"sync the site so the model reads that page, then run it again"
+	ReasonSlugTaken = "the site already holds a page under this page's slug that this run did not create; " +
+		"give the planned page another slug, or map that page to the entity in its place, then run it again"
 )
+
+func unread() *content.KeptBody {
+	return &content.KeptBody{Raw: "", Hash: block.BodyHash(""), Written: []string{}}
+}
 
 func keptBody(sc *run.StepContext, seen sitemodel.Picture) *content.KeptBody {
 	if sc.Page.WPID == nil || seen.Scope.Rewrites || sc.Rewrites(sc.Page.ID) {
@@ -111,8 +115,17 @@ func readLiveBody(ctx context.Context, client *wp.Client, itemType wp.ItemType, 
 type guarded struct {
 	final    string
 	theirs   string
+	part     string
 	previous string
 	client   bool
+}
+
+func composed(raw string, written []string, ours, rendered string) (final, part string, client bool) {
+	final, client = block.Keep(raw, written, ours)
+	if !client {
+		return rendered, rendered, false
+	}
+	return final, block.Part(raw, written, ours), true
 }
 
 func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, site liveBody, rendered string) (guarded, bool, error) {
@@ -120,24 +133,29 @@ func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, 
 	if err != nil {
 		return guarded{}, false, err
 	}
-	read := block.Client(kept.Raw, kept.Written)
-	theirs := block.Client(site.raw, written)
-	if block.Hash(read) != block.Hash(theirs) {
-		return guarded{}, false, nil
-	}
 	ours, err := withoutHeadingOne(rendered)
 	if err != nil {
 		return guarded{}, false, err
 	}
-	final, client := block.Keep(site.raw, written, ours)
-	if !client {
-		final = rendered
+	read := block.Client(kept.Raw, kept.Written)
+	theirs := block.Client(site.raw, written)
+	if block.Hash(read) != block.Hash(theirs) {
+		earlier, part, _ := composed(kept.Raw, kept.Written, ours, rendered)
+		if !block.SameRender(site.raw, earlier) {
+			return guarded{}, false, nil
+		}
+		written = append(slices.Clone(written), block.Ours(site.raw, read, part)...)
+		theirs = block.Client(site.raw, written)
+		if block.Hash(read) != block.Hash(theirs) {
+			return guarded{}, false, nil
+		}
 	}
+	final, part, client := composed(site.raw, written, ours, rendered)
 	previous := site.raw
 	if site.hashed() != kept.Hash {
 		previous = kept.Raw
 	}
-	return guarded{final: final, theirs: theirs, previous: previous, client: client}, true, nil
+	return guarded{final: final, theirs: theirs, part: part, previous: previous, client: client}, true, nil
 }
 
 func (d Deps) writtenOf(ctx context.Context, pageID string, kept *content.KeptBody) ([]string, error) {
@@ -155,12 +173,8 @@ func (d Deps) writtenOf(ctx context.Context, pageID string, kept *content.KeptBo
 	return out, nil
 }
 
-func adoptable(site liveBody, final string) bool {
-	return block.Parse(site.raw).Empty() || block.Hash(site.raw) == block.Hash(final)
-}
-
 func recordOurBlocks(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, itemType wp.ItemType, id int64,
-	sent, theirs string) error {
+	sent, theirs, part string) error {
 	if deps.Bodies == nil {
 		return nil
 	}
@@ -172,5 +186,5 @@ func recordOurBlocks(ctx context.Context, deps Deps, sc *run.StepContext, client
 	case !wp.IsPluginMissing(err):
 		return err
 	}
-	return deps.Bodies.ReplaceWritten(ctx, sc.Page.ID, block.Ours(stored, theirs), sc.Run.ID, deps.now())
+	return deps.Bodies.ReplaceWritten(ctx, sc.Page.ID, block.Ours(stored, theirs, part), sc.Run.ID, deps.now())
 }

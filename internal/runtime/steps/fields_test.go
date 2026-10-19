@@ -105,8 +105,9 @@ func TestTheExcerptIsWrittenAndReverted(t *testing.T) {
 
 	stand := newRevertStand(t)
 	deps := stand.deps
+	deps.Types = scopedTypes{keys: []field.Key{field.Excerpt}}
 	seeded := stand.server.Seed(wptest.Item{Type: wptest.TypePost, Title: "Espresso", Slug: "espresso-post", Status: "publish", Content: oursBody, Excerpt: "The owner's excerpt."})
-	sc := publishContext(t)
+	sc := rewritten(publishContext(t))
 	sc.Page.WPType, sc.Page.WPID = pagemap.WPPost, &seeded[0].ID
 	blob, err := json.Marshal(steps.Fields{Values: []steps.FieldValue{{Key: "excerpt", Value: "Pull a shot."}}})
 	if err != nil {

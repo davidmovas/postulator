@@ -235,7 +235,85 @@ func TestAPublishRetriedAfterItsRawWriteLeavesOneCopy(t *testing.T) {
 	}
 }
 
-func TestAPlannedPageFoundBySlugIsAdoptedOnlyWhenNothingOfItsOwnIsLost(t *testing.T) {
+func TestAPageThatGainedItsIdAfterTheWriterRanIsStillGuarded(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	deps.Bodies = &bodyLog{}
+	seeded := server.Seed(wptest.Item{Type: "page", Title: "Espresso", Slug: "espresso", Status: "publish", Content: clientText})
+	sc := publishContext(t)
+	sc.Page.WPID = &seeded[0].ID
+
+	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if result.Next != run.TransitionPause || !strings.Contains(result.Message, steps.ReasonClientChanged) {
+		t.Fatalf("result = %+v, want a pause: the writer never read the body the site holds", result)
+	}
+	if stored, _ := server.Lookup(seeded[0].ID); stored.Content != clientText {
+		t.Errorf("the site holds %q, want the client's body untouched", stored.Content)
+	}
+}
+
+func TestARawWriteWhoseAnswerWasLostIsRecognisedOnTheRetry(t *testing.T) {
+	t.Parallel()
+
+	kept := &content.KeptBody{Raw: clientText, Hash: block.BodyHash(clientText)}
+	deps, server, log, sc := keptRun(t, oursBody, kept)
+	server.Rewrite(*sc.Page.WPID, clientText+"\n\n"+oursBody)
+
+	published := runPublish(t, deps, sc)
+	stored, _ := server.Lookup(published.WPID)
+	if stored.Content != clientText+"\n\n"+oursBody {
+		t.Errorf("the site holds %q, want the client's text and one copy of ours", stored.Content)
+	}
+	if written := log.ours(sc.Page.ID); len(written) != 1 || written[0] != block.Hash(oursBody) {
+		t.Errorf("ours = %v, want our block claimed and the client's not", written)
+	}
+	if published.PreviousContent != clientText {
+		t.Errorf("the publish kept %q as what it replaced, want the body the writer read", published.PreviousContent)
+	}
+}
+
+func TestAFieldTheOwnerChangedAfterTheReadIsKept(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	deps.Bodies = &bodyLog{}
+	ours := field.NewValue("page-child", field.Title, "Espresso", time.Now())
+	ours.WrittenRunID = new("run-earlier")
+	deps.Fields = &fieldLog{values: []field.Value{ours}}
+	seeded := server.Seed(wptest.Item{Type: "page", Title: "The owner's new title", Slug: "espresso", Status: "publish", Content: oursBody})
+	sc := publishContext(t)
+	sc.Page.WPID = &seeded[0].ID
+	sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: keptDraft(t, &content.KeptBody{
+		Raw: oursBody, Hash: block.BodyHash(oursBody), Written: []string{block.Hash(oursBody)},
+	})}
+	deps.Bodies = &bodyLog{written: map[string][]string{sc.Page.ID: {block.Hash(oursBody)}}}
+
+	published := runPublish(t, deps, sc)
+	if stored, _ := server.Lookup(published.WPID); stored.Title != "The owner's new title" {
+		t.Errorf("the title became %q, want the owner's edit kept: the model still held ours", stored.Title)
+	}
+}
+
+type fieldLog struct {
+	mu     sync.Mutex
+	values []field.Value
+}
+
+func (f *fieldLog) Record(context.Context, string, field.Key, string, string, time.Time) error {
+	return nil
+}
+
+func (f *fieldLog) ListForPage(context.Context, string) ([]field.Value, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]field.Value(nil), f.values...), nil
+}
+
+func TestAPlannedPageFoundBySlugIsAdoptedOnlyWhenItIsTheRunsOwn(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -244,7 +322,8 @@ func TestAPlannedPageFoundBySlugIsAdoptedOnlyWhenNothingOfItsOwnIsLost(t *testin
 		paused bool
 	}{
 		{name: "a stranger's page with its own text", onSite: clientText, paused: true},
-		{name: "an empty page under the slug", onSite: ""},
+		{name: "a blank page someone made under the slug", onSite: "", paused: true},
+		{name: "the page this run created before it was interrupted", onSite: publishBody},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -459,7 +538,7 @@ func TestADisabledFieldIsNeitherWrittenNorSent(t *testing.T) {
 	deps, server := imageDeps(t)
 	deps.Types = disabledSEO{}
 	seeded := server.Seed(wptest.Item{Type: "page", Title: "The owner's title", Slug: "espresso", Status: "publish", Content: oursBody})
-	sc := publishContext(t)
+	sc := rewritten(publishContext(t))
 	sc.Page.WPID = &seeded[0].ID
 
 	published := runPublish(t, deps, sc)

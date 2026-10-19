@@ -31,6 +31,11 @@ func publishContext(t *testing.T) *run.StepContext {
 	return sc
 }
 
+func rewritten(sc *run.StepContext) *run.StepContext {
+	sc.Params[run.ParamRewrite] = []any{sc.Page.ID}
+	return sc
+}
+
 func nestedContext(t *testing.T) *run.StepContext {
 	t.Helper()
 
@@ -116,7 +121,7 @@ func TestPublishFindsAnExistingPageBySlugAndParent(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
-	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft"})
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft", Content: publishBody})
 
 	published := runPublish(t, deps, publishContext(t))
 	if published.Created || published.WPID != seeded[0].ID {
@@ -155,14 +160,14 @@ func TestPublishKeepsTheSEOMetaItReplaced(t *testing.T) {
 
 	deps, server := imageDepsWith(t, wptest.WithSEOPlugin("yoast"))
 	seeded := server.Seed(wptest.Item{
-		Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft",
+		Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft", Content: publishBody,
 		Meta: map[string]string{
 			"_yoast_wpseo_title":    "what a human wrote",
 			"_yoast_wpseo_metadesc": "and the description with it",
 		},
 	})
 
-	published := runPublish(t, deps, publishContext(t))
+	published := runPublish(t, deps, rewritten(publishContext(t)))
 	if published.Created || published.WPID != seeded[0].ID {
 		t.Fatalf("publish = %+v, want an update of the seeded page", published)
 	}
@@ -210,7 +215,7 @@ func TestPublishKeepsNoPreviousMetaItCouldNotRead(t *testing.T) {
 
 			deps, server := imageDepsWith(t, tc.options...)
 			if tc.seed {
-				server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft"})
+				server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft", Content: publishBody})
 			}
 
 			published := runPublish(t, deps, publishContext(t))
@@ -455,7 +460,7 @@ func TestPublishUpdatesAFlatPageWhereItStands(t *testing.T) {
 	deps, server := imageDeps(t)
 	parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Slug: "coffee"})
 	wpID := parent[0].ID
-	flat := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft"})
+	flat := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft", Content: publishBody})
 
 	deps.Pages = pageList{items: []pagemap.Page{{
 		ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,

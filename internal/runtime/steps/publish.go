@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -104,10 +105,15 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 			return run.Result{}, err
 		}
 	}
-	final, theirs, previous := rendered, "", site.raw
-	keeping := keptOf(draft, found)
-	switch {
-	case keeping != nil:
+	final, theirs, part, previous := rendered, "", rendered, site.raw
+	if found && sc.Page.WPID == nil && !block.SameRender(site.raw, rendered) {
+		return needsHuman(sc.Page.Path + ": " + ReasonSlugTaken + " (" + existing.Link + ")"), nil
+	}
+	keeping, err := deps.keepingOf(ctx, sc, draft, found)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if keeping != nil {
 		held, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, site, rendered)
 		if guardErr != nil {
 			return run.Result{}, guardErr
@@ -118,11 +124,16 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 		if held.client && !site.plugin {
 			return needsHuman(sc.Page.Path + ": " + ReasonKeptNeedsPlugin), nil
 		}
-		final, theirs, previous = held.final, held.theirs, held.previous
-	case found && sc.Page.WPID == nil && !adoptable(site, rendered):
-		return needsHuman(sc.Page.Path + ": " + ReasonSlugTaken), nil
+		final, theirs, part, previous = held.final, held.theirs, held.part, held.previous
 	}
-	kept, err := deps.keptFieldsOf(ctx, sc, found, field.Title, field.SEOTitle, field.SEODescription)
+	live := map[field.Key]string{}
+	if found {
+		live[field.Title], live[field.Excerpt] = existing.Title, existing.Excerpt
+		if seoErr := liveSnippet(ctx, client, itemType, existing.ID, true, live); seoErr != nil {
+			return run.Result{}, seoErr
+		}
+	}
+	kept, err := deps.keptFieldsOf(ctx, sc, found, live, field.Title, field.Excerpt, field.SEOTitle, field.SEODescription)
 	if err != nil {
 		return run.Result{}, err
 	}
@@ -134,7 +145,7 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 			}
 			return run.Result{}, putErr
 		}
-		if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, existing.ID, final, theirs); recordErr != nil {
+		if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, existing.ID, final, theirs, part); recordErr != nil {
 			return run.Result{}, recordErr
 		}
 	}
@@ -146,7 +157,7 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	asked := itemRequest(sc, draft, final, placed.wpID, featured.FeaturedID)
 	asked.existing, asked.found = existing, found
 	asked.viaRaw, asked.keepTitle = viaRaw, kept[field.Title]
-	if excerpt, written := answered.Value(field.Excerpt); written {
+	if excerpt, written := answered.Value(field.Excerpt); written && !kept[field.Excerpt] {
 		asked.excerpt = &excerpt
 	}
 	written, mismatches, err := writeItem(ctx, client, itemType, sc, asked)
@@ -187,7 +198,7 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 		return run.Result{}, recordErr
 	}
 	if !viaRaw {
-		if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, written.ID, final, theirs); recordErr != nil {
+		if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, written.ID, final, theirs, part); recordErr != nil {
 			return run.Result{}, recordErr
 		}
 	}
@@ -199,11 +210,18 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, rendered s
 	return publishedAs(result, verb(found)+" "+sc.Page.Path+" as "+strconv.FormatInt(written.ID, 10))
 }
 
-func keptOf(draft content.ContentDraft, found bool) *content.KeptBody {
+func (d Deps) keepingOf(ctx context.Context, sc *run.StepContext, draft content.ContentDraft, found bool) (*content.KeptBody, error) {
 	if !found {
-		return nil
+		return nil, nil
 	}
-	return draft.Kept
+	if draft.Kept != nil {
+		return draft.Kept, nil
+	}
+	rewriting, err := d.rewriting(ctx, sc)
+	if err != nil || rewriting {
+		return nil, err
+	}
+	return unread(), nil
 }
 
 type writeRequest struct {

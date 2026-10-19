@@ -27,7 +27,8 @@ func (k keptFields) all(keys ...field.Key) bool {
 	return len(keys) > 0
 }
 
-func (d Deps) keptFieldsOf(ctx context.Context, sc *run.StepContext, existing bool, keys ...field.Key) (keptFields, error) {
+func (d Deps) keptFieldsOf(ctx context.Context, sc *run.StepContext, existing bool, live map[field.Key]string,
+	keys ...field.Key) (keptFields, error) {
 	kept := make(keptFields, len(keys))
 	set, err := d.Types.Set(ctx, sc.Run.SiteID)
 	if err != nil {
@@ -49,12 +50,27 @@ func (d Deps) keptFieldsOf(ctx context.Context, sc *run.StepContext, existing bo
 		value := values[key]
 		ours := value.WrittenRunID != nil && value.CurrentHash == value.BaseHash
 		rewrites := scope.Rewrites || sc.Rewrites(sc.Page.ID)
+		onSite, read := live[key]
 		switch {
 		case !scope.Enabled || !scope.AIWrites:
 			kept[key] = existing || key != field.Title
 		case existing && !rewrites && strings.TrimSpace(value.Current) != "" && !ours:
 			kept[key] = true
+		case existing && !rewrites && read && strings.TrimSpace(onSite) != strings.TrimSpace(value.Current):
+			kept[key] = true
 		}
 	}
 	return kept, nil
+}
+
+func (d Deps) rewriting(ctx context.Context, sc *run.StepContext) (bool, error) {
+	if sc.Rewrites(sc.Page.ID) {
+		return true, nil
+	}
+	set, err := d.Types.Set(ctx, sc.Run.SiteID)
+	if err != nil {
+		return false, err
+	}
+	scope, _ := set.Scope(claimedType(set, sc).ID, bodyField(sc))
+	return scope.Rewrites, nil
 }

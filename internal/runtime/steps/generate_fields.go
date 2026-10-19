@@ -162,7 +162,7 @@ func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]asked
 			skipped = append(skipped, FieldSkip{Key: string(key), Reason: reason})
 			continue
 		}
-		kept, err := deps.keptFieldsOf(ctx, sc, sc.Page.WPID != nil, key)
+		kept, err := deps.keptFieldsOf(ctx, sc, sc.Page.WPID != nil, nil, key)
 		if err != nil {
 			return nil, nil, err
 		}

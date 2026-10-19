@@ -109,6 +109,26 @@ func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.C
 	}
 }
 
+func liveSnippet(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID int64, updating bool,
+	into map[field.Key]string) error {
+	if !updating {
+		return nil
+	}
+	capabilities, err := client.Capabilities(ctx)
+	switch {
+	case wp.IsPluginMissing(err):
+		return nil
+	case err != nil:
+		return err
+	}
+	held, err := metaBeingReplaced(ctx, client, capabilities, itemType, wpID, updating)
+	if err != nil || held == nil {
+		return err
+	}
+	into[field.SEOTitle], into[field.SEODescription] = held.Title, held.Description
+	return nil
+}
+
 func noMetaGenerated() seoWrite {
 	return seoWrite{applied: []string{}, skipped: []string{CodeSEOMetaSkipped}}
 }
