@@ -230,6 +230,9 @@ func seedStandGraph(t *testing.T, core *app.Core, siteID string, seeds []seededE
 		if _, err = core.Pages.MapToEntity(t.Context(), pages.MapToEntityRequest{PageID: page.ID, EntityID: created.Entity.ID}); err != nil {
 			t.Fatalf("map %s to %s: %v", seed.path, seed.name, err)
 		}
+		if _, err = core.Pages.SetCanonical(t.Context(), pages.SetCanonicalRequest{EntityID: created.Entity.ID, PageID: page.ID}); err != nil {
+			t.Fatalf("make %s the page of %s: %v", seed.path, seed.name, err)
+		}
 	}
 	return ids
 }
