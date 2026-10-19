@@ -108,7 +108,7 @@ func TestABlockEditorBodyKeepsItsFreeformClientContentAcrossRuns(t *testing.T) {
 		!strings.Contains(stored, "<!-- wp:html -->\n"+first+"\n<!-- /wp:html -->") {
 		t.Fatalf("the first run stored %q, want the client's paragraph, ours as its own block, then the form", stored)
 	}
-	written := block.Ours(stored, block.Client(current, nil))
+	written := block.Ours(stored, block.Client(current, nil), block.Part(current, nil, first))
 	if len(written) != 1 {
 		t.Fatalf("ours = %v, want our one block and nothing of the client's", written)
 	}
@@ -136,9 +136,12 @@ func TestTheClientsBlocksAreWhatIsLeftOfOurs(t *testing.T) {
 func TestOursAreTheBlocksTheClientDidNotHave(t *testing.T) {
 	t.Parallel()
 
-	const client = "<p>Theirs.</p>"
-	stored := client + "\n\n<h2>Storage</h2><p>Keep them cold.</p>"
-	got := block.Ours(stored, client)
+	const (
+		client = "<p>Theirs.</p>"
+		part   = "<h2>Storage</h2><p>Keep them cold.</p>"
+	)
+	stored := client + "\n\n" + part
+	got := block.Ours(stored, client, part)
 	if len(got) == 0 {
 		t.Fatal("no block counted as ours")
 	}
@@ -147,7 +150,7 @@ func TestOursAreTheBlocksTheClientDidNotHave(t *testing.T) {
 			t.Errorf("the client's paragraph was counted as ours")
 		}
 	}
-	if all := block.Ours(stored, ""); len(all) != len(hashesOf(stored)) {
+	if all := block.Ours(stored, "", stored); len(all) != len(hashesOf(stored)) {
 		t.Errorf("with no client text every block is ours: %v", all)
 	}
 }

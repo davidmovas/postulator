@@ -11,15 +11,21 @@ const (
 	htmlClose     = "\n<!-- /wp:html -->"
 )
 
+func Part(current string, written []string, ours string) string {
+	body := Parse(current)
+	if len(clientBlocks(body, written)) > 0 && body.Kind == Blocks {
+		return htmlOpen + ours + htmlClose
+	}
+	return ours
+}
+
 func Keep(current string, written []string, ours string) (raw string, kept bool) {
 	body := Parse(current)
 	client := clientBlocks(body, written)
 	if len(client) == 0 {
 		return ours, false
 	}
-	if body.Kind == Blocks {
-		ours = htmlOpen + ours + htmlClose
-	}
+	ours = Part(current, written, ours)
 	at := insertionPoint(client)
 	parts := make([]string, 0, 3)
 	if before := strings.TrimRight(joinRaw(client[:at]), " \t\r\n"); before != "" {
@@ -40,15 +46,34 @@ func HasClient(current string, written []string) bool {
 	return len(clientBlocks(Parse(current), written)) > 0
 }
 
-func Ours(stored, client string) []string {
-	theirs := make(map[string]struct{})
-	for _, held := range Parse(client).Blocks {
-		theirs[held.Hash] = struct{}{}
+func Ours(stored, client, part string) []string {
+	blocks := Parse(stored).Blocks
+	out := make([]string, 0, len(blocks))
+	if strings.TrimSpace(client) == "" {
+		for i := range blocks {
+			if !slices.Contains(out, blocks[i].Hash) {
+				out = append(out, blocks[i].Hash)
+			}
+		}
+		return out
 	}
-	out := make([]string, 0)
-	for _, held := range Parse(stored).Blocks {
-		if _, kept := theirs[held.Hash]; !kept && !slices.Contains(out, held.Hash) {
-			out = append(out, held.Hash)
+	theirs := make(map[int]struct{})
+	for _, at := range align(renders(blocks), renders(Parse(client).Blocks)) {
+		theirs[at.left] = struct{}{}
+	}
+	mine := renders(Parse(part).Blocks)
+	storedRenders := renders(blocks)
+	for i := range blocks {
+		if _, held := theirs[i]; held {
+			continue
+		}
+		at := slices.Index(mine, storedRenders[i])
+		if at < 0 {
+			continue
+		}
+		mine = slices.Delete(mine, at, at+1)
+		if !slices.Contains(out, blocks[i].Hash) {
+			out = append(out, blocks[i].Hash)
 		}
 	}
 	return out

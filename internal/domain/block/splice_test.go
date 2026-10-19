@@ -79,6 +79,58 @@ func TestASpliceKeepsTheBytesOfEveryBlockItDidNotChange(t *testing.T) {
 	}
 }
 
+func TestASpliceOverSeveralChangedBlocksKeepsEverythingBetweenThem(t *testing.T) {
+	t.Parallel()
+
+	const (
+		first  = "<p>Tea &amp; coffee&nbsp;now.</p>"
+		ours   = "<!-- wp:html -->\n<p>Espresso is pulled under pressure.</p>\n<!-- /wp:html -->"
+		second = "<p>Milk &amp; sugar&nbsp;later.</p>"
+	)
+	before := first + "\n\n" + ours + "\n\n" + second
+	after := rerendered(t, rerendered(t, before, "coffee", `<a href="/coffee/">coffee</a>`), "sugar", `<a href="/sugar/">sugar</a>`)
+
+	raw, gotOurs := block.Splice(before, after, []string{block.Hash(ours)})
+	if !strings.Contains(raw, "\n\n"+ours+"\n\n") {
+		t.Errorf("Splice = %q, want our untouched block between the two linked ones byte for byte", raw)
+	}
+	if !slices.Equal(gotOurs, []string{block.Hash(ours)}) {
+		t.Errorf("ours = %v, want our untouched block still ours and the client's linked blocks his", gotOurs)
+	}
+}
+
+func TestOursAreOnlyTheBlocksOfOurPart(t *testing.T) {
+	t.Parallel()
+
+	const (
+		theirs = "<p>Tea & coffee, roasted daily.</p>"
+		part   = "<p>Espresso is pulled under pressure.</p>"
+	)
+	cases := []struct {
+		name   string
+		stored string
+		client string
+		want   []string
+	}{
+		{name: "a whole body of ours", stored: part, want: []string{block.Hash(part)}},
+		{name: "ours beside the client's", stored: theirs + "\n\n" + part, client: theirs, want: []string{block.Hash(part)}},
+		{
+			name: "a client block the save changed stays his", stored: "<p>Tea &amp; coffee, roasted daily.</p>\n\n" + part,
+			client: theirs, want: []string{block.Hash(part)},
+		},
+		{name: "an unclosed client tag that swallowed ours is no block of ours", stored: "<div>Client text\n\n" + part, client: "<div>Client text"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := block.Ours(tc.stored, tc.client, part); !slices.Equal(got, tc.want) && (len(got) != 0 || len(tc.want) != 0) {
+				t.Errorf("Ours = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestASpliceOfAnUnchangedBodyIsTheBodyItself(t *testing.T) {
 	t.Parallel()
 
