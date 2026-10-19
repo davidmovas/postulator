@@ -428,6 +428,31 @@ func TestTheClientsLinkSatisfiesWhatThePageOwesAndIsNotPlacedTwice(t *testing.T)
 	}
 }
 
+func TestTheClientsOwnExternalLinkDoesNotHoldThePage(t *testing.T) {
+	t.Parallel()
+
+	deps := unitDeps()
+	theirs := `<p>We buy from <a href="https://supplier.example/">our supplier</a>.</p>`
+	kept := &content.KeptBody{Raw: theirs, Hash: block.BodyHash(theirs)}
+	artifacts := map[run.ArtifactKind][]byte{
+		run.ArtifactLinkContext: linkContextBlob(t, deps), run.ArtifactDraft: keptDraft(t, kept),
+		run.ArtifactBodyHTML: []byte(`<h1>Espresso</h1><p>Espresso is a way to make <a href="/coffee/">coffee</a>.</p>`),
+	}
+	validated, err := steps.Validate(deps).Run(t.Context(), unitContext(t, artifacts))
+	if err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	var report steps.ValidationReport
+	if err = json.Unmarshal(validated.Artifacts[0].Blob, &report); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, item := range report.Compliance.Items {
+		if item.Code == content.CodeExternalLink {
+			t.Errorf("compliance = %+v, want the client's own external link left ungraded", report.Compliance.Items)
+		}
+	}
+}
+
 func TestADisabledFieldIsNeitherWrittenNorSent(t *testing.T) {
 	t.Parallel()
 

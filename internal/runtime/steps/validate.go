@@ -71,7 +71,7 @@ func Validate(deps Deps) run.StepDef {
 			keywords := pagemap.Keywords(sc.Page, entity)
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
-				Compliance: content.Compliance(whole, lc, policy, sc.Page.ID),
+				Compliance: content.ComplianceOf(whole, doc, lc, policy, sc.Page.ID),
 				Structure:  content.Structure(doc, keywords, sc.Spec),
 				Links:      links,
 			}

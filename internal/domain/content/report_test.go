@@ -188,6 +188,24 @@ func TestCompliancePolicySwitchesAndCaps(t *testing.T) {
 	}
 }
 
+func TestTheClientsOwnLinksAreNeverGradedButStillSatisfyWhatThePageOwes(t *testing.T) {
+	t.Parallel()
+
+	lc := contextOf(target("/drinks/", []string{"drinks"}, content.RelationUp, true))
+	theirs := `<p>Our supplier is <a href="https://example.com/">elsewhere</a>; see our <a href="/drinks/">drinks</a>.</p>`
+	ours := `<p>Espresso is brewed under pressure.</p>`
+	whole := mustParse(t, theirs+ours)
+
+	graded := content.ComplianceOf(whole, mustParse(t, ours), lc, policy(field.LinkRules{}), "self")
+	if hasCode(graded, content.CodeExternalLink) || hasCode(graded, content.CodeTargetMissing) || graded.HasErrors() {
+		t.Errorf("the kept page = %v, want the client's external link ungraded and his link to the parent counted", codesOf(graded))
+	}
+	ourLink := content.ComplianceOf(whole, mustParse(t, ours+`<p><a href="https://example.com/">ours</a></p>`), lc, policy(field.LinkRules{}), "self")
+	if !hasCode(ourLink, content.CodeExternalLink) {
+		t.Errorf("our own external link = %v, want it graded", codesOf(ourLink))
+	}
+}
+
 func TestTheLinkCapCountsGraphLinksOnBothSides(t *testing.T) {
 	t.Parallel()
 
