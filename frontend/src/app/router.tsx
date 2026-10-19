@@ -14,6 +14,7 @@ import {
     AgentSettingsScreen,
     BrowserSettingsScreen,
     ModelSettingsScreen,
+    PageTypesScreen,
     RunSettingsScreen,
     SecurityScreen,
     SettingsScreen,
@@ -65,6 +66,7 @@ export const router = createHashRouter([
                 children: [
                     { index: true, element: <Navigate to="models" replace /> },
                     { path: "models", element: <ModelSettingsScreen /> },
+                    { path: "types", element: <PageTypesScreen /> },
                     { path: "runs", element: <RunSettingsScreen /> },
                     { path: "agent", element: <AgentSettingsScreen /> },
                     { path: "browser", element: <BrowserSettingsScreen /> },

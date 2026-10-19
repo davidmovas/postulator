@@ -23,6 +23,7 @@ describe("the placement of every declared setting", () => {
         const open = (tab: (typeof settingsTabKeys)[number]): number =>
             tabLayout(tab, declared).plain.flatMap((section) => section.keys).length;
         expect(open("models")).toBe(11);
+        expect(open("types")).toBe(0);
         expect(open("runs")).toBe(7);
         expect(open("agent")).toBe(2);
         expect(open("browser")).toBe(1);

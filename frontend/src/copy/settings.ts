@@ -18,6 +18,7 @@ export const settings = {
     title: "Settings",
     tabs: {
         models: "Models",
+        types: "Page types",
         runs: "Runs",
         agent: "Agent",
         browser: "Browser",

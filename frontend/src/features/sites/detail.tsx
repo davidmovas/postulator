@@ -5,7 +5,7 @@ import { Link } from "react-router";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import { useTestConnection } from "../../data/hooks/sites.js";
-import { useTemplate } from "../../data/hooks/templates.js";
+import { usePageTypes, useTemplate } from "../../data/hooks/templates.js";
 import { isBrowsable, openExternal } from "../../data/host.js";
 import type { Reachability, Site } from "../../data/types.js";
 import { localAddress } from "../../domain/address.js";
@@ -22,6 +22,7 @@ import {
     StatusBadge,
     TravelExploreIcon,
 } from "../../ui/index.js";
+import { pageTypesOf } from "../settings/tabs.js";
 import { PluginPanel } from "./plugin-panel.js";
 import { ReachabilityReport } from "./reachability.js";
 import { SiteSettingsForm } from "./settings-form.js";
@@ -39,8 +40,10 @@ function Row({ label, children }: { label: string; children: ReactNode }): React
 
 function Defaults({ site }: { site: Site }): ReactElement {
     const template = useTemplate(site.defaults.templateId ?? null);
+    const types = usePageTypes(site.id);
     const roles = Object.keys(site.defaults.modelProfiles ?? {}).length;
     const said = copy.sites.defaults;
+    const typeCount = types.data?.types?.length ?? 0;
 
     return (
         <div className="flex flex-col gap-1.5">
@@ -48,6 +51,11 @@ function Defaults({ site }: { site: Site }): ReactElement {
             <dl className="flex flex-col gap-1.5">
                 <Row label={said.template}>
                     <Link to={`/s/${site.id}/templates`}>{template.data?.template.name ?? said.none}</Link>
+                </Row>
+                <Row label={said.pageTypes}>
+                    <Link to={pageTypesOf(site.id)} data-site-page-types={true}>
+                        {typeCount === 0 ? said.none : said.types(typeCount)}
+                    </Link>
                 </Row>
                 <Row label={said.modelRoles}>
                     <Link to="/settings/models">{roles === 0 ? said.none : said.roles(roles)}</Link>

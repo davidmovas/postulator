@@ -18,6 +18,8 @@ export const sites = {
     defaults: {
         title: "Defaults",
         template: "Template",
+        pageTypes: "Page types",
+        types: (count: number) => (count === 1 ? "1 type" : `${count} types`),
         modelRoles: "Model roles",
         none: "None chosen",
         roles: (count: number) => (count === 1 ? "1 role set" : `${count} roles set`),

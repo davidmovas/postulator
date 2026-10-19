@@ -654,6 +654,57 @@
     "route": "#/settings/models"
   },
   {
+    "name": "settings-types",
+    "route": "#/settings/types?site=:siteId",
+    "wait": 1200
+  },
+  {
+    "name": "settings-types-scopes",
+    "route": "#/settings/types?site=:siteId",
+    "height": 1400,
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-type-row=hub]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[data-scope-field=body] button[aria-expanded]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "settings-types-read-only",
+    "route": "#/settings/types?site=:siteId",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-type-row=store_category]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "settings-types-new",
+    "route": "#/settings/types?site=:siteId",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-type-new]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
     "name": "settings-runs",
     "route": "#/settings/runs"
   },

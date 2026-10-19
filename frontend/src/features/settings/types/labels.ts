@@ -61,6 +61,10 @@ export function presetLabel(preset: string): string {
     return isOneOf(pageTypePresets, preset) ? copy.pageTypes.presets[preset] : spaced(preset);
 }
 
+export function presetHint(preset: string): string {
+    return isOneOf(pageTypePresets, preset) ? copy.pageTypes.presetHints[preset] : "";
+}
+
 export function presetIcon(preset: string): IconComponent {
     return presetIcons[roleOf(preset)];
 }
