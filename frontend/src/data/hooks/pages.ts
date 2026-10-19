@@ -11,6 +11,7 @@ import {
     pageTree,
     previewLink,
     setCanonicalPage,
+    setPageType,
     unmapPage,
     updatePage,
 } from "../endpoints/pages.js";
@@ -103,6 +104,21 @@ export function useSetCanonicalPage() {
             void client.invalidateQueries({ queryKey: keys.pages.detail(answered.page.id) });
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.graph.root() });
+        },
+    });
+}
+
+export function useSetPageType() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof setPageType>[0]) => setPageType(request),
+        onSuccess: (answered) => {
+            void client.invalidateQueries({ queryKey: keys.pages.detail(answered.page.id) });
+            void client.invalidateQueries({ queryKey: keys.pages.lists() });
+            void client.invalidateQueries({ queryKey: keys.pages.tree(answered.page.siteId) });
+            void client.invalidateQueries({ queryKey: keys.sites.types(answered.page.siteId) });
+            void client.invalidateQueries({ queryKey: keys.templates.resolved(answered.page.id) });
+            void client.invalidateQueries({ queryKey: keys.graph.full(answered.page.siteId) });
         },
     });
 }

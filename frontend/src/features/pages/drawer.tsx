@@ -27,6 +27,7 @@ import { PageModelTab } from "./model/tab.js";
 import { PreviewTab } from "./preview/tab.js";
 import { PageReportPanel } from "./report.js";
 import { TemplatePanel } from "./template.js";
+import { TypePanel } from "./type.js";
 
 const drawerWidth = 688;
 
@@ -145,6 +146,7 @@ export function PageDrawer({
                     </TabPanel>
                     <TabPanel label={copy.pages.tabs.mapping} active={active === "mapping"}>
                         <div className="flex flex-col gap-3 p-3">
+                            <TypePanel page={page} siteId={siteId} />
                             <PageMapping page={page} siteId={siteId} index={index} search={search} />
                             <TemplatePanel page={page} siteId={siteId} />
                         </div>
