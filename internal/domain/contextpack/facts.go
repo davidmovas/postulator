@@ -129,8 +129,8 @@ func (s Snapshot) Facts(pageID string, plan content.LinkContext) (Facts, error) 
 		Page: s.ref(page, true), H1: h1Of(page), WPType: page.WPType, Status: page.Status,
 		TypeSource: page.TypeSource, TypeReason: page.TypeReason, Technical: page.TechnicalReason,
 		ReadOnly: page.ReadOnlyReason, ParentReason: page.ParentReason, Card: s.card(page),
-		Trail: s.refs(s.trail(page), true), Children: s.refs(s.ranked(page, s.children(page)), true),
-		Siblings: s.refs(s.ranked(page, s.siblings(page)), true), Terms: slices.Clone(s.Terms[page.ID]),
+		Trail: s.refs(s.trail(page), true), Children: s.refs(s.ranked(page, s.beside(page, s.children(page))), true),
+		Siblings: s.refs(s.ranked(page, s.beside(page, s.siblings(page))), true), Terms: slices.Clone(s.Terms[page.ID]),
 		Targets: s.targets(plan), Outbound: s.outbound(page.ID), Inbound: s.inbound(page.ID),
 		Fields: s.fields(page, kind), Written: slices.Clone(s.Written[page.ID]), Notes: slices.Clone(page.Notes),
 		Findings: s.findings(page.ID),
@@ -150,6 +150,13 @@ func (s Snapshot) Facts(pageID string, plan content.LinkContext) (Facts, error) 
 		facts.Root, facts.Regions, facts.Generated = record.Root, slices.Clone(record.Regions), record.WordsGenerated
 	}
 	return facts, nil
+}
+
+func (s Snapshot) beside(page pagemap.Page, pages []pagemap.Page) []pagemap.Page {
+	return slices.DeleteFunc(slices.Clone(pages), func(other pagemap.Page) bool {
+		technical := other.TechnicalReason != pagemap.TechnicalNone || s.typeOf(other).Preset == pagetype.Technical
+		return technical || (other.WPType.Term() && !page.WPType.Term())
+	})
 }
 
 func (s Snapshot) Ref(page pagemap.Page) Ref {

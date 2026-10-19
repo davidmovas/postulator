@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
 )
@@ -81,6 +82,46 @@ func TestAnEmptyPageIsSummarisedFromItsStructure(t *testing.T) {
 	want := "Hub for Healing Peptides under Peptides; lists BPC-157 5 mg, TB-500; its children are BPC-157"
 	if got := s.Summary(page); got.Text != want || got.Source != contextpack.FromStructure {
 		t.Errorf("Summary = %+v, want %q", got, want)
+	}
+}
+
+func TestTheNeighboursAreTheContentBesideAPage(t *testing.T) {
+	t.Parallel()
+
+	f := replicaLike()
+	cart := typed(under(onSitePage("cart", "/cart/", "Cart", 40, pagemap.WPPage), "home", pagemap.ParentURL), pagetype.Technical)
+	cart.TechnicalReason = pagemap.TechnicalCart
+	twin := under(f.pages[5], "home", pagemap.ParentURL)
+	post := typed(under(onSitePage("post", "/hello-world/", "Hello world!", 41, pagemap.WPPost), "home", pagemap.ParentURL), pagetype.Entity)
+	f.pages = append(f.pages[:5], f.pages[6:]...)
+	f.pages = append(f.pages, cart, twin, post)
+	s := f.snapshot(t)
+
+	facts, err := s.Facts("hub", planFor(t, s, "hub"))
+	if err != nil {
+		t.Fatalf("Facts: %v", err)
+	}
+	if got := titles(facts.Siblings, refTitle); !slices.Equal(got, []string{"Lab Guides", "Hello world!"}) &&
+		!slices.Equal(got, []string{"Hello world!", "Lab Guides"}) {
+		t.Errorf("siblings = %v, want the content beside the hub, never the cart or a store category", got)
+	}
+	home, err := s.Facts("home", planFor(t, s, "home"))
+	if err != nil {
+		t.Fatalf("Facts: %v", err)
+	}
+	for _, child := range home.Children {
+		if child.Preset == pagetype.Technical || child.Preset == pagetype.StoreCategory {
+			t.Errorf("the front page's children hold %s (%s), want content only", child.Path, child.Preset)
+		}
+	}
+	term, err := s.Facts("term", planFor(t, s, "term"))
+	if err != nil {
+		t.Fatalf("Facts: %v", err)
+	}
+	for _, sibling := range term.Siblings {
+		if sibling.Preset == pagetype.Technical {
+			t.Errorf("a store category's siblings hold %s, want no technical page", sibling.Path)
+		}
 	}
 }
 
