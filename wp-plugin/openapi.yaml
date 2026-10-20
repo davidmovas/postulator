@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Postulator companion plugin
-  version: 1.4.1
+  version: 1.5.0
   summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
   description: >-
     Every route lives under the WordPress REST namespace postulator/v1 and is
@@ -152,7 +152,15 @@ paths:
     put:
       operationId: setSeoMeta
       summary: Write SEO meta through whichever SEO plugin the site runs.
-      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. From
+        plugin version 1.5.0 (the capability guarded_write) a field named in
+        expected is written only while its stored value still hashes to the
+        hash given, the empty string standing for a field the post does not
+        carry; when any named field moved, the request answers 409 with the
+        code hash_mismatch and moved naming each such field with its current
+        hash, and nothing is written. A field left out of expected is written
+        unconditionally, as before 1.5.0.
       parameters:
         - $ref: "#/components/parameters/PostID"
       requestBody:
@@ -176,11 +184,19 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Moved"
   /content/{id}/raw:
     get:
       operationId: getRawContent
       summary: Read the stored post_content together with its hash.
-      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. From
+        plugin version 1.5.0 saveStable says whether the stored content passes
+        the current user's pre_post_content and content_save_pre filters
+        unchanged, kses and balanceTags among them, which is whether any save
+        of the whole post (a title, an excerpt, the raw write, a store save)
+        would leave the body as it stands.
       parameters:
         - $ref: "#/components/parameters/PostID"
       responses:
@@ -199,7 +215,11 @@ paths:
     put:
       operationId: putRawContent
       summary: Replace post_content under optimistic concurrency control.
-      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. From
+        plugin version 1.5.0 the answer carries the content WordPress stored
+        beside its hash, which the user's own save filters may have changed
+        from the content sent.
       parameters:
         - $ref: "#/components/parameters/PostID"
       requestBody:
@@ -266,9 +286,10 @@ paths:
         starts with an underscore, the store's own keys and the SEO plugins'
         underscored keys among them: such a request answers 400 with the code
         meta_key_denied and data.keys naming the refused keys, and reads
-        nothing. A key the post does not carry answers null. Advertised as the
-        capability meta from plugin version 1.4.0; an older plugin answers 404
-        with the code rest_no_route.
+        nothing; from plugin version 1.5.0 a key on x-denied-meta is refused
+        the same way. A key the post does not carry answers null. Advertised as
+        the capability meta from plugin version 1.4.0; an older plugin answers
+        404 with the code rest_no_route.
       parameters:
         - $ref: "#/components/parameters/PostID"
         - name: keys
@@ -295,6 +316,49 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+    put:
+      operationId: putMeta
+      summary: Write post meta values, each under the hash it was read with.
+      description: >-
+        Post-only, as the read is. Every key written names in expected the hash
+        of the value it was read with, or null for a key the post did not
+        carry; a key without one answers 400 missing_expected. A key on
+        x-denied-meta, one is_protected_meta protects, one the user may not
+        edit_post_meta, a value that is neither a string nor null, and a key
+        whose stored value is not one plain text (an array, an object or more
+        than one row) all answer 400 meta_key_denied with data.keys naming
+        them, and nothing is written. When any key's stored value no longer
+        hashes to its expectation, the request answers 409 hash_mismatch with
+        moved naming each such key with its current hash or null, and nothing
+        is written. A null value deletes the key; a string is stored with
+        wp_slash. At most 50 keys. Which keys a person's scopes name is the
+        client's to decide. Advertised as the capability meta_write from plugin
+        version 1.5.0; an older plugin answers 404 with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetaWriteRequest"
+      responses:
+        "200":
+          description: Every key written, with the value now stored and its hash, both null for a deleted key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaWriteResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Moved"
   /settings:
     get:
       operationId: getSettings
@@ -448,6 +512,14 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/HashConflict"
+    Moved:
+      description: >-
+        A value named in expected no longer hashes to its expectation, so the
+        write was refused and nothing changed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/MovedConflict"
   schemas:
     Error:
       type: object
@@ -482,6 +554,28 @@ components:
           type: string
           pattern: "^[0-9a-f]{64}$"
           description: The hash the stored content has right now.
+    MovedConflict:
+      type: object
+      required:
+        - code
+        - message
+        - moved
+      properties:
+        code:
+          type: string
+          const: hash_mismatch
+        message:
+          type: string
+        moved:
+          type: object
+          description: >-
+            Each field or meta key whose stored value moved, with the hash it has
+            right now, or null for a meta key the post no longer carries.
+          additionalProperties:
+            type:
+              - string
+              - "null"
+            pattern: "^[0-9a-f]{64}$"
     Manifest:
       type: object
       required:
@@ -498,11 +592,16 @@ components:
         capabilities:
           type: array
           description: >-
-            For version 1.4.0 this is exactly bulk, seo_meta, seo_meta_read,
-            content_hash, raw, preview, rendered, meta, terms and settings, in that order; 1.2.0
-            listed the first six and 1.3.0 was never released. A 1.1.0 plugin lists
-            the same list without seo_meta_read and serves no read of the SEO
-            meta; a 1.0.0 plugin lists neither that nor preview.
+            For version 1.5.0 this is exactly bulk, seo_meta, seo_meta_read,
+            content_hash, raw, preview, rendered, meta, terms, settings,
+            meta_write and guarded_write, in that order; 1.4.0 and 1.4.1 listed
+            the first ten, 1.2.0 listed the first six and 1.3.0 was never
+            released. A 1.1.0 plugin lists the same list without seo_meta_read
+            and serves no read of the SEO meta; a 1.0.0 plugin lists neither
+            that nor preview. guarded_write says the SEO route takes expected
+            hashes, the raw write answers the content it stored and the raw
+            read answers saveStable; a client writes nothing through a plugin
+            without it.
           items:
             type: string
             enum:
@@ -516,6 +615,14 @@ components:
               - meta
               - terms
               - settings
+              - meta_write
+              - guarded_write
+        unfilteredHtml:
+          type: boolean
+          description: >-
+            Whether the user the request runs as holds unfiltered_html, absent
+            before 1.5.0. Without it every save of the whole post runs kses over
+            the stored content again.
         seoPlugin:
           type: string
           enum:
@@ -697,6 +804,15 @@ components:
           type: string
         ogDescription:
           type: string
+        expected:
+          type: object
+          description: >-
+            From 1.5.0, the hash of the value each field was read with, keyed by
+            the field's name; the empty string's hash stands for a field the
+            post does not carry.
+          additionalProperties:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
     SeoMetaState:
       type: object
       description: >-
@@ -747,6 +863,14 @@ components:
               - canonical
               - ogTitle
               - ogDescription
+        hashes:
+          type: object
+          description: >-
+            From 1.5.0, the hash of the value each applied field now stores,
+            after the SEO plugin's own filters.
+          additionalProperties:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
         seoPlugin:
           type: string
           enum:
@@ -775,6 +899,11 @@ components:
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"
+        saveStable:
+          type: boolean
+          description: >-
+            From 1.5.0, whether a save of the whole post by the current user
+            would store the content unchanged.
     TechnicalPages:
       type: object
       required:
@@ -912,10 +1041,63 @@ components:
       required:
         - contentHash
       properties:
+        content:
+          type: string
+          description: From 1.5.0, the post_content now stored, after the user's save filters.
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"
           description: The hash of the content that is now stored.
+    MetaWriteRequest:
+      type: object
+      required:
+        - meta
+        - expected
+      properties:
+        meta:
+          type: object
+          description: Each key to write with its new value, null to delete it.
+          additionalProperties:
+            type:
+              - string
+              - "null"
+        expected:
+          type: object
+          description: >-
+            Each key written with the hash of the value it was read with, null
+            for a key the post did not carry.
+          additionalProperties:
+            type:
+              - string
+              - "null"
+            pattern: "^[0-9a-f]{64}$"
+    MetaWriteResult:
+      type: object
+      required:
+        - id
+        - meta
+      properties:
+        id:
+          type: integer
+          format: int64
+        meta:
+          type: object
+          description: Each key written, with what is now stored.
+          additionalProperties:
+            type: object
+            required:
+              - value
+              - hash
+            properties:
+              value:
+                type:
+                  - string
+                  - "null"
+              hash:
+                type:
+                  - string
+                  - "null"
+                pattern: "^[0-9a-f]{64}$"
     PreviewLink:
       type: object
       required:

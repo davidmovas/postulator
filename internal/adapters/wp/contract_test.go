@@ -60,7 +60,7 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 		"/content/{id}/raw":      {"get", "put"},
 		"/content/{id}/preview":  {"post"},
 		"/content/{id}/rendered": {"get"},
-		"/meta/{id}":             {"get"},
+		"/meta/{id}":             {"get", "put"},
 		"/terms/{id}":            {"get"},
 		"/settings":              {"get"},
 	}
@@ -153,7 +153,18 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
 		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
-		{name: "plugin version", snippet: "\n  version: 1.4.1\n"},
+		{name: "plugin version", snippet: "\n  version: 1.5.0\n"},
+		{name: "meta write request schema", snippet: "\n    MetaWriteRequest:\n"},
+		{name: "meta write result schema", snippet: "\n    MetaWriteResult:\n"},
+		{name: "moved conflict schema", snippet: "\n    MovedConflict:\n"},
+		{name: "meta write capability", snippet: "\n              - meta_write\n"},
+		{name: "guarded write capability", snippet: "\n              - guarded_write\n"},
+		{name: "unfiltered html property", snippet: "\n        unfilteredHtml:\n"},
+		{name: "save stable property", snippet: "\n        saveStable:\n"},
+		{name: "stored hashes property", snippet: "\n        hashes:\n"},
+		{name: "moved property", snippet: "\n        moved:\n"},
+		{name: "unguarded meta key code", snippet: "missing_expected"},
+		{name: "save filters named", snippet: "pre_post_content and content_save_pre"},
 	}
 
 	document := contractDocument(t)
@@ -222,13 +233,13 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	if _, err := client.ListContent(t.Context(), wp.ContentQuery{}); err != nil {
 		t.Fatalf("ListContent: %v", err)
 	}
-	if _, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{Title: "x"}); err != nil {
+	if _, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{Title: "x"}, nil); err != nil {
 		t.Fatalf("SetSEOMeta: %v", err)
 	}
 	if _, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("GetSEOMeta: %v", err)
 	}
-	if _, err := client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, []string{"title"}); err != nil {
+	if _, err := client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, []string{"title"}, nil); err != nil {
 		t.Fatalf("ReplaceSEOMeta: %v", err)
 	}
 	raw, err := client.GetRaw(t.Context(), wp.TypePage, seeded[0].ID)

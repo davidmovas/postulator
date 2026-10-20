@@ -52,12 +52,12 @@ func TestNothingTheClientSendsNamesTheProgram(t *testing.T) {
 		{name: "GetRaw", call: func() error { _, err := client.GetRaw(ctx, wp.TypePage, page.ID); return err }},
 		{name: "PutRaw", call: func() error { _, err := client.PutRaw(ctx, wp.TypePage, page.ID, body, ""); return err }},
 		{name: "SetSEOMeta", call: func() error {
-			_, err := client.SetSEOMeta(ctx, wp.TypePage, page.ID, wp.SEOMeta{Title: title, Description: "Beans, roasted."})
+			_, err := client.SetSEOMeta(ctx, wp.TypePage, page.ID, wp.SEOMeta{Title: title, Description: "Beans, roasted."}, nil)
 			return err
 		}},
 		{name: "GetSEOMeta", call: func() error { _, err := client.GetSEOMeta(ctx, wp.TypePage, page.ID); return err }},
 		{name: "ReplaceSEOMeta", call: func() error {
-			_, err := client.ReplaceSEOMeta(ctx, wp.TypePage, page.ID, wp.SEOMeta{Title: title}, []string{"title"})
+			_, err := client.ReplaceSEOMeta(ctx, wp.TypePage, page.ID, wp.SEOMeta{Title: title}, []string{"title"}, nil)
 			return err
 		}},
 		{name: "PreviewLink", call: func() error { _, err := client.PreviewLink(ctx, wp.TypePage, draft.ID); return err }},

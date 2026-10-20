@@ -80,9 +80,26 @@ function read_term_seo( \WP_Term $term ): array {
 	);
 }
 
+function seo_moved( int $post_id, array $fields, array $expected ): array {
+	$map   = META_KEYS[ detect_plugin() ];
+	$moved = array();
+
+	foreach ( array_keys( $fields ) as $field ) {
+		if ( ! array_key_exists( $field, $expected ) ) {
+			continue;
+		}
+		$current = content_hash( (string) get_post_meta( $post_id, $map[ $field ], true ) );
+		if ( ! is_string( $expected[ $field ] ) || ! hash_equals( $current, $expected[ $field ] ) ) {
+			$moved[ $field ] = $current;
+		}
+	}
+	return $moved;
+}
+
 function write_post_seo( int $post_id, array $fields ): array {
 	$map     = META_KEYS[ detect_plugin() ];
 	$applied = array();
+	$hashes  = array();
 
 	foreach ( $map as $field => $key ) {
 		if ( ! array_key_exists( $field, $fields ) ) {
@@ -94,7 +111,11 @@ function write_post_seo( int $post_id, array $fields ): array {
 		} else {
 			update_post_meta( $post_id, $key, wp_slash( $value ) );
 		}
-		$applied[] = $field;
+		$applied[]        = $field;
+		$hashes[ $field ] = content_hash( (string) get_post_meta( $post_id, $key, true ) );
 	}
-	return $applied;
+	return array(
+		'applied' => $applied,
+		'hashes'  => $hashes,
+	);
 }

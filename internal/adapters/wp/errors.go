@@ -13,9 +13,22 @@ import (
 )
 
 type wpError struct {
-	Code        string `json:"code"`
-	Message     string `json:"message"`
-	CurrentHash string `json:"currentHash"`
+	Code        string             `json:"code"`
+	Message     string             `json:"message"`
+	CurrentHash string             `json:"currentHash"`
+	Moved       map[string]*string `json:"moved"`
+}
+
+func movedHashes(moved map[string]*string) map[string]string {
+	out := make(map[string]string, len(moved))
+	for name, hash := range moved {
+		if hash == nil {
+			out[name] = ""
+			continue
+		}
+		out[name] = *hash
+	}
+	return out
 }
 
 func decodeError(body []byte) wpError {
@@ -49,6 +62,9 @@ func classify(resp *http.Response, body []byte) error {
 		conflict := recode(base, errors.Conflict, "the WordPress content changed since it was read")
 		if failure.CurrentHash != "" {
 			conflict = conflict.WithDetail("currentHash", failure.CurrentHash)
+		}
+		if len(failure.Moved) > 0 {
+			conflict = conflict.WithDetail("moved", movedHashes(failure.Moved))
 		}
 		return conflict
 	case resp.StatusCode == http.StatusTooManyRequests:

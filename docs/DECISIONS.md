@@ -3629,3 +3629,22 @@ on what stage 2 left open and what was decided while building.
   `AIWritable` is false for any field without a writer, and so no scope, pack or writer sees it.
   `field.FeaturedImage` is a core field marked `Fill`, written only where the page has none; it is no
   scope's to switch, the image step and the template deciding when one is drawn.
+- **Plugin 1.5.0 writes under the hash read, and says what a save would do** (A.3). `PUT /meta/{id}`
+  takes every key with the hash of the value it was read with (null for one the post did not carry),
+  refuses the deny set, `is_protected_meta`, a key the user may not `edit_post_meta`, a value that is
+  no text and a stored value that is not one plain text (an array, or more than one row, which
+  `update_post_meta` would flatten), answers 409 `hash_mismatch` with `moved` naming each key that
+  moved and writes nothing then, deletes on a null, and answers what each key now stores with its
+  hash. The SEO route takes the same `expected` per field (the empty string's hash for a field not
+  carried) and answers the stored hashes; the raw write answers the content WordPress stored beside
+  its hash; the raw read answers `saveStable`, whether the stored content passes the user's
+  `pre_post_content` and `content_save_pre` filters unchanged; the manifest answers
+  `unfilteredHtml`. The capabilities `meta_write` and `guarded_write` join the required list, so a
+  1.4.1 plugin reads as outdated and **the client writes nothing through it**: `PutRaw`, `SetSEOMeta`,
+  `ReplaceSEOMeta` and `PutMeta` refuse it as `plugin_outdated`, since its SEO route ignores an
+  `expected` it does not know and its raw write answers no content. `PutMeta` refuses a denied key
+  itself before anything leaves. The fake's `WithFilteredHTML` now re-filters the body on the raw
+  write and on a core update too, as WordPress does for a user without `unfiltered_html`, and one
+  product test that pinned the description byte for byte against the old fake expects kses' form.
+  A step that hands an SEO write no expected hashes keeps writing as before; `publish` and the revert
+  pass them in A.5 and C.1.

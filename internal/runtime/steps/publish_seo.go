@@ -96,7 +96,7 @@ func (d Deps) canonicalWritten(ctx context.Context, sc *run.StepContext, creatin
 
 func sendSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64,
 	plan seoPlan) (seoWrite, error) {
-	result, err := client.SetSEOMeta(ctx, itemType, wpID, plan.Meta)
+	result, err := client.SetSEOMeta(ctx, itemType, wpID, plan.Meta, nil)
 	if err != nil {
 		if wp.IsPluginMissing(err) {
 			return metaNotWritten(sc.Page, ReasonNoPlugin), nil

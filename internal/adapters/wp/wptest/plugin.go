@@ -73,6 +73,7 @@ func (s *Server) routePlugin(mux *http.ServeMux) {
 	mux.HandleFunc("POST "+pluginNamespace+"/content/{id}/preview", s.handlePreview)
 	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/rendered", s.handleRendered)
 	mux.HandleFunc("GET "+pluginNamespace+"/meta/{id}", s.handleMeta)
+	mux.HandleFunc("PUT "+pluginNamespace+"/meta/{id}", s.handleMetaPut)
 	mux.HandleFunc("GET "+pluginNamespace+"/terms/{id}", s.handleTerms)
 	mux.HandleFunc("GET "+pluginNamespace+"/settings", s.handlePluginSettings)
 }
@@ -98,16 +99,18 @@ func (s *Server) handleManifest(w http.ResponseWriter, _ *http.Request) {
 	version := s.pluginVersion
 	capabilities := slices.Clone(s.capabilities)
 	postTypes, taxonomies := s.contentTypes(), s.contentTaxonomies()
+	unfiltered := !s.filteredHTML
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, map[string]any{
-		"postTypes":    postTypes,
-		"taxonomies":   taxonomies,
-		"version":      version,
-		"capabilities": capabilities,
-		"seoPlugin":    plugin,
-		"wpVersion":    "6.9.1",
-		"site":         s.http.URL,
+		"postTypes":      postTypes,
+		"taxonomies":     taxonomies,
+		"version":        version,
+		"capabilities":   capabilities,
+		"seoPlugin":      plugin,
+		"wpVersion":      "6.9.1",
+		"site":           s.http.URL,
+		"unfilteredHtml": unfiltered,
 	})
 }
 
@@ -297,7 +300,15 @@ func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keys := seoKeys[s.seoPlugin]
+	if moved := s.movedSEO(stored, keys, body); len(moved) > 0 {
+		s.mu.Unlock()
+		s.respond(w, http.StatusConflict, map[string]any{
+			"code": "hash_mismatch", "message": "an SEO field changed since it was read.", "moved": moved,
+		})
+		return
+	}
 	applied := make([]string, 0, len(seoFieldOrder))
+	hashes := make(map[string]string, len(seoFieldOrder))
 	for _, field := range seoFieldOrder {
 		held, present := body[field]
 		if !present {
@@ -315,11 +326,12 @@ func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 			stored.Meta[keys[field]] = value
 		}
 		applied = append(applied, field)
+		hashes[field] = contentHash(value)
 	}
 	plugin := s.seoPlugin
 	s.mu.Unlock()
 
-	s.respond(w, http.StatusOK, map[string]any{"applied": applied, "seoPlugin": plugin})
+	s.respond(w, http.StatusOK, map[string]any{"applied": applied, "seoPlugin": plugin, "hashes": hashes})
 }
 
 func (s *Server) handleRawGet(w http.ResponseWriter, r *http.Request) {
@@ -342,6 +354,7 @@ func (s *Server) handleRawGet(w http.ResponseWriter, r *http.Request) {
 			"type":        stored.Type,
 			"content":     stored.Content,
 			"contentHash": s.reportedHash(stored.Content),
+			"saveStable":  s.saveStable(stored.Content),
 		}
 	}
 	s.mu.Unlock()
@@ -396,9 +409,9 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stored.Content = content
+	stored.Content = s.saved(content)
 	stored.Modified = s.tick()
-	updated := contentHash(content)
+	kept := stored.Content
 	lost := 0
 	if len(s.rawAnswerFaults) > 0 {
 		lost, s.rawAnswerFaults = s.rawAnswerFaults[0], s.rawAnswerFaults[1:]
@@ -409,7 +422,7 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, lost, faultCode(lost), "the injected fault fired after the write")
 		return
 	}
-	s.respond(w, http.StatusOK, map[string]any{"contentHash": updated})
+	s.respond(w, http.StatusOK, map[string]any{"content": kept, "contentHash": contentHash(kept)})
 }
 
 func (s *Server) LoseTheAnswerOfTheNextRawWrite(status int) {

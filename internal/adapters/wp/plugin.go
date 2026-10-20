@@ -13,11 +13,13 @@ import (
 )
 
 const (
-	codePluginMissing     = "plugin_missing"
-	codePluginOutdated    = "plugin_outdated"
-	CapabilityPreview     = "preview"
-	CapabilitySEOMetaRead = "seo_meta_read"
-	CapabilityRaw         = "raw"
+	codePluginMissing      = "plugin_missing"
+	codePluginOutdated     = "plugin_outdated"
+	CapabilityPreview      = "preview"
+	CapabilitySEOMetaRead  = "seo_meta_read"
+	CapabilityRaw          = "raw"
+	CapabilityMetaWrite    = "meta_write"
+	CapabilityGuardedWrite = "guarded_write"
 
 	fieldSEOTitle         = "title"
 	fieldSEODescription   = "description"
@@ -28,11 +30,12 @@ const (
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 
-	PluginVersion = "1.4.1"
+	PluginVersion = "1.5.0"
 )
 
 var requiredCapabilities = []string{
 	"bulk", "seo_meta", CapabilitySEOMetaRead, "content_hash", CapabilityRaw, CapabilityPreview, CapabilityRendered, CapabilityMeta, CapabilityTerms, CapabilitySettings,
+	CapabilityMetaWrite, CapabilityGuardedWrite,
 }
 
 type PreviewLink struct {
@@ -41,23 +44,25 @@ type PreviewLink struct {
 }
 
 type Manifest struct {
-	Version      string
-	SEOPlugin    string
-	WPVersion    string
-	Site         string
-	Capabilities []string
-	PostTypes    []string
-	Taxonomies   []string
+	Version        string
+	SEOPlugin      string
+	WPVersion      string
+	Site           string
+	Capabilities   []string
+	PostTypes      []string
+	Taxonomies     []string
+	UnfilteredHTML bool
 }
 
 type Capabilities struct {
-	Version    string
-	SEOPlugin  string
-	WPVersion  string
-	Site       string
-	Names      []string
-	PostTypes  []string
-	Taxonomies []string
+	Version        string
+	SEOPlugin      string
+	WPVersion      string
+	Site           string
+	Names          []string
+	PostTypes      []string
+	Taxonomies     []string
+	UnfilteredHTML bool
 }
 
 func (c Capabilities) Has(name string) bool {
@@ -184,6 +189,7 @@ type SEOMeta struct {
 type SEOResult struct {
 	Applied   []string
 	SEOPlugin string
+	Hashes    map[string]string
 }
 
 type RawContent struct {
@@ -191,16 +197,23 @@ type RawContent struct {
 	Content     string
 	ContentHash string
 	ID          int64
+	SaveStable  bool
+}
+
+type RawWrite struct {
+	Content string
+	Hash    string
 }
 
 type manifestPayload struct {
-	Version      string   `json:"version"`
-	SEOPlugin    string   `json:"seoPlugin"`
-	WPVersion    string   `json:"wpVersion"`
-	Site         string   `json:"site"`
-	Capabilities []string `json:"capabilities"`
-	PostTypes    []string `json:"postTypes"`
-	Taxonomies   []string `json:"taxonomies"`
+	Version        string   `json:"version"`
+	SEOPlugin      string   `json:"seoPlugin"`
+	WPVersion      string   `json:"wpVersion"`
+	Site           string   `json:"site"`
+	Capabilities   []string `json:"capabilities"`
+	PostTypes      []string `json:"postTypes"`
+	Taxonomies     []string `json:"taxonomies"`
+	UnfilteredHTML bool     `json:"unfilteredHtml"`
 }
 
 type contentMetaPayload struct {
@@ -265,11 +278,13 @@ type rawPayload struct {
 	Content     string `json:"content"`
 	ContentHash string `json:"contentHash"`
 	ID          int64  `json:"id"`
+	SaveStable  bool   `json:"saveStable"`
 }
 
 type seoResultPayload struct {
-	SEOPlugin string   `json:"seoPlugin"`
-	Applied   []string `json:"applied"`
+	SEOPlugin string            `json:"seoPlugin"`
+	Applied   []string          `json:"applied"`
+	Hashes    map[string]string `json:"hashes"`
 }
 
 type seoStatePayload struct {
@@ -365,13 +380,14 @@ func (c *Client) Capabilities(ctx context.Context) (Capabilities, error) {
 	}
 
 	return Capabilities{
-		Version:    manifest.Version,
-		SEOPlugin:  manifest.SEOPlugin,
-		WPVersion:  manifest.WPVersion,
-		Site:       manifest.Site,
-		Names:      manifest.Capabilities,
-		PostTypes:  manifest.PostTypes,
-		Taxonomies: manifest.Taxonomies,
+		Version:        manifest.Version,
+		SEOPlugin:      manifest.SEOPlugin,
+		WPVersion:      manifest.WPVersion,
+		Site:           manifest.Site,
+		Names:          manifest.Capabilities,
+		PostTypes:      manifest.PostTypes,
+		Taxonomies:     manifest.Taxonomies,
+		UnfilteredHTML: manifest.UnfilteredHTML,
 	}, nil
 }
 
@@ -447,18 +463,37 @@ func (c *Client) contentPost(ctx context.Context, itemType ItemType, id int64) e
 	}
 }
 
-func (c *Client) SetSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta) (SEOResult, error) {
+func (c *Client) SetSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta, expected map[string]string) (SEOResult, error) {
 	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return SEOResult{}, err
 	}
-	if err := c.requirePlugin(ctx); err != nil {
+	if err := c.requireCapability(ctx, CapabilityGuardedWrite); err != nil {
 		return SEOResult{}, err
 	}
 	if meta == (SEOMeta{}) {
 		return SEOResult{}, errors.New(errors.Invalid, "the SEO meta update carries no fields")
 	}
 
-	body, err := encodeJSON(meta)
+	written := make(map[string]string, len(seoFields))
+	for _, name := range seoFields {
+		if value, _ := meta.field(name); value != "" {
+			written[name] = value
+		}
+	}
+	return c.putSEO(ctx, id, written, expected)
+}
+
+var seoFields = []string{fieldSEOTitle, fieldSEODescription, fieldSEOCanonical, fieldSEOOGTitle, fieldSEOOGDescription}
+
+func (c *Client) putSEO(ctx context.Context, id int64, written, expected map[string]string) (SEOResult, error) {
+	attributes := make(map[string]any, len(written)+1)
+	for name, value := range written {
+		attributes[name] = value
+	}
+	if len(expected) > 0 {
+		attributes["expected"] = expected
+	}
+	body, err := encodeJSON(attributes)
 	if err != nil {
 		return SEOResult{}, err
 	}
@@ -478,7 +513,7 @@ func (c *Client) SetSEOMeta(ctx context.Context, itemType ItemType, id int64, me
 	if err := decodeJSON(raw, &payload); err != nil {
 		return SEOResult{}, err
 	}
-	return SEOResult{Applied: payload.Applied, SEOPlugin: payload.SEOPlugin}, nil
+	return SEOResult{Applied: payload.Applied, SEOPlugin: payload.SEOPlugin, Hashes: payload.Hashes}, nil
 }
 
 func (c *Client) GetSEOMeta(ctx context.Context, itemType ItemType, id int64) (SEOMeta, error) {
@@ -505,11 +540,12 @@ func (c *Client) GetSEOMeta(ctx context.Context, itemType ItemType, id int64) (S
 	return SEOMeta(payload), nil
 }
 
-func (c *Client) ReplaceSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta, fields []string) (SEOResult, error) {
+func (c *Client) ReplaceSEOMeta(ctx context.Context, itemType ItemType, id int64, meta SEOMeta, fields []string,
+	expected map[string]string) (SEOResult, error) {
 	if err := c.contentPost(ctx, itemType, id); err != nil {
 		return SEOResult{}, err
 	}
-	if err := c.requirePlugin(ctx); err != nil {
+	if err := c.requireCapability(ctx, CapabilityGuardedWrite); err != nil {
 		return SEOResult{}, err
 	}
 
@@ -525,28 +561,7 @@ func (c *Client) ReplaceSEOMeta(ctx context.Context, itemType ItemType, id int64
 	if len(written) == 0 {
 		return SEOResult{}, errors.New(errors.Invalid, "the SEO meta replacement names no field")
 	}
-
-	body, err := encodeJSON(written)
-	if err != nil {
-		return SEOResult{}, err
-	}
-
-	_, raw, err := c.do(ctx, request{
-		method:      http.MethodPut,
-		namespace:   pluginNamespace,
-		path:        resourcePath("/seo-meta", id),
-		body:        body,
-		contentType: contentTypeJSON,
-	})
-	if err != nil {
-		return SEOResult{}, err
-	}
-
-	var payload seoResultPayload
-	if err := decodeJSON(raw, &payload); err != nil {
-		return SEOResult{}, err
-	}
-	return SEOResult{Applied: payload.Applied, SEOPlugin: payload.SEOPlugin}, nil
+	return c.putSEO(ctx, id, written, expected)
 }
 
 func (c *Client) GetRaw(ctx context.Context, itemType ItemType, id int64) (RawContent, error) {
@@ -582,15 +597,16 @@ func (c *Client) GetRaw(ctx context.Context, itemType ItemType, id int64) (RawCo
 		Type:        ItemType(payload.Type),
 		Content:     payload.Content,
 		ContentHash: payload.ContentHash,
+		SaveStable:  payload.SaveStable,
 	}, nil
 }
 
-func (c *Client) PutRaw(ctx context.Context, itemType ItemType, id int64, content, expectedHash string) (string, error) {
+func (c *Client) PutRaw(ctx context.Context, itemType ItemType, id int64, content, expectedHash string) (RawWrite, error) {
 	if err := c.contentPost(ctx, itemType, id); err != nil {
-		return "", err
+		return RawWrite{}, err
 	}
-	if err := c.requirePlugin(ctx); err != nil {
-		return "", err
+	if err := c.requireCapability(ctx, CapabilityGuardedWrite); err != nil {
+		return RawWrite{}, err
 	}
 
 	attributes := map[string]any{"content": content}
@@ -600,7 +616,7 @@ func (c *Client) PutRaw(ctx context.Context, itemType ItemType, id int64, conten
 
 	body, err := encodeJSON(attributes)
 	if err != nil {
-		return "", err
+		return RawWrite{}, err
 	}
 
 	_, raw, err := c.do(ctx, request{
@@ -611,16 +627,21 @@ func (c *Client) PutRaw(ctx context.Context, itemType ItemType, id int64, conten
 		contentType: contentTypeJSON,
 	})
 	if err != nil {
-		return "", err
+		return RawWrite{}, err
 	}
 
 	var payload struct {
+		Content     string `json:"content"`
 		ContentHash string `json:"contentHash"`
 	}
 	if err := decodeJSON(raw, &payload); err != nil {
-		return "", err
+		return RawWrite{}, err
 	}
-	return payload.ContentHash, nil
+	if payload.ContentHash != ContentHash(payload.Content) {
+		return RawWrite{}, errors.New(errors.External, "the site answered a stored content whose hash it did not report").
+			WithDetail("id", id)
+	}
+	return RawWrite{Content: payload.Content, Hash: payload.ContentHash}, nil
 }
 
 func rawPath(id int64) string {

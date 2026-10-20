@@ -321,9 +321,9 @@ tasks:
   plugin:test:
     summary: Runs the companion plugin's PHP tests on PHP 7.4, the plugin's floor
     cmds:
-      - cmd: docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T phplint -c 'php /plugin/tests/normalize.php'
+      - cmd: docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T phplint -c 'php /plugin/tests/normalize.php && php /plugin/tests/meta_deny.php'
         platforms: [windows]
-      - cmd: php wp-plugin/tests/normalize.php
+      - cmd: php wp-plugin/tests/normalize.php && php wp-plugin/tests/meta_deny.php
         platforms: [linux, darwin]
 
   plugin:zip:

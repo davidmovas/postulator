@@ -421,7 +421,7 @@ func assertPluginCallsAreRefusedAsInvalid(t *testing.T, core *app.Core, siteID s
 			return callErr
 		},
 		"seo meta": func() error {
-			_, callErr := client.SetSEOMeta(t.Context(), wp.TypePage, wpID, wp.SEOMeta{Title: "Our Menu"})
+			_, callErr := client.SetSEOMeta(t.Context(), wp.TypePage, wpID, wp.SEOMeta{Title: "Our Menu"}, nil)
 			return callErr
 		},
 		"raw read": func() error { _, callErr := client.GetRaw(t.Context(), wp.TypePage, wpID); return callErr },

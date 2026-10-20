@@ -73,9 +73,16 @@ function register_routes(): void {
 		NAMESPACE_PATH,
 		'/meta/(?P<id>\d+)',
 		array(
-			'methods'             => \WP_REST_Server::READABLE,
-			'callback'            => __NAMESPACE__ . '\\meta_get',
-			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => __NAMESPACE__ . '\\meta_get',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
+			array(
+				'methods'             => \WP_REST_Server::EDITABLE,
+				'callback'            => __NAMESPACE__ . '\\meta_put',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
 		)
 	);
 
@@ -113,13 +120,14 @@ function register_routes(): void {
 function manifest(): \WP_REST_Response {
 	return new \WP_REST_Response(
 		array(
-			'version'      => VERSION,
-			'capabilities' => CAPABILITIES,
-			'postTypes'    => content_post_types(),
-			'taxonomies'   => content_taxonomies(),
-			'seoPlugin'    => detect_plugin(),
-			'wpVersion'    => (string) get_bloginfo( 'version' ),
-			'site'         => (string) home_url(),
+			'version'        => VERSION,
+			'capabilities'   => CAPABILITIES,
+			'postTypes'      => content_post_types(),
+			'taxonomies'     => content_taxonomies(),
+			'seoPlugin'      => detect_plugin(),
+			'wpVersion'      => (string) get_bloginfo( 'version' ),
+			'site'           => (string) home_url(),
+			'unfilteredHtml' => current_user_can( 'unfiltered_html' ),
 		),
 		200
 	);
@@ -292,9 +300,30 @@ function seo_meta_update( \WP_REST_Request $request ) {
 		$fields[ $field ] = $body[ $field ];
 	}
 
+	$expected = array();
+	if ( array_key_exists( 'expected', $body ) ) {
+		if ( ! is_array( $body['expected'] ) ) {
+			return invalid( 'invalid_param', 'expected must be an object of hashes' );
+		}
+		$expected = $body['expected'];
+	}
+	$moved = seo_moved( (int) $post->ID, $fields, $expected );
+	if ( ! empty( $moved ) ) {
+		return new \WP_REST_Response(
+			array(
+				'code'    => 'hash_mismatch',
+				'message' => 'an SEO field changed since it was read',
+				'moved'   => (object) $moved,
+			),
+			409
+		);
+	}
+
+	$written = write_post_seo( (int) $post->ID, $fields );
 	return new \WP_REST_Response(
 		array(
-			'applied'   => write_post_seo( (int) $post->ID, $fields ),
+			'applied'   => $written['applied'],
+			'hashes'    => (object) $written['hashes'],
 			'seoPlugin' => detect_plugin(),
 		),
 		200
@@ -314,9 +343,16 @@ function raw_get( \WP_REST_Request $request ) {
 			'type'        => (string) $post->post_type,
 			'content'     => $content,
 			'contentHash' => content_hash( $content ),
+			'saveStable'  => save_stable( $content ),
 		),
 		200
 	);
+}
+
+function save_stable( string $content ): bool {
+	$filtered = apply_filters( 'pre_post_content', wp_slash( $content ) );
+	$filtered = apply_filters( 'content_save_pre', $filtered );
+	return is_string( $filtered ) && wp_unslash( $filtered ) === $content;
 }
 
 function rendered_get( \WP_REST_Request $request ) {
@@ -357,19 +393,12 @@ function meta_get( \WP_REST_Request $request ) {
 
 	$denied = array();
 	foreach ( $keys as $key ) {
-		if ( is_protected_meta( $key, 'post' ) ) {
+		if ( is_protected_meta( $key, 'post' ) || meta_key_denied( $key ) ) {
 			$denied[] = $key;
 		}
 	}
 	if ( ! empty( $denied ) ) {
-		return new \WP_Error(
-			'meta_key_denied',
-			'a protected meta key is never read: ' . implode( ', ', $denied ),
-			array(
-				'status' => 400,
-				'keys'   => $denied,
-			)
-		);
+		return denied_meta( $denied, 'read' );
 	}
 
 	$values = array();
@@ -380,6 +409,87 @@ function meta_get( \WP_REST_Request $request ) {
 		array(
 			'id'   => (int) $post->ID,
 			'meta' => (object) $values,
+		),
+		200
+	);
+}
+
+function meta_put( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$body = $request->get_json_params();
+	if ( ! is_array( $body ) || ! isset( $body['meta'], $body['expected'] ) || ! is_array( $body['meta'] ) || ! is_array( $body['expected'] ) || empty( $body['meta'] ) ) {
+		return invalid( 'invalid_body', 'meta and expected are required objects' );
+	}
+	$values   = array();
+	$expected = $body['expected'];
+	foreach ( $body['meta'] as $key => $value ) {
+		$values[ (string) $key ] = $value;
+	}
+	if ( count( $values ) > MAX_META_KEYS ) {
+		return invalid( 'too_many_keys', 'meta names more than ' . MAX_META_KEYS . ' meta keys' );
+	}
+
+	$post_id = (int) $post->ID;
+	$denied  = array();
+	foreach ( $values as $key => $value ) {
+		if ( ! array_key_exists( $key, $expected ) ) {
+			return invalid( 'missing_expected', 'every key written names the hash it was read with: ' . $key );
+		}
+		$text = null === $value || is_string( $value );
+		if ( ! $text || meta_key_denied( $key ) || is_protected_meta( $key, 'post' ) || ! current_user_can( 'edit_post_meta', $post_id, $key ) ) {
+			$denied[] = $key;
+		}
+	}
+	if ( ! empty( $denied ) ) {
+		return denied_meta( $denied, 'written' );
+	}
+
+	$moved = array();
+	foreach ( array_keys( $values ) as $key ) {
+		$state = meta_state( $post_id, $key );
+		if ( ! $state['scalar'] ) {
+			$denied[] = $key;
+			continue;
+		}
+		if ( meta_moved( $expected[ $key ], $state['hash'] ) ) {
+			$moved[ $key ] = $state['hash'];
+		}
+	}
+	if ( ! empty( $denied ) ) {
+		return denied_meta( $denied, 'written over a value that is not one plain text' );
+	}
+	if ( ! empty( $moved ) ) {
+		return new \WP_REST_Response(
+			array(
+				'code'    => 'hash_mismatch',
+				'message' => 'a meta value changed since it was read',
+				'moved'   => (object) $moved,
+			),
+			409
+		);
+	}
+
+	$stored = array();
+	foreach ( $values as $key => $value ) {
+		if ( null === $value ) {
+			delete_post_meta( $post_id, $key );
+		} else {
+			update_post_meta( $post_id, $key, wp_slash( $value ) );
+		}
+		$state          = meta_state( $post_id, $key );
+		$stored[ $key ] = array(
+			'value' => $state['value'],
+			'hash'  => $state['hash'],
+		);
+	}
+	return new \WP_REST_Response(
+		array(
+			'id'   => $post_id,
+			'meta' => (object) $stored,
 		),
 		200
 	);
@@ -470,7 +580,13 @@ function raw_update( \WP_REST_Request $request ) {
 	}
 
 	$stored = (string) get_post_field( 'post_content', (int) $post->ID, 'raw' );
-	return new \WP_REST_Response( array( 'contentHash' => content_hash( $stored ) ), 200 );
+	return new \WP_REST_Response(
+		array(
+			'content'     => $stored,
+			'contentHash' => content_hash( $stored ),
+		),
+		200
+	);
 }
 
 function preview_create( \WP_REST_Request $request ) {

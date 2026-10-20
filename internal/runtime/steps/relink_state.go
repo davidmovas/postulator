@@ -88,9 +88,9 @@ type landing struct {
 }
 
 func landRelinkedBody(ctx context.Context, client *wp.Client, page pagemap.Page, after, beforeHash string) (landing, error) {
-	hash, err := client.PutRaw(ctx, onSiteType(page), *page.WPID, after, beforeHash)
+	written, err := client.PutRaw(ctx, onSiteType(page), *page.WPID, after, beforeHash)
 	if err == nil {
-		return landing{hash: hash, written: true}, nil
+		return landing{hash: written.Hash, written: true}, nil
 	}
 	if !errors.IsCode(err, errors.Conflict) {
 		return landing{}, err

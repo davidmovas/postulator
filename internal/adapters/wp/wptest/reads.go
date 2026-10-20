@@ -112,7 +112,7 @@ func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	var denied []string
 	for _, key := range keys {
-		if strings.HasPrefix(key, "_") {
+		if metaKeyRefused(key) {
 			denied = append(denied, key)
 		}
 	}

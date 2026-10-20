@@ -240,7 +240,7 @@ func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (has
 	written, err := work.client.PutRaw(ctx, onSiteType(work.page), work.published.WPID, work.published.PreviousContent, raw.ContentHash)
 	switch {
 	case err == nil:
-		return written, "", true
+		return written.Hash, "", true
 	case errors.IsCode(err, errors.Conflict):
 		return "", writtenUnderUs(raw.ContentHash), false
 	default:
@@ -302,7 +302,7 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 	}
 
 	_, err := work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
-		work.published.SEOApplied)
+		work.published.SEOApplied, nil)
 	switch {
 	case err == nil:
 		return "", true
@@ -360,7 +360,7 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 			}
 			return putErr.Error(), false
 		}
-		hash = written
+		hash = written.Hash
 	}
 
 	if known {

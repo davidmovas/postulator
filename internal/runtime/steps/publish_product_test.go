@@ -181,7 +181,10 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 func TestPublishWritesTheDescriptionAfterTheStoreResavesTheProduct(t *testing.T) {
 	t.Parallel()
 
-	const lines = `<p>Pull a shot.<br/>Steam the milk.</p>`
+	const (
+		lines  = `<p>Pull a shot.<br/>Steam the milk.</p>`
+		stored = `<p>Pull a shot.<br />Steam the milk.</p>`
+	)
 	item := storeProduct()
 	item.Content = "<p>old<br>description</p>"
 	h := newProductHarness(t, item, wptest.WithFilteredHTML())
@@ -189,13 +192,13 @@ func TestPublishWritesTheDescriptionAfterTheStoreResavesTheProduct(t *testing.T)
 	sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte(`<h1>Espresso Machine</h1>` + lines)}
 	published := runPublish(t, h.deps, sc)
 
-	stored, _ := h.server.Lookup(h.held.ID)
-	if stored.Content != lines || published.ContentHash != wp.ContentHash(lines) {
-		t.Errorf("description = %q under %q, want %q byte for byte after the store saved the short description",
-			stored.Content, published.ContentHash, lines)
+	held, _ := h.server.Lookup(h.held.ID)
+	if held.Content != stored || published.ContentHash != wp.ContentHash(stored) {
+		t.Errorf("description = %q under %q, want %q as the raw write stored it, after the store saved the short description",
+			held.Content, published.ContentHash, stored)
 	}
-	if stored.Excerpt != productShort {
-		t.Errorf("short description = %q", stored.Excerpt)
+	if held.Excerpt != productShort {
+		t.Errorf("short description = %q", held.Excerpt)
 	}
 	if published.PreviousContent != "<p>old<br>description</p>" {
 		t.Errorf("previous content = %q, want the description the client had", published.PreviousContent)

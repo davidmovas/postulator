@@ -315,7 +315,8 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 func writeRawBody(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, itemType wp.ItemType,
 	state *publishState) (run.Result, error) {
 	plan := state.Plan
-	hash, err := client.PutRaw(ctx, itemType, plan.WPID, plan.Final, plan.SiteHash)
+	written, err := client.PutRaw(ctx, itemType, plan.WPID, plan.Final, plan.SiteHash)
+	hash := written.Hash
 	if err != nil {
 		if !errors.IsCode(err, errors.Conflict) {
 			return state.failed(err)

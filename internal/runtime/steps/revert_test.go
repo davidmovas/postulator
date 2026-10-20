@@ -206,7 +206,7 @@ func (s *revertStand) updatedOverMeta(t *testing.T, pageID, body string, previou
 		applied = []string{"title", "description"}
 		if _, err := client.SetSEOMeta(t.Context(), itemType, wpID, wp.SEOMeta{
 			Title: "written by the run", Description: "written by the run",
-		}); err != nil {
+		}, nil); err != nil {
 			t.Fatalf("write the run meta to %s: %v", pageID, err)
 		}
 	}

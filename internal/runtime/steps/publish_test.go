@@ -233,13 +233,6 @@ func TestPublishKeepsNoPreviousMetaItCouldNotRead(t *testing.T) {
 		seed    bool
 	}{
 		{name: "a page it created", seed: false},
-		{
-			name: "a plugin too old to answer",
-			seed: true,
-			options: []wptest.Option{wptest.WithCapabilities(
-				"bulk", "seo_meta", "content_hash", "raw", "preview",
-			)},
-		},
 		{name: "a site without the plugin", seed: true, options: []wptest.Option{wptest.WithoutPlugin()}},
 	}
 
