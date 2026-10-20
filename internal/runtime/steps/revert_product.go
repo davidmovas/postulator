@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application/edit"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -14,6 +15,8 @@ const (
 	ReasonRevertNoStore      = "the site answers no WooCommerce store, so the product cannot be put back"
 	ReasonRevertStoreRefused = "the WordPress user may not edit products, so the product cannot be put back"
 	ReasonRevertShortEdited  = "the short description was edited in the store since the run wrote it, " +
+		"so putting the old one back would lose that edit"
+	ReasonRevertVariationEdited = "a variation's description was edited in the store since the run wrote it, " +
 		"so putting the old one back would lose that edit"
 )
 
@@ -24,6 +27,10 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 		return storeReason(err), false
 	}
 	update, attributes, reason := productRestore(*work.published.PreviousProduct, held)
+	if reason != "" {
+		return reason, false
+	}
+	variations, reason := variationsToRestore(ctx, work, held.ID)
 	if reason != "" {
 		return reason, false
 	}
@@ -42,7 +49,13 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 			return storeReason(err), false
 		}
 	}
-	if hasFields(update) || attributes != nil {
+	for _, written := range variations {
+		id, _ := edit.VariationID(written.Key)
+		if _, err = work.client.UpdateVariation(ctx, held.ID, id, written.Before); err != nil {
+			return storeReason(err), false
+		}
+	}
+	if hasFields(update) || attributes != nil || len(variations) > 0 {
 		if raw, reason, ok = readRawBack(ctx, work); !ok {
 			return reason, false
 		}
@@ -52,7 +65,29 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 		return reason, false
 	}
 	return bodyRestored(ctx, deps, sc, result, work, hash,
-		"the description, the short description and the attributes the run replaced were written back")
+		"the description, the short description, the variations' descriptions and the attributes the run replaced were written back")
+}
+
+func variationsToRestore(ctx context.Context, work revertWork, productID int64) (restore []VariationWrite, reason string) {
+	out := make([]VariationWrite, 0, len(work.published.PreviousVariations))
+	for _, written := range work.published.PreviousVariations {
+		id, named := edit.VariationID(written.Key)
+		if !named {
+			continue
+		}
+		held, err := work.client.GetVariation(ctx, productID, id)
+		switch {
+		case errors.IsCode(err, errors.NotFound):
+			continue
+		case err != nil:
+			return nil, storeReason(err)
+		case held.Description != written.Written:
+			return nil, ReasonRevertVariationEdited
+		case held.Description != written.Before:
+			out = append(out, written)
+		}
+	}
+	return out, ""
 }
 
 func storeReason(err error) string {

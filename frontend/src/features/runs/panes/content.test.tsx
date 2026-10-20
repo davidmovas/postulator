@@ -61,6 +61,14 @@ describe("the fields pane", () => {
         expect(skipped.getByText("nothing on this site writes it yet")).toBeDefined();
     });
 
+    it("names a variation's description by its variation", () => {
+        render(<FieldsPane payload={{ values: [{ key: "variation_description:12", value: "<p>Ten milligrams.</p>" }], skipped: [] }} />);
+
+        const written = within(screen.getByRole("region", { name: said.written }));
+        expect(written.getByText(copy.pageTypes.variation("12"))).toBeDefined();
+        expect(written.getByText("Ten milligrams.")).toBeDefined();
+    });
+
     it("says so when the step asked for nothing", () => {
         render(<FieldsPane payload={{ values: [], skipped: [] }} />);
 

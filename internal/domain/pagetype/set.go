@@ -55,6 +55,9 @@ func (s Set) TypeOf(page pagemap.Page) Type {
 }
 
 func (s Set) Scope(typeID string, key field.Key) (field.Scope, bool) {
+	if key.Kind() != field.Meta && key.Instance() != "" {
+		key = key.Kind()
+	}
 	if scope, stored := s.scopes[scopeKey{typeID: typeID, key: key}]; stored {
 		return scope, true
 	}

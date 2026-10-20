@@ -38,6 +38,9 @@ func (s *Server) SetStorePages(pages StorePages) {
 
 func (s *Server) routeStore(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+wooNamespace+"/products/{id}/{tail...}", s.withCommerce(s.handleProductTail))
+	mux.HandleFunc("GET "+wooNamespace+"/products/{id}/variations/{variation}", s.withCommerce(s.handleVariationGet))
+	mux.HandleFunc("POST "+wooNamespace+"/products/{id}/variations/{variation}", s.withCommerce(s.handleVariationUpdate))
+	mux.HandleFunc("PUT "+wooNamespace+"/products/{id}/variations/{variation}", s.withCommerce(s.handleVariationUpdate))
 	mux.HandleFunc("GET "+wooNamespace+"/settings/products/woocommerce_shop_page_id", s.withCommerce(s.handleShopPageSetting))
 	mux.HandleFunc("GET "+wooNamespace+"/settings/advanced", s.withCommerce(s.handleAdvancedSettings))
 }
@@ -80,6 +83,72 @@ func (s *Server) handleProductTail(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("X-WP-Total", strconv.Itoa(total))
 	w.Header().Set("X-WP-TotalPages", strconv.Itoa(totalPages))
+	s.respond(w, http.StatusOK, payload)
+}
+
+func (s *Server) variationAt(r *http.Request) (variation, parent *Item, found bool) {
+	id, ok := pathID(r)
+	if !ok {
+		return nil, nil, false
+	}
+	variationID, err := strconv.ParseInt(r.PathValue("variation"), 10, 64)
+	if err != nil {
+		return nil, nil, false
+	}
+	parent, held := s.items[id]
+	if !held || parent.Type != TypeProduct {
+		return nil, nil, false
+	}
+	variation, held = s.items[variationID]
+	if !held || variation.Type != TypeProductVariation || variation.Parent != parent.ID || variation.Status == "trash" {
+		return nil, nil, false
+	}
+	return variation, parent, true
+}
+
+func (s *Server) handleVariationGet(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	variation, parent, found := s.variationAt(r)
+	if !found {
+		s.mu.Unlock()
+		s.fail(w, http.StatusNotFound, "woocommerce_rest_product_variation_invalid_id", "Invalid ID.")
+		return
+	}
+	payload := s.variationPayload(variation, parent, r.URL.Query().Get("context") == "edit")
+	s.mu.Unlock()
+
+	s.respond(w, http.StatusOK, narrowFields(payload, r.URL.Query().Get("_fields")))
+}
+
+func (s *Server) handleVariationUpdate(w http.ResponseWriter, r *http.Request) {
+	body, ok := s.decodeBody(w, r)
+	if !ok {
+		return
+	}
+
+	s.mu.Lock()
+	if s.noProductEdit {
+		s.mu.Unlock()
+		s.fail(w, http.StatusForbidden, "woocommerce_rest_cannot_edit", "Sorry, you are not allowed to edit this resource.")
+		return
+	}
+	variation, parent, found := s.variationAt(r)
+	if !found {
+		s.mu.Unlock()
+		s.fail(w, http.StatusNotFound, "woocommerce_rest_product_variation_invalid_id", "Invalid ID.")
+		return
+	}
+	if value, present := body["description"].(string); present {
+		variation.Content = kses(value)
+	}
+	variation.Modified = s.tick()
+	if s.filteredHTML {
+		parent.Content = kses(parent.Content)
+	}
+	parent.Modified = s.tick()
+	payload := s.variationPayload(variation, parent, true)
+	s.mu.Unlock()
+
 	s.respond(w, http.StatusOK, payload)
 }
 

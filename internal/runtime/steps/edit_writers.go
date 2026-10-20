@@ -108,6 +108,22 @@ func (w editWriters) WriteStore(ctx context.Context, target edit.Target, values 
 	return storeValues(product), nil
 }
 
+func (w editWriters) ReadVariation(ctx context.Context, target edit.Target, id int64) (string, error) {
+	variation, err := w.client.GetVariation(ctx, target.ID, id)
+	if err != nil {
+		return "", err
+	}
+	return variation.Description, nil
+}
+
+func (w editWriters) WriteVariation(ctx context.Context, target edit.Target, id int64, description string) (string, error) {
+	variation, err := w.client.UpdateVariation(ctx, target.ID, id, description)
+	if err != nil {
+		return "", err
+	}
+	return variation.Description, nil
+}
+
 func storeValues(product wp.Product) map[field.Key]string {
 	first := ""
 	if len(product.Images) > 0 {

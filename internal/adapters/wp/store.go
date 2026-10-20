@@ -255,6 +255,50 @@ func (c *Client) ListVariations(ctx context.Context, productID int64, page, perP
 	return newPage(resp, pageNumber(page), variations), nil
 }
 
+func variationPath(productID, variationID int64) string {
+	return resourcePath("/products", productID) + resourcePath("/variations", variationID)
+}
+
+func (c *Client) GetVariation(ctx context.Context, productID, variationID int64) (Variation, error) {
+	_, body, err := c.do(ctx, request{
+		method:    http.MethodGet,
+		namespace: wooNamespace,
+		path:      variationPath(productID, variationID),
+		query:     url.Values{"context": {"edit"}},
+	})
+	if err != nil {
+		return Variation{}, err
+	}
+	var payload variationPayload
+	if err := decodeJSON(body, &payload); err != nil {
+		return Variation{}, err
+	}
+	return payload.variation(), nil
+}
+
+func (c *Client) UpdateVariation(ctx context.Context, productID, variationID int64, description string) (Variation, error) {
+	body, err := encodeJSON(map[string]any{"description": description})
+	if err != nil {
+		return Variation{}, err
+	}
+	_, raw, err := c.do(ctx, request{
+		method:      http.MethodPost,
+		namespace:   wooNamespace,
+		path:        variationPath(productID, variationID),
+		query:       url.Values{"context": {"edit"}},
+		body:        body,
+		contentType: contentTypeJSON,
+	})
+	if err != nil {
+		return Variation{}, err
+	}
+	var payload variationPayload
+	if err := decodeJSON(raw, &payload); err != nil {
+		return Variation{}, err
+	}
+	return payload.variation(), nil
+}
+
 func (c *Client) StoreSettings(ctx context.Context) (StorePages, error) {
 	_, body, err := c.do(ctx, request{
 		method:    http.MethodGet,

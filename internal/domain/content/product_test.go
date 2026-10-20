@@ -125,8 +125,8 @@ func TestTheShortDescriptionIsWrittenAsEscapedParagraphs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := content.ShortDescriptionHTML(tc.plain); got != tc.want {
-				t.Errorf("ShortDescriptionHTML(%q) = %q, want %q", tc.plain, got, tc.want)
+			if got := content.PlainParagraphs(tc.plain); got != tc.want {
+				t.Errorf("PlainParagraphs(%q) = %q, want %q", tc.plain, got, tc.want)
 			}
 		})
 	}

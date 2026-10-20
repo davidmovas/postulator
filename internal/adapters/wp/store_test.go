@@ -164,6 +164,58 @@ func TestListVariationsCarriesSKUPriceStockAndAttributes(t *testing.T) {
 	}
 }
 
+func TestAVariationIsReadAndItsDescriptionWrittenAlone(t *testing.T) {
+	t.Parallel()
+
+	store := seedStore(t)
+	client := newClient(t, store.server)
+	five := store.variations[0]
+
+	held, err := client.GetVariation(t.Context(), store.variable.ID, five.ID)
+	if err != nil {
+		t.Fatalf("GetVariation: %v", err)
+	}
+	if held.ID != five.ID || held.ParentID != store.variable.ID || held.Description != "<p>Five.</p>" || held.SKU != "BPC157-5" {
+		t.Fatalf("variation = %+v", held)
+	}
+	if recorded, _ := store.server.LastRequest(); recorded.Query.Get("context") != "edit" {
+		t.Errorf("context = %q, want edit, or the store answers its rendering", recorded.Query.Get("context"))
+	}
+
+	written, err := client.UpdateVariation(t.Context(), store.variable.ID, five.ID, "<p>Five milligrams.</p>")
+	if err != nil {
+		t.Fatalf("UpdateVariation: %v", err)
+	}
+	if written.Description != "<p>Five milligrams.</p>" || written.SKU != "BPC157-5" {
+		t.Errorf("written = %+v", written)
+	}
+	recorded, _ := store.server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	if _, sent := body["description"]; !sent || len(body) != 1 {
+		t.Errorf("the update sent %v, want the description alone: a variation's attributes, price and stock are the store's", body)
+	}
+	stored, _ := store.server.Lookup(five.ID)
+	if stored.RegularPrice != "19.90" || stored.SKU != "BPC157-5" || len(stored.Choices) != 1 || stored.Choices[0].Option != "5 mg" {
+		t.Errorf("the store's facts of the variation moved: %+v", stored)
+	}
+
+	for name, ids := range map[string][2]int64{
+		"an unknown variation":              {store.variable.ID, five.ID + 1000},
+		"a variation of another product":    {store.simple.ID, five.ID},
+		"a product that is not a variation": {store.variable.ID, store.simple.ID},
+	} {
+		if _, err := client.GetVariation(t.Context(), ids[0], ids[1]); !errors.IsCode(err, errors.NotFound) {
+			t.Errorf("%s read = %v, want NotFound", name, err)
+		}
+		if _, err := client.UpdateVariation(t.Context(), ids[0], ids[1], "<p>x</p>"); !errors.IsCode(err, errors.NotFound) {
+			t.Errorf("%s written = %v, want NotFound", name, err)
+		}
+	}
+}
+
 func TestAVariationManagedByItsParentDecodes(t *testing.T) {
 	t.Parallel()
 

@@ -91,10 +91,15 @@ export function metaKeyOf(field: string): string | null {
     return field.startsWith(metaPrefix) ? field.slice(metaPrefix.length) : null;
 }
 
+const variationPrefix = "variation_description:";
+
 export function fieldLabel(field: string, label = ""): string {
     const meta = metaKeyOf(field);
     if (meta !== null) {
         return label.trim() === "" ? meta : label;
+    }
+    if (field.startsWith(variationPrefix)) {
+        return copy.pageTypes.variation(field.slice(variationPrefix.length));
     }
     return isOneOf(fieldKeys, field) ? copy.pageTypes.fields[field] : spaced(field);
 }

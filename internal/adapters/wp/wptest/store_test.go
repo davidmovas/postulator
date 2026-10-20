@@ -107,6 +107,62 @@ func TestVariationsAreListedUnderTheirProduct(t *testing.T) {
 	}
 }
 
+func TestAVariationIsReadAndWrittenUnderItsProduct(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithFilteredHTML())
+	product, variations := seedVariable(t, server)
+	server.Restore(wptest.Item{ID: product.ID, Type: wptest.TypeProduct, Title: "BPC-157", Slug: "bpc-157", ProductType: "variable",
+		Status: "publish", Content: "<p>One<br>two</p>", RegularPrice: "19.90", SKU: "BPC157", ManageStock: true})
+	path := "/wp-json/wc/v3/products/" + itoa(product.ID) + "/variations/" + itoa(variations[0].ID)
+
+	response, payload := call(t, server, http.MethodGet, path+"?context=edit", nil, true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("read = %d: %s", response.StatusCode, payload)
+	}
+	var held struct {
+		SKU      string `json:"sku"`
+		ID       int64  `json:"id"`
+		ParentID int64  `json:"parent_id"`
+	}
+	decode(t, payload, &held)
+	if held.ID != variations[0].ID || held.ParentID != product.ID || held.SKU != "BPC157-5" {
+		t.Fatalf("variation = %+v", held)
+	}
+
+	response, payload = call(t, server, http.MethodPost, path, []byte(`{"description":"<p>Five<br>milligrams.</p>"}`), true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("write = %d: %s", response.StatusCode, payload)
+	}
+	var written struct {
+		Description string `json:"description"`
+	}
+	decode(t, payload, &written)
+	if written.Description != "<p>Five<br />milligrams.</p>" {
+		t.Errorf("description = %q, want it filtered as the user's save filters it", written.Description)
+	}
+	parent, _ := server.Lookup(product.ID)
+	if parent.Content != "<p>One<br />two</p>" {
+		t.Errorf("the parent holds %q: a variation's save syncs and saves its parent, which filters its description again", parent.Content)
+	}
+	stored, _ := server.Lookup(variations[0].ID)
+	if stored.SKU != "BPC157-5" || stored.RegularPrice != "19.90" || len(stored.Choices) != 1 {
+		t.Errorf("the variation's store facts moved: %+v", stored)
+	}
+
+	for name, at := range map[string]string{
+		"an unknown variation":           "/wp-json/wc/v3/products/" + itoa(product.ID) + "/variations/9999",
+		"a variation of another product": "/wp-json/wc/v3/products/9999/variations/" + itoa(variations[0].ID),
+	} {
+		if response, _ = call(t, server, http.MethodGet, at, nil, true); response.StatusCode != http.StatusNotFound {
+			t.Errorf("%s read = %d, want 404", name, response.StatusCode)
+		}
+		if response, _ = call(t, server, http.MethodPost, at, []byte(`{"description":"x"}`), true); response.StatusCode != http.StatusNotFound {
+			t.Errorf("%s written = %d, want 404", name, response.StatusCode)
+		}
+	}
+}
+
 func TestThePostRoutesRefuseAVariation(t *testing.T) {
 	t.Parallel()
 

@@ -2,7 +2,7 @@ import { plainText } from "../../../domain/text.js";
 import type { Finding } from "./decode.js";
 import { boolAt, findingsAt, listAt, numberAt, record, stringAt, stringsAt } from "./decode.js";
 
-const htmlFields: ReadonlySet<string> = new Set(["product_short_description"]);
+const htmlFields: ReadonlySet<string> = new Set(["product_short_description", "variation_description"]);
 
 export interface JudgeView {
     score: number;
@@ -203,7 +203,7 @@ export function fieldsView(held: unknown): FieldsView | null {
         const key = stringAt(entry, "key");
         if (key !== "") {
             const value = stringAt(entry, "value");
-            values.push({ key, value: htmlFields.has(key) ? plainText(value) : value });
+            values.push({ key, value: htmlFields.has(key.split(":")[0] ?? key) ? plainText(value) : value });
         }
     }
     const skipped: FieldSkipView[] = [];

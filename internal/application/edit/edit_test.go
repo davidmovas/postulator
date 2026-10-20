@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"maps"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/edit"
@@ -14,24 +15,41 @@ import (
 )
 
 type site struct {
-	core     map[field.Key]string
-	store    map[field.Key]string
-	body     string
-	seo      map[string]string
-	meta     map[string]string
-	calls    []string
-	outdated bool
-	noPlugin bool
+	core       map[field.Key]string
+	store      map[field.Key]string
+	variations map[int64]string
+	body       string
+	seo        map[string]string
+	meta       map[string]string
+	calls      []string
+	outdated   bool
+	noPlugin   bool
 }
 
 func newSite() *site {
 	return &site{
-		core:  map[field.Key]string{field.Title: "Old title", field.Excerpt: "", field.FeaturedImage: ""},
-		store: map[field.Key]string{field.ProductShortDescription: "Old short"},
-		body:  "<p>Old body</p>",
-		seo:   map[string]string{"title": "Old SEO"},
-		meta:  map[string]string{"subtitle": "Old"},
+		core:       map[field.Key]string{field.Title: "Old title", field.Excerpt: "", field.FeaturedImage: ""},
+		store:      map[field.Key]string{field.ProductShortDescription: "Old short"},
+		variations: map[int64]string{5: "<p>Old five</p>", 6: "<p>Old six</p>"},
+		body:       "<p>Old body</p>",
+		seo:        map[string]string{"title": "Old SEO"},
+		meta:       map[string]string{"subtitle": "Old"},
 	}
+}
+
+func (s *site) ReadVariation(_ context.Context, _ edit.Target, id int64) (string, error) {
+	s.calls = append(s.calls, "read variation "+strconv.FormatInt(id, 10))
+	held, found := s.variations[id]
+	if !found {
+		return "", errors.New(errors.NotFound, "no such variation")
+	}
+	return held, nil
+}
+
+func (s *site) WriteVariation(_ context.Context, _ edit.Target, id int64, description string) (string, error) {
+	s.calls = append(s.calls, "write variation "+strconv.FormatInt(id, 10))
+	s.variations[id] = description
+	return description, nil
 }
 
 func (s *site) ReadCore(context.Context, edit.Target) (map[field.Key]string, error) {
@@ -275,6 +293,91 @@ func TestAMovedValueIsNotWrittenOver(t *testing.T) {
 			}
 			if !found {
 				t.Errorf("results = %+v, want %s moved", results, tc.moved)
+			}
+		})
+	}
+}
+
+func TestAVariationsDescriptionIsWrittenUnderTheValueRead(t *testing.T) {
+	t.Parallel()
+
+	five, six := field.Instance(field.VariationDescription, "5"), field.Instance(field.VariationDescription, "6")
+
+	s := newSite()
+	results, err := serviceOver(s).Write(t.Context(), product, []edit.Write{
+		{Key: field.SEOTitle, Value: new("New SEO"), Expected: hashOf("Old SEO")},
+		{Key: six, Value: new("<p>New six</p>"), Expected: hashOf("<p>Old six</p>")},
+		{Key: five, Value: new("<p>New five</p>"), Expected: hashOf("<p>Old five</p>")},
+		{Key: field.ProductShortDescription, Value: new("New short"), Expected: hashOf("Old short")},
+	})
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	want := []string{"read store", "write store", "read variation 5", "read variation 6", "write variation 5", "write variation 6", "write seo"}
+	if !slices.Equal(s.calls, want) {
+		t.Errorf("calls = %v, want %v: the variations after the store's own fields, each read before any is written", s.calls, want)
+	}
+	for _, result := range results {
+		if result.Outcome != edit.OutcomeWritten || result.Hash == nil {
+			t.Errorf("%s: %+v, want written with its hash", result.Key, result)
+		}
+	}
+	if s.variations[5] != "<p>New five</p>" || s.variations[6] != "<p>New six</p>" {
+		t.Errorf("the variations hold %v", s.variations)
+	}
+
+	moved := newSite()
+	moved.variations[6] = "<p>His six</p>"
+	results, err = serviceOver(moved).Write(t.Context(), product, []edit.Write{
+		{Key: five, Value: new("<p>New five</p>"), Expected: hashOf("<p>Old five</p>")},
+		{Key: six, Value: new("<p>New six</p>"), Expected: hashOf("<p>Old six</p>")},
+	})
+	if err != nil {
+		t.Fatalf("Write over a moved variation: %v", err)
+	}
+	outcomes := map[field.Key]edit.Outcome{}
+	for _, result := range results {
+		outcomes[result.Key] = result.Outcome
+	}
+	if outcomes[six] != edit.OutcomeMoved || outcomes[five] == edit.OutcomeWritten || moved.variations[5] != "<p>Old five</p>" || moved.variations[6] != "<p>His six</p>" {
+		t.Errorf("outcomes %v over %v, want the moved one named and nothing written", outcomes, moved.variations)
+	}
+
+	already := newSite()
+	already.variations[5] = "<p>New five</p>"
+	results, err = serviceOver(already).Write(t.Context(), product, []edit.Write{
+		{Key: five, Value: new("<p>New five</p>"), Expected: hashOf("<p>Old five</p>")},
+	})
+	if err != nil || len(results) != 1 || results[0].Outcome != edit.OutcomeWritten || slices.Contains(already.calls, "write variation 5") {
+		t.Errorf("a variation already holding our value = %+v, %v with calls %v, want it taken as written and not sent again", results, err, already.calls)
+	}
+}
+
+func TestAVariationIsWrittenOnAProductOnly(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		target edit.Target
+		key    field.Key
+		reason string
+	}{
+		{name: "a page", target: page, key: field.Instance(field.VariationDescription, "5"), reason: edit.ReasonNoWriter},
+		{name: "no variation named", target: product, key: field.VariationDescription, reason: field.ReasonUnknown},
+		{name: "a variation that is no id", target: product, key: field.Instance(field.VariationDescription, "five"), reason: field.ReasonUnknown},
+		{name: "a variation's own facts", target: product, key: field.Instance(field.Variation, "5"), reason: field.ReasonDenied},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := newSite()
+			_, err := serviceOver(s).Write(t.Context(), tc.target, []edit.Write{{Key: tc.key, Value: new("<p>x</p>")}})
+			if reason := reasonOf(t, err); reason != tc.reason {
+				t.Errorf("reason %q, want %q", reason, tc.reason)
+			}
+			if len(s.calls) != 0 {
+				t.Errorf("a refused write reached the site: %v", s.calls)
 			}
 		})
 	}

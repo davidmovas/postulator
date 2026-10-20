@@ -1,4 +1,5 @@
 export const pageTypes = {
+    variation: (id: string) => `Variation ${id}'s description`,
     untyped: "No page type",
     presets: {
         hub: "Hub",

@@ -43,7 +43,7 @@ func ShortDescriptionRules(product template.Product) []string {
 	return rules
 }
 
-func ShortDescriptionHTML(plain string) string {
+func PlainParagraphs(plain string) string {
 	paragraphs := make([]string, 0)
 	for _, chunk := range blankLines.Split(strings.ReplaceAll(plain, "\r\n", "\n"), -1) {
 		text := strings.Join(strings.Fields(chunk), " ")

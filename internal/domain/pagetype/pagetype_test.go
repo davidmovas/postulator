@@ -344,4 +344,15 @@ func TestTheSetResolvesEveryPageToATypeAndAPolicy(t *testing.T) {
 	if len(withCustom.Custom("s1-entity")) != 0 {
 		t.Error("a type without custom fields lists some")
 	}
+
+	variations := pagetype.DefaultScope(pagetype.Product, field.VariationDescription, "s1-product")
+	variations.Enabled, variations.Instruction = true, "One sentence per variation."
+	withVariations := pagetype.NewSet(types, append(slices.Clone(scopes), variations))
+	scope, found := withVariations.Scope("s1-product", field.Instance(field.VariationDescription, "41"))
+	if !found || !scope.Enabled || scope.Instruction != "One sentence per variation." || scope.Key != field.VariationDescription {
+		t.Errorf("a variation's description reads the scope %+v (stored %t), want the one that names the field for every variation", scope, found)
+	}
+	if scope, found := withVariations.Scope("s1-product", field.Instance(field.Meta, "spec_sheet")); found || scope.Enabled {
+		t.Errorf("a meta key took a scope it does not have: %+v %t", scope, found)
+	}
 }

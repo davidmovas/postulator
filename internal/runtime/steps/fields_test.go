@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
@@ -175,6 +179,95 @@ func TestTheShortDescriptionIsAFieldOfItsOwn(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type variationTypes struct{}
+
+func (variationTypes) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	kind := pagetype.Type{ID: "type-product", SiteID: siteID, Name: "Product", Preset: pagetype.Product}
+	scope := pagetype.DefaultScope(pagetype.Product, field.VariationDescription, kind.ID)
+	scope.Enabled, scope.Instruction, scope.MaxLength = true, "Say what sets the variation apart.", 300
+	return pagetype.NewSet([]pagetype.Type{kind}, append(pagetype.DefaultScopes(pagetype.Product, kind.ID), scope)), nil
+}
+
+type callRecorder struct {
+	reply    string
+	prompts  []string
+	ceilings []int
+}
+
+func (r *callRecorder) Complete(_ context.Context, req port.Request) (port.Response, error) {
+	r.prompts = append(r.prompts, req.System+"\n"+req.Messages[len(req.Messages)-1].Text)
+	r.ceilings = append(r.ceilings, req.MaxTokens)
+	return port.Response{Text: r.reply, Usage: domainllm.Usage{Input: 1, Output: 2, Total: 3}}, nil
+}
+
+func (r *callRecorder) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	return nil, errors.New(errors.Internal, "the recorder does not stream")
+}
+
+func TestEveryVariationsDescriptionIsAskedInTheProductsOneCall(t *testing.T) {
+	t.Parallel()
+
+	at := time.Unix(1, 0).UTC()
+	earlier := "run-0"
+	ours := field.NewValue("page-child", field.Instance(field.VariationDescription, "12"), "<p>Ours.</p>", at)
+	ours.WrittenRunID = &earlier
+	deps, _ := imageDeps(t)
+	deps.Types = variationTypes{}
+	deps.Fields = &fieldLog{values: []field.Value{
+		field.NewValue("page-child", field.Instance(field.Variation, "9"), `{"attributes":[{"name":"Size","option":"5 mg"}]}`, at),
+		field.NewValue("page-child", field.Instance(field.VariationDescription, "9"), "", at),
+		field.NewValue("page-child", field.Instance(field.Variation, "12"), `{"attributes":[{"name":"Size","option":"10 mg"}]}`, at),
+		ours,
+		field.NewValue("page-child", field.Instance(field.Variation, "15"), `{"attributes":[{"name":"Size","option":"20 mg"}]}`, at),
+		field.NewValue("page-child", field.Instance(field.VariationDescription, "15"), "<p>His own words.</p>", at),
+	}}
+	recorder := &callRecorder{reply: `{"fields":[` +
+		`{"key":"variation_description:9","value":"Five milligrams & a dropper, for a first course."},` +
+		`{"key":"variation_description:12","value":"Ten milligrams, for a longer one."}]}`}
+	deps.LLM = recorder
+	sc := unitContext(t, nil)
+	wpID := int64(77)
+	sc.Page.WPType, sc.Page.WPID = pagemap.WPProduct, &wpID
+
+	result, err := steps.GenerateFields(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("GenerateFields: %v", err)
+	}
+	if len(recorder.prompts) != 1 {
+		t.Fatalf("the model was asked %d times, want one call for every variation of the product", len(recorder.prompts))
+	}
+	prompt := recorder.prompts[0]
+	for _, want := range []string{
+		"Variation description, Size: 5 mg (key variation_description:9)", "Variation description, Size: 10 mg (key variation_description:12)",
+		"Instruction: Say what sets the variation apart.", "Length: at most 300 characters",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("the prompt lacks %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "variation_description:15") {
+		t.Errorf("the variation whose description is the client's was asked for:\n%s", prompt)
+	}
+	if recorder.ceilings[0] <= 1024 {
+		t.Errorf("the call has %d tokens of room, want more than one field's for every variation it asks", recorder.ceilings[0])
+	}
+
+	fields := fieldsOf(t, result)
+	if got, _ := fields.Value(field.Instance(field.VariationDescription, "9")); got != "<p>Five milligrams &amp; a dropper, for a first course.</p>" {
+		t.Errorf("variation 9 = %q, want the plain answer as an escaped paragraph", got)
+	}
+	if got, _ := fields.Value(field.Instance(field.VariationDescription, "12")); got != "<p>Ten milligrams, for a longer one.</p>" {
+		t.Errorf("variation 12 = %q, want ours rewritten", got)
+	}
+	kept := false
+	for _, skip := range fields.Skipped {
+		kept = kept || skip.Key == "variation_description:15" && skip.Reason != ""
+	}
+	if !kept {
+		t.Errorf("skipped = %+v, want the client's variation description kept with its reason", fields.Skipped)
 	}
 }
 

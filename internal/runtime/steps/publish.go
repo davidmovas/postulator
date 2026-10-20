@@ -32,6 +32,7 @@ const (
 type PublishResult struct {
 	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
 	PreviousProduct     *ProductSnapshot   `json:"previousProduct,omitempty"`
+	PreviousVariations  []VariationWrite   `json:"previousVariations,omitempty"`
 	URL                 string             `json:"url"`
 	Status              string             `json:"status"`
 	ContentHash         string             `json:"contentHash"`
@@ -171,9 +172,14 @@ func (d Deps) planEdit(ctx context.Context, sc *run.StepContext, plan *publishPl
 func (p *publishPlan) fieldChanges() []field.Change {
 	out := make([]field.Change, 0, 5)
 	switch {
-	case p.Product && p.Store != nil && p.Store.ShortDescription != nil:
-		out = append(out, field.NewChange(field.ProductShortDescription, p.Store.Snapshot.ShortDescription, *p.Store.ShortDescription))
-	case !p.Product:
+	case p.Product:
+		if p.Store != nil && p.Store.ShortDescription != nil {
+			out = append(out, field.NewChange(field.ProductShortDescription, p.Store.Snapshot.ShortDescription, *p.Store.ShortDescription))
+		}
+		for _, planned := range p.Variations {
+			out = append(out, field.NewChange(planned.Key, planned.Before, planned.Value))
+		}
+	default:
 		if !p.Request.KeepTitle {
 			out = append(out, field.NewChange(field.Title, p.SiteTitle, p.Request.Title))
 		}

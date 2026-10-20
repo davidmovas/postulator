@@ -22,7 +22,8 @@ const (
 
 	CodeFieldNotWritten = "field_not_written"
 
-	fieldsTokens = 1024
+	fieldsTokens    = 1024
+	variationTokens = 256
 )
 
 type FieldValue struct {
@@ -110,7 +111,8 @@ func GenerateFields(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 			prompt := fieldsPrompt{Page: sc.Page}
-			seen, err := deps.fitted(ctx, sc, call, asked[0].Key, nil, fieldsTokens, func() (string, string, error) {
+			room := fieldsRoom(asked)
+			seen, err := deps.fitted(ctx, sc, call, asked[0].Scope.Key, nil, room, func() (string, string, error) {
 				return prompts.Render(NameGenerateFields, prompt)
 			}, schemaText[fieldsAnswer]())
 			if err != nil {
@@ -119,7 +121,7 @@ func GenerateFields(deps Deps) run.StepDef {
 			prompt.Picture = picture(seen.Fitted, contextpack.SectionTargets, contextpack.SectionRules)
 			prompt.Asked = askedFields(seen, asked, sc.Spec.Product)
 
-			request, err := stepRequest(sc, call, prompt, fieldsTokens)
+			request, err := stepRequest(sc, call, prompt, room)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -146,7 +148,54 @@ func fieldsKey(page pagemap.Page) field.Key {
 
 type askedScope struct {
 	Key   field.Key
+	Name  string
 	Scope field.Scope
+}
+
+func fieldsRoom(asked []askedScope) int {
+	room := fieldsTokens
+	for i := range asked {
+		if asked[i].Key.Kind() == field.VariationDescription {
+			room += variationTokens
+		}
+	}
+	return room
+}
+
+func variationsToWrite(ctx context.Context, deps Deps, sc *run.StepContext, scope field.Scope) ([]askedScope, []FieldSkip, error) {
+	if !scope.Enabled || !scope.AIWrites || deps.Fields == nil {
+		return nil, nil, nil
+	}
+	values, err := deps.Fields.ListForPage(ctx, sc.Page.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	variations := contextpack.Variations(values)
+	keys := make([]field.Key, 0, len(variations))
+	for i := range variations {
+		keys = append(keys, variations[i].Key)
+	}
+	kept, err := deps.keptFieldsOf(ctx, sc, sc.Page.WPID != nil, nil, keys...)
+	if err != nil {
+		return nil, nil, err
+	}
+	asked := make([]askedScope, 0, len(variations))
+	skipped := make([]FieldSkip, 0)
+	for i := range variations {
+		variation := variations[i]
+		if kept[variation.Key] {
+			skipped = append(skipped, FieldSkip{Key: string(variation.Key), Reason: reasonKept})
+			continue
+		}
+		named := strings.Join(variation.Options, ", ")
+		if named == "" {
+			named = variation.Key.Instance()
+		}
+		asked = append(asked, askedScope{
+			Key: variation.Key, Name: contextpack.FieldName(field.VariationDescription) + ", " + named, Scope: scope,
+		})
+	}
+	return asked, skipped, nil
 }
 
 func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]askedScope, []FieldSkip, error) {
@@ -185,6 +234,14 @@ func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]asked
 			continue
 		}
 		asked = append(asked, askedScope{Key: key, Scope: scope})
+	}
+	if sc.Page.WPType == pagemap.WPProduct {
+		scope, _ := set.Scope(kind.ID, field.VariationDescription)
+		variations, kept, err := variationsToWrite(ctx, deps, sc, scope)
+		if err != nil {
+			return nil, nil, err
+		}
+		asked, skipped = append(asked, variations...), append(skipped, kept...)
 	}
 	return asked, skipped, nil
 }
@@ -251,14 +308,18 @@ func askedFields(seen sitemodel.Picture, asked []askedScope, product *template.P
 		if wanted.Key == field.ProductShortDescription && product != nil {
 			rules = append(rules, content.ShortDescriptionRules(*product)...)
 		}
-		out = append(out, askedField{Key: string(wanted.Key), Name: contextpack.FieldName(wanted.Key), Rules: rules})
+		name := wanted.Name
+		if name == "" {
+			name = contextpack.FieldName(wanted.Key)
+		}
+		out = append(out, askedField{Key: string(wanted.Key), Name: name, Rules: rules})
 	}
 	return out
 }
 
 func settledValue(key field.Key, value string) string {
-	if key == field.ProductShortDescription {
-		return content.ShortDescriptionHTML(value)
+	if key == field.ProductShortDescription || key.Kind() == field.VariationDescription {
+		return content.PlainParagraphs(value)
 	}
 	return value
 }

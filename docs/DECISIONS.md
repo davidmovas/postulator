@@ -3750,3 +3750,25 @@ on what stage 2 left open and what was decided while building.
   never after the engine's, as `sync_site` already did, and the engine dispatches the item again at
   once; the harness's suite takes 107 s. `TestEveryWriteUnitWakesAtOnce` drives each of the three
   and fails on a wait without its wake.
+- **Every variation's description is written in one call per product** (B.3). The scope names
+  `variation_description` once for every variation, so `pagetype.Set.Scope` resolves an instanced
+  key (`variation_description:<id>`, `image_alt:<id>`) to its kind's scope, a meta key keeping its
+  own. `generate_fields` reads the product's variations from the model (`contextpack.Variations`
+  over the page's `variation:<id>` and `variation_description:<id>` rows), never from the store, and
+  asks every one whose description is not the client's, or is his under a scope or run that
+  rewrites, in the same structured call as the product's other fields, named by its options
+  (`Variation description, Size: 5 mg`), with 256 tokens of room more for each; the plain answer is
+  kept as escaped paragraphs (`content.PlainParagraphs`, the short description's helper renamed).
+  The registry routes the key to the store writer's `ReadVariation` and `WriteVariation`
+  (`wp.GetVariation`, `wp.UpdateVariation`, which sends `description` alone), after the store's own
+  fields: every variation of a call is read before any is written, a moved one writes nothing, and
+  one already holding our value is taken as written. `publish` reads each against the store in
+  its plan, re-reads them in its check, writes one per execution after the store's fields and
+  before the SEO meta, and reads the description's hash again after each, because WooCommerce saves
+  the parent when a variation is saved; over a product whose save would change the client's
+  description, no variation is written, as no store field is. The result keeps
+  `previousVariations` (before and what was stored), the review diff names each, and the field
+  rows are recorded. The revert puts each back while it still holds what the run wrote, and hands
+  the whole product back when a person edited one since, as it does for the short description.
+  The fake store reads and writes a variation under its product and, with filtered HTML, filters
+  the parent again on a variation's save.

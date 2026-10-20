@@ -409,10 +409,13 @@ address the store decides, empty when the two agree. `ImportOptions.rowType` is 
 `product_not_in_store`, `product_row_left`, `wp_type_kept` and `intermediate_level` are warnings.
 
 A publish over a product writes the description through the plugin's raw route and the short
-description, the filled attributes and an image through WooCommerce's REST API, and its result
-carries `previousProduct {shortDescription, writtenShort, attributes, written, images, added,
-imageId, shortWritten, attributesSent}`, what the product held and what the run wrote, which the
-revert reads. A sync result may carry `product_description_hidden` or `product_page_unread`, both
+description, a first image where it has none and each variation's description (one
+`POST products/{id}/variations/{vid}` carrying `description` alone) through WooCommerce's REST API,
+and its result carries `previousProduct {shortDescription, writtenShort, attributes, written,
+images, added, imageId, shortWritten, attributesSent}` and `previousVariations [{key, before,
+written}]` (the key is `variation_description:<variation id>`), what the product held and what the
+run wrote, which the revert reads; `attributes`, `written`, `added` and `attributesSent` are an
+older run's, since no run writes an attribute now. A sync result may carry `product_description_hidden` or `product_page_unread`, both
 warnings. `PagesService.Delete{onSite: true}` refuses a product or a product category with
 `details.field = onSite`. The name, price, stock, SKU, status, slug and categories of a product
 are never written.

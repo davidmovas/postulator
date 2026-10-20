@@ -32,6 +32,12 @@ const (
 	FieldShortDescription = "shortDescription"
 )
 
+type VariationWrite struct {
+	Key     field.Key `json:"key"`
+	Before  string    `json:"before"`
+	Written string    `json:"written"`
+}
+
 type SnapshotAttribute struct {
 	Name      string   `json:"name"`
 	Options   []string `json:"options"`
@@ -116,18 +122,93 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *
 		}
 		return reviewThePlan(ctx, deps, sc, state, "planned what to write to the product "+sc.Page.Path)
 	}
-	switch state.next() {
-	case unitCheck:
+	switch unit := state.next(); {
+	case unit == unitCheck:
 		return checkTheProduct(ctx, sc, client, state)
-	case unitStore:
+	case unit == unitStore:
 		return writeStoreFields(ctx, deps, sc, client, state)
-	case unitRaw:
+	case field.Key(unit).Kind() == field.VariationDescription:
+		return writeVariation(ctx, deps, sc, client, state, field.Key(unit))
+	case unit == unitRaw:
 		return writeRawBody(ctx, deps, sc, client, wp.TypeProduct, state)
-	case unitSEO:
+	case unit == unitSEO:
 		return writeSEOMeta(ctx, sc, client, wp.TypeProduct, state)
 	default:
 		return finishProduct(ctx, deps, sc, state)
 	}
+}
+
+func planVariations(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, productID int64) ([]variationPlan, error) {
+	answered, _, err := decodeArtifact[Fields](sc, run.ArtifactFields)
+	if err != nil {
+		return nil, err
+	}
+	live := make(map[field.Key]string)
+	wanted := make([]variationPlan, 0)
+	for _, value := range answered.Values {
+		key := field.Key(value.Key)
+		id, named := edit.VariationID(key)
+		if !named {
+			continue
+		}
+		held, readErr := client.GetVariation(ctx, productID, id)
+		switch {
+		case errors.IsCode(readErr, errors.NotFound):
+			continue
+		case readErr != nil:
+			return nil, readErr
+		}
+		live[key] = held.Description
+		if held.Description != value.Value {
+			wanted = append(wanted, variationPlan{Key: key, Before: held.Description, Value: value.Value})
+		}
+	}
+	keys := make([]field.Key, 0, len(wanted))
+	for i := range wanted {
+		keys = append(keys, wanted[i].Key)
+	}
+	kept, err := deps.keptFieldsOf(ctx, sc, true, live, keys...)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(wanted, func(planned variationPlan) bool { return kept[planned.Key] }), nil
+}
+
+func (p *publishPlan) variation(key field.Key) variationPlan {
+	for i := range p.Variations {
+		if p.Variations[i].Key == key {
+			return p.Variations[i]
+		}
+	}
+	return variationPlan{Key: key}
+}
+
+func writeVariation(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, state *publishState,
+	key field.Key) (run.Result, error) {
+	plan := state.Plan
+	planned := plan.variation(key)
+	results, err := editorFor(client).Write(ctx, edit.Target{Type: string(wp.TypeProduct), ID: plan.WPID, Product: true},
+		[]edit.Write{{Key: key, Value: &planned.Value, Expected: expectedOf(planned.Before)}})
+	if err != nil {
+		refused, refusedErr := refusedByStore(ctx, deps, sc, err)
+		if refusedErr != nil {
+			return state.failed(refusedErr)
+		}
+		return state.stopped(refused)
+	}
+	if moved := movedKeys(results); len(moved) > 0 {
+		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
+	}
+	written, _ := writtenValue(results, key)
+	state.Result.PreviousVariations = append(state.Result.PreviousVariations,
+		VariationWrite{Key: key, Before: planned.Before, Written: written})
+	resaved, err := client.GetRaw(ctx, wp.TypeProduct, plan.WPID)
+	if err != nil {
+		return state.failed(err)
+	}
+	plan.SiteHash = resaved.ContentHash
+	state.wrote(string(key))
+	return state.wait("wrote the description of the variation " + key.Instance() + " of " + sc.Page.Path)
 }
 
 func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, state *publishState,
@@ -200,16 +281,25 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	if err != nil {
 		return nil, err
 	}
+	variations, err := planVariations(ctx, deps, sc, client, held.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	saved := productAnswerOf(held)
 	plan := &publishPlan{
 		Writes: make([]string, 0, 4), Kept: kept.keys(), SEO: seo, Final: description, Theirs: theirs, Part: part,
 		Previous: previous, SiteHash: raw.ContentHash, WPID: held.ID, Plugin: true, Product: true,
-		Store: storePlanOf(update, snapshot, &saved), Unstable: !raw.SaveStable,
+		Store: storePlanOf(update, snapshot, &saved), Unstable: !raw.SaveStable, Variations: variations,
 	}
 	plan.Writes = append(plan.Writes, unitCheck)
 	if hasFields(update) && !plan.Unstable {
 		plan.Writes = append(plan.Writes, unitStore)
+	}
+	for i := range variations {
+		if !plan.Unstable {
+			plan.Writes = append(plan.Writes, string(variations[i].Key))
+		}
 	}
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
@@ -263,6 +353,20 @@ func checkTheProduct(ctx context.Context, sc *run.StepContext, client *wp.Client
 		}
 		if plan.Store.ImagesSent && len(held.Images) > 0 {
 			moved = append(moved, string(field.FeaturedImage))
+		}
+	}
+	for i := range plan.Variations {
+		planned := plan.Variations[i]
+		id, _ := edit.VariationID(planned.Key)
+		if !slices.Contains(plan.Writes, string(planned.Key)) {
+			continue
+		}
+		held, err := client.GetVariation(ctx, plan.WPID, id)
+		if err != nil {
+			return state.failed(err)
+		}
+		if held.Description != planned.Before {
+			moved = append(moved, string(planned.Key))
 		}
 	}
 	if slices.Contains(plan.Writes, unitSEO) && plan.SEO.Previous != nil {
@@ -345,6 +449,9 @@ func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 		if !plan.kept()[field.ProductShortDescription] {
 			recorded[field.ProductShortDescription] = stored.ShortDescription
 		}
+	}
+	for _, written := range state.Result.PreviousVariations {
+		recorded[written.Key] = written.Written
 	}
 	for key, value := range recorded {
 		if err := recordField(ctx, deps, sc, sc.Page.ID, key, value); err != nil {

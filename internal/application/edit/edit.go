@@ -1,7 +1,10 @@
 package edit
 
 import (
+	"cmp"
 	"context"
+	"slices"
+	"strconv"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
@@ -65,6 +68,8 @@ type CoreWriter interface {
 type StoreWriter interface {
 	ReadStore(ctx context.Context, target Target) (map[field.Key]string, error)
 	WriteStore(ctx context.Context, target Target, values map[field.Key]string) (map[field.Key]string, error)
+	ReadVariation(ctx context.Context, target Target, id int64) (string, error)
+	WriteVariation(ctx context.Context, target Target, id int64, description string) (string, error)
 }
 
 type PluginWriter interface {
@@ -93,6 +98,7 @@ type route int
 const (
 	routeCore route = iota
 	routeStore
+	routeVariations
 	routeMeta
 	routeSEO
 	routeBody
@@ -145,6 +151,15 @@ func routeOf(target Target, write Write) (route, error) {
 		}
 		return routeMeta, nil
 	}
+	if key.Kind() == field.VariationDescription {
+		if !target.Product {
+			return 0, refused(key, ReasonNoWriter, "only a product carries variations")
+		}
+		if _, named := VariationID(key); !named {
+			return 0, refused(key, field.ReasonUnknown, "a variation's description names its variation by id")
+		}
+		return routeVariations, nil
+	}
 	spec, known := field.Lookup(key)
 	switch {
 	case !known || spec.Denied:
@@ -193,6 +208,8 @@ func (s Service) write(ctx context.Context, target Target, at route, group []Wri
 		return checked(ctx, target, group, s.writers.Core.ReadCore, s.writers.Core.WriteCore)
 	case routeStore:
 		return checked(ctx, target, group, s.writers.Store.ReadStore, s.writers.Store.WriteStore)
+	case routeVariations:
+		return s.writeVariations(ctx, target, group)
 	case routeMeta:
 		return s.writeMeta(ctx, target, group)
 	case routeSEO:
@@ -236,6 +253,52 @@ func checked(ctx context.Context, target Target, group []Write, read reader, put
 	for i := range group {
 		value := stored[group[i].Key]
 		results = append(results, Result{Key: group[i].Key, Outcome: OutcomeWritten, Value: &value, Hash: new(block.BodyHash(value))})
+	}
+	return results, nil
+}
+
+func VariationID(key field.Key) (int64, bool) {
+	if key.Kind() != field.VariationDescription {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(key.Instance(), 10, 64)
+	return id, err == nil && id > 0
+}
+
+func (s Service) writeVariations(ctx context.Context, target Target, group []Write) ([]Result, error) {
+	ordered := slices.Clone(group)
+	slices.SortFunc(ordered, func(a, b Write) int {
+		left, _ := VariationID(a.Key)
+		right, _ := VariationID(b.Key)
+		return cmp.Compare(left, right)
+	})
+	live := make(map[field.Key]string, len(ordered))
+	results := make([]Result, 0, len(ordered))
+	for i := range ordered {
+		id, _ := VariationID(ordered[i].Key)
+		current, err := s.writers.Store.ReadVariation(ctx, target, id)
+		if err != nil {
+			return nil, err
+		}
+		live[ordered[i].Key] = current
+		if !holds(current, ordered[i].Expected) && current != text(ordered[i].Value) {
+			results = append(results, Result{Key: ordered[i].Key, Outcome: OutcomeMoved, Hash: new(block.BodyHash(current))})
+		}
+	}
+	if len(results) > 0 {
+		return withHeld(results, ordered), nil
+	}
+	for i := range ordered {
+		value := live[ordered[i].Key]
+		if value != text(ordered[i].Value) {
+			id, _ := VariationID(ordered[i].Key)
+			stored, err := s.writers.Store.WriteVariation(ctx, target, id, text(ordered[i].Value))
+			if err != nil {
+				return results, err
+			}
+			value = stored
+		}
+		results = append(results, Result{Key: ordered[i].Key, Outcome: OutcomeWritten, Value: &value, Hash: new(block.BodyHash(value))})
 	}
 	return results, nil
 }
