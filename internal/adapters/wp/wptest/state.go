@@ -65,6 +65,7 @@ type Item struct {
 	MenuOrder      int
 	FeaturedMedia  int64
 	ManageStock    bool
+	Closed         bool
 }
 
 type Crumb struct {

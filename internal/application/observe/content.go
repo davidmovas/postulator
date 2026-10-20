@@ -129,12 +129,19 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 		a.rows.remember(next)
 
 		terms, err := a.readTerms(ctx, items[i])
-		if err != nil {
+		closed := closedToUser(err)
+		if err != nil && !closed {
 			return nil, err
 		}
 		body, err := a.readBody(ctx, next, items[i])
+		if closedToUser(err) {
+			closed, err = true, nil
+		}
 		if err != nil {
 			return nil, err
+		}
+		if closed {
+			a.state.Counts.Closed++
 		}
 		batch = append(batch, prepared{it: items[i], current: current, next: next, terms: terms, body: body, known: known})
 	}
@@ -208,7 +215,7 @@ func (a *absorber) readTerms(ctx context.Context, it item) ([]pagemap.Term, erro
 }
 
 func (a *absorber) terms(ctx context.Context, page pagemap.Page, it item, terms []pagemap.Term) error {
-	if it.mappedType().Term() {
+	if it.mappedType().Term() || terms == nil {
 		return nil
 	}
 	return a.service.deps.Identity.ReplaceTerms(ctx, page.ID, terms)

@@ -204,15 +204,22 @@ func (r pluginReader) ListContent(ctx context.Context, query observe.ContentQuer
 func (r pluginReader) GetRaw(ctx context.Context, postType string, id int64) (observe.Raw, error) {
 	raw, err := r.client.GetRaw(ctx, wp.ItemType(postType), id)
 	if err != nil {
-		return observe.Raw{}, err
+		return observe.Raw{}, closedOr(err)
 	}
 	return observe.Raw{Content: raw.Content, Hash: raw.ContentHash}, nil
+}
+
+func closedOr(err error) error {
+	if wp.Forbidden(err) {
+		return observe.ClosedToUser(err)
+	}
+	return err
 }
 
 func (r pluginReader) GetRendered(ctx context.Context, postType string, id int64) (observe.Rendered, error) {
 	rendered, err := r.client.GetRendered(ctx, wp.ItemType(postType), id)
 	if err != nil {
-		return observe.Rendered{}, err
+		return observe.Rendered{}, closedOr(err)
 	}
 	return observe.Rendered{Content: rendered.Content, Hash: rendered.ContentHash}, nil
 }
@@ -228,7 +235,7 @@ func (r pluginReader) GetSEOMeta(ctx context.Context, postType string, id int64)
 func (r pluginReader) GetTerms(ctx context.Context, postType string, id int64) ([]pagemap.Term, error) {
 	terms, err := r.client.GetTerms(ctx, wp.ItemType(postType), id)
 	if err != nil {
-		return nil, err
+		return nil, closedOr(err)
 	}
 	return termsOf(terms), nil
 }
@@ -238,7 +245,7 @@ func (r pluginReader) GetMeta(ctx context.Context, postType string, id int64, ke
 	for asked := range slices.Chunk(keys, wp.MaxMetaKeys) {
 		found, err := r.client.GetMeta(ctx, wp.ItemType(postType), id, asked)
 		if err != nil {
-			return nil, err
+			return nil, closedOr(err)
 		}
 		for key, raw := range found {
 			values[key] = metaText(raw)

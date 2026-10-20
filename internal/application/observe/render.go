@@ -265,7 +265,7 @@ func (s *Service) fetchOne(ctx context.Context, readers Readers, using extractio
 	filtered := ""
 	if readers.plugin(capabilityRendered) && !target.page.WPType.Term() {
 		rendered, renderErr := readers.Plugin.GetRendered(ctx, string(target.page.WPType), *target.page.WPID)
-		if renderErr != nil {
+		if renderErr != nil && !closedToUser(renderErr) {
 			outcome.err = renderErr
 			return outcome
 		}

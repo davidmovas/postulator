@@ -51,6 +51,10 @@ func (s *Service) fields(ctx context.Context, state *State, readers Readers, bat
 	}
 	for i := range reads {
 		values, readErr := readers.Plugin.GetMeta(ctx, string(reads[i].page.WPType), *reads[i].page.WPID, reads[i].keys)
+		if closedToUser(readErr) {
+			reads[i].keys = nil
+			continue
+		}
 		if readErr != nil {
 			return false, readErr
 		}

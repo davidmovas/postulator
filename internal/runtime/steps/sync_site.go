@@ -42,6 +42,7 @@ type SiteSyncResult struct {
 	Rendered    int               `json:"rendered"`
 	Unreachable int               `json:"unreachable"`
 	Archived    int               `json:"archived"`
+	Closed      int               `json:"closed"`
 	Full        bool              `json:"full"`
 	Done        bool              `json:"done"`
 }
@@ -107,7 +108,7 @@ func syncResult(ctx context.Context, deps Deps, owner site.Site, held syncCheckp
 		StartedAt: state.StartedAt, Source: state.Source, Stage: string(state.Stage), Findings: state.Findings,
 		Batches: held.Batches, Pulled: state.Counts.Pulled, Created: state.Counts.Created, Updated: state.Counts.Updated,
 		Products: state.Counts.Products, Rendered: state.Counts.Rendered, Unreachable: state.Counts.Unreachable,
-		Archived: state.Counts.Archived, Full: state.Full, Done: state.Done(),
+		Archived: state.Counts.Archived, Closed: state.Counts.Closed, Full: state.Full, Done: state.Done(),
 	}
 	message := "observed " + strconv.Itoa(state.Counts.Pulled) + " items of " + owner.Name + " through the " + state.Source +
 		" (" + string(state.Stage) + ")"

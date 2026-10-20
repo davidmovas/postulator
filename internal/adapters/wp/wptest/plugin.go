@@ -66,16 +66,31 @@ type cursor struct {
 func (s *Server) routePlugin(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+pluginNamespace+"/manifest", s.handleManifest)
 	mux.HandleFunc("GET "+pluginNamespace+"/content", s.handleContent)
-	mux.HandleFunc("GET "+pluginNamespace+"/seo-meta/{id}", s.handleSEOMetaGet)
-	mux.HandleFunc("PUT "+pluginNamespace+"/seo-meta/{id}", s.handleSEOMeta)
-	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/raw", s.handleRawGet)
-	mux.HandleFunc("PUT "+pluginNamespace+"/content/{id}/raw", s.handleRawPut)
-	mux.HandleFunc("POST "+pluginNamespace+"/content/{id}/preview", s.handlePreview)
-	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/rendered", s.handleRendered)
-	mux.HandleFunc("GET "+pluginNamespace+"/meta/{id}", s.handleMeta)
-	mux.HandleFunc("PUT "+pluginNamespace+"/meta/{id}", s.handleMetaPut)
-	mux.HandleFunc("GET "+pluginNamespace+"/terms/{id}", s.handleTerms)
+	mux.HandleFunc("GET "+pluginNamespace+"/seo-meta/{id}", s.editing(s.handleSEOMetaGet))
+	mux.HandleFunc("PUT "+pluginNamespace+"/seo-meta/{id}", s.editing(s.handleSEOMeta))
+	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/raw", s.editing(s.handleRawGet))
+	mux.HandleFunc("PUT "+pluginNamespace+"/content/{id}/raw", s.editing(s.handleRawPut))
+	mux.HandleFunc("POST "+pluginNamespace+"/content/{id}/preview", s.editing(s.handlePreview))
+	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/rendered", s.editing(s.handleRendered))
+	mux.HandleFunc("GET "+pluginNamespace+"/meta/{id}", s.editing(s.handleMeta))
+	mux.HandleFunc("PUT "+pluginNamespace+"/meta/{id}", s.editing(s.handleMetaPut))
+	mux.HandleFunc("GET "+pluginNamespace+"/terms/{id}", s.editing(s.handleTerms))
 	mux.HandleFunc("GET "+pluginNamespace+"/settings", s.handlePluginSettings)
+}
+
+func (s *Server) editing(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathID(r)
+		s.mu.Lock()
+		stored, found := s.items[id]
+		closed := ok && found && !s.noPlugin && stored.Closed
+		s.mu.Unlock()
+		if closed {
+			s.fail(w, http.StatusForbidden, "forbidden", "editing this post is not allowed")
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (s *Server) pluginMissing(w http.ResponseWriter) bool {

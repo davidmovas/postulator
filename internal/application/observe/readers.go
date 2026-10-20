@@ -3,12 +3,30 @@ package observe
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"slices"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
+
+const detailClosed = "closedToUser"
+
+func ClosedToUser(err error) error {
+	return errors.New(errors.Unauthorized, "the site's user may not edit this page").
+		WithDetail(detailClosed, true).WithInternal(err)
+}
+
+func closedToUser(err error) bool {
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) || kernel == nil {
+		return false
+	}
+	closed, ok := kernel.Details[detailClosed].(bool)
+	return ok && closed
+}
 
 type PostType struct {
 	Slug         string

@@ -281,6 +281,34 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 	}
 }
 
+func TestSyncSiteWalksPastAPageTheSitesUserMayNotEdit(t *testing.T) {
+	t.Parallel()
+
+	h := newSyncHarness(t, 0)
+	seedSite(t, h)
+	h.server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "Privacy", Slug: "privacy",
+		Content: `<h1>Privacy</h1><p>What the shop keeps.</p>`, Closed: true,
+	})
+
+	state := h.all(t)
+	if state.Pulled != 4 || state.Closed != 1 {
+		t.Fatalf("state = %+v, want four pages pulled and one the site's user may not edit", state)
+	}
+	closed := h.byPath(t, "/privacy/")
+	if closed.WPID == nil || closed.Title != "Privacy" {
+		t.Fatalf("the page the user may not edit is %+v, want it kept in the map from the listing", closed)
+	}
+	child := h.byPath(t, "/coffee/espresso/")
+	if links := h.rawLinks(t, child.ID); len(links) != 1 {
+		t.Fatalf("the raw links of the child are %+v, want the walk to go on past the closed page", links)
+	}
+	again := h.fullWalk(t)
+	if again.Closed != 1 || again.Summary == nil || again.Summary.Observed != 4 {
+		t.Fatalf("a full walk reports %+v, want the closed page counted again and every page observed", again)
+	}
+}
+
 func TestSyncSiteRebuildsTheDraftPathsCoreRESTWillNotGive(t *testing.T) {
 	t.Parallel()
 

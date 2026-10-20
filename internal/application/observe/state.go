@@ -39,6 +39,7 @@ type Counts struct {
 	Archived    int `json:"archived"`
 	Typed       int `json:"typed"`
 	Custom      int `json:"custom"`
+	Closed      int `json:"closed"`
 }
 
 type State struct {

@@ -3873,3 +3873,21 @@ on what stage 2 left open and what was decided while building.
   canonical is put back only while the live one is still what that run's meta artifact wrote. The
   old path's restores of variations, images, lists and custom fields are gone: no record before
   stage 3 wrote them.
+
+### What the stands found (session 2, 2026-10-20)
+
+- **A page the site's user may not edit no longer stops the walk.** Under the replica's restricted
+  user (an editor without `unfiltered_html`) every sync failed with "WordPress rejected the
+  application password": the plugin's `/content` lists every content post, but its per-post routes
+  answer 403 for one the user may not `edit_post`, and WordPress maps editing the privacy policy
+  page to `manage_privacy_options`, which no editor holds. One such page failed the whole walk. The
+  observation now takes a 403 from the plugin's terms, raw, custom field or rendered read as the page
+  being closed to this user (`observe.ClosedToUser`, made by `steps/observe_readers.go` from
+  `wp.Forbidden`): the page keeps what the listing gave and the terms and body it had, its render
+  falls back to the public visit, and the walk counts it (`closed`), so a client whose application
+  password belongs to an editor still has his site observed. `wptest` answers such a post (`Item.Closed`)
+  as the plugin does (`TestSyncSiteWalksPastAPageTheSitesUserMayNotEdit`, failing first with the
+  stand's message).
+- **The restricted-user test checked the plugin before anything probed it.** `sites.Create` stores a
+  site without asking it anything, so the plugin read as absent on the response of the create; the
+  test now checks it through `Sync.CheckPlugin`, as the full loop does.
