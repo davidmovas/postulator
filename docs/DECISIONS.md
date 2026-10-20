@@ -3874,6 +3874,20 @@ on what stage 2 left open and what was decided while building.
   old path's restores of variations, images, lists and custom fields are gone: no record before
   stage 3 wrote them.
 
+### The image step never draws over the client's image (session 2, the open item)
+
+- **An image is drawn for an existing page only where it has none.** `publish` already filled the
+  featured image only where the site had none, but `generate_images` drew and uploaded one first,
+  so a page or product with its own image left the client's media library holding an attachment of
+  ours that nothing used, and the image model was paid for it. The step now reads the page on the
+  site before it draws: a page or post whose `featured_media` is set, and a product with any image in
+  its gallery, keep theirs, and the step draws its inline images alone, naming the kept image in an
+  info finding (`featured_image_kept`); a read that fails fails the step, which is retried, so
+  nothing is drawn on a guess. A planned page, and a page on the site without an image, get one as
+  before. **No switch replaces a client's image**: the featured image is no scope's to switch (A.2),
+  so a person who wants a new one removes his own in WordPress first. The estimate still counts the
+  featured image of every page, being an upper bound read from no site.
+
 ### What the stands found (session 2, 2026-10-20)
 
 - **A page the site's user may not edit no longer stops the walk.** Under the replica's restricted

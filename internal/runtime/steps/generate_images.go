@@ -31,6 +31,7 @@ const (
 	CodeImagesShort    = "images_short"
 
 	CodeImagesWaitForLive = "images_wait_for_live"
+	CodeFeaturedImageKept = "featured_image_kept"
 
 	imageStepTimeout  = 15 * time.Minute
 	imageOutputTokens = 1056
@@ -84,9 +85,9 @@ func GenerateImages(deps Deps) run.StepDef {
 				Findings: make([]content.Finding, 0),
 			}
 
-			wanted := sc.Spec.Images.Wanted()
-			result.Wanted = wanted
-			if wanted == 0 {
+			spec := sc.Spec.Images
+			result.Wanted = spec.Wanted()
+			if result.Wanted == 0 {
 				return manifest(result, nil, "the template asks for no image")
 			}
 			if reviewing(sc) && sc.Page.WPID != nil {
@@ -94,6 +95,25 @@ func GenerateImages(deps Deps) run.StepDef {
 					sc.Page.Path+" is on the site and this is a draft run, so no image was drawn or uploaded: an upload "+
 						"writes to the site, which a draft run does not do to a page that is already there", "draft_run")
 				return manifest(result, nil, "no image for a page already on the site in a draft run")
+			}
+			if spec.Featured && sc.Page.WPID != nil {
+				kept, keptErr := keepsItsImage(ctx, deps, sc)
+				if keptErr != nil {
+					return run.Result{}, keptErr
+				}
+				if kept {
+					spec.Featured = false
+					result.Wanted = spec.Wanted()
+					result.Findings = append(result.Findings, content.Finding{
+						Severity: content.SeverityInfo,
+						Code:     CodeFeaturedImageKept,
+						Message:  sc.Page.Path + " keeps the image it has on the site, so no featured image was drawn or uploaded for it",
+						Details:  map[string]any{"pageId": sc.Page.ID, "path": sc.Page.Path},
+					})
+				}
+				if result.Wanted == 0 {
+					return manifest(result, nil, "kept the image "+sc.Page.Path+" has on the site")
+				}
 			}
 
 			doc, err := bodyOf(sc)
@@ -105,7 +125,7 @@ func GenerateImages(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			acquired, err := acquire(ctx, deps, sc, entity, wanted, &result)
+			acquired, err := acquire(ctx, deps, sc, entity, result.Wanted, &result)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -126,7 +146,7 @@ func GenerateImages(deps Deps) run.StepDef {
 			}
 
 			var body []byte
-			if place(doc, sc.Spec.Images, uploaded, &result, sc.Page) {
+			if place(doc, spec, uploaded, &result, sc.Page) {
 				rendered, renderErr := doc.Render()
 				if renderErr != nil {
 					return run.Result{}, renderErr
@@ -137,6 +157,27 @@ func GenerateImages(deps Deps) run.StepDef {
 			return manifest(result, body, placedMessage(result, sc.Page))
 		},
 	}
+}
+
+func keepsItsImage(ctx context.Context, deps Deps, sc *run.StepContext) (bool, error) {
+	if deps.WordPress == nil {
+		return false, errors.New(errors.Invalid, "no WordPress client is configured for this site").
+			WithDetail("siteId", sc.Run.SiteID)
+	}
+	client, err := deps.WordPress.Client(ctx, sc.Run.SiteID)
+	if err != nil {
+		return false, err
+	}
+	if sc.Page.WPType == pagemap.WPProduct {
+		product, productErr := client.GetProduct(ctx, *sc.Page.WPID)
+		return len(product.Images) > 0, productErr
+	}
+	itemType, err := itemTypeOf(sc.Page)
+	if err != nil {
+		return false, err
+	}
+	item, err := client.GetItem(ctx, itemType, *sc.Page.WPID)
+	return item.FeaturedMedia != 0, err
 }
 
 func placedMessage(result ImagesResult, page pagemap.Page) string {
