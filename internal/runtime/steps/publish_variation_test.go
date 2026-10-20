@@ -126,6 +126,52 @@ func TestAVariationTheClientEditedSinceIsHandedBack(t *testing.T) {
 	}
 }
 
+func TestADescriptionTheClientEditsDuringTheStoresSaveIsNotWrittenOver(t *testing.T) {
+	t.Parallel()
+
+	for _, unit := range []string{"the store's fields", "a variation"} {
+		t.Run(unit, func(t *testing.T) {
+			t.Parallel()
+
+			item := storeProduct()
+			item.ProductType = "variable"
+			h := newProductHarness(t, item)
+			h.deps.Types = variationTypes{}
+			variation := h.server.Seed(wptest.Item{Type: wptest.TypeProductVariation, Parent: h.held.ID, SKU: "EM-1-S", Status: "publish",
+				Content: "<p>Old small.</p>", Choices: []wptest.Choice{{ID: 3, Name: "Size", Option: "Small"}}})[0]
+			sc := storeContext(t, h.held.ID)
+			if unit == "a variation" {
+				withFields(t, sc, steps.FieldValue{Key: string(variationKey(variation)), Value: "<p>A small machine.</p>"})
+			}
+
+			def := steps.Publish(h.deps)
+			var result run.Result
+			for execution := range 16 {
+				if execution == 2 {
+					edited, _ := h.server.Lookup(h.held.ID)
+					edited.Content = "<p>The owner's description, edited a moment ago.</p>"
+					h.server.Restore(edited)
+				}
+				var err error
+				result, err = def.Run(t.Context(), sc)
+				if err != nil {
+					t.Fatalf("Publish: %v", err)
+				}
+				settle(def, sc, result)
+				if result.Next != run.TransitionWait {
+					break
+				}
+			}
+			if result.Next != run.TransitionPause || !strings.Contains(result.Message, string(field.ProductDescription)) {
+				t.Errorf("publish = %s %q, want a pause naming the description that moved", result.Next, result.Message)
+			}
+			if stored, _ := h.server.Lookup(h.held.ID); stored.Content != "<p>The owner's description, edited a moment ago.</p>" {
+				t.Errorf("the owner's edit became %q: a save that cannot change the description does not make his edit our base", stored.Content)
+			}
+		})
+	}
+}
+
 func TestAVariationIsNotWrittenOverAProductWhoseSaveWouldChangeIt(t *testing.T) {
 	t.Parallel()
 

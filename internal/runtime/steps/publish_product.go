@@ -202,13 +202,8 @@ func writeVariation(ctx context.Context, deps Deps, sc *run.StepContext, client 
 	written, _ := writtenValue(results, key)
 	state.Result.PreviousVariations = append(state.Result.PreviousVariations,
 		VariationWrite{Key: key, Before: planned.Before, Written: written})
-	resaved, err := client.GetRaw(ctx, wp.TypeProduct, plan.WPID)
-	if err != nil {
-		return state.failed(err)
-	}
-	plan.SiteHash = resaved.ContentHash
 	state.wrote(string(key))
-	return state.wait("wrote the description of the variation " + key.Instance() + " of " + sc.Page.Path)
+	return afterTheSave(ctx, sc, client, state, "wrote the description of the variation "+key.Instance()+" of "+sc.Page.Path)
 }
 
 func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, state *publishState,
@@ -415,16 +410,23 @@ func writeStoreFields(ctx context.Context, deps Deps, sc *run.StepContext, clien
 	if snapshot.ShortWritten && strings.TrimSpace(written.ShortDescription) == "" {
 		return state.stopped(refuseMismatch(sc, []pagemap.Mismatch{{Field: FieldShortDescription, Planned: "a short description", Actual: "none"}}))
 	}
-	resaved, err := client.GetRaw(ctx, wp.TypeProduct, plan.WPID)
-	if err != nil {
-		return state.failed(err)
-	}
 	answer := productAnswerOf(written)
-	plan.Store.Snapshot, plan.Store.Saved, plan.SiteHash = snapshot, &answer, resaved.ContentHash
+	plan.Store.Snapshot, plan.Store.Saved = snapshot, &answer
 	state.Result.PreviousProduct = &snapshot
 	state.Result.URL, state.Result.Status = permalinkOf(wp.Item{Link: answer.Permalink}), answer.Status
 	state.wrote(unitStore)
-	return state.wait("wrote the store's fields of " + sc.Page.Path)
+	return afterTheSave(ctx, sc, client, state, "wrote the store's fields of "+sc.Page.Path)
+}
+
+func afterTheSave(ctx context.Context, sc *run.StepContext, client *wp.Client, state *publishState, message string) (run.Result, error) {
+	resaved, err := client.GetRaw(ctx, wp.TypeProduct, state.Plan.WPID)
+	if err != nil {
+		return state.failed(err)
+	}
+	if resaved.ContentHash != state.Plan.SiteHash {
+		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, []string{string(field.ProductDescription)})))
+	}
+	return state.wait(message)
 }
 
 func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *publishState) (run.Result, error) {

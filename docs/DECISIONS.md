@@ -3772,3 +3772,12 @@ on what stage 2 left open and what was decided while building.
   the whole product back when a person edited one since, as it does for the short description.
   The fake store reads and writes a variation under its product and, with filtered HTML, filters
   the parent again on a variation's save.
+- **A save that cannot change the description does not make a change to it ours** (found while
+  building B.3, closing a path in B.1). After the store's fields and after each variation, the
+  description's hash was read again and taken as the base the raw write goes under, so a client's
+  edit to the description landing between the check and that save was written over by our body.
+  Those saves are made only over a product whose save is stable, which by the plugin's own test
+  leaves the stored content as it was, so the hash read after them must equal the one checked: a
+  difference now pauses the item naming `product_description`, the save already on record for a
+  revert (`TestADescriptionTheClientEditsDuringTheStoresSaveIsNotWrittenOver`, failing first for
+  both saves).
