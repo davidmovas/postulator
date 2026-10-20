@@ -50,9 +50,6 @@ func fullBrief() content.Brief {
 		Sections: []content.BriefSection{{Slot: 1, Heading: "What they are", Intent: "Define them", Required: true, Words: 200, PrimaryInHeading: true}},
 		Phrases:  []content.BriefPhrase{{Text: "peptides", Lead: true, Why: "the primary keyword opens the page"}, {Text: "home", Within: 2, Why: "the parent"}},
 		Children: []string{"BPC-157"},
-		Product: &content.BriefProduct{
-			ShortDescription: true, ShortWords: 40, ShortIntent: "Sell it", ShortKeyword: true,
-		},
 	}
 }
 

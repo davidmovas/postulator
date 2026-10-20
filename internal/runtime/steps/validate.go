@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
@@ -80,11 +81,15 @@ func Validate(deps Deps) run.StepDef {
 			if drafted {
 				report.Structure.Items = append(report.Structure.Items, draft.Findings...)
 			}
-			if drafted && draft.Product != nil && sc.Spec.Product != nil {
-				report.Structure.Items = append(report.Structure.Items,
-					content.ProductFindings(*draft.Product, *sc.Spec.Product, keywords.Main())...)
-			}
 			if sc.Page.WPType == pagemap.WPProduct {
+				short, written, shortErr := writtenField(sc, field.ProductShortDescription)
+				if shortErr != nil {
+					return run.Result{}, shortErr
+				}
+				if written && sc.Spec.Product != nil {
+					report.Structure.Items = append(report.Structure.Items,
+						content.ShortDescriptionFindings(short, *sc.Spec.Product, keywords.Main())...)
+				}
 				report.Structure = content.ForStore(report.Structure)
 			}
 			report.Structure.Items = plannedH1Wins(append(report.Structure.Items, repairs...))

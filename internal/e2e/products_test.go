@@ -128,8 +128,11 @@ func productAnswer(keyword string) string {
 		`{"heading":"Key Features","html":"<ul><li>A dropper cap that measures the dose.</li><li>A dark glass bottle.</li></ul>"},` +
 		`{"heading":"Who It Is For","html":"<p>It suits the buyer who measures a dose every morning, and not the one who travels light.</p>"},` +
 		`{"heading":"Frequently Asked Questions","html":"<p>It ships in two days and comes back within thirty days unopened.</p>"}],` +
-		`"summary":"What the ` + keyword + ` is and who should buy it.",` +
-		`"shortDescription":"<p>The ` + keyword + ` in a dark glass bottle with a dropper cap.</p>"}`
+		`"summary":"What the ` + keyword + ` is and who should buy it."}`
+}
+
+func productFields(keyword string) string {
+	return `{"fields":[{"key":"product_short_description","value":"The ` + keyword + ` in a dark glass bottle with a dropper cap."}]}`
 }
 
 func productTemplate(t *testing.T, core *app.Core) string {
@@ -195,8 +198,10 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	core := openCoreWith(t, fake.NewScripted(append(replies(),
 		fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + liquidPath + "\n", Text: productAnswer("mak liquid")},
 		fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + liquidPath + "\n", Text: metaOf("mak liquid")},
+		fake.Reply{Step: steps.NameGenerateFields, Match: "Path: " + liquidPath + "\n", Text: productFields("mak liquid")},
 		fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + capsulePath + "\n", Text: productAnswer("mak capsule")},
 		fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + capsulePath + "\n", Text: metaOf("mak capsule")},
+		fake.Reply{Step: steps.NameGenerateFields, Match: "Path: " + capsulePath + "\n", Text: productFields("mak capsule")},
 	)...))
 	owner, err := core.Sites.Create(t.Context(), sites.CreateRequest{
 		Name: "Docker Store", BaseURL: live.env.baseURL, Username: live.env.user, Password: live.env.pass,

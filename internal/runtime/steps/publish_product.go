@@ -27,6 +27,7 @@ const (
 	CodeProductCategoryUnwritable = "product_category_unwritable"
 	CodeProductOutputsMissing     = "product_outputs_missing"
 	CodeProductOutputsIgnored     = "product_outputs_ignored"
+	CodeShortDescriptionUnwritten = "short_description_unwritten"
 
 	FieldShortDescription = "shortDescription"
 )
@@ -187,13 +188,14 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	if err != nil {
 		return nil, err
 	}
-	written := draft.Product
-	if written != nil && kept[field.ProductShortDescription] {
-		copied := *written
-		copied.ShortDescription = ""
-		written = &copied
+	short, _, err := writtenField(sc, field.ProductShortDescription)
+	if err != nil {
+		return nil, err
 	}
-	update, snapshot := productUpdate(held, written, featured.FeaturedID)
+	if kept[field.ProductShortDescription] {
+		short = ""
+	}
+	update, snapshot := productUpdate(held, short, featured.FeaturedID)
 	seo, err := planSEO(ctx, client, sc, wp.TypeProduct, held.ID, true, kept, false)
 	if err != nil {
 		return nil, err
@@ -372,14 +374,13 @@ func findingsOfProduct(page pagemap.Page, held wp.Product) []content.Finding {
 	return findings
 }
 
-func productUpdate(held wp.Product, draft *content.ProductDraft, featured int64) (wp.UpdateProduct, ProductSnapshot) {
+func productUpdate(held wp.Product, short string, featured int64) (wp.UpdateProduct, ProductSnapshot) {
 	snapshot := ProductSnapshot{
 		ShortDescription: held.ShortDescription, Attributes: snapshotOf(held.Attributes),
 		Written: make([]SnapshotAttribute, 0), Images: imageIDs(held.Images), Added: make([]string, 0),
 	}
 	var update wp.UpdateProduct
-	if draft != nil && draft.ShortDescription != "" {
-		short := draft.ShortDescription
+	if strings.TrimSpace(short) != "" {
 		update.ShortDescription = &short
 		snapshot.ShortWritten = true
 	}

@@ -42,7 +42,6 @@ type ContentDraft struct {
 	H1       string         `json:"h1"`
 	Sections []DraftSection `json:"sections"`
 	Summary  string         `json:"summary"`
-	Product  *ProductDraft  `json:"product,omitempty"`
 	Kept     *KeptBody      `json:"kept,omitempty"`
 	Findings []Finding      `json:"findings,omitempty"`
 }

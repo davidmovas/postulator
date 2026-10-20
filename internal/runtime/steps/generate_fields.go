@@ -13,6 +13,7 @@ import (
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -48,6 +49,15 @@ func (f Fields) Value(key field.Key) (string, bool) {
 	return "", false
 }
 
+func writtenField(sc *run.StepContext, key field.Key) (value string, written bool, err error) {
+	fields, _, err := decodeArtifact[Fields](sc, run.ArtifactFields)
+	if err != nil {
+		return "", false, err
+	}
+	value, written = fields.Value(key)
+	return value, written, nil
+}
+
 type fieldAnswer struct {
 	Key   string `json:"key" description:"The key of the field, exactly as the brief names it"`
 	Value string `json:"value" description:"The field's text, plain, within the field's length rule"`
@@ -73,6 +83,7 @@ const (
 	reasonNoWriter    = "nothing on this site writes it yet"
 	reasonUnsupported = "the page's post type carries no excerpt"
 	reasonKept        = "it holds the owner's own text, and the field's rewrites switch is off"
+	reasonNoShort     = "the page's template writes no short description"
 )
 
 func GenerateFields(deps Deps) run.StepDef {
@@ -82,8 +93,8 @@ func GenerateFields(deps Deps) run.StepDef {
 		Produces:  []run.ArtifactKind{run.ArtifactFields},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   editorTimeout,
-		Price:     run.Price{OutputTokens: fieldsTokens, Input: packInput(deps, domainllm.RoleEditor, excerptKey), Applies: fieldsApply(deps)},
-		Preflight: inputPreflight(deps, domainllm.RoleEditor, excerptKey),
+		Price:     run.Price{OutputTokens: fieldsTokens, Input: packInput(deps, domainllm.RoleEditor, fieldsKey), Applies: fieldsApply(deps)},
+		Preflight: inputPreflight(deps, domainllm.RoleEditor, fieldsKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			asked, skipped, err := fieldsToWrite(ctx, deps, sc)
 			if err != nil {
@@ -106,7 +117,7 @@ func GenerateFields(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 			prompt.Picture = picture(seen.Fitted, contextpack.SectionTargets, contextpack.SectionRules)
-			prompt.Asked = askedFields(seen, asked)
+			prompt.Asked = askedFields(seen, asked, sc.Spec.Product)
 
 			request, err := stepRequest(sc, call, prompt, fieldsTokens)
 			if err != nil {
@@ -126,7 +137,10 @@ func GenerateFields(deps Deps) run.StepDef {
 	}
 }
 
-func excerptKey(pagemap.Page) field.Key {
+func fieldsKey(page pagemap.Page) field.Key {
+	if page.WPType == pagemap.WPProduct {
+		return field.ProductShortDescription
+	}
 	return field.Excerpt
 }
 
@@ -177,14 +191,14 @@ func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]asked
 
 func otherTextFields(page pagemap.Page) []field.Key {
 	taken := []field.Key{
-		field.Title, field.Body, field.ProductDescription, field.ProductShortDescription, field.SEOTitle, field.SEODescription,
-		field.SEOCanonical,
+		field.Title, field.Body, field.ProductDescription, field.SEOTitle, field.SEODescription, field.SEOCanonical,
 	}
+	product := page.WPType == pagemap.WPProduct
 	out := make([]field.Key, 0)
 	for _, spec := range field.Catalog() {
 		switch {
 		case !spec.Text || spec.Denied || spec.Instanced || field.CheckScope(spec.Key) != nil, slices.Contains(taken, spec.Key):
-		case spec.Key == field.Excerpt && page.WPType == pagemap.WPProduct:
+		case spec.Key == field.Excerpt && product, spec.Key == field.ProductShortDescription && !product:
 		default:
 			out = append(out, spec.Key)
 		}
@@ -193,6 +207,12 @@ func otherTextFields(page pagemap.Page) []field.Key {
 }
 
 func writerFor(ctx context.Context, deps Deps, sc *run.StepContext, key field.Key) (string, error) {
+	if key == field.ProductShortDescription && sc.Page.WPType == pagemap.WPProduct {
+		if !content.WritesShortDescription(sc.Spec.Product) {
+			return reasonNoShort, nil
+		}
+		return "", nil
+	}
 	if key != field.Excerpt || sc.Page.WPType == pagemap.WPProduct {
 		return reasonNoWriter, nil
 	}
@@ -217,21 +237,30 @@ func fieldsApply(deps Deps) func(context.Context, run.Target) (bool, error) {
 		return nil
 	}
 	return func(ctx context.Context, target run.Target) (bool, error) {
-		sc := &run.StepContext{Run: run.Run{SiteID: target.Page.SiteID}, Page: target.Page}
+		sc := &run.StepContext{Run: run.Run{SiteID: target.Page.SiteID}, Page: target.Page, Spec: target.Spec}
 		asked, _, err := fieldsToWrite(ctx, deps, sc)
 		return len(asked) > 0, err
 	}
 }
 
-func askedFields(seen sitemodel.Picture, asked []askedScope) []askedField {
+func askedFields(seen sitemodel.Picture, asked []askedScope, product *template.Product) []askedField {
 	out := make([]askedField, 0, len(asked))
 	for i := range asked {
 		wanted := &asked[i]
-		out = append(out, askedField{
-			Key: string(wanted.Key), Name: contextpack.FieldName(wanted.Key), Rules: contextpack.FieldRules(seen.Facts, wanted.Scope),
-		})
+		rules := contextpack.FieldRules(seen.Facts, wanted.Scope)
+		if wanted.Key == field.ProductShortDescription && product != nil {
+			rules = append(rules, content.ShortDescriptionRules(*product)...)
+		}
+		out = append(out, askedField{Key: string(wanted.Key), Name: contextpack.FieldName(wanted.Key), Rules: rules})
 	}
 	return out
+}
+
+func settledValue(key field.Key, value string) string {
+	if key == field.ProductShortDescription {
+		return content.ShortDescriptionHTML(value)
+	}
+	return value
 }
 
 func settleFields(answer fieldsAnswer, asked []askedScope) (Fields, error) {
@@ -249,7 +278,9 @@ func settleFields(answer fieldsAnswer, asked []askedScope) (Fields, error) {
 			return Fields{}, errors.New(errors.External, "the model left out a field it was asked for").
 				WithDetail("reason", content.ReasonIncompleteAnswer).WithDetail("field", string(wanted.Key))
 		}
-		settled.Values = append(settled.Values, FieldValue{Key: string(wanted.Key), Value: clip(value, wanted.Scope.MaxLength)})
+		settled.Values = append(settled.Values, FieldValue{
+			Key: string(wanted.Key), Value: settledValue(wanted.Key, clip(value, wanted.Scope.MaxLength)),
+		})
 	}
 	return settled, nil
 }

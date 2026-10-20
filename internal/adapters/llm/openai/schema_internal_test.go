@@ -135,7 +135,7 @@ func TestEveryStructuredAnswerBecomesAStrictSchema(t *testing.T) {
 		schema *port.Schema
 	}{
 		{name: "the writer's draft", schema: schemaFor[content.DraftAnswer](t)},
-		{name: "the writer's product", schema: schemaFor[content.ProductAnswer](t)},
+		{name: "an answer that embeds the draft", schema: schemaFor[embeddedDraft](t)},
 		{name: "the linker's repair", schema: schemaFor[content.RepairResponse](t)},
 		{name: "a probe of every shape", schema: schemaFor[strictProbe](t)},
 	}
@@ -156,21 +156,26 @@ func TestEveryStructuredAnswerBecomesAStrictSchema(t *testing.T) {
 	}
 }
 
-func TestTheProductAnswerKeepsTheDraftItEmbeds(t *testing.T) {
+type embeddedDraft struct {
+	content.DraftAnswer
+	Extra string `json:"extra" description:"A field beside the embedded draft"`
+}
+
+func TestAnAnswerKeepsTheDraftItEmbeds(t *testing.T) {
 	t.Parallel()
 
-	strict := strictOf(schemaFor[content.ProductAnswer](t))
+	strict := strictOf(schemaFor[embeddedDraft](t))
 	properties, ok := strict["properties"].(map[string]any)
 	if !ok {
 		t.Fatalf("properties = %v, want an object", strict["properties"])
 	}
-	for _, name := range []string{"title", "h1", "sections", "summary", "shortDescription"} {
+	for _, name := range []string{"title", "h1", "sections", "summary", "extra"} {
 		if _, present := properties[name]; !present {
-			t.Errorf("the product schema lacks %s: %v", name, properties)
+			t.Errorf("the embedding schema lacks %s: %v", name, properties)
 		}
 	}
-	if _, present := properties["specifications"]; present {
-		t.Errorf("the product schema still asks for specifications, which the store owns: %v", properties)
+	if _, present := properties["DraftAnswer"]; present {
+		t.Errorf("the embedded draft became a property of its own: %v", properties)
 	}
 }
 

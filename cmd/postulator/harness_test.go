@@ -635,16 +635,25 @@ func TestTheHarnessSeedsAProductTheStoreLetsARunEdit(t *testing.T) {
 	if report.Status != string(run.StatusCompleted) || len(report.Product) == 0 {
 		t.Fatalf("the product's last run is %q with outputs %s, want a completed run that wrote them", report.Status, report.Product)
 	}
+	var outputs struct {
+		ShortDescription string `json:"shortDescription"`
+	}
+	if err = json.Unmarshal(report.Product, &outputs); err != nil || !strings.Contains(outputs.ShortDescription, "rewards a good grinder") {
+		t.Errorf("the product's outputs are %s (%v), want the short description generate_fields wrote", report.Product, err)
+	}
 	var published struct {
 		PreviousProduct *struct {
-			Added []string `json:"added"`
+			Added          []string `json:"added"`
+			AttributesSent bool     `json:"attributesSent"`
+			ShortWritten   bool     `json:"shortWritten"`
 		} `json:"previousProduct"`
 	}
 	if err = json.Unmarshal(report.Publish, &published); err != nil || published.PreviousProduct == nil {
 		t.Fatalf("the publish result %s keeps no snapshot of the product (%v)", report.Publish, err)
 	}
-	if len(published.PreviousProduct.Added) != 1 || published.PreviousProduct.Added[0] != "Form" {
-		t.Errorf("the run filled %v, want the one empty attribute the template names", published.PreviousProduct.Added)
+	if snapshot := published.PreviousProduct; len(snapshot.Added) != 0 || snapshot.AttributesSent || !snapshot.ShortWritten {
+		t.Errorf("the run filled %v (attributes sent %t, short description %t), want the short description alone: the attributes are the store's",
+			snapshot.Added, snapshot.AttributesSent, snapshot.ShortWritten)
 	}
 }
 

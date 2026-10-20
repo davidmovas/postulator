@@ -2,6 +2,8 @@ package content
 
 import (
 	stdhtml "html"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -13,52 +15,43 @@ const (
 	CodePrimaryMissingInShortDescription = "primary_missing_in_short_description"
 )
 
-type ProductAnswer struct {
-	DraftAnswer
-	ShortDescription string `json:"shortDescription" description:"The short description the store shows beside the price, as HTML paragraphs"`
-}
-
-type ProductDraft struct {
-	ShortDescription string `json:"shortDescription"`
-}
-
-type BriefProduct struct {
-	ShortIntent      string `json:"shortIntent"`
-	ShortWords       int    `json:"shortWords"`
-	ShortDescription bool   `json:"shortDescription"`
-	ShortKeyword     bool   `json:"shortKeyword"`
-}
+var (
+	blankLines  = regexp.MustCompile(`\n[ \t\r]*\n`)
+	textEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+)
 
 func StoreName(page pagemap.Page) string {
 	return stdhtml.UnescapeString(strings.TrimSpace(page.Observed.Title))
 }
 
-func productBrief(product template.Product) *BriefProduct {
-	return &BriefProduct{
-		ShortDescription: product.ShortDescription.Enabled,
-		ShortIntent:      strings.TrimSpace(product.ShortDescription.Intent),
-		ShortWords:       product.ShortDescription.TargetWords,
-		ShortKeyword:     product.ShortDescription.PrimaryKeyword,
-	}
+func WritesShortDescription(product *template.Product) bool {
+	return product != nil && product.ShortDescription.Enabled
 }
 
-func AssembleProduct(answer ProductAnswer, brief Brief) (ContentDraft, *Document, error) {
-	draft, doc, err := Assemble(answer.DraftAnswer, brief)
-	if err != nil || brief.Product == nil {
-		return draft, doc, err
+func ShortDescriptionRules(product template.Product) []string {
+	short := product.ShortDescription
+	rules := make([]string, 0, 3)
+	if intent := strings.TrimSpace(short.Intent); intent != "" {
+		rules = append(rules, "The template asks: "+intent)
 	}
+	if short.TargetWords > 0 {
+		rules = append(rules, "About "+strconv.Itoa(short.TargetWords)+" words")
+	}
+	if short.PrimaryKeyword {
+		rules = append(rules, "It carries the primary keyword")
+	}
+	return rules
+}
 
-	product := ProductDraft{}
-	if brief.Product.ShortDescription {
-		short, stripped := Sanitize(answer.ShortDescription, nil)
-		if strings.TrimSpace(short) == "" {
-			return ContentDraft{}, nil, incomplete("the model left the short description empty", nil)
+func ShortDescriptionHTML(plain string) string {
+	paragraphs := make([]string, 0)
+	for _, chunk := range blankLines.Split(strings.ReplaceAll(plain, "\r\n", "\n"), -1) {
+		text := strings.Join(strings.Fields(chunk), " ")
+		if text != "" {
+			paragraphs = append(paragraphs, "<p>"+textEscaper.Replace(text)+"</p>")
 		}
-		product.ShortDescription = strings.TrimSpace(short)
-		draft.Findings = append(draft.Findings, strippedFindings("the short description", stripped)...)
 	}
-	draft.Product = &product
-	return draft, doc, nil
+	return strings.Join(paragraphs, "\n")
 }
 
 func plainText(value string) string {
@@ -69,13 +62,13 @@ func plainText(value string) string {
 	return strings.Join(strings.Fields(doc.Text()), " ")
 }
 
-func ProductFindings(draft ProductDraft, product template.Product, primary string) []Finding {
+func ShortDescriptionFindings(short string, product template.Product, primary string) []Finding {
 	out := make([]Finding, 0)
-	short := product.ShortDescription
-	if !short.Enabled || !short.PrimaryKeyword || primary == "" {
+	rule := product.ShortDescription
+	if !rule.Enabled || !rule.PrimaryKeyword || primary == "" {
 		return out
 	}
-	if !carries(plainText(draft.ShortDescription), primary) {
+	if !carries(plainText(short), primary) {
 		out = append(out, Finding{
 			Severity: SeverityError, Code: CodePrimaryMissingInShortDescription,
 			Message: "the primary keyword does not appear in the short description",

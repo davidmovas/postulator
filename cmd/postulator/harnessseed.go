@@ -78,6 +78,7 @@ func harnessRecipe() []template.StepSpec {
 		{Name: steps.NameResolveContext, Enabled: true},
 		{Name: steps.NameGenerateBody, Enabled: true},
 		{Name: steps.NameGenerateMeta, Enabled: true},
+		{Name: steps.NameGenerateFields, Enabled: true},
 		{Name: steps.NameInsertLinks, Enabled: true},
 		{Name: steps.NameRepairLinks, Enabled: true},
 		{Name: steps.NameValidate, Enabled: true},
@@ -110,6 +111,7 @@ func harnessReplies() []fake.Reply {
 	out = append(out,
 		fake.Reply{Step: steps.NameGenerateBody, Match: productPath, Text: productDraftOf()},
 		fake.Reply{Step: steps.NameGenerateMeta, Match: productPath, Text: metaOf(productKeyword)},
+		fake.Reply{Step: steps.NameGenerateFields, Match: productPath, Text: productFieldsOf()},
 	)
 	out = append(out, repairReplies()...)
 	out = append(out, proposeReplies()...)
@@ -184,8 +186,12 @@ func productDraftOf() string {
 		`and not the one who wants milk drinks for four in a row.</p>"},` +
 		`{"heading":"Frequently Asked Questions","html":"<p>Yes, it takes a bottomless portafilter, and no, ` +
 		`it does not steam and brew at the same time.</p>"}],` +
-		`"summary":"What the ` + productKeyword + ` is and who should buy it.",` +
-		`"shortDescription":"<p>The ` + productKeyword + ` is a single boiler machine that rewards a good grinder.</p>"}`
+		`"summary":"What the ` + productKeyword + ` is and who should buy it."}`
+}
+
+func productFieldsOf() string {
+	return `{"fields":[{"key":"product_short_description",` +
+		`"value":"The ` + productKeyword + ` is a single boiler machine that rewards a good grinder."}]}`
 }
 
 func stockTheStore(site *wptest.Server) {
@@ -196,7 +202,6 @@ func stockTheStore(site *wptest.Server) {
 	site.Seed(wptest.Item{
 		Type: wptest.TypeProduct, Title: productName, Slug: productSlug, Status: "publish",
 		Content:      "<p>A single boiler machine with a commercial portafilter.</p>",
-		Excerpt:      "<p>Single boiler, 58 mm.</p>",
 		RegularPrice: "449", SKU: "GCP-2024",
 		Categories: []int64{storeCategoryID}, Terms: storeTermsOf(productPath),
 		Attributes: []wptest.Attribute{

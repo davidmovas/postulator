@@ -20,6 +20,21 @@ describe("the fields artifact", () => {
         });
     });
 
+    it("reads the short description, which is HTML, as the text a buyer sees", () => {
+        expect(
+            fieldsView({
+                values: [
+                    { key: "product_short_description", value: "<p>A compact machine &amp; grinder.</p>\n<p>For the counter.</p>" },
+                    { key: "excerpt", value: "Fits 5 <b> 7" },
+                ],
+                skipped: [],
+            })?.values,
+        ).toStrictEqual([
+            { key: "product_short_description", value: "A compact machine & grinder. For the counter." },
+            { key: "excerpt", value: "Fits 5 <b> 7" },
+        ]);
+    });
+
     it("refuses what is not an object", () => {
         expect(fieldsView(null)).toBeNull();
         expect(fieldsView([])).toBeNull();

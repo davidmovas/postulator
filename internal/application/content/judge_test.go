@@ -9,7 +9,6 @@ import (
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
-	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -339,7 +338,7 @@ func TestAssessShowsTheJudgeTheProductOutputs(t *testing.T) {
 	page.WPType = pagemap.WPProduct
 	_, err := newService(model, nil).Assess(t.Context(), appcontent.AssessRequest{
 		SiteID: "site", Page: page, Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
-		Product: &contentdomain.ProductDraft{ShortDescription: "<p>A strong shot.</p>"},
+		ShortDescription: "<p>A strong shot.</p>",
 	})
 	if err != nil {
 		t.Fatalf("Assess: %v", err)
@@ -349,6 +348,17 @@ func TestAssessShowsTheJudgeTheProductOutputs(t *testing.T) {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("the prompt lacks %q:\n%s", want, prompt)
 		}
+	}
+
+	_, err = newService(model, nil).Assess(t.Context(), appcontent.AssessRequest{
+		SiteID: "site", Page: page, Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
+	})
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	prompt = model.last.Messages[len(model.last.Messages)-1].Text
+	if !strings.Contains(prompt, "PRODUCT\n") || strings.Contains(prompt, "Short description:") {
+		t.Errorf("a product whose short description this run kept is still a product, with no short description shown:\n%s", prompt)
 	}
 }
 

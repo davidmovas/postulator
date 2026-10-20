@@ -1,10 +1,12 @@
 package reports
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -48,26 +50,51 @@ func (s *Service) PageReport(ctx context.Context, req PageReportRequest) (PageRe
 	report.Judge = latest(artifacts, run.ArtifactJudgeReport)
 	report.Publish = latest(artifacts, run.ArtifactPublishResult)
 	report.Relink = latest(artifacts, run.ArtifactRelinkResult)
-	if report.Product, err = productOf(latest(artifacts, run.ArtifactDraft)); err != nil {
+	if report.Product, err = productOf(latest(artifacts, run.ArtifactDraft), latest(artifacts, run.ArtifactFields)); err != nil {
 		return PageReportResponse{}, err
 	}
 	return report, nil
 }
 
-func productOf(draft json.RawMessage) (json.RawMessage, error) {
-	if len(draft) == 0 {
+func productOf(draft, fields json.RawMessage) (json.RawMessage, error) {
+	if len(draft) > 0 {
+		var held struct {
+			Product json.RawMessage `json:"product"`
+		}
+		if err := json.Unmarshal(draft, &held); err != nil {
+			return nil, errors.Wrap(err, errors.Internal, "the stored draft is not readable")
+		}
+		if len(held.Product) > 0 && string(held.Product) != "null" {
+			return held.Product, nil
+		}
+	}
+	if len(fields) == 0 {
 		return nil, nil
 	}
-	var held struct {
-		Product json.RawMessage `json:"product"`
+	var written struct {
+		Values []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"values"`
 	}
-	if err := json.Unmarshal(draft, &held); err != nil {
-		return nil, errors.Wrap(err, errors.Internal, "the stored draft is not readable")
+	if err := json.Unmarshal(fields, &written); err != nil {
+		return nil, errors.Wrap(err, errors.Internal, "the stored fields are not readable")
 	}
-	if len(held.Product) == 0 || string(held.Product) == "null" {
-		return nil, nil
+	for _, value := range written.Values {
+		if value.Key != string(field.ProductShortDescription) {
+			continue
+		}
+		var encoded bytes.Buffer
+		encoder := json.NewEncoder(&encoded)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(struct {
+			ShortDescription string `json:"shortDescription"`
+		}{value.Value}); err != nil {
+			return nil, errors.Wrap(err, errors.Internal, "the short description could not be encoded")
+		}
+		return bytes.TrimSpace(encoded.Bytes()), nil
 	}
-	return held.Product, nil
+	return nil, nil
 }
 
 func (s *Service) RunReport(ctx context.Context, req RunReportRequest) (RunReportResponse, error) {

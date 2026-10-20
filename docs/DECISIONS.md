@@ -3721,3 +3721,24 @@ on what stage 2 left open and what was decided while building.
   after its SEO meta. The product row is written through `UpdatePublished`. A revert of a run made
   before this still puts back the attributes it filled, through `RestoreAttributes`, which sends the
   whole attribute list alone, `wc/v3` replacing it whole.
+- **The short description is a field of its own** (B.2). `generate_body` no longer answers it: the
+  writer's schema is the draft alone for a product too, its prompt no longer names it, and its ceiling
+  and the estimate count the body's words only (`writerCeiling(spec, attempts)`), so
+  `content.ProductAnswer`, `ProductDraft`, `BriefProduct` and `template.Product.Words` are gone.
+  `generate_fields` asks for `product_short_description` on a product page where the page type's
+  scope enables it with AI writes **and** the template's `product.shortDescription` is enabled, the
+  template keeping its switch in the editor and the preflight's `product_outputs_missing` staying
+  true; a template that writes none is a skip with its reason. The template's intent, words and
+  keyword rule join the scope's instruction and limits as the field's rules. The editor answers
+  plain text, like every field, and the value is kept as paragraphs with `&`, `<` and `>` escaped
+  (`content.ShortDescriptionHTML`), so nothing the model answers reaches the store as markup and the
+  stored form is what kses keeps. `publish`, `validate` (the primary keyword rule, now only when the
+  field was written this run) and the judge read it from the `fields` artifact; a page report shows
+  it from there for a new run and from the draft for an older one, and the run's fields pane shows
+  its text. An older draft's `product` is never read by a publish, so a retried older item keeps the
+  store's short description rather than writing a value no field step produced. A run whose recipe
+  leaves `generate_fields` out under a template that writes a short description is warned in
+  preflight (`short_description_unwritten`), since the product then keeps the one it has; the
+  shipped Product template carries the step. Like any field, a short description the client wrote is
+  kept unless the scope or the run rewrites it, where the body writer used to draft one anyway that
+  `publish` then dropped; the harness's product now starts with none, so its run writes one.

@@ -638,12 +638,14 @@ func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name  string
-		short string
-		held  bool
+		name    string
+		short   string
+		written bool
+		held    bool
 	}{
-		{name: "a short description with the keyword", short: "<p>An espresso machine.</p>"},
-		{name: "a short description without it", short: "<p>A machine.</p>", held: true},
+		{name: "a short description with the keyword", short: "<p>An espresso machine.</p>", written: true},
+		{name: "a short description without it", short: "<p>A machine.</p>", written: true, held: true},
+		{name: "no short description written this run", short: "<p>A machine.</p>"},
 	}
 
 	for _, tc := range cases {
@@ -655,7 +657,6 @@ func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
 			draft, err := json.Marshal(content.ContentDraft{
 				Title: "Machine", H1: "Machine",
 				Sections: []content.DraftSection{{Heading: "About", HTML: "<p>Espresso.</p>"}},
-				Product:  &content.ProductDraft{ShortDescription: tc.short},
 			})
 			if err != nil {
 				t.Fatalf("encode the draft: %v", err)
@@ -663,6 +664,9 @@ func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
 			sc := productContext(t, deps)
 			sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: body}
 			sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: draft}
+			if tc.written {
+				withFields(t, sc, steps.FieldValue{Key: string(field.ProductShortDescription), Value: tc.short})
+			}
 			sc.Spec.KeywordRules.PrimaryInH1 = true
 
 			result, err := steps.Validate(deps).Run(t.Context(), sc)
@@ -1534,8 +1538,7 @@ func TestTheWriterPromptSaysWhenAPageHasNoKeywords(t *testing.T) {
 const productDraftReply = `{"title":"Espresso guide","h1":"Espresso guide","sections":[` +
 	`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"},` +
 	`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
-	`],"summary":"A short guide to espresso.",` +
-	`"shortDescription":"<p>An espresso machine for the home.</p>"}`
+	`],"summary":"A short guide to espresso."}`
 
 func productContext(t *testing.T, deps steps.Deps) *run.StepContext {
 	t.Helper()
@@ -1563,28 +1566,26 @@ func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
 	}
 	for _, want := range []string{
 		"writing body copy for a WooCommerce product",
-		"summary and shortDescription",
+		"title, h1, sections and summary",
 		"H1: Espresso Machine & Grinder (the product's name in the store",
 		"never state a price, a stock level or an SKU",
-		"Short description: write it in shortDescription as HTML paragraphs, about 30 words: Say what it is; it carries the primary keyword",
 	} {
 		if !strings.Contains(recorder.last, want) {
 			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
 		}
 	}
-	if strings.Contains(recorder.last, "pecification") {
-		t.Errorf("the prompt still asks for specifications, which the store owns:\n%s", recorder.last)
+	for _, gone := range []string{"pecification", "shortDescription", "Short description"} {
+		if strings.Contains(recorder.last, gone) {
+			t.Errorf("the writer is still asked %q, which generate_fields writes or the store owns:\n%s", gone, recorder.last)
+		}
 	}
 
 	var draft content.ContentDraft
 	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil {
 		t.Fatalf("decode the draft: %v", err)
 	}
-	if draft.H1 != "Espresso Machine & Grinder" || draft.Product == nil {
+	if draft.H1 != "Espresso Machine & Grinder" {
 		t.Fatalf("draft = %+v", draft)
-	}
-	if draft.Product.ShortDescription != "<p>An espresso machine for the home.</p>" {
-		t.Errorf("product draft = %+v", draft.Product)
 	}
 }
 
@@ -1607,12 +1608,12 @@ func TestTheWriterOfAPageIsAskedNothingAboutProducts(t *testing.T) {
 		}
 	}
 	var draft content.ContentDraft
-	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil || draft.Product != nil {
-		t.Fatalf("a page's draft = %+v, %v", draft.Product, err)
+	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil {
+		t.Fatalf("a page's draft: %v", err)
 	}
 }
 
-func TestTheWriterCeilingMakesRoomForAProductsShortDescription(t *testing.T) {
+func TestTheWriterCeilingIsTheBodysAlone(t *testing.T) {
 	t.Parallel()
 
 	deps := unitDeps()
@@ -1624,8 +1625,8 @@ func TestTheWriterCeilingMakesRoomForAProductsShortDescription(t *testing.T) {
 	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
 		t.Fatalf("GenerateBody: %v", err)
 	}
-	if got, want := recorder.ceilings[len(recorder.ceilings)-1], (1800+30)*3+1024; got != want {
-		t.Errorf("ceiling = %d, want %d", got, want)
+	if got, want := recorder.ceilings[len(recorder.ceilings)-1], 1800*3+1024; got != want {
+		t.Errorf("ceiling = %d, want %d: the short description is generate_fields' to write", got, want)
 	}
 }
 

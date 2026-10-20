@@ -326,21 +326,45 @@ func TestPageReportReadsTheNewestItem(t *testing.T) {
 	}
 }
 
+func TestPageReportReadsTheShortDescriptionFromTheFields(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	f.withRun(t, run.StatusCompleted, map[run.ArtifactKind]string{
+		run.ArtifactPublishResult: `{"wpId":7}`,
+		run.ArtifactDraft:         `{"title":"Espresso","sections":[]}`,
+		run.ArtifactFields:        `{"values":[{"key":"excerpt","value":"x"},{"key":"product_short_description","value":"<p>short</p>"}],"skipped":[]}`,
+	})
+	report, err := f.service.PageReport(t.Context(), reports.PageReportRequest{PageID: f.pages["/coffee/espresso/"].ID})
+	if err != nil {
+		t.Fatalf("PageReport: %v", err)
+	}
+	if got := string(report.Product); got != `{"shortDescription":"<p>short</p>"}` {
+		t.Errorf("product = %s, want the short description generate_fields wrote", got)
+	}
+}
+
 func TestPageReportCarriesNoProductForADraftWithout(t *testing.T) {
 	t.Parallel()
 
-	for name, draft := range map[string]string{
-		"no draft":                "",
-		"a page's draft":          `{"title":"Espresso","sections":[]}`,
-		"a draft with no outputs": `{"title":"Espresso","product":null}`,
+	for name, held := range map[string]struct{ draft, fields string }{
+		"no draft":                {},
+		"a page's draft":          {draft: `{"title":"Espresso","sections":[]}`},
+		"a draft with no outputs": {draft: `{"title":"Espresso","product":null}`},
+		"fields with no short description": {
+			draft: `{"title":"Espresso","sections":[]}`, fields: `{"values":[{"key":"excerpt","value":"x"}],"skipped":[]}`,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			f := newFixture(t)
 			blobs := map[run.ArtifactKind]string{run.ArtifactPublishResult: `{"wpId":7}`}
-			if draft != "" {
-				blobs[run.ArtifactDraft] = draft
+			if held.draft != "" {
+				blobs[run.ArtifactDraft] = held.draft
+			}
+			if held.fields != "" {
+				blobs[run.ArtifactFields] = held.fields
 			}
 			f.withRun(t, run.StatusCompleted, blobs)
 			report, err := f.service.PageReport(t.Context(), reports.PageReportRequest{PageID: f.pages["/coffee/espresso/"].ID})

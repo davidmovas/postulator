@@ -6,6 +6,7 @@ import (
 
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
@@ -103,7 +104,7 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
-	draft, _, err := decodeArtifact[content.ContentDraft](sc, run.ArtifactDraft)
+	short, _, err := writtenField(sc, field.ProductShortDescription)
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
@@ -111,7 +112,7 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	assessed, err := deps.Content.Assess(ctx, appcontent.AssessRequest{
 		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: body,
 		Snippet:    appcontent.Snippet{Title: snippet.Title, Description: snippet.Description},
-		HasSnippet: hasSnippet, Product: draft.Product, Targets: targets, Picture: appcontent.JudgedPicture(seen.Fitted),
+		HasSnippet: hasSnippet, ShortDescription: short, Targets: targets, Picture: appcontent.JudgedPicture(seen.Fitted),
 		Call: callMeta(sc, NameJudge, domainllm.RoleJudge),
 	})
 	return assessed.Report, assessed.Tokens, err

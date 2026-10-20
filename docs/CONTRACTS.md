@@ -85,7 +85,8 @@ still active, and a run that wrote nothing to the site.
 `ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
 judge rubric against it and answers with the report, one model call inside the request.
 `PageReport` and `RunReport` read what a run already recorded, and a page report carries, as
-`product`, the short description and attributes of the newest draft and nothing else of it; `SiteOverview`,
+`product`, the short description and attributes of the newest draft (a run before 2026-10-20), else
+`{shortDescription}` from the newest `fields` artifact, and nothing else of either; `SiteOverview`,
 `LinkAudit{siteId}` and `LinkAuditPage{pageId}` read the graph and the page map. The audit
 plans every mapped page's link targets with the rules of the page's resolved template and the
 site's effective policy, exactly as `resolve_context` does, and answers one summary row per

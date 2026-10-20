@@ -53,7 +53,7 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 	system, user, err := render(NameJudge, judgePrompt{
 		Page: req.Page, Entity: req.Entity, Keywords: pagemap.Keywords(req.Page, req.Entity), Spec: req.Spec, Body: req.Body,
 		Meta: req.Snippet, HasMeta: req.HasSnippet, Targets: req.Targets,
-		Store: req.Page.WPType == pagemap.WPProduct, Product: req.Product, Picture: req.Picture,
+		Store: req.Page.WPType == pagemap.WPProduct, Short: req.ShortDescription, Picture: req.Picture,
 	})
 	if err != nil {
 		return AssessResponse{}, err

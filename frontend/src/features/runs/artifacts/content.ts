@@ -1,5 +1,8 @@
+import { plainText } from "../../../domain/text.js";
 import type { Finding } from "./decode.js";
 import { boolAt, findingsAt, listAt, numberAt, record, stringAt, stringsAt } from "./decode.js";
+
+const htmlFields: ReadonlySet<string> = new Set(["product_short_description"]);
 
 export interface JudgeView {
     score: number;
@@ -199,7 +202,8 @@ export function fieldsView(held: unknown): FieldsView | null {
     for (const entry of listAt(held, "values")) {
         const key = stringAt(entry, "key");
         if (key !== "") {
-            values.push({ key, value: stringAt(entry, "value") });
+            const value = stringAt(entry, "value");
+            values.push({ key, value: htmlFields.has(key) ? plainText(value) : value });
         }
     }
     const skipped: FieldSkipView[] = [];

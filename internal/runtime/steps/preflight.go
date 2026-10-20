@@ -164,13 +164,13 @@ func storePreflight(deps Deps) run.Preflight {
 				}
 				owner = &held
 			}
-			findings = append(findings, productFindings(*owner, target)...)
+			findings = append(findings, productFindings(*owner, target, record.Recipe)...)
 		}
 		return findings, nil
 	}
 }
 
-func productFindings(owner site.Site, target run.Target) []run.EstimateFinding {
+func productFindings(owner site.Site, target run.Target, recipe []template.StepSpec) []run.EstimateFinding {
 	page := target.Page
 	found := make([]run.EstimateFinding, 0, 2)
 	switch owner.Commerce {
@@ -199,6 +199,12 @@ func productFindings(owner site.Site, target run.Target) []run.EstimateFinding {
 	if target.Spec.Product == nil {
 		found = append(found, pageFinding(content.SeverityWarn, CodeProductOutputsMissing, page,
 			"the template of "+page.Path+" declares no product outputs, so the product gets its description and nothing else"))
+	}
+	fielded := slices.ContainsFunc(run.Enabled(recipe), func(spec template.StepSpec) bool { return spec.Name == NameGenerateFields })
+	if content.WritesShortDescription(target.Spec.Product) && !fielded {
+		found = append(found, pageFinding(content.SeverityWarn, CodeShortDescriptionUnwritten, page,
+			"the template of "+page.Path+" writes a short description, and the run's recipe leaves out "+NameGenerateFields+
+				", which writes it, so the product keeps the short description it has; switch the step on in the template's recipe"))
 	}
 	return found
 }

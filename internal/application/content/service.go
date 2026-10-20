@@ -82,7 +82,7 @@ type judgePrompt struct {
 	Meta     Snippet
 	HasMeta  bool
 	Store    bool
-	Product  *contentdomain.ProductDraft
+	Short    string
 	Targets  []contentdomain.LinkTarget
 	Picture  string
 }

@@ -37,13 +37,6 @@ func bodyField(sc *run.StepContext) field.Key {
 	return pageKey(sc.Page)
 }
 
-func bodySchema(product bool) string {
-	if product {
-		return schemaText[content.ProductAnswer]()
-	}
-	return schemaText[content.DraftAnswer]()
-}
-
 func GenerateBody(deps Deps) run.StepDef {
 	return run.StepDef{
 		Name:      NameGenerateBody,
@@ -73,10 +66,10 @@ func GenerateBody(deps Deps) run.StepDef {
 			prompt := bodyPrompt{
 				Page: sc.Page, Type: sc.Type.Name, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
 			}
-			ceiling := writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts)
+			ceiling := writerCeiling(sc.Spec, sc.Item.Attempts)
 			seen, err := deps.fitted(ctx, sc, call, bodyField(sc), &lc, ceiling, func() (string, string, error) {
 				return prompts.Render(NameGenerateBody, prompt)
-			}, bodySchema(prompt.Product))
+			}, schemaText[content.DraftAnswer]())
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -132,19 +125,10 @@ func outOfRoom(sc *run.StepContext, usage domainllm.Usage) run.Result {
 
 func write(ctx context.Context, deps Deps, request port.Request,
 	brief content.Brief) (content.ContentDraft, *content.Document, domainllm.Usage, error) {
-	if brief.Product == nil {
-		answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, request)
-		if err != nil {
-			return content.ContentDraft{}, nil, usage, err
-		}
-		draft, doc, err := content.Assemble(answer, brief)
-		return draft, doc, usage, err
-	}
-
-	answer, usage, err := port.Structured[content.ProductAnswer](ctx, deps.LLM, request)
+	answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, request)
 	if err != nil {
 		return content.ContentDraft{}, nil, usage, err
 	}
-	draft, doc, err := content.AssembleProduct(answer, brief)
+	draft, doc, err := content.Assemble(answer, brief)
 	return draft, doc, usage, err
 }

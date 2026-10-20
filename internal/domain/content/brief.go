@@ -46,7 +46,6 @@ type Brief struct {
 	Sections       []BriefSection `json:"sections"`
 	Phrases        []BriefPhrase  `json:"phrases"`
 	Children       []string       `json:"children"`
-	Product        *BriefProduct  `json:"product,omitempty"`
 	Links          *LinkAllowance `json:"-"`
 }
 
@@ -83,9 +82,6 @@ func NewBrief(spec template.TemplateSpec, rules field.LinkRules, page pagemap.Pa
 	if page.WPType == pagemap.WPProduct {
 		if name := StoreName(page); name != "" {
 			brief.H1 = name
-		}
-		if spec.Product != nil {
-			brief.Product = productBrief(*spec.Product)
 		}
 	}
 	brief.PlannedTitle = brief.Title != ""

@@ -10,7 +10,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 func productSpec() template.TemplateSpec {
@@ -47,25 +46,15 @@ func TestNewBriefWritesAProductUnderTheNameTheStoreGivesIt(t *testing.T) {
 	if brief.Title != "Buy BPC-157 Liquid" {
 		t.Errorf("title = %q, want the file's title", brief.Title)
 	}
-	if brief.Product == nil {
-		t.Fatal("a product written from a template with product outputs carries no product brief")
-	}
-	if !brief.Product.ShortDescription || brief.Product.ShortWords != 40 || !brief.Product.ShortKeyword {
-		t.Errorf("product brief = %+v", brief.Product)
-	}
 }
 
-func TestNewBriefLeavesTheProductOutputsOffAPage(t *testing.T) {
+func TestNewBriefKeepsAPagesOwnH1(t *testing.T) {
 	t.Parallel()
 
 	page := storeProductPage()
 	page.WPType = pagemap.WPPage
-	brief := productBrief(page)
-	if brief.Product != nil {
-		t.Errorf("a page got a product brief: %+v", brief.Product)
-	}
-	if brief.H1 != "BPC-157 Liquid Form" {
-		t.Errorf("h1 = %q, want the page's own plan", brief.H1)
+	if got := productBrief(page).H1; got != "BPC-157 Liquid Form" {
+		t.Errorf("h1 = %q, want the page's own plan", got)
 	}
 
 	unnamed := storeProductPage()
@@ -75,51 +64,75 @@ func TestNewBriefLeavesTheProductOutputsOffAPage(t *testing.T) {
 	}
 }
 
-func productAnswer() content.ProductAnswer {
-	return content.ProductAnswer{
-		DraftAnswer: content.DraftAnswer{
-			H1:       "BPC-157 Liquid & Spray",
-			Sections: []content.AnswerSection{{Slot: 1, Heading: "Overview", HTML: "<p>bpc 157 liquid in a vial.</p>"}},
+func TestTheTemplateBriefsTheShortDescription(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		product *template.Product
+		writes  bool
+		rules   []string
+	}{
+		{name: "no product outputs", product: nil},
+		{name: "switched off", product: &template.Product{ShortDescription: template.ProductShortDescription{Intent: "Say what it is"}}},
+		{
+			name:    "every rule",
+			product: &template.Product{ShortDescription: template.ProductShortDescription{Enabled: true, Intent: " Say what it is ", TargetWords: 40, PrimaryKeyword: true}},
+			writes:  true,
+			rules:   []string{"The template asks: Say what it is", "About 40 words", "It carries the primary keyword"},
 		},
-		ShortDescription: `<p>A <strong>bpc 157 liquid</strong> <a href="/x/">for research</a>.</p>`,
+		{
+			name:    "the intent alone",
+			product: &template.Product{ShortDescription: template.ProductShortDescription{Enabled: true}},
+			writes:  true,
+			rules:   []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := content.WritesShortDescription(tc.product); got != tc.writes {
+				t.Fatalf("writes = %t, want %t", got, tc.writes)
+			}
+			if !tc.writes {
+				return
+			}
+			if got := content.ShortDescriptionRules(*tc.product); !slices.Equal(got, tc.rules) {
+				t.Errorf("rules = %q, want %q", got, tc.rules)
+			}
+		})
 	}
 }
 
-func TestAssembleProductSanitizesTheShortDescription(t *testing.T) {
+func TestTheShortDescriptionIsWrittenAsEscapedParagraphs(t *testing.T) {
 	t.Parallel()
 
-	brief := productBrief(storeProductPage())
-	draft, doc, err := content.AssembleProduct(productAnswer(), brief)
-	if err != nil {
-		t.Fatalf("AssembleProduct: %v", err)
+	cases := []struct {
+		name  string
+		plain string
+		want  string
+	}{
+		{name: "one paragraph", plain: " A bpc 157 liquid for research. ", want: "<p>A bpc 157 liquid for research.</p>"},
+		{name: "two paragraphs", plain: "First.\n\n  Second.\n", want: "<p>First.</p>\n<p>Second.</p>"},
+		{name: "a line break is a space", plain: "First line\nsecond  line", want: "<p>First line second line</p>"},
+		{name: "markup is text", plain: `Fits <b>5 & 7</b> "kits"`, want: `<p>Fits &lt;b&gt;5 &amp; 7&lt;/b&gt; "kits"</p>`},
+		{name: "nothing", plain: " \n\n ", want: ""},
 	}
-	if doc == nil || draft.Product == nil {
-		t.Fatalf("draft = %+v", draft)
-	}
-	if draft.Product.ShortDescription != `<p>A <strong>bpc 157 liquid</strong> for research.</p>` {
-		t.Errorf("short description = %q, want it sanitized like a section", draft.Product.ShortDescription)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := content.ShortDescriptionHTML(tc.plain); got != tc.want {
+				t.Errorf("ShortDescriptionHTML(%q) = %q, want %q", tc.plain, got, tc.want)
+			}
+		})
 	}
 }
 
-func TestAssembleProductAsksAgainForAShortDescriptionTheTemplateWants(t *testing.T) {
-	t.Parallel()
-
-	answer := productAnswer()
-	answer.ShortDescription = "  "
-	_, _, err := content.AssembleProduct(answer, productBrief(storeProductPage()))
-	if !errors.IsCode(err, errors.External) || reasonOf(t, err) != content.ReasonIncompleteAnswer {
-		t.Fatalf("err = %v, want an incomplete answer the engine tries again", err)
-	}
-
-	page := storeProductPage()
-	page.WPType = pagemap.WPPage
-	draft, _, err := content.AssembleProduct(answer, productBrief(page))
-	if err != nil || draft.Product != nil {
-		t.Errorf("a page's draft = %+v, %v; it carries no product outputs", draft.Product, err)
-	}
-}
-
-func TestProductFindingsGradeTheShortDescription(t *testing.T) {
+func TestShortDescriptionFindingsGradeTheShortDescription(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -138,7 +151,7 @@ func TestProductFindingsGradeTheShortDescription(t *testing.T) {
 			t.Parallel()
 
 			product := template.Product{ShortDescription: template.ProductShortDescription{Enabled: true, PrimaryKeyword: tc.rule}}
-			found := content.ProductFindings(content.ProductDraft{ShortDescription: tc.short}, product, "bpc 157 liquid")
+			found := content.ShortDescriptionFindings(tc.short, product, "bpc 157 liquid")
 			if got := codesIn(found); !slices.Equal(got, tc.want) {
 				t.Errorf("codes = %v, want %v", got, tc.want)
 			}

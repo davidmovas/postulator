@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -24,8 +25,11 @@ const (
 	productShort       = `<p>A compact machine for the counter.</p>`
 	productDraft       = `{"title":"Espresso guide","h1":"Espresso Machine","sections":[` +
 		`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"}` +
-		`],"summary":"A short guide to espresso.","product":{"shortDescription":"<p>A compact machine for the counter.</p>",` +
-		`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Origin","value":"Spain"},{"name":"Size","value":"Large"}]}}`
+		`],"summary":"A short guide to espresso."}`
+	olderProductDraft = `{"title":"Espresso guide","h1":"Espresso Machine","sections":[` +
+		`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"}` +
+		`],"summary":"A short guide to espresso.","product":{"shortDescription":"<p>An older run's short description.</p>",` +
+		`"specifications":[{"name":"Form","value":"Countertop"}]}}`
 )
 
 type siteKeeper struct {
@@ -102,7 +106,29 @@ func storeContext(t *testing.T, wpID int64) *run.StepContext {
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is for", TargetWords: 30},
 	}
+	withFields(t, sc, steps.FieldValue{Key: string(field.ProductShortDescription), Value: productShort})
 	return sc
+}
+
+func TestTheShortDescriptionComesFromTheFieldsNotTheDraft(t *testing.T) {
+	t.Parallel()
+
+	h := newProductHarness(t, storeProduct())
+	sc := storeContext(t, h.held.ID)
+	sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: []byte(olderProductDraft)}
+	delete(sc.Artifacts, run.ArtifactFields)
+
+	published := runPublish(t, h.deps, sc)
+	stored, _ := h.server.Lookup(h.held.ID)
+	if stored.Excerpt != "<p>old short</p>" {
+		t.Errorf("short description = %q, want the store's own: no field was written this run", stored.Excerpt)
+	}
+	if stored.Content != productDescription {
+		t.Errorf("description = %q, want the run's", stored.Content)
+	}
+	if snapshot := published.PreviousProduct; snapshot == nil || snapshot.ShortWritten {
+		t.Errorf("snapshot = %+v, want no short description recorded as written", snapshot)
+	}
 }
 
 func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
@@ -478,15 +504,28 @@ func TestPublishPreflightRefusesAProductBeforeItSpends(t *testing.T) {
 	}
 	outputs := &template.Product{ShortDescription: template.ProductShortDescription{Enabled: true, TargetWords: 30}}
 
+	withoutFields := make([]template.StepSpec, 0)
+	for _, spec := range run.GenerateRecipe() {
+		if spec.Name != steps.NameGenerateFields {
+			withoutFields = append(withoutFields, spec)
+		}
+	}
+
 	cases := []struct {
 		name    string
 		page    pagemap.Page
 		owner   func(*site.Site)
 		mode    run.PublishMode
 		outputs *template.Product
+		recipe  []template.StepSpec
 		errors  []string
 		warns   []string
 	}{
+		{
+			name: "a recipe that leaves out the step writing the short description", page: product, outputs: outputs,
+			recipe: withoutFields, warns: []string{steps.CodeShortDescriptionUnwritten},
+		},
+		{name: "a recipe without it under a template that writes none", page: product, recipe: withoutFields, warns: []string{steps.CodeProductOutputsMissing}},
 		{name: "a product the store can take", page: product, outputs: outputs},
 		{name: "a store never checked", page: product, outputs: outputs, owner: func(s *site.Site) { s.Commerce = site.CommerceUnknown }, errors: []string{steps.CodeCommerceUnknown}},
 		{name: "a site with no store", page: product, outputs: outputs, owner: func(s *site.Site) { s.Commerce = site.CommerceAbsent }, errors: []string{steps.CodeCommerceAbsent}},
@@ -530,7 +569,11 @@ func TestPublishPreflightRefusesAProductBeforeItSpends(t *testing.T) {
 			}
 			deps := unitDeps()
 			deps.Sites = siteStub{record: owner}
-			record, targets := preflightRun(run.GenerateRecipe(), tc.page)
+			recipe := run.GenerateRecipe()
+			if tc.recipe != nil {
+				recipe = tc.recipe
+			}
+			record, targets := preflightRun(recipe, tc.page)
 			record.PublishMode = run.PublishLive
 			if tc.mode != "" {
 				record.PublishMode = tc.mode
