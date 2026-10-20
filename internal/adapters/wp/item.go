@@ -338,16 +338,8 @@ func (in CreateItem) payload() map[string]any {
 type UpdateItem struct {
 	Title         *string
 	Content       *string
-	Slug          *string
-	Status        *string
-	Parent        *int64
 	Excerpt       *string
-	MenuOrder     *int
-	Template      *string
 	FeaturedMedia *int64
-	Meta          map[string]any
-	Categories    []int64
-	Tags          []int64
 }
 
 func (in UpdateItem) payload() map[string]any {
@@ -358,35 +350,11 @@ func (in UpdateItem) payload() map[string]any {
 	if in.Content != nil {
 		payload["content"] = *in.Content
 	}
-	if in.Slug != nil {
-		payload["slug"] = *in.Slug
-	}
-	if in.Status != nil {
-		payload["status"] = *in.Status
-	}
-	if in.Parent != nil {
-		payload["parent"] = *in.Parent
-	}
 	if in.Excerpt != nil {
 		payload["excerpt"] = *in.Excerpt
 	}
-	if in.MenuOrder != nil {
-		payload["menu_order"] = *in.MenuOrder
-	}
-	if in.Template != nil {
-		payload["template"] = *in.Template
-	}
 	if in.FeaturedMedia != nil {
 		payload["featured_media"] = *in.FeaturedMedia
-	}
-	if in.Categories != nil {
-		payload["categories"] = in.Categories
-	}
-	if in.Tags != nil {
-		payload["tags"] = in.Tags
-	}
-	if len(in.Meta) > 0 {
-		payload["meta"] = in.Meta
 	}
 	return payload
 }

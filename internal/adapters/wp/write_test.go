@@ -1,6 +1,8 @@
 package wp_test
 
 import (
+	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -69,74 +71,34 @@ func TestCreateItemPlacesAChildUnderItsParent(t *testing.T) {
 	}
 }
 
-func TestUpdateItemTreatsParentAsThreeStates(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name   string
-		update func(parent int64) wp.UpdateItem
-		want   func(parent int64) int64
-	}{
-		{
-			name:   "absent keeps the parent",
-			update: func(int64) wp.UpdateItem { return wp.UpdateItem{Status: pointerTo("publish")} },
-			want:   func(parent int64) int64 { return parent },
-		},
-		{
-			name:   "zero moves it to the top level",
-			update: func(int64) wp.UpdateItem { return wp.UpdateItem{Parent: pointerTo(int64(0))} },
-			want:   func(int64) int64 { return 0 },
-		},
-		{
-			name:   "an id reparents it",
-			update: func(parent int64) wp.UpdateItem { return wp.UpdateItem{Parent: pointerTo(parent)} },
-			want:   func(parent int64) int64 { return parent },
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			server := wptest.New(t)
-			parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})[0]
-			child := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Powder", Parent: parent.ID})[0]
-
-			updated, err := newClient(t, server).UpdateItem(t.Context(), wp.TypePage, child.ID, tc.update(parent.ID))
-			if err != nil {
-				t.Fatalf("UpdateItem: %v", err)
-			}
-			if got := tc.want(parent.ID); updated.Parent != got {
-				t.Errorf("parent = %d, want %d", updated.Parent, got)
-			}
-			if updated.Title != "Powder" {
-				t.Errorf("title = %q; an absent field must not be overwritten", updated.Title)
-			}
-		})
-	}
-}
-
-func TestUpdateItemDistinguishesKeepingFromClearing(t *testing.T) {
+func TestAnUpdateCarriesOnlyWhatAnUpdateMayWrite(t *testing.T) {
 	t.Parallel()
 
 	server := wptest.New(t)
-	seeded := server.Seed(wptest.Item{Type: wptest.TypePost, Title: "Powder", Categories: []int64{7, 9}})
-	client := newClient(t, server)
+	parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Koffein"})[0]
+	child := server.Seed(wptest.Item{
+		Type: wptest.TypePage, Title: "Powder", Slug: "powder", Status: "publish", Parent: parent.ID, Categories: []int64{7},
+	})[0]
+	server.ResetRequests()
 
-	kept, err := client.UpdateItem(t.Context(), wp.TypePost, seeded[0].ID, wp.UpdateItem{Status: pointerTo("draft")})
+	updated, err := newClient(t, server).UpdateItem(t.Context(), wp.TypePage, child.ID, wp.UpdateItem{
+		Title: pointerTo("Ground powder"), Content: pointerTo("<p>x</p>"), Excerpt: pointerTo("Short"), FeaturedMedia: pointerTo(int64(12)),
+	})
 	if err != nil {
 		t.Fatalf("UpdateItem: %v", err)
 	}
-	if len(kept.Categories) != 2 {
-		t.Errorf("categories = %v, want them kept when the field is nil", kept.Categories)
+	if updated.Parent != parent.ID || updated.Slug != "powder" || updated.Status != "publish" || len(updated.Categories) != 1 {
+		t.Errorf("the update moved what it may not write: %+v", updated)
 	}
-
-	cleared, err := client.UpdateItem(t.Context(), wp.TypePost, seeded[0].ID, wp.UpdateItem{Categories: []int64{}})
-	if err != nil {
-		t.Fatalf("UpdateItem: %v", err)
+	request, _ := server.LastRequest()
+	var sent map[string]any
+	if err = json.Unmarshal(request.Body, &sent); err != nil {
+		t.Fatalf("decode the update: %v", err)
 	}
-	if len(cleared.Categories) != 0 {
-		t.Errorf("categories = %v, want them cleared by an empty slice", cleared.Categories)
+	for key := range sent {
+		if !slices.Contains([]string{"title", "content", "excerpt", "featured_media"}, key) {
+			t.Errorf("the update sent %s", key)
+		}
 	}
 }
 
@@ -196,7 +158,7 @@ func TestTheGenericWriteMethodsCoverPagesAndPostsOnly(t *testing.T) {
 	if _, err := client.CreateItem(t.Context(), wp.TypeProduct, wp.CreateItem{Title: "x"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("create code = %q, want %q", errors.CodeOf(err), errors.Invalid)
 	}
-	if _, err := client.UpdateItem(t.Context(), wp.TypeProduct, 1, wp.UpdateItem{Status: pointerTo("draft")}); !errors.IsCode(err, errors.Invalid) {
+	if _, err := client.UpdateItem(t.Context(), wp.TypeProduct, 1, wp.UpdateItem{Title: pointerTo("x")}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("update code = %q, want %q", errors.CodeOf(err), errors.Invalid)
 	}
 	if err := client.DeleteItem(t.Context(), wp.TypeProductCategory, 1, true); !errors.IsCode(err, errors.Invalid) {

@@ -3648,3 +3648,20 @@ on what stage 2 left open and what was decided while building.
   product test that pinned the description byte for byte against the old fake expects kses' form.
   A step that hands an SEO write no expected hashes keeps writing as before; `publish` and the revert
   pass them in A.5 and C.1.
+- **The field registry is `application/edit`, three writers behind one `Write`** (A.4). It declares a
+  core writer (title, excerpt, featured image, and the body on a site without the plugin), a store
+  writer (a product's short description) and a plugin writer (the body under its hash, the SEO fields
+  with their Open Graph twins, meta by key) over its own types; `runtime/steps/edit_writers.go`
+  adapts `*wp.Client`, and a run builds the service per site client, so the composition root is
+  untouched. `Write` refuses before anything leaves a denied or unknown key (`field_denied`), a key no
+  writer takes here (`field_not_writable`, the H1 among them), a product's title, excerpt or featured
+  image (`field_owned_by_store`), and a plugin field on a site without the plugin
+  (`field_needs_plugin`); it asks the plugin for guarded writes before the first write, so an
+  outdated plugin writes nothing, not even the core fields of the same call. It writes the core and
+  store fields first, each group read just before its write and written only when every value still
+  hashes as read, then the meta and the SEO fields, then the body, and answers each key as written
+  (with what was stored), moved (with the live hash) or held behind a group that moved. `UpdateItem`
+  now carries only the title, content, excerpt and featured image; slug, status, parent, menu order,
+  template, terms and meta left it, a creation keeping what it needs on `CreateItem`. The variation,
+  media, upsell and store meta writers arrive with their fields in Part B, `UpdateMedia` and
+  `UpdateVariation` with them.

@@ -391,6 +391,10 @@ func (c *Client) Capabilities(ctx context.Context) (Capabilities, error) {
 	}, nil
 }
 
+func (c *Client) GuardedWrites(ctx context.Context) error {
+	return c.requireCapability(ctx, CapabilityGuardedWrite)
+}
+
 func (c *Client) requirePlugin(ctx context.Context) error {
 	_, err := c.Manifest(ctx)
 	return err
