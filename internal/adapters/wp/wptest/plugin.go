@@ -399,9 +399,24 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 	stored.Content = content
 	stored.Modified = s.tick()
 	updated := contentHash(content)
+	lost := 0
+	if len(s.rawAnswerFaults) > 0 {
+		lost, s.rawAnswerFaults = s.rawAnswerFaults[0], s.rawAnswerFaults[1:]
+	}
 	s.mu.Unlock()
 
+	if lost != 0 {
+		s.fail(w, lost, faultCode(lost), "the injected fault fired after the write")
+		return
+	}
 	s.respond(w, http.StatusOK, map[string]any{"contentHash": updated})
+}
+
+func (s *Server) LoseTheAnswerOfTheNextRawWrite(status int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.rawAnswerFaults = append(s.rawAnswerFaults, status)
 }
 
 func (s *Server) contentItem(stored *Item) map[string]any {

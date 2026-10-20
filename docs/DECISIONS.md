@@ -3546,6 +3546,18 @@ on what stage 2 left open and what was decided while building.
   its visitors, always waits the same way. A confirmation whose lookup fails falls through to the
   tool's own path, which proposes in confirm mode and fails the call in autonomous mode. No schema
   changed: 91 tools, 63,107 bytes.
+- **A relink whose answer was lost is recognised** (ruling 5). `relink_page` and `relink_neighbors`
+  now keep the same kind of record as publish: a first execution composes every body they will
+  write (the body read with its hash, the spliced body, the blocks it makes ours) and settles that
+  plan, the review gate of a draft run included; then each write is its own execution, recorded
+  straight after it lands. A write whose answer was lost answers 409 on its rerun, and the rerun
+  reads the stored body: when it renders as the body composed, the write is taken as made, so its
+  body, its blocks and its links are recorded as if the answer had come back and nothing is placed
+  again; anything else is the client's edit and is reported (a conflict for a neighbour, a pause for
+  the page). The neighbours' result is carried on every wait once a write has landed, so a relink
+  stopped halfway still tells a revert what each written neighbour held. `wptest` gained
+  `LoseTheAnswerOfTheNextRawWrite`, which stores a raw write and answers an error, the shape of a
+  lost answer.
 
 ### Decided while building
 

@@ -12,7 +12,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
@@ -88,23 +87,18 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 			if published.Status != wordPressPublished {
 				return relinked(notLiveYet(sc.Page, published.Status), "no neighbor links to "+sc.Page.Path+" yet")
 			}
+			state, err := relinkStateOf(sc, checkpointRelinkNeighbors, run.ArtifactLinkContext, run.ArtifactPublishResult)
+			if err != nil {
+				return run.Result{}, err
+			}
 			around, err := neighborhoodOf(ctx, deps, sc)
 			if err != nil {
 				return run.Result{}, err
 			}
-			held, err := around.review(ctx, deps, sc)
-			if err != nil || held.held != nil {
-				return orHeld(held, err)
+			if !state.Planned {
+				return around.planAll(ctx, deps, sc, &state)
 			}
-			result, err := around.relink(ctx, deps)
-			if err != nil {
-				return run.Result{}, err
-			}
-			settled, err := relinked(result, "relinked "+strconv.Itoa(result.Linked)+" neighbors of "+sc.Page.Path)
-			if err != nil {
-				return run.Result{}, err
-			}
-			return withChecks(settled, held.check), nil
+			return around.writeNext(ctx, deps, &state)
 		},
 	}
 }
@@ -140,7 +134,6 @@ type neighborhood struct {
 	index    pagemap.Index
 	graph    graph.Graph
 	types    pagetype.Set
-	planned  *[]relinkedBody
 	runID    string
 	absolute bool
 }
@@ -194,24 +187,12 @@ func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighb
 	}, nil
 }
 
-func (n neighborhood) review(ctx context.Context, deps Deps, sc *run.StepContext) (gate, error) {
-	if !reviewing(sc) {
-		return reviewGate(sc, checkpointRelinkNeighborsReviewed, EditPlan{}, "")
-	}
-	planned := make([]relinkedBody, 0)
-	dry := n
-	dry.planned = &planned
-	if _, err := dry.relink(ctx, deps); err != nil {
-		return gate{}, err
-	}
-	return deps.reviewRelinks(ctx, sc, checkpointRelinkNeighborsReviewed, "the links "+n.page.Path+"'s neighbors owe it", planned)
-}
-
-func (n neighborhood) relink(ctx context.Context, deps Deps) (RelinkResult, error) {
+func (n neighborhood) plan(ctx context.Context, deps Deps) (RelinkResult, []relinkWrite, error) {
 	result := RelinkResult{
 		Neighbors: make([]NeighborResult, 0, len(n.lc.Targets)),
 		Findings:  make([]content.Finding, 0),
 	}
+	writes := make([]relinkWrite, 0)
 
 	candidates := n.candidates()
 	for i := range candidates {
@@ -220,16 +201,21 @@ func (n neighborhood) relink(ctx context.Context, deps Deps) (RelinkResult, erro
 			continue
 		}
 
-		outcome, err := n.relinkOne(ctx, deps, neighbor)
+		outcome, write, err := n.relinkOne(ctx, deps, neighbor)
 		if err != nil {
-			return RelinkResult{}, err
+			return RelinkResult{}, nil, err
+		}
+		if write != nil {
+			write.Planned = candidates[i].planned
+			writes = append(writes, *write)
+			continue
 		}
 		if !candidates[i].planned && quiet(outcome) {
 			continue
 		}
 		result.tally(outcome, n.page)
 	}
-	return result, nil
+	return result, writes, nil
 }
 
 func (r *RelinkResult) tally(outcome NeighborResult, page pagemap.Page) {
@@ -299,14 +285,14 @@ type owedLink struct {
 	target content.LinkTarget
 }
 
-func (n neighborhood) relinkOne(ctx context.Context, deps Deps, neighbor pagemap.Page) (NeighborResult, error) {
+func (n neighborhood) relinkOne(ctx context.Context, deps Deps, neighbor pagemap.Page) (NeighborResult, *relinkWrite, error) {
 	outcome := NeighborResult{
 		PageID: neighbor.ID, Path: neighbor.Path, Type: string(neighbor.WPType), WPID: *neighbor.WPID,
 	}
 
 	owed, reason := n.owedBy(neighbor)
 	if reason != "" {
-		return skip(outcome, reason), nil
+		return skip(outcome, reason), nil, nil
 	}
 	return n.placeOwed(ctx, deps, neighbor, owed, outcome)
 }
@@ -335,13 +321,13 @@ func (n neighborhood) planOf(neighbor pagemap.Page) (content.LinkContext, field.
 }
 
 func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap.Page, owed owedLink,
-	outcome NeighborResult) (NeighborResult, error) {
+	outcome NeighborResult) (NeighborResult, *relinkWrite, error) {
 	body, reason, err := readSiteBody(ctx, n.client, neighbor, ReasonNeighborGone, ReasonNeighborUnreadable)
 	if err != nil {
-		return NeighborResult{}, err
+		return NeighborResult{}, nil, err
 	}
 	if reason != "" {
-		return skip(outcome, reason), nil
+		return skip(outcome, reason), nil, nil
 	}
 
 	placement, sentence := backfill(body.doc, owed.lc, owed.policy, owed.target)
@@ -350,39 +336,18 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 		outcome.Outcome = OutcomeUnchanged
 		outcome.Detail = firstDetail(placement)
 		outcome.missing = !alreadyLinked(placement)
-		return outcome, nil
+		return outcome, nil, nil
 	}
 
 	updated, err := body.spliced(ctx, deps, neighbor)
 	if err != nil {
-		return skip(outcome, ReasonNeighborUnreadable), nil
+		return skip(outcome, ReasonNeighborUnreadable), nil, nil
 	}
-	if n.planned != nil {
-		*n.planned = append(*n.planned, relinkedBody{page: neighbor, before: body.raw.Content, after: updated.raw})
-		outcome.Outcome = OutcomeLinked
-		return outcome, nil
-	}
-	hash, err := body.put(ctx, n.client, neighbor, updated.raw)
-	if err != nil {
-		if errors.IsCode(err, errors.Conflict) {
-			outcome.Outcome = OutcomeConflict
-			outcome.Detail = err.Error()
-			return outcome, nil
-		}
-		return NeighborResult{}, err
-	}
-
 	outcome.Outcome = OutcomeLinked
 	outcome.Anchor = anchor
 	outcome.Sentence = sentence
 	outcome.Before = NeighborBefore{Hash: body.raw.ContentHash, HTML: body.raw.Content}
-	if recordErr := recordSpliced(ctx, deps, neighbor.ID, n.runID, updated); recordErr != nil {
-		return NeighborResult{}, recordErr
-	}
-	if adoptErr := adopt(ctx, deps, neighbor, n.index, n.site, body.doc, hash); adoptErr != nil {
-		return NeighborResult{}, adoptErr
-	}
-	return outcome, nil
+	return outcome, &relinkWrite{Outcome: outcome, After: updated.raw, Ours: updated.ours}, nil
 }
 
 func owedReason(lc content.LinkContext, page pagemap.Page) string {
@@ -458,4 +423,83 @@ func conflictFinding(outcome NeighborResult) content.Finding {
 			"class": ClassNeedsHuman, "pageId": outcome.PageID, "wpId": outcome.WPID,
 		},
 	}
+}
+
+func (n neighborhood) planAll(ctx context.Context, deps Deps, sc *run.StepContext, state *relinkState) (run.Result, error) {
+	result, writes, err := n.plan(ctx, deps)
+	if err != nil {
+		return run.Result{}, err
+	}
+	state.Result, state.Writes, state.Planned = result, writes, true
+	held, err := deps.reviewRelinks(ctx, sc, checkpointRelinkNeighborsReviewed, "the links "+n.page.Path+"'s neighbors owe it",
+		state.bodies(n.index))
+	if err != nil || held.held != nil {
+		return orHeld(held, err)
+	}
+	waiting, err := n.settled(state, "planned the links "+strconv.Itoa(len(writes))+" neighbors of "+n.page.Path+" owe it")
+	if err != nil {
+		return run.Result{}, err
+	}
+	return withChecks(waiting, held.check), nil
+}
+
+func (n neighborhood) writeNext(ctx context.Context, deps Deps, state *relinkState) (run.Result, error) {
+	write := state.Writes[state.Done]
+	outcome := write.Outcome
+	neighbor, known := n.index.ByID(outcome.PageID)
+	if !known || neighbor.WPID == nil {
+		state.Result.tally(skip(outcome, ReasonNeighborGone), n.page)
+		state.Done++
+		return n.settled(state, "the neighbor "+outcome.Path+" left the map before it was relinked")
+	}
+	landed, err := landRelinkedBody(ctx, n.client, neighbor, write.After, outcome.Before.Hash)
+	if err != nil {
+		check, checkErr := state.checkpoint(checkpointRelinkNeighbors)
+		if checkErr != nil {
+			return run.Result{}, checkErr
+		}
+		return run.Result{Checkpoint: check}, err
+	}
+	if !landed.written {
+		outcome.Outcome, outcome.Detail = OutcomeConflict, "the neighbor changed on the site after its links were planned"
+	} else if recorded := n.recordLanded(ctx, deps, neighbor, write, landed.hash); recorded != nil {
+		return run.Result{}, recorded
+	}
+	state.Result.tally(outcome, n.page)
+	state.Done++
+	return n.settled(state, "relinked "+outcome.Path)
+}
+
+func (n neighborhood) recordLanded(ctx context.Context, deps Deps, neighbor pagemap.Page, write relinkWrite, hash string) error {
+	if err := recordSpliced(ctx, deps, neighbor.ID, n.runID, splicedBody{raw: write.After, ours: write.Ours}); err != nil {
+		return err
+	}
+	doc, err := content.Parse(write.After)
+	if err != nil {
+		return err
+	}
+	return adopt(ctx, deps, neighbor, n.index, n.site, doc, hash)
+}
+
+func (n neighborhood) settled(state *relinkState, message string) (run.Result, error) {
+	finished := state.Done >= len(state.Writes)
+	state.Finished = finished
+	check, err := state.checkpoint(checkpointRelinkNeighbors)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if !finished && state.Done == 0 {
+		return run.Result{Next: run.TransitionWait, Checkpoint: check, Message: message}, nil
+	}
+	carried, err := relinked(state.Result, message)
+	if err != nil {
+		return run.Result{}, err
+	}
+	carried.Checkpoint = check
+	if !finished {
+		carried.Next = run.TransitionWait
+	} else {
+		carried.Message = "relinked " + strconv.Itoa(state.Result.Linked) + " neighbors of " + n.page.Path
+	}
+	return carried, nil
 }

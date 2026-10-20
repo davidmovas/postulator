@@ -76,7 +76,7 @@ func relinkPageContext(t *testing.T, deps steps.Deps, wpID int64) *run.StepConte
 func runRelinkPage(t *testing.T, deps steps.Deps, sc *run.StepContext) (steps.RelinkPageResult, steps.PublishResult, run.Result) {
 	t.Helper()
 
-	result, err := steps.RelinkPage(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.RelinkPage(deps), sc)
 	if err != nil {
 		t.Fatalf("RelinkPage: %v", err)
 	}
@@ -426,7 +426,7 @@ func TestRelinkPageHoldsAPageThatIsNotOnTheSite(t *testing.T) {
 	sc := relinkPageContext(t, deps, 0)
 	sc.Page.WPID = nil
 
-	result, err := steps.RelinkPage(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.RelinkPage(deps), sc)
 	if err != nil {
 		t.Fatalf("RelinkPage: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestRelinkPageHoldsAPageTheSiteChangedUnderIt(t *testing.T) {
 	deps, server, _, wpID := relinkPageDeps(t, espressoBody)
 	server.EditBeforeNextRawWrite(wpID, espressoBody+"<p>Edited by a human.</p>")
 
-	result, err := steps.RelinkPage(deps).Run(t.Context(), relinkPageContext(t, deps, wpID))
+	result, err := drive(t, steps.RelinkPage(deps), relinkPageContext(t, deps, wpID))
 	if err != nil {
 		t.Fatalf("RelinkPage: %v", err)
 	}

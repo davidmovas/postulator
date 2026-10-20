@@ -37,10 +37,6 @@ func readSiteBody(ctx context.Context, client *wp.Client, page pagemap.Page,
 	return siteBody{raw: raw, doc: doc}, "", nil
 }
 
-func (b siteBody) put(ctx context.Context, client *wp.Client, page pagemap.Page, rendered string) (string, error) {
-	return client.PutRaw(ctx, onSiteType(page), *page.WPID, rendered, b.raw.ContentHash)
-}
-
 type splicedBody struct {
 	raw  string
 	ours []string

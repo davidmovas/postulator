@@ -82,6 +82,7 @@ type Server struct {
 	noSettings    bool
 
 	noStoreSettings bool
+	rawAnswerFaults []int
 	mu              sync.Mutex
 }
 

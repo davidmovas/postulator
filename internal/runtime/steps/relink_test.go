@@ -82,7 +82,7 @@ func relinkContext(t *testing.T, deps steps.Deps) *run.StepContext {
 func runRelink(t *testing.T, deps steps.Deps) steps.RelinkResult {
 	t.Helper()
 
-	result, err := steps.RelinkNeighbors(deps).Run(t.Context(), relinkContext(t, deps))
+	result, err := drive(t, steps.RelinkNeighbors(deps), relinkContext(t, deps))
 	if err != nil {
 		t.Fatalf("RelinkNeighbors: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestANeighborFollowsTheRulesOfItsOwnType(t *testing.T) {
 	sc := relinkContext(t, deps)
 	sc.Links = linksOf(field.LinkRules{UpDepth: 1, MaxPerTarget: 1})
 
-	result, err := steps.RelinkNeighbors(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.RelinkNeighbors(deps), sc)
 	if err != nil {
 		t.Fatalf("RelinkNeighbors: %v", err)
 	}
@@ -267,7 +267,7 @@ func TestRelinkReachesANeighborThatOwesThePageALink(t *testing.T) {
 			}
 			sc.Artifacts[run.ArtifactLinkContext] = run.Artifact{Kind: run.ArtifactLinkContext, Blob: alone}
 
-			result, err := steps.RelinkNeighbors(deps).Run(t.Context(), sc)
+			result, err := drive(t, steps.RelinkNeighbors(deps), sc)
 			if err != nil {
 				t.Fatalf("RelinkNeighbors: %v", err)
 			}

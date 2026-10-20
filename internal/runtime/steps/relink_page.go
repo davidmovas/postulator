@@ -9,7 +9,6 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
@@ -61,6 +60,13 @@ func RelinkPage(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			state, err := relinkStateOf(sc, checkpointRelinkPage, run.ArtifactLinkContext)
+			if err != nil {
+				return run.Result{}, err
+			}
+			if state.Planned {
+				return landRelinkedPage(ctx, deps, client, sc, &state)
+			}
 
 			work := newPageRelink(sc.Page, len(lc.Targets))
 			body, reason, err := readSiteBody(ctx, client, sc.Page, ReasonPageGone, ReasonPageUnreadable)
@@ -80,7 +86,7 @@ func RelinkPage(deps Deps) run.StepDef {
 			if work.result.Linked == 0 {
 				return settleRelinkPage(work)
 			}
-			return writeRelinkedPage(ctx, deps, client, sc, work, body, pages)
+			return planRelinkedPage(ctx, deps, sc, &state, work, body)
 		},
 	}
 }
@@ -165,43 +171,76 @@ func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, 
 	return row
 }
 
-func writeRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run.StepContext, work pageRelink,
-	body siteBody, pages []pagemap.Page) (run.Result, error) {
+func planRelinkedPage(ctx context.Context, deps Deps, sc *run.StepContext, state *relinkState, work pageRelink,
+	body siteBody) (run.Result, error) {
 	linked, err := body.spliced(ctx, deps, sc.Page)
 	if err != nil {
 		return run.Result{}, err
 	}
+	state.Page, state.Publish, state.Planned = work.result, work.published, true
+	state.Writes = []relinkWrite{{
+		Outcome: NeighborResult{
+			PageID: sc.Page.ID, Path: sc.Page.Path, WPID: *sc.Page.WPID,
+			Before: NeighborBefore{Hash: body.raw.ContentHash, HTML: body.raw.Content},
+		},
+		After: linked.raw, Ours: linked.ours,
+	}}
 	held, err := deps.reviewRelinks(ctx, sc, checkpointRelinkPageReviewed, "the new links of "+sc.Page.Path,
 		[]relinkedBody{{page: sc.Page, before: body.raw.Content, after: linked.raw}})
 	if err != nil || held.held != nil {
 		return orHeld(held, err)
 	}
-	hash, err := body.put(ctx, client, sc.Page, linked.raw)
+	waiting, err := state.wait(checkpointRelinkPage, "planned the new links of "+sc.Page.Path)
 	if err != nil {
-		if errors.IsCode(err, errors.Conflict) {
-			return needsHuman("the page " + sc.Page.Path + " changed on the site while it was being relinked: " +
-				"it held " + body.raw.ContentHash + " and now holds " + currentHashOf(err)), nil
-		}
 		return run.Result{}, err
 	}
-	work.published.ContentHash = hash
-	if recordErr := recordSpliced(ctx, deps, sc.Page.ID, sc.Run.ID, linked); recordErr != nil {
+	return withChecks(waiting, held.check), nil
+}
+
+func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run.StepContext, state *relinkState) (run.Result, error) {
+	write := state.Writes[0]
+	landed, err := landRelinkedBody(ctx, client, sc.Page, write.After, write.Outcome.Before.Hash)
+	if err != nil {
+		check, checkErr := state.checkpoint(checkpointRelinkPage)
+		if checkErr != nil {
+			return run.Result{}, checkErr
+		}
+		return run.Result{Checkpoint: check}, err
+	}
+	if !landed.written {
+		return needsHuman("the page " + sc.Page.Path + " changed on the site while it was being relinked: it held " +
+			write.Outcome.Before.Hash + " and now holds " + landed.held + "; sync the site and relink it again"), nil
+	}
+	state.Publish.ContentHash = landed.hash
+	if recordErr := recordSpliced(ctx, deps, sc.Page.ID, sc.Run.ID, splicedBody{raw: write.After, ours: write.Ours}); recordErr != nil {
 		return run.Result{}, recordErr
 	}
-
 	owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 	if err != nil {
 		return run.Result{}, err
 	}
-	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages),
-		pagemap.NewSite(owner.BaseURL), body.doc, hash); adoptErr != nil {
-		return run.Result{}, adoptErr
-	}
-	settled, err := settleRelinkPage(work)
+	pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
 	if err != nil {
 		return run.Result{}, err
 	}
-	return withChecks(settled, held.check), nil
+	doc, err := content.Parse(write.After)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc, landed.hash); adoptErr != nil {
+		return run.Result{}, adoptErr
+	}
+	state.Finished = true
+	check, err := state.checkpoint(checkpointRelinkPage)
+	if err != nil {
+		return run.Result{}, err
+	}
+	settled, err := settleRelinkPage(pageRelink{result: state.Page, published: state.Publish})
+	if err != nil {
+		return run.Result{}, err
+	}
+	settled.Checkpoint = check
+	return settled, nil
 }
 
 func unplaced(placement content.InsertResult, target content.LinkTarget, live bool,
