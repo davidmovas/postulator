@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -26,6 +27,10 @@ type entityStore interface {
 
 type edgeStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
+}
+
+type fieldStore interface {
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
 }
 
 type specResolver interface {
@@ -52,6 +57,7 @@ type Deps struct {
 	Pages    pageStore
 	Entities entityStore
 	Edges    edgeStore
+	Fields   fieldStore
 	Specs    specResolver
 	Types    typeSets
 	Profiles profileResolver

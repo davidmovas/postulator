@@ -8,7 +8,7 @@ func (i Index) HubTwin(term Page) (Page, bool) {
 	found := 0
 	for at := range i.pages {
 		candidate := i.pages[at]
-		if !twinnable(candidate) || !sharesName(candidate, term) {
+		if !twinnable(candidate) || !i.sharesName(candidate, term) {
 			continue
 		}
 		twin = candidate
@@ -27,7 +27,7 @@ func (i Index) TermTwins(page Page) []Page {
 	}
 	for at := range i.pages {
 		candidate := i.pages[at]
-		if candidate.WPType.Term() && candidate.Status != StatusArchived && sharesName(candidate, page) {
+		if candidate.WPType.Term() && candidate.Status != StatusArchived && i.sharesName(candidate, page) {
 			out = append(out, candidate)
 		}
 	}
@@ -38,9 +38,9 @@ func twinnable(page Page) bool {
 	return page.WPType == WPPage && page.Status != StatusArchived
 }
 
-func sharesName(page, other Page) bool {
-	held := names(page)
-	for _, name := range names(other) {
+func (i Index) sharesName(page, other Page) bool {
+	held := i.namesOf(page)
+	for _, name := range i.namesOf(other) {
 		key := nameKey(name)
 		for _, own := range held {
 			if key != "" && nameKey(own) == key {
@@ -51,9 +51,10 @@ func sharesName(page, other Page) bool {
 	return false
 }
 
-func names(page Page) []string {
-	out := make([]string, 0, 4)
-	for _, held := range []string{page.Observed.Title, page.Observed.H1, page.Title, page.H1} {
+func (i Index) namesOf(page Page) []string {
+	known := i.names[page.ID]
+	out := make([]string, 0, len(known)+2)
+	for _, held := range append([]string{page.Title, page.H1}, known...) {
 		if held != "" {
 			out = append(out, held)
 		}

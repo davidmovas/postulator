@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
@@ -20,8 +19,8 @@ var (
 	textEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 )
 
-func StoreName(page pagemap.Page) string {
-	return stdhtml.UnescapeString(strings.TrimSpace(page.Observed.Title))
+func StoreName(name string) string {
+	return stdhtml.UnescapeString(strings.TrimSpace(name))
 }
 
 func WritesShortDescription(product *template.Product) bool {

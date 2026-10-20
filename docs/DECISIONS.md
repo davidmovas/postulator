@@ -3873,6 +3873,23 @@ on what stage 2 left open and what was decided while building.
   canonical is put back only while the live one is still what that run's meta artifact wrote. The
   old path's restores of variations, images, lists and custom fields are gone: no record before
   stage 3 wrote them.
+- **A page's site title and H1 are read from its fields** (C.2a, decision 20's second half).
+  `pagemap.Names` turns the site's `title` and `h1` rows into the named index, and the twins
+  (`HubTwin`, `TermTwins`) and a product's match by name (`MatchProduct`, `ClaimProduct`) read
+  those, a product whose name was never read (the observation's store candidate) answering by its
+  plan's title. Every link plan that settles twins is built over the named index (the writer's
+  context, both relinks, the judge and the link audit), so the writer and the audit see the same
+  twins; the preflight, which reads only the blocked targets, keeps the plain one. Because the plan
+  that names a pack's neighbourhood needs the site's names first, the read layer now loads the
+  site's field rows once with the snapshot and no longer reads the neighbourhood's again. The
+  observation tells a plan from the site against the last walk: the identity's URL (a core draft's
+  query permalink compares no address) and the `title` and `h1` fields, read for the batch before
+  its unit of work. The product brief and the judge take the store's name from the product's
+  `title` field; the graph's mismatch compares the plan with the identity and the fields; the
+  pages DTO loses `observed` and `mismatches`, and the product panel reads the store's name from
+  the page model. `Mismatch` lives in `runtime/steps`, built from what a write asked for and what
+  the site answered, and is encoded `{field, planned, actual}` (the old type carried no tags, so
+  an older artifact's keys still decode).
 
 ### The image step never draws over the client's image (session 2, the open item)
 

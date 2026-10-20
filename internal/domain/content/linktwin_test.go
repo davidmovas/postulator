@@ -29,10 +29,11 @@ func twinFixture(t *testing.T) dag {
 
 	termID, hubID := int64(20), int64(10)
 	term := page("page-term", "/product-category/peptides/", "peptides")
-	term.WPType, term.WPID, term.Observed.Title = pagemap.WPProductCategory, &termID, "Peptides"
+	term.WPType, term.WPID = pagemap.WPProductCategory, &termID
 	hub := page("page-hub", "/peptides/", "guide")
-	hub.WPID, hub.Observed.Title = &hubID, "Peptides"
-	return dag{g: g, index: pagemap.NewIndex([]pagemap.Page{term, hub, page("page-bpc", "/bpc-157/", "bpc")})}
+	hub.WPID = &hubID
+	names := map[string][]string{"page-term": {"Peptides"}, "page-hub": {"Peptides"}}
+	return dag{g: g, index: pagemap.NewIndexNamed([]pagemap.Page{term, hub, page("page-bpc", "/bpc-157/", "bpc")}, names)}
 }
 
 func twinPolicy() field.LinkPolicy {

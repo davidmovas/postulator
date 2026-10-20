@@ -54,6 +54,7 @@ func newHarnessWithRows(t *testing.T, maxRows int) harness {
 			Edges:      sqlite.NewEdgeRepo(store),
 			Pages:      sqlite.NewPageRepo(store),
 			Types:      sqlite.NewPageTypeRepo(store),
+			Fields:     sqlite.NewPageFieldRepo(store),
 			Mappings:   sqlite.NewImportMappingRepo(store),
 			Sites:      sqlite.NewSiteRepo(store),
 			UnitOfWork: store,

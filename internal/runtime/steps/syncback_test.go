@@ -154,11 +154,11 @@ func TestSyncBackRecordsWhatTheSiteHolds(t *testing.T) {
 
 	synced := runSyncBack(t, deps, syncBackContext(t, wpID))
 
-	if stored.Observed.H1 != "Espresso" || stored.Observed.Title != "Espresso" {
-		t.Fatalf("the stored mirror = %+v, want the heading and the title the site holds", stored.Observed)
+	if stored.WPID == nil || *stored.WPID != wpID || stored.LastSyncedAt == nil {
+		t.Fatalf("the stored page = %+v, want the id the site answers and the time it was read", stored)
 	}
-	if stored.Observed.Status != "draft" || stored.Observed.Slug != "espresso" {
-		t.Fatalf("the stored mirror = %+v", stored.Observed)
+	if synced.WPID != wpID || synced.Status != "draft" {
+		t.Fatalf("synced = %+v, want the status the site holds", synced)
 	}
 	if len(synced.Mismatches) != 0 {
 		t.Errorf("mismatches = %+v, want none: nothing was planned to disagree with", synced.Mismatches)
@@ -175,7 +175,7 @@ func TestSyncBackReportsAHeadingThatIsNotTheOneAskedFor(t *testing.T) {
 
 	synced := runSyncBack(t, deps, sc)
 
-	if len(synced.Mismatches) != 1 || synced.Mismatches[0].Field != pagemap.FieldH1 {
+	if len(synced.Mismatches) != 1 || synced.Mismatches[0].Field != steps.FieldH1 {
 		t.Fatalf("mismatches = %+v, want the heading reported", synced.Mismatches)
 	}
 	if synced.Mismatches[0].Planned != "How Far Can an E-Bike Go?" || synced.Mismatches[0].Actual != "Espresso" {
@@ -254,9 +254,8 @@ func TestSyncBackReadsAProductFromTheStore(t *testing.T) {
 			if len(synced.Mismatches) != 0 || len(synced.Findings) != 0 {
 				t.Errorf("a product the store names and places reports %+v / %+v", synced.Mismatches, synced.Findings)
 			}
-			if recorded.Observed.Title != "Espresso Machine" || recorded.Observed.Slug != "espresso-machine" ||
-				!strings.HasSuffix(recorded.Observed.Link, "/product/espresso-machine/") {
-				t.Errorf("the page observes %+v", recorded.Observed)
+			if recorded.WPID == nil || *recorded.WPID != product.ID || !strings.HasSuffix(synced.URL, "/product/espresso-machine/") {
+				t.Errorf("the page records %+v and the read back %+v", recorded, synced)
 			}
 			if links := recorder.byPage["page-child"]; len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != "page-parent" {
 				t.Errorf("the recorded links are %+v", links)

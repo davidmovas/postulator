@@ -27,7 +27,7 @@ func (t WPType) StoreAddressed() bool {
 	return t == WPProduct || t == WPProductCategory
 }
 
-func MatchProduct(row ProductRow, pages []Page) ProductMatch {
+func MatchProduct(row ProductRow, pages []Page, names map[string][]string) ProductMatch {
 	held := inTheStore(pages)
 
 	if path, err := NormalizePath(row.Path); err == nil {
@@ -36,7 +36,7 @@ func MatchProduct(row ProductRow, pages []Page) ProductMatch {
 				return ProductMatch{Page: held[i], By: MatchedByPath, Found: true}
 			}
 		}
-		if match, decided := only(held, MatchedBySlug, func(p Page) bool { return storeSlug(p) == Slug(path) }); decided {
+		if match, decided := only(held, MatchedBySlug, func(p Page) bool { return p.Slug == Slug(path) }); decided {
 			return match
 		}
 	}
@@ -46,16 +46,26 @@ func MatchProduct(row ProductRow, pages []Page) ProductMatch {
 		if wanted == "" {
 			continue
 		}
-		if match, decided := only(held, MatchedByName, func(p Page) bool {
-			return strings.EqualFold(strings.TrimSpace(p.Observed.Title), wanted)
-		}); decided {
+		if match, decided := only(held, MatchedByName, func(p Page) bool { return answersTo(p, names[p.ID], wanted) }); decided {
 			return match
 		}
 	}
 	return ProductMatch{}
 }
 
-func ClaimProduct(store Page, pages []Page) (Page, bool) {
+func answersTo(page Page, known []string, wanted string) bool {
+	if len(known) == 0 {
+		known = []string{page.Title}
+	}
+	for _, name := range known {
+		if strings.EqualFold(strings.TrimSpace(name), wanted) {
+			return true
+		}
+	}
+	return false
+}
+
+func ClaimProduct(store Page, pages []Page, names map[string][]string) (Page, bool) {
 	candidates := make([]Page, 0, len(pages)+1)
 	for i := range pages {
 		if pages[i].PlannedPath == "" {
@@ -77,7 +87,7 @@ func ClaimProduct(store Page, pages []Page) (Page, bool) {
 		if row.PlannedPath != "" {
 			address = row.PlannedPath
 		}
-		match := MatchProduct(ProductRow{Path: address, H1: row.H1, Title: row.Title}, candidates)
+		match := MatchProduct(ProductRow{Path: address, H1: row.H1, Title: row.Title}, candidates, names)
 		if match.Found && match.Page.WPID != nil && store.WPID != nil && *match.Page.WPID == *store.WPID {
 			claimer = row
 			count++
@@ -97,13 +107,6 @@ func inTheStore(pages []Page) []Page {
 		}
 	}
 	return held
-}
-
-func storeSlug(page Page) string {
-	if page.Observed.Slug != "" {
-		return page.Observed.Slug
-	}
-	return page.Slug
 }
 
 func only(pages []Page, by MatchedBy, keep func(Page) bool) (ProductMatch, bool) {

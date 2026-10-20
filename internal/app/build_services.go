@@ -54,7 +54,7 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 	})
 
 	reportsService := reports.New(reports.Deps{
-		Entities: stores.entities, Edges: stores.edges, Pages: stores.pages, Links: stores.links,
+		Entities: stores.entities, Edges: stores.edges, Pages: stores.pages, Fields: stores.fields, Links: stores.links,
 		Runs: stores.runs, Items: stores.items, Artifacts: stores.artifacts,
 		Sites: stores.sites, Specs: templateService, Types: pageTypes,
 	})
@@ -71,7 +71,7 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 		reports:   reportsService,
 		wordpress: wordpress,
 		content: content.New(content.Deps{
-			Pages: stores.pages, Entities: stores.entities, Edges: stores.edges, Specs: templateService,
+			Pages: stores.pages, Entities: stores.entities, Edges: stores.edges, Fields: stores.fields, Specs: templateService,
 			Types: pageTypes, Profiles: llm.profiles, Raw: rawContent{clients: wordpress}, Pictures: siteModel, LLM: llm.client,
 		}),
 	}
@@ -91,7 +91,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		sites: sites.New(stores.sites, stores.secrets, stores.store, writing.pageTypes, writing.wordpress, c.Events, stores.now),
 		graph: graph.New(graph.Deps{
 			Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
-			Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,
+			Identities: stores.identities, Fields: stores.fields, Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,
 			Publisher: c.Events, Clock: stores.now,
 		}),
 		pages: pagesService,
@@ -101,6 +101,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 			Edges:      stores.edges,
 			Pages:      stores.pages,
 			Types:      stores.pageTypes,
+			Fields:     stores.fields,
 			Mappings:   stores.mappings,
 			Sites:      stores.sites,
 			UnitOfWork: stores.store,

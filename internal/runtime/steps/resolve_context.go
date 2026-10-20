@@ -61,7 +61,11 @@ func ResolveContext(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			plan := content.PlanLinks(g, pagemap.NewIndex(pages), content.Subject{
+			index, err := deps.namedIndex(ctx, sc.Run.SiteID, pages)
+			if err != nil {
+				return run.Result{}, err
+			}
+			plan := content.PlanLinks(g, index, content.Subject{
 				Site:     pagemap.NewSite(owner.BaseURL),
 				PageID:   sc.Page.ID,
 				PagePath: sc.Page.Path,

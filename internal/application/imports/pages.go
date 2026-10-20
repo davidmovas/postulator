@@ -182,7 +182,11 @@ func (b *builder) planUpdate(current, next pagemap.Page, draft *pageDraft) error
 }
 
 func (b *builder) pageView(page pagemap.Page, draft *pageDraft, action Action) PreviewPage {
-	return pageView(b.p.sheetAt(draft.at), page, draft, action, b.state.typeName(page.PageTypeID))
+	view := pageView(b.p.sheetAt(draft.at), page, draft, action, b.state.typeName(page.PageTypeID))
+	if page.WPType == pagemap.WPProduct && page.WPID != nil {
+		view.StoreName = b.state.storeName(page.ID)
+	}
+	return view
 }
 
 func (b *builder) siteOwned() map[string]int {

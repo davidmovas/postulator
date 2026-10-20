@@ -59,6 +59,14 @@ func (e edgeStub) ListBySite(context.Context, string) ([]graph.Edge, error) {
 	return e.items, e.err
 }
 
+type fieldStub struct {
+	values map[string][]field.Value
+}
+
+func (f fieldStub) ListBySite(context.Context, string) (map[string][]field.Value, error) {
+	return f.values, nil
+}
+
 type specStub struct {
 	err error
 }
@@ -192,6 +200,7 @@ func newService(model *llmStub, mutate func(*appcontent.Deps)) *appcontent.Servi
 		Pages:    pageStub{items: pages()},
 		Entities: entityStub{items: entities()},
 		Edges:    edgeStub{items: edges()},
+		Fields:   fieldStub{},
 		Specs:    specStub{},
 		Types:    typesStub{},
 		Profiles: profileStub{},
@@ -313,8 +322,11 @@ func TestJudgeAuditsAProductUnderTheNameTheStoreShows(t *testing.T) {
 	service := newService(model, func(deps *appcontent.Deps) {
 		listed := pages()
 		listed[1].WPType = pagemap.WPProduct
-		listed[1].Observed.Title = "Espresso &amp; Crema"
+		listed[1].Title = "Buy Espresso"
 		deps.Pages = pageStub{items: listed}
+		deps.Fields = fieldStub{values: map[string][]field.Value{
+			listed[1].ID: {field.NewValue(listed[1].ID, field.Title, "Espresso &amp; Crema", listed[1].CreatedAt)},
+		}}
 		deps.Raw = rawStub{body: "<h2>About</h2><p>Espresso is a way to make coffee.</p>"}
 	})
 

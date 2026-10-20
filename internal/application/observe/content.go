@@ -46,6 +46,8 @@ type absorber struct {
 	rows     siteRows
 	tracked  *findings
 	pending  map[string]struct{}
+	seen     map[string]lastSeen
+	names    map[string][]string
 	now      time.Time
 	findings []content.Finding
 }
@@ -66,7 +68,11 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 		service: s, state: state, readers: readers, owner: owner, install: install, rows: rowsOf(pages), tracked: tracked,
 		pending: map[string]struct{}{}, now: s.now(),
 	}
-	batch, err := a.prepare(ctx, resolveDraftPaths(items, a.rows.byWPID))
+	resolved := resolveDraftPaths(items, a.rows.byWPID)
+	if a.seen, err = a.lastSeen(ctx, resolved); err != nil {
+		return err
+	}
+	batch, err := a.prepare(ctx, resolved)
 	if err != nil {
 		return err
 	}
@@ -93,6 +99,49 @@ type prepared struct {
 	terms   []pagemap.Term
 	body    bodyRead
 	known   bool
+	planned bool
+}
+
+func (a *absorber) lastSeen(ctx context.Context, items []item) (map[string]lastSeen, error) {
+	ids := make([]string, 0, len(items))
+	for i := range items {
+		if current, known, _ := match(items[i], a.rows); known {
+			ids = append(ids, current.ID)
+		}
+	}
+	seen := make(map[string]lastSeen, len(ids))
+	if len(ids) == 0 {
+		return seen, nil
+	}
+	identities, err := a.service.deps.Identity.ListBySite(ctx, a.state.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	byPage := make(map[string]pagemap.Identity, len(identities))
+	for i := range identities {
+		byPage[identities[i].PageID] = identities[i]
+	}
+	fields, err := a.service.deps.Fields.ListForPages(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, pageID := range ids {
+		identity, held := byPage[pageID]
+		seen[pageID] = seenOf(identity, held, fields[pageID])
+	}
+	return seen, nil
+}
+
+func (a *absorber) siteNames(ctx context.Context) (map[string][]string, error) {
+	if a.names != nil {
+		return a.names, nil
+	}
+	stored, err := a.service.deps.Fields.ListBySite(ctx, a.state.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	a.names = pagemap.Names(stored)
+	return a.names, nil
 }
 
 type bodyRead struct {
@@ -114,12 +163,17 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 			continue
 		}
 		if !known && items[i].Type == pagemap.WPProduct && waiting > 0 {
-			current, known = pagemap.ClaimProduct(storeCandidate(items[i]), slices.Collect(maps.Values(a.rows.byPath)))
+			names, err := a.siteNames(ctx)
+			if err != nil {
+				return nil, err
+			}
+			current, known = pagemap.ClaimProduct(storeCandidate(items[i]), slices.Collect(maps.Values(a.rows.byPath)), names)
 			if known {
 				waiting--
 			}
 		}
-		next, _ := merge(current, known, items[i], a.state.SiteID, a.now)
+		planned := hasPlan(current, known, a.seen[current.ID])
+		next, _ := merge(current, known, planned, items[i], a.state.SiteID, a.now)
 		if known && current.Path != next.Path {
 			delete(a.rows.byPath, current.Path)
 		}
@@ -143,7 +197,7 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 		if closed {
 			a.state.Counts.Closed++
 		}
-		batch = append(batch, prepared{it: items[i], current: current, next: next, terms: terms, body: body, known: known})
+		batch = append(batch, prepared{it: items[i], current: current, next: next, terms: terms, body: body, known: known, planned: planned})
 	}
 	return batch, nil
 }
@@ -176,7 +230,7 @@ func (a *absorber) keep(ctx context.Context, p prepared) error {
 	if err := a.body(ctx, p.next, p.it, p.body); err != nil {
 		return err
 	}
-	return a.plan(ctx, p.current, p.known, p.next, p.it)
+	return a.plan(ctx, p.current, p.planned, p.next, p.it)
 }
 
 func sameButStamps(current, next pagemap.Page) bool {
@@ -446,8 +500,7 @@ func (a *absorber) heldOurs(ctx context.Context, pageID string) (map[block.LinkK
 	return block.HeldOurs(stored), nil
 }
 
-func (a *absorber) plan(ctx context.Context, current pagemap.Page, known bool, next pagemap.Page, it item) error {
-	planned := hasPlan(current, known)
+func (a *absorber) plan(ctx context.Context, current pagemap.Page, planned bool, next pagemap.Page, it item) error {
 	if err := a.planFinding(ctx, next, finding.PageTitleDiffers, planned && it.Title != "" && current.Title != "" && current.Title != it.Title, current.Title, it.Title); err != nil {
 		return err
 	}

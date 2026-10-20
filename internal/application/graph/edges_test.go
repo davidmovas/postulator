@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -246,6 +247,7 @@ func TestLoadGraphCarriesTheStateOfEveryMappedPage(t *testing.T) {
 	h := newHarness(t)
 	hub := h.entity(t, "Components")
 	topic := h.entity(t, "Range")
+	motor := h.entity(t, "Motors")
 	h.entity(t, "Unmapped")
 
 	repo := sqlite.NewPageRepo(h.store)
@@ -253,30 +255,49 @@ func TestLoadGraphCarriesTheStateOfEveryMappedPage(t *testing.T) {
 	hubType := id.New()
 	pages := []pagemap.Page{
 		{
-			ID: id.New(), SiteID: h.siteID, Path: "/components/", Slug: "components", WPType: pagemap.WPPage,
+			ID: id.New(), SiteID: h.siteID, Path: "/components/", Slug: "components", WPType: pagemap.WPPage, Title: "Components",
 			Status: pagemap.StatusPublished, EntityID: &hub.ID, WPID: &wpID, PageTypeID: &hubType,
 			TypeSource: pagemap.TypeSourceManual, TypeReason: pagemap.TypeByUser,
-			Observed:  pagemap.Observed{Link: "https://shop.example.com/components/", Slug: "components", Status: "publish"},
 			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 		},
 		{
 			ID: id.New(), SiteID: h.siteID, Path: "/components/batteries/range/", Slug: "range", WPType: pagemap.WPPage,
 			Status: pagemap.StatusPublished, EntityID: &topic.ID,
-			Observed:  pagemap.Observed{Link: "https://shop.example.com/range/", Slug: "range", Status: "publish"},
+			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		},
+		{
+			ID: id.New(), SiteID: h.siteID, Path: "/components/motors/", Slug: "motors", WPType: pagemap.WPPage, Title: "Motors",
+			Status: pagemap.StatusPublished, EntityID: &motor.ID,
 			CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 		},
 	}
+	seen := map[string]string{
+		pages[0].ID: "https://shop.example.com/components/", pages[1].ID: "https://shop.example.com/range/",
+		pages[2].ID: "https://shop.example.com/components/motors/",
+	}
+	identities, fields := sqlite.NewPageIdentityRepo(h.store), sqlite.NewPageFieldRepo(h.store)
 	for _, page := range pages {
 		if err := repo.Insert(t.Context(), page); err != nil {
 			t.Fatalf("insert %s: %v", page.Path, err)
 		}
+		if err := identities.Put(t.Context(), pagemap.Identity{
+			PageID: page.ID, URL: seen[page.ID], Status: "publish", WPType: pagemap.WPPage, ObservedAt: sqlitetest.Stamp,
+		}); err != nil {
+			t.Fatalf("observe %s: %v", page.Path, err)
+		}
+	}
+	if err := fields.Observe(t.Context(), pages[0].ID, []field.Value{field.NewValue(pages[0].ID, field.Title, "Components", sqlitetest.Stamp)}); err != nil {
+		t.Fatalf("observe the hub's title: %v", err)
+	}
+	if err := fields.Observe(t.Context(), pages[2].ID, []field.Value{field.NewValue(pages[2].ID, field.Title, "Electric Motors", sqlitetest.Stamp)}); err != nil {
+		t.Fatalf("observe the motors' title: %v", err)
 	}
 
 	loaded, err := h.service.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: h.siteID})
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Pages) != 2 {
+	if len(loaded.Pages) != 3 {
 		t.Fatalf("the graph carries %d page states, want one per mapped page", len(loaded.Pages))
 	}
 
@@ -296,5 +317,8 @@ func TestLoadGraphCarriesTheStateOfEveryMappedPage(t *testing.T) {
 	}
 	if flat.Work != "" {
 		t.Errorf("the page state = %+v, want no work in flight", flat)
+	}
+	if state := byEntity[motor.ID]; !state.Mismatch {
+		t.Errorf("the motors page state = %+v, want the title the site shows against the plan's reported", state)
 	}
 }

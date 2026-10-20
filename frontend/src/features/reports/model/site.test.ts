@@ -27,8 +27,6 @@ function page(overrides: Partial<Page> = {}): Page {
         typeSource: "",
         typeReason: "",
         contentHash: "",
-        observed: { link: "", slug: "", status: "", title: "", h1: "" },
-        mismatches: [],
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,

@@ -77,6 +77,7 @@ func newProposeFixture(t *testing.T, model *scriptedModel, profiles fixedProfile
 		service: appgraph.New(appgraph.Deps{
 			Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store),
 			Sites: sqlite.NewSiteRepo(store), Pages: pageRepo, Profiles: profiles, LLM: model,
+			Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 			UnitOfWork: store, Publisher: &applicationtest.Recorder{}, Clock: clock.NewFake(sqlitetest.Stamp),
 		}),
 		store: store, model: model, pages: pageRepo, edges: sqlite.NewEdgeRepo(store), siteID: owner.ID,

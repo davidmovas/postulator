@@ -46,6 +46,7 @@ type fieldStore interface {
 	Observe(ctx context.Context, pageID string, values []field.Value) error
 	Agree(ctx context.Context, pageID string, key field.Key, at time.Time) error
 	ListForPage(ctx context.Context, pageID string) ([]field.Value, error)
+	ListForPages(ctx context.Context, pageIDs []string) (map[string][]field.Value, error)
 	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
 }
 

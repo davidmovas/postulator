@@ -154,7 +154,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		t.Fatalf("seed the page types: %v", seedErr)
 	}
 	reportsService := reports.New(reports.Deps{
-		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Fields: sqlite.NewPageFieldRepo(store), Links: linkRepo,
 		Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
 		Sites: siteRepo, Specs: templateService, Types: types,
 	})
@@ -168,6 +168,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{
 			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store),
+			Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Pages:     pagesService,
@@ -179,13 +180,14 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Imports: imports.New(imports.Deps{
 			Tables:   importer.New(),
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Types: sqlite.NewPageTypeRepo(store),
+			Fields:   sqlite.NewPageFieldRepo(store),
 			Mappings: sqlite.NewImportMappingRepo(store), Sites: siteRepo, UnitOfWork: store,
 			Publisher: bus, Clock: now,
 		}),
 		Models: models.New(built, modelRepo, modelProfiles, book,
 			secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), book, bus, now),
 		Content: content.New(content.Deps{
-			Pages: pageRepo, Entities: entityRepo, Edges: edgeRepo, Specs: templateService,
+			Pages: pageRepo, Entities: entityRepo, Edges: edgeRepo, Fields: sqlite.NewPageFieldRepo(store), Specs: templateService,
 			Types: types, Profiles: modelProfiles, LLM: book,
 		}),
 		Schedules: schedules.New(schedules.Deps{

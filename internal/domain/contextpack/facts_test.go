@@ -4,6 +4,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -49,6 +50,29 @@ func TestASummaryFallsFromMetaToExcerptToBodyToStructure(t *testing.T) {
 				t.Errorf("Summary(%s) = %+v, want %q from %s", tc.page, got, tc.text, tc.source)
 			}
 		})
+	}
+}
+
+func TestAPageIsNamedAsTheSiteShowsItBeforeItsPlan(t *testing.T) {
+	t.Parallel()
+
+	f := replicaLike()
+	f.fields["bpc"] = values("bpc", "title", "BPC-157 Research Peptide", "h1", "About BPC-157")
+	s := f.snapshot(t)
+	bpc, _ := s.Index.ByID("bpc")
+	hub, _ := s.Index.ByID("hub")
+	if got := s.Ref(bpc).Title; got != "BPC-157 Research Peptide" {
+		t.Errorf("ref title = %q, want the title the site shows, not the plan's", got)
+	}
+	facts, err := s.Facts("bpc", content.LinkContext{})
+	if err != nil {
+		t.Fatalf("Facts: %v", err)
+	}
+	if facts.H1 != "About BPC-157" {
+		t.Errorf("facts H1 = %q, want the H1 the site shows", facts.H1)
+	}
+	if got := s.Ref(hub).Title; got != "Peptides" {
+		t.Errorf("ref title = %q, want the plan's title where the site's matches it", got)
 	}
 }
 

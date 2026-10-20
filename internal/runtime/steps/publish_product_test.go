@@ -101,7 +101,6 @@ func storeContext(t *testing.T, wpID int64) *run.StepContext {
 	sc.Page.WPType = pagemap.WPProduct
 	sc.Page.WPID = &wpID
 	sc.Page.Status = pagemap.StatusPublished
-	sc.Page.Observed = pagemap.Observed{Title: "Espresso Machine", Slug: "espresso-machine", Status: "publish"}
 	rewritten(sc)
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is for", TargetWords: 30},
@@ -185,8 +184,7 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 		t.Error("the publish kept no previous meta")
 	}
 
-	if h.recorded.ContentHash != published.ContentHash || h.recorded.Status != pagemap.StatusPublished ||
-		h.recorded.Observed.Title != "Espresso Machine" || h.recorded.Drift {
+	if h.recorded.ContentHash != published.ContentHash || h.recorded.Status != pagemap.StatusPublished || h.recorded.Drift {
 		t.Errorf("the page records %+v", h.recorded)
 	}
 	if len(h.sites.updates) != 0 {

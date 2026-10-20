@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -117,9 +118,37 @@ func waitingProducts(byPath map[string]pagemap.Page) int {
 func storeCandidate(it item) pagemap.Page {
 	wpID := it.WPID
 	return pagemap.Page{
-		Path: it.Path, Slug: pagemap.Slug(it.Path), WPType: pagemap.WPProduct, WPID: &wpID,
-		Observed: pagemap.Observed{Slug: it.Slug, Title: it.Title},
+		Path: it.Path, Slug: orKept(it.Slug, pagemap.Slug(it.Path)), WPType: pagemap.WPProduct, WPID: &wpID, Title: it.Title,
 	}
+}
+
+type lastSeen struct {
+	path     string
+	title    string
+	h1       string
+	observed bool
+}
+
+func seenOf(identity pagemap.Identity, held bool, values []field.Value) lastSeen {
+	seen := lastSeen{observed: held}
+	if held && !queryPermalink(identity.URL) {
+		if path, err := pagemap.NormalizePath(identity.URL); err == nil {
+			seen.path = path
+		}
+	}
+	for i := range values {
+		switch values[i].Key {
+		case field.Title:
+			seen.title = values[i].Current
+		case field.H1:
+			seen.h1 = values[i].Current
+		}
+	}
+	return seen
+}
+
+func (s lastSeen) movedFrom(path string) bool {
+	return s.path != "" && s.path != path
 }
 
 func pathTaken(it item, row pagemap.Page) content.Finding {
@@ -136,7 +165,7 @@ func pathTaken(it item, row pagemap.Page) content.Finding {
 	}
 }
 
-func merge(current pagemap.Page, known bool, it item, siteID string, now time.Time) (next pagemap.Page, drifted bool) {
+func merge(current pagemap.Page, known, planned bool, it item, siteID string, now time.Time) (next pagemap.Page, drifted bool) {
 	next = current
 	if !known {
 		next = pagemap.Page{ID: id.New(), SiteID: siteID, CreatedAt: now}
@@ -144,7 +173,7 @@ func merge(current pagemap.Page, known bool, it item, siteID string, now time.Ti
 
 	drifted = known && next.ContentHash != "" && next.ContentHash != it.ContentHash
 
-	if !hasPlan(current, known) {
+	if !planned {
 		next.Path = it.Path
 		next.Slug = orKept(it.Slug, pagemap.Slug(it.Path))
 		next.Title = orKept(it.Title, next.Title)
@@ -170,9 +199,6 @@ func merge(current pagemap.Page, known bool, it item, siteID string, now time.Ti
 		next.Status = pagemap.StatusFromWordPress(it.Status)
 	}
 	next.WPID = &it.WPID
-	next.Observed = pagemap.Observed{
-		Link: it.Path, Slug: it.Slug, Status: it.Status, Title: it.Title, H1: it.H1,
-	}
 	next.Drift = drifted
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
@@ -183,16 +209,14 @@ func merge(current pagemap.Page, known bool, it item, siteID string, now time.Ti
 	return next, drifted
 }
 
-func hasPlan(current pagemap.Page, known bool) bool {
+func hasPlan(current pagemap.Page, known bool, seen lastSeen) bool {
 	switch {
 	case !known:
 		return false
-	case current.Status == pagemap.StatusPlanned, current.ContentHash != "":
+	case current.Status == pagemap.StatusPlanned, current.ContentHash != "", !seen.observed:
 		return true
 	default:
-		return current.Path != current.Observed.Path() ||
-			current.Title != current.Observed.Title ||
-			current.H1 != current.Observed.H1
+		return seen.movedFrom(current.Path) || current.Title != seen.title || current.H1 != seen.h1
 	}
 }
 

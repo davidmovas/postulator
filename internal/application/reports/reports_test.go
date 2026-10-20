@@ -79,7 +79,7 @@ func newFixture(t *testing.T) *fixture {
 		store: store, siteID: owner.ID, templateID: hub.ID, hubType: hubType.ID, types: types,
 		pages: make(map[string]pagemap.Page), entities: make(map[string]graph.Entity),
 		service: reports.New(reports.Deps{
-			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Fields: sqlite.NewPageFieldRepo(store), Links: linkRepo,
 			Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
 			Sites: siteRepo, Specs: templateService, Types: types,
 		}),

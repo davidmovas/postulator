@@ -65,7 +65,8 @@ func briefKeywords(keywords keyword.List, rules template.KeywordRules) []BriefKe
 	return out
 }
 
-func NewBrief(spec template.TemplateSpec, rules field.LinkRules, page pagemap.Page, entity graph.Entity, lc LinkContext) Brief {
+func NewBrief(spec template.TemplateSpec, rules field.LinkRules, page pagemap.Page, storeName string, entity graph.Entity,
+	lc LinkContext) Brief {
 	keywords := pagemap.Keywords(page, entity)
 	brief := Brief{
 		Title:          strings.TrimSpace(page.Title),
@@ -80,7 +81,7 @@ func NewBrief(spec template.TemplateSpec, rules field.LinkRules, page pagemap.Pa
 		Children:       make([]string, 0),
 	}
 	if page.WPType == pagemap.WPProduct {
-		if name := StoreName(page); name != "" {
+		if name := StoreName(storeName); name != "" {
 			brief.H1 = name
 		}
 	}

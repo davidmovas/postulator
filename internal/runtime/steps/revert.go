@@ -447,7 +447,6 @@ func replan(ctx context.Context, deps Deps, page pagemap.Page) error {
 	next.WPID = nil
 	next.Status = pagemap.StatusPlanned
 	next.ContentHash = ""
-	next.Observed = pagemap.Observed{}
 	next.WPModifiedAt = nil
 	next.LastSyncedAt = nil
 	next.Drift = false

@@ -802,6 +802,54 @@ func TestAnOutdatedPluginIsAFindingThatClearsWhenUpdated(t *testing.T) {
 	}
 }
 
+func TestAPlanIsTheTitleAndAddressThatDifferFromWhatTheLastWalkSaw(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		edit    func(page *pagemap.Page)
+		title   string
+		path    string
+		finding bool
+	}{
+		{name: "an untouched page follows the site", edit: func(*pagemap.Page) {}, title: "TB-500 Research", path: "/tb-500/"},
+		{name: "a title a person changed is kept", edit: func(page *pagemap.Page) { page.Title = "TB-500 for Labs" },
+			title: "TB-500 for Labs", path: "/tb-500/", finding: true},
+		{name: "an address a person moved is kept with its title", edit: func(page *pagemap.Page) { page.Path = "/peptides/tb-500/" },
+			title: "TB-500", path: "/peptides/tb-500/", finding: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			s := newScenario(t)
+			s.run(t, observe.Options{})
+			adopted := s.pageAt(t, "/tb-500/")
+			s.stores.mu.Lock()
+			edited := s.stores.pages[adopted.ID]
+			tc.edit(&edited)
+			s.stores.pages[adopted.ID] = edited
+			s.stores.mu.Unlock()
+			for i := range s.plugin.items {
+				if s.plugin.items[i].ID == tb500ID {
+					s.plugin.items[i].Title = "TB-500 Research"
+				}
+			}
+			s.touch(tb500ID, start.Add(time.Minute))
+			s.clock.Set(start.Add(time.Hour))
+
+			s.run(t, observe.Options{Full: true})
+			after := s.stores.pages[adopted.ID]
+			if after.Title != tc.title || after.Path != tc.path {
+				t.Errorf("the page reads %q at %s, want %q at %s", after.Title, after.Path, tc.title, tc.path)
+			}
+			if _, raised := s.finding(finding.PageTitleDiffers, finding.SubjectPage(adopted.ID)); raised != tc.finding {
+				t.Errorf("page_title_differs raised = %t, want %t", raised, tc.finding)
+			}
+		})
+	}
+}
+
 func TestAPlannedTitleThatDiffersIsAFindingAndThePlanIsKept(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

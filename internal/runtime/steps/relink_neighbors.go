@@ -181,10 +181,14 @@ func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighb
 	if err != nil {
 		return neighborhood{}, err
 	}
+	index, err := deps.namedIndex(ctx, sc.Run.SiteID, pages)
+	if err != nil {
+		return neighborhood{}, err
+	}
 
 	return neighborhood{
 		client: client, lc: lc, entity: entity, page: sc.Page, site: pagemap.NewSite(owner.BaseURL),
-		index: pagemap.NewIndex(pages), graph: built, types: types, runID: sc.Run.ID, absolute: absolute,
+		index: index, graph: built, types: types, runID: sc.Run.ID, absolute: absolute,
 	}, nil
 }
 

@@ -62,17 +62,16 @@ func (s Snapshot) typeOf(page pagemap.Page) pagetype.Type {
 	return s.Types.TypeOf(page)
 }
 
-func titleOf(page pagemap.Page) string {
-	for _, held := range []string{page.Observed.Title, page.Title, page.Observed.H1, page.H1} {
-		if held != "" {
-			return held
-		}
-	}
-	return page.Path
+func (s Snapshot) titleOf(page pagemap.Page) string {
+	return shown(page, s.text(page.ID, field.Title), page.Title, s.text(page.ID, field.H1), page.H1)
 }
 
-func h1Of(page pagemap.Page) string {
-	for _, held := range []string{page.Observed.H1, page.H1, page.Observed.Title, page.Title} {
+func (s Snapshot) h1Of(page pagemap.Page) string {
+	return shown(page, s.text(page.ID, field.H1), page.H1, s.text(page.ID, field.Title), page.Title)
+}
+
+func shown(page pagemap.Page, names ...string) string {
+	for _, held := range names {
 		if held != "" {
 			return held
 		}

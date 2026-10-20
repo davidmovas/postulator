@@ -27,8 +27,6 @@ function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
         typeSource: "",
         typeReason: "",
         contentHash: "",
-        observed: { link: "", slug: "", status: "", title: "", h1: "" },
-        mismatches: null,
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,

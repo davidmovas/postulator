@@ -128,7 +128,7 @@ func (s Snapshot) hubs() []Hub {
 		if !live(*page) || page.Path == pagemap.RootPath || !hubLike(s.typeOf(*page).Preset) {
 			continue
 		}
-		hub := Hub{PageID: page.ID, Path: page.Path, Title: titleOf(*page), Pages: tree.descendants(page.ID), Children: []Hub{}}
+		hub := Hub{PageID: page.ID, Path: page.Path, Title: s.titleOf(*page), Pages: tree.descendants(page.ID), Children: []Hub{}}
 		above, found := s.hubAbove(*page)
 		if !found {
 			top = append(top, hub)

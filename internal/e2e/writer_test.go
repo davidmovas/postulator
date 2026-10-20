@@ -166,12 +166,12 @@ func TestTheWriterSeesTheFullPicture(t *testing.T) {
 	parentOfExisting := parentIn(t, models, byID, stand.existing)
 	parentOfEmpty := parentIn(t, models, byID, stand.empty)
 	assertThePicture(t, bodyPromptOf(t, script, stand.existing), pictureWant{
-		path: stand.existing, parentPath: parentOfExisting, parentTitle: shownTitle(models[parentOfExisting].Page),
+		path: stand.existing, parentPath: parentOfExisting, parentTitle: shownTitle(models[parentOfExisting]),
 		instruction: writerInstruction, titleLine: titleLineOf(t, models[stand.existing]),
-		products: productTitles(models, stand.lists), target: stand.empty, targetUnder: shownTitle(models[parentOfEmpty].Page),
+		products: productTitles(models, stand.lists), target: stand.empty, targetUnder: shownTitle(models[parentOfEmpty]),
 	})
 	assertThePicture(t, bodyPromptOf(t, script, stand.child.path), pictureWant{
-		path: stand.child.path, planned: true, parentPath: stand.existing, parentTitle: shownTitle(models[stand.existing].Page),
+		path: stand.child.path, planned: true, parentPath: stand.existing, parentTitle: shownTitle(models[stand.existing]),
 	})
 
 	client := wordpress(t, core, siteID)
@@ -315,13 +315,17 @@ func parentIn(t *testing.T, models map[string]observe.PageModel, byID map[string
 	return parent
 }
 
-func shownTitle(page pagemap.Page) string {
-	for _, held := range []string{page.Observed.Title, page.Title, page.Observed.H1, page.H1} {
+func shownTitle(model observe.PageModel) string {
+	shown := map[field.Key]string{}
+	for i := range model.Fields {
+		shown[model.Fields[i].Key] = model.Fields[i].Current
+	}
+	for _, held := range []string{shown[field.Title], model.Page.Title, shown[field.H1], model.Page.H1} {
 		if held != "" {
 			return held
 		}
 	}
-	return page.Path
+	return model.Page.Path
 }
 
 func titleLineOf(t *testing.T, model observe.PageModel) string {
@@ -343,7 +347,7 @@ func productTitles(models map[string]observe.PageModel, lists bool) []string {
 	}
 	for path := range models {
 		if page := models[path].Page; page.WPType == pagemap.WPProduct && page.Status != pagemap.StatusArchived {
-			out = append(out, shownTitle(page))
+			out = append(out, shownTitle(models[path]))
 		}
 	}
 	slices.Sort(out)

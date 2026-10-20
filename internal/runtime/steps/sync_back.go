@@ -24,15 +24,15 @@ const (
 )
 
 type SyncResult struct {
-	ModifiedAt  time.Time          `json:"modifiedAt"`
-	URL         string             `json:"url"`
-	Status      string             `json:"status"`
-	ContentHash string             `json:"contentHash"`
-	Source      string             `json:"source"`
-	Findings    []content.Finding  `json:"findings"`
-	Mismatches  []pagemap.Mismatch `json:"mismatches"`
-	WPID        int64              `json:"wpId"`
-	Links       int                `json:"links"`
+	ModifiedAt  time.Time         `json:"modifiedAt"`
+	URL         string            `json:"url"`
+	Status      string            `json:"status"`
+	ContentHash string            `json:"contentHash"`
+	Source      string            `json:"source"`
+	Findings    []content.Finding `json:"findings"`
+	Mismatches  []Mismatch        `json:"mismatches"`
+	WPID        int64             `json:"wpId"`
+	Links       int               `json:"links"`
 }
 
 func headingOne(doc *content.Document) string {
@@ -115,10 +115,6 @@ func SyncBack(deps Deps) run.StepDef {
 			next := sc.Page
 			next.WPID = &item.ID
 			next.ContentHash = wp.ContentHash(body)
-			next.Observed = pagemap.Observed{
-				Link: permalinkOf(item), Slug: item.Slug, Status: item.Status,
-				Title: item.Title, H1: headingOne(doc),
-			}
 			next.Drift = false
 			next.LastSyncedAt = &now
 			next.UpdatedAt = now
@@ -131,11 +127,13 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, persistErr
 			}
 
-			mismatches := next.Mismatches()
+			differs := mismatches(next, answered{
+				link: permalinkOf(item), slug: item.Slug, status: item.Status, title: item.Title, h1: headingOne(doc),
+			})
 			result := SyncResult{
 				WPID: item.ID, URL: item.Link, Status: item.Status, ContentHash: next.ContentHash,
 				Source: source, Links: len(links), ModifiedAt: item.Modified.UTC(),
-				Mismatches: mismatches, Findings: planFindings(next, mismatches),
+				Mismatches: differs, Findings: planFindings(next, differs),
 			}
 			if seen := storefrontFinding(ctx, client, next, item, body); seen != nil {
 				result.Findings = append(result.Findings, *seen)
@@ -152,17 +150,17 @@ func SyncBack(deps Deps) run.StepDef {
 	}
 }
 
-func planFindings(page pagemap.Page, mismatches []pagemap.Mismatch) []content.Finding {
-	out := make([]content.Finding, 0, len(mismatches))
-	for i := range mismatches {
+func planFindings(page pagemap.Page, found []Mismatch) []content.Finding {
+	out := make([]content.Finding, 0, len(found))
+	for i := range found {
 		out = append(out, content.Finding{
 			Severity: content.SeverityWarn,
 			Code:     CodePlanNotKept,
-			Message: "the " + mismatches[i].Field + " of " + page.Path + " was planned as " +
-				mismatches[i].Planned + " and the site holds " + mismatches[i].Actual,
+			Message: "the " + found[i].Field + " of " + page.Path + " was planned as " +
+				found[i].Planned + " and the site holds " + found[i].Actual,
 			Details: map[string]any{
 				"class": ClassNeedsHuman, "pageId": page.ID, "path": page.Path,
-				"field": mismatches[i].Field, "planned": mismatches[i].Planned, "actual": mismatches[i].Actual,
+				"field": found[i].Field, "planned": found[i].Planned, "actual": found[i].Actual,
 			},
 		})
 	}

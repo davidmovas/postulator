@@ -50,7 +50,7 @@ func presetSet() pagetype.Set {
 func sitePage(id, path, title string, wpID int64, wpType pagemap.WPType, preset pagetype.Preset, parent string) pagemap.Page {
 	page := pagemap.Page{
 		ID: id, SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: wpType, WPID: new(wpID),
-		Status: pagemap.StatusPublished, Observed: pagemap.Observed{Title: title, H1: title}, PageTypeID: new(typeOf(preset)),
+		Status: pagemap.StatusPublished, Title: title, H1: title, PageTypeID: new(typeOf(preset)),
 	}
 	if parent != "" {
 		page.ParentPageID, page.ParentReason = new(parent), pagemap.ParentJSONLD
@@ -122,7 +122,7 @@ func TestAPackReadsOnlyThePagesNeighborhood(t *testing.T) {
 		t.Errorf("the pack read in %d units, want one read", m.reads)
 	}
 	if len(m.asked) != 1 || slices.Contains(m.asked[0], "far") || !slices.Contains(m.asked[0], "tb") {
-		t.Errorf("fields were asked for %v, want the hub's neighborhood without the far page", m.asked)
+		t.Errorf("bodies were asked for %v, want the hub's neighborhood without the far page", m.asked)
 	}
 	if picture.Fitted.Field != field.Body {
 		t.Errorf("an unnamed field = %s, want the hub's link field", picture.Fitted.Field)

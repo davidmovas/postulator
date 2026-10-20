@@ -185,13 +185,17 @@ func (s *Service) base(ctx context.Context, siteID string) (contextpack.Snapshot
 	if err != nil {
 		return contextpack.Snapshot{}, err
 	}
+	fields, err := s.deps.Fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return contextpack.Snapshot{}, err
+	}
 	absolute, err := s.absolute(ctx, owner)
 	if err != nil {
 		return contextpack.Snapshot{}, err
 	}
 	return contextpack.Snapshot{
-		Site: pagemap.NewSite(owner.BaseURL), Absolute: absolute, Index: pagemap.NewIndex(pages), Types: types, Graph: g,
-		Terms: terms, Fields: map[string][]field.Value{}, Bodies: map[string]block.Snapshot{}, Written: map[string][]string{},
+		Site: pagemap.NewSite(owner.BaseURL), Absolute: absolute, Index: pagemap.NewIndexNamed(pages, pagemap.Names(fields)), Types: types, Graph: g,
+		Terms: terms, Fields: fields, Bodies: map[string]block.Snapshot{}, Written: map[string][]string{},
 		Renders: map[string]render.Record{}, Links: []pagemap.PageLink{}, Findings: []finding.Finding{},
 	}, nil
 }
@@ -232,9 +236,6 @@ func (s *Service) fill(ctx context.Context, snapshot *contextpack.Snapshot, page
 		return err
 	}
 	snapshot.Links = mergeLinks(from, to)
-	if snapshot.Fields, err = s.deps.Fields.ListForPages(ctx, ids); err != nil {
-		return err
-	}
 	bodies, err := s.deps.Bodies.ListCurrent(ctx, ids)
 	if err != nil {
 		return err

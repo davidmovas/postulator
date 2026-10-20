@@ -453,7 +453,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	state.Result = PublishResult{
 		WPID: held.ID, URL: permalinkOf(wp.Item{Link: held.Permalink}), Status: held.Status, PreviousProduct: &snapshot,
 		SEOApplied: make([]string, 0), Skipped: unattached, Findings: findingsOfProduct(sc.Page, held),
-		Mismatches: make([]pagemap.Mismatch, 0), Version: publishRecordVersion,
+		Mismatches: make([]Mismatch, 0), Version: publishRecordVersion,
 	}
 	if !seo.Send {
 		state.Result.took(seoWrite{applied: []string{}, skipped: seo.Skipped, findings: seo.Findings})
@@ -584,7 +584,7 @@ func writeStoreFields(ctx context.Context, deps Deps, sc *run.StepContext, clien
 	snapshot := plan.Store.Snapshot
 	snapshot.wrote(written)
 	if snapshot.ShortWritten && strings.TrimSpace(written.ShortDescription) == "" {
-		return state.stopped(refuseMismatch(sc, []pagemap.Mismatch{{Field: FieldShortDescription, Planned: "a short description", Actual: "none"}}))
+		return state.stopped(refuseMismatch(sc, []Mismatch{{Field: FieldShortDescription, Planned: "a short description", Actual: "none"}}))
 	}
 	answer := productAnswerOf(written)
 	plan.Store.Snapshot, plan.Store.Saved = snapshot, &answer
@@ -687,7 +687,7 @@ func hasFields(update wp.UpdateProduct) bool {
 
 func nameDiffers(page pagemap.Page, held wp.Product) *content.Finding {
 	planned := strings.TrimSpace(page.H1)
-	name := content.StoreName(pagemap.Page{Observed: pagemap.Observed{Title: held.Name}})
+	name := content.StoreName(held.Name)
 	if planned == "" || name == "" || strings.EqualFold(planned, name) {
 		return nil
 	}
@@ -747,9 +747,6 @@ func recordProduct(ctx context.Context, deps Deps, sc *run.StepContext, written 
 	next.WPID = &written.ID
 	next.Status = pagemap.StatusFromWordPress(written.Status)
 	next.ContentHash = hash
-	next.Observed = pagemap.Observed{
-		Link: permalinkOf(wp.Item{Link: written.Permalink}), Slug: written.Slug, Status: written.Status, Title: written.Name,
-	}
 	next.Drift = false
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now

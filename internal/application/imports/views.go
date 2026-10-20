@@ -268,7 +268,7 @@ func entityView(sheet string, e graph.Entity, parent string, action Action) Prev
 }
 
 func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action, pageType string) PreviewPage {
-	view := PreviewPage{
+	return PreviewPage{
 		Sheet:           sheet,
 		Path:            p.Path,
 		PlannedPath:     p.PlannedPath,
@@ -284,8 +284,4 @@ func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action, pag
 		Action:          string(action),
 		Generated:       draft.generated,
 	}
-	if p.WPType == pagemap.WPProduct && p.WPID != nil {
-		view.StoreName = p.Observed.Title
-	}
-	return view
 }

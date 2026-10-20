@@ -106,7 +106,7 @@ func matchProduct(draft *pageDraft, state *siteState, claimed map[string]bool, p
 		}
 	}
 
-	match := pagemap.MatchProduct(pagemap.ProductRow{Path: draft.path, H1: draft.h1, Title: draft.title}, candidates)
+	match := pagemap.MatchProduct(pagemap.ProductRow{Path: draft.path, H1: draft.h1, Title: draft.title}, candidates, state.names)
 	switch {
 	case match.Found:
 		claimed[match.Page.ID] = true

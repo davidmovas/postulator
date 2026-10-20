@@ -1,6 +1,10 @@
 package pagemap
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/davidmovas/postulator/internal/domain/field"
+)
 
 type Index struct {
 	byID     map[string]Page
@@ -16,6 +20,20 @@ func NewIndexNamed(pages []Page, names map[string][]string) Index {
 	index := NewIndex(pages)
 	index.names = names
 	return index
+}
+
+func Names(stored map[string][]field.Value) map[string][]string {
+	names := make(map[string][]string, len(stored))
+	for pageID, values := range stored {
+		for _, key := range []field.Key{field.Title, field.H1} {
+			for i := range values {
+				if values[i].Key == key && values[i].Current != "" {
+					names[pageID] = append(names[pageID], values[i].Current)
+				}
+			}
+		}
+	}
+	return names
 }
 
 func NewIndex(pages []Page) Index {

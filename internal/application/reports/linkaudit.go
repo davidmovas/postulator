@@ -114,6 +114,10 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	if err != nil {
 		return siteLinks{}, err
 	}
+	fields, err := s.fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteLinks{}, err
+	}
 	links, err := s.links.ListBySite(ctx, siteID)
 	if err != nil {
 		return siteLinks{}, err
@@ -137,7 +141,7 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	return siteLinks{
 		site:  pagemap.NewSite(owner.BaseURL),
 		types: types,
-		g:     g, index: pagemap.NewIndex(pages), entities: byID,
+		g:     g, index: pagemap.NewIndexNamed(pages, pagemap.Names(fields)), entities: byID,
 		outgoing: linksByPage(owed), incoming: incoming, typed: typesByPage(links),
 	}, nil
 }

@@ -66,7 +66,7 @@ func typed(page pagemap.Page, preset pagetype.Preset) pagemap.Page {
 func onSitePage(id, path, title string, wpID int64, wpType pagemap.WPType) pagemap.Page {
 	return pagemap.Page{
 		ID: id, SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: wpType, WPID: new(wpID),
-		Status: pagemap.StatusPublished, Observed: pagemap.Observed{Title: title, H1: title}, CreatedAt: stamp, UpdatedAt: stamp,
+		Status: pagemap.StatusPublished, Title: title, H1: title, CreatedAt: stamp, UpdatedAt: stamp,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -23,11 +24,15 @@ type siteState struct {
 	edgeKeys  map[string]struct{}
 	types     map[pagemap.WPType]struct{}
 	pageTypes []pagetype.Type
+	fields    map[string][]field.Value
+	names     map[string][]string
 }
 
-func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, pageTypes []pagetype.Type) siteState {
+func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, pageTypes []pagetype.Type,
+	fields map[string][]field.Value) siteState {
 	state := siteState{
 		siteID: siteID, entities: entities, edges: edges, pages: pages, pageTypes: pageTypes,
+		fields: fields, names: pagemap.Names(fields),
 		byName:    make(map[string][]graph.Entity, len(entities)),
 		byPath:    make(map[string]pagemap.Page, len(pages)),
 		byPlanned: make(map[string]pagemap.Page),
@@ -82,7 +87,21 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	if err != nil {
 		return siteState{}, err
 	}
-	return newSiteState(siteID, entities, edges, pages, pageTypes), nil
+	fields, err := s.deps.Fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	return newSiteState(siteID, entities, edges, pages, pageTypes, fields), nil
+}
+
+func (s *siteState) storeName(pageID string) string {
+	values := s.fields[pageID]
+	for i := range values {
+		if values[i].Key == field.Title {
+			return values[i].Current
+		}
+	}
+	return ""
 }
 
 func (s *siteState) typeName(typeID *string) string {
@@ -136,7 +155,7 @@ func (s *siteState) storeHolds(row pagemap.ProductRow) bool {
 	if page, held := s.held(row.Path); held && inTheStore(page) {
 		return true
 	}
-	return pagemap.MatchProduct(row, s.pages).Found
+	return pagemap.MatchProduct(row, s.pages, s.names).Found
 }
 
 func (s *siteState) rowTypeOf(binding importmap.Binding, rows [][]string) importmap.RowType {

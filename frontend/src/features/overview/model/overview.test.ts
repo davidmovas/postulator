@@ -52,8 +52,6 @@ function node(id: string, drift: boolean, children: PageTreeNode[] = []): PageTr
             typeSource: "",
             typeReason: "",
             contentHash: "",
-            observed: { link: "", slug: "", status: "", title: "", h1: "" },
-            mismatches: [],
             wpModifiedAt: null,
             lastSyncedAt: null,
             drift,

@@ -313,6 +313,16 @@ func (f *fieldLog) ListForPage(context.Context, string) ([]field.Value, error) {
 	return append([]field.Value(nil), f.values...), nil
 }
 
+func (f *fieldLog) ListBySite(context.Context, string) (map[string][]field.Value, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make(map[string][]field.Value)
+	for i := range f.values {
+		out[f.values[i].PageID] = append(out[f.values[i].PageID], f.values[i])
+	}
+	return out, nil
+}
+
 func TestAPlannedPageFoundBySlugIsAdoptedOnlyWhenItIsTheRunsOwn(t *testing.T) {
 	t.Parallel()
 

@@ -661,7 +661,7 @@ func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
 			if err != nil {
 				t.Fatalf("encode the draft: %v", err)
 			}
-			sc := productContext(t, deps)
+			sc := productContext(t, &deps)
 			sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: body}
 			sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: draft}
 			if tc.written {
@@ -1540,12 +1540,12 @@ const productDraftReply = `{"title":"Espresso guide","h1":"Espresso guide","sect
 	`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
 	`],"summary":"A short guide to espresso."}`
 
-func productContext(t *testing.T, deps steps.Deps) *run.StepContext {
+func productContext(t *testing.T, deps *steps.Deps) *run.StepContext {
 	t.Helper()
 
-	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, *deps)})
 	sc.Page.WPType = pagemap.WPProduct
-	sc.Page.Observed.Title = "Espresso Machine &amp; Grinder"
+	deps.Fields = &fieldLog{values: []field.Value{field.NewValue(sc.Page.ID, field.Title, "Espresso Machine &amp; Grinder", time.Time{})}}
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is", TargetWords: 30, PrimaryKeyword: true},
 	}
@@ -1558,7 +1558,7 @@ func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
 	deps := unitDeps()
 	recorder := &promptRecorder{reply: productDraftReply}
 	deps.LLM = recorder
-	sc := productContext(t, deps)
+	sc := productContext(t, &deps)
 
 	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
 	if err != nil {
@@ -1595,7 +1595,7 @@ func TestTheWriterOfAPageIsAskedNothingAboutProducts(t *testing.T) {
 	deps := unitDeps()
 	recorder := &promptRecorder{reply: goodDraft}
 	deps.LLM = recorder
-	sc := productContext(t, deps)
+	sc := productContext(t, &deps)
 	sc.Page.WPType = pagemap.WPPage
 
 	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
@@ -1620,7 +1620,7 @@ func TestTheWriterCeilingIsTheBodysAlone(t *testing.T) {
 	recorder := &ceilingRecorder{reply: productDraftReply}
 	deps.LLM = recorder
 
-	sc := productContext(t, deps)
+	sc := productContext(t, &deps)
 	sc.Spec.Sections = []template.Section{{Heading: "About", TargetWords: 1800, Required: true}, {Heading: "Brewing"}}
 	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
 		t.Fatalf("GenerateBody: %v", err)

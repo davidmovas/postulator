@@ -343,6 +343,18 @@ func (f fieldStore) ListForPage(_ context.Context, pageID string) ([]field.Value
 	return out, nil
 }
 
+func (f fieldStore) ListForPages(_ context.Context, pageIDs []string) (map[string][]field.Value, error) {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	out := make(map[string][]field.Value, len(pageIDs))
+	for _, pageID := range pageIDs {
+		for key := range f.s.fields[pageID] {
+			out[pageID] = append(out[pageID], f.s.fields[pageID][key])
+		}
+	}
+	return out, nil
+}
+
 func (f fieldStore) ListBySite(_ context.Context, siteID string) (map[string][]field.Value, error) {
 	f.s.mu.Lock()
 	defer f.s.mu.Unlock()

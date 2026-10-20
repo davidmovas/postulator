@@ -121,10 +121,10 @@ func newPageRelink(page pagemap.Page, targets int) pageRelink {
 			Placed: make([]PlacedLink, 0, targets), Findings: make([]content.Finding, 0),
 		},
 		published: PublishResult{
-			WPID: *page.WPID, URL: page.Observed.Link, Status: string(page.Status),
+			WPID: *page.WPID, URL: page.Path, Status: string(page.Status),
 			ContentHash: page.ContentHash, SEOApplied: make([]string, 0),
 			Skipped: make([]string, 0), Findings: make([]content.Finding, 0),
-			Mismatches: make([]pagemap.Mismatch, 0),
+			Mismatches: make([]Mismatch, 0),
 		},
 	}
 }

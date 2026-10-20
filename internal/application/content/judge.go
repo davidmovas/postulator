@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -97,8 +98,12 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 	if err != nil {
 		return JudgeResponse{}, err
 	}
+	fields, err := s.deps.Fields.ListBySite(ctx, page.SiteID)
+	if err != nil {
+		return JudgeResponse{}, err
+	}
 	if page.WPType == pagemap.WPProduct {
-		raw = "<h1>" + html.EscapeString(contentdomain.StoreName(page)) + "</h1>" + raw
+		raw = "<h1>" + html.EscapeString(contentdomain.StoreName(siteTitle(fields[page.ID]))) + "</h1>" + raw
 	}
 	doc, err := contentdomain.Parse(raw)
 	if err != nil {
@@ -110,7 +115,7 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 		return JudgeResponse{}, err
 	}
 
-	entity, targets, err := s.context(ctx, page)
+	entity, targets, err := s.context(ctx, page, pagemap.Names(fields))
 	if err != nil {
 		return JudgeResponse{}, err
 	}
@@ -138,7 +143,16 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 	return JudgeResponse{PageID: page.ID, Path: page.Path, Report: assessed.Report, Tokens: assessed.Tokens}, nil
 }
 
-func (s *Service) context(ctx context.Context, page pagemap.Page) (graph.Entity, []contentdomain.LinkTarget, error) {
+func siteTitle(values []field.Value) string {
+	for i := range values {
+		if values[i].Key == field.Title {
+			return values[i].Current
+		}
+	}
+	return ""
+}
+
+func (s *Service) context(ctx context.Context, page pagemap.Page, names map[string][]string) (graph.Entity, []contentdomain.LinkTarget, error) {
 	entities, err := s.deps.Entities.ListBySite(ctx, page.SiteID)
 	if err != nil {
 		return graph.Entity{}, nil, err
@@ -173,7 +187,7 @@ func (s *Service) context(ctx context.Context, page pagemap.Page) (graph.Entity,
 		return graph.Entity{}, nil, err
 	}
 
-	planned := contentdomain.PlanLinks(built, pagemap.NewIndex(pages), contentdomain.Subject{
+	planned := contentdomain.PlanLinks(built, pagemap.NewIndexNamed(pages, names), contentdomain.Subject{
 		PageID: page.ID, PagePath: page.Path, EntityID: entity.ID,
 	}, policy)
 	entity.Name = built.Label(entity.ID)

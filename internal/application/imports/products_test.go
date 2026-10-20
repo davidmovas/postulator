@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/importer"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -20,15 +21,16 @@ func (h harness) storeProduct(t *testing.T, slug, name string, wpID int64) pagem
 	now := time.Date(2026, time.September, 18, 8, 0, 0, 0, time.UTC)
 	page, err := pagemap.NewPage(pagemap.Page{
 		ID: id.New(), SiteID: h.siteID, Path: "/product/" + slug + "/", WPType: pagemap.WPProduct, WPID: &wpID,
-		Status: pagemap.StatusPublished, Title: name,
-		Observed:  pagemap.Observed{Title: name, Slug: slug, Status: "publish", Link: "/product/" + slug + "/"},
-		CreatedAt: now, UpdatedAt: now,
+		Status: pagemap.StatusPublished, Title: "The plan's own title", CreatedAt: now, UpdatedAt: now,
 	})
 	if err != nil {
 		t.Fatalf("NewPage: %v", err)
 	}
 	if err = sqlite.NewPageRepo(h.store).Insert(t.Context(), page); err != nil {
 		t.Fatalf("Insert: %v", err)
+	}
+	if err = sqlite.NewPageFieldRepo(h.store).Observe(t.Context(), page.ID, []field.Value{field.NewValue(page.ID, field.Title, name, now)}); err != nil {
+		t.Fatalf("observe the store's name: %v", err)
 	}
 	return page
 }

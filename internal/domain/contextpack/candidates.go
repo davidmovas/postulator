@@ -24,7 +24,7 @@ func (s Snapshot) candidates(page pagemap.Page) []Candidate {
 				continue
 			}
 			seen[other.ID] = struct{}{}
-			out = append(out, Candidate{WPID: *other.WPID, Name: titleOf(*other), Path: other.Path})
+			out = append(out, Candidate{WPID: *other.WPID, Name: s.titleOf(*other), Path: other.Path})
 		}
 	}
 	offer(s.siblings(page))

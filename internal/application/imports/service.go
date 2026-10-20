@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -45,6 +46,10 @@ type typeReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagetype.Type, error)
 }
 
+type fieldReader interface {
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+}
+
 type mappingStore interface {
 	Upsert(ctx context.Context, m importmap.Mapping) error
 	Delete(ctx context.Context, id string) error
@@ -66,6 +71,7 @@ type Deps struct {
 	Edges      edgeStore
 	Pages      pageStore
 	Types      typeReader
+	Fields     fieldReader
 	Mappings   mappingStore
 	Sites      siteReader
 	UnitOfWork unitOfWork

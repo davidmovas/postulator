@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
+import { usePageModel } from "../../data/hooks/pages.js";
 import { usePageReport } from "../../data/hooks/reports.js";
 import type { Page } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
@@ -15,12 +16,13 @@ export interface ProductPanelProps {
 
 export function ProductPanel({ page }: ProductPanelProps): ReactElement {
     const report = usePageReport(page.wpId === null ? null : page.id);
+    const model = usePageModel(page.wpId === null ? null : page.id);
 
     if (page.wpId === null) {
         return <Banner tone="warn" icon={CategoryIcon} title={said.notInStore} body={said.notInStoreBody} />;
     }
 
-    const storeName = page.observed.title;
+    const storeName = model.data?.title ?? "";
     const outputs = productOutputsOf(report.data?.product ?? null);
     const finished = report.data?.finishedAt ?? null;
 

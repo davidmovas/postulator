@@ -68,6 +68,7 @@ type bodyRecorder interface {
 type fieldRecorder interface {
 	Record(ctx context.Context, pageID string, key field.Key, value, runID string, at time.Time) error
 	ListForPage(ctx context.Context, pageID string) ([]field.Value, error)
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
 }
 
 type typeSets interface {
@@ -132,6 +133,33 @@ func (d Deps) now() time.Time {
 		return time.Time{}
 	}
 	return d.Clock.Now().UTC().Truncate(time.Second)
+}
+
+func (d Deps) namedIndex(ctx context.Context, siteID string, pages []pagemap.Page) (pagemap.Index, error) {
+	if d.Fields == nil {
+		return pagemap.NewIndex(pages), nil
+	}
+	stored, err := d.Fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return pagemap.Index{}, err
+	}
+	return pagemap.NewIndexNamed(pages, pagemap.Names(stored)), nil
+}
+
+func (d Deps) storeName(ctx context.Context, page pagemap.Page) (string, error) {
+	if d.Fields == nil || page.WPType != pagemap.WPProduct {
+		return "", nil
+	}
+	values, err := d.Fields.ListForPage(ctx, page.ID)
+	if err != nil {
+		return "", err
+	}
+	for i := range values {
+		if values[i].Key == field.Title {
+			return values[i].Current, nil
+		}
+	}
+	return "", nil
 }
 
 func (d Deps) inUnit(ctx context.Context, apply func(context.Context) error) error {

@@ -127,7 +127,7 @@ func (s Snapshot) Facts(pageID string, plan content.LinkContext) (Facts, error) 
 	}
 	kind := s.typeOf(page)
 	facts := Facts{
-		Page: s.ref(page, true), H1: h1Of(page), WPType: page.WPType, Status: page.Status,
+		Page: s.ref(page, true), H1: s.h1Of(page), WPType: page.WPType, Status: page.Status,
 		TypeSource: page.TypeSource, TypeReason: page.TypeReason, Technical: page.TechnicalReason,
 		ReadOnly: page.ReadOnlyReason, ParentReason: page.ParentReason, Card: s.card(page),
 		Trail: s.refs(s.trail(page), true), Children: s.refs(s.ranked(page, s.beside(page, s.children(page))), true),
@@ -167,7 +167,7 @@ func (s Snapshot) Ref(page pagemap.Page) Ref {
 
 func (s Snapshot) ref(page pagemap.Page, summarized bool) Ref {
 	kind := s.typeOf(page)
-	ref := Ref{PageID: page.ID, Path: page.Path, Title: titleOf(page), Type: kind.Name, Preset: kind.Preset, OnSite: onSite(page)}
+	ref := Ref{PageID: page.ID, Path: page.Path, Title: s.titleOf(page), Type: kind.Name, Preset: kind.Preset, OnSite: onSite(page)}
 	if summarized {
 		ref.Summary = s.Summary(page)
 	}
@@ -345,7 +345,7 @@ func (s Snapshot) ranked(page pagemap.Page, pages []pagemap.Page) []pagemap.Page
 	}
 	rows := make([]scored, 0, len(pages))
 	for i := range pages {
-		row := scored{page: pages[i], shared: shared(wanted, s.keywordKeys(pages[i]), titleOf(pages[i])), at: i}
+		row := scored{page: pages[i], shared: shared(wanted, s.keywordKeys(pages[i]), s.titleOf(pages[i])), at: i}
 		if entity, mapped := s.entity(pages[i]); mapped {
 			row.score = entity.Score
 		}

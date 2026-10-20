@@ -3,10 +3,12 @@ package observe
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -164,20 +166,47 @@ func (s *Service) Model(ctx context.Context, req ModelRequest) (ModelView, error
 	if err != nil {
 		return ModelView{}, err
 	}
-	return modelView(model, pagemap.NewIndex(pages), written), nil
+	index := pagemap.NewIndex(pages)
+	named, err := s.deps.Fields.ListForPages(ctx, shownBeside(model, index))
+	if err != nil {
+		return ModelView{}, err
+	}
+	return modelView(model, index, written, named), nil
 }
 
-func titleOf(page pagemap.Page) string {
-	if page.Observed.Title != "" {
-		return page.Observed.Title
+func shownBeside(model PageModel, index pagemap.Index) []string {
+	ids := make([]string, 0)
+	if model.Page.ParentPageID != nil {
+		ids = append(ids, *model.Page.ParentPageID)
+	}
+	if model.Render == nil {
+		return ids
+	}
+	for _, trail := range model.Render.Trails {
+		for _, crumb := range trail.Crumbs {
+			for _, path := range []string{crumb.Path, crumb.Final} {
+				if target, found := index.ByPath(path); path != "" && found && !slices.Contains(ids, target.ID) {
+					ids = append(ids, target.ID)
+				}
+			}
+		}
+	}
+	return ids
+}
+
+func titleOf(page pagemap.Page, values []field.Value) string {
+	for i := range values {
+		if values[i].Key == field.Title && values[i].Current != "" {
+			return values[i].Current
+		}
 	}
 	return page.Title
 }
 
-func modelView(model PageModel, index pagemap.Index, written []block.Written) ModelView {
+func modelView(model PageModel, index pagemap.Index, written []block.Written, named map[string][]field.Value) ModelView {
 	page := model.Page
 	view := ModelView{
-		PageID: page.ID, Path: page.Path, Title: titleOf(page), WPType: string(page.WPType), WPID: page.WPID, Status: string(page.Status),
+		PageID: page.ID, Path: page.Path, Title: titleOf(page, model.Fields), WPType: string(page.WPType), WPID: page.WPID, Status: string(page.Status),
 		Hierarchy:       HierarchyView{Reason: string(page.ParentReason), Method: string(page.ParentMethod)},
 		TechnicalReason: string(page.TechnicalReason), ReadOnlyReason: string(page.ReadOnlyReason),
 		Terms: make([]TermView, 0, len(model.Terms)), Links: make([]LinkView, 0, len(model.Links)),
@@ -186,7 +215,7 @@ func modelView(model PageModel, index pagemap.Index, written []block.Written) Mo
 	if page.ParentPageID != nil {
 		view.Hierarchy.ParentID = *page.ParentPageID
 		if parent, found := index.ByID(*page.ParentPageID); found {
-			view.Hierarchy.ParentPath, view.Hierarchy.ParentTitle = parent.Path, titleOf(parent)
+			view.Hierarchy.ParentPath, view.Hierarchy.ParentTitle = parent.Path, titleOf(parent, named[parent.ID])
 		}
 	}
 	if model.Identity.PageID != "" {
@@ -199,7 +228,7 @@ func modelView(model PageModel, index pagemap.Index, written []block.Written) Mo
 		view.Terms = append(view.Terms, TermView{Taxonomy: term.Taxonomy, Name: term.Name, Slug: term.Slug})
 	}
 	if model.Render != nil {
-		view.Render = renderView(page, *model.Render, index)
+		view.Render = renderView(page, *model.Render, index, named)
 	}
 	for i := range model.Links {
 		link := &model.Links[i]
@@ -236,7 +265,7 @@ func modelView(model PageModel, index pagemap.Index, written []block.Written) Mo
 	return view
 }
 
-func renderView(page pagemap.Page, record render.Record, index pagemap.Index) *RenderView {
+func renderView(page pagemap.Page, record render.Record, index pagemap.Index, named map[string][]field.Value) *RenderView {
 	view := &RenderView{
 		Root: string(record.Root), WordsContent: record.WordsContent, WordsGenerated: record.WordsGenerated, Builder: record.Builder,
 		URLForm: record.URLForm, Robots: record.Robots, NoIndex: record.NoIndex(), FinalPath: record.FinalPath,
@@ -255,7 +284,7 @@ func renderView(page pagemap.Page, record render.Record, index pagemap.Index) *R
 					continue
 				}
 				if target, found := index.ByPath(path); found {
-					item.TargetID, item.TargetTitle = target.ID, titleOf(target)
+					item.TargetID, item.TargetTitle = target.ID, titleOf(target, named[target.ID])
 				}
 			}
 			crumbs = append(crumbs, item)

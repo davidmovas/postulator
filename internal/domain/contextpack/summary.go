@@ -67,30 +67,30 @@ func (s Snapshot) structure(page pagemap.Page) string {
 	var builder strings.Builder
 	builder.WriteString(kind)
 	builder.WriteString(" for ")
-	builder.WriteString(h1Of(page))
+	builder.WriteString(s.h1Of(page))
 	if parent, found := s.parent(page); found {
 		builder.WriteString(" under ")
-		builder.WriteString(titleOf(parent))
+		builder.WriteString(s.titleOf(parent))
 	}
 	if products, _ := s.products(page); len(products) > 0 {
 		builder.WriteString("; lists ")
-		builder.WriteString(namesOf(products))
+		builder.WriteString(s.namesOf(products))
 	}
 	if children := s.children(page); len(children) > 0 {
 		builder.WriteString("; its children are ")
-		builder.WriteString(namesOf(children))
+		builder.WriteString(s.namesOf(children))
 	}
 	return builder.String()
 }
 
-func namesOf(pages []pagemap.Page) string {
-	shown := pages[:min(len(pages), namesShown)]
-	names := make([]string, 0, len(shown))
-	for i := range shown {
-		names = append(names, titleOf(shown[i]))
+func (s Snapshot) namesOf(pages []pagemap.Page) string {
+	listed := pages[:min(len(pages), namesShown)]
+	names := make([]string, 0, len(listed))
+	for i := range listed {
+		names = append(names, s.titleOf(listed[i]))
 	}
 	out := strings.Join(names, ", ")
-	if rest := len(pages) - len(shown); rest > 0 {
+	if rest := len(pages) - len(listed); rest > 0 {
 		out += " and " + strconv.Itoa(rest) + " more"
 	}
 	return out

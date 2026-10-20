@@ -24,22 +24,23 @@ func productSpec() template.TemplateSpec {
 	}
 }
 
+const storeName = "BPC-157 Liquid &amp; Spray"
+
 func storeProductPage() pagemap.Page {
 	return pagemap.Page{
 		Path: "/product/bpc-157-liquid/", WPType: pagemap.WPProduct, Title: "Buy BPC-157 Liquid", H1: "BPC-157 Liquid Form",
-		Observed: pagemap.Observed{Title: "BPC-157 Liquid &amp; Spray"},
 	}
 }
 
-func productBrief(page pagemap.Page) content.Brief {
+func productBrief(page pagemap.Page, name string) content.Brief {
 	entity := graph.Entity{Name: "BPC-157 Liquid", Keywords: keyword.Of("bpc 157 liquid")}
-	return content.NewBrief(productSpec(), field.LinkRules{}, page, entity, content.LinkContext{})
+	return content.NewBrief(productSpec(), field.LinkRules{}, page, name, entity, content.LinkContext{})
 }
 
 func TestNewBriefWritesAProductUnderTheNameTheStoreGivesIt(t *testing.T) {
 	t.Parallel()
 
-	brief := productBrief(storeProductPage())
+	brief := productBrief(storeProductPage(), storeName)
 	if !brief.PlannedH1 || brief.H1 != "BPC-157 Liquid & Spray" {
 		t.Fatalf("h1 = %q (planned %t), want the store's name as it reads", brief.H1, brief.PlannedH1)
 	}
@@ -53,13 +54,11 @@ func TestNewBriefKeepsAPagesOwnH1(t *testing.T) {
 
 	page := storeProductPage()
 	page.WPType = pagemap.WPPage
-	if got := productBrief(page).H1; got != "BPC-157 Liquid Form" {
+	if got := productBrief(page, storeName).H1; got != "BPC-157 Liquid Form" {
 		t.Errorf("h1 = %q, want the page's own plan", got)
 	}
 
-	unnamed := storeProductPage()
-	unnamed.Observed.Title = ""
-	if got := productBrief(unnamed).H1; got != "BPC-157 Liquid Form" {
+	if got := productBrief(storeProductPage(), "  ").H1; got != "BPC-157 Liquid Form" {
 		t.Errorf("h1 = %q, want the file's H1 for a product the store has not named yet", got)
 	}
 }

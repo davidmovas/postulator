@@ -24,8 +24,6 @@ export function aPage(id: string, path: string, overrides: Partial<Page> = {}): 
         typeSource: "",
         typeReason: "",
         contentHash: "",
-        observed: { link: "", slug: "", status: "", title: "", h1: "" },
-        mismatches: [],
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,

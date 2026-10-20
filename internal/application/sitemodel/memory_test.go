@@ -141,17 +141,6 @@ func (r termReader) ListTermsBySite(context.Context, string) (map[string][]pagem
 
 type fieldReader struct{ m *memory }
 
-func (r fieldReader) ListForPages(_ context.Context, ids []string) (map[string][]field.Value, error) {
-	r.m.ask(ids)
-	out := make(map[string][]field.Value)
-	for _, id := range ids {
-		if values, held := r.m.fields[id]; held {
-			out[id] = values
-		}
-	}
-	return out, nil
-}
-
 func (r fieldReader) ListBySite(context.Context, string) (map[string][]field.Value, error) {
 	return r.m.fields, nil
 }
@@ -159,6 +148,7 @@ func (r fieldReader) ListBySite(context.Context, string) (map[string][]field.Val
 type bodyReader struct{ m *memory }
 
 func (r bodyReader) ListCurrent(_ context.Context, ids []string) ([]block.Snapshot, error) {
+	r.m.ask(ids)
 	out := make([]block.Snapshot, 0)
 	for i := range r.m.bodies {
 		if slices.Contains(ids, r.m.bodies[i].PageID) {

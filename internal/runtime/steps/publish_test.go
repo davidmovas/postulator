@@ -556,15 +556,11 @@ func TestPublishRecordsWhatTheSiteReportedBack(t *testing.T) {
 	sc.Run.PublishMode = run.PublishLive
 	published := runPublish(t, deps, sc)
 
-	if written.last.Observed.Link != published.URL {
-		t.Fatalf("the stored link = %q, want the address WordPress answered with (%q)",
-			written.last.Observed.Link, published.URL)
+	if written.last.WPID == nil || *written.last.WPID != published.WPID || written.last.Status != pagemap.StatusPublished {
+		t.Fatalf("the stored page = %+v, want the id and the status WordPress answered with", written.last)
 	}
-	if written.last.Observed.Slug != "espresso" || written.last.Observed.Status != "publish" {
-		t.Fatalf("the stored mirror = %+v", written.last.Observed)
-	}
-	if written.last.Observed.Title != "Espresso guide" {
-		t.Errorf("the stored title = %q, want the title the site holds", written.last.Observed.Title)
+	if !strings.HasSuffix(published.URL, "/espresso/") || published.Status != "publish" {
+		t.Fatalf("the publish result = %+v, want the address and the status WordPress answered with", published)
 	}
 	if len(published.Mismatches) != 0 {
 		t.Errorf("mismatches = %+v, want none: the site agreed", published.Mismatches)

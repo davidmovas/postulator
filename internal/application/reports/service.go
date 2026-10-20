@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -59,6 +60,7 @@ type Deps struct {
 	Entities  entityReader
 	Edges     edgeReader
 	Pages     pageReader
+	Fields    fieldReader
 	Links     linkReader
 	Runs      runReader
 	Items     itemReader
@@ -72,10 +74,15 @@ type typeSets interface {
 	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
+type fieldReader interface {
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+}
+
 type Service struct {
 	entities  entityReader
 	edges     edgeReader
 	pages     pageReader
+	fields    fieldReader
 	links     linkReader
 	runs      runReader
 	items     itemReader
@@ -87,12 +94,12 @@ type Service struct {
 
 func New(deps Deps) *Service {
 	return &Service{
-		entities: deps.Entities, edges: deps.Edges, pages: deps.Pages, links: deps.Links,
+		entities: deps.Entities, edges: deps.Edges, pages: deps.Pages, fields: deps.Fields, links: deps.Links,
 		runs: deps.Runs, items: deps.Items, artifacts: deps.Artifacts,
 		sites: deps.Sites, specs: deps.Specs, types: deps.Types,
 	}
 }
 
-func invalid(message, field string) *errors.Error {
-	return errors.New(errors.Invalid, message).WithDetail("field", field)
+func invalid(message, name string) *errors.Error {
+	return errors.New(errors.Invalid, message).WithDetail("field", name)
 }

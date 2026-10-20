@@ -47,7 +47,7 @@ func guideBrief(page pagemap.Page) content.Brief {
 		{URL: "/coffee/", Anchors: []string{"coffee"}, Relation: content.RelationUp, Required: true},
 		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
 	}}
-	return content.NewBrief(spec, field.LinkRules{ParentLinkWithinParagraphs: 2}, page, entity, lc)
+	return content.NewBrief(spec, field.LinkRules{ParentLinkWithinParagraphs: 2}, page, "", entity, lc)
 }
 
 func reasonOf(t *testing.T, err error) string {
@@ -106,7 +106,7 @@ func TestNewBriefListsTheKeywordsOfThePageMostImportantFirst(t *testing.T) {
 	spec := template.TemplateSpec{KeywordRules: template.KeywordRules{PrimaryInFirstParagraph: true}}
 	entity := graph.Entity{Name: "BPC-157", Keywords: keyword.Of("bpc 157", "bpc dosage")}
 	brief := func(page pagemap.Page, owner graph.Entity) content.Brief {
-		return content.NewBrief(spec, field.LinkRules{}, page, owner, content.LinkContext{})
+		return content.NewBrief(spec, field.LinkRules{}, page, "", owner, content.LinkContext{})
 	}
 
 	own := brief(pagemap.Page{Keywords: keyword.New([]keyword.Keyword{
@@ -161,7 +161,7 @@ func TestNewBriefMarksTheKeywordsTheTemplateRequires(t *testing.T) {
 			t.Parallel()
 
 			spec := template.TemplateSpec{KeywordRules: template.KeywordRules{RequiredKeywords: tc.required}}
-			brief := content.NewBrief(spec, field.LinkRules{}, page, graph.Entity{}, content.LinkContext{})
+			brief := content.NewBrief(spec, field.LinkRules{}, page, "", graph.Entity{}, content.LinkContext{})
 			got := make([]bool, 0, len(brief.Keywords))
 			for _, item := range brief.Keywords {
 				got = append(got, item.Required)
@@ -212,7 +212,7 @@ func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			brief := content.NewBrief(template.TemplateSpec{}, tc.rules, pagemap.Page{}, entity, lc)
+			brief := content.NewBrief(template.TemplateSpec{}, tc.rules, pagemap.Page{}, "", entity, lc)
 			if got := phraseTexts(brief); !slices.Equal(got, tc.phrases) {
 				t.Fatalf("phrases = %v, want %v", got, tc.phrases)
 			}

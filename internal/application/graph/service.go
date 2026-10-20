@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -52,6 +53,14 @@ type workReader interface {
 	ActiveBySite(ctx context.Context, siteID string) ([]run.Item, error)
 }
 
+type identityReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error)
+}
+
+type fieldReader interface {
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+}
+
 type profileResolver interface {
 	Resolve(ctx context.Context, siteID string, role domainllm.Role, templateProfiles map[domainllm.Role]domainllm.ModelRef) (domainllm.ModelRef, error)
 }
@@ -72,6 +81,8 @@ type Deps struct {
 	Edges      edgeStore
 	Sites      siteReader
 	Pages      pageStore
+	Identities identityReader
+	Fields     fieldReader
 	Findings   findingStore
 	Work       workReader
 	Profiles   profileResolver
@@ -82,22 +93,25 @@ type Deps struct {
 }
 
 type Service struct {
-	entities  entityStore
-	edges     edgeStore
-	sites     siteReader
-	pages     pageStore
-	work      workReader
-	findings  findingStore
-	profiles  profileResolver
-	llm       llm.Client
-	uow       unitOfWork
-	publisher application.Publisher
-	clock     clock.Clock
+	entities   entityStore
+	edges      edgeStore
+	sites      siteReader
+	pages      pageStore
+	identities identityReader
+	fields     fieldReader
+	work       workReader
+	findings   findingStore
+	profiles   profileResolver
+	llm        llm.Client
+	uow        unitOfWork
+	publisher  application.Publisher
+	clock      clock.Clock
 }
 
 func New(deps Deps) *Service {
 	return &Service{
-		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, work: deps.Work, findings: deps.Findings,
+		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, identities: deps.Identities, fields: deps.Fields,
+		work: deps.Work, findings: deps.Findings,
 		profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
 		clock: deps.Clock,
 	}

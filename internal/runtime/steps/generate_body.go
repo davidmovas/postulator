@@ -61,7 +61,11 @@ func GenerateBody(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			brief := content.NewBrief(sc.Spec, sc.Links.Rules, sc.Page, entity, lc)
+			named, err := deps.storeName(ctx, sc.Page)
+			if err != nil {
+				return run.Result{}, err
+			}
+			brief := content.NewBrief(sc.Spec, sc.Links.Rules, sc.Page, named, entity, lc)
 			brief.Links = content.NewLinkAllowance(lc, sc.Links)
 			prompt := bodyPrompt{
 				Page: sc.Page, Type: sc.Type.Name, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,

@@ -1,12 +1,16 @@
 package steps_test
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -64,13 +68,21 @@ func TestSyncSiteKeepsThePlanOfAPageItNeverPublished(t *testing.T) {
 		{name: "metaDescription", got: stored.MetaDescription, want: planned.MetaDescription},
 		{name: "status", got: string(stored.Status), want: string(pagemap.StatusPlanned)},
 	}
-	for _, field := range fields {
-		if field.got != field.want {
-			t.Errorf("%s = %q, want the plan %q", field.name, field.got, field.want)
+	for _, row := range fields {
+		if row.got != row.want {
+			t.Errorf("%s = %q, want the plan %q", row.name, row.got, row.want)
 		}
 	}
-	if stored.Observed.Title != "E-Bike Range" || stored.Observed.Slug != "e-bike-range" {
-		t.Fatalf("the mirror = %+v, want what the site holds", stored.Observed)
+	identity, err := h.identities.Get(t.Context(), planned.ID)
+	if err != nil || !strings.HasSuffix(identity.URL, "/e-bike-range/") {
+		t.Fatalf("the identity = %+v (%v), want the address the site holds", identity, err)
+	}
+	values, err := h.fields.ListForPage(t.Context(), planned.ID)
+	if err != nil {
+		t.Fatalf("read the fields: %v", err)
+	}
+	if !slices.ContainsFunc(values, func(value field.Value) bool { return value.Key == field.Title && value.Current == "E-Bike Range" }) {
+		t.Fatalf("the fields = %+v, want the title the site holds", values)
 	}
 	if stored.WPID == nil || *stored.WPID != wpID {
 		t.Fatalf("the page lost the id the site gave it: %+v", stored.WPID)
@@ -109,8 +121,14 @@ func TestSyncSiteAdoptsAKnownPageThatCarriesNoPlan(t *testing.T) {
 	if stored.Title != renamed {
 		t.Fatalf("title = %q, want the site's own %q: there was no plan to protect", stored.Title, renamed)
 	}
-	if found := stored.Mismatches(); len(found) != 0 {
-		t.Fatalf("mismatches = %+v, want none", found)
+	open, err := h.findings.ListForPage(t.Context(), adopted.ID)
+	if err != nil {
+		t.Fatalf("list the findings: %v", err)
+	}
+	for i := range open {
+		if open[i].Code == finding.PageTitleDiffers {
+			t.Fatalf("finding = %+v, want none: there was no plan to differ from", open[i])
+		}
 	}
 }
 

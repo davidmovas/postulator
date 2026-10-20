@@ -45,7 +45,6 @@ type termStore interface {
 }
 
 type fieldStore interface {
-	ListForPages(ctx context.Context, pageIDs []string) (map[string][]field.Value, error)
 	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
 }
 

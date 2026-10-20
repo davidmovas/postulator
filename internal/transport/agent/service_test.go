@@ -60,7 +60,7 @@ func blocked(t *testing.T) (*agentapp.Service, string, *blockingRunner) {
 		Calls:         sqlite.NewToolCallRepo(store),
 		Sites:         siteRepo,
 		Reports: reports.New(reports.Deps{
-			Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store), Pages: pageRepo,
+			Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store), Pages: pageRepo, Fields: sqlite.NewPageFieldRepo(store),
 			Links: sqlite.NewPageLinkRepo(store), Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store),
 			Artifacts: sqlite.NewArtifactRepo(store), Sites: siteRepo, Specs: templateService,
 		}),

@@ -7,20 +7,6 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
-type Observed struct {
-	Link   string `json:"link"`
-	Slug   string `json:"slug"`
-	Status string `json:"status"`
-	Title  string `json:"title"`
-	H1     string `json:"h1"`
-}
-
-type Mismatch struct {
-	Field   string `json:"field"`
-	Planned string `json:"planned"`
-	Actual  string `json:"actual"`
-}
-
 type Note struct {
 	Label string `json:"label"`
 	Text  string `json:"text"`
@@ -49,8 +35,6 @@ type Page struct {
 	TypeSource      string        `json:"typeSource"`
 	TypeReason      string        `json:"typeReason"`
 	ContentHash     string        `json:"contentHash"`
-	Observed        Observed      `json:"observed"`
-	Mismatches      []Mismatch    `json:"mismatches"`
 	WPModifiedAt    dto.Time      `json:"wpModifiedAt"`
 	LastSyncedAt    dto.Time      `json:"lastSyncedAt"`
 	Drift           bool          `json:"drift"`
@@ -110,16 +94,11 @@ func view(p pagemap.Page) Page {
 		TypeSource:      string(p.TypeSource),
 		TypeReason:      string(p.TypeReason),
 		ContentHash:     p.ContentHash,
-		Observed: Observed{
-			Link: p.Observed.Link, Slug: p.Observed.Slug, Status: p.Observed.Status,
-			Title: p.Observed.Title, H1: p.Observed.H1,
-		},
-		Mismatches:   mismatchViews(p),
-		WPModifiedAt: dto.TimeOf(p.WPModifiedAt),
-		LastSyncedAt: dto.TimeOf(p.LastSyncedAt),
-		Drift:        p.Drift,
-		CreatedAt:    dto.NewTime(p.CreatedAt),
-		UpdatedAt:    dto.NewTime(p.UpdatedAt),
+		WPModifiedAt:    dto.TimeOf(p.WPModifiedAt),
+		LastSyncedAt:    dto.TimeOf(p.LastSyncedAt),
+		Drift:           p.Drift,
+		CreatedAt:       dto.NewTime(p.CreatedAt),
+		UpdatedAt:       dto.NewTime(p.UpdatedAt),
 	}
 }
 
@@ -127,15 +106,6 @@ func noteViews(notes []note.Note) []Note {
 	out := make([]Note, 0, len(notes))
 	for _, n := range notes {
 		out = append(out, Note{Label: n.Label, Text: n.Text})
-	}
-	return out
-}
-
-func mismatchViews(p pagemap.Page) []Mismatch {
-	found := p.Mismatches()
-	out := make([]Mismatch, 0, len(found))
-	for i := range found {
-		out = append(out, Mismatch{Field: found[i].Field, Planned: found[i].Planned, Actual: found[i].Actual})
 	}
 	return out
 }

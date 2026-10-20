@@ -23,35 +23,33 @@ const (
 
 	CodePublishOverDrift = "publish_over_drift"
 
-	FieldParent = "parent"
-
 	publishTimeout = 2 * time.Minute
 	lookupPerPage  = 100
 )
 
 type PublishResult struct {
-	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
-	WrittenMeta         *wp.SEOMeta        `json:"writtenMeta,omitempty"`
-	PreviousProduct     *ProductSnapshot   `json:"previousProduct,omitempty"`
-	PreviousVariations  []FieldWrite       `json:"previousVariations,omitempty"`
-	PreviousMedia       []FieldWrite       `json:"previousMedia,omitempty"`
-	PreviousFields      []FieldWrite       `json:"previousFields,omitempty"`
-	URL                 string             `json:"url"`
-	Status              string             `json:"status"`
-	ContentHash         string             `json:"contentHash"`
-	PreviousContent     string             `json:"previousContent"`
-	PreviousContentHash string             `json:"previousContentHash"`
-	Excerpt             string             `json:"excerpt,omitempty"`
-	PreviousExcerpt     *string            `json:"previousExcerpt,omitempty"`
-	SEOApplied          []string           `json:"seoApplied"`
-	Skipped             []string           `json:"skipped"`
-	Findings            []content.Finding  `json:"findings"`
-	Mismatches          []pagemap.Mismatch `json:"mismatches"`
-	Fields              []field.Change     `json:"fields"`
-	Blocks              []block.Change     `json:"blocks"`
-	WPID                int64              `json:"wpId"`
-	Version             int                `json:"version,omitempty"`
-	Created             bool               `json:"created"`
+	PreviousMeta        *wp.SEOMeta       `json:"previousMeta,omitempty"`
+	WrittenMeta         *wp.SEOMeta       `json:"writtenMeta,omitempty"`
+	PreviousProduct     *ProductSnapshot  `json:"previousProduct,omitempty"`
+	PreviousVariations  []FieldWrite      `json:"previousVariations,omitempty"`
+	PreviousMedia       []FieldWrite      `json:"previousMedia,omitempty"`
+	PreviousFields      []FieldWrite      `json:"previousFields,omitempty"`
+	URL                 string            `json:"url"`
+	Status              string            `json:"status"`
+	ContentHash         string            `json:"contentHash"`
+	PreviousContent     string            `json:"previousContent"`
+	PreviousContentHash string            `json:"previousContentHash"`
+	Excerpt             string            `json:"excerpt,omitempty"`
+	PreviousExcerpt     *string           `json:"previousExcerpt,omitempty"`
+	SEOApplied          []string          `json:"seoApplied"`
+	Skipped             []string          `json:"skipped"`
+	Findings            []content.Finding `json:"findings"`
+	Mismatches          []Mismatch        `json:"mismatches"`
+	Fields              []field.Change    `json:"fields"`
+	Blocks              []block.Change    `json:"blocks"`
+	WPID                int64             `json:"wpId"`
+	Version             int               `json:"version,omitempty"`
+	Created             bool              `json:"created"`
 }
 
 const publishRecordVersion = 3
@@ -355,7 +353,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	state.Plan = plan
 	state.Result = PublishResult{
 		WPID: existing.ID, URL: existing.Link, Status: existing.Status, SEOApplied: make([]string, 0),
-		Skipped: make([]string, 0), Findings: driftFindings(sc.Page), Mismatches: make([]pagemap.Mismatch, 0),
+		Skipped: make([]string, 0), Findings: driftFindings(sc.Page), Mismatches: make([]Mismatch, 0),
 		Version: publishRecordVersion,
 	}
 	if !seo.Send {
@@ -511,7 +509,7 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 	asked := plan.request()
 	var (
 		written    wp.Item
-		mismatches []pagemap.Mismatch
+		mismatches []Mismatch
 		stored     = plan.Final
 	)
 	if plan.Create {
@@ -743,7 +741,7 @@ type writeRequest struct {
 }
 
 func createItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, sc *run.StepContext,
-	asked writeRequest) (wp.Item, []pagemap.Mismatch, error) {
+	asked writeRequest) (wp.Item, []Mismatch, error) {
 	asked.created = true
 	in := wp.CreateItem{Title: asked.title, Content: asked.content, Slug: asked.slug, Status: asked.status}
 	if asked.excerpt != nil {
@@ -762,28 +760,22 @@ func createItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, sc
 	return written, compare(sc, asked, written), nil
 }
 
-func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap.Mismatch {
-	checked := sc.Page
-	checked.Title = asked.title
-	if asked.keepTitle && !asked.created {
-		checked.Title = written.Title
-	}
-	checked.H1 = ""
-	checked.Status = pagemap.StatusFromWordPress(written.Status)
-	if asked.created {
-		checked.Status = statusOf(sc.Run.PublishMode)
-	}
-	checked.Observed = observedOf(written)
+func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []Mismatch {
+	checked := pagemap.Page{Path: sc.Page.Path, WPType: sc.Page.WPType, Title: asked.title}
+	held := answered{status: written.Status, title: written.Title}
 	if !asked.created {
-		checked.Slug = ""
-		checked.Observed.Link = ""
-		return checked.Mismatches()
+		if asked.keepTitle {
+			checked.Title = written.Title
+		}
+		checked.Status = pagemap.StatusFromWordPress(written.Status)
+		return mismatches(checked, held)
 	}
 
-	checked.Slug = asked.slug
-	found := checked.Mismatches()
+	checked.Slug, checked.Status = asked.slug, statusOf(sc.Run.PublishMode)
+	held.link, held.slug = permalinkOf(written), written.Slug
+	found := mismatches(checked, held)
 	if hierarchical(sc.Page) && written.Parent != asked.parent {
-		found = append(found, pagemap.Mismatch{
+		found = append(found, Mismatch{
 			Field:   FieldParent,
 			Planned: strconv.FormatInt(asked.parent, 10),
 			Actual:  strconv.FormatInt(written.Parent, 10),
@@ -792,11 +784,11 @@ func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap
 	return found
 }
 
-func refuseMismatch(sc *run.StepContext, mismatches []pagemap.Mismatch) run.Result {
-	said := make([]string, 0, len(mismatches))
-	for i := range mismatches {
-		said = append(said, mismatches[i].Field+" was asked for as "+mismatches[i].Planned+
-			" and the site answers "+mismatches[i].Actual)
+func refuseMismatch(sc *run.StepContext, found []Mismatch) run.Result {
+	said := make([]string, 0, len(found))
+	for i := range found {
+		said = append(said, found[i].Field+" was asked for as "+found[i].Planned+
+			" and the site answers "+found[i].Actual)
 	}
 	return needsHuman("the site did not take " + sc.Page.Path + " as it was asked for: " + strings.Join(said, "; "))
 }
@@ -889,7 +881,6 @@ func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item
 	next.WPID = &written.ID
 	next.Status = pagemap.StatusFromWordPress(written.Status)
 	next.ContentHash = result.ContentHash
-	next.Observed = observedOf(written)
 	next.Drift = false
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now

@@ -476,16 +476,21 @@ func TestSyncSiteKeepsThePlanAndRecordsWhatTheSiteHolds(t *testing.T) {
 	if stored.Title != planned.Title {
 		t.Errorf("the stored title = %q, want the plan %q", stored.Title, planned.Title)
 	}
-	if stored.Observed.Link == "" || stored.Observed.Slug != "e-bike-range" {
-		t.Fatalf("the stored mirror = %+v, want the address the site holds", stored.Observed)
+	identity, err := h.identities.Get(t.Context(), planned.ID)
+	if err != nil {
+		t.Fatalf("read the identity: %v", err)
 	}
-
-	found := stored.Mismatches()
-	if len(found) != 1 || found[0].Field != pagemap.FieldPath {
-		t.Fatalf("mismatches = %+v, want the flattened path reported", found)
+	if path, pathErr := pagemap.NormalizePath(identity.URL); pathErr != nil || path != "/e-bike-range/" {
+		t.Fatalf("the identity = %+v, want the address the site holds", identity)
 	}
-	if found[0].Planned != planned.Path || found[0].Actual != "/e-bike-range/" {
-		t.Errorf("the mismatch = %+v", found[0])
+	values, err := h.fields.ListForPage(t.Context(), planned.ID)
+	if err != nil {
+		t.Fatalf("read the fields: %v", err)
+	}
+	if !slices.ContainsFunc(values, func(value field.Value) bool {
+		return value.Key == field.Title && value.Current == "How Far Can an E-Bike Go?"
+	}) {
+		t.Errorf("the fields = %+v, want the title the site holds", values)
 	}
 }
 
@@ -578,8 +583,15 @@ func TestSyncSiteGivesAWaitingRowTheProductCreatedForIt(t *testing.T) {
 		stored.PlannedPath != "/mak/mak-liquid/" || stored.Status != pagemap.StatusPublished {
 		t.Fatalf("the waiting row reads %+v, want it on the store's product at the store's address", stored)
 	}
-	if stored.H1 != "Mak Liquid" || !stored.Keywords.Equal(claimed.Keywords) || stored.Observed.Title != "Liquid" {
-		t.Errorf("the claimed row lost its plan or the store's name: %+v", stored)
+	if stored.H1 != "Mak Liquid" || !stored.Keywords.Equal(claimed.Keywords) {
+		t.Errorf("the claimed row lost its plan: %+v", stored)
+	}
+	values, err := h.fields.ListForPage(t.Context(), claimed.ID)
+	if err != nil {
+		t.Fatalf("read the fields: %v", err)
+	}
+	if !slices.ContainsFunc(values, func(value field.Value) bool { return value.Key == field.Title && value.Current == "Liquid" }) {
+		t.Errorf("the claimed row's fields = %+v, want the store's name", values)
 	}
 	all, err := h.pages.ListBySite(t.Context(), h.siteID)
 	if err != nil {
@@ -808,11 +820,17 @@ func TestSyncSiteAdoptsAPageItHasNeverSeen(t *testing.T) {
 	h.all(t)
 
 	discovered := h.byPath(t, "/coffee/espresso/")
-	if discovered.Title != "Espresso" || discovered.Observed.Slug != "espresso" {
+	if discovered.Title != "Espresso" || discovered.Slug != "espresso" || discovered.Path != "/coffee/espresso/" {
 		t.Fatalf("a page the map never held = %+v, want the site's own values adopted", discovered)
 	}
-	if found := discovered.Mismatches(); len(found) != 0 {
-		t.Fatalf("mismatches = %+v, want none: nothing was planned for this page", found)
+	open, err := h.findings.ListForPage(t.Context(), discovered.ID)
+	if err != nil {
+		t.Fatalf("list the findings: %v", err)
+	}
+	for i := range open {
+		if open[i].Code == finding.PageTitleDiffers || open[i].Code == finding.PageH1Differs {
+			t.Fatalf("finding = %+v, want none: nothing was planned for this page", open[i])
+		}
 	}
 }
 
