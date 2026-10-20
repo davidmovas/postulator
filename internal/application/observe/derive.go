@@ -54,7 +54,7 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 			m.pages[i] = page
 		}
 	}
-	m.index = pagemap.NewIndex(m.pages)
+	m.reindex()
 	m.landed = m.landings()
 	for i := range m.pages {
 		page := m.pages[i]
@@ -400,7 +400,7 @@ func (s *Service) breakCycles(ctx context.Context, tracked *findings, m *siteMod
 		if !progressed {
 			break
 		}
-		m.index = pagemap.NewIndex(m.pages)
+		m.reindex()
 	}
 
 	for pageID, paths := range broken {

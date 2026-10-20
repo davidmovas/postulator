@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -38,8 +39,25 @@ type siteModel struct {
 	identities map[string]pagemap.Identity
 	renders    map[string]render.Record
 	bodies     map[string]block.Snapshot
+	names      map[string][]string
 	index      pagemap.Index
 	landed     map[string]string
+}
+
+func (m *siteModel) reindex() {
+	m.index = pagemap.NewIndexNamed(m.pages, m.names)
+}
+
+func fieldNames(stored map[string][]field.Value) map[string][]string {
+	names := make(map[string][]string, len(stored))
+	for pageID, values := range stored {
+		for i := range values {
+			if (values[i].Key == field.Title || values[i].Key == field.H1) && values[i].Current != "" {
+				names[pageID] = append(names[pageID], values[i].Current)
+			}
+		}
+	}
+	return names
 }
 
 func (s *Service) model(ctx context.Context, siteID string) (siteModel, error) {
@@ -55,10 +73,15 @@ func (s *Service) model(ctx context.Context, siteID string) (siteModel, error) {
 	if err != nil {
 		return siteModel{}, err
 	}
+	stored, err := s.deps.Fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteModel{}, err
+	}
 	m := siteModel{
 		pages: pages, identities: make(map[string]pagemap.Identity, len(identities)),
-		renders: make(map[string]render.Record, len(renders)), bodies: map[string]block.Snapshot{}, index: pagemap.NewIndex(pages),
+		renders: make(map[string]render.Record, len(renders)), bodies: map[string]block.Snapshot{}, names: fieldNames(stored),
 	}
+	m.reindex()
 	for i := range identities {
 		m.identities[identities[i].PageID] = identities[i]
 	}

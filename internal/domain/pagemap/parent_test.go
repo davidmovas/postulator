@@ -15,7 +15,7 @@ func sitePage(id, path string, wpType pagemap.WPType, wpID int64) pagemap.Page {
 }
 
 func titled(page pagemap.Page, title string) pagemap.Page {
-	page.Observed.Title = title
+	page.Title = title
 	return page
 }
 
@@ -382,5 +382,27 @@ func TestByNameAnswersEveryOnSitePageThatCarriesTheName(t *testing.T) {
 	}
 	if got := index.ByName("  "); len(got) != 0 {
 		t.Errorf("ByName(blank) = %v, want nothing", ids(got))
+	}
+}
+
+func TestByNameReadsTheTitleAndH1FieldsAndThePlanNotTheObservedCopy(t *testing.T) {
+	t.Parallel()
+
+	renamed := sitePage("renamed", "/renamed/", pagemap.WPPage, 50)
+	renamed.Observed.Title = "What the copy once said"
+	planned := sitePage("planned", "/planned/", pagemap.WPPage, 51)
+	planned.H1 = "The Workbook's H1"
+	index := pagemap.NewIndexNamed([]pagemap.Page{renamed, planned}, map[string][]string{
+		"renamed": {"Today's Title", "The H1 on the Site"},
+	})
+	for name, want := range map[string]string{
+		"today's title": "renamed", "THE H1 ON THE SITE": "renamed", "the workbook's h1": "planned",
+	} {
+		if got := index.ByName(name); len(got) != 1 || got[0].ID != want {
+			t.Errorf("ByName(%q) = %+v, want %s", name, got, want)
+		}
+	}
+	if got := index.ByName("What the copy once said"); len(got) != 0 {
+		t.Errorf("ByName found %s by the observed copy, which the fields replace", got[0].ID)
 	}
 }

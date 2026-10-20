@@ -3830,3 +3830,13 @@ on what stage 2 left open and what was decided while building.
   re-read in the check, recorded in the product snapshot's `lists` with what the store answered,
   and put back by the revert while they still hold what the run wrote; `hasFields` now counts them,
   so a revert of a list alone is sent.
+- **A crumb's name is matched against the fields and the plan** (B.7, decision 20's first half).
+  The observation writes the `h1` field beside the title for every page that is not a term, from
+  the H1 the plugin or the content answers; it is read-only, so a change raises no finding.
+  `pagemap.NewIndexNamed` carries, per page, the names its `title` and `h1` fields hold, and
+  `Index.ByName` and the landing check of a redirect match a crumb against those and the plan's
+  title and H1, no longer the observed copy; the observation's model loads the site's field rows
+  once and rebuilds the named index wherever it rebuilt the plain one. The test fixture's titled
+  pages carry the plan's title, which the observation copies from the site wherever no plan is
+  held. Twins still match on the observed copy, with their own matcher, until C.2 moves every
+  reader of `Observed` onto the fields.

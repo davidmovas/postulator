@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -123,6 +124,32 @@ func TestArchivesAndStorePagesReadTruthfulRoots(t *testing.T) {
 	}
 	if summary.Roots[string(render.RootNotFound)] != 0 {
 		t.Errorf("roots = %v, want no page not found", summary.Roots)
+	}
+}
+
+func TestACrumbFindsAPageByTheH1TheSiteShows(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.seedPage(t, pagemap.Page{ID: "planned-hub", Path: "/peptides/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned,
+		Title: "Peptides for research", H1: "Research peptides"})
+	for i := range s.plugin.items {
+		if s.plugin.items[i].ID == peptidesID {
+			s.plugin.items[i].H1 = "The Peptide Shelf"
+		}
+	}
+	s.serveTheSite(false)
+	s.serve(tb500Page(false, crumb{name: "Home", path: "/"}, crumb{name: "The Peptide Shelf", bare: true}, crumb{name: "TB-500", path: "/tb-500/"}))
+
+	s.run(t, observe.Options{})
+
+	peptides := s.pageAt(t, "/peptides/")
+	if got := s.fieldOf(t, peptides.ID, field.H1); got.Current != "The Peptide Shelf" {
+		t.Errorf("the hub's h1 field = %+v, want the H1 the site holds", got)
+	}
+	tb500 := s.pageAt(t, "/tb-500/")
+	if tb500.ParentPageID == nil || *tb500.ParentPageID != peptides.ID || tb500.ParentMethod != pagemap.MethodName {
+		t.Errorf("tb-500's parent = %v by %q, want the hub found by the H1 its fields hold, which neither its title nor the plan says",
+			tb500.ParentPageID, tb500.ParentMethod)
 	}
 }
 

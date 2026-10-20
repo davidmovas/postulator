@@ -39,9 +39,13 @@ func twinnable(page Page) bool {
 }
 
 func sharesName(page, other Page) bool {
+	held := names(page)
 	for _, name := range names(other) {
-		if carriesName(page, name) {
-			return true
+		key := nameKey(name)
+		for _, own := range held {
+			if key != "" && nameKey(own) == key {
+				return true
+			}
 		}
 	}
 	return false

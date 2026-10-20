@@ -217,7 +217,10 @@ func (a *absorber) terms(ctx context.Context, page pagemap.Page, it item, terms 
 func (a *absorber) fields(ctx context.Context, page pagemap.Page, it item) error {
 	values := []field.Value{field.NewValue(page.ID, field.Title, it.Title, a.now)}
 	if !it.mappedType().Term() {
-		values = append(values, field.NewValue(page.ID, field.Excerpt, it.Excerpt, a.now))
+		values = append(values,
+			field.NewValue(page.ID, field.Excerpt, it.Excerpt, a.now),
+			field.NewValue(page.ID, field.H1, it.H1, a.now),
+		)
 	}
 	if !it.Meta.Empty() {
 		values = append(values,

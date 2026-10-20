@@ -266,7 +266,7 @@ func landing(page Page, crumb Crumb, landed string, index Index) (Page, bool) {
 		return Page{}, false
 	}
 	target, found := index.ByPath(landed)
-	if !found || target.ID == page.ID || !carriesName(target, crumb.Name) {
+	if !found || target.ID == page.ID || !carriesName(target, crumb.Name, index.names[target.ID]) {
 		return Page{}, false
 	}
 	return target, true
@@ -280,12 +280,12 @@ func nameKey(name string) string {
 	return graph.Key(html.UnescapeString(name))
 }
 
-func carriesName(page Page, name string) bool {
+func carriesName(page Page, name string, known []string) bool {
 	key := nameKey(name)
 	if key == "" {
 		return false
 	}
-	for _, held := range []string{page.Observed.Title, page.Observed.H1, page.Title, page.H1} {
+	for _, held := range append([]string{page.Title, page.H1}, known...) {
 		if held != "" && nameKey(held) == key {
 			return true
 		}

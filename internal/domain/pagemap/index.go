@@ -8,7 +8,14 @@ type Index struct {
 	byEntity map[string][]Page
 	byPostID map[int64]Page
 	byTermID map[int64]Page
+	names    map[string][]string
 	pages    []Page
+}
+
+func NewIndexNamed(pages []Page, names map[string][]string) Index {
+	index := NewIndex(pages)
+	index.names = names
+	return index
 }
 
 func NewIndex(pages []Page) Index {
@@ -78,7 +85,7 @@ func (i Index) PathParentID(page Page) *string {
 func (i Index) ByName(name string) []Page {
 	out := make([]Page, 0)
 	for at := range i.pages {
-		if page := i.pages[at]; page.WPID != nil && page.Status != StatusArchived && carriesName(page, name) {
+		if page := i.pages[at]; page.WPID != nil && page.Status != StatusArchived && carriesName(page, name, i.names[page.ID]) {
 			out = append(out, page)
 		}
 	}
