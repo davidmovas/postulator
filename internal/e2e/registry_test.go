@@ -233,11 +233,12 @@ func TestAProductIsEditedThroughTheRegistry(t *testing.T) {
 	}
 	productPath := "/product/" + slug + "/"
 	beforeFacts, beforeVariations := live.factsOf(t, planted.ID)
+	clientVariations := live.variationsOf(t, planted.ID)
 
 	fieldsAnswer := func(llmport.Request) string {
 		values := make([]map[string]string, 0, 2+len(variationIDs))
 		values = append(values,
-			map[string]string{"key": string(field.ProductShortDescription), "value": "A vial of registry peptide, measured by the dropper."},
+			map[string]string{"key": string(field.ProductShortDescription), "value": "A registry vial of peptide, measured by the dropper."},
 			map[string]string{"key": "meta:dosage_note", "value": "Once a day, as the label says."},
 		)
 		for i, id := range variationIDs {
@@ -279,8 +280,11 @@ func TestAProductIsEditedThroughTheRegistry(t *testing.T) {
 		}
 	}
 	for _, scope := range []pagetypes.SetScopeRequest{
-		{PageTypeID: productType, Field: string(field.VariationDescription), Enabled: true, AIWrites: true},
-		{PageTypeID: productType, Field: "meta:dosage_note", Enabled: true, AIWrites: true, Label: "Dosage note", Provider: string(field.ProviderStore)},
+		{PageTypeID: productType, Field: string(field.VariationDescription), Enabled: true, AIWrites: true, Links: field.NoLinks()},
+		{
+			PageTypeID: productType, Field: "meta:dosage_note", Enabled: true, AIWrites: true, Label: "Dosage note",
+			Provider: string(field.ProviderStore), Links: field.NoLinks(),
+		},
 	} {
 		if _, err = core.PageTypes.SetScope(t.Context(), scope); err != nil {
 			t.Fatalf("set the scope of %s: %v", scope.Field, err)
@@ -371,8 +375,9 @@ func TestAProductIsEditedThroughTheRegistry(t *testing.T) {
 		t.Errorf("after the revert the product holds %q / %q / %q, want the client's", back.Description, back.ShortDescription, back.meta("dosage_note"))
 	}
 	for i, variation := range live.variationsOf(t, planted.ID) {
-		if want := "<p>The client's " + []string{"5 mg", "10 mg"}[i] + ".</p>"; variation.Description != want {
-			t.Errorf("after the revert variation %d holds %q, want %q", i, variation.Description, want)
+		want := clientVariations[i].Description
+		if !strings.Contains(want, []string{"5 mg", "10 mg"}[i]) || variation.Description != want {
+			t.Errorf("after the revert variation %d holds %q, want %q, what the store answered before the run", i, variation.Description, want)
 		}
 	}
 	if finalFacts, finalVariations := live.factsOf(t, planted.ID); !reflect.DeepEqual(beforeFacts, finalFacts) || !reflect.DeepEqual(beforeVariations, finalVariations) {
