@@ -674,11 +674,195 @@ under stage 1c in `DECISIONS.md`.
 
 ## Stage 3 — editing: block operations, field writes through the registry, the pipeline over existing pages, revert
 
-- **Goal.** A run edits an existing page field by field and block by block, writes under the hash of what it read, never touches the deny list, and a revert puts back exactly what each field and block held.
-- **Touches.** `internal/domain/block` (operations), `internal/domain/field` (write side), `internal/application/edit` (the writers `CoreWriter`, `StoreWriter`, `PluginWriter` declared here; the field write use case), `internal/runtime/steps/{publish,publish_product,publish_seo,relink,relink_page,relink_neighbors,revert,revert_product,generate_images}.go`, `internal/adapters/wp/{items,woo,plugin,media}.go` (writers: excerpt, featured media, meta by key, upsells and cross-sells, image alt and title, variation description, the raw PUT reading the stored content), `wp-plugin/postulator-companion` (`PUT /meta/{id}`, `meta_write`), `wp-plugin/openapi.yaml`, migrations 0066 (the old `pages` columns dropped, down restores) and 0067 (`page_links.origin` dropped), `internal/domain/pagemap/observed.go` deleted, `internal/application/tools/pages_replace_links.go` deleted, `frontend/src/features/runs/panes/*` (per-field diffs), `frontend/src/features/pages` (blocks editable through a run, revert per field).
-- **Behaviour.** `publish` creates a planned page once (status, parent and slug in that one call, recorded in the artifact: the owner's answer 1) and otherwise writes every produced field through the registry under a per-field checkpoint; `publish_product` folds into the registry writers (the store's fields first, the description last, the hash read after, as today); relink places links with `PlaceLink` on blocks; revert restores per field and per block (neighbours by block hash); media names stay neutral.
-- **Reuses.** The raw route's CAS, `InsertTarget`, the publish artifact shape extended per field, the revert run kind, `generate_images`. **Rewrites.** `publish.go` as the field writer, `revert.go` at field granularity.
-- **Exit.** Unit: `Serialize` byte-exact for untouched blocks (a property test over random bodies and operations); every operation on classic and block bodies, a `wp:paragraph` with `align` kept valid; the deny list refused at the use case and at the adapter; a recording transport proves no slug, parent, status, price, stock, SKU, category or variation attribute leaves on an update; a publish killed after its second field resumes at the third with no second model call; the PHP deny set in `openapi.yaml` includes `field.Denied`'s keys. E2E on both stands: `TestAnExistingPageIsEditedBlockByBlock` (a hub with an injected breadcrumb and grid on the replica gets its body between them, untouched blocks identical, links placed only in content, a revert restores the base; on vanilla a nested page's body is edited and its URL and parent unchanged); `TestAProductIsEditedThroughTheRegistry` (description, short description, a `meta_data` key, a variation description written and reverted; price, SKU, stock and categories untouched, proven on the wire); `TestAWriteAgainstAStaleHashPauses`. Owner sees: a run that edits existing pages, the diff per field, revert per field.
+- **Goal (amended 2026-10-20).** A run improves the client's live pages without ever damaging them: it writes every enabled field through the registry, each under the hash of what it read; it edits a body block by block, keeping the client's blocks and everything the site injects; it never sends anything on the deny list; a revert puts back exactly what each field and block held. A draft-mode run writes nothing to an existing page until a person accepts its diff.
+- **Touches (amended 2026-10-20).** `internal/domain/{block,field,pagetype,run,pagemap,content,template}`, `internal/application/{edit,pagetypes,runs,tools,pages,observe,imports,sitemodel}`, `internal/runtime/steps/*` with a new `edit_writers.go`, `internal/adapters/{wp,wp/wptest,sqlite}` (migrations 0066 to 0069), `wp-plugin` (1.5.0), `docker/e2e` (the replica's restricted user), `internal/e2e`, `internal/adapters/wp/e2e`, `cmd/postulator` (the harness), `frontend/src/features/{runs,pages,settings,agent}`, `frontend/src/copy`.
+- **Migrations.** 0066, the seeded types' default templates where a type has none and its site no default; 0067, the template's `product.specifications` stripped from stored specs and overrides (the attribute filling retired); 0068, the old `pages` columns that copied the site dropped (`drift`, `content_hash`, `wp_link`, `wp_slug`, `wp_status`, `wp_title`, `wp_h1`, `canonical`), the `title` and `h1` field rows backfilled from `wp_title` and `wp_h1` first, the down restoring the columns; 0069, `page_links.origin` dropped, the down restoring it from `ours`. The plan's `title`, `h1`, `meta_title` and `meta_description` stay (the owner, 2026-10-20).
+- **Steps.** None added. `publish` becomes the field writer, one write per execution, and `publish_product` folds into it; `generate_fields` widens with each writer; `generate_body`'s product answer loses the short description and the specifications; relinks place through `PlaceLink`; `revert` works per field and per block.
+- **Tools.** None added. `pages_replace_links` goes; `runs_revert` takes its own arguments, so the per-field revert is a person's; `pages_update`, `pagetypes_delete`, `pagetypes_set_scope`, `imports_apply` and `pages_delete` gain a per-call confirmation, which changes no schema; `product.specifications` leaves `TemplateSpec` and `canonical` leaves the page update request. `schemaCeilingBytes` falls with each.
+- **Exit.** Below, per part.
+
+#### 3 tasks
+
+**Status, 2026-10-20: planned.**
+
+**Part 0 lands the owner's rulings on stage 2's open items; Parts A to D are the stage, each ending on a committed, green boundary.** Execution: `superpowers:executing-plans`, one accountable owner for every untagged Go package and the plugin, at most two agents at once and only on disjoint packages (F: `frontend/`; H: `cmd/postulator`, `internal/e2e`, `internal/adapters/wp/e2e`, `docker/e2e`). Every commit uses `git commit -- <paths>` with `gofmt -l` checked inside; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; a commit that regenerates `vocab.ts` carries the frontend copy, labels and icons it needs; F regenerates the bindings only at my commit points; one stand up at a time and one heavy leg at a time, and a leg the memory guard or `0xc0000142` stops is listed for the owner, never retried in a loop; a zombie test process is rerun alone first. Each ruling's commit carries its `DECISIONS.md` entry and the spec's amendment. The plan was reviewed by an Opus critic before the owner saw it; its three blocking and twelve serious findings are folded into the decisions below.
+
+**Decided at the plan** (the owner's answers of 2026-10-20 first):
+1. **The six rulings** are Part 0, each pinned by a test that fails first; ruling 2's review and ruling 5 stand on the durable record of decision 7, which lands first.
+2. **The plan's four columns stay** (the owner): `title`, `h1`, `meta_title`, `meta_description` are the workbook's plan for a page, which no model row holds; the site's values live in `page_fields`, the H1 in a new read-only field `h1` (`field.H1`: read from the plugin's `h1` by the observation, never scoped, packed or written). Spec 16.1 is amended.
+3. **In draft mode every write to an existing page waits for review** (the owner): `publish`, `relink_page` and `relink_neighbors` plan their writes without sending them, keep the plan as an `edit_plan` artifact (decision 22's diff) and pause the item `awaiting_review`. **Only a person accepts it**: the runs service refuses an agent's accept of an item awaiting review, and `runs_retry_step` says so. The acceptance records the hash of the plan accepted (`publish.accepted`), which the step clears when the plan is written; an acceptance never overrides `client_changed`. On acceptance the step re-plans the fields not yet written and writes when the plan equals the one accepted; when anything moved the item pauses for review again with the new plan, never writing. `publish.compare` no longer expects a status. A draft-mode product run is no longer refused in preflight: it waits for review like any page. **A page we created as a draft is not on the site for any link plan** (`target_not_published` for the neighbours, `relink_page` and the writer's own targets alike). A revert is exempt: it puts back. `generate_images` over an existing page in a draft run uploads nothing and says so (`images_wait_for_live`), an upload being a write to the site. A page we create as a draft stays one until a person publishes it in WordPress, an existing page's status never being written.
+4. **The attribute filling is retired** (the owner): the store owns a product's attributes, `attributes` has been denied since 1b, and `wc/v3` replaces the whole list. The template's `product.specifications`, its prompt and its answer go; the seed's current copy joins `seed/superseded` first; 0067 strips the key from stored specs and overrides, which `merge.go`'s strict decode would otherwise refuse. A revert of an older run still puts back what that run added, through a revert-only `RestoreAttributes` that no publish path can reach and that runs only while the attributes are what that run left.
+5. **The registry** is `application/edit`: it declares `CoreWriter` (title, excerpt, the featured image, a media item's alt and title), `StoreWriter` (short description, a product's first image, a variation's description, upsell and cross-sell ids, `meta_data` by key) and `PluginWriter` (the raw body, the SEO title and description, post meta by key), and `Service.Write` refuses a denied or unknown key (`field_denied`), and the title of a product page (the store owns the name), dispatches by `field.Spec.Write` and answers each field's outcome (written with the stored hash, moved, refused). `runtime/steps/edit_writers.go` adapts `*wp.Client`, as `observe_readers.go` does. **The adapter refuses again**: `wp.UpdateItem` loses `Slug`, `Status`, `Parent`, `Categories`, `Tags`, `MenuOrder`, `Template` and `Meta` (a creation keeps what it needs on `CreateItem`; meta goes only through `PUT /meta`); a denied meta key is refused by the client before it leaves; `wp.UpdateProduct` and the new `UpdateVariation` carry only writable fields. **A plugin write needs the plugin's `guarded_write` capability** (1.5.0): against 1.4.1, whose SEO route ignores unknown keys and whose raw PUT answers no content, every update write through the plugin is refused as `plugin_outdated`.
+6. **Every write goes under the hash of what it read, and every guard is checked before the first write.** The body through the raw route's expected hash; a meta key and an SEO field through the plugin's expected hash per key, the routes answering 409 for a moved value; the title, excerpt, short description, variation description, upsells, cross-sells, the featured image and a media item's alt and title, which core and WooCommerce cannot check, are read just before the write and refused when they moved, the window being one request. Before the first write `publish` reads every live value it will write over, the client-block guard and the save stability (decision 8); a moved value pauses the item with `client_changed` naming the field and nothing is written; the note says to sync and regenerate. A value that moves between that check and its own write pauses the same way, the fields already written staying recorded and revertible.
+7. **The durable record: one write per execution.** The engine replaces a step's artifacts and merges its checkpoint at every settle, and a process that dies between a PUT and its settle loses the Result. So `publish` (and each relink) makes one write per execution and returns `TransitionWait` waking at once, carrying the checkpoint (`publish.field.<key>`: the outcome, the hashes before and after) and the whole `publish_result` so far; every return path (a wait, a pause, an error) carries both, so a pause at the third field keeps the first two revertible. A rerun treats a field whose live value is what it was about to send as written. Order: the core and store fields first, the plugin's meta and SEO fields next, the body last under the hash read after those saves (a product: the store's fields first and the description last, as today). A retried publish never calls a model (the answers live in `draft`, `meta` and `fields`). A creation sets `publish.creating` before its one call, so the retry of a lost answer claims the page it finds by slug, when `block.SameRender` agrees, as this run's (`Created` true, so a revert trashes it instead of emptying it).
+8. **Save stability** (review focus 3): a whole-post save under a user without `unfiltered_html` runs kses over the stored content again (a core title or excerpt update, the raw PUT and a store save all do), so writing a title could strip the client's iframe or form. The manifest says whether the user has `unfiltered_html`, and the raw GET answers `saveStable` (the stored content passes the current user's `content_save_pre` filters unchanged, `balanceTags` included). Over a page whose content is not save-stable, no write that re-saves the post is sent: the item pauses `save_alters_client`, saying the site's user needs `unfiltered_html` or the page must be edited by hand. Meta and SEO writes, which never re-save the post, still go. The replica gets a role with an editor's capabilities but `unfiltered_html`, and a user with an application password in it.
+9. **With `rewrites` on, the client's text blocks are rewritten and nothing else** (the owner): our article takes the place of his first text block, his other text blocks go, and every non-text block (a shortcode, a dynamic, foreign or media block, markup with no text) stays where it stands byte for byte; a group block holding any non-text inner block counts as non-text and is kept. This amends 2b's decision 3, which wrote the body whole.
+10. **The block operations** live in `domain/block` on `Body` and return a new body: `Replace`, `InsertAfter`, `Delete`, `RewriteRange`, `PlaceLink`. An editor block keeps its delimiters and attribute JSON and has the classes its attributes imply reapplied (`align` gives `has-text-align-*`); a block whose attributes cannot be kept is foreign and refused (`block_not_editable`). A block added to an editor body is one `core/html` block (2b), and an operation never leaves an editor body without a delimiter (deleting its last delimited block is refused), so it never parses back as classic. In a classic body blocks are separated by a blank line: `InsertAfter` adds one, and `Delete` takes the block with its own trailing separator, never fusing its neighbours. Nested inner blocks are not addressable; the outer block is the unit. **Consumers:** `InsertAfter` composes the kept body and the neighbour's plain sentence; `RewriteRange` the rewrite; `Replace`, `Delete` and `InsertAfter` the revert; `PlaceLink` the relinks: `content.InsertTarget` chooses the block and the anchor over the whole document (its rules intact) and `PlaceLink` writes the link into that block's bytes alone (`block` imports `content`, which never imports `block`). `Splice` stays the oracle the property test compares a relink with.
+11. **What the site stored is ours.** The raw PUT answers the stored content beside its hash (plugin 1.5.0), and `page_blocks_written` is recorded from that answer at once, so the hashes are those of what the site holds after its filters, and no second read can race an edit.
+12. **The canonical** (ruling 3): `seo_canonical` becomes scopable by a person only (Settings → Page types), never AI-written, off on every preset, absent from `pagetypes_set_scope`'s enum and from the pack (`vocabgen`'s `packable`); `generate_meta` no longer answers one; an update never sends it. A creation writes it only when its scope enables it and the page goes out live, as the `link` WordPress answered; a draft creation writes none, its link being `?page_id=`. A revert puts back an earlier canonical only where an older run's artifact recorded writing one and the live value is still what that run wrote.
+13. **The agent's switches** (ruling 4, and what the critic found beside it): a tool may name a per-call confirmation (`Tool.Confirm`), which the registry applies in every mode unless the call is approved, with its own summary: `pages_update` naming a type whose scope rewrites; `pagetypes_delete` reassigning pages to one; `imports_apply` typing existing pages into one; `pagetypes_set_scope` enabling a field or its AI writes on a scope that rewrites; the summary names the pages and says their own text will be rewritten by the next run. `pages_delete` with `onSite`, which trashes a page and so writes its status, always waits for a person the same way.
+14. **A relink's lost answer** (ruling 5) is decision 7 applied per page: the checkpoint (`relink.page.<id>`: the hash read, the hash composed, the links placed) is settled before the write; a rerun that finds the composed hash on the site records the body, our blocks and our links and places nothing; one that finds the read hash writes again; anything else is the client's and is reported.
+15. **Our links are ours** (ruling 6): a link we place inside the client's paragraph sits in a block that stays his, so block ownership cannot tell it. `adopt` marks `ours` on every link the write placed (its target and anchor) and every link in a block we wrote, and the observation carries `ours` forward by target and anchor from the rows it replaces, as it carried `origin`, so the mark holds while the link stands. The rule lives in `block` (`pagemap` cannot import `block`: `block` imports `content`, which imports `pagemap`).
+16. **The default templates** (ruling 1): `pagetype.Preset.DefaultTemplate` names the built-in (Hub, Guide, Product); `Seed`, and `Create` without a template, take the global built-in of that name when it exists (picked as `seed.go` picks it: global, by name, the oldest first). 0066 backfills a writable type whose template is null and whose site has no default template, because the type's template would otherwise win over a default a person chose; it runs once, so a type a person later sets to none keeps none. **0066 is the backfill** because Part 0 lands first and goose refuses a number below one the owner's database has applied.
+17. **Revert per field and per block**: a field we wrote whose live hash is still ours gets its before value back, under the expected hash where the route has one; a field changed since is handed back as `revert_field_kept` naming it, never overwritten. The title is put back; the SEO meta is now checked against what we wrote (it was put back blindly); a status is never touched. A body is put back per block: each block we changed is found among its neighbours by block hash and restored, the client's later edits elsewhere kept; a block he changed since is handed back. A page we created is trashed only while it is still what we wrote, else handed back. A second revert of a run may put back the fields the first left; one already put back is refused. A `publish_result` written before stage 3 reverts whole, as today. `runs.RevertRequest` gains `pageId` and `fields` for a person; the tool keeps `{runId}`.
+18. **Writes that stood outside the registry**: the featured image becomes a catalog field (`featured_image`, fill-only: written only where the page has none, so its before value is none and a revert removes ours while it is still ours), and a product's first image the same through the store; the Open Graph title and description follow their SEO field's guard (written only where empty or equal to what we wrote), their before values kept.
+19. **A media item's alt and title** are written only for an attachment whose parent is the page, so an image shared by other products is never renamed for one, and only where empty or ours unless the scope rewrites; nothing names the program.
+20. **`Index.ByName`** reads the `title` and `h1` fields and the plan's title and H1. The observation writes the `h1` field, and 0068 backfills the `title` and `h1` rows from `wp_title` and `wp_h1` before it drops them. Every reader of `Observed`, `Drift` and `ContentHash` moves before 0068: `observe/reconcile.go`'s `hasPlan` and `merge` onto the identity and the bodies, `pagemap`'s `twin.go`, `parent.go` and `product.go` onto the fields, the rest as listed in C.2.
+21. **`record` and `adopt` write only what they own** (a narrow repository update each, as `UpdateDerived` is), never a whole page row, so an edit made during a run is not lost.
+22. **The diff** is kept by `publish` (as `publish_result`, and as `edit_plan` while it waits for review): per field the key, the value and hash before and after and whose it was; per block the before and after lists with kind, hash and owner (ours, the client's, added, removed). The screens read only that.
+23. **No schema grows** in stage 3: decisions 12 and 13 change none, `runs_revert` keeps its own `{runId}`, and the bytes `product.specifications`, the page update's `canonical` and `pages_replace_links` free lower the ceiling in their own commits.
+
+##### 0.0 — the plan
+- This task list. Commit `docs(plan): stage 3's task list`.
+
+##### 0.1 — the seeded types' templates (ruling 1)
+- Decision 16: `domain/pagetype` `Preset.DefaultTemplate`; `application/pagetypes` `Seed` and `Create`, its template reader gaining the global built-in by name; migration 0066 with its round trip; the suites lose `templateTheTypes` (agent H).
+- Tests: `TestASeededTypeCarriesItsPresetsTemplate`, `TestATypeCreatedFromAPresetInheritsItsTemplate`, `TestTheBackfillFillsOnlyATypeWithoutATemplate`, `TestTheBackfillLeavesASiteWithADefaultTemplate`, `TestAFreshSiteStartsARunOnAuto`.
+- Commit `feat(pagetypes): the seeded types carry their preset's template`.
+
+##### 0.2 — the durable record
+- Decision 7 over today's writes (the raw body, the core update, the SEO meta), one per execution, the checkpoint and the whole `publish_result` on every return; `field.Change` and `block.Change`, the diff's shapes (decision 22). No behaviour a person sees changes.
+- Tests: `TestAPublishPausedAfterItsFirstWriteIsStillRevertible`, `TestAWriteWhoseAnswerWasLostIsRecognisedOnTheRerun` (the execution's whole Result discarded after the PUT, the step run again from the last settled checkpoint), `TestACreationWhoseAnswerWasLostIsStillOurs`.
+- Commit `refactor(publish): one write per execution, each recorded before the next`.
+
+##### 0.3 — an existing page's status is never written, and a draft run waits for review (ruling 2)
+- Decision 3: no status on an update and none in `compare`; the page row's status from the identity; `run.PauseAwaitingReview`, `run.ArtifactEditPlan`; `publish`, `relink_page` and `relink_neighbors` in draft mode over an existing page; the person-only acceptance with the plan's hash; the draft target rule in the link plans; the product preflight; `generate_images`; `vocab.ts`; the frontend's `primaryAction` offering Accept for `awaiting_review`, with its copy (the diff itself is D.1). One commit, so no build ever writes a draft run's content live.
+- Tests: `TestNoStatusLeavesOnAnUpdate` (a recording transport: a live run, an accepted draft run, a post and a product), `TestADraftRunWritesNothingToAnExistingPage`, `TestAnAcceptedReviewWritesAndTheItemCompletes`, `TestAReviewAcceptedAfterTheSiteMovedWaitsForReviewAgain`, `TestTheAgentCannotAcceptADraftReview`, `TestAnAcceptNeverWritesOverAClientChange`, `TestADraftRunCreatesAPlannedPageAsADraft`, `TestADraftRunsNeighboursWaitForReview`, `TestNoLinkPlanTargetsADraftWeCreated`.
+- Commit `fix(publish): an existing page's status is never written, and a draft run's writes wait for review`.
+
+##### 0.4 — the canonical (ruling 3)
+- Decision 12: `field.CheckScope`, the presets, `pagetypes` refusing AI writes on it, `vocabgen`, `generate_meta`'s answer and prompt, `publish_seo`, the revert's put-back.
+- Tests: `TestTheCanonicalIsNeverWrittenToAnExistingPage`, `TestALiveCreationTakesItsPermalinkAsTheCanonical`, `TestADraftCreationWritesNoCanonical`, `TestACanonicalScopeIsNeverAIWritten`.
+- Commit `fix(seo): the canonical is written once, as the permalink WordPress answered`.
+
+##### 0.5 — the agent's switches (ruling 4)
+- Decision 13: `tools.Tool.Confirm`, the registry's `Build` and `Call`, the five tools.
+- Tests: `TestTypingAPageIntoARewritingTypeWaitsForAPerson` (confirm and autonomous modes), `TestReassigningPagesIntoARewritingTypeWaitsForAPerson`, `TestAnImportTypingPagesIntoARewritingTypeWaitsForAPerson`, `TestEnablingAFieldUnderRewritesWaitsForAPerson`, `TestTrashingAPageOnTheSiteWaitsForAPerson`, `TestTheConfirmationSaysThePagesOwnTextWillBeRewritten`; the schema bytes logged, unchanged.
+- Commit `fix(tools): the agent cannot switch a page into rewriting, or trash one, unseen`.
+
+##### 0.6 — a relink's lost answer (ruling 5)
+- Decision 14 in `relink.go`, `relink_page.go` and `relink_neighbors.go`.
+- Tests: `TestARelinkWhoseAnswerWasLostRecordsItsBlocks`, `TestARetriedRelinkPlacesNothingTwice`, each for a page and a neighbour.
+- Commit `fix(relink): a relink whose answer was lost is recognised on the rerun`.
+
+##### 0.7 — our links are ours (ruling 6)
+- Decision 15: the rule in `block`; `observe/content.go` and `steps/page_links.go`.
+- Tests: `TestARelinkedClientParagraphsLinkReadsAsOursAfterASync` (the link ours, the paragraph not in `page_blocks_written`), `TestTheLinkFormCountsTheClientsLinksOnly`.
+- Commit `fix(links): adopt records the links of our own writes as ours`.
+
+**Part A — block operations and the field writers.** Exit: the property test; every operation on classic and block bodies, a `wp:paragraph` with `align` kept valid; the deny list refused at the use case and at the adapter; a recording transport proves no slug, parent, status, price, stock, SKU, category or variation attribute leaves on an update; a publish killed after its second field resumes at the third with no second model call; the PHP deny set in `openapi.yaml` includes `field.Denied`'s meta keys; review focus 3 on the replica under a role without `unfiltered_html`; `TestAWriteAgainstAStaleHashPauses` on both stands.
+
+##### A.1 — block operations
+- Decision 10.
+- Tests: `TestSerializeKeepsEveryUntouchedBlock`, a property test over seeded `math/rand/v2` bodies (classic and editor, CRLF, nested groups, self-closing dynamic blocks, shortcodes, foreign elements) and random sequences of operations: every untouched block's bytes appear unchanged and in order, the body keeps its kind, and it parses back to the same blocks; a table per operation on classic and editor bodies; `TestAnAlignedParagraphStaysValid`; `TestABlockWhoseAttributesCannotBeKeptIsRefused`; `TestPlaceLinkAgreesWithTheSplice`.
+- Commit `feat(block): operations that keep every untouched byte`.
+
+##### A.2 — the catalog's new keys and the deny list's meta keys
+- `field`: `H1` and `FeaturedImage` (decisions 2 and 18); the store meta keys behind each denied field (`_price`, `_regular_price`, `_sale_price`, `_sku`, `_stock_status`, `_stock`, `_manage_stock`, `_product_attributes`, the `attribute_` prefix, `total_sales`) as `field.DeniedMeta()`, beside the protected prefixes; `wp-plugin/openapi.yaml`'s deny set; `testdata/meta_deny.json`, one table both sides test, as the href table is.
+- Tests: `TestTheContractsDenySetIncludesTheCatalogs`, `TestAMetaKeyIsDeniedAlikeOnBothSides`, `TestTheH1IsNeverScoped`.
+- Commit `feat(field): the deny list names the store's meta keys`.
+
+##### A.3 — the plugin 1.5.0
+- PHP 7.4: `PUT /meta/{id}` (`edit_post_meta` checked per key; never an `is_protected_meta` key, the deny set or a non-scalar value; an expected hash per key and 409 naming a moved one; `wp_slash`; answers each key's stored value and hash; content posts only; which keys a scope names is the Go side's to decide); `/seo-meta/{id}` takes expected hashes; the raw PUT answers the stored content beside its hash; the raw GET answers `saveStable`; `meta_get` refuses the deny set too; the manifest's `meta_write`, `guarded_write`, `unfilteredHtml` and 1.5.0; `openapi.yaml`; `tests/meta_deny.php`; `task plugin:lint`, `task plugin:test`.
+- `adapters/wp`: `PutMeta`, `SetSEOMeta` with expected hashes, `PutRaw` answering `RawWrite{Content, Hash}`, `Raw.SaveStable`, `requiredCapabilities` with the fake's defaults, the PHP `CAPABILITIES`, `openapi.yaml` and the three pinned lists; `wptest` serves the same as an independent implementation; `wp/e2e` `TestMetaWritesOnlyWhatTheUserMayEdit`, `TestTheRawWriteAnswersWhatWasStored` and `TestSaveStabilityFollowsTheUsersFilters` (agent H).
+- Commit `feat(plugin): meta writes and writes under an expected hash, 1.5.0`.
+
+##### A.4 — the writers and the use case
+- Decision 5: `wp.UpdateItem` narrowed, `UpdateMedia`, `UpdateProduct`, `UpdateVariation`; `application/edit`; `steps/edit_writers.go`; `internal/app/build_*.go`.
+- Tests: `TestADeniedFieldIsRefusedByTheUseCase`, `TestAProductsNameIsNeverWritten`, `TestADeniedMetaKeyIsRefusedByTheClient`, `TestNothingOnTheDenyListLeavesOnAnUpdate` (a recording transport over every writer), `TestAMovedValueIsNotWrittenOver`, `TestAnOutdatedPluginWritesNothing`.
+- Commit `feat(edit): the field registry writes through three writers`.
+
+##### A.5 — `publish` as the field writer
+- Decisions 6 to 9, 11, 18 and 21: `publish.go` rewritten over `edit` on 0.2's durable record; the creation once with status, parent and slug recorded; `publish_seo` through the plugin writer; the featured image fill-only; `recordOurBlocks` from the PUT's answer; the client-block guard and the save stability before the first write over an existing page; the rewrite of text blocks only; the diff in `PublishResult`.
+- Tests: `TestAPublishKilledAfterItsSecondFieldResumesAtTheThird` (the second execution's Result discarded after its PUT; no second model call), `TestEveryGuardIsCheckedBeforeTheFirstWrite`, `TestEveryWriteOverAnExistingPageIsGuarded`, `TestOurBlocksAreWhatTheSiteStored` (the fake alters a body on save), `TestAPageThatIsNotSaveStableIsNotResaved`, `TestAWriteAgainstAStaleHashPauses`, `TestRewritesKeepTheClientsNonTextBlocks`, `TestTheFeaturedImageIsNeverReplaced`, `TestTheOpenGraphFieldsFollowTheirGuard`.
+- Commit `feat(publish): every produced field through the registry`.
+
+##### A.6 — relinks place through `PlaceLink`
+- Decision 10's relink consumer in `relink.go`, `relink_page.go` and `relink_neighbors.go`, on 0.6's record; the neighbour's plain sentence through `InsertAfter`.
+- Tests: the relink tables green; `TestARelinkTouchesOnlyTheBlockItLinks`.
+- Commit `refactor(relink): a link is placed in its block alone`.
+
+##### A.7 — Part A on the stands (agent H)
+- The replica's bootstrap: a role with an editor's capabilities but `unfiltered_html`, a user in it with an application password (`E2E_RESTRICTED_*` in `.env.replica`); `internal/e2e/edit_test.go`: `TestTheSiteFiltersAreRespectedUnderARestrictedUser` (the user is shown to lack `unfiltered_html`; a page with a client `<iframe>` block, a title-only run and a run that keeps the body either leave that block byte-identical or write nothing; a body the save alters is recorded by the stored hashes, and the next run keeps no copy of it as the client's) and `TestAWriteAgainstAStaleHashPauses` (both stands: the body, the title and an SEO field moved through `wpCLI` after the read).
+- Commit `test(e2e): writes under the hash read and the site's own filters`.
+
+**Part B — products through the registry.** Exit: `TestAProductIsEditedThroughTheRegistry` on both stands.
+
+##### B.1 — the product through the registry
+- `publish_product` folds into `publish`'s field writer; decision 4 with `seed/superseded`, 0067 and its round trip, `RestoreAttributes`; the ceiling lowered by the specifications' bytes.
+- Tests: `TestAProductWritesTheStoreFirstAndTheDescriptionLast`, `TestAnOlderRunsAttributesAreStillPutBack`, `TestNoPublishPathSendsAttributes`, `TestAStoredSpecWithSpecificationsStillDecodes`.
+- Commit `refactor(publish): a product is written through the registry`.
+
+##### B.2 — the short description
+- Out of `generate_body`'s product answer into `generate_fields` where the scope enables it; the template's `product.shortDescription` stays the field's brief under the scope's instruction and limits; the seeds.
+- Commit `feat(fields): the short description is a field of its own`.
+
+##### B.3 — variation descriptions
+- One structured call per product for all its variations from the store's facts; `variation_description:<id>` through `StoreWriter.UpdateVariation`; a variation's attributes never sent.
+- Commit `feat(fields): variation descriptions in one call per product`.
+
+##### B.4 — image alt and title
+- Decision 19, from the product's facts, through `CoreWriter.UpdateMedia`.
+- Commit `feat(fields): a product image's alt and title`.
+
+##### B.5 — custom meta by key
+- An enabled, AI-written `meta:<key>` through the plugin's `PUT /meta` or the store's `meta_data`, as its scope's provider says.
+- Commit `feat(fields): custom fields by key`.
+
+##### B.6 — upsells and cross-sells
+- The pack offers candidates (the same hub's products, then the graph's related entities' products); the model answers ids from them only; written as ids; off by default; a list we did not write is kept unless the scope rewrites.
+- Commit `feat(fields): upsells and cross-sells from the pack's candidates`.
+
+##### B.7 — `Index.ByName` on the fields
+- Decision 20's first half: the `h1` field observed, `ByName` on the fields and the plan.
+- Commit `refactor(pagemap): a crumb's name is matched against the fields`.
+
+##### B.8 — the product proof (agent H)
+- `internal/e2e/products_test.go` `TestAProductIsEditedThroughTheRegistry` on each stand: the description, the short description, a `meta_data` key and a variation description written and reverted (a variable product planted through the store's API where a stand has none, and removed after); a recording proxy proves price, SKU, stock, categories, status, slug and the variations' attributes never on the wire, and the store's reads before and after prove them unchanged, a variation's save re-syncing its parent; the test logs the fields written and the wire's keys.
+- Commit `test(e2e): a product is edited through the registry`.
+
+**Part C — revert per field and block, and the cleanup.** Exit: `TestAnExistingPageIsEditedBlockByBlock` on both stands.
+
+##### C.1 — revert per field and per block
+- Decisions 12 and 17 in `revert.go` and `revert_product.go`; `runs.Revert` with `pageId` and `fields`; `runs_revert`'s own arguments.
+- Tests: `TestARevertPutsBackEachFieldItWrote`, `TestAFieldChangedSinceOurWriteIsHandedBack`, `TestARevertRestoresOurBlocksAmongTheClientsEdits`, `TestARevertOfOneFieldLeavesTheOthers`, `TestASecondRevertPutsBackWhatTheFirstLeft`, `TestTheSEOMetaIsNotPutBackOverTheClientsEdit`, `TestACreatedPageTheClientEditedIsHandedBack`, `TestAnOlderRunStillRevertsWhole`, `TestAnOlderRunsCanonicalIsPutBack`.
+- Commit `feat(revert): per field and per block`.
+
+##### C.2 — 0068: the read-through columns go
+- Decision 20's second half: migration 0068 with its backfill and round trip; `pagemap.Observed`, `Mismatches` and `Page.Drift`, `ContentHash` and `Canonical` deleted, every reader moved (`observe/reconcile.go`, `pagemap/{twin,parent,product,index}.go`, `contextpack/snapshot.go`, `content/product.go`, `imports/views.go`, `observe/views.go`, `pages/views.go`, `graph/edges.go`, `steps/{publish,sync_back,relink_page,revert,wordpress}.go`); `observed.go` deleted; `pages.UpdateRequest` and the Pages drawer lose the canonical (agent F for the screen, in the same commit); the ceiling lowered by its bytes.
+- Commit `refactor(pagemap): the page reads the model, not its old copies`.
+
+##### C.3 — 0069 and `pages_replace_links` go
+- Migration 0069 and its round trip; `page_links.origin` and `pagemap.Origin` gone, their readers on `ours`; `pages_replace_links`, `pages.ReplaceLinks`, `PagesService.ReplaceLinks` (130 to 129 bound methods) and their frontend card gone; `schemaCeilingBytes` lowered to the new bytes.
+- Commit `refactor(links): our links are told by their mark alone`.
+
+##### C.4 — the block proof (agent H)
+- `internal/e2e/edit_test.go` `TestAnExistingPageIsEditedBlockByBlock`: on the replica, `/peptides/` (the injected breadcrumb and product grid) gets its body between them, untouched blocks byte-identical, links only in the content, a revert restoring the base; on vanilla, a nested page's body edited with its URL and parent unchanged; the test logs the hub's blocks before and after, with their owners, and after the revert.
+- Commit `test(e2e): an existing page is edited block by block`.
+
+**Part D — the screens** (agent F, the bindings regenerated at my commit points). Exit: `npm run typecheck`, `npm run test:run`, `task ui:lint` green.
+
+##### D.1 — the diff per field and per block
+- The run report's publish pane: each field before and after, and the body's blocks with ours, the client's, added and removed marked apart; the review pane of `awaiting_review` with Accept.
+- Commit `feat(runs): the diff per field and per block`.
+
+##### D.2 — revert per field
+- From the run (fields chosen per page) and from the Pages drawer (each field a run wrote, with its revert).
+- Commit `feat(pages): revert a field`.
+
+##### D.3 — Settings, the drawer and the agent's cards
+- The canonical scope switch without AI writes; upsells and cross-sells off by default; the short description under `generate_fields`; the new confirmations' cards; copy.
+- Commit `feat(settings): the scopes stage 3 writes`.
+
+##### D.4 — the harness (agent H)
+- Fixtures for a publish result with its diff, an item awaiting review and a revert per field; `routes.json`.
+- Commit `test(harness): the diff, the review and the revert per field`.
+
+##### G — the client-ownership review and the gate
+- One fresh review whose only question is: is there any path where a run, an agent tool or the image step changes text, a link, a status, a slug, a parent or a canonical that the client owns? Every finding closed with a test that fails first.
+- The gate: every exit test on both stands; `e2e:full` on both stands; the migrations' round trips; `task plugin:lint` and `task plugin:test` on 7.4; `task build` with no generated drift; `go vet` and `golangci-lint run` on the plain, `uiharness` and `e2e` builds; `task lint:e2e` alone; `go test -race` in groups; `go run ./cmd/covergate`; the comment check; `gofmt -l .`; `npm run typecheck`, `npm run test:run`, `task ui:lint`.
+- Docs: `STATUS.md` (stage 3 done, stage 4 next), `DECISIONS.md` (stage 3), the spec (16.1, 16.2, 16.3, 16.6, 16.7, 16.9), `CONTRACTS.md`, `ARCHITECTURE.md`, `CLAUDE.md`.
+- Commit `docs: stage 3, editing the client's pages field by field and block by block`.
 
 ## Stage 4 — reconciliation with the workbook, findings, the site map, agent tools over the model
 
