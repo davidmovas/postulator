@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -29,19 +29,31 @@ func onTheSite(pages []pagemap.Page) map[string]bool {
 }
 
 func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Index, site pagemap.Site,
-	doc *content.Document, hash string) error {
+	raw, hash string, placed []block.LinkKey) error {
+	written, err := deps.ourBlocks(ctx, page.ID)
+	if err != nil {
+		return err
+	}
+	stored, err := deps.Links.ListForPage(ctx, page.ID)
+	if err != nil {
+		return err
+	}
+	held := block.HeldOurs(stored)
+	for _, key := range placed {
+		held[key] = true
+	}
+
 	now := deps.now()
 	next := page
 	next.ContentHash = hash
 	next.Drift = false
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
-
-	return persist(ctx, deps, next, observedOn(page, index, site, doc.Links(), now))
+	return persist(ctx, deps, next, observedOn(page, index, site, block.LinksOf(raw, written), held, now))
 }
 
-func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found []content.Link,
-	at time.Time) []pagemap.PageLink {
+func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found []block.LinkAt,
+	held map[block.LinkKey]bool, at time.Time) []pagemap.PageLink {
 	out := make([]pagemap.PageLink, 0, len(found))
 	for i := range found {
 		path, kind := site.Resolve(found[i].Href)
@@ -49,10 +61,15 @@ func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found
 			continue
 		}
 
+		position := found[i].Position
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID,
-			ToURL: path, AnchorText: found[i].Anchor, Origin: pagemap.OriginObserved,
-			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Absolute: pagemap.AbsoluteHref(found[i].Href), ObservedAt: at,
+			ToURL: path, AnchorText: found[i].Anchor, Origin: pagemap.OriginObserved, Position: &position,
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: found[i].Ours(path, held),
+			Absolute: pagemap.AbsoluteHref(found[i].Href), ObservedAt: at,
+		}
+		if link.Ours {
+			link.Origin = pagemap.OriginGenerated
 		}
 		if target, ok := index.ByPath(path); ok {
 			link.ToPageID = &target.ID

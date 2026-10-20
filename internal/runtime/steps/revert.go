@@ -421,14 +421,13 @@ func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.P
 	if err != nil {
 		return err
 	}
-	doc, err := content.Parse(body)
-	if err != nil {
+	if _, err = content.Parse(body); err != nil {
 		return errors.Wrap(err, errors.Internal, "read the body the revert wrote back")
 	}
 	if err := recordBody(ctx, deps, page.ID, body); err != nil {
 		return err
 	}
-	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc, hash)
+	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), body, hash, nil)
 }
 
 func metaKept(page pagemap.Page, applied []string, reason string) content.Finding {

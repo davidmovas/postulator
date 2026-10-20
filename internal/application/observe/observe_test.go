@@ -703,6 +703,31 @@ func TestOurOwnWriteRaisesNoFinding(t *testing.T) {
 	}
 }
 
+func TestARelinkedClientParagraphsLinkReadsAsOursAfterASync(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished})
+	placed := pagemap.PageLink{
+		ID: "link-ours", SiteID: siteID, FromPageID: "tb", ToURL: "/bpc-157/", AnchorText: "BPC-157",
+		Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, ObservedAt: earlier,
+	}
+	s.stores.links["tb"] = map[pagemap.LinkSource][]pagemap.PageLink{pagemap.SourceRaw: {placed}}
+
+	s.run(t, observe.Options{})
+	var kept *pagemap.PageLink
+	for i, link := range s.stores.links["tb"][pagemap.SourceRaw] {
+		if link.ToURL == "/bpc-157/" && link.AnchorText == "BPC-157" {
+			kept = &s.stores.links["tb"][pagemap.SourceRaw][i]
+		}
+	}
+	if kept == nil || !kept.Ours {
+		t.Fatalf("the link we placed in the client's paragraph = %+v, want it still ours after the sync", kept)
+	}
+	if written := s.stores.written["tb"]; len(written) != 0 {
+		t.Errorf("the client's paragraph was recorded as ours: %v", written)
+	}
+}
+
 func TestAFieldChangedOnTheSiteIsAFindingUntilAccepted(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

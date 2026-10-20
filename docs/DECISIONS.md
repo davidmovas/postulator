@@ -3558,6 +3558,14 @@ on what stage 2 left open and what was decided while building.
   stopped halfway still tells a revert what each written neighbour held. `wptest` gained
   `LoseTheAnswerOfTheNextRawWrite`, which stores a raw write and answers an error, the shape of a
   lost answer.
+- **`adopt` records the links of our own writes as ours** (ruling 6). A link is ours when it sits in
+  a block `page_blocks_written` holds, or when we placed it: a relink names every link it placed by
+  its target and anchor, since a link put into the client's paragraph sits in his block. The rule
+  lives once in `block` (`LinksOf`, `LinkAt.Ours`, `HeldOurs`), and the observation, `adopt` and
+  `sync_back` all carry an earlier `ours` forward by target and anchor, as `origin` was, so a later
+  sync never hands our link back to the client. The auto link form already counted the client's
+  links only (`contextpack.form`), so its count no longer leans toward ours. Until migration 0069
+  drops it, `origin` is still written `generated` beside every link that is ours.
 
 ### Decided while building
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -93,9 +94,18 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
+			written, err := deps.ourBlocks(ctx, sc.Page.ID)
+			if err != nil {
+				return run.Result{}, err
+			}
+			stored, err := deps.Links.ListForPage(ctx, sc.Page.ID)
+			if err != nil {
+				return run.Result{}, err
+			}
 			now := deps.now()
 			index := pagemap.NewIndex(pages)
-			links := observedOn(sc.Page, index, pagemap.NewSite(owner.BaseURL), doc.Links(), now)
+			links := observedOn(sc.Page, index, pagemap.NewSite(owner.BaseURL), block.LinksOf(body, written),
+				block.HeldOurs(stored), now)
 			if deps.Bodies != nil {
 				if recordErr := deps.Bodies.Record(ctx, sc.Page.ID, body, now); recordErr != nil {
 					return run.Result{}, recordErr

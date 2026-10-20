@@ -82,6 +82,28 @@ func TestARelinkWhoseAnswerWasLostRecordsItsBlocks(t *testing.T) {
 	})
 }
 
+func TestAdoptMarksTheLinksOfOurBlocksAsOurs(t *testing.T) {
+	t.Parallel()
+
+	theirs := `<p>We roast every espresso blend we sell, beside our <a href="/coffee/filter/">filter</a> range.</p>`
+	deps, _, recorder, _ := relinkDeps(t, theirs)
+	deps.Bodies = &bodyLog{}
+	if _, err := drive(t, steps.RelinkNeighbors(deps), relinkContext(t, deps)); err != nil {
+		t.Fatalf("RelinkNeighbors: %v", err)
+	}
+
+	byTarget := map[string]bool{}
+	for _, link := range recorder.byPage["page-parent"] {
+		byTarget[link.ToURL] = link.Ours
+	}
+	if ours, held := byTarget["/coffee/espresso/"]; !held || !ours {
+		t.Errorf("the link the relink placed = %v (held %v), want it ours though it sits in the client's paragraph", ours, held)
+	}
+	if ours := byTarget["/coffee/filter/"]; ours {
+		t.Error("the client's own link was recorded as ours")
+	}
+}
+
 func TestARetriedRelinkPlacesNothingTwice(t *testing.T) {
 	t.Parallel()
 

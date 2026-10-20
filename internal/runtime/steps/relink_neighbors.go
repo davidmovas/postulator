@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -474,11 +475,8 @@ func (n neighborhood) recordLanded(ctx context.Context, deps Deps, neighbor page
 	if err := recordSpliced(ctx, deps, neighbor.ID, n.runID, splicedBody{raw: write.After, ours: write.Ours}); err != nil {
 		return err
 	}
-	doc, err := content.Parse(write.After)
-	if err != nil {
-		return err
-	}
-	return adopt(ctx, deps, neighbor, n.index, n.site, doc, hash)
+	placed := []block.LinkKey{{To: n.page.Path, Anchor: write.Outcome.Anchor}}
+	return adopt(ctx, deps, neighbor, n.index, n.site, write.After, hash, placed)
 }
 
 func (n neighborhood) settled(state *relinkState, message string) (run.Result, error) {

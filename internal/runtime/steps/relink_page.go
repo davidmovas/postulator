@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -223,11 +224,14 @@ func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run
 	if err != nil {
 		return run.Result{}, err
 	}
-	doc, err := content.Parse(write.After)
-	if err != nil {
-		return run.Result{}, err
+	placed := make([]block.LinkKey, 0, len(state.Page.Placed))
+	for i := range state.Page.Placed {
+		if state.Page.Placed[i].Outcome == OutcomeLinked {
+			placed = append(placed, block.LinkKey{To: state.Page.Placed[i].Path, Anchor: state.Page.Placed[i].Anchor})
+		}
 	}
-	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc, landed.hash); adoptErr != nil {
+	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), write.After,
+		landed.hash, placed); adoptErr != nil {
 		return run.Result{}, adoptErr
 	}
 	state.Finished = true

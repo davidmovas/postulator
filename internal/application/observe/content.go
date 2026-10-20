@@ -311,7 +311,7 @@ func (a *absorber) body(ctx context.Context, page pagemap.Page, it item, read bo
 		return nil
 	case read.stored:
 		if a.state.Full {
-			if err := a.rawLinks(ctx, page, block.Parse(read.current.Raw)); err != nil {
+			if err := a.rawLinks(ctx, page, read.current.Raw); err != nil {
 				return err
 			}
 		}
@@ -326,7 +326,7 @@ func (a *absorber) body(ctx context.Context, page pagemap.Page, it item, read bo
 	}); err != nil {
 		return err
 	}
-	if err := a.rawLinks(ctx, page, body); err != nil {
+	if err := a.rawLinks(ctx, page, read.raw); err != nil {
 		return err
 	}
 	current, base, _, err := a.service.deps.Bodies.Get(ctx, page.ID)
@@ -346,52 +346,41 @@ func (a *absorber) bodyFinding(ctx context.Context, page pagemap.Page, current, 
 	return a.tracked.clear(ctx, finding.BodyChangedOnSite, subject)
 }
 
-func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, body block.Body) error {
-	written, err := a.service.deps.Bodies.ListWritten(ctx, page.ID)
+func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, raw string) error {
+	stored, err := a.service.deps.Bodies.ListWritten(ctx, page.ID)
 	if err != nil {
 		return err
 	}
-	ours := make(map[string]struct{}, len(written))
-	for i := range written {
-		ours[written[i].BlockHash] = struct{}{}
+	written := make([]string, 0, len(stored))
+	for i := range stored {
+		written = append(written, stored[i].BlockHash)
 	}
-	generated, err := a.generatedTargets(ctx, page.ID)
+	held, err := a.heldOurs(ctx, page.ID)
 	if err != nil {
 		return err
 	}
 
 	links := make([]pagemap.PageLink, 0)
-	for i := range body.Blocks {
-		if body.Blocks[i].Dynamic {
+	for _, found := range block.LinksOf(raw, written) {
+		path, kind := a.install.ResolveAt(page.Path, found.Href)
+		if kind != pagemap.LinkPath || path == "" {
 			continue
 		}
-		doc, parseErr := content.Parse(body.Blocks[i].Raw)
-		if parseErr != nil {
-			continue
+		position := found.Position
+		link := pagemap.PageLink{
+			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: found.Anchor,
+			Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Region: string(regionContent),
+			Source: pagemap.SourceRaw, Position: &position, Ours: found.Ours(path, held),
+			Absolute: pagemap.AbsoluteHref(found.Href), ObservedAt: a.now,
 		}
-		_, blockOurs := ours[body.Blocks[i].Hash]
-		for _, found := range doc.Links() {
-			path, kind := a.install.ResolveAt(page.Path, found.Href)
-			if kind != pagemap.LinkPath || path == "" {
-				continue
-			}
-			position := i
-			_, wasGenerated := generated[path]
-			link := pagemap.PageLink{
-				ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: found.Anchor,
-				Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Region: string(regionContent),
-				Source: pagemap.SourceRaw, Position: &position, Ours: blockOurs || wasGenerated,
-				Absolute: pagemap.AbsoluteHref(found.Href), ObservedAt: a.now,
-			}
-			if wasGenerated {
-				link.Origin = pagemap.OriginGenerated
-			}
-			if target, ok := a.stored(path); ok {
-				link.ToPageID = &target.ID
-			}
-			if built, buildErr := pagemap.NewPageLink(link); buildErr == nil {
-				links = append(links, built)
-			}
+		if link.Ours {
+			link.Origin = pagemap.OriginGenerated
+		}
+		if target, ok := a.stored(path); ok {
+			link.ToPageID = &target.ID
+		}
+		if built, buildErr := pagemap.NewPageLink(link); buildErr == nil {
+			links = append(links, built)
 		}
 	}
 	return a.service.deps.Links.ReplaceForPage(ctx, page.ID, pagemap.SourceRaw, links)
@@ -410,7 +399,7 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 	if len(it.Links) == 0 {
 		return nil
 	}
-	generated, err := a.generatedTargets(ctx, page.ID)
+	held, err := a.heldOurs(ctx, page.ID)
 	if err != nil {
 		return err
 	}
@@ -420,13 +409,13 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 		if normalizeErr != nil {
 			continue
 		}
-		_, wasGenerated := generated[path]
+		ours := held[block.LinkKey{To: path, Anchor: it.Links[i].Anchor}]
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: it.Links[i].Anchor,
 			Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Region: string(regionContent),
-			Source: pagemap.SourceRaw, Ours: wasGenerated, Absolute: pagemap.AbsoluteHref(it.Links[i].Href), ObservedAt: a.now,
+			Source: pagemap.SourceRaw, Ours: ours, Absolute: pagemap.AbsoluteHref(it.Links[i].Href), ObservedAt: a.now,
 		}
-		if wasGenerated {
+		if ours {
 			link.Origin = pagemap.OriginGenerated
 		}
 		if target, ok := a.stored(path); ok {
@@ -439,18 +428,12 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 	return a.service.deps.Links.ReplaceForPage(ctx, page.ID, pagemap.SourceRaw, links)
 }
 
-func (a *absorber) generatedTargets(ctx context.Context, pageID string) (map[string]struct{}, error) {
+func (a *absorber) heldOurs(ctx context.Context, pageID string) (map[block.LinkKey]bool, error) {
 	stored, err := a.service.deps.Links.ListForPage(ctx, pageID)
 	if err != nil {
 		return nil, err
 	}
-	ours := make(map[string]struct{}, len(stored))
-	for i := range stored {
-		if stored[i].Source == pagemap.SourceRaw && stored[i].Origin == pagemap.OriginGenerated {
-			ours[stored[i].ToURL] = struct{}{}
-		}
-	}
-	return ours, nil
+	return block.HeldOurs(stored), nil
 }
 
 func (a *absorber) plan(ctx context.Context, current pagemap.Page, known bool, next pagemap.Page, it item) error {
