@@ -192,10 +192,9 @@ func TestRelinkWritesAPlainSentenceWhereTheNeighborHasNoAnchor(t *testing.T) {
 		t.Fatalf("neighbor = %+v, want a written sentence and the body it replaced", neighbor)
 	}
 	stored, _ := server.Lookup(wpID)
-	want := `<h1>Coffee</h1><p>We roast beans every week.</p>` +
-		`<p>Visit the shop. Read more about <a href="/coffee/espresso/">espresso</a>.</p>`
+	want := bare + "\n\n" + `<p>Read more about <a href="/coffee/espresso/">espresso</a>.</p>`
 	if stored.Content != want {
-		t.Fatalf("the parent holds\n%s\nwant\n%s", stored.Content, want)
+		t.Fatalf("the parent holds\n%s\nwant\n%s: the client's paragraphs untouched and ours a block of its own", stored.Content, want)
 	}
 	if codes := findingCodes(relinked.Findings); len(codes) != 1 || codes[0] != steps.CodeRelinkPhraseTemplated {
 		t.Fatalf("findings = %+v, want the plain sentence named", relinked.Findings)

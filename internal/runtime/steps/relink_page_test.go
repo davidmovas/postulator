@@ -146,6 +146,25 @@ func TestRelinkPagePlacesTheLinksTheGraphAsksThePageFor(t *testing.T) {
 	}
 }
 
+func TestARelinkTouchesOnlyTheBlockItLinks(t *testing.T) {
+	t.Parallel()
+
+	const (
+		his   = "<p>Tea &amp; coffee&nbsp;now, <em class='x'>freshly</em> roasted.</p>"
+		other = "<p>His <em class='y'>other</em> text&nbsp;here.</p>"
+	)
+	deps, server, _, wpID := relinkPageDeps(t, his+"\n\n"+other)
+	relinked, _, _ := runRelinkPage(t, deps, relinkPageContext(t, deps, wpID))
+	if relinked.Linked != 1 {
+		t.Fatalf("relinked = %+v, want the parent linked", relinked)
+	}
+	stored, _ := server.Lookup(wpID)
+	want := "<p>Tea &amp; <a href=\"/coffee/\">coffee</a>&nbsp;now, <em class='x'>freshly</em> roasted.</p>\n\n" + other
+	if stored.Content != want {
+		t.Errorf("the page holds\n%q\nwant\n%q: the link alone, every other byte of the client's as he wrote it", stored.Content, want)
+	}
+}
+
 func TestRelinkPagePlacesTheLinksInAProductsDescription(t *testing.T) {
 	t.Parallel()
 
@@ -206,7 +225,8 @@ func TestRelinkPageBackfillsWhatThePageOwes(t *testing.T) {
 		{
 			name: "a parent on the site whose anchor the page lacks", body: bare, deps: parentOnTheSite,
 			linked: 1, sentence: true, codes: []string{steps.CodeRelinkPhraseTemplated},
-			content: `Espresso is the shortest way to make a strong cup at home. Read more about <a href="/coffee/">coffee</a>.`,
+			content: `<p>Read more about <a href="/coffee/">coffee</a>.</p>` + "\n\n" +
+				`<p>Espresso is the shortest way to make a strong cup at home.</p><p>A grinder helps, and so does fresh water.</p>`,
 		},
 		{
 			name: "a parent that is not on the site", body: bare,

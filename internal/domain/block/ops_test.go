@@ -676,6 +676,38 @@ func TestPlaceLinkAgreesWithTheSplice(t *testing.T) {
 	}
 }
 
+func TestTheOneChangedBlockIsNamed(t *testing.T) {
+	t.Parallel()
+
+	const (
+		first  = "<p>First about coffee.</p>"
+		second = "<p>Second about tea.</p>"
+	)
+	cases := []struct {
+		name   string
+		before string
+		after  string
+		at     int
+		single bool
+	}{
+		{name: "the second block changed", before: first + "\n\n" + second, after: first + "\n\n<p>Second about <a href=\"/tea/\">tea</a>.</p>", at: 1, single: true},
+		{name: "the first block changed", before: first + "\n\n" + second, after: "<p>First about <a href=\"/c/\">coffee</a>.</p>\n\n" + second, at: 0, single: true},
+		{name: "nothing changed", before: first, after: first},
+		{name: "two blocks changed", before: first + "\n\n" + second, after: "<p>x</p>\n\n<p>y</p>"},
+		{name: "a block was added", before: first, after: first + "\n\n" + second},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			at, single := block.ChangedBlock(tc.before, tc.after)
+			if single != tc.single || (single && at != tc.at) {
+				t.Errorf("ChangedBlock = %d, %t; want %d, %t", at, single, tc.at, tc.single)
+			}
+		})
+	}
+}
+
 func withoutOurLink(raw string) string {
 	before, rest, opened := strings.Cut(raw, "<a href=\"/target/\">")
 	anchor, after, closed := strings.Cut(rest, "</a>")

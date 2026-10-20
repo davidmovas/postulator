@@ -43,6 +43,23 @@ func Splice(before, after string, written []string) (raw string, ours []string) 
 	return builder.String(), ours
 }
 
+func ChangedBlock(before, after string) (at int, single bool) {
+	old, next := Parse(before).Blocks, Parse(after).Blocks
+	if len(old) != len(next) {
+		return 0, false
+	}
+	matched := align(renders(old), renders(next))
+	if len(matched) != len(old)-1 {
+		return 0, false
+	}
+	for i := range old {
+		if i >= len(matched) || matched[i].left != i {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
 func gapOurs(replaced, inserted []Block, written []string) []bool {
 	out := make([]bool, len(inserted))
 	switch {

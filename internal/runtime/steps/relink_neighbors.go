@@ -331,7 +331,14 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 		return skip(outcome, reason), nil, nil
 	}
 
-	placement, sentence := backfill(body.doc, owed.lc, owed.policy, owed.target)
+	writer, err := body.writer(ctx, deps, neighbor)
+	if err != nil {
+		return NeighborResult{}, nil, err
+	}
+	placement, sentence, err := writer.backfill(owed.lc, owed.policy, owed.target)
+	if err != nil {
+		return skip(outcome, ReasonNeighborUnreadable), nil, nil
+	}
 	anchor, inserted := insertedAnchor(placement)
 	if !inserted {
 		outcome.Outcome = OutcomeUnchanged
@@ -340,10 +347,7 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 		return outcome, nil, nil
 	}
 
-	updated, err := body.spliced(ctx, deps, neighbor)
-	if err != nil {
-		return skip(outcome, ReasonNeighborUnreadable), nil, nil
-	}
+	updated := writer.result()
 	outcome.Outcome = OutcomeLinked
 	outcome.Anchor = anchor
 	outcome.Sentence = sentence

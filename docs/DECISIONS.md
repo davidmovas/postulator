@@ -3690,3 +3690,17 @@ on what stage 2 left open and what was decided while building.
   and drift), so a person's edit to the plan during a run is kept. A creation is one call; the second
   update that tried to fix a mismatch after it is gone, since an update may no longer send a slug,
   parent or status, and a mismatch pauses as before.
+- **A relink writes a link into its block's own bytes, and its plain sentence is a block of its own**
+  (A.6). Both relinks keep the linker's choices as they were (`content.InsertTarget` over the page,
+  with its anchor order, budget and parent rule), now taken on a fresh parse per target, whose render
+  is the oracle; `block.ChangedBlock` names the one block it changed and `PlaceLink` writes the link
+  there at the occurrence whose render agrees. A link the oracle placed where no byte-for-byte write
+  agrees (an anchor in a block whose attributes hold it) is not placed and reads as an anchor not
+  found, so the plain sentence takes over, the owed link said rather than dropped. The splice used to
+  re-render every block a link touched: the client's `&nbsp;` became a raw no-break space and his
+  single-quoted attributes double-quoted (`TestARelinkTouchesOnlyTheBlockItLinks`, failing on the old
+  code). The plain sentence used to be appended inside the client's own paragraph; it is now its own
+  paragraph, added with `InsertAfter` (one `core/html` block in an editor body) after the paragraph
+  the linker chose, or before it for a link up, so it stays inside the opening paragraphs the parent
+  rule allows, and it is ours. `block.Splice` has no caller left but the property test that compares
+  `PlaceLink` with it.

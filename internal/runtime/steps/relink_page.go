@@ -82,12 +82,18 @@ func RelinkPage(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			writer, err := body.writer(ctx, deps, sc.Page)
+			if err != nil {
+				return run.Result{}, err
+			}
 			work.read(body.raw)
-			work.place(body.doc, lc, policy, sc.Page, onTheSite(pages))
+			if placeErr := work.place(writer, lc, policy, sc.Page, onTheSite(pages)); placeErr != nil {
+				return standDown(work, sc, ReasonPageUnreadable)
+			}
 			if work.result.Linked == 0 {
 				return settleRelinkPage(work)
 			}
-			return planRelinkedPage(ctx, deps, sc, &state, work, body)
+			return planRelinkedPage(ctx, deps, sc, &state, work, body, writer.result())
 		},
 	}
 }
@@ -129,28 +135,41 @@ func (w *pageRelink) read(raw wp.RawContent) {
 	w.published.PreviousContentHash = raw.ContentHash
 }
 
-func (w *pageRelink) place(doc *content.Document, lc content.LinkContext,
-	policy field.LinkPolicy, page pagemap.Page, live map[string]bool) {
+func (w *pageRelink) place(writer *linkWriter, lc content.LinkContext,
+	policy field.LinkPolicy, page pagemap.Page, live map[string]bool) error {
 	for i := range lc.Targets {
 		target := lc.Targets[i]
 		if target.PageID == page.ID || target.PageID == "" {
 			continue
 		}
-		w.result.Placed = append(w.result.Placed, w.placeTarget(doc, lc, policy, page, target, live[target.PageID]))
+		row, err := w.placeTarget(writer, lc, policy, page, target, live[target.PageID])
+		if err != nil {
+			return err
+		}
+		w.result.Placed = append(w.result.Placed, row)
+	}
+	doc, err := writer.document()
+	if err != nil {
+		return err
 	}
 	w.result.Findings = append(w.result.Findings, content.Unpublished(doc, lc, live, page.ID)...)
+	return nil
 }
 
-func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, policy field.LinkPolicy,
-	page pagemap.Page, target content.LinkTarget, live bool) PlacedLink {
+func (w *pageRelink) placeTarget(writer *linkWriter, lc content.LinkContext, policy field.LinkPolicy,
+	page pagemap.Page, target content.LinkTarget, live bool) (PlacedLink, error) {
 	var (
 		placement content.InsertResult
 		sentence  string
+		err       error
 	)
 	if live {
-		placement, sentence = backfill(doc, lc, policy, target)
+		placement, sentence, err = writer.backfill(lc, policy, target)
 	} else {
-		placement = content.InsertTarget(doc, lc, policy, target)
+		placement, err = writer.insert(lc, policy, target)
+	}
+	if err != nil {
+		return PlacedLink{}, err
 	}
 
 	row := PlacedLink{PageID: target.PageID, Path: target.URL}
@@ -160,7 +179,7 @@ func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, 
 		if sentence != "" {
 			w.result.Findings = append(w.result.Findings, templatedPageFinding(page, target, sentence))
 		}
-		return row
+		return row, nil
 	}
 
 	row.Outcome, row.Detail = OutcomeUnchanged, firstDetail(placement)
@@ -169,15 +188,11 @@ func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, 
 	} else if !live && !alreadyLinked(placement) {
 		row.Detail = "it is linked once " + target.URL + " is published"
 	}
-	return row
+	return row, nil
 }
 
 func planRelinkedPage(ctx context.Context, deps Deps, sc *run.StepContext, state *relinkState, work pageRelink,
-	body siteBody) (run.Result, error) {
-	linked, err := body.spliced(ctx, deps, sc.Page)
-	if err != nil {
-		return run.Result{}, err
-	}
+	body siteBody, linked splicedBody) (run.Result, error) {
 	state.Page, state.Publish, state.Planned = work.result, work.published, true
 	state.Writes = []relinkWrite{{
 		Outcome: NeighborResult{
