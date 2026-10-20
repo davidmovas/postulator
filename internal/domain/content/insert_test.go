@@ -356,6 +356,21 @@ func TestInsertLinksLeavesNonProseZonesAlone(t *testing.T) {
 			body: `<script>var label = "coffee";</script><p>We roast coffee.</p>`,
 			want: `<script>var label = "coffee";</script><p>We roast <a href="/coffee/">coffee</a>.</p>`,
 		},
+		{
+			name: "a shortcode's attributes are never spliced",
+			body: `<p>[products category="coffee" limit="4"] and more coffee.</p>`,
+			want: `<p>[products category=&#34;coffee&#34; limit=&#34;4&#34;] and more <a href="/coffee/">coffee</a>.</p>`,
+		},
+		{
+			name: "an enclosing shortcode's content is never spliced",
+			body: `<p>[note]Fresh coffee[/note] beside our coffee.</p>`,
+			want: `<p>[note]Fresh coffee[/note] beside our <a href="/coffee/">coffee</a>.</p>`,
+		},
+		{
+			name: "a shortcode alone leaves the anchor unplaced",
+			body: `<p>[products category="coffee"]</p>`,
+			want: `<p>[products category=&#34;coffee&#34;]</p>`,
+		},
 	}
 
 	for _, tc := range cases {

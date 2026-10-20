@@ -3589,3 +3589,26 @@ on what stage 2 left open and what was decided while building.
 - **The two tool enums the review touches stay narrowed** (`runs_pause`'s reason and
   `runs_get_artifact`'s kind): a hand pause cannot claim `awaiting_review`, and the edit plan is the
   person's to read in the run's report, so neither enum grows and the schemas keep their bytes.
+- **The block operations write what they are given and parse back what they wrote.** `Replace`,
+  `InsertAfter`, `Delete`, `RewriteRange` and `PlaceLink` on `block.Body` take the bytes as given;
+  each result is parsed again and refused (`block_not_editable`) unless every block it did not touch
+  comes back as itself, whole and in order, and the body keeps its kind, so an editor body never
+  loses its last delimiter and a classic body never gains one. A separator added between blocks
+  follows the body's own line ends; a delete that would join its neighbours puts a blank line between
+  them; a delete of the last block takes the separator before it. So an insert undone by a delete,
+  and a replace undone by a replace with the old bytes, give the body back byte for byte, which is
+  what a revert per block stands on. `RewriteRange` puts the new bytes where the range's first text
+  block stood and drops its other text blocks: a text block (`Block.Prose`) is a paragraph, heading,
+  list or quote, or a group or columns holding only those, with prose markup and no shortcode;
+  everything else stays where it stands. **No operation rewrites a block's markup**: a link is written
+  into the bytes of the text that holds its anchor, the delimiters, attribute JSON and classes
+  untouched, so the plan's "classes reapplied" had nothing to reapply. A block whose attributes hold
+  the anchor (its text is an attribute's, as in a plugin's FAQ block) and a dynamic or shortcode
+  block are refused. Wrapping our new HTML as one `core/html` block for an editor body stays the
+  composer's (`block.Part`), so a revert can put back a client's freeform chunk exactly.
+- **A link is never placed inside a shortcode** (found while building A.1). The linker matched an
+  anchor in any text the HTML parser saw, and to it `[products category="coffee"]` is text: a relink
+  could wrap `coffee` inside the client's shortcode attribute, and the splice then re-rendered the
+  block, so his shortcode stopped working. `content.FindAnchor` passes over a shortcode tag and the
+  text an enclosing shortcode wraps; the linker and `PlaceLink` both find anchors through it, and
+  `TestPlaceLinkAgreesWithTheSplice` compares the two over random bodies.

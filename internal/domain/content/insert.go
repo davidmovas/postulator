@@ -1,6 +1,7 @@
 package content
 
 import (
+	"regexp"
 	"slices"
 	"unicode"
 
@@ -39,6 +40,8 @@ type InsertResult struct {
 	Missing   []LinkTarget `json:"missing"`
 	Decisions []Decision   `json:"decisions"`
 }
+
+var shortcodeTag = regexp.MustCompile(`\[(/)?([a-zA-Z_][\w-]*)(?:\s[^\]]*)?/?\]`)
 
 var forbiddenZones = []string{
 	"a", "h1", "h2", "h3", "h4", "h5", "h6", "code", "pre",
@@ -149,7 +152,7 @@ func insertOne(doc *Document, lc LinkContext, target LinkTarget, policy field.Li
 		}
 
 		for _, anchor := range anchors {
-			start, end, matched := findFold(node.Data, anchor)
+			start, end, matched := FindAnchor(node.Data, anchor)
 			if !matched {
 				continue
 			}
@@ -194,6 +197,58 @@ func splice(node *html.Node, start, end int, href string) {
 
 func FindFold(haystack, needle string) (start, end int, found bool) {
 	return findFold(haystack, needle)
+}
+
+func FindAnchor(text, anchor string) (start, end int, found bool) {
+	held := shortcodeSpans(text)
+	for offset := 0; offset < len(text); {
+		start, end, found = findFold(text[offset:], anchor)
+		if !found {
+			return 0, 0, false
+		}
+		start, end = start+offset, end+offset
+		if !overlaps(held, start, end) {
+			return start, end, true
+		}
+		offset = end
+	}
+	return 0, 0, false
+}
+
+func ForbiddenZone(tag string) bool {
+	return slices.Contains(forbiddenZones, tag)
+}
+
+type textSpan struct {
+	start, end int
+}
+
+func shortcodeSpans(text string) []textSpan {
+	tags := shortcodeTag.FindAllStringSubmatchIndex(text, -1)
+	out := make([]textSpan, 0, len(tags))
+	for i, tag := range tags {
+		span := textSpan{start: tag[0], end: tag[1]}
+		if tag[2] < 0 {
+			name := text[tag[4]:tag[5]]
+			for _, closing := range tags[i+1:] {
+				if closing[2] >= 0 && text[closing[4]:closing[5]] == name {
+					span.end = closing[1]
+					break
+				}
+			}
+		}
+		out = append(out, span)
+	}
+	return out
+}
+
+func overlaps(spans []textSpan, start, end int) bool {
+	for _, span := range spans {
+		if start < span.end && span.start < end {
+			return true
+		}
+	}
+	return false
 }
 
 func findFold(haystack, needle string) (start, end int, found bool) {
