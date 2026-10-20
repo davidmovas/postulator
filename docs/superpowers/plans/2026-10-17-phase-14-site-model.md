@@ -726,6 +726,12 @@ under stage 1c in `DECISIONS.md`.
 - Windows flakes, green alone: openai `TestAClientWithoutATimeoutWaits`; wp `TestTheSocksProxyDialerCarriesTheConnect` under load; wp and wptest dial timeouts in parallel, so run adapter packages `-p 1`.
 - Gate legs owed (none run on a stand this session; memory allows one stand at a time): `go test -count=1 -p 1 ./...` (stopped once by the memory guard; optionally after `wsl --shutdown`); per stand, `task plugin:deploy STAND=<stand>` then `E2E_STAND=<stand> go test -tags e2e -count=1 -run 'TestMetaWritesOnlyWhatTheUserMayEdit|TestTheRawWriteAnswersWhatWasStored|TestSaveStabilityFollowsTheUsersFilters|TestSEOMetaWritesUnderTheHashesRead|TestManifestDescribesTheSite|TestMetaReadsOnlyTheKeysAsked' ./internal/adapters/wp/e2e/`, then `E2E_STAND=<stand> go test -tags e2e -count=1 -timeout 30m -run 'TestAProductIsEditedThroughTheRegistry|TestTheProductLoopEditsWhatTheClientCreatedInTheStore' ./internal/e2e/`; on the replica, `TestTheSiteFiltersAreRespectedUnderARestrictedUser`; then the whole G gate.
 
+#### Session 2, 2026-10-20/21 (in progress)
+
+- **Part 1, the stand proofs: done.** Replica: the six plugin 1.5.0 proofs green; `TestTheSiteFiltersAreRespectedUnderARestrictedUser` red, then green after `76bc5e1` (the test read the plugin off the create) and `bd4bc4d` (a page the user may not edit stopped the walk); `TestAProductIsEditedThroughTheRegistry` red, then green after `205d8fb` (its setup) and `e2080f7` (a revert took our own variation description for the client's); `TestTheProductLoopEditsWhatTheClientCreatedInTheStore` green. Vanilla: all of it green, the restricted test skipping by design. The Go suite: kernel+domain, application and runtime green; **the memory guard stopped it in the adapters group**, owed below.
+- **Part 2, the image step: done** (`7fe0c6c`).
+- **Next:** C.2 (as four commits: fields, drift, canonical, 0068), C.3, C.4.
+
 ##### 0.0 — the plan
 - This task list. Commit `docs(plan): stage 3's task list`.
 
