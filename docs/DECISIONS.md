@@ -3612,3 +3612,20 @@ on what stage 2 left open and what was decided while building.
   block, so his shortcode stopped working. `content.FindAnchor` passes over a shortcode tag and the
   text an enclosing shortcode wraps; the linker and `PlaceLink` both find anchors through it, and
   `TestPlaceLinkAgreesWithTheSplice` compares the two over random bodies.
+- **The deny list names the store's meta keys, and a meta key is compared as MySQL compares it.**
+  `field.DeniedMeta` lists the keys behind the denied fields (`_price`, `_regular_price`,
+  `_sale_price`, `_sku`, `_stock_status`, `_stock`, `_manage_stock`, `_product_attributes`,
+  `total_sales`) and the prefixes `_`, `attribute_` (a variation's attributes) and `rank_math_`
+  (an SEO plugin's keys, written through the SEO route alone); `openapi.yaml`'s `x-denied-meta` is
+  the same set, which a contract test holds equal, and `wp-plugin/testdata/meta_deny.json` is the one
+  table the Go side tests now and the plugin's tests take in A.3. The `meta_key` column's collation
+  ignores case and trailing spaces, so `TOTAL_SALES` or `total_sales ` reaches the store's own row:
+  a key is compared after ASCII case folding, and one that is not ASCII letters, digits, underscores
+  and hyphens, or is longer than 255 bytes, is refused whole (`field_unknown`), which also closes an
+  accent-insensitive match. `field.MetaKeyAllowed` is the one predicate the scope, the client and the
+  plugin share.
+- **The H1 is read, never written, and the featured image is filled, never replaced.** `field.H1`
+  is a text field read from the plugin with no writer; `CheckScope` refuses it as `field_read_only`,
+  `AIWritable` is false for any field without a writer, and so no scope, pack or writer sees it.
+  `field.FeaturedImage` is a core field marked `Fill`, written only where the page has none; it is no
+  scope's to switch, the image step and the template deciding when one is drawn.

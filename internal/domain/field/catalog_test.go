@@ -27,11 +27,40 @@ func TestTheCatalogNamesEveryDeniedField(t *testing.T) {
 		}
 	}
 	for _, spec := range field.Catalog() {
-		if !spec.Denied && spec.Text && spec.Write == field.None {
+		if !spec.Denied && spec.Text && spec.Write == field.None && spec.Key != field.H1 {
 			t.Errorf("%s is a writable text field without a writer", spec.Key)
 		}
 		if spec.Read == field.None {
 			t.Errorf("%s has no reader", spec.Key)
+		}
+	}
+}
+
+func TestTheH1IsNeverScoped(t *testing.T) {
+	t.Parallel()
+
+	spec, found := field.Lookup(field.H1)
+	if !found || spec.Read != field.Plugin || spec.Write != field.None || spec.Denied || !spec.Text {
+		t.Fatalf("the H1 is %+v found %t, want a text field read from the plugin and never written", spec, found)
+	}
+	if spec.AIWritable() {
+		t.Error("the H1 is AI-writable, so a pack would offer it to the writer")
+	}
+	if _, reason := refusal(t, field.CheckScope(field.H1)); reason != field.ReasonReadOnly {
+		t.Errorf("CheckScope(h1) reason %q, want %s", reason, field.ReasonReadOnly)
+	}
+}
+
+func TestTheFeaturedImageIsFilledOnly(t *testing.T) {
+	t.Parallel()
+
+	spec, found := field.Lookup(field.FeaturedImage)
+	if !found || spec.Read != field.Core || spec.Write != field.Core || !spec.Fill || spec.Text || spec.Denied {
+		t.Fatalf("the featured image is %+v found %t, want a core field written only where the page has none", spec, found)
+	}
+	for _, other := range field.Catalog() {
+		if other.Fill && other.Key != field.FeaturedImage {
+			t.Errorf("%s is filled only, and only the featured image is", other.Key)
 		}
 	}
 }

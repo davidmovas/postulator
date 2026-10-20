@@ -18,6 +18,32 @@ servers:
         description: Host and optional subdirectory of the WordPress installation.
 security:
   - applicationPassword: []
+x-denied-meta:
+  description: >-
+    The post meta keys no client reads or writes through the meta route, from
+    plugin version 1.5.0, beside every key is_protected_meta protects: the
+    store's own keys behind a product's prices, stock, SKU, attributes and
+    sales counter, a variation's attribute keys, and the SEO plugins' keys,
+    which are written through the SEO route alone. A key is compared after
+    ASCII case folding, because the meta_key column's collation ignores case
+    and trailing spaces, and a key that is not ASCII letters, digits,
+    underscores and hyphens, or longer than 255 bytes, is refused whole. The
+    client refuses the same keys before a request leaves; testdata/meta_deny.json
+    is the one table both sides test.
+  keys:
+    - _price
+    - _regular_price
+    - _sale_price
+    - _sku
+    - _stock_status
+    - _stock
+    - _manage_stock
+    - _product_attributes
+    - total_sales
+  prefixes:
+    - _
+    - attribute_
+    - rank_math_
 paths:
   /manifest:
     get:

@@ -10,6 +10,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
 var httpMethods = []string{"get", "put", "post", "delete", "patch"}
@@ -164,6 +165,47 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 				t.Errorf("the contract does not carry %q", tc.snippet)
 			}
 		})
+	}
+}
+
+func documentedDenySet(t *testing.T) (keys, prefixes []string) {
+	t.Helper()
+
+	var list *[]string
+	inDeny := false
+	for line := range strings.SplitSeq(contractDocument(t), "\n") {
+		switch {
+		case line == "x-denied-meta:":
+			inDeny = true
+		case inDeny && line != "" && !strings.HasPrefix(line, " "):
+			inDeny = false
+		case inDeny && line == "  keys:":
+			list = &keys
+		case inDeny && line == "  prefixes:":
+			list = &prefixes
+		case inDeny && list != nil && strings.HasPrefix(line, "    - "):
+			*list = append(*list, strings.Trim(strings.TrimPrefix(line, "    - "), "\""))
+		case inDeny && strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   "):
+			list = nil
+		}
+	}
+	return keys, prefixes
+}
+
+func TestTheContractsDenySetIncludesTheCatalogs(t *testing.T) {
+	t.Parallel()
+
+	keys, prefixes := documentedDenySet(t)
+	denied := field.DeniedMeta()
+	slices.Sort(keys)
+	slices.Sort(prefixes)
+	slices.Sort(denied.Keys)
+	slices.Sort(denied.Prefixes)
+	if !slices.Equal(keys, denied.Keys) {
+		t.Errorf("the contract denies the keys %v, and the catalog %v", keys, denied.Keys)
+	}
+	if !slices.Equal(prefixes, denied.Prefixes) {
+		t.Errorf("the contract denies the prefixes %v, and the catalog %v", prefixes, denied.Prefixes)
 	}
 }
 

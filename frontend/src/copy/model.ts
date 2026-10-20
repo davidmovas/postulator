@@ -133,6 +133,7 @@ export const model = {
     },
     fieldNames: {
         title: "title",
+        h1: "H1",
         excerpt: "excerpt",
         body: "body",
         seo_title: "SEO title",
@@ -141,6 +142,7 @@ export const model = {
         product_description: "product description",
         product_short_description: "short description",
         variation_description: "variation description",
+        featured_image: "featured image",
         image_alt: "image alt text",
         image_title: "image title",
         upsells: "upsells",

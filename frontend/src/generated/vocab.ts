@@ -149,6 +149,7 @@ export type PageTypeReason = (typeof pageTypeReasons)[number];
 
 export const fieldKeys = [
     "title",
+    "h1",
     "excerpt",
     "body",
     "seo_title",
@@ -157,6 +158,7 @@ export const fieldKeys = [
     "product_description",
     "product_short_description",
     "variation_description",
+    "featured_image",
     "image_alt",
     "image_title",
     "upsells",

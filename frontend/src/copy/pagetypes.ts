@@ -28,6 +28,7 @@ export const pageTypes = {
     },
     fields: {
         title: "Title",
+        h1: "H1",
         excerpt: "Excerpt",
         body: "Body",
         seo_title: "SEO title",
@@ -36,6 +37,7 @@ export const pageTypes = {
         product_description: "Product description",
         product_short_description: "Short description",
         variation_description: "Variation descriptions",
+        featured_image: "Featured image",
         image_alt: "Image alt text",
         image_title: "Image titles",
         upsells: "Upsells",

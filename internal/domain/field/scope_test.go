@@ -52,6 +52,12 @@ func TestCheckScopeRefusesWhatNoScopeMayName(t *testing.T) {
 		"a meta key with a space":     {field.Instance(field.Meta, "spec sheet"), field.ReasonUnknown},
 		"a field the catalog lacks":   {field.Key("rating"), field.ReasonUnknown},
 		"one variation's description": {field.Instance(field.VariationDescription, "42"), field.ReasonUnknown},
+		"the H1":                      {field.H1, field.ReasonReadOnly},
+		"the featured image":          {field.FeaturedImage, field.ReasonUnknown},
+		"a variation's attribute key": {field.Instance(field.Meta, "attribute_pa_color"), field.ReasonDenied},
+		"a sales counter in capitals": {field.Instance(field.Meta, "TOTAL_SALES"), field.ReasonDenied},
+		"an SEO key in capitals":      {field.Instance(field.Meta, "Rank_Math_Title"), field.ReasonDenied},
+		"a meta key past ASCII":       {field.Instance(field.Meta, "café_note"), field.ReasonUnknown},
 	}
 	for name, tc := range refused {
 		t.Run(name, func(t *testing.T) {

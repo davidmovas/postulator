@@ -6,6 +6,7 @@ type Key string
 
 const (
 	Title                   Key = "title"
+	H1                      Key = "h1"
 	Excerpt                 Key = "excerpt"
 	Body                    Key = "body"
 	SEOTitle                Key = "seo_title"
@@ -14,6 +15,7 @@ const (
 	ProductDescription      Key = "product_description"
 	ProductShortDescription Key = "product_short_description"
 	VariationDescription    Key = "variation_description"
+	FeaturedImage           Key = "featured_image"
 	ImageAlt                Key = "image_alt"
 	ImageTitle              Key = "image_title"
 	Upsells                 Key = "upsells"
@@ -52,14 +54,16 @@ type Spec struct {
 	Denied    bool
 	Text      bool
 	Person    bool
+	Fill      bool
 }
 
 func (s Spec) AIWritable() bool {
-	return !s.Denied && !s.Person
+	return !s.Denied && !s.Person && s.Write != None
 }
 
 var catalog = []Spec{
 	{Key: Title, Read: Core, Write: Core, Text: true},
+	{Key: H1, Read: Plugin, Write: None, Text: true},
 	{Key: Excerpt, Read: Core, Write: Core, Text: true},
 	{Key: Body, Read: Plugin, Write: Plugin, Text: true},
 	{Key: SEOTitle, Read: Plugin, Write: Plugin, Text: true},
@@ -68,6 +72,7 @@ var catalog = []Spec{
 	{Key: ProductDescription, Read: Store, Write: Plugin, Text: true},
 	{Key: ProductShortDescription, Read: Store, Write: Store, Text: true},
 	{Key: VariationDescription, Instanced: true, Read: Store, Write: Store, Text: true},
+	{Key: FeaturedImage, Read: Core, Write: Core, Fill: true},
 	{Key: ImageAlt, Instanced: true, Read: Core, Write: Core, Text: true},
 	{Key: ImageTitle, Instanced: true, Read: Core, Write: Core, Text: true},
 	{Key: Upsells, Read: Store, Write: Store},

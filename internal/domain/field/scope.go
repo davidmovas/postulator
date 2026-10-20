@@ -3,7 +3,6 @@ package field
 import (
 	"bytes"
 	"encoding/json"
-	"slices"
 	"strings"
 	"time"
 
@@ -11,8 +10,9 @@ import (
 )
 
 const (
-	ReasonDenied  = "field_denied"
-	ReasonUnknown = "field_unknown"
+	ReasonDenied   = "field_denied"
+	ReasonUnknown  = "field_unknown"
+	ReasonReadOnly = "field_read_only"
 )
 
 type Provider string
@@ -136,15 +136,13 @@ func (s Scope) Validate() error {
 	return s.Links.Validate()
 }
 
-var deniedMetaPrefixes = []string{"_", "rank_math_"}
-
-var deniedMetaKeys = []string{"total_sales"}
-
 func CheckScope(key Key) error {
 	spec, known := Lookup(key)
 	switch {
 	case known && spec.Denied:
 		return refused(key, ReasonDenied, "the field is never written")
+	case known && spec.Write == None:
+		return refused(key, ReasonReadOnly, "the field is read from the site and never written")
 	case !known || !spec.Text && !scopedWithoutText(spec.Key):
 		return refused(key, ReasonUnknown, "no scope may name the field")
 	case spec.Key != Meta && key.Instance() != "":
@@ -161,19 +159,14 @@ func scopedWithoutText(key Key) bool {
 }
 
 func checkMetaKey(key Key) error {
-	name := key.Instance()
-	if name == "" || strings.TrimSpace(name) != name || strings.ContainsAny(name, ", \t\r\n") {
-		return refused(key, ReasonUnknown, "a custom field needs one meta key")
+	switch name := key.Instance(); {
+	case !metaKeyWellFormed(name):
+		return refused(key, ReasonUnknown, "a custom field needs one meta key of ASCII letters, digits, underscores and hyphens")
+	case metaKeyDenied(name):
+		return refused(key, ReasonDenied, "the meta key is protected, or the store's own")
+	default:
+		return nil
 	}
-	for _, prefix := range deniedMetaPrefixes {
-		if strings.HasPrefix(name, prefix) {
-			return refused(key, ReasonDenied, "the meta key is protected")
-		}
-	}
-	if slices.Contains(deniedMetaKeys, name) {
-		return refused(key, ReasonDenied, "the meta key is the store's")
-	}
-	return nil
 }
 
 func refused(key Key, reason, message string) error {
