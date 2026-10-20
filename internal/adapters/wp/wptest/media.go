@@ -17,6 +17,22 @@ type Upload struct {
 	Title    string
 	Bytes    []byte
 	ID       int64
+	Parent   int64
+}
+
+func (s *Server) SeedUpload(seeded Upload) Upload {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.nextID++
+	stored := &upload{
+		ID: s.nextID, Filename: seeded.Filename, MimeType: seeded.MimeType, Alt: seeded.Alt, Title: seeded.Title,
+		Bytes: slices.Clone(seeded.Bytes), Parent: seeded.Parent,
+	}
+	s.uploads[stored.ID] = stored
+	s.uploadOrder = append(s.uploadOrder, stored.ID)
+	seeded.ID = stored.ID
+	return seeded
 }
 
 func (s *Server) routeMedia(mux *http.ServeMux) {
@@ -40,6 +56,7 @@ func (s *Server) Uploads() []Upload {
 			Alt:      stored.Alt,
 			Title:    stored.Title,
 			Bytes:    slices.Clone(stored.Bytes),
+			Parent:   stored.Parent,
 		})
 	}
 	return uploads
@@ -136,6 +153,7 @@ func (s *Server) uploadPayload(stored *upload) map[string]any {
 		"alt_text":   stored.Alt,
 		"mime_type":  stored.MimeType,
 		"title":      renderedField(stored.Title),
+		"post":       stored.Parent,
 	}
 }
 

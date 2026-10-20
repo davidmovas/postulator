@@ -91,15 +91,21 @@ export function metaKeyOf(field: string): string | null {
     return field.startsWith(metaPrefix) ? field.slice(metaPrefix.length) : null;
 }
 
-const variationPrefix = "variation_description:";
+const instanceLabels: readonly (readonly [string, (id: string) => string])[] = [
+    ["variation_description:", copy.pageTypes.variation],
+    ["image_alt:", copy.pageTypes.imageAlt],
+    ["image_title:", copy.pageTypes.imageTitle],
+];
 
 export function fieldLabel(field: string, label = ""): string {
     const meta = metaKeyOf(field);
     if (meta !== null) {
         return label.trim() === "" ? meta : label;
     }
-    if (field.startsWith(variationPrefix)) {
-        return copy.pageTypes.variation(field.slice(variationPrefix.length));
+    for (const [prefix, named] of instanceLabels) {
+        if (field.startsWith(prefix)) {
+            return named(field.slice(prefix.length));
+        }
     }
     return isOneOf(fieldKeys, field) ? copy.pageTypes.fields[field] : spaced(field);
 }

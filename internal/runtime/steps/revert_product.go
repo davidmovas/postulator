@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/edit"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -18,7 +19,42 @@ const (
 		"so putting the old one back would lose that edit"
 	ReasonRevertVariationEdited = "a variation's description was edited in the store since the run wrote it, " +
 		"so putting the old one back would lose that edit"
+	ReasonRevertImageEdited = "an image's alt text or title was edited since the run wrote it, " +
+		"so putting the old one back would lose that edit"
 )
+
+func imagesToRestore(ctx context.Context, work revertWork) (restore map[int64]wp.UpdateMedia, reason string) {
+	out := make(map[int64]wp.UpdateMedia)
+	for _, written := range work.published.PreviousMedia {
+		id, named := edit.MediaID(written.Key)
+		if !named {
+			continue
+		}
+		held, err := work.client.GetMedia(ctx, id)
+		switch {
+		case errors.IsCode(err, errors.NotFound):
+			continue
+		case err != nil:
+			return nil, storeReason(err)
+		}
+		current := held.Alt
+		if written.Key.Kind() == field.ImageTitle {
+			current = held.Title
+		}
+		if current != written.Written {
+			return nil, ReasonRevertImageEdited
+		}
+		back := out[id]
+		before := written.Before
+		if written.Key.Kind() == field.ImageTitle {
+			back.Title = &before
+		} else {
+			back.Alt = &before
+		}
+		out[id] = back
+	}
+	return out, ""
+}
 
 func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
 	work revertWork) (string, bool) {
@@ -31,6 +67,10 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 		return reason, false
 	}
 	variations, reason := variationsToRestore(ctx, work, held.ID)
+	if reason != "" {
+		return reason, false
+	}
+	images, reason := imagesToRestore(ctx, work)
 	if reason != "" {
 		return reason, false
 	}
@@ -55,6 +95,11 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 			return storeReason(err), false
 		}
 	}
+	for id, back := range images {
+		if _, err = work.client.UpdateMedia(ctx, id, back); err != nil {
+			return storeReason(err), false
+		}
+	}
 	if hasFields(update) || attributes != nil || len(variations) > 0 {
 		if raw, reason, ok = readRawBack(ctx, work); !ok {
 			return reason, false
@@ -68,8 +113,8 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 		"the description, the short description, the variations' descriptions and the attributes the run replaced were written back")
 }
 
-func variationsToRestore(ctx context.Context, work revertWork, productID int64) (restore []VariationWrite, reason string) {
-	out := make([]VariationWrite, 0, len(work.published.PreviousVariations))
+func variationsToRestore(ctx context.Context, work revertWork, productID int64) (restore []FieldWrite, reason string) {
+	out := make([]FieldWrite, 0, len(work.published.PreviousVariations))
 	for _, written := range work.published.PreviousVariations {
 		id, named := edit.VariationID(written.Key)
 		if !named {

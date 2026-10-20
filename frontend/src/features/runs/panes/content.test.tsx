@@ -69,6 +69,25 @@ describe("the fields pane", () => {
         expect(written.getByText("Ten milligrams.")).toBeDefined();
     });
 
+    it("names an image's alt text and title by the image", () => {
+        render(
+            <FieldsPane
+                payload={{
+                    values: [
+                        { key: "image_alt:41", value: "A vial & its dropper" },
+                        { key: "image_title:41", value: "Vial" },
+                    ],
+                    skipped: [],
+                }}
+            />,
+        );
+
+        const written = within(screen.getByRole("region", { name: said.written }));
+        expect(written.getByText(copy.pageTypes.imageAlt("41"))).toBeDefined();
+        expect(written.getByText(copy.pageTypes.imageTitle("41"))).toBeDefined();
+        expect(written.getByText("A vial & its dropper")).toBeDefined();
+    });
+
     it("says so when the step asked for nothing", () => {
         render(<FieldsPane payload={{ values: [], skipped: [] }} />);
 

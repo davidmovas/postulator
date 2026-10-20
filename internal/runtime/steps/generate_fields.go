@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -24,6 +25,7 @@ const (
 
 	fieldsTokens    = 1024
 	variationTokens = 256
+	imageTokens     = 64
 )
 
 type FieldValue struct {
@@ -155,45 +157,72 @@ type askedScope struct {
 func fieldsRoom(asked []askedScope) int {
 	room := fieldsTokens
 	for i := range asked {
-		if asked[i].Key.Kind() == field.VariationDescription {
+		switch asked[i].Key.Kind() {
+		case field.VariationDescription:
 			room += variationTokens
+		case field.ImageAlt, field.ImageTitle:
+			room += imageTokens
 		}
 	}
 	return room
 }
 
-func variationsToWrite(ctx context.Context, deps Deps, sc *run.StepContext, scope field.Scope) ([]askedScope, []FieldSkip, error) {
-	if !scope.Enabled || !scope.AIWrites || deps.Fields == nil {
+var instancedKinds = []field.Key{field.VariationDescription, field.ImageAlt, field.ImageTitle}
+
+func instancesToWrite(ctx context.Context, deps Deps, sc *run.StepContext, set pagetype.Set, kind pagetype.Type) ([]askedScope, []FieldSkip, error) {
+	scopes := make(map[field.Key]field.Scope)
+	for _, instanced := range instancedKinds {
+		if scope, _ := set.Scope(kind.ID, instanced); scope.Enabled && scope.AIWrites {
+			scopes[instanced] = scope
+		}
+	}
+	if len(scopes) == 0 || deps.Fields == nil {
 		return nil, nil, nil
 	}
 	values, err := deps.Fields.ListForPage(ctx, sc.Page.ID)
 	if err != nil {
 		return nil, nil, err
 	}
-	variations := contextpack.Variations(values)
-	keys := make([]field.Key, 0, len(variations))
-	for i := range variations {
-		keys = append(keys, variations[i].Key)
+	candidates := make([]askedScope, 0)
+	if scope, enabled := scopes[field.VariationDescription]; enabled {
+		for _, variation := range contextpack.Variations(values) {
+			named := strings.Join(variation.Options, ", ")
+			if named == "" {
+				named = variation.Key.Instance()
+			}
+			candidates = append(candidates, askedScope{
+				Key: variation.Key, Name: contextpack.FieldName(field.VariationDescription) + ", " + named, Scope: scope,
+			})
+		}
+	}
+	images := make([]askedScope, 0)
+	for i := range values {
+		instanced := values[i].Key.Kind()
+		if scope, enabled := scopes[instanced]; enabled && (instanced == field.ImageAlt || instanced == field.ImageTitle) {
+			images = append(images, askedScope{
+				Key: values[i].Key, Name: contextpack.FieldName(instanced) + ", image " + values[i].Key.Instance(), Scope: scope,
+			})
+		}
+	}
+	slices.SortFunc(images, func(a, b askedScope) int { return strings.Compare(string(a.Key), string(b.Key)) })
+	candidates = append(candidates, images...)
+
+	keys := make([]field.Key, 0, len(candidates))
+	for i := range candidates {
+		keys = append(keys, candidates[i].Key)
 	}
 	kept, err := deps.keptFieldsOf(ctx, sc, sc.Page.WPID != nil, nil, keys...)
 	if err != nil {
 		return nil, nil, err
 	}
-	asked := make([]askedScope, 0, len(variations))
+	asked := make([]askedScope, 0, len(candidates))
 	skipped := make([]FieldSkip, 0)
-	for i := range variations {
-		variation := variations[i]
-		if kept[variation.Key] {
-			skipped = append(skipped, FieldSkip{Key: string(variation.Key), Reason: reasonKept})
+	for i := range candidates {
+		if kept[candidates[i].Key] {
+			skipped = append(skipped, FieldSkip{Key: string(candidates[i].Key), Reason: reasonKept})
 			continue
 		}
-		named := strings.Join(variation.Options, ", ")
-		if named == "" {
-			named = variation.Key.Instance()
-		}
-		asked = append(asked, askedScope{
-			Key: variation.Key, Name: contextpack.FieldName(field.VariationDescription) + ", " + named, Scope: scope,
-		})
+		asked = append(asked, candidates[i])
 	}
 	return asked, skipped, nil
 }
@@ -236,12 +265,11 @@ func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]asked
 		asked = append(asked, askedScope{Key: key, Scope: scope})
 	}
 	if sc.Page.WPType == pagemap.WPProduct {
-		scope, _ := set.Scope(kind.ID, field.VariationDescription)
-		variations, kept, err := variationsToWrite(ctx, deps, sc, scope)
+		instances, kept, err := instancesToWrite(ctx, deps, sc, set, kind)
 		if err != nil {
 			return nil, nil, err
 		}
-		asked, skipped = append(asked, variations...), append(skipped, kept...)
+		asked, skipped = append(asked, instances...), append(skipped, kept...)
 	}
 	return asked, skipped, nil
 }

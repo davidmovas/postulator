@@ -1,5 +1,7 @@
 export const pageTypes = {
     variation: (id: string) => `Variation ${id}'s description`,
+    imageAlt: (id: string) => `Image ${id}'s alt text`,
+    imageTitle: (id: string) => `Image ${id}'s title`,
     untyped: "No page type",
     presets: {
         hub: "Hub",

@@ -32,7 +32,8 @@ const (
 type PublishResult struct {
 	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
 	PreviousProduct     *ProductSnapshot   `json:"previousProduct,omitempty"`
-	PreviousVariations  []VariationWrite   `json:"previousVariations,omitempty"`
+	PreviousVariations  []FieldWrite       `json:"previousVariations,omitempty"`
+	PreviousMedia       []FieldWrite       `json:"previousMedia,omitempty"`
 	URL                 string             `json:"url"`
 	Status              string             `json:"status"`
 	ContentHash         string             `json:"contentHash"`
@@ -178,6 +179,11 @@ func (p *publishPlan) fieldChanges() []field.Change {
 		}
 		for _, planned := range p.Variations {
 			out = append(out, field.NewChange(planned.Key, planned.Before, planned.Value))
+		}
+		for _, image := range p.Media {
+			for _, planned := range image.Writes {
+				out = append(out, field.NewChange(planned.Key, planned.Before, planned.Value))
+			}
 		}
 	default:
 		if !p.Request.KeepTitle {

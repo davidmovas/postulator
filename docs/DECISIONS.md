@@ -3781,3 +3781,20 @@ on what stage 2 left open and what was decided while building.
   difference now pauses the item naming `product_description`, the save already on record for a
   revert (`TestADescriptionTheClientEditsDuringTheStoresSaveIsNotWrittenOver`, failing first for
   both saves).
+- **A product image's alt text and title are written only where the image is the product's**
+  (B.4, decision 19). The observation records `image_alt:<id>` and `image_title:<id>` for every
+  image the store lists on a product, from the store's own payload (its `alt` and `name`), so no
+  request is added to a walk. `generate_fields` asks them like the variations, from the model and
+  under the kind's scope (off on every preset), each named by its media id with 64 tokens more
+  room, and keeps the answer as plain text, an attribute's text having no paragraphs. The registry
+  routes them to the core writer's `ReadMedia` and `WriteMedia` (`wp.GetMedia`, which reads the
+  attachment's parent, and `wp.UpdateMedia`, which sends `alt_text` and `title` alone) and refuses,
+  before writing, an image whose parent is not the page (`image_not_attached`), so an image the
+  library shares is never renamed for one product; an image's two fields go in one request and
+  one execution. `publish` leaves such an image out at the plan and names it in `skipped` (the SEO
+  write used to replace `skipped` whole; it now adds to it), re-reads each image in its check and
+  writes it after the variations; an attachment's save is not a save of the product, so it is
+  made over an unstable product too. The result keeps `previousMedia` (the shape of
+  `previousVariations`, both now `FieldWrite`), the field rows are recorded, and the revert puts
+  each back while it still holds what the run wrote, handing the product back otherwise. The fake
+  seeds an upload under a parent, answers its `post`, and names a product image by its title.

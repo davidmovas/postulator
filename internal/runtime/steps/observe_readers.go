@@ -117,12 +117,16 @@ func (r storeReader) ListProducts(ctx context.Context, query observe.ProductQuer
 				Taxonomy: string(pagemap.WPProductCategory), TermID: category.ID, Name: category.Name, Slug: category.Slug,
 			})
 		}
+		images := make([]observe.ProductImage, 0, len(product.Images))
+		for _, image := range product.Images {
+			images = append(images, observe.ProductImage{ID: image.ID, Alt: image.Alt, Title: image.Name})
+		}
 		out.Items = append(out.Items, observe.Product{
 			ID: product.ID, Permalink: product.Permalink, Slug: product.Slug, Status: product.Status, Name: product.Name, Type: product.Type,
 			Description: product.Description, ShortDescription: product.ShortDescription, Price: product.Price,
 			RegularPrice: product.RegularPrice, SalePrice: product.SalePrice, SKU: product.SKU, StockStatus: product.StockStatus,
 			StockQuantity: product.StockQuantity, ManageStock: string(product.ManageStock), Attributes: encoded,
-			Categories: categories, VariationIDs: product.VariationIDs, Modified: product.Modified,
+			Categories: categories, VariationIDs: product.VariationIDs, Images: images, Modified: product.Modified,
 		})
 	}
 	return out, nil

@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	ReasonNoWriter  = "field_not_writable"
-	ReasonStoreOwns = "field_owned_by_store"
-	ReasonNoPlugin  = "field_needs_plugin"
+	ReasonNoWriter    = "field_not_writable"
+	ReasonStoreOwns   = "field_owned_by_store"
+	ReasonNoPlugin    = "field_needs_plugin"
+	ReasonNotAttached = "image_not_attached"
 )
 
 type Outcome string
@@ -60,9 +61,17 @@ type Result struct {
 	Hash    *string   `json:"hash,omitempty"`
 }
 
+type Media struct {
+	Alt    string
+	Title  string
+	Parent int64
+}
+
 type CoreWriter interface {
 	ReadCore(ctx context.Context, target Target) (map[field.Key]string, error)
 	WriteCore(ctx context.Context, target Target, values map[field.Key]string) (map[field.Key]string, error)
+	ReadMedia(ctx context.Context, id int64) (Media, error)
+	WriteMedia(ctx context.Context, id int64, alt, title *string) (Media, error)
 }
 
 type StoreWriter interface {
@@ -99,6 +108,7 @@ const (
 	routeCore route = iota
 	routeStore
 	routeVariations
+	routeMedia
 	routeMeta
 	routeSEO
 	routeBody
@@ -160,6 +170,12 @@ func routeOf(target Target, write Write) (route, error) {
 		}
 		return routeVariations, nil
 	}
+	if key.Kind() == field.ImageAlt || key.Kind() == field.ImageTitle {
+		if _, named := MediaID(key); !named {
+			return 0, refused(key, field.ReasonUnknown, "an image's alt text and title name the image by its media id")
+		}
+		return routeMedia, nil
+	}
 	spec, known := field.Lookup(key)
 	switch {
 	case !known || spec.Denied:
@@ -210,6 +226,8 @@ func (s Service) write(ctx context.Context, target Target, at route, group []Wri
 		return checked(ctx, target, group, s.writers.Store.ReadStore, s.writers.Store.WriteStore)
 	case routeVariations:
 		return s.writeVariations(ctx, target, group)
+	case routeMedia:
+		return s.writeMedia(ctx, target, group)
 	case routeMeta:
 		return s.writeMeta(ctx, target, group)
 	case routeSEO:
@@ -299,6 +317,76 @@ func (s Service) writeVariations(ctx context.Context, target Target, group []Wri
 			value = stored
 		}
 		results = append(results, Result{Key: ordered[i].Key, Outcome: OutcomeWritten, Value: &value, Hash: new(block.BodyHash(value))})
+	}
+	return results, nil
+}
+
+func MediaID(key field.Key) (int64, bool) {
+	if key.Kind() != field.ImageAlt && key.Kind() != field.ImageTitle {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(key.Instance(), 10, 64)
+	return id, err == nil && id > 0
+}
+
+func mediaValue(held Media, key field.Key) string {
+	if key.Kind() == field.ImageAlt {
+		return held.Alt
+	}
+	return held.Title
+}
+
+func (s Service) writeMedia(ctx context.Context, target Target, group []Write) ([]Result, error) {
+	byImage := make(map[int64][]Write)
+	ids := make([]int64, 0)
+	for i := range group {
+		id, _ := MediaID(group[i].Key)
+		if _, listed := byImage[id]; !listed {
+			ids = append(ids, id)
+		}
+		byImage[id] = append(byImage[id], group[i])
+	}
+	slices.Sort(ids)
+	held := make(map[int64]Media, len(ids))
+	results := make([]Result, 0, len(group))
+	for _, id := range ids {
+		image, err := s.writers.Core.ReadMedia(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if image.Parent != target.ID {
+			return nil, refused(byImage[id][0].Key, ReasonNotAttached,
+				"the image is not attached to this page, so another page may show it, and it is never renamed for this one")
+		}
+		held[id] = image
+		for _, write := range byImage[id] {
+			current := mediaValue(image, write.Key)
+			if !holds(current, write.Expected) && current != text(write.Value) {
+				results = append(results, Result{Key: write.Key, Outcome: OutcomeMoved, Hash: new(block.BodyHash(current))})
+			}
+		}
+	}
+	if len(results) > 0 {
+		return withHeld(results, group), nil
+	}
+	for _, id := range ids {
+		var alt, title *string
+		for _, write := range byImage[id] {
+			value := text(write.Value)
+			if write.Key.Kind() == field.ImageAlt {
+				alt = &value
+			} else {
+				title = &value
+			}
+		}
+		stored, err := s.writers.Core.WriteMedia(ctx, id, alt, title)
+		if err != nil {
+			return results, err
+		}
+		for _, write := range byImage[id] {
+			value := mediaValue(stored, write.Key)
+			results = append(results, Result{Key: write.Key, Outcome: OutcomeWritten, Value: &value, Hash: new(block.BodyHash(value))})
+		}
 	}
 	return results, nil
 }

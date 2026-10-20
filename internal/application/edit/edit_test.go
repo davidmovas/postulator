@@ -18,6 +18,7 @@ type site struct {
 	core       map[field.Key]string
 	store      map[field.Key]string
 	variations map[int64]string
+	media      map[int64]edit.Media
 	body       string
 	seo        map[string]string
 	meta       map[string]string
@@ -31,10 +32,33 @@ func newSite() *site {
 		core:       map[field.Key]string{field.Title: "Old title", field.Excerpt: "", field.FeaturedImage: ""},
 		store:      map[field.Key]string{field.ProductShortDescription: "Old short"},
 		variations: map[int64]string{5: "<p>Old five</p>", 6: "<p>Old six</p>"},
+		media:      map[int64]edit.Media{41: {Alt: "", Title: "vial", Parent: 9}, 42: {Alt: "Shared", Title: "shared", Parent: 0}},
 		body:       "<p>Old body</p>",
 		seo:        map[string]string{"title": "Old SEO"},
 		meta:       map[string]string{"subtitle": "Old"},
 	}
+}
+
+func (s *site) ReadMedia(_ context.Context, id int64) (edit.Media, error) {
+	s.calls = append(s.calls, "read media "+strconv.FormatInt(id, 10))
+	held, found := s.media[id]
+	if !found {
+		return edit.Media{}, errors.New(errors.NotFound, "no such media")
+	}
+	return held, nil
+}
+
+func (s *site) WriteMedia(_ context.Context, id int64, alt, title *string) (edit.Media, error) {
+	s.calls = append(s.calls, "write media "+strconv.FormatInt(id, 10))
+	held := s.media[id]
+	if alt != nil {
+		held.Alt = *alt
+	}
+	if title != nil {
+		held.Title = *title
+	}
+	s.media[id] = held
+	return held, nil
 }
 
 func (s *site) ReadVariation(_ context.Context, _ edit.Target, id int64) (string, error) {
@@ -350,6 +374,53 @@ func TestAVariationsDescriptionIsWrittenUnderTheValueRead(t *testing.T) {
 	})
 	if err != nil || len(results) != 1 || results[0].Outcome != edit.OutcomeWritten || slices.Contains(already.calls, "write variation 5") {
 		t.Errorf("a variation already holding our value = %+v, %v with calls %v, want it taken as written and not sent again", results, err, already.calls)
+	}
+}
+
+func TestAnImagesAltAndTitleAreWrittenOnlyWhereItIsAttached(t *testing.T) {
+	t.Parallel()
+
+	alt, title := field.Instance(field.ImageAlt, "41"), field.Instance(field.ImageTitle, "41")
+	s := newSite()
+	results, err := serviceOver(s).Write(t.Context(), product, []edit.Write{
+		{Key: title, Value: new("Vial of powder"), Expected: hashOf("vial")},
+		{Key: alt, Value: new("A vial of powder")},
+	})
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if !slices.Equal(s.calls, []string{"read media 41", "write media 41"}) {
+		t.Errorf("calls = %v, want the image read once and written once with both", s.calls)
+	}
+	for _, result := range results {
+		if result.Outcome != edit.OutcomeWritten || result.Hash == nil {
+			t.Errorf("%s: %+v, want written", result.Key, result)
+		}
+	}
+	if held := s.media[41]; held.Alt != "A vial of powder" || held.Title != "Vial of powder" {
+		t.Errorf("the image holds %+v", held)
+	}
+
+	shared := newSite()
+	_, err = serviceOver(shared).Write(t.Context(), product, []edit.Write{{Key: field.Instance(field.ImageAlt, "42"), Value: new("Ours"), Expected: hashOf("Shared")}})
+	if reason := reasonOf(t, err); reason != edit.ReasonNotAttached {
+		t.Errorf("an image attached elsewhere: reason %q, want %s", reason, edit.ReasonNotAttached)
+	}
+	if slices.Contains(shared.calls, "write media 42") || shared.media[42].Alt != "Shared" {
+		t.Errorf("an image another page may show was renamed for this one: %v %+v", shared.calls, shared.media[42])
+	}
+
+	moved := newSite()
+	moved.media[41] = edit.Media{Alt: "His alt", Title: "vial", Parent: 9}
+	results, err = serviceOver(moved).Write(t.Context(), product, []edit.Write{
+		{Key: alt, Value: new("Ours")}, {Key: title, Value: new("Ours"), Expected: hashOf("vial")},
+	})
+	if err != nil || slices.Contains(moved.calls, "write media 41") || results[0].Outcome == edit.OutcomeWritten && results[1].Outcome == edit.OutcomeWritten {
+		t.Errorf("an alt the client wrote = %+v, %v with calls %v, want nothing written", results, err, moved.calls)
+	}
+
+	if _, err = serviceOver(newSite()).Write(t.Context(), product, []edit.Write{{Key: field.Instance(field.ImageAlt, "image"), Value: new("x")}}); reasonOf(t, err) != field.ReasonUnknown {
+		t.Errorf("an image named by no id = %v, want refused", err)
 	}
 }
 

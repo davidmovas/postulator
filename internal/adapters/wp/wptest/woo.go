@@ -299,10 +299,11 @@ func optionsField(object map[string]any) []string {
 func (s *Server) imagePayload(ids []int64) []map[string]any {
 	payload := make([]map[string]any, 0, len(ids))
 	for _, id := range ids {
-		image := map[string]any{"id": id, "src": "", "alt": ""}
+		image := map[string]any{"id": id, "src": "", "alt": "", "name": ""}
 		if stored, ok := s.uploads[id]; ok {
 			image["src"] = s.http.URL + "/wp-content/uploads/" + stored.Filename
 			image["alt"] = stored.Alt
+			image["name"] = stored.Title
 		}
 		payload = append(payload, image)
 	}

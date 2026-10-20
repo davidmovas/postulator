@@ -100,6 +100,13 @@ func (a *absorber) productFields(ctx context.Context, page pagemap.Page, product
 		field.NewValue(page.ID, field.ManageStock, product.ManageStock, a.now),
 		field.NewValue(page.ID, field.Attributes, string(product.Attributes), a.now),
 	}
+	for _, image := range product.Images {
+		instance := strconv.FormatInt(image.ID, 10)
+		values = append(values,
+			field.NewValue(page.ID, field.Instance(field.ImageAlt, instance), image.Alt, a.now),
+			field.NewValue(page.ID, field.Instance(field.ImageTitle, instance), image.Title, a.now),
+		)
+	}
 	for i := range variations {
 		variation := variations[i]
 		instance := strconv.FormatInt(variation.ID, 10)

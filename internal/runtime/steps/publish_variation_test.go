@@ -3,6 +3,7 @@ package steps_test
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -87,7 +88,7 @@ func TestAVariationsDescriptionIsWrittenAloneAndPutBack(t *testing.T) {
 	if writes != 2 {
 		t.Errorf("the run sent %d variation writes, want one per variation", writes)
 	}
-	want := []steps.VariationWrite{
+	want := []steps.FieldWrite{
 		{Key: variationKey(p.small), Before: "<p>Old small.</p>", Written: "<p>A small machine.</p>"},
 		{Key: variationKey(p.large), Before: "", Written: "<p>A large machine.</p>"},
 	}
@@ -169,6 +170,55 @@ func TestADescriptionTheClientEditsDuringTheStoresSaveIsNotWrittenOver(t *testin
 				t.Errorf("the owner's edit became %q: a save that cannot change the description does not make his edit our base", stored.Content)
 			}
 		})
+	}
+}
+
+func TestAProductImagesAltAndTitleAreWrittenWhereAttachedAndPutBack(t *testing.T) {
+	t.Parallel()
+
+	h := newProductHarness(t, storeProduct())
+	h.deps.Types = imageTypes{}
+	attached := h.server.SeedUpload(wptest.Upload{Filename: "machine.jpg", MimeType: "image/jpeg", Title: "machine", Parent: h.held.ID})
+	shared := h.server.SeedUpload(wptest.Upload{Filename: "logo.jpg", MimeType: "image/jpeg", Title: "logo", Alt: "Shop logo"})
+	sc := storeContext(t, h.held.ID)
+	altOf := func(upload wptest.Upload) string {
+		return string(field.Instance(field.ImageAlt, strconv.FormatInt(upload.ID, 10)))
+	}
+	withFields(t, sc,
+		steps.FieldValue{Key: altOf(attached), Value: "An espresso machine on a counter"},
+		steps.FieldValue{Key: altOf(shared), Value: "An espresso machine"},
+	)
+	published := runPublish(t, h.deps, sc)
+
+	uploads := map[int64]wptest.Upload{}
+	for _, upload := range h.server.Uploads() {
+		uploads[upload.ID] = upload
+	}
+	if uploads[attached.ID].Alt != "An espresso machine on a counter" || uploads[attached.ID].Title != "machine" {
+		t.Errorf("the attached image holds %+v, want its alt text written and its title left", uploads[attached.ID])
+	}
+	if uploads[shared.ID].Alt != "Shop logo" {
+		t.Errorf("an image attached to no page became %q: another page may show it", uploads[shared.ID].Alt)
+	}
+	if !slices.ContainsFunc(published.Skipped, func(skip string) bool { return strings.Contains(skip, altOf(shared)) }) {
+		t.Errorf("skipped = %v, want the shared image named", published.Skipped)
+	}
+	if got := published.PreviousMedia; len(got) != 1 || got[0] != (steps.FieldWrite{Key: field.Key(altOf(attached)), Before: "", Written: "An espresso machine on a counter"}) {
+		t.Errorf("the publish kept %+v", got)
+	}
+
+	page := *h.recorded
+	source := newSourceRecord()
+	source.record(t, page.ID, map[run.ArtifactKind]any{run.ArtifactPublishResult: published})
+	h.deps.Pages, h.deps.Links, h.deps.Items, h.deps.Artifacts = newPageMap(page), &linkRecorder{}, source, source
+	reverted, result := runRevert(t, h.deps, "page-child")
+	if result.Next == run.TransitionPause || reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("the revert answered %+v / %s", reverted, result.Message)
+	}
+	for _, upload := range h.server.Uploads() {
+		if upload.ID == attached.ID && upload.Alt != "" {
+			t.Errorf("after the revert the image's alt is %q, want it empty again", upload.Alt)
+		}
 	}
 }
 

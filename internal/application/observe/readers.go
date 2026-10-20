@@ -143,8 +143,15 @@ type Product struct {
 	Attributes       json.RawMessage
 	Categories       []pagemap.Term
 	VariationIDs     []int64
+	Images           []ProductImage
 	StockQuantity    *int64
 	ID               int64
+}
+
+type ProductImage struct {
+	Alt   string
+	Title string
+	ID    int64
 }
 
 type ProductPage struct {

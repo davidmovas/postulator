@@ -32,7 +32,7 @@ const (
 	FieldShortDescription = "shortDescription"
 )
 
-type VariationWrite struct {
+type FieldWrite struct {
 	Key     field.Key `json:"key"`
 	Before  string    `json:"before"`
 	Written string    `json:"written"`
@@ -129,6 +129,8 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *
 		return writeStoreFields(ctx, deps, sc, client, state)
 	case field.Key(unit).Kind() == field.VariationDescription:
 		return writeVariation(ctx, deps, sc, client, state, field.Key(unit))
+	case strings.HasPrefix(unit, unitMedia):
+		return writeImage(ctx, sc, client, state, unit)
 	case unit == unitRaw:
 		return writeRawBody(ctx, deps, sc, client, wp.TypeProduct, state)
 	case unit == unitSEO:
@@ -174,6 +176,106 @@ func planVariations(ctx context.Context, deps Deps, sc *run.StepContext, client 
 	return slices.DeleteFunc(wanted, func(planned variationPlan) bool { return kept[planned.Key] }), nil
 }
 
+func planImages(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, productID int64) (planned []mediaPlan,
+	skipped []string, err error) {
+	answered, _, err := decodeArtifact[Fields](sc, run.ArtifactFields)
+	if err != nil {
+		return nil, nil, err
+	}
+	asked := make(map[int64][]FieldValue)
+	ids := make([]int64, 0)
+	for _, value := range answered.Values {
+		id, named := edit.MediaID(field.Key(value.Key))
+		if !named {
+			continue
+		}
+		if _, listed := asked[id]; !listed {
+			ids = append(ids, id)
+		}
+		asked[id] = append(asked[id], value)
+	}
+	slices.Sort(ids)
+	live := make(map[field.Key]string)
+	planned = make([]mediaPlan, 0, len(ids))
+	skipped = make([]string, 0)
+	for _, id := range ids {
+		held, readErr := client.GetMedia(ctx, id)
+		switch {
+		case errors.IsCode(readErr, errors.NotFound):
+			continue
+		case readErr != nil:
+			return nil, nil, readErr
+		}
+		if held.Parent != productID {
+			for _, value := range asked[id] {
+				skipped = append(skipped, value.Key+": the image is not attached to this product, so another page may show it")
+			}
+			continue
+		}
+		image := mediaPlan{ID: id, Writes: make([]variationPlan, 0, 2)}
+		for _, value := range asked[id] {
+			key := field.Key(value.Key)
+			before := held.Alt
+			if key.Kind() == field.ImageTitle {
+				before = held.Title
+			}
+			live[key] = before
+			if before != value.Value {
+				image.Writes = append(image.Writes, variationPlan{Key: key, Before: before, Value: value.Value})
+			}
+		}
+		planned = append(planned, image)
+	}
+	keys := make([]field.Key, 0, len(live))
+	for key := range live {
+		keys = append(keys, key)
+	}
+	kept, err := deps.keptFieldsOf(ctx, sc, true, live, keys...)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range planned {
+		planned[i].Writes = slices.DeleteFunc(planned[i].Writes, func(write variationPlan) bool { return kept[write.Key] })
+	}
+	return slices.DeleteFunc(planned, func(image mediaPlan) bool { return len(image.Writes) == 0 }), skipped, nil
+}
+
+func (p *publishPlan) image(unit string) mediaPlan {
+	for i := range p.Media {
+		if p.Media[i].unit() == unit {
+			return p.Media[i]
+		}
+	}
+	return mediaPlan{}
+}
+
+func writeImage(ctx context.Context, sc *run.StepContext, client *wp.Client, state *publishState, unit string) (run.Result, error) {
+	plan := state.Plan
+	image := plan.image(unit)
+	writes := make([]edit.Write, 0, len(image.Writes))
+	for i := range image.Writes {
+		writes = append(writes, edit.Write{Key: image.Writes[i].Key, Value: &image.Writes[i].Value, Expected: expectedOf(image.Writes[i].Before)})
+	}
+	results, err := editorFor(client).Write(ctx, edit.Target{Type: string(wp.TypeProduct), ID: plan.WPID, Product: true}, writes)
+	if err != nil {
+		if refusedFor(err, edit.ReasonNotAttached) {
+			return state.stopped(needsHuman(sc.Page.Path + ": the image " + strconv.FormatInt(image.ID, 10) +
+				" was moved off the product after it was read, so its alt text and title were not written"))
+		}
+		return state.failed(err)
+	}
+	if moved := movedKeys(results); len(moved) > 0 {
+		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
+	}
+	for i := range image.Writes {
+		written, _ := writtenValue(results, image.Writes[i].Key)
+		state.Result.PreviousMedia = append(state.Result.PreviousMedia,
+			FieldWrite{Key: image.Writes[i].Key, Before: image.Writes[i].Before, Written: written})
+	}
+	state.wrote(unit)
+	return state.wait("wrote the alt text and title of the image " + strconv.FormatInt(image.ID, 10) + " of " + sc.Page.Path)
+}
+
 func (p *publishPlan) variation(key field.Key) variationPlan {
 	for i := range p.Variations {
 		if p.Variations[i].Key == key {
@@ -201,7 +303,7 @@ func writeVariation(ctx context.Context, deps Deps, sc *run.StepContext, client 
 	}
 	written, _ := writtenValue(results, key)
 	state.Result.PreviousVariations = append(state.Result.PreviousVariations,
-		VariationWrite{Key: key, Before: planned.Before, Written: written})
+		FieldWrite{Key: key, Before: planned.Before, Written: written})
 	state.wrote(string(key))
 	return afterTheSave(ctx, sc, client, state, "wrote the description of the variation "+key.Instance()+" of "+sc.Page.Path)
 }
@@ -280,12 +382,16 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	if err != nil {
 		return nil, err
 	}
+	images, unattached, err := planImages(ctx, deps, sc, client, held.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	saved := productAnswerOf(held)
 	plan := &publishPlan{
 		Writes: make([]string, 0, 4), Kept: kept.keys(), SEO: seo, Final: description, Theirs: theirs, Part: part,
 		Previous: previous, SiteHash: raw.ContentHash, WPID: held.ID, Plugin: true, Product: true,
-		Store: storePlanOf(update, snapshot, &saved), Unstable: !raw.SaveStable, Variations: variations,
+		Store: storePlanOf(update, snapshot, &saved), Unstable: !raw.SaveStable, Variations: variations, Media: images,
 	}
 	plan.Writes = append(plan.Writes, unitCheck)
 	if hasFields(update) && !plan.Unstable {
@@ -296,6 +402,9 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 			plan.Writes = append(plan.Writes, string(variations[i].Key))
 		}
 	}
+	for i := range images {
+		plan.Writes = append(plan.Writes, images[i].unit())
+	}
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
 	}
@@ -305,7 +414,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	state.Plan = plan
 	state.Result = PublishResult{
 		WPID: held.ID, URL: permalinkOf(wp.Item{Link: held.Permalink}), Status: held.Status, PreviousProduct: &snapshot,
-		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findingsOfProduct(sc.Page, held),
+		SEOApplied: make([]string, 0), Skipped: unattached, Findings: findingsOfProduct(sc.Page, held),
 		Mismatches: make([]pagemap.Mismatch, 0),
 	}
 	if !seo.Send {
@@ -362,6 +471,21 @@ func checkTheProduct(ctx context.Context, sc *run.StepContext, client *wp.Client
 		}
 		if held.Description != planned.Before {
 			moved = append(moved, string(planned.Key))
+		}
+	}
+	for _, image := range plan.Media {
+		held, err := client.GetMedia(ctx, image.ID)
+		if err != nil {
+			return state.failed(err)
+		}
+		for _, write := range image.Writes {
+			current := held.Alt
+			if write.Key.Kind() == field.ImageTitle {
+				current = held.Title
+			}
+			if current != write.Before || held.Parent != plan.WPID {
+				moved = append(moved, string(write.Key))
+			}
 		}
 	}
 	if slices.Contains(plan.Writes, unitSEO) && plan.SEO.Previous != nil {
@@ -452,7 +576,7 @@ func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 			recorded[field.ProductShortDescription] = stored.ShortDescription
 		}
 	}
-	for _, written := range state.Result.PreviousVariations {
+	for _, written := range append(slices.Clone(state.Result.PreviousVariations), state.Result.PreviousMedia...) {
 		recorded[written.Key] = written.Written
 	}
 	for key, value := range recorded {

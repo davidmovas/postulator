@@ -30,7 +30,7 @@ type seoWrite struct {
 
 func (r *PublishResult) took(seo seoWrite) {
 	r.SEOApplied = seo.applied
-	r.Skipped = seo.skipped
+	r.Skipped = append(r.Skipped, seo.skipped...)
 	r.PreviousMeta = seo.previous
 	r.Findings = append(r.Findings, seo.findings...)
 }

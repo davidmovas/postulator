@@ -31,9 +31,10 @@ type ProductAttribute struct {
 }
 
 type ProductImage struct {
-	Src string
-	Alt string
-	ID  int64
+	Src  string
+	Alt  string
+	Name string
+	ID   int64
 }
 
 type ProductCategory struct {
@@ -122,9 +123,10 @@ type productAttributePayload struct {
 }
 
 type productImagePayload struct {
-	Src string `json:"src"`
-	Alt string `json:"alt"`
-	ID  int64  `json:"id"`
+	Src  string `json:"src"`
+	Alt  string `json:"alt"`
+	Name string `json:"name"`
+	ID   int64  `json:"id"`
 }
 
 type productPayload struct {

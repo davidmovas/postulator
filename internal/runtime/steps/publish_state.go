@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -111,9 +112,21 @@ type variationPlan struct {
 	Value  string    `json:"value"`
 }
 
+type mediaPlan struct {
+	Writes []variationPlan `json:"writes"`
+	ID     int64           `json:"id"`
+}
+
+const unitMedia = "media:"
+
+func (m mediaPlan) unit() string {
+	return unitMedia + strconv.FormatInt(m.ID, 10)
+}
+
 type publishPlan struct {
 	Store        *storePlan      `json:"store,omitempty"`
 	Variations   []variationPlan `json:"variations,omitempty"`
+	Media        []mediaPlan     `json:"media,omitempty"`
 	Item         *itemAnswer     `json:"item,omitempty"`
 	Writes       []string        `json:"writes"`
 	Kept         []field.Key     `json:"kept"`

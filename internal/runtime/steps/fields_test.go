@@ -191,6 +191,50 @@ func (variationTypes) Set(_ context.Context, siteID string) (pagetype.Set, error
 	return pagetype.NewSet([]pagetype.Type{kind}, append(pagetype.DefaultScopes(pagetype.Product, kind.ID), scope)), nil
 }
 
+type imageTypes struct{}
+
+func (imageTypes) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	kind := pagetype.Type{ID: "type-product", SiteID: siteID, Name: "Product", Preset: pagetype.Product}
+	scope := pagetype.DefaultScope(pagetype.Product, field.ImageAlt, kind.ID)
+	scope.Enabled, scope.MaxLength = true, 120
+	return pagetype.NewSet([]pagetype.Type{kind}, append(pagetype.DefaultScopes(pagetype.Product, kind.ID), scope)), nil
+}
+
+func TestAProductImagesAltTextIsAskedForTheImagesTheModelHolds(t *testing.T) {
+	t.Parallel()
+
+	at := time.Unix(1, 0).UTC()
+	deps, _ := imageDeps(t)
+	deps.Types = imageTypes{}
+	deps.Fields = &fieldLog{values: []field.Value{
+		field.NewValue("page-child", field.Instance(field.ImageAlt, "42"), "His own alt text", at),
+		field.NewValue("page-child", field.Instance(field.ImageAlt, "41"), "", at),
+		field.NewValue("page-child", field.Instance(field.ImageTitle, "41"), "vial", at),
+	}}
+	recorder := &callRecorder{reply: `{"fields":[{"key":"image_alt:41","value":"A vial of the powder & its dropper"}]}`}
+	deps.LLM = recorder
+	sc := unitContext(t, nil)
+	wpID := int64(77)
+	sc.Page.WPType, sc.Page.WPID = pagemap.WPProduct, &wpID
+
+	result, err := steps.GenerateFields(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("GenerateFields: %v", err)
+	}
+	if len(recorder.prompts) != 1 || !strings.Contains(recorder.prompts[0], "Image alt text, image 41 (key image_alt:41)") {
+		t.Fatalf("the prompts = %q, want the image's alt text asked by its id", recorder.prompts)
+	}
+	for _, gone := range []string{"image_alt:42", "image_title:41"} {
+		if strings.Contains(recorder.prompts[0], gone) {
+			t.Errorf("the prompt asks %s: the client's own alt text, or a title no scope enables:\n%s", gone, recorder.prompts[0])
+		}
+	}
+	fields := fieldsOf(t, result)
+	if got, _ := fields.Value(field.Instance(field.ImageAlt, "41")); got != "A vial of the powder & its dropper" {
+		t.Errorf("image 41's alt = %q, want the plain text as it is, an attribute's text and no paragraph", got)
+	}
+}
+
 type callRecorder struct {
 	reply    string
 	prompts  []string

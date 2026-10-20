@@ -86,6 +86,7 @@ type upload struct {
 	Title    string
 	Bytes    []byte
 	ID       int64
+	Parent   int64
 }
 
 func contentHash(raw string) string {

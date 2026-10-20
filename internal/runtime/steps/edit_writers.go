@@ -55,6 +55,22 @@ func (w editWriters) WriteCore(ctx context.Context, target edit.Target, values m
 	return coreValues(item), nil
 }
 
+func (w editWriters) ReadMedia(ctx context.Context, id int64) (edit.Media, error) {
+	held, err := w.client.GetMedia(ctx, id)
+	if err != nil {
+		return edit.Media{}, err
+	}
+	return edit.Media{Alt: held.Alt, Title: held.Title, Parent: held.Parent}, nil
+}
+
+func (w editWriters) WriteMedia(ctx context.Context, id int64, alt, title *string) (edit.Media, error) {
+	written, err := w.client.UpdateMedia(ctx, id, wp.UpdateMedia{Alt: alt, Title: title})
+	if err != nil {
+		return edit.Media{}, err
+	}
+	return edit.Media{Alt: written.Alt, Title: written.Title, Parent: written.Parent}, nil
+}
+
 func coreValues(item wp.Item) map[field.Key]string {
 	featured := ""
 	if item.FeaturedMedia != 0 {
