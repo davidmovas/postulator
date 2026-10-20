@@ -55,14 +55,25 @@ type ProductSnapshot struct {
 	Written          []SnapshotAttribute `json:"written"`
 	Images           []int64             `json:"images"`
 	Added            []string            `json:"added"`
+	Lists            []FieldWrite        `json:"lists,omitempty"`
 	ImageID          int64               `json:"imageId"`
 	ShortWritten     bool                `json:"shortWritten"`
 	AttributesSent   bool                `json:"attributesSent"`
 }
 
+func listOf(product wp.Product, key field.Key) string {
+	if key == field.Upsells {
+		return field.IDList(product.UpsellIDs)
+	}
+	return field.IDList(product.CrossSellIDs)
+}
+
 func (s *ProductSnapshot) wrote(written wp.Product) {
 	if s.ShortWritten {
 		s.WrittenShort = written.ShortDescription
+	}
+	for i := range s.Lists {
+		s.Lists[i].Written = listOf(written, s.Lists[i].Key)
 	}
 	for _, name := range s.Added {
 		if at := attributeNamed(written.Attributes, name); at >= 0 {
@@ -361,11 +372,15 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		}
 		description, theirs, part, previous = guarded.final, guarded.theirs, guarded.part, guarded.previous
 	}
-	live := map[field.Key]string{field.ProductShortDescription: held.ShortDescription}
+	live := map[field.Key]string{
+		field.ProductShortDescription: held.ShortDescription,
+		field.Upsells:                 field.IDList(held.UpsellIDs), field.CrossSells: field.IDList(held.CrossSellIDs),
+	}
 	if seoErr := liveSnippet(ctx, client, wp.TypeProduct, held.ID, true, live); seoErr != nil {
 		return nil, seoErr
 	}
-	kept, err := deps.keptFieldsOf(ctx, sc, true, live, field.SEOTitle, field.SEODescription, field.ProductShortDescription)
+	kept, err := deps.keptFieldsOf(ctx, sc, true, live, field.SEOTitle, field.SEODescription, field.ProductShortDescription,
+		field.Upsells, field.CrossSells)
 	if err != nil {
 		return nil, err
 	}
@@ -377,6 +392,17 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		short = ""
 	}
 	update, snapshot := productUpdate(held, short, featured.FeaturedID)
+	lists := make([]variationPlan, 0, len(listFields))
+	for _, key := range listFields {
+		chosen, written, listErr := writtenField(sc, key)
+		if listErr != nil {
+			return nil, listErr
+		}
+		if written && !kept[key] && chosen != live[key] {
+			lists = append(lists, variationPlan{Key: key, Before: live[key], Value: chosen})
+			snapshot.Lists = append(snapshot.Lists, FieldWrite{Key: key, Before: live[key]})
+		}
+	}
 	seo, err := planSEO(ctx, client, sc, wp.TypeProduct, held.ID, true, kept, false)
 	if err != nil {
 		return nil, err
@@ -401,8 +427,9 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		Store: storePlanOf(update, snapshot, &saved), Unstable: !raw.SaveStable, Variations: variations, Media: images,
 		Custom: custom,
 	}
+	plan.Store.Lists = lists
 	plan.Writes = append(plan.Writes, unitCheck)
-	if hasFields(update) && !plan.Unstable {
+	if (hasFields(update) || len(lists) > 0) && !plan.Unstable {
 		plan.Writes = append(plan.Writes, unitStore)
 	}
 	for i := range variations {
@@ -450,6 +477,9 @@ func (p storePlan) writes() []edit.Write {
 	if p.ImagesSent && len(p.Images) > 0 {
 		writes = append(writes, edit.Write{Key: field.FeaturedImage, Value: new(strconv.FormatInt(p.Images[0], 10))})
 	}
+	for i := range p.Lists {
+		writes = append(writes, edit.Write{Key: p.Lists[i].Key, Value: &p.Lists[i].Value, Expected: expectedOf(p.Lists[i].Before)})
+	}
 	return writes
 }
 
@@ -466,6 +496,11 @@ func checkTheProduct(ctx context.Context, sc *run.StepContext, client *wp.Client
 		}
 		if plan.Store.ImagesSent && len(held.Images) > 0 {
 			moved = append(moved, string(field.FeaturedImage))
+		}
+		for _, planned := range plan.Store.Lists {
+			if listOf(held, planned.Key) != planned.Before {
+				moved = append(moved, string(planned.Key))
+			}
 		}
 	}
 	for i := range plan.Variations {
@@ -590,7 +625,11 @@ func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 			recorded[field.ProductShortDescription] = stored.ShortDescription
 		}
 	}
-	for _, written := range slices.Concat(state.Result.PreviousVariations, state.Result.PreviousMedia, state.Result.PreviousFields) {
+	lists := []FieldWrite{}
+	if state.Result.PreviousProduct != nil {
+		lists = state.Result.PreviousProduct.Lists
+	}
+	for _, written := range slices.Concat(state.Result.PreviousVariations, state.Result.PreviousMedia, state.Result.PreviousFields, lists) {
 		recorded[written.Key] = written.Written
 	}
 	for key, value := range recorded {
@@ -640,7 +679,7 @@ func productUpdate(held wp.Product, short string, featured int64) (wp.UpdateProd
 }
 
 func hasFields(update wp.UpdateProduct) bool {
-	return update.ShortDescription != nil || update.Images != nil
+	return update.ShortDescription != nil || update.Images != nil || update.UpsellIDs != nil || update.CrossSellIDs != nil
 }
 
 func nameDiffers(page pagemap.Page, held wp.Product) *content.Finding {

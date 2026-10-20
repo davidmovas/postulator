@@ -1,12 +1,17 @@
 package steps_test
 
 import (
+	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -96,6 +101,92 @@ func TestAProductsCustomFieldIsWrittenThroughTheStoreAndPutBack(t *testing.T) {
 	if back, _ := h.server.Lookup(h.held.ID); metaDataOf(back, "dosage_note") != "" {
 		t.Errorf("after the revert the custom field holds %q, want what it held before", metaDataOf(back, "dosage_note"))
 	}
+}
+
+func TestAProductsUpsellsAreWrittenAsIDsAndPutBack(t *testing.T) {
+	t.Parallel()
+
+	item := storeProduct()
+	item.CrossSells = []int64{77}
+	h := newProductHarness(t, item)
+	sc := storeContext(t, h.held.ID)
+	withFields(t, sc,
+		steps.FieldValue{Key: string(field.Upsells), Value: "31,30"},
+		steps.FieldValue{Key: string(field.CrossSells), Value: "30"},
+	)
+	h.deps.Types = listTypes{}
+	published := runPublish(t, h.deps, sc)
+
+	stored, _ := h.server.Lookup(h.held.ID)
+	if !slices.Equal(stored.Upsells, []int64{31, 30}) {
+		t.Errorf("upsells = %v, want the ids the run chose, in their order", stored.Upsells)
+	}
+	if !slices.Equal(stored.CrossSells, []int64{30}) {
+		t.Errorf("cross-sells = %v, want ours: the run rewrites", stored.CrossSells)
+	}
+	if snapshot := published.PreviousProduct; snapshot == nil || len(snapshot.Lists) != 2 {
+		t.Fatalf("the snapshot keeps %+v, want both lists before and after", published.PreviousProduct)
+	}
+
+	page := *h.recorded
+	source := newSourceRecord()
+	source.record(t, page.ID, map[run.ArtifactKind]any{run.ArtifactPublishResult: published})
+	h.deps.Pages, h.deps.Links, h.deps.Items, h.deps.Artifacts = newPageMap(page), &linkRecorder{}, source, source
+	reverted, result := runRevert(t, h.deps, "page-child")
+	if result.Next == run.TransitionPause || reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("the revert answered %+v / %s", reverted, result.Message)
+	}
+	back, _ := h.server.Lookup(h.held.ID)
+	if len(back.Upsells) != 0 || !slices.Equal(back.CrossSells, []int64{77}) {
+		t.Errorf("after the revert = %v / %v, want what the product listed before", back.Upsells, back.CrossSells)
+	}
+}
+
+func TestTheClientsOwnListIsKeptWithoutRewrites(t *testing.T) {
+	t.Parallel()
+
+	item := storeProduct()
+	item.CrossSells = []int64{77}
+	h := newProductHarness(t, item)
+	h.deps.Types = listTypes{}
+	sc := storeContext(t, h.held.ID)
+	delete(sc.Params, run.ParamRewrite)
+	var draft content.ContentDraft
+	if err := json.Unmarshal(sc.Artifacts[run.ArtifactDraft].Blob, &draft); err != nil {
+		t.Fatalf("decode the draft: %v", err)
+	}
+	draft.Kept = &content.KeptBody{Raw: "<p>old description</p>", Hash: block.BodyHash("<p>old description</p>"), Written: []string{}}
+	blob, err := json.Marshal(draft)
+	if err != nil {
+		t.Fatalf("encode the draft: %v", err)
+	}
+	sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: blob}
+	withFields(t, sc,
+		steps.FieldValue{Key: string(field.Upsells), Value: "31"},
+		steps.FieldValue{Key: string(field.CrossSells), Value: "30"},
+	)
+	runPublish(t, h.deps, sc)
+
+	stored, _ := h.server.Lookup(h.held.ID)
+	if !slices.Equal(stored.CrossSells, []int64{77}) {
+		t.Errorf("cross-sells = %v, want the client's own list kept: the scope does not rewrite it", stored.CrossSells)
+	}
+	if !slices.Equal(stored.Upsells, []int64{31}) {
+		t.Errorf("upsells = %v, want an empty list filled", stored.Upsells)
+	}
+}
+
+type listTypes struct{}
+
+func (listTypes) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	kind := pagetype.Type{ID: "type-product", SiteID: siteID, Name: "Product", Preset: pagetype.Product}
+	scopes := pagetype.DefaultScopes(pagetype.Product, kind.ID)
+	for _, key := range []field.Key{field.Upsells, field.CrossSells} {
+		scope := pagetype.DefaultScope(pagetype.Product, key, kind.ID)
+		scope.Enabled = true
+		scopes = append(scopes, scope)
+	}
+	return pagetype.NewSet([]pagetype.Type{kind}, scopes), nil
 }
 
 func metaDataOf(item wptest.Item, key string) string {

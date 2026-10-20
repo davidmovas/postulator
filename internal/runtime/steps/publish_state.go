@@ -103,6 +103,7 @@ type storePlan struct {
 	Images           []int64         `json:"images,omitempty"`
 	Snapshot         ProductSnapshot `json:"snapshot"`
 	Saved            *productAnswer  `json:"saved,omitempty"`
+	Lists            []variationPlan `json:"lists,omitempty"`
 	ImagesSent       bool            `json:"imagesSent"`
 }
 

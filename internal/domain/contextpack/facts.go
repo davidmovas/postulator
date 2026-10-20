@@ -94,6 +94,7 @@ type Facts struct {
 	Children     []Ref                   `json:"children"`
 	Siblings     []Ref                   `json:"siblings"`
 	Products     []Product               `json:"products"`
+	Candidates   []Candidate             `json:"candidates,omitempty"`
 	ListedFrom   string                  `json:"listedFrom"`
 	Twin         *Ref                    `json:"twin"`
 	Terms        []pagemap.Term          `json:"terms"`
@@ -142,6 +143,7 @@ func (s Snapshot) Facts(pageID string, plan content.LinkContext) (Facts, error) 
 	}
 	products, from := s.products(page)
 	facts.Products, facts.ListedFrom = s.productFacts(s.ranked(page, products)), from
+	facts.Candidates = s.candidates(page)
 	if twin, paired := s.twin(page); paired {
 		ref := s.ref(twin, false)
 		facts.Twin = &ref

@@ -127,6 +127,7 @@ func (r storeReader) ListProducts(ctx context.Context, query observe.ProductQuer
 			RegularPrice: product.RegularPrice, SalePrice: product.SalePrice, SKU: product.SKU, StockStatus: product.StockStatus,
 			StockQuantity: product.StockQuantity, ManageStock: string(product.ManageStock), Attributes: encoded,
 			Categories: categories, VariationIDs: product.VariationIDs, Images: images, Modified: product.Modified,
+			UpsellIDs: product.UpsellIDs, CrossSellIDs: product.CrossSellIDs,
 		})
 	}
 	return out, nil

@@ -113,6 +113,16 @@ func (w editWriters) WriteStore(ctx context.Context, target edit.Target, values 
 					WithDetail("value", value)
 			}
 			in.Images = &[]int64{image}
+		case field.Upsells, field.CrossSells:
+			ids, valid := field.ParseIDList(value)
+			if !valid {
+				return nil, errors.New(errors.Invalid, "upsells and cross-sells are product ids").WithDetail("value", value)
+			}
+			if key == field.Upsells {
+				in.UpsellIDs = &ids
+			} else {
+				in.CrossSellIDs = &ids
+			}
 		default:
 			if key.Kind() != field.Meta {
 				return nil, errors.New(errors.Invalid, "the store writer takes no such field").WithDetail("key", string(key))
@@ -151,7 +161,10 @@ func storeValues(product wp.Product) map[field.Key]string {
 	if len(product.Images) > 0 {
 		first = strconv.FormatInt(product.Images[0].ID, 10)
 	}
-	values := map[field.Key]string{field.ProductShortDescription: product.ShortDescription, field.FeaturedImage: first}
+	values := map[field.Key]string{
+		field.ProductShortDescription: product.ShortDescription, field.FeaturedImage: first,
+		field.Upsells: field.IDList(product.UpsellIDs), field.CrossSells: field.IDList(product.CrossSellIDs),
+	}
 	for _, entry := range product.MetaData {
 		values[field.Instance(field.Meta, entry.Key)] = metaText(entry.Value)
 	}

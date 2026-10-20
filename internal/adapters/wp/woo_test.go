@@ -234,6 +234,39 @@ func TestUpdateProductWritesACustomFieldByKeyAndRefusesTheStoresOwn(t *testing.T
 	}
 }
 
+func TestUpdateProductWritesTheUpsellsAndCrossSellsAsIDs(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := seedProduct(server)
+	others := server.Seed(
+		wptest.Item{Type: wptest.TypeProduct, Title: "Grinder", Status: "publish"},
+		wptest.Item{Type: wptest.TypeProduct, Title: "Scale", Status: "publish"},
+	)
+	client := newClient(t, server)
+
+	upsells, crossSells := []int64{others[1].ID, others[0].ID}, []int64{others[0].ID}
+	product, err := client.UpdateProduct(t.Context(), seeded.ID, wp.UpdateProduct{UpsellIDs: &upsells, CrossSellIDs: &crossSells})
+	if err != nil {
+		t.Fatalf("UpdateProduct: %v", err)
+	}
+	if !slices.Equal(product.UpsellIDs, upsells) || !slices.Equal(product.CrossSellIDs, crossSells) {
+		t.Errorf("product = %v / %v, want the lists as sent, in their order", product.UpsellIDs, product.CrossSellIDs)
+	}
+	recorded, _ := server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	if _, sent := body["upsell_ids"]; !sent || len(body) != 2 {
+		t.Errorf("the update sent %v, want the two lists alone", body)
+	}
+	read, err := client.GetProduct(t.Context(), seeded.ID)
+	if err != nil || !slices.Equal(read.UpsellIDs, upsells) || !slices.Equal(read.CrossSellIDs, crossSells) {
+		t.Errorf("read back = %v / %v (%v)", read.UpsellIDs, read.CrossSellIDs, err)
+	}
+}
+
 func TestUpdateProductRefusesAnEmptyUpdate(t *testing.T) {
 	t.Parallel()
 

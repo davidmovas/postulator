@@ -58,6 +58,8 @@ type Item struct {
 	Terms          []Term
 	Crumbs         []Crumb
 	Images         []int64
+	Upsells        []int64
+	CrossSells     []int64
 	ID             int64
 	Parent         int64
 	MenuOrder      int

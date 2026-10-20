@@ -104,7 +104,8 @@ func newScenario(t *testing.T) *scenario {
 			StockStatus: "instock", ManageStock: "false", Attributes: json.RawMessage(`[{"name":"Strength","options":["5 mg","10 mg"]}]`),
 			Categories:   []pagemap.Term{{Taxonomy: "product_cat", TermID: healingTermID, Name: "Healing Peptides", Slug: "healing-peptides"}},
 			VariationIDs: []int64{variationAID, variationBID}, Modified: earlier,
-			Images: []observe.ProductImage{{ID: 41, Alt: "A vial of BPC-157", Title: "bpc-vial"}},
+			Images:    []observe.ProductImage{{ID: 41, Alt: "A vial of BPC-157", Title: "bpc-vial"}},
+			UpsellIDs: []int64{902, 901}, CrossSellIDs: []int64{},
 		}},
 		variations: map[int64][]observe.Variation{productID: {
 			{ID: variationAID, ParentID: productID, Description: "Five milligrams.", SKU: "BPC157-5MG", Price: "39", StockStatus: "instock", ManageStock: "parent", Attributes: json.RawMessage(`[{"name":"Strength","option":"5 mg"}]`), Modified: earlier},
@@ -627,6 +628,8 @@ func TestProductsFillFieldsAndFactsAndVariationsStayUnderTheirProduct(t *testing
 		field.Instance(field.VariationDescription, "11"): "Five milligrams.",
 		field.Instance(field.ImageAlt, "41"):             "A vial of BPC-157",
 		field.Instance(field.ImageTitle, "41"):           "bpc-vial",
+		field.Upsells:                                    "902,901",
+		field.CrossSells:                                 "",
 	}
 	for key, value := range want {
 		if got := s.fieldOf(t, product.ID, key); got.Current != value || got.Base != value {

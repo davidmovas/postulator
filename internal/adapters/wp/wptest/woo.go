@@ -163,6 +163,12 @@ func (s *Server) handleProductUpdate(w http.ResponseWriter, r *http.Request) {
 	if _, present := body["images"]; present {
 		stored.Images = objectIDList(body, "images")
 	}
+	if _, present := body["upsell_ids"]; present {
+		stored.Upsells = numberList(body, "upsell_ids")
+	}
+	if _, present := body["cross_sell_ids"]; present {
+		stored.CrossSells = numberList(body, "cross_sell_ids")
+	}
 	if entries, present := body["meta_data"].([]any); present {
 		for _, raw := range entries {
 			entry, isObject := raw.(map[string]any)
@@ -197,6 +203,8 @@ func (s *Server) productPayload(stored *Item, edit bool) map[string]any {
 		"stock_quantity":    stored.StockQuantity,
 		"meta_data":         metaDataPayload(stored.MetaData),
 		"variations":        s.variationIDs(stored.ID),
+		"upsell_ids":        append([]int64{}, stored.Upsells...),
+		"cross_sell_ids":    append([]int64{}, stored.CrossSells...),
 		"sku":               stored.SKU,
 		"menu_order":        stored.MenuOrder,
 		"date_modified_gmt": stored.Modified.UTC().Format(wpTimeLayout),
@@ -357,6 +365,20 @@ func (s *Server) countProducts(categoryID int64) int {
 		}
 	}
 	return count
+}
+
+func numberList(body map[string]any, key string) []int64 {
+	raw, ok := body[key].([]any)
+	if !ok {
+		return []int64{}
+	}
+	ids := make([]int64, 0, len(raw))
+	for _, entry := range raw {
+		if number, valid := entry.(float64); valid {
+			ids = append(ids, int64(number))
+		}
+	}
+	return ids
 }
 
 func objectIDList(body map[string]any, key string) []int64 {

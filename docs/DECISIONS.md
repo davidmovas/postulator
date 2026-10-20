@@ -3814,3 +3814,19 @@ on what stage 2 left open and what was decided while building.
   provider, the field rows are recorded, and the revert puts each back under the hash of what the
   run wrote (a key that held nothing is deleted), naming any the client changed since
   (`revert_custom_kept`) and putting back the rest of the page.
+- **Upsells and cross-sells are product ids from the read layer's candidates** (B.6). A list is
+  held in one plain form everywhere, its ids comma-joined in the store's order and empty for none
+  (`field.IDList`, `field.ParseIDList`), so the kept rule of every field applies to it as written:
+  a list the client made is kept unless the scope or the run rewrites, an empty one is filled. The
+  observation records `upsells` and `cross_sells` from the store's `upsell_ids` and
+  `cross_sell_ids`. `contextpack` offers a product's candidates in its facts (`Candidate`: the
+  WordPress id, the name and the path): the published products under the same parent first, then
+  the products of the entities the graph relates to it, each group ranked as the read layer ranks
+  pages, at most twenty, never a draft, a page or the product itself. `generate_fields` asks a
+  product's lists, both off on every preset, only when it has candidates (else a skip with its
+  reason), lists the candidates in the field's rules, and keeps from the answer only the
+  candidates' ids in the order named; an answer naming none is a skip, not an error. The lists go
+  in the store unit's one request (`wp.UpdateProduct` with `upsell_ids` and `cross_sell_ids`), are
+  re-read in the check, recorded in the product snapshot's `lists` with what the store answered,
+  and put back by the revert while they still hold what the run wrote; `hasFields` now counts them,
+  so a revert of a list alone is sent.

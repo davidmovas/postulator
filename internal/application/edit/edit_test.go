@@ -454,6 +454,24 @@ func TestACustomFieldIsWrittenByTheProviderItsScopeNames(t *testing.T) {
 	}
 }
 
+func TestAProductsUpsellsAreWrittenThroughTheStoreAndAPagesAreRefused(t *testing.T) {
+	t.Parallel()
+
+	for _, key := range []field.Key{field.Upsells, field.CrossSells} {
+		s := newSite()
+		results, err := serviceOver(s).Write(t.Context(), product, []edit.Write{{Key: key, Value: new("21,30")}})
+		if err != nil || len(results) != 1 || results[0].Outcome != edit.OutcomeWritten {
+			t.Errorf("%s on a product = %+v, %v", key, results, err)
+		}
+		if !slices.Equal(s.calls, []string{"read store", "write store"}) || s.store[key] != "21,30" {
+			t.Errorf("%s: calls %v, store %v, want it written through the store", key, s.calls, s.store)
+		}
+		if _, err = serviceOver(newSite()).Write(t.Context(), page, []edit.Write{{Key: key, Value: new("21")}}); reasonOf(t, err) != edit.ReasonNoWriter {
+			t.Errorf("%s on a page = %v, want refused", key, err)
+		}
+	}
+}
+
 func TestAVariationIsWrittenOnAProductOnly(t *testing.T) {
 	t.Parallel()
 

@@ -99,6 +99,8 @@ func (a *absorber) productFields(ctx context.Context, page pagemap.Page, product
 		field.NewValue(page.ID, field.StockQuantity, quantity(product.StockQuantity), a.now),
 		field.NewValue(page.ID, field.ManageStock, product.ManageStock, a.now),
 		field.NewValue(page.ID, field.Attributes, string(product.Attributes), a.now),
+		field.NewValue(page.ID, field.Upsells, field.IDList(product.UpsellIDs), a.now),
+		field.NewValue(page.ID, field.CrossSells, field.IDList(product.CrossSellIDs), a.now),
 	}
 	for _, image := range product.Images {
 		instance := strconv.FormatInt(image.ID, 10)

@@ -23,6 +23,8 @@ const (
 		"so putting the old one back would lose that edit"
 	ReasonRevertCustomEdited = "a custom field was edited since the run wrote it, " +
 		"so putting the old value back would lose that edit"
+	ReasonRevertListEdited = "the upsells or cross-sells were edited in the store since the run wrote them, " +
+		"so putting the old list back would lose that edit"
 )
 
 func imagesToRestore(ctx context.Context, work revertWork) (restore map[int64]wp.UpdateMedia, reason string) {
@@ -166,6 +168,20 @@ func productRestore(snapshot ProductSnapshot, held wp.Product) (update wp.Update
 		}
 		if changed {
 			attributes = &restored
+		}
+	}
+	for _, written := range snapshot.Lists {
+		if listOf(held, written.Key) != written.Written {
+			return wp.UpdateProduct{}, nil, ReasonRevertListEdited
+		}
+		before, valid := field.ParseIDList(written.Before)
+		if !valid {
+			continue
+		}
+		if written.Key == field.Upsells {
+			update.UpsellIDs = &before
+		} else {
+			update.CrossSellIDs = &before
 		}
 	}
 	if snapshot.ImageID != 0 {

@@ -412,7 +412,8 @@ A publish over a product writes the description through the plugin's raw route a
 description, a first image where it has none and each variation's description (one
 `POST products/{id}/variations/{vid}` carrying `description` alone) through WooCommerce's REST API,
 and its result carries `previousProduct {shortDescription, writtenShort, attributes, written,
-images, added, imageId, shortWritten, attributesSent}`, `previousVariations [{key, before,
+images, added, imageId, shortWritten, attributesSent, lists}` (`lists` holds `upsells` and
+`cross_sells` as `{key, before, written}`, each a comma-joined list of product ids), `previousVariations [{key, before,
 written}]` (the key is `variation_description:<variation id>`) and `previousMedia [{key, before,
 written}]` (`image_alt:<media id>` or `image_title:<media id>`, written through `POST
 wp/v2/media/{id}` with `alt_text` and `title` alone, only for an attachment whose parent is the

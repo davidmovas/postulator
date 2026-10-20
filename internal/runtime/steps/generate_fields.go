@@ -123,6 +123,11 @@ func GenerateFields(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			candidates := seen.Facts.Candidates
+			if asked, skipped = withCandidates(candidates, asked, skipped); len(asked) == 0 {
+				return fieldsResult(Fields{Values: []FieldValue{}, Skipped: skipped}, 0,
+					"asked for no other field of "+sc.Page.Path)
+			}
 			prompt.Picture = picture(seen.Fitted, contextpack.SectionTargets, contextpack.SectionRules)
 			prompt.Asked = askedFields(seen, asked, sc.Spec.Product)
 
@@ -134,11 +139,11 @@ func GenerateFields(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			settled, err := settleFields(answer, asked)
+			settled, err := settleFields(answer, asked, candidates)
 			if err != nil {
 				return run.Result{}, err
 			}
-			settled.Skipped = skipped
+			settled.Skipped = append(skipped, settled.Skipped...)
 			return fieldsResult(settled, usage.Total, "wrote "+plural(len(settled.Values))+" of "+sc.Page.Path)
 		},
 	}
@@ -285,6 +290,10 @@ func otherTextFields(page pagemap.Page) []field.Key {
 	out := make([]field.Key, 0)
 	for _, spec := range field.Catalog() {
 		switch {
+		case listField(spec.Key):
+			if product {
+				out = append(out, spec.Key)
+			}
 		case !spec.Text || spec.Denied || spec.Instanced || field.CheckScope(spec.Key) != nil, slices.Contains(taken, spec.Key):
 		case spec.Key == field.Excerpt && product, spec.Key == field.ProductShortDescription && !product:
 		default:
@@ -326,6 +335,9 @@ func writerFor(ctx context.Context, deps Deps, sc *run.StepContext, scope field.
 		}
 		return "", nil
 	}
+	if listField(key) && sc.Page.WPType == pagemap.WPProduct {
+		return "", nil
+	}
 	if key != field.Excerpt || sc.Page.WPType == pagemap.WPProduct {
 		return reasonNoWriter, nil
 	}
@@ -364,6 +376,9 @@ func askedFields(seen sitemodel.Picture, asked []askedScope, product *template.P
 		if wanted.Key == field.ProductShortDescription && product != nil {
 			rules = append(rules, content.ShortDescriptionRules(*product)...)
 		}
+		if listField(wanted.Key) {
+			rules = append(rules, candidateRules(seen.Facts.Candidates)...)
+		}
 		name := wanted.Name
 		if name == "" {
 			name = contextpack.FieldName(wanted.Key)
@@ -380,8 +395,8 @@ func settledValue(key field.Key, value string) string {
 	return value
 }
 
-func settleFields(answer fieldsAnswer, asked []askedScope) (Fields, error) {
-	settled := Fields{Values: make([]FieldValue, 0, len(asked))}
+func settleFields(answer fieldsAnswer, asked []askedScope, candidates []contextpack.Candidate) (Fields, error) {
+	settled := Fields{Values: make([]FieldValue, 0, len(asked)), Skipped: make([]FieldSkip, 0)}
 	for i := range asked {
 		wanted := &asked[i]
 		value := ""
@@ -390,6 +405,14 @@ func settleFields(answer fieldsAnswer, asked []askedScope) (Fields, error) {
 				value = strings.TrimSpace(given.Value)
 				break
 			}
+		}
+		if listField(wanted.Key) {
+			if chosen := listAnswer(value, candidates); chosen != "" {
+				settled.Values = append(settled.Values, FieldValue{Key: string(wanted.Key), Value: chosen})
+			} else {
+				settled.Skipped = append(settled.Skipped, FieldSkip{Key: string(wanted.Key), Reason: reasonNoneChosen})
+			}
+			continue
 		}
 		if value == "" {
 			return Fields{}, errors.New(errors.External, "the model left out a field it was asked for").

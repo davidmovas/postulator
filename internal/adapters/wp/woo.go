@@ -71,6 +71,8 @@ type Product struct {
 	Categories       []ProductCategory
 	MetaData         []MetaEntry
 	VariationIDs     []int64
+	UpsellIDs        []int64
+	CrossSellIDs     []int64
 	ManageStock      StockManagement
 	ID               int64
 }
@@ -78,6 +80,8 @@ type Product struct {
 type UpdateProduct struct {
 	ShortDescription *string
 	Images           *[]int64
+	UpsellIDs        *[]int64
+	CrossSellIDs     *[]int64
 	MetaData         map[string]string
 }
 
@@ -112,6 +116,12 @@ func (in UpdateProduct) payload() map[string]any {
 			images = append(images, map[string]any{"id": id})
 		}
 		fields["images"] = images
+	}
+	if in.UpsellIDs != nil {
+		fields["upsell_ids"] = append([]int64{}, *in.UpsellIDs...)
+	}
+	if in.CrossSellIDs != nil {
+		fields["cross_sell_ids"] = append([]int64{}, *in.CrossSellIDs...)
 	}
 	if len(in.MetaData) > 0 {
 		entries := make([]map[string]any, 0, len(in.MetaData))
@@ -170,6 +180,8 @@ type productPayload struct {
 	Categories       []productCategoryPayload  `json:"categories"`
 	MetaData         []metaEntryPayload        `json:"meta_data"`
 	Variations       []int64                   `json:"variations"`
+	UpsellIDs        []int64                   `json:"upsell_ids"`
+	CrossSellIDs     []int64                   `json:"cross_sell_ids"`
 	ID               int64                     `json:"id"`
 }
 
@@ -221,6 +233,8 @@ func (p productPayload) product() Product {
 		Categories:       categories,
 		MetaData:         metaEntries(p.MetaData),
 		VariationIDs:     slices.Clone(p.Variations),
+		UpsellIDs:        append([]int64{}, p.UpsellIDs...),
+		CrossSellIDs:     append([]int64{}, p.CrossSellIDs...),
 		Modified:         parseWPTime(p.DateModifiedGMT),
 	}
 }

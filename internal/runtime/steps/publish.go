@@ -180,6 +180,11 @@ func (p *publishPlan) fieldChanges() []field.Change {
 		if p.Store != nil && p.Store.ShortDescription != nil {
 			out = append(out, field.NewChange(field.ProductShortDescription, p.Store.Snapshot.ShortDescription, *p.Store.ShortDescription))
 		}
+		if p.Store != nil {
+			for _, planned := range p.Store.Lists {
+				out = append(out, field.NewChange(planned.Key, planned.Before, planned.Value))
+			}
+		}
 		for _, planned := range p.Variations {
 			out = append(out, field.NewChange(planned.Key, planned.Before, planned.Value))
 		}

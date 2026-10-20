@@ -195,7 +195,8 @@ func routeOf(target Target, write Write) (route, error) {
 	switch {
 	case key == field.Title, key == field.Excerpt, key == field.FeaturedImage && !target.Product:
 		return routeCore, nil
-	case key == field.ProductShortDescription && target.Product, key == field.FeaturedImage && target.Product:
+	case key == field.ProductShortDescription && target.Product, key == field.FeaturedImage && target.Product,
+		(key == field.Upsells || key == field.CrossSells) && target.Product:
 		return routeStore, nil
 	case key == field.Body && !target.Product, key == field.ProductDescription && target.Product:
 		return routeBody, nil
