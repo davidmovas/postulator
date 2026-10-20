@@ -91,6 +91,8 @@ func (stubPacker) Package() ([]byte, error) {
 }
 
 type fixture struct {
+	types    *pagetypes.Service
+	pages    *pages.Service
 	site     string
 	entity   string
 	other    string
@@ -161,6 +163,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Types: sqlite.NewPageTypeRepo(store),
 		UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
+	seeded.types, seeded.pages = types, pagesService
 	return tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
 		Graph: graph.New(graph.Deps{

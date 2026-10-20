@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -21,7 +22,7 @@ func (in *pagesUpdateArgs) touchesPage() bool {
 }
 
 func pagesUpdate(deps Deps) Tool {
-	return NewTool(Def{
+	return confirming(NewTool(Def{
 		Name:        pagesUpdateName,
 		Description: "Change the path, titles, meta, template or type of a page.",
 		Risk:        RiskWrite,
@@ -37,5 +38,23 @@ func pagesUpdate(deps Deps) Tool {
 			return pages.UpdateResponse{}, err
 		}
 		return pages.UpdateResponse(typed), nil
+	}), func(ctx context.Context, _ Binding, in pagesUpdateArgs) (string, error) {
+		if in.PageTypeID == nil {
+			return "", nil
+		}
+		kind, err := deps.PageTypes.Get(ctx, pagetypes.GetRequest{ID: *in.PageTypeID})
+		if err != nil {
+			return "", err
+		}
+		fields := rewrittenFields(kind)
+		if len(fields) == 0 {
+			return "", nil
+		}
+		held, err := deps.Pages.Get(ctx, pages.GetRequest{ID: in.ID})
+		if err != nil {
+			return "", err
+		}
+		return "Type " + held.Page.Path + " as " + whoseScopeRewrites(kind, fields) +
+			": the page's own text will be rewritten by the next run", nil
 	})
 }

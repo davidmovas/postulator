@@ -84,12 +84,28 @@ func (r *Registry) Build(b Binding) []Tool {
 	for _, name := range r.order {
 		tool := r.byName[name](r.deps)
 		if b.Mode == agent.ModeConfirm && tool.Def.Risk.NeedsConfirmation() {
-			tool.Run = r.proposal(tool.Def, tool.Check)
+			tool.Run = r.proposal(tool.Def, tool.Check, "")
 		}
-		tool.Run = asTheAgent(tool.Run)
+		tool.Run = asTheAgent(r.confirmed(tool))
 		built = append(built, tool)
 	}
 	return built
+}
+
+func (r *Registry) confirmed(tool Tool) func(context.Context, Binding, json.RawMessage) (any, error) {
+	if tool.Confirm == nil {
+		return tool.Run
+	}
+	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
+		if b.Approved {
+			return tool.Run(ctx, b, args)
+		}
+		summary, err := tool.Confirm(ctx, b, args)
+		if err != nil || summary == "" {
+			return tool.Run(ctx, b, args)
+		}
+		return r.proposal(tool.Def, tool.Check, summary)(ctx, b, args)
+	}
 }
 
 func asTheAgent(run func(context.Context, Binding, json.RawMessage) (any, error)) func(context.Context, Binding, json.RawMessage) (any, error) {
@@ -106,7 +122,7 @@ func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.R
 
 	tool := build(r.deps)
 	if b.Mode == agent.ModeConfirm && !b.Approved && tool.Def.Risk.NeedsConfirmation() {
-		tool.Run = r.proposal(tool.Def, tool.Check)
+		tool.Run = r.proposal(tool.Def, tool.Check, "")
 	}
 	ctx = kctx.WithActor(ctx, kctx.ActorAgent)
 	if tool.Authorize != nil {
@@ -114,7 +130,7 @@ func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.R
 			return nil, err
 		}
 	}
-	return tool.Run(ctx, b, args)
+	return r.confirmed(tool)(ctx, b, args)
 }
 
 func (r *Registry) Lookup(name string) (Def, bool) {
@@ -125,7 +141,7 @@ func (r *Registry) Lookup(name string) (Def, bool) {
 	return build(r.deps).Def, true
 }
 
-func (r *Registry) proposal(def Def, check func(json.RawMessage) error) func(
+func (r *Registry) proposal(def Def, check func(json.RawMessage) error, said string) func(
 	context.Context, Binding, json.RawMessage) (any, error) {
 	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
 		if b.ConversationID == "" {
@@ -138,10 +154,14 @@ func (r *Registry) proposal(def Def, check func(json.RawMessage) error) func(
 			}
 		}
 
+		summary := said
+		if summary == "" {
+			summary = Summary(def, args)
+		}
 		now := r.now()
 		action, err := agent.NewPendingAction(agent.PendingAction{
 			ID: id.New(), ConversationID: b.ConversationID, Tool: def.Name, Args: args,
-			Summary: Summary(def, args), CreatedAt: now, UpdatedAt: now,
+			Summary: summary, CreatedAt: now, UpdatedAt: now,
 		})
 		if err != nil {
 			return nil, err

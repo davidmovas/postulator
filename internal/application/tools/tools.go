@@ -54,7 +54,21 @@ type Tool struct {
 	Authorize func(ctx context.Context, b Binding) error
 	Check     func(args json.RawMessage) error
 	Run       func(ctx context.Context, b Binding, args json.RawMessage) (any, error)
+	Confirm   func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
 	Def       Def
+}
+
+func confirming[In any](tool Tool, ask func(ctx context.Context, b Binding, in In) (string, error)) Tool {
+	tool.Confirm = func(ctx context.Context, b Binding, args json.RawMessage) (string, error) {
+		var in In
+		if len(args) > 0 {
+			if err := json.Unmarshal(args, &in); err != nil {
+				return "", refused(tool.Def.Name, err)
+			}
+		}
+		return ask(ctx, b, in)
+	}
+	return tool
 }
 
 type Confirmation struct {

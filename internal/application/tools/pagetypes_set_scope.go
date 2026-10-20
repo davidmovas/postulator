@@ -73,7 +73,7 @@ func scopeOf(kind pagetypes.Type, key string) pagetypes.Scope {
 }
 
 func pagetypesSetScope(deps Deps) Tool {
-	return NewTool(Def{
+	return confirming(NewTool(Def{
 		Name:        pagetypesSetScopeName,
 		Description: "Change how one field of a page type is written: on or off, instruction, lengths, link policy.",
 		Risk:        RiskWrite,
@@ -83,5 +83,17 @@ func pagetypesSetScope(deps Deps) Tool {
 			return pagetypes.Scope{}, err
 		}
 		return deps.PageTypes.SetScope(ctx, in.over(scopeOf(kind, in.key())))
+	}), func(ctx context.Context, _ Binding, in pagetypesSetScopeArgs) (string, error) {
+		kind, err := deps.PageTypes.Get(ctx, pagetypes.GetRequest{ID: in.PageTypeID})
+		if err != nil {
+			return "", err
+		}
+		current := scopeOf(kind, in.key())
+		switching := (in.Enabled != nil && *in.Enabled && !current.Enabled) || (in.AIWrites != nil && *in.AIWrites && !current.AIWrites)
+		if !current.Rewrites || !switching {
+			return "", nil
+		}
+		return "Switch on the " + in.key() + " of " + kind.Name + ", which a person set to rewrite: the pages' own text " +
+			"in it will be rewritten by the next run", nil
 	})
 }

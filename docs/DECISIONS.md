@@ -3535,6 +3535,17 @@ on what stage 2 left open and what was decided while building.
   (`field_not_ai_written`), the pack leaves it out, every preset has it off, and the agent's
   `pagetypes_set_scope` enum stays without it, so the schemas keep their bytes. A revert puts the SEO
   fields back field by field, as it always did; an older run's canonical is put back by C.1's rule.
+- **The agent cannot switch a page into rewriting, or trash one, unseen** (ruling 4, and the paths the
+  plan's critic found beside it). A tool may name a per-call confirmation (`Tool.Confirm`), which the
+  registry applies in every mode unless the call was approved, with a summary of its own:
+  `pages_update` typing a page into a type whose scope rewrites a field it writes, `pagetypes_delete`
+  moving pages into such a type, `imports_apply` whose preview types pages already in the map into
+  one, and `pagetypes_set_scope` switching on a field, or its AI writes, that a person set to
+  rewrite; the summary names the pages and the type and says their own text will be rewritten by
+  the next run. `pages_delete` with `onSite`, which trashes the page and so changes its status for
+  its visitors, always waits the same way. A confirmation whose lookup fails falls through to the
+  tool's own path, which proposes in confirm mode and fails the call in autonomous mode. No schema
+  changed: 91 tools, 63,107 bytes.
 
 ### Decided while building
 
