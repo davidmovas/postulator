@@ -164,10 +164,13 @@ func TestTheProductAnswerKeepsTheDraftItEmbeds(t *testing.T) {
 	if !ok {
 		t.Fatalf("properties = %v, want an object", strict["properties"])
 	}
-	for _, name := range []string{"title", "h1", "sections", "summary", "shortDescription", "specifications"} {
+	for _, name := range []string{"title", "h1", "sections", "summary", "shortDescription"} {
 		if _, present := properties[name]; !present {
 			t.Errorf("the product schema lacks %s: %v", name, properties)
 		}
+	}
+	if _, present := properties["specifications"]; present {
+		t.Errorf("the product schema still asks for specifications, which the store owns: %v", properties)
 	}
 }
 

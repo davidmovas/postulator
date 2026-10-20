@@ -108,7 +108,6 @@ describe("template spec drafts", () => {
     it("reads the product outputs, rebuilds them, and writes none where the spec had none", () => {
         const product: JsonObject = {
             shortDescription: { enabled: true, intent: "Say what it is", targetWords: 40, primaryKeyword: true },
-            specifications: [{ name: "Form", intent: "As the notes say" }],
         };
         const withProduct = { ...hub, product };
         const draft = draftFromJson(withProduct);
@@ -117,24 +116,23 @@ describe("template spec drafts", () => {
             shortIntent: "Say what it is",
             shortWords: 40,
             shortKeyword: true,
-            specifications: [{ name: "Form", intent: "As the notes say" }],
         });
         expect(specJsonOf(draft)).toStrictEqual(withProduct);
         expect(draftFromJson(hub).product).toBeNull();
         expect("product" in specJsonOf(draftFromJson(hub))).toBe(false);
     });
 
-    it("reads a product block that says only part of itself", () => {
+    it("reads a product block that says only part of itself and never writes the retired attributes back", () => {
         const draft = draftFromJson({ ...hub, product: { specifications: [{ name: "Size" }, "not a row"] } });
         expect(draft.product).toStrictEqual({
             shortEnabled: false,
             shortIntent: "",
             shortWords: 0,
             shortKeyword: false,
-            specifications: [{ name: "Size", intent: "" }],
         });
+        const written = specJsonOf(draft)["product"];
+        expect(written !== null && typeof written === "object" && "specifications" in written).toBe(false);
         expect(emptyProduct().shortEnabled).toBe(true);
-        expect(emptyProduct().specifications).toStrictEqual([]);
     });
 
     it("keeps the params a step carries when the step is switched off", () => {

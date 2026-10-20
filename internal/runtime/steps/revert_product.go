@@ -23,7 +23,7 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 	if err != nil {
 		return storeReason(err), false
 	}
-	update, reason := productRestore(*work.published.PreviousProduct, held)
+	update, attributes, reason := productRestore(*work.published.PreviousProduct, held)
 	if reason != "" {
 		return reason, false
 	}
@@ -36,6 +36,13 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 		if _, err = work.client.UpdateProduct(ctx, held.ID, update); err != nil {
 			return storeReason(err), false
 		}
+	}
+	if attributes != nil {
+		if _, err = work.client.RestoreAttributes(ctx, held.ID, *attributes); err != nil {
+			return storeReason(err), false
+		}
+	}
+	if hasFields(update) || attributes != nil {
 		if raw, reason, ok = readRawBack(ctx, work); !ok {
 			return reason, false
 		}
@@ -61,21 +68,22 @@ func storeReason(err error) string {
 	}
 }
 
-func productRestore(snapshot ProductSnapshot, held wp.Product) (update wp.UpdateProduct, reason string) {
+func productRestore(snapshot ProductSnapshot, held wp.Product) (update wp.UpdateProduct, attributes *[]wp.ProductAttribute,
+	reason string) {
 	if snapshot.ShortWritten {
 		if strings.TrimSpace(held.ShortDescription) != strings.TrimSpace(snapshot.WrittenShort) {
-			return wp.UpdateProduct{}, ReasonRevertShortEdited
+			return wp.UpdateProduct{}, nil, ReasonRevertShortEdited
 		}
 		short := snapshot.ShortDescription
 		update.ShortDescription = &short
 	}
 	if snapshot.AttributesSent {
-		attributes, changed, edited := attributesRestored(snapshot, held.Attributes)
+		restored, changed, edited := attributesRestored(snapshot, held.Attributes)
 		if edited != "" {
-			return wp.UpdateProduct{}, edited
+			return wp.UpdateProduct{}, nil, edited
 		}
 		if changed {
-			update.Attributes = &attributes
+			attributes = &restored
 		}
 	}
 	if snapshot.ImageID != 0 {
@@ -85,7 +93,7 @@ func productRestore(snapshot ProductSnapshot, held wp.Product) (update wp.Update
 			update.Images = &kept
 		}
 	}
-	return update, ""
+	return update, attributes, ""
 }
 
 func attributesRestored(snapshot ProductSnapshot, held []wp.ProductAttribute) (restored []wp.ProductAttribute, changed bool, reason string) {

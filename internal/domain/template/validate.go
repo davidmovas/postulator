@@ -96,30 +96,7 @@ func validateProduct(product Product) error {
 	if product.ShortDescription.TargetWords < 0 {
 		return invalid("short description target words must not be negative", "product.shortDescription.targetWords")
 	}
-	if err := validatePlaceholders(product.ShortDescription.Intent, "product.shortDescription.intent"); err != nil {
-		return err
-	}
-
-	seen := make(map[string]struct{}, len(product.Specifications))
-	for i := range product.Specifications {
-		field := "product.specifications[" + strconv.Itoa(i) + "]"
-		name := strings.TrimSpace(product.Specifications[i].Name)
-		if name == "" {
-			return invalid("specification name must not be empty", field+".name")
-		}
-		key := strings.ToLower(name)
-		if _, twice := seen[key]; twice {
-			return invalid("specification name is repeated", field+".name")
-		}
-		seen[key] = struct{}{}
-		if err := validatePlaceholders(product.Specifications[i].Name, field+".name"); err != nil {
-			return err
-		}
-		if err := validatePlaceholders(product.Specifications[i].Intent, field+".intent"); err != nil {
-			return err
-		}
-	}
-	return nil
+	return validatePlaceholders(product.ShortDescription.Intent, "product.shortDescription.intent")
 }
 
 func validatePlaceholders(text, field string) error {

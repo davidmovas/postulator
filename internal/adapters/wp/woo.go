@@ -74,33 +74,33 @@ type Product struct {
 
 type UpdateProduct struct {
 	ShortDescription *string
-	Attributes       *[]ProductAttribute
 	Images           *[]int64
+}
+
+func attributesPayload(held []ProductAttribute) []map[string]any {
+	attributes := make([]map[string]any, 0, len(held))
+	for _, attribute := range held {
+		entry := map[string]any{
+			"position":  attribute.Position,
+			"visible":   attribute.Visible,
+			"variation": attribute.Variation,
+			"options":   append([]string{}, attribute.Options...),
+		}
+		if attribute.ID != 0 {
+			entry["id"] = attribute.ID
+		}
+		if attribute.Name != "" {
+			entry["name"] = attribute.Name
+		}
+		attributes = append(attributes, entry)
+	}
+	return attributes
 }
 
 func (in UpdateProduct) payload() map[string]any {
 	fields := make(map[string]any)
 	if in.ShortDescription != nil {
 		fields["short_description"] = *in.ShortDescription
-	}
-	if in.Attributes != nil {
-		attributes := make([]map[string]any, 0, len(*in.Attributes))
-		for _, attribute := range *in.Attributes {
-			entry := map[string]any{
-				"position":  attribute.Position,
-				"visible":   attribute.Visible,
-				"variation": attribute.Variation,
-				"options":   append([]string{}, attribute.Options...),
-			}
-			if attribute.ID != 0 {
-				entry["id"] = attribute.ID
-			}
-			if attribute.Name != "" {
-				entry["name"] = attribute.Name
-			}
-			attributes = append(attributes, entry)
-		}
-		fields["attributes"] = attributes
 	}
 	if in.Images != nil {
 		images := make([]map[string]any, 0, len(*in.Images))
@@ -236,7 +236,14 @@ func (c *Client) UpdateProduct(ctx context.Context, id int64, in UpdateProduct) 
 	if len(fields) == 0 {
 		return Product{}, errors.New(errors.Invalid, "the product update carries no fields")
 	}
+	return c.saveProduct(ctx, id, fields)
+}
 
+func (c *Client) RestoreAttributes(ctx context.Context, id int64, attributes []ProductAttribute) (Product, error) {
+	return c.saveProduct(ctx, id, map[string]any{"attributes": attributesPayload(attributes)})
+}
+
+func (c *Client) saveProduct(ctx context.Context, id int64, fields map[string]any) (Product, error) {
 	body, err := encodeJSON(fields)
 	if err != nil {
 		return Product{}, err

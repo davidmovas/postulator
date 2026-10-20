@@ -113,26 +113,17 @@ type productShortDescriptionArgs struct {
 	PrimaryKeyword bool   `json:"primaryKeyword,omitempty" description:"Must contain the primary keyword"`
 }
 
-type productSpecificationArgs struct {
-	Name   string `json:"name" description:"Attribute, e.g. Form or Size"`
-	Intent string `json:"intent,omitempty" description:"Value source; a value the data lacks is skipped"`
-}
-
 type productArgs struct {
 	ShortDescription *productShortDescriptionArgs `json:"shortDescription,omitempty" description:"Text shown beside the price"`
-	Specifications   []productSpecificationArgs   `json:"specifications,omitempty" description:"Attributes the writer fills if missing"`
 }
 
 func (a productArgs) product() *template.Product {
-	built := &template.Product{Specifications: make([]template.ProductSpecification, 0, len(a.Specifications))}
+	built := &template.Product{}
 	if a.ShortDescription != nil {
 		built.ShortDescription = template.ProductShortDescription{
 			Enabled: a.ShortDescription.Enabled, Intent: a.ShortDescription.Intent,
 			TargetWords: a.ShortDescription.TargetWords, PrimaryKeyword: a.ShortDescription.PrimaryKeyword,
 		}
-	}
-	for _, specification := range a.Specifications {
-		built.Specifications = append(built.Specifications, template.ProductSpecification(specification))
 	}
 	return built
 }

@@ -13,11 +13,7 @@
     "metaRules": {"titlePattern": "{pageTitle}", "descriptionMax": 155},
     "images": {"featured": false, "inline": 0, "source": ""},
     "product": {
-      "shortDescription": {"enabled": true, "intent": "Say in plain words what the product is and the one reason to buy it, for a buyer reading beside the price", "targetWords": 40, "primaryKeyword": true},
-      "specifications": [
-        {"name": "Form", "intent": "The form the product comes in, as its name or the page notes state it"},
-        {"name": "Size", "intent": "The amount or the pack size, as the page notes state it"}
-      ]
+      "shortDescription": {"enabled": true, "intent": "Say in plain words what the product is and the one reason to buy it, for a buyer reading beside the price", "targetWords": 40, "primaryKeyword": true}
     },
     "modelProfiles": {},
     "recipe": [

@@ -185,8 +185,7 @@ func productDraftOf() string {
 		`{"heading":"Frequently Asked Questions","html":"<p>Yes, it takes a bottomless portafilter, and no, ` +
 		`it does not steam and brew at the same time.</p>"}],` +
 		`"summary":"What the ` + productKeyword + ` is and who should buy it.",` +
-		`"shortDescription":"<p>The ` + productKeyword + ` is a single boiler machine that rewards a good grinder.</p>",` +
-		`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Size","value":""}]}`
+		`"shortDescription":"<p>The ` + productKeyword + ` is a single boiler machine that rewards a good grinder.</p>"}`
 }
 
 func stockTheStore(site *wptest.Server) {

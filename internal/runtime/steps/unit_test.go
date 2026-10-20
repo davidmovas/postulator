@@ -1535,8 +1535,7 @@ const productDraftReply = `{"title":"Espresso guide","h1":"Espresso guide","sect
 	`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"},` +
 	`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
 	`],"summary":"A short guide to espresso.",` +
-	`"shortDescription":"<p>An espresso machine for the home.</p>",` +
-	`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Size","value":""}]}`
+	`"shortDescription":"<p>An espresso machine for the home.</p>"}`
 
 func productContext(t *testing.T, deps steps.Deps) *run.StepContext {
 	t.Helper()
@@ -1546,9 +1545,6 @@ func productContext(t *testing.T, deps steps.Deps) *run.StepContext {
 	sc.Page.Observed.Title = "Espresso Machine &amp; Grinder"
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is", TargetWords: 30, PrimaryKeyword: true},
-		Specifications: []template.ProductSpecification{
-			{Name: "Form", Intent: "The form the notes state"}, {Name: "Size", Intent: "The size the notes state"},
-		},
 	}
 	return sc
 }
@@ -1567,15 +1563,17 @@ func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
 	}
 	for _, want := range []string{
 		"writing body copy for a WooCommerce product",
-		"shortDescription and specifications",
+		"summary and shortDescription",
 		"H1: Espresso Machine & Grinder (the product's name in the store",
 		"never state a price, a stock level or an SKU",
 		"Short description: write it in shortDescription as HTML paragraphs, about 30 words: Say what it is; it carries the primary keyword",
-		"- Form: The form the notes state\n",
 	} {
 		if !strings.Contains(recorder.last, want) {
 			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
 		}
+	}
+	if strings.Contains(recorder.last, "pecification") {
+		t.Errorf("the prompt still asks for specifications, which the store owns:\n%s", recorder.last)
 	}
 
 	var draft content.ContentDraft
@@ -1585,8 +1583,7 @@ func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
 	if draft.H1 != "Espresso Machine & Grinder" || draft.Product == nil {
 		t.Fatalf("draft = %+v", draft)
 	}
-	if draft.Product.ShortDescription != "<p>An espresso machine for the home.</p>" ||
-		len(draft.Product.Specifications) != 1 || draft.Product.Specifications[0].Value != "Countertop" {
+	if draft.Product.ShortDescription != "<p>An espresso machine for the home.</p>" {
 		t.Errorf("product draft = %+v", draft.Product)
 	}
 }

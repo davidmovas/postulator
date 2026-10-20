@@ -143,15 +143,10 @@ function productSentences(after: SpecDraft): string[] {
     if (product === null) {
         return [said.productNone];
     }
-    const parts: string[] = [];
-    if (product.shortEnabled) {
-        parts.push(product.shortWords > 0 ? said.productShortWords(product.shortWords) : said.productShort);
+    if (!product.shortEnabled) {
+        return [said.productNothing];
     }
-    const names = product.specifications.map((row) => (row.name === "" ? copy.templates.product.unnamed : row.name));
-    if (names.length > 0) {
-        parts.push(said.productFills(joined(names)));
-    }
-    return parts.length === 0 ? [said.productNothing] : [parts.join(" and ")];
+    return [product.shortWords > 0 ? said.productShortWords(product.shortWords) : said.productShort];
 }
 
 function sectionSentences(after: SpecDraft): string[] {

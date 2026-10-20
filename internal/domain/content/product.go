@@ -11,41 +11,22 @@ import (
 const (
 	CodePrimaryMissingInName             = "primary_missing_in_name"
 	CodePrimaryMissingInShortDescription = "primary_missing_in_short_description"
-	CodeSpecificationMissing             = "specification_missing"
 )
-
-type AnswerSpecification struct {
-	Name  string `json:"name" description:"The specification name, exactly as the brief gives it"`
-	Value string `json:"value" description:"Its value as plain text; empty when neither the name nor the page notes state it"`
-}
 
 type ProductAnswer struct {
 	DraftAnswer
-	ShortDescription string                `json:"shortDescription" description:"The short description the store shows beside the price, as HTML paragraphs"`
-	Specifications   []AnswerSpecification `json:"specifications" description:"One value for every specification the brief lists"`
-}
-
-type Specification struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	ShortDescription string `json:"shortDescription" description:"The short description the store shows beside the price, as HTML paragraphs"`
 }
 
 type ProductDraft struct {
-	ShortDescription string          `json:"shortDescription"`
-	Specifications   []Specification `json:"specifications"`
-}
-
-type BriefSpecification struct {
-	Name   string `json:"name"`
-	Intent string `json:"intent"`
+	ShortDescription string `json:"shortDescription"`
 }
 
 type BriefProduct struct {
-	ShortIntent      string               `json:"shortIntent"`
-	Specifications   []BriefSpecification `json:"specifications"`
-	ShortWords       int                  `json:"shortWords"`
-	ShortDescription bool                 `json:"shortDescription"`
-	ShortKeyword     bool                 `json:"shortKeyword"`
+	ShortIntent      string `json:"shortIntent"`
+	ShortWords       int    `json:"shortWords"`
+	ShortDescription bool   `json:"shortDescription"`
+	ShortKeyword     bool   `json:"shortKeyword"`
 }
 
 func StoreName(page pagemap.Page) string {
@@ -53,19 +34,12 @@ func StoreName(page pagemap.Page) string {
 }
 
 func productBrief(product template.Product) *BriefProduct {
-	brief := &BriefProduct{
+	return &BriefProduct{
 		ShortDescription: product.ShortDescription.Enabled,
 		ShortIntent:      strings.TrimSpace(product.ShortDescription.Intent),
 		ShortWords:       product.ShortDescription.TargetWords,
 		ShortKeyword:     product.ShortDescription.PrimaryKeyword,
-		Specifications:   make([]BriefSpecification, 0, len(product.Specifications)),
 	}
-	for _, specification := range product.Specifications {
-		brief.Specifications = append(brief.Specifications, BriefSpecification{
-			Name: strings.TrimSpace(specification.Name), Intent: strings.TrimSpace(specification.Intent),
-		})
-	}
-	return brief
 }
 
 func AssembleProduct(answer ProductAnswer, brief Brief) (ContentDraft, *Document, error) {
@@ -74,7 +48,7 @@ func AssembleProduct(answer ProductAnswer, brief Brief) (ContentDraft, *Document
 		return draft, doc, err
 	}
 
-	product := ProductDraft{Specifications: make([]Specification, 0, len(brief.Product.Specifications))}
+	product := ProductDraft{}
 	if brief.Product.ShortDescription {
 		short, stripped := Sanitize(answer.ShortDescription, nil)
 		if strings.TrimSpace(short) == "" {
@@ -83,31 +57,8 @@ func AssembleProduct(answer ProductAnswer, brief Brief) (ContentDraft, *Document
 		product.ShortDescription = strings.TrimSpace(short)
 		draft.Findings = append(draft.Findings, strippedFindings("the short description", stripped)...)
 	}
-
-	for _, wanted := range brief.Product.Specifications {
-		value := specificationValue(answer.Specifications, wanted.Name)
-		if value == "" {
-			draft.Findings = append(draft.Findings, Finding{
-				Severity: SeverityWarn, Code: CodeSpecificationMissing,
-				Message: "the writer stated no value for " + wanted.Name + ", so the product does not get it",
-				Details: map[string]any{"specification": wanted.Name},
-			})
-			continue
-		}
-		product.Specifications = append(product.Specifications, Specification{Name: wanted.Name, Value: value})
-	}
 	draft.Product = &product
 	return draft, doc, nil
-}
-
-func specificationValue(answered []AnswerSpecification, name string) string {
-	for _, specification := range answered {
-		if !strings.EqualFold(strings.TrimSpace(specification.Name), name) {
-			continue
-		}
-		return plainText(specification.Value)
-	}
-	return ""
 }
 
 func plainText(value string) string {

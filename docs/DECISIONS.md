@@ -3704,3 +3704,20 @@ on what stage 2 left open and what was decided while building.
   the linker chose, or before it for a link up, so it stays inside the opening paragraphs the parent
   rule allows, and it is ours. `block.Splice` has no caller left but the property test that compares
   `PlaceLink` with it.
+- **A product is written through the registry, and attribute filling is retired** (B.1, the owner's
+  answer 3 at the plan). The template's `product.specifications`, the writer's attribute values and
+  their prompt lines, the judge's attribute check, the tool schema's `specifications` and the
+  template editor's attribute rows are gone; the schemas fell from 63,107 to 62,174 bytes and the
+  ceiling to 62,187. Migration 0067 strips the key from stored specs and overrides, which the strict
+  decode would otherwise refuse, so an untouched built-in reads as the shipped seed again and needs
+  no superseded copy. `UpdateProduct` carries only the short description and the images, and a
+  product's first image is filled only where the store has none, through the registry's store
+  writer. The product publish follows the page's order: one check that reads the short description,
+  the images, the SEO fields and the description's hash again and pauses naming each that moved,
+  then the store's fields through `edit` under the value read, then the SEO meta, then the
+  description under the raw route's hash read after the store's save. Over a product whose
+  description the user's save filters would change, the store's fields and the description are not
+  written, since WooCommerce's save is a whole-post save, and the item pauses `save_alters_client`
+  after its SEO meta. The product row is written through `UpdatePublished`. A revert of a run made
+  before this still puts back the attributes it filled, through `RestoreAttributes`, which sends the
+  whole attribute list alone, `wc/v3` replacing it whole.

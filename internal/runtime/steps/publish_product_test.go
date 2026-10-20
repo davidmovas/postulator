@@ -101,7 +101,6 @@ func storeContext(t *testing.T, wpID int64) *run.StepContext {
 	rewritten(sc)
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is for", TargetWords: 30},
-		Specifications:   []template.ProductSpecification{{Name: "Form"}, {Name: "Origin"}, {Name: "Size"}},
 	}
 	return sc
 }
@@ -126,13 +125,8 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 		stored.RegularPrice != "120" || stored.SKU != "EM-1" {
 		t.Errorf("the store's own fields moved: %+v", stored)
 	}
-	want := []wptest.Attribute{
-		{Name: "Origin", Options: []string{"Italy"}, Visible: true},
-		{Name: "form", Options: []string{"Countertop"}, Position: 1},
-		{ID: 3, Name: "Size", Options: []string{}, Position: 2, Visible: true},
-	}
-	if !reflect.DeepEqual(stored.Attributes, want) {
-		t.Errorf("attributes = %+v, want %+v", stored.Attributes, want)
+	if !reflect.DeepEqual(stored.Attributes, storeProduct().Attributes) {
+		t.Errorf("attributes = %+v, want the store's own %+v", stored.Attributes, storeProduct().Attributes)
 	}
 	if stored.Meta["_yoast_wpseo_title"] != "Espresso Machine | Shop" {
 		t.Errorf("the run did not write its meta: %v", stored.Meta)
@@ -152,15 +146,11 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("the publish kept no snapshot of the product")
 	}
-	if snapshot.ShortDescription != "<p>old short</p>" || !snapshot.ShortWritten || !snapshot.AttributesSent || snapshot.ImageID != 0 {
+	if snapshot.ShortDescription != "<p>old short</p>" || !snapshot.ShortWritten || snapshot.AttributesSent || snapshot.ImageID != 0 {
 		t.Errorf("snapshot = %+v", snapshot)
 	}
-	if snapshot.WrittenShort != productShort || len(snapshot.Written) != 1 || snapshot.Written[0].Name != "form" ||
-		!slices.Equal(snapshot.Written[0].Options, []string{"Countertop"}) {
-		t.Errorf("the snapshot records it wrote %q and %+v", snapshot.WrittenShort, snapshot.Written)
-	}
-	if !slices.Equal(snapshot.Added, []string{"Form"}) {
-		t.Errorf("added = %v, want only the empty attribute the template filled", snapshot.Added)
+	if snapshot.WrittenShort != productShort || len(snapshot.Written) != 0 || len(snapshot.Added) != 0 {
+		t.Errorf("the snapshot records it wrote %q and %+v, want the short description alone", snapshot.WrittenShort, snapshot.Written)
 	}
 	if len(snapshot.StoreAttributes()) != 3 || len(snapshot.StoreAttributes()[1].Options) != 0 {
 		t.Errorf("the snapshot holds %+v, want the attributes as they were", snapshot.StoreAttributes())
@@ -186,7 +176,7 @@ func TestPublishWritesTheDescriptionAfterTheStoreResavesTheProduct(t *testing.T)
 		stored = `<p>Pull a shot.<br />Steam the milk.</p>`
 	)
 	item := storeProduct()
-	item.Content = "<p>old<br>description</p>"
+	item.Content = "<p>old<br />description</p>"
 	h := newProductHarness(t, item, wptest.WithFilteredHTML())
 	sc := storeContext(t, h.held.ID)
 	sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte(`<h1>Espresso Machine</h1>` + lines)}
@@ -200,7 +190,7 @@ func TestPublishWritesTheDescriptionAfterTheStoreResavesTheProduct(t *testing.T)
 	if held.Excerpt != productShort {
 		t.Errorf("short description = %q", held.Excerpt)
 	}
-	if published.PreviousContent != "<p>old<br>description</p>" {
+	if published.PreviousContent != "<p>old<br />description</p>" {
 		t.Errorf("previous content = %q, want the description the client had", published.PreviousContent)
 	}
 }
@@ -344,55 +334,18 @@ func TestPublishWritesOverDriftAndSaysSoForAPageAndAProductAlike(t *testing.T) {
 	}
 }
 
-func TestPublishFillsOnlyTheAttributesAProductLacks(t *testing.T) {
+func TestNoPublishPathSendsAttributes(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name     string
-		kind     string
-		held     []wptest.Attribute
-		want     []wptest.Attribute
-		added    []string
-		findings []string
+		name string
+		kind string
+		held []wptest.Attribute
 	}{
-		{
-			name: "a product with no attributes",
-			held: []wptest.Attribute{},
-			want: []wptest.Attribute{
-				{Name: "Form", Options: []string{"Countertop"}, Visible: true},
-				{Name: "Origin", Options: []string{"Spain"}, Position: 1, Visible: true},
-				{Name: "Size", Options: []string{"Large"}, Position: 2, Visible: true},
-			},
-			added: []string{"Form", "Origin", "Size"},
-		},
-		{
-			name: "a product that carries every attribute",
-			held: []wptest.Attribute{
-				{Name: "FORM", Options: []string{"Wall"}},
-				{Name: " origin ", Options: []string{"Italy"}, Position: 1},
-				{Name: "Size", Options: []string{"Small"}, Position: 2},
-			},
-			want: []wptest.Attribute{
-				{Name: "FORM", Options: []string{"Wall"}},
-				{Name: " origin ", Options: []string{"Italy"}, Position: 1},
-				{Name: "Size", Options: []string{"Small"}, Position: 2},
-			},
-			added: []string{},
-		},
-		{
-			name:  "a variation attribute with no options",
-			held:  []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}, {Name: "Origin", Options: []string{"Italy"}, Position: 1}, {Name: "Size", Options: []string{"Small"}, Position: 2}},
-			want:  []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}, {Name: "Origin", Options: []string{"Italy"}, Position: 1}, {Name: "Size", Options: []string{"Small"}, Position: 2}},
-			added: []string{},
-		},
-		{
-			name:     "a variable product",
-			kind:     "variable",
-			held:     []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}},
-			want:     []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}},
-			added:    []string{},
-			findings: []string{steps.CodeProductTypeKept},
-		},
+		{name: "a product with no attributes", held: []wptest.Attribute{}},
+		{name: "a product with an attribute it left empty", held: []wptest.Attribute{{Name: "Form", Options: []string{}}}},
+		{name: "a variation attribute with no options", held: []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}}},
+		{name: "a variable product", kind: "variable", held: []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}}},
 	}
 
 	for _, tc := range cases {
@@ -406,22 +359,45 @@ func TestPublishFillsOnlyTheAttributesAProductLacks(t *testing.T) {
 			published := runPublish(t, h.deps, storeContext(t, h.held.ID))
 
 			stored, _ := h.server.Lookup(h.held.ID)
-			if !reflect.DeepEqual(stored.Attributes, tc.want) {
-				t.Errorf("attributes = %+v, want %+v", stored.Attributes, tc.want)
+			if !reflect.DeepEqual(stored.Attributes, tc.held) {
+				t.Errorf("attributes = %+v, want the store's own %+v", stored.Attributes, tc.held)
 			}
-			if !slices.Equal(published.PreviousProduct.Added, tc.added) {
-				t.Errorf("added = %v, want %v", published.PreviousProduct.Added, tc.added)
+			if published.PreviousProduct.AttributesSent || len(published.PreviousProduct.Added) != 0 {
+				t.Errorf("the record says attributes were written: %+v", published.PreviousProduct)
 			}
-			if published.PreviousProduct.AttributesSent != (len(tc.added) > 0) {
-				t.Errorf("attributesSent = %t with %v added", published.PreviousProduct.AttributesSent, tc.added)
-			}
-			if got := findingCodes(published.Findings); !slices.Equal(got, orNone(tc.findings)) {
-				t.Errorf("findings = %v, want %v", got, tc.findings)
+			for _, request := range h.server.Requests() {
+				if request.Method != http.MethodGet && bytes.Contains(request.Body, []byte(`"attributes"`)) {
+					t.Errorf("%s %s sent the attributes, which the store owns", request.Method, request.Path)
+				}
 			}
 			if stored.Excerpt != productShort {
 				t.Errorf("short description = %q, want it written whatever the attributes", stored.Excerpt)
 			}
 		})
+	}
+}
+
+func TestAProductWritesTheStoreFirstAndTheDescriptionLast(t *testing.T) {
+	t.Parallel()
+
+	h := newProductHarness(t, storeProduct())
+	h.server.ResetRequests()
+	runPublish(t, h.deps, storeContext(t, h.held.ID))
+
+	order := make([]string, 0, 3)
+	for _, request := range h.server.Requests() {
+		switch {
+		case request.Method == http.MethodGet:
+		case strings.HasPrefix(request.Path, "/wp-json/wc/v3/products"):
+			order = append(order, "store")
+		case strings.Contains(request.Path, "/seo-meta/"):
+			order = append(order, "seo")
+		case strings.HasSuffix(request.Path, "/raw"):
+			order = append(order, "description")
+		}
+	}
+	if want := []string{"store", "seo", "description"}; !slices.Equal(order, want) {
+		t.Errorf("the writes went %v, want %v: the store's fields first and the description last", order, want)
 	}
 }
 

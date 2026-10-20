@@ -71,14 +71,11 @@ function productText(product: ProductDraft | null): string {
     if (product === null) {
         return copy.templates.product.none;
     }
-    return copy.templates.product.summary(product.shortEnabled, product.specifications.length);
+    return copy.templates.product.summary(product.shortEnabled);
 }
 
 function productCopy(product: ProductDraft | null): ProductDraft | null {
-    if (product === null) {
-        return null;
-    }
-    return { ...product, specifications: product.specifications.map((row) => ({ ...row })) };
+    return product === null ? null : { ...product };
 }
 
 export function diffRows(below: SpecDraft, here: SpecDraft): readonly DiffRow[] {

@@ -425,7 +425,7 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 	binding.Mode = domainagent.ModeAutonomous
 
 	product := `,"product":{"shortDescription":{"enabled":true,"intent":"Say what it is","targetWords":40,` +
-		`"primaryKeyword":true},"specifications":[{"name":"Form","intent":"As the notes say"}]}}`
+		`"primaryKeyword":true}}}`
 	spec := strings.TrimSuffix(minimalSpec, "}") + product
 	out, err := registry.Call(t.Context(), binding, "templates_create",
 		json.RawMessage(`{"name":"Product outputs","spec":`+spec+`}`))
@@ -436,10 +436,15 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode the answer: %v", err)
 	}
-	for _, want := range []string{`"shortDescription":{"enabled":true`, `"targetWords":40`, `"name":"Form"`} {
+	for _, want := range []string{`"shortDescription":{"enabled":true`, `"targetWords":40`} {
 		if !strings.Contains(string(encoded), want) {
 			t.Errorf("the template lost %s: %s", want, encoded)
 		}
+	}
+	retired := strings.TrimSuffix(minimalSpec, "}") + `,"product":{"specifications":[{"name":"Form"}]}}`
+	if _, err = registry.Call(t.Context(), binding, "templates_create",
+		json.RawMessage(`{"name":"Retired outputs","spec":`+retired+`}`)); err == nil {
+		t.Error("a template naming the retired specifications was taken; the store owns a product's attributes")
 	}
 
 	bare, err := registry.Call(t.Context(), binding, "templates_create",

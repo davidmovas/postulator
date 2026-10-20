@@ -100,14 +100,8 @@ type ProductShortDescription struct {
 	PrimaryKeyword bool   `json:"primaryKeyword" description:"The primary keyword must appear in the short description"`
 }
 
-type ProductSpecification struct {
-	Name   string `json:"name" description:"The attribute the product shows, for example Form or Size"`
-	Intent string `json:"intent" description:"Where its value comes from, one short sentence to the writer; a value the page data does not state is left out"`
-}
-
 type Product struct {
 	ShortDescription ProductShortDescription `json:"shortDescription" description:"The short description the product shows beside its price"`
-	Specifications   []ProductSpecification  `json:"specifications" description:"The attributes the writer fills in where the product does not carry them yet"`
 }
 
 func (p *Product) Words() int {

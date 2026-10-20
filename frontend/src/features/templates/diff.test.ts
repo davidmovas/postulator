@@ -39,17 +39,16 @@ describe("diffRows", () => {
             shortIntent: "",
             shortWords: 40,
             shortKeyword: false,
-            specifications: [{ name: "Form", intent: "" }],
         };
         const added = diffRows(below, { ...below, product: outputs });
         expect(added.map((row) => row.key)).toEqual(["product"]);
         expect(added[0].below).toBe(copy.templates.product.none);
-        expect(added[0].here).toBe(copy.templates.product.summary(true, 1));
+        expect(added[0].here).toBe(copy.templates.product.summary(true));
         expect(applied(below, added).product).toBeNull();
 
-        const changed = diffRows({ ...below, product: outputs }, { ...below, product: { ...outputs, specifications: [] } });
-        expect(changed[0].here).toBe(copy.templates.product.summary(true, 0));
-        expect(applied(below, changed).product?.specifications).toEqual([{ name: "Form", intent: "" }]);
+        const changed = diffRows({ ...below, product: outputs }, { ...below, product: { ...outputs, shortEnabled: false } });
+        expect(changed[0].here).toBe(copy.templates.product.summary(false));
+        expect(applied(below, changed).product?.shortEnabled).toBe(true);
     });
 
     it("counts the sections rather than listing them", () => {

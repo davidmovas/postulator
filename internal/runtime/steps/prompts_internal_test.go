@@ -52,7 +52,6 @@ func fullBrief() content.Brief {
 		Children: []string{"BPC-157"},
 		Product: &content.BriefProduct{
 			ShortDescription: true, ShortWords: 40, ShortIntent: "Sell it", ShortKeyword: true,
-			Specifications: []content.BriefSpecification{{Name: "Purity", Intent: "As tested"}},
 		},
 	}
 }

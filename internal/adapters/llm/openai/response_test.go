@@ -216,12 +216,10 @@ func TestEveryAnswerTheStepsAskForCrossesTheStrictContract(t *testing.T) {
 	})
 	t.Run("the writer's product", func(t *testing.T) {
 		t.Parallel()
-		roundTrip(t, `{"title":"Koffein","h1":"Koffein","sections":[],"summary":"s","shortDescription":"<p>short</p>",`+
-			`"specifications":[{"name":"Purity","value":"99%"}]}`,
+		roundTrip(t, `{"title":"Koffein","h1":"Koffein","sections":[],"summary":"s","shortDescription":"<p>short</p>"}`,
 			content.ProductAnswer{
 				DraftAnswer:      content.DraftAnswer{Title: "Koffein", H1: "Koffein", Sections: []content.AnswerSection{}, Summary: "s"},
 				ShortDescription: "<p>short</p>",
-				Specifications:   []content.AnswerSpecification{{Name: "Purity", Value: "99%"}},
 			})
 	})
 	t.Run("the linker's repair", func(t *testing.T) {

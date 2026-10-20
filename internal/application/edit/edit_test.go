@@ -175,7 +175,7 @@ func TestADeniedFieldIsRefusedByTheUseCase(t *testing.T) {
 func TestAProductsNameIsNeverWritten(t *testing.T) {
 	t.Parallel()
 
-	for _, key := range []field.Key{field.Title, field.Excerpt, field.FeaturedImage} {
+	for _, key := range []field.Key{field.Title, field.Excerpt} {
 		s := newSite()
 		_, err := serviceOver(s).Write(t.Context(), product, []edit.Write{{Key: key, Value: new("x"), Expected: hashOf("Old title")}})
 		if reason := reasonOf(t, err); reason != edit.ReasonStoreOwns {
@@ -184,6 +184,11 @@ func TestAProductsNameIsNeverWritten(t *testing.T) {
 		if len(s.calls) != 0 {
 			t.Errorf("%s on a product reached the site: %v", key, s.calls)
 		}
+	}
+	image := newSite()
+	if _, err := serviceOver(image).Write(t.Context(), product, []edit.Write{{Key: field.FeaturedImage, Value: new("12")}}); err != nil ||
+		!slices.Equal(image.calls, []string{"read store", "write store"}) {
+		t.Errorf("a product's featured image = %v with calls %v, want it written through the store", err, image.calls)
 	}
 	s := newSite()
 	if _, err := serviceOver(s).Write(t.Context(), page, []edit.Write{{Key: field.ProductShortDescription, Value: new("x")}}); reasonOf(t, err) != edit.ReasonNoWriter {

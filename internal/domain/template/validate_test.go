@@ -52,10 +52,6 @@ func validProduct() *template.Product {
 		ShortDescription: template.ProductShortDescription{
 			Enabled: true, Intent: "Say what {entityName} is for", TargetWords: 40, PrimaryKeyword: true,
 		},
-		Specifications: []template.ProductSpecification{
-			{Name: "Form", Intent: "The form the name and the notes state"},
-			{Name: "Size", Intent: "The pack size the notes state"},
-		},
 	}
 }
 
@@ -112,18 +108,6 @@ func TestValidateSpec(t *testing.T) {
 			s.Product = validProduct()
 			s.Product.ShortDescription.Intent = "Sell the {price}"
 		}, field: "product.shortDescription.intent"},
-		{name: "blank specification name", mutate: func(s *template.TemplateSpec) {
-			s.Product = validProduct()
-			s.Product.Specifications[1].Name = "  "
-		}, field: "product.specifications[1].name"},
-		{name: "a specification named twice", mutate: func(s *template.TemplateSpec) {
-			s.Product = validProduct()
-			s.Product.Specifications[1].Name = "FORM"
-		}, field: "product.specifications[1].name"},
-		{name: "unknown specification placeholder", mutate: func(s *template.TemplateSpec) {
-			s.Product = validProduct()
-			s.Product.Specifications[0].Intent = "Read {notes}"
-		}, field: "product.specifications[0].intent"},
 		{name: "unknown role", mutate: func(s *template.TemplateSpec) {
 			s.ModelProfiles = map[llm.Role]llm.ModelRef{"painter": {Provider: "a", Model: "b"}}
 		}, field: "modelProfiles.painter"},

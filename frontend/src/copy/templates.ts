@@ -237,25 +237,15 @@ export const templates = {
         productNothing: "writes no product outputs beyond the description",
         productShort: "writes a short description",
         productShortWords: (words: number) => `writes a short description of about ${words} words`,
-        productFills: (names: string) => `fills ${names}`,
         other: (field: string) => `changes ${field}`,
     },
     product: {
         title: "Product",
         none: "No product outputs",
-        summary: (short: boolean, specifications: number) => {
-            const attributes = specifications === 1 ? "1 attribute" : `${specifications} attributes`;
-            if (short && specifications > 0) {
-                return `Short description and ${attributes}`;
-            }
-            if (short) {
-                return "Short description";
-            }
-            return specifications > 0 ? attributes : "The description alone";
-        },
-        body: "What a product written on this template gets beside its description. A page or a post on this template ignores it.",
+        summary: (short: boolean) => (short ? "Short description" : "The description alone"),
+        body: "What a product written on this template gets beside its description. A page or a post on this template ignores it. The name, price, stock, SKU, status and attributes of a product are never written.",
         emptyBody:
-            "A product written on this template gets its description and nothing else. Add product outputs to also write the short description the store shows beside the price, and to fill the attributes a product lacks.",
+            "A product written on this template gets its description and nothing else. Add product outputs to also write the short description the store shows beside the price.",
         add: "Add product outputs",
         remove: "Remove product outputs",
         short: "Short description",
@@ -263,15 +253,6 @@ export const templates = {
         shortIntent: "What the short description has to say",
         shortWords: "About how many words",
         shortKeyword: "The primary keyword must appear in it",
-        attributes: "Attributes",
-        attributesHint:
-            "Filled only where the product carries no attribute of that name, or an empty one. The name, price, stock, SKU and status of a product are never written.",
-        attributeName: "Attribute, such as Form or Size",
-        attributeIntent: "Where its value comes from",
-        addAttribute: "Add an attribute",
-        removeAttribute: "Remove this attribute",
-        unnamed: "an unnamed attribute",
-        attributesEmpty: "No attribute is filled in.",
     },
     sections: {
         title: "Sections",

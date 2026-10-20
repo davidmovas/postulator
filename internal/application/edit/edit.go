@@ -149,15 +149,15 @@ func routeOf(target Target, write Write) (route, error) {
 	switch {
 	case !known || spec.Denied:
 		return 0, refused(key, field.ReasonDenied, "the field is never written")
-	case target.Product && (key == field.Title || key == field.Excerpt || key == field.FeaturedImage):
+	case target.Product && (key == field.Title || key == field.Excerpt):
 		return 0, refused(key, ReasonStoreOwns, "the store owns this field of a product")
 	case write.Social != nil && socialNames[key] == "":
 		return 0, refused(key, ReasonNoWriter, "only the SEO title and description carry an Open Graph twin")
 	}
 	switch {
-	case key == field.Title, key == field.Excerpt, key == field.FeaturedImage:
+	case key == field.Title, key == field.Excerpt, key == field.FeaturedImage && !target.Product:
 		return routeCore, nil
-	case key == field.ProductShortDescription && target.Product:
+	case key == field.ProductShortDescription && target.Product, key == field.FeaturedImage && target.Product:
 		return routeStore, nil
 	case key == field.Body && !target.Product, key == field.ProductDescription && target.Product:
 		return routeBody, nil

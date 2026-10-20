@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 66
+const latestMigration = 67
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -87,6 +87,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0064_conversation_brief.sql",
 		"0065_page_links_absolute.sql",
 		"0066_page_types_default_templates.sql",
+		"0067_template_specifications_retired.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1788,6 +1789,82 @@ func TestTheBackfillLeavesASiteWithADefaultTemplate(t *testing.T) {
 	}
 	if got := templatesOfTheTypes(t, store)["t-kept"]; got != "" {
 		t.Errorf("a type of a site whose default is chosen took %q, which would win over that default", got)
+	}
+}
+
+func TestAStoredSpecWithSpecificationsStillDecodes(t *testing.T) {
+	t.Parallel()
+
+	var shipped template.TemplateSpec
+	for _, seeded := range template.Seed() {
+		if seeded.Name == "Product" {
+			shipped = seeded.Spec
+		}
+	}
+	encoded, err := json.Marshal(shipped)
+	if err != nil {
+		t.Fatalf("encode the product spec: %v", err)
+	}
+	var document map[string]any
+	if err = json.Unmarshal(encoded, &document); err != nil {
+		t.Fatalf("decode the product spec: %v", err)
+	}
+	product, ok := document["product"].(map[string]any)
+	if !ok {
+		t.Fatalf("the shipped product template carries no product block: %s", encoded)
+	}
+	product["specifications"] = []map[string]string{{"name": "Form", "intent": "As the notes say"}}
+	stored, err := json.Marshal(document)
+	if err != nil {
+		t.Fatalf("encode the stored spec: %v", err)
+	}
+	const patch = `{"product":{"specifications":[{"name":"Size","intent":"As the notes say"}]},"tone":"plain"}`
+
+	store := storeAt(t, 66)
+	const at = "2026-10-20T09:00:00Z"
+	for _, setup := range []struct {
+		query string
+		args  []any
+	}{
+		{query: `INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, args: []any{at, at}},
+		{query: `INSERT INTO templates (id, scope, name, version, spec, created_at, updated_at) VALUES ('tpl-product', 'global', 'Product', 1, ?, ?, ?)`, args: []any{string(stored), at, at}},
+		{query: `INSERT INTO template_overrides (id, template_id, scope, site_id, patch, created_at, updated_at) VALUES ('o1', 'tpl-product', 'site', 's1', ?, ?, ?)`, args: []any{patch, at, at}},
+	} {
+		if _, err = store.writer.ExecContext(t.Context(), setup.query, setup.args...); err != nil {
+			t.Fatalf("%s: %v", setup.query, err)
+		}
+	}
+	if _, err = template.Resolve(shipped, json.RawMessage(patch), nil); err == nil {
+		t.Fatal("the strict decode took the retired key before 0067, so the test proves nothing")
+	}
+
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	if _, err = provider.UpTo(t.Context(), 67); err != nil {
+		t.Fatalf("up to 67: %v", err)
+	}
+	var spec, override string
+	if err = store.writer.QueryRowContext(t.Context(), `SELECT spec FROM templates WHERE id = 'tpl-product'`).Scan(&spec); err != nil {
+		t.Fatalf("read the spec: %v", err)
+	}
+	if err = store.writer.QueryRowContext(t.Context(), `SELECT patch FROM template_overrides WHERE id = 'o1'`).Scan(&override); err != nil {
+		t.Fatalf("read the override: %v", err)
+	}
+	if strings.Contains(spec, "specifications") || strings.Contains(override, "specifications") {
+		t.Fatalf("0067 left the retired key: %s / %s", spec, override)
+	}
+	var migrated template.TemplateSpec
+	if err = json.Unmarshal([]byte(spec), &migrated); err != nil {
+		t.Fatalf("decode the migrated spec: %v", err)
+	}
+	resolved, err := template.Resolve(migrated, json.RawMessage(override), nil)
+	if err != nil {
+		t.Fatalf("the migrated spec and override do not resolve: %v", err)
+	}
+	if resolved.Tone != "plain" || resolved.Product == nil || !resolved.Product.ShortDescription.Enabled {
+		t.Errorf("the resolved spec lost what it held beside the retired key: %+v", resolved)
 	}
 }
 

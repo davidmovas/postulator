@@ -98,27 +98,11 @@ type seoPlan struct {
 }
 
 type storePlan struct {
-	ShortDescription *string             `json:"shortDescription,omitempty"`
-	Attributes       []SnapshotAttribute `json:"attributes,omitempty"`
-	Images           []int64             `json:"images,omitempty"`
-	Snapshot         ProductSnapshot     `json:"snapshot"`
-	Expected         string              `json:"expected"`
-	Saved            *productAnswer      `json:"saved,omitempty"`
-	AttributesSent   bool                `json:"attributesSent"`
-	ImagesSent       bool                `json:"imagesSent"`
-}
-
-func (p storePlan) update() wp.UpdateProduct {
-	update := wp.UpdateProduct{ShortDescription: p.ShortDescription}
-	if p.AttributesSent {
-		attributes := ProductSnapshot{Attributes: p.Attributes}.StoreAttributes()
-		update.Attributes = &attributes
-	}
-	if p.ImagesSent {
-		images := slices.Clone(p.Images)
-		update.Images = &images
-	}
-	return update
+	ShortDescription *string         `json:"shortDescription,omitempty"`
+	Images           []int64         `json:"images,omitempty"`
+	Snapshot         ProductSnapshot `json:"snapshot"`
+	Saved            *productAnswer  `json:"saved,omitempty"`
+	ImagesSent       bool            `json:"imagesSent"`
 }
 
 type publishPlan struct {
@@ -213,6 +197,10 @@ func (s *publishState) wrote(write string) {
 	s.Done = append(s.Done, write)
 }
 
+func (s *publishState) wroteAny() bool {
+	return slices.ContainsFunc(s.Done, func(done string) bool { return done != unitCheck })
+}
+
 func (s *publishState) carry(result run.Result) (run.Result, error) {
 	s.Seq++
 	check := run.NewCheckpoint()
@@ -220,7 +208,7 @@ func (s *publishState) carry(result run.Result) (run.Result, error) {
 		return run.Result{}, err
 	}
 	result.Checkpoint = check
-	if len(s.Done) == 0 && !s.Finished {
+	if !s.wroteAny() && !s.Finished {
 		return result, nil
 	}
 	blob, err := encode(s.Result, "publish result")

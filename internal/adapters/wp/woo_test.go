@@ -97,13 +97,35 @@ func TestGetProductTreatsTheTrashAndTheMissingAsNotFound(t *testing.T) {
 	}
 }
 
-func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
+func TestRestoreAttributesSendsTheWholeListAlone(t *testing.T) {
 	t.Parallel()
 
+	server := wptest.New(t)
+	seeded := seedProduct(server)
 	attributes := []wp.ProductAttribute{
 		{ID: 7, Name: "Color", Options: []string{"Blue"}, Visible: true},
 		{Name: "Form", Options: []string{"Liquid"}, Position: 1, Visible: true},
 	}
+	product, err := newClient(t, server).RestoreAttributes(t.Context(), seeded.ID, attributes)
+	if err != nil {
+		t.Fatalf("RestoreAttributes: %v", err)
+	}
+	if len(product.Attributes) != 2 || product.Attributes[1].Name != "Form" || !slices.Equal(product.Attributes[1].Options, []string{"Liquid"}) {
+		t.Errorf("product = %+v", product)
+	}
+	recorded, _ := server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	if _, sent := body["attributes"]; !sent || len(body) != 1 {
+		t.Errorf("the restore sent %v, want the attribute list alone", body)
+	}
+}
+
+func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
+	t.Parallel()
+
 	images := []int64{55}
 
 	cases := []struct {
@@ -119,18 +141,6 @@ func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
 			check: func(t *testing.T, product wp.Product) {
 				t.Helper()
 				if product.ShortDescription != "<p>new short</p>" || len(product.Attributes) != 2 {
-					t.Errorf("product = %+v", product)
-				}
-			},
-		},
-		{
-			name:   "the whole attribute list",
-			update: wp.UpdateProduct{Attributes: &attributes},
-			sent:   []string{"attributes"},
-			check: func(t *testing.T, product wp.Product) {
-				t.Helper()
-				if len(product.Attributes) != 2 || product.Attributes[1].Name != "Form" ||
-					!slices.Equal(product.Attributes[1].Options, []string{"Liquid"}) || product.ShortDescription != "<p>short</p>" {
 					t.Errorf("product = %+v", product)
 				}
 			},

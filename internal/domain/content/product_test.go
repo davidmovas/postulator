@@ -21,10 +21,6 @@ func productSpec() template.TemplateSpec {
 			ShortDescription: template.ProductShortDescription{
 				Enabled: true, Intent: "Say what it is", TargetWords: 40, PrimaryKeyword: true,
 			},
-			Specifications: []template.ProductSpecification{
-				{Name: "Form", Intent: "As the name says"},
-				{Name: "Size", Intent: "As the notes say"},
-			},
 		},
 	}
 }
@@ -57,13 +53,6 @@ func TestNewBriefWritesAProductUnderTheNameTheStoreGivesIt(t *testing.T) {
 	if !brief.Product.ShortDescription || brief.Product.ShortWords != 40 || !brief.Product.ShortKeyword {
 		t.Errorf("product brief = %+v", brief.Product)
 	}
-	names := make([]string, 0, len(brief.Product.Specifications))
-	for _, specification := range brief.Product.Specifications {
-		names = append(names, specification.Name)
-	}
-	if !slices.Equal(names, []string{"Form", "Size"}) {
-		t.Errorf("specifications = %v", names)
-	}
 }
 
 func TestNewBriefLeavesTheProductOutputsOffAPage(t *testing.T) {
@@ -93,14 +82,10 @@ func productAnswer() content.ProductAnswer {
 			Sections: []content.AnswerSection{{Slot: 1, Heading: "Overview", HTML: "<p>bpc 157 liquid in a vial.</p>"}},
 		},
 		ShortDescription: `<p>A <strong>bpc 157 liquid</strong> <a href="/x/">for research</a>.</p>`,
-		Specifications: []content.AnswerSpecification{
-			{Name: "form", Value: " <b>Liquid</b> "},
-			{Name: "Shade", Value: "Clear"},
-		},
 	}
 }
 
-func TestAssembleProductKeepsTheBriefsSpecificationsAndSaysWhichCameBackEmpty(t *testing.T) {
+func TestAssembleProductSanitizesTheShortDescription(t *testing.T) {
 	t.Parallel()
 
 	brief := productBrief(storeProductPage())
@@ -113,13 +98,6 @@ func TestAssembleProductKeepsTheBriefsSpecificationsAndSaysWhichCameBackEmpty(t 
 	}
 	if draft.Product.ShortDescription != `<p>A <strong>bpc 157 liquid</strong> for research.</p>` {
 		t.Errorf("short description = %q, want it sanitized like a section", draft.Product.ShortDescription)
-	}
-	want := []content.Specification{{Name: "Form", Value: "Liquid"}}
-	if !slices.Equal(draft.Product.Specifications, want) {
-		t.Errorf("specifications = %+v, want %+v", draft.Product.Specifications, want)
-	}
-	if !slices.Contains(codesIn(draft.Findings), content.CodeSpecificationMissing) {
-		t.Errorf("findings = %v, want the empty Size named", codesIn(draft.Findings))
 	}
 }
 

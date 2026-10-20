@@ -81,22 +81,39 @@ func (w editWriters) ReadStore(ctx context.Context, target edit.Target) (map[fie
 	if err != nil {
 		return nil, err
 	}
-	return map[field.Key]string{field.ProductShortDescription: product.ShortDescription}, nil
+	return storeValues(product), nil
 }
 
 func (w editWriters) WriteStore(ctx context.Context, target edit.Target, values map[field.Key]string) (map[field.Key]string, error) {
 	var in wp.UpdateProduct
 	for key, value := range values {
-		if key != field.ProductShortDescription {
+		switch key {
+		case field.ProductShortDescription:
+			in.ShortDescription = &value
+		case field.FeaturedImage:
+			image, err := mediaID(value)
+			if err != nil || image == 0 {
+				return nil, errors.New(errors.Invalid, "a product's first image is only ever filled with a media id").
+					WithDetail("value", value)
+			}
+			in.Images = &[]int64{image}
+		default:
 			return nil, errors.New(errors.Invalid, "the store writer takes no such field").WithDetail("key", string(key))
 		}
-		in.ShortDescription = &value
 	}
 	product, err := w.client.UpdateProduct(ctx, target.ID, in)
 	if err != nil {
 		return nil, err
 	}
-	return map[field.Key]string{field.ProductShortDescription: product.ShortDescription}, nil
+	return storeValues(product), nil
+}
+
+func storeValues(product wp.Product) map[field.Key]string {
+	first := ""
+	if len(product.Images) > 0 {
+		first = strconv.FormatInt(product.Images[0].ID, 10)
+	}
+	return map[field.Key]string{field.ProductShortDescription: product.ShortDescription, field.FeaturedImage: first}
 }
 
 func (w editWriters) Plugin(ctx context.Context) (bool, error) {

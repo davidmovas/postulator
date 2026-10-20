@@ -24,17 +24,11 @@ export interface StepDraft {
     params: JsonObject | null;
 }
 
-export interface SpecificationDraft {
-    name: string;
-    intent: string;
-}
-
 export interface ProductDraft {
     shortEnabled: boolean;
     shortIntent: string;
     shortWords: number;
     shortKeyword: boolean;
-    specifications: SpecificationDraft[];
 }
 
 export interface SpecDraft {
@@ -129,9 +123,6 @@ function productOf(held: JsonObject | null): ProductDraft | null {
         shortIntent: text(short, "intent"),
         shortWords: count(short, "targetWords"),
         shortKeyword: flag(short, "primaryKeyword"),
-        specifications: series(held, "specifications")
-            .filter(isJsonObject)
-            .map((row) => ({ name: text(row, "name"), intent: text(row, "intent") })),
     };
 }
 
@@ -143,12 +134,11 @@ function productJson(product: ProductDraft): JsonObject {
             targetWords: product.shortWords,
             primaryKeyword: product.shortKeyword,
         },
-        specifications: product.specifications.map((row) => ({ name: row.name, intent: row.intent })),
     };
 }
 
 export function emptyProduct(): ProductDraft {
-    return { shortEnabled: true, shortIntent: "", shortWords: 0, shortKeyword: false, specifications: [] };
+    return { shortEnabled: true, shortIntent: "", shortWords: 0, shortKeyword: false };
 }
 
 function profilesOf(held: JsonObject | null): ProfileDraft[] {

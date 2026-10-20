@@ -39,16 +39,15 @@ describe("sentencesOf", () => {
             sentencesOf(draft, {
                 product: {
                     shortDescription: { enabled: true, intent: "", targetWords: 40, primaryKeyword: false },
-                    specifications: [{ name: "Form", intent: "" }, { name: "Size", intent: "" }],
                 },
             }),
-        ).toStrictEqual(["writes a short description of about 40 words and fills Form and Size"]);
+        ).toStrictEqual(["writes a short description of about 40 words"]);
         expect(
             sentencesOf(draft, {
-                product: { shortDescription: { enabled: false }, specifications: [] },
+                product: { shortDescription: { enabled: false } },
             }),
         ).toStrictEqual(["writes no product outputs beyond the description"]);
-        const outputs = draftFromJson({ ...base, product: { specifications: [{ name: "Form" }] } });
+        const outputs = draftFromJson({ ...base, product: { shortDescription: { enabled: true } } });
         expect(sentencesOf(outputs, { product: null })).toStrictEqual(["drops the product outputs"]);
     });
 

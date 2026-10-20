@@ -16,6 +16,35 @@ type publishedProduct struct {
 	productHarness
 	published steps.PublishResult
 	pages     *pageMap
+	source    *sourceRecord
+}
+
+func filledByAnOlderRun(t *testing.T, p publishedProduct) publishedProduct {
+	t.Helper()
+
+	held, _ := p.server.Lookup(p.held.ID)
+	filled := make([]wp.ProductAttribute, 0, len(held.Attributes))
+	for _, attribute := range held.Attributes {
+		options := slices.Clone(attribute.Options)
+		if attribute.Name == "form" {
+			options = []string{"Countertop"}
+		}
+		filled = append(filled, wp.ProductAttribute{
+			ID: attribute.ID, Name: attribute.Name, Options: options,
+			Position: attribute.Position, Visible: attribute.Visible, Variation: attribute.Variation,
+		})
+	}
+	if _, err := syncClient(t, p.server).RestoreAttributes(t.Context(), p.held.ID, filled); err != nil {
+		t.Fatalf("fill the attribute as an older release did: %v", err)
+	}
+	snapshot := *p.published.PreviousProduct
+	snapshot.AttributesSent, snapshot.Added = true, []string{"form"}
+	snapshot.Written = []steps.SnapshotAttribute{{Name: "form", Options: []string{"Countertop"}, Position: 1}}
+	p.published.PreviousProduct = &snapshot
+	p.source.items = p.source.items[:0]
+	delete(p.source.artifacts, "item-page-child")
+	p.source.record(t, "page-child", map[run.ArtifactKind]any{run.ArtifactPublishResult: p.published})
+	return p
 }
 
 func publishAndRecord(t *testing.T, item wptest.Item, opts ...wptest.Option) publishedProduct {
@@ -34,7 +63,7 @@ func publishAndRecord(t *testing.T, item wptest.Item, opts ...wptest.Option) pub
 	h.deps.Links = &linkRecorder{}
 	h.deps.Items = source
 	h.deps.Artifacts = source
-	return publishedProduct{productHarness: h, published: published, pages: pages}
+	return publishedProduct{productHarness: h, published: published, pages: pages, source: source}
 }
 
 func TestRevertPutsAProductBackAsTheClientHadIt(t *testing.T) {
@@ -115,9 +144,10 @@ func TestRevertHandsBackAProductAHumanChangedSince(t *testing.T) {
 			reason: "short description",
 		},
 		{
-			name: "an attribute the run filled",
+			name: "an attribute an older run filled",
 			change: func(t *testing.T, p publishedProduct) {
-				if _, err := syncClient(t, p.server).UpdateProduct(t.Context(), p.held.ID, wp.UpdateProduct{Attributes: &wall}); err != nil {
+				filledByAnOlderRun(t, p)
+				if _, err := syncClient(t, p.server).RestoreAttributes(t.Context(), p.held.ID, wall); err != nil {
 					t.Fatalf("edit the attribute: %v", err)
 				}
 			},
@@ -168,12 +198,12 @@ func TestRevertHandsBackAProductAHumanChangedSince(t *testing.T) {
 func TestRevertLeavesAnAttributeAHumanRemovedSince(t *testing.T) {
 	t.Parallel()
 
-	p := publishAndRecord(t, storeProduct())
+	p := filledByAnOlderRun(t, publishAndRecord(t, storeProduct()))
 	kept := []wp.ProductAttribute{
 		{Name: "Origin", Options: []string{"Italy"}, Visible: true},
 		{ID: 3, Name: "Size", Options: []string{}, Position: 2, Visible: true},
 	}
-	if _, err := syncClient(t, p.server).UpdateProduct(t.Context(), p.held.ID, wp.UpdateProduct{Attributes: &kept}); err != nil {
+	if _, err := syncClient(t, p.server).RestoreAttributes(t.Context(), p.held.ID, kept); err != nil {
 		t.Fatalf("remove the attribute: %v", err)
 	}
 
@@ -191,5 +221,18 @@ func TestRevertLeavesAnAttributeAHumanRemovedSince(t *testing.T) {
 	}
 	if stored.Content != "<p>old description</p>" || stored.Excerpt != "<p>old short</p>" {
 		t.Errorf("the product holds %q / %q", stored.Content, stored.Excerpt)
+	}
+}
+
+func TestAnOlderRunsAttributesAreStillPutBack(t *testing.T) {
+	t.Parallel()
+
+	p := filledByAnOlderRun(t, publishAndRecord(t, storeProduct()))
+	reverted, result := runRevert(t, p.deps, "page-child")
+	if result.Next == run.TransitionPause || reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("the revert answered %+v / %s", reverted, result.Message)
+	}
+	if stored, _ := p.server.Lookup(p.held.ID); !reflect.DeepEqual(stored.Attributes, storeProduct().Attributes) {
+		t.Errorf("attributes = %+v, want the ones the older run filled in taken back to %+v", stored.Attributes, storeProduct().Attributes)
 	}
 }

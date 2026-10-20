@@ -262,9 +262,8 @@ func TestTheStoreFactsAreNeverSent(t *testing.T) {
 	client := newClient(t, store.server)
 
 	short := "<p>short</p>"
-	attributes := []wp.ProductAttribute{{ID: 3, Name: "Size", Options: []string{"5 mg", "10 mg"}, Variation: true}}
 	images := []int64{41}
-	if _, err := client.UpdateProduct(t.Context(), store.variable.ID, wp.UpdateProduct{ShortDescription: &short, Attributes: &attributes, Images: &images}); err != nil {
+	if _, err := client.UpdateProduct(t.Context(), store.variable.ID, wp.UpdateProduct{ShortDescription: &short, Images: &images}); err != nil {
 		t.Fatalf("UpdateProduct: %v", err)
 	}
 
@@ -273,7 +272,10 @@ func TestTheStoreFactsAreNeverSent(t *testing.T) {
 	if err := json.Unmarshal(recorded.Body, &sent); err != nil {
 		t.Fatalf("decode the update: %v", err)
 	}
-	for _, field := range []string{"price", "regular_price", "sale_price", "sku", "stock_status", "stock_quantity", "manage_stock", "categories", "meta_data", "variations", "status", "slug", "name"} {
+	for _, field := range []string{
+		"price", "regular_price", "sale_price", "sku", "stock_status", "stock_quantity", "manage_stock", "categories",
+		"meta_data", "variations", "status", "slug", "name", "attributes",
+	} {
 		if _, present := sent[field]; present {
 			t.Errorf("the update sent %s, which the store owns", field)
 		}

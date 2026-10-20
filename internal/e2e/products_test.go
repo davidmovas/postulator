@@ -129,8 +129,7 @@ func productAnswer(keyword string) string {
 		`{"heading":"Who It Is For","html":"<p>It suits the buyer who measures a dose every morning, and not the one who travels light.</p>"},` +
 		`{"heading":"Frequently Asked Questions","html":"<p>It ships in two days and comes back within thirty days unopened.</p>"}],` +
 		`"summary":"What the ` + keyword + ` is and who should buy it.",` +
-		`"shortDescription":"<p>The ` + keyword + ` in a dark glass bottle with a dropper cap.</p>",` +
-		`"specifications":[{"name":"Form","value":"Liquid"},{"name":"Size","value":""}]}`
+		`"shortDescription":"<p>The ` + keyword + ` in a dark glass bottle with a dropper cap.</p>"}`
 }
 
 func productTemplate(t *testing.T, core *app.Core) string {
@@ -308,8 +307,8 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 		for _, attribute := range written.Attributes {
 			names = append(names, attribute.Name+"="+strings.Join(attribute.Options, "|"))
 		}
-		if !slices.Contains(names, "Origin=Client") || !slices.Contains(names, "Form=Liquid") || len(names) != 2 {
-			t.Errorf("%s carries the attributes %v, want the client's kept and the form added", held.Name, names)
+		if !slices.Equal(names, []string{"Origin=Client"}) {
+			t.Errorf("%s carries the attributes %v, want the client's alone, the store owning them", held.Name, names)
 		}
 	}
 	if hub, ok := live.byPath(t, hubPath); !ok || !linksTo(hub.Links, liquidPath) {
