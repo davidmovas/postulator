@@ -3840,3 +3840,13 @@ on what stage 2 left open and what was decided while building.
   pages carry the plan's title, which the observation copies from the site wherever no plan is
   held. Twins still match on the observed copy, with their own matcher, until C.2 moves every
   reader of `Observed` onto the fields.
+- **The product proof runs through a recording forward proxy** (B.8). `TestAProductIsEditedThroughTheRegistry`
+  plants a variable product with the client's own description, short description, `dosage_note`
+  meta and variation descriptions through the store's API, opens the core with `wp.WithProxy` at a
+  proxy the test runs (so the site's host, and every link resolved against it, stays the stand's),
+  enables the variation and custom-field scopes, and runs the product live with rewrites; it proves
+  that no store write sent a name, slug, status, SKU, price, stock, category, tag, attribute, type,
+  parent or menu order, that the only meta key sent is the custom field, that the store's own facts
+  and every variation's facts read the same before, after and after the revert, and that the revert
+  puts back the client's text. The suites' shared recipe gains `generate_fields`, which B.2 made
+  the writer of the short description: without it the product loop wrote none.

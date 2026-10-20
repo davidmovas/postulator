@@ -40,6 +40,7 @@ func recipe() []template.StepSpec {
 		{Name: steps.NameResolveContext, Enabled: true},
 		{Name: steps.NameGenerateBody, Enabled: true},
 		{Name: steps.NameGenerateMeta, Enabled: true},
+		{Name: steps.NameGenerateFields, Enabled: true},
 		{Name: steps.NameInsertLinks, Enabled: true},
 		{Name: steps.NameRepairLinks, Enabled: true},
 		{Name: steps.NameValidate, Enabled: true},
