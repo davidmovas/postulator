@@ -181,6 +181,15 @@ func (w editWriters) WriteMeta(ctx context.Context, target edit.Target, writes m
 	return out, nil, nil
 }
 
+func refusedFor(err error, reason string) bool {
+	var kerr *errors.Error
+	if !errors.IsCode(err, errors.Invalid) || !stderrors.As(err, &kerr) {
+		return false
+	}
+	held, ok := kerr.Details["reason"].(string)
+	return ok && held == reason
+}
+
 func movedOf(err error) (map[string]string, bool) {
 	var kerr *errors.Error
 	if !errors.IsCode(err, errors.Conflict) || !stderrors.As(err, &kerr) {

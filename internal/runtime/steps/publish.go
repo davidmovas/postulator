@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application/edit"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
@@ -95,6 +96,8 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *pub
 		return reviewThePlan(ctx, deps, sc, state, "planned what to write to "+sc.Page.Path)
 	}
 	switch state.next() {
+	case unitCheck:
+		return checkBeforeWriting(ctx, sc, client, itemType, state)
 	case unitRaw:
 		return writeRawBody(ctx, deps, sc, client, itemType, state)
 	case unitItem:
@@ -123,16 +126,16 @@ func orStopped(sc *run.StepContext, stop *run.Result, err error) (run.Result, er
 }
 
 func reviewThePlan(ctx context.Context, deps Deps, sc *run.StepContext, state *publishState, message string) (run.Result, error) {
-	edit, err := deps.planEdit(ctx, sc, state.Plan)
+	planned, err := deps.planEdit(ctx, sc, state.Plan)
 	if err != nil {
 		return run.Result{}, err
 	}
-	state.Result.Fields, state.Result.Blocks = edit.Fields, edit.Blocks
+	state.Result.Fields, state.Result.Blocks = planned.Fields, planned.Blocks
 	hash, err := hashOf(state.Plan, "publish plan")
 	if err != nil {
 		return run.Result{}, err
 	}
-	reviewed := EditPlan{Pages: []PageEdit{edit}, Hash: hash}
+	reviewed := EditPlan{Pages: []PageEdit{planned}, Hash: hash}
 	if state.Plan.Create {
 		reviewed.Pages = nil
 	}
@@ -227,6 +230,9 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 		if site, err = readLiveBody(ctx, client, itemType, existing); err != nil {
 			return nil, err
 		}
+		if stop, guardErr := guardedPlugin(ctx, client, sc, site); guardErr != nil || stop != nil {
+			return stop, guardErr
+		}
 	}
 	final, theirs, part, previous := rendered, "", rendered, site.raw
 	if found && sc.Page.WPID == nil && !block.SameRender(site.raw, rendered) {
@@ -252,6 +258,13 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 		}
 		final, theirs, part, previous = held.final, held.theirs, held.part, held.previous
 	}
+	if keeping == nil && found {
+		rewrote, stop, rewriteErr := deps.rewrite(ctx, sc, site, rendered)
+		if rewriteErr != nil || stop != nil {
+			return stop, rewriteErr
+		}
+		final, theirs, part = rewrote.final, rewrote.theirs, rewrote.part
+	}
 	live := map[field.Key]string{}
 	if found {
 		live[field.Title], live[field.Excerpt] = existing.Title, existing.Excerpt
@@ -267,10 +280,13 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	if err != nil {
 		return nil, err
 	}
-	viaRaw := keeping != nil && site.plugin
+	viaRaw := found && site.plugin
 	request := itemPlan{
 		Title: draft.Title, Slug: sc.Page.Slug, Status: string(sc.Run.PublishMode), Parent: placed.wpID,
-		Featured: featured.FeaturedID, ViaRaw: viaRaw, KeepTitle: kept[field.Title],
+		ViaRaw: viaRaw, KeepTitle: kept[field.Title],
+	}
+	if !found || existing.FeaturedMedia == 0 {
+		request.Featured = featured.FeaturedID
 	}
 	if excerpt, written := answered.Value(field.Excerpt); written && !kept[field.Excerpt] {
 		request.Excerpt = &excerpt
@@ -285,14 +301,15 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	}
 
 	plan := &publishPlan{
-		Writes: make([]string, 0, 3), Kept: kept.keys(), Request: request, SEO: seo, Final: final, Theirs: theirs,
-		Part: part, Previous: previous, SiteHash: site.hash, SiteTitle: existing.Title, Excerpt: existing.Excerpt,
-		WPID: existing.ID, Create: !found, Plugin: site.plugin,
+		Writes: make([]string, 0, 4), Kept: kept.keys(), Request: request, SEO: seo, Final: final, Theirs: theirs,
+		Part: part, Previous: previous, SiteHash: site.hashed(), SiteTitle: existing.Title, Excerpt: existing.Excerpt,
+		WPID: existing.ID, SiteFeatured: existing.FeaturedMedia, Create: !found, Plugin: site.plugin,
+		Unstable: found && !site.stable,
 	}
-	if viaRaw {
-		plan.Writes = append(plan.Writes, unitRaw)
+	if found {
+		plan.Writes = append(plan.Writes, unitCheck)
 	}
-	if !found || request.carries() {
+	if (!found || request.carries()) && !plan.Unstable {
 		plan.Writes = append(plan.Writes, unitItem)
 	} else {
 		read := answerOf(existing)
@@ -300,6 +317,9 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	}
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
+	}
+	if viaRaw && !plan.Unstable {
+		plan.Writes = append(plan.Writes, unitRaw)
 	}
 	state.Plan = plan
 	state.Result = PublishResult{
@@ -312,27 +332,126 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	return nil, nil
 }
 
-func writeRawBody(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, itemType wp.ItemType,
+func guardedPlugin(ctx context.Context, client *wp.Client, sc *run.StepContext, site liveBody) (*run.Result, error) {
+	if !site.plugin {
+		return nil, nil
+	}
+	err := client.GuardedWrites(ctx)
+	switch {
+	case err == nil:
+		return nil, nil
+	case wp.IsPluginOutdated(err):
+		outdated := needsHuman(sc.Page.Path + ": " + ReasonPluginTooOld)
+		return &outdated, nil
+	default:
+		return nil, err
+	}
+}
+
+type rewrittenBody struct {
+	final  string
+	theirs string
+	part   string
+}
+
+func (d Deps) rewrite(ctx context.Context, sc *run.StepContext, site liveBody, rendered string) (rewrittenBody, *run.Result, error) {
+	written, err := d.ourBlocks(ctx, sc.Page.ID)
+	if err != nil {
+		return rewrittenBody{}, nil, err
+	}
+	ours, err := withoutHeadingOne(rendered)
+	if err != nil {
+		return rewrittenBody{}, nil, err
+	}
+	final, theirs, part, err := block.Rewrite(site.raw, written, ours)
+	switch {
+	case errors.IsCode(err, errors.Invalid):
+		refused := needsHuman(sc.Page.Path + ": " + ReasonRewriteRefused + ": " + err.Error())
+		return rewrittenBody{}, &refused, nil
+	case err != nil:
+		return rewrittenBody{}, nil, err
+	}
+	return rewrittenBody{final: final, theirs: theirs, part: part}, nil, nil
+}
+
+func checkBeforeWriting(ctx context.Context, sc *run.StepContext, client *wp.Client, itemType wp.ItemType,
 	state *publishState) (run.Result, error) {
 	plan := state.Plan
-	written, err := client.PutRaw(ctx, itemType, plan.WPID, plan.Final, plan.SiteHash)
-	hash := written.Hash
+	item, err := client.GetItem(ctx, itemType, plan.WPID)
 	if err != nil {
-		if !errors.IsCode(err, errors.Conflict) {
-			return state.failed(err)
+		return state.failed(err)
+	}
+	moved := make([]string, 0)
+	if slices.Contains(plan.Writes, unitItem) {
+		request := plan.Request
+		for _, check := range []struct {
+			key   field.Key
+			moved bool
+		}{
+			{key: field.Title, moved: !request.KeepTitle && item.Title != plan.SiteTitle},
+			{key: field.Excerpt, moved: request.Excerpt != nil && item.Excerpt != plan.Excerpt},
+			{key: field.FeaturedImage, moved: request.Featured != 0 && item.FeaturedMedia != plan.SiteFeatured},
+			{key: field.Body, moved: !request.ViaRaw && wp.ContentHash(item.Content) != plan.SiteHash},
+		} {
+			if check.moved {
+				moved = append(moved, string(check.key))
+			}
 		}
-		landed, readErr := landedRaw(ctx, client, itemType, plan.WPID, plan.Final)
+	}
+	if slices.Contains(plan.Writes, unitSEO) && plan.SEO.Previous != nil {
+		held, readErr := client.GetSEOMeta(ctx, itemType, plan.WPID)
 		if readErr != nil {
 			return state.failed(readErr)
 		}
-		if landed == "" {
-			return state.stopped(rawConflict(sc, plan, err))
-		}
-		hash = landed
+		moved = append(moved, plan.SEO.movedSince(held)...)
 	}
-	if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, plan.WPID, plan.Final, plan.Theirs, plan.Part); recordErr != nil {
+	if slices.Contains(plan.Writes, unitRaw) {
+		raw, readErr := client.GetRaw(ctx, itemType, plan.WPID)
+		if readErr != nil {
+			return state.failed(readErr)
+		}
+		if raw.ContentHash != plan.SiteHash {
+			moved = append(moved, string(field.Body))
+		}
+	}
+	if len(moved) > 0 {
+		state.Plan = nil
+		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
+	}
+	state.wrote(unitCheck)
+	return state.wait("checked what " + sc.Page.Path + " holds before writing over it")
+}
+
+func writeRawBody(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, itemType wp.ItemType,
+	state *publishState) (run.Result, error) {
+	plan := state.Plan
+	key := field.Body
+	if plan.Product {
+		key = field.ProductDescription
+	}
+	target := edit.Target{Type: string(itemType), ID: plan.WPID, Product: plan.Product}
+	results, err := editorFor(client).Write(ctx, target, []edit.Write{{Key: key, Value: new(plan.Final), Expected: new(plan.SiteHash)}})
+	if err != nil {
+		return state.failed(err)
+	}
+	var stored, hash string
+	switch written := results[0]; written.Outcome {
+	case edit.OutcomeWritten:
+		stored, hash = *written.Value, *written.Hash
+	default:
+		held, readErr := client.GetRaw(ctx, itemType, plan.WPID)
+		if readErr != nil {
+			return state.failed(readErr)
+		}
+		if !block.SameRender(held.Content, plan.Final) {
+			return state.stopped(rawConflict(sc, plan, held.ContentHash))
+		}
+		stored, hash = held.Content, held.ContentHash
+	}
+	if recordErr := recordOurBlocks(ctx, deps, sc, stored, plan.Theirs, plan.Part); recordErr != nil {
 		return state.failed(recordErr)
 	}
+	plan.Stored = &stored
 	state.Result.ContentHash = hash
 	if plan.Plugin {
 		state.Result.PreviousContent, state.Result.PreviousContentHash = plan.Previous, wp.ContentHash(plan.Previous)
@@ -341,21 +460,10 @@ func writeRawBody(ctx context.Context, deps Deps, sc *run.StepContext, client *w
 	return state.wait("wrote the body of " + sc.Page.Path)
 }
 
-func landedRaw(ctx context.Context, client *wp.Client, itemType wp.ItemType, id int64, sent string) (string, error) {
-	held, err := client.GetRaw(ctx, itemType, id)
-	if err != nil {
-		return "", err
-	}
-	if !block.SameRender(held.Content, sent) {
-		return "", nil
-	}
-	return held.ContentHash, nil
-}
-
-func rawConflict(sc *run.StepContext, plan *publishPlan, cause error) run.Result {
+func rawConflict(sc *run.StepContext, plan *publishPlan, current string) run.Result {
 	if plan.Product {
 		return needsHuman("the product " + sc.Page.Path + " changed in the store while its description was written: " +
-			"it held " + plan.SiteHash + " and now holds " + currentHashOf(cause))
+			"it held " + plan.SiteHash + " and now holds " + current)
 	}
 	return needsHuman(sc.Page.Path + ": " + ReasonClientChanged)
 }
@@ -367,19 +475,38 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 	var (
 		written    wp.Item
 		mismatches []pagemap.Mismatch
+		stored     = plan.Final
 	)
-	claimed, taken, err := createdEarlier(ctx, client, itemType, sc.Page, plan)
-	switch {
-	case err != nil:
-		return state.failed(err)
-	case taken != nil:
-		return state.stopped(*taken)
-	case claimed != nil:
-		asked.created = true
-		written, mismatches = *claimed, compare(sc, asked, *claimed)
-	default:
-		if written, mismatches, err = writeItem(ctx, client, itemType, sc, asked); err != nil {
+	if plan.Create {
+		claimed, taken, err := createdEarlier(ctx, client, itemType, sc.Page, plan)
+		switch {
+		case err != nil:
 			return state.failed(err)
+		case taken != nil:
+			return state.stopped(*taken)
+		case claimed != nil:
+			asked.created = true
+			written, mismatches = *claimed, compare(sc, asked, *claimed)
+		default:
+			if written, mismatches, err = createItem(ctx, client, itemType, sc, asked); err != nil {
+				return state.failed(err)
+			}
+		}
+		stored = written.Content
+	} else {
+		results, err := editorFor(client).Write(ctx, edit.Target{Type: string(itemType), ID: plan.WPID}, plan.coreWrites())
+		if err != nil {
+			return state.failed(err)
+		}
+		if moved := movedKeys(results); len(moved) > 0 {
+			return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
+		}
+		if written, err = client.GetItem(ctx, itemType, plan.WPID); err != nil {
+			return state.failed(err)
+		}
+		mismatches = compare(sc, asked, written)
+		if body, wrote := writtenValue(results, field.Body); wrote {
+			stored = body
 		}
 	}
 
@@ -392,11 +519,12 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 		state.Result.Excerpt, state.Result.PreviousExcerpt = *plan.Request.Excerpt, &excerpt
 	}
 	if !plan.Request.ViaRaw {
-		state.Result.ContentHash = wp.ContentHash(plan.Final)
+		plan.Stored = &stored
+		state.Result.ContentHash = wp.ContentHash(stored)
 		if plan.Plugin {
 			state.Result.PreviousContent, state.Result.PreviousContentHash = plan.Previous, wp.ContentHash(plan.Previous)
 		}
-		if recordErr := recordOurBlocks(ctx, deps, sc, client, itemType, written.ID, plan.Final, plan.Theirs, plan.Part); recordErr != nil {
+		if recordErr := recordOurBlocks(ctx, deps, sc, stored, plan.Theirs, plan.Part); recordErr != nil {
 			return state.failed(recordErr)
 		}
 	}
@@ -408,6 +536,49 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 		return state.stopped(refuseMismatch(sc, mismatches))
 	}
 	return state.wait(verb(!plan.Create) + " " + sc.Page.Path + " as " + strconv.FormatInt(written.ID, 10))
+}
+
+func (p *publishPlan) coreWrites() []edit.Write {
+	writes := make([]edit.Write, 0, 4)
+	if !p.Request.KeepTitle {
+		writes = append(writes, edit.Write{Key: field.Title, Value: new(p.Request.Title), Expected: expectedOf(p.SiteTitle)})
+	}
+	if p.Request.Excerpt != nil {
+		writes = append(writes, edit.Write{Key: field.Excerpt, Value: p.Request.Excerpt, Expected: expectedOf(p.Excerpt)})
+	}
+	if p.Request.Featured != 0 {
+		writes = append(writes, edit.Write{Key: field.FeaturedImage, Value: new(strconv.FormatInt(p.Request.Featured, 10))})
+	}
+	if !p.Request.ViaRaw {
+		writes = append(writes, edit.Write{Key: field.Body, Value: new(p.Final), Expected: new(p.SiteHash)})
+	}
+	return writes
+}
+
+func expectedOf(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return new(block.BodyHash(value))
+}
+
+func movedKeys(results []edit.Result) []string {
+	out := make([]string, 0)
+	for i := range results {
+		if results[i].Outcome == edit.OutcomeMoved {
+			out = append(out, string(results[i].Key))
+		}
+	}
+	return out
+}
+
+func writtenValue(results []edit.Result, key field.Key) (string, bool) {
+	for i := range results {
+		if results[i].Key == key && results[i].Outcome == edit.OutcomeWritten && results[i].Value != nil {
+			return *results[i].Value, true
+		}
+	}
+	return "", false
 }
 
 func (p *publishPlan) request() writeRequest {
@@ -448,9 +619,12 @@ func writeSEOMeta(ctx context.Context, sc *run.StepContext, client *wp.Client, i
 			plan.SEO.Meta.Canonical = permalinkOf(plan.Item.item())
 		}
 	}
-	seo, err := sendSEO(ctx, client, sc, itemType, wpID, plan.SEO)
+	seo, moved, err := sendSEO(ctx, client, sc, itemType, wpID, plan.SEO)
 	if err != nil {
 		return state.failed(err)
+	}
+	if len(moved) > 0 {
+		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 	}
 	state.Result.took(seo)
 	state.wrote(unitSEO)
@@ -464,11 +638,17 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 		return state.failed(err)
 	}
 	kept := plan.kept()
-	title := written.Title
-	if kept[field.Title] {
+	title, body := written.Title, plan.Final
+	if plan.Stored != nil {
+		body = *plan.Stored
+	}
+	if kept[field.Title] || plan.Unstable {
 		title = ""
 	}
-	if err := recordWritten(ctx, deps, sc, sc.Page.ID, plan.Final, title, state.Result.SEOApplied, kept); err != nil {
+	if plan.Unstable {
+		body = plan.Previous
+	}
+	if err := recordWritten(ctx, deps, sc, sc.Page.ID, body, title, state.Result.SEOApplied, kept); err != nil {
 		return state.failed(err)
 	}
 	if plan.Request.Excerpt != nil {
@@ -480,6 +660,10 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 		if err := recordField(ctx, deps, sc, sc.Page.ID, field.SEOCanonical, canonical); err != nil {
 			return state.failed(err)
 		}
+	}
+	if plan.Unstable {
+		state.Finished = true
+		return state.stopped(needsHuman(sc.Page.Path + ": " + ReasonSaveAltersClient))
 	}
 	return state.finish(verb(!plan.Create) + " " + sc.Page.Path + " as " + strconv.FormatInt(written.ID, 10))
 }
@@ -513,53 +697,24 @@ type writeRequest struct {
 	keepTitle bool
 }
 
-func writeItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, sc *run.StepContext,
+func createItem(ctx context.Context, client *wp.Client, itemType wp.ItemType, sc *run.StepContext,
 	asked writeRequest) (wp.Item, []pagemap.Mismatch, error) {
-	asked.created = !asked.found
-	written, err := upsert(ctx, client, itemType, asked)
+	asked.created = true
+	in := wp.CreateItem{Title: asked.title, Content: asked.content, Slug: asked.slug, Status: asked.status}
+	if asked.excerpt != nil {
+		in.Excerpt = *asked.excerpt
+	}
+	if itemType == wp.TypePage {
+		in.Parent = &asked.parent
+	}
+	if asked.featured != 0 {
+		in.FeaturedMedia = &asked.featured
+	}
+	written, err := client.CreateItem(ctx, itemType, in)
 	if err != nil {
 		return wp.Item{}, nil, err
 	}
-
-	mismatches := compare(sc, asked, written)
-	if len(mismatches) > 0 {
-		asked.existing, asked.found = written, true
-		if written, err = upsert(ctx, client, itemType, asked); err != nil {
-			return wp.Item{}, nil, err
-		}
-		mismatches = compare(sc, asked, written)
-	}
-	return written, mismatches, nil
-}
-
-func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req writeRequest) (wp.Item, error) {
-	if !req.found {
-		in := wp.CreateItem{
-			Title: req.title, Content: req.content, Slug: req.slug, Status: req.status,
-		}
-		if req.excerpt != nil {
-			in.Excerpt = *req.excerpt
-		}
-		if itemType == wp.TypePage {
-			in.Parent = &req.parent
-		}
-		if req.featured != 0 {
-			in.FeaturedMedia = &req.featured
-		}
-		return client.CreateItem(ctx, itemType, in)
-	}
-
-	in := wp.UpdateItem{Excerpt: req.excerpt}
-	if !req.keepTitle {
-		in.Title = &req.title
-	}
-	if !req.viaRaw {
-		in.Content = &req.content
-	}
-	if req.featured != 0 {
-		in.FeaturedMedia = &req.featured
-	}
-	return client.UpdateItem(ctx, itemType, req.existing.ID, in)
+	return written, compare(sc, asked, written), nil
 }
 
 func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap.Mismatch {
@@ -697,7 +852,7 @@ func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item
 		modified := written.Modified.UTC()
 		next.WPModifiedAt = &modified
 	}
-	return deps.Pages.Update(ctx, next)
+	return deps.Pages.UpdatePublished(ctx, next)
 }
 
 func statusOf(mode run.PublishMode) pagemap.Status {

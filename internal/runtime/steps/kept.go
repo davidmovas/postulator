@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
@@ -19,7 +20,18 @@ const (
 		"plugin's raw route can write beside it without changing it; install the plugin or let the run rewrite the page"
 	ReasonSlugTaken = "the site already holds a page under this page's slug that this run did not create; " +
 		"give the planned page another slug, or map that page to the entity in its place, then run it again"
+	ReasonSaveAltersClient = "a save of this page by the site's user would change its owner's content, because the user " +
+		"lacks unfiltered_html, so nothing that saves the post again was written; give that user unfiltered_html, " +
+		"or edit the page by hand"
+	ReasonPluginTooOld = "the companion plugin on the site is too old to write under the hash it read, so nothing was " +
+		"written; upload the new zip over the old one and run the page again"
+	ReasonRewriteRefused = "the rewrite would have changed a block it must keep, so nothing was written"
 )
+
+func fieldsMoved(page string, keys []string) string {
+	return page + ": " + strings.Join(keys, ", ") + " changed on the site after it was read, so nothing more was " +
+		"written; sync the site and run the page again"
+}
 
 func unread() *content.KeptBody {
 	return &content.KeptBody{Raw: "", Hash: block.BodyHash(""), Written: []string{}}
@@ -91,6 +103,7 @@ type liveBody struct {
 	raw    string
 	hash   string
 	plugin bool
+	stable bool
 }
 
 func (b liveBody) hashed() string {
@@ -104,9 +117,9 @@ func readLiveBody(ctx context.Context, client *wp.Client, itemType wp.ItemType, 
 	raw, err := client.GetRaw(ctx, itemType, existing.ID)
 	switch {
 	case err == nil:
-		return liveBody{raw: raw.Content, hash: raw.ContentHash, plugin: true}, nil
+		return liveBody{raw: raw.Content, hash: raw.ContentHash, plugin: true, stable: raw.SaveStable}, nil
 	case wp.IsPluginMissing(err), errors.IsCode(err, errors.NotFound):
-		return liveBody{raw: existing.Content}, nil
+		return liveBody{raw: existing.Content, stable: true}, nil
 	default:
 		return liveBody{}, err
 	}
@@ -173,18 +186,9 @@ func (d Deps) writtenOf(ctx context.Context, pageID string, kept *content.KeptBo
 	return out, nil
 }
 
-func recordOurBlocks(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, itemType wp.ItemType, id int64,
-	sent, theirs, part string) error {
+func recordOurBlocks(ctx context.Context, deps Deps, sc *run.StepContext, stored, theirs, part string) error {
 	if deps.Bodies == nil {
 		return nil
-	}
-	stored := sent
-	raw, err := client.GetRaw(ctx, itemType, id)
-	switch {
-	case err == nil:
-		stored = raw.Content
-	case !wp.IsPluginMissing(err):
-		return err
 	}
 	return deps.Bodies.ReplaceWritten(ctx, sc.Page.ID, block.Ours(stored, theirs, part), sc.Run.ID, deps.now())
 }

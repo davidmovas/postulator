@@ -135,8 +135,8 @@ func TestAnAcceptedReviewWritesAndTheItemCompletes(t *testing.T) {
 		t.Fatal("the written page carries no publish result")
 	}
 	stored, _ := server.Lookup(*sc.Page.WPID)
-	if stored.Content != publishBody || stored.Status != "publish" {
-		t.Errorf("the site holds %q (%s), want our body with the page still published", stored.Content, stored.Status)
+	if want := strings.TrimPrefix(publishBody, "<h1>Espresso</h1>"); stored.Content != want || stored.Status != "publish" {
+		t.Errorf("the site holds %q (%s), want our body, its H1 left to the theme, with the page still published", stored.Content, stored.Status)
 	}
 	if sc.Accepted() {
 		t.Error("the acceptance is still on the item, so a later retry would be taken as accepted")

@@ -3665,3 +3665,28 @@ on what stage 2 left open and what was decided while building.
   template, terms and meta left it, a creation keeping what it needs on `CreateItem`. The variation,
   media, upsell and store meta writers arrive with their fields in Part B, `UpdateMedia` and
   `UpdateVariation` with them.
+- **`publish` writes every field through the registry, the body last, after one check of them all**
+  (A.5). Over an existing page the plan reads every value it will write over, as before, and the
+  first write unit is now a check that reads them all again (the title, excerpt and featured image
+  through core, the SEO fields and their Open Graph twins, the body's hash) and pauses naming each
+  field that moved, nothing written and the plan dropped so a retry reads afresh. The core fields go
+  next through `edit` (read just before their write), then the SEO meta under the hashes read, then
+  the body under the raw route's hash; a field that moves between the check and its own write pauses
+  the same way with the earlier writes on record. A rerun takes a field whose live value is already
+  what it was about to send as written (`edit` treats such a "moved" value as ours), so a lost answer
+  is never written twice. **Six client-ownership paths found by the stage's tests closed here**, each
+  failing first: a rewrite replaced the whole body, the client's shortcodes, banners and other
+  non-text blocks included, and wrote our H1 into it, where it now goes through `block.Rewrite` and
+  ours carries no H1, as the kept path already did; the featured image replaced the client's, where
+  it is now filled only; the Open Graph title and description were overwritten whatever they held,
+  where each is now written only when empty or when it followed its SEO field; the SEO meta went
+  unguarded; a body or SEO field the client edited after the read was written over; a page whose
+  content the user's save filters would change was saved again, where now, without `unfiltered_html`
+  over such a page, only the SEO meta goes and the item pauses `save_alters_client`. A plugin too old
+  for guarded writes pauses the item before anything is written. Our blocks are recorded from the
+  content the write answered, with no second read an edit could race, and the body snapshot is what
+  the site stored. `record` and `adopt` write only what a publish owns
+  (`PageRepo.UpdatePublished`: the WordPress id, status, content hash, the site's copies, the stamps
+  and drift), so a person's edit to the plan during a run is kept. A creation is one call; the second
+  update that tried to fix a mismatch after it is gone, since an update may no longer send a slug,
+  parent or status, and a mismatch pauses as before.

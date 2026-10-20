@@ -38,6 +38,36 @@ func Keep(current string, written []string, ours string) (raw string, kept bool)
 	return strings.Join(parts, keptSeparator), true
 }
 
+func Rewrite(current string, written []string, ours string) (raw, theirs, part string, err error) {
+	body := Parse(current)
+	part = Part(current, written, ours)
+	rewritable := func(held Block) bool { return slices.Contains(written, held.Hash) || held.Prose() }
+	first := slices.IndexFunc(body.Blocks, rewritable)
+	kept := make([]Block, 0, len(body.Blocks))
+	for i := range body.Blocks {
+		if !rewritable(body.Blocks[i]) && strings.TrimSpace(body.Blocks[i].Raw) != "" {
+			kept = append(kept, body.Blocks[i])
+		}
+	}
+	if first < 0 {
+		raw, _ = Keep(current, written, ours)
+		return raw, joinRaw(kept), part, nil
+	}
+	original := body.Blocks
+	for i := range slices.Backward(original) {
+		if i <= first || !rewritable(original[i]) {
+			continue
+		}
+		if body, err = body.Delete(i); err != nil {
+			return "", "", "", err
+		}
+	}
+	if body, err = body.Replace(first, part); err != nil {
+		return "", "", "", err
+	}
+	return body.Serialize(), joinRaw(kept), part, nil
+}
+
 func Client(current string, written []string) string {
 	return joinRaw(clientBlocks(Parse(current), written))
 }

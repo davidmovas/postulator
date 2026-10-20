@@ -192,6 +192,59 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	}
 }
 
+func TestPageRepoUpdatePublishedTouchesOnlyWhatAPublishOwns(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageRepo(store)
+
+	read := fullPage(owner.ID, "/bpc-157/", sqlitetest.Stamp)
+	if err := repo.Insert(t.Context(), read); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+	edited := read
+	edited.Keywords = keyword.New([]keyword.Keyword{{Text: "edited while the run wrote"}})
+	edited.Title = "Edited by a person"
+	edited.Notes = []note.Note{{Label: "Notes", Text: "a person's note, kept"}}
+	edited.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
+	if err := repo.Update(t.Context(), edited); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	wpID := int64(4242)
+	synced := sqlitetest.Stamp.Add(3 * time.Minute)
+	published := read
+	published.WPID = &wpID
+	published.Status = pagemap.StatusPublished
+	published.ContentHash = "published-hash"
+	published.Observed = pagemap.Observed{Link: "https://shop.test/bpc-157/", Slug: "bpc-157", Status: "publish", Title: "On the site", H1: "Heading"}
+	published.Drift = false
+	published.LastSyncedAt = &synced
+	published.WPModifiedAt = &synced
+	published.UpdatedAt = sqlitetest.Stamp.Add(2 * time.Minute)
+	if err := repo.UpdatePublished(t.Context(), published); err != nil {
+		t.Fatalf("UpdatePublished: %v", err)
+	}
+
+	got, err := repo.Get(t.Context(), read.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	want := edited
+	want.WPID, want.Status, want.ContentHash, want.Observed = &wpID, pagemap.StatusPublished, "published-hash", published.Observed
+	want.Drift, want.LastSyncedAt, want.WPModifiedAt, want.UpdatedAt = false, &synced, &synced, published.UpdatedAt
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Get = %+v\nwant %+v", got, want)
+	}
+
+	missing := read
+	missing.ID = id.New()
+	if err = repo.UpdatePublished(t.Context(), missing); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("UpdatePublished of an unknown page code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
 func TestPageRepoUpdateDerivedTouchesOnlyTheDerivedColumns(t *testing.T) {
 	t.Parallel()
 

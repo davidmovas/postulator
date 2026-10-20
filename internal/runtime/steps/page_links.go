@@ -11,7 +11,7 @@ import (
 
 func persist(ctx context.Context, deps Deps, page pagemap.Page, links []pagemap.PageLink) error {
 	return deps.inUnit(ctx, func(c context.Context) error {
-		if err := deps.Pages.Update(c, page); err != nil {
+		if err := deps.Pages.UpdatePublished(c, page); err != nil {
 			return err
 		}
 		return deps.Links.ReplaceForPage(c, page.ID, pagemap.SourceRaw, links)

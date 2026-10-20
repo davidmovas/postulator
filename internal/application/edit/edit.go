@@ -212,8 +212,14 @@ func checked(ctx context.Context, target Target, group []Write, read reader, put
 		return nil, err
 	}
 	results := make([]Result, 0, len(group))
+	values := make(map[field.Key]string, len(group))
 	for i := range group {
-		if current := live[group[i].Key]; !holds(current, group[i].Expected) {
+		current := live[group[i].Key]
+		switch {
+		case holds(current, group[i].Expected):
+			values[group[i].Key] = text(group[i].Value)
+		case current == text(group[i].Value):
+		default:
 			results = append(results, Result{Key: group[i].Key, Outcome: OutcomeMoved, Hash: new(block.BodyHash(current))})
 		}
 	}
@@ -221,13 +227,11 @@ func checked(ctx context.Context, target Target, group []Write, read reader, put
 		return withHeld(results, group), nil
 	}
 
-	values := make(map[field.Key]string, len(group))
-	for i := range group {
-		values[group[i].Key] = text(group[i].Value)
-	}
-	stored, err := put(ctx, target, values)
-	if err != nil {
-		return nil, err
+	stored := live
+	if len(values) > 0 {
+		if stored, err = put(ctx, target, values); err != nil {
+			return nil, err
+		}
 	}
 	for i := range group {
 		value := stored[group[i].Key]
@@ -236,72 +240,127 @@ func checked(ctx context.Context, target Target, group []Write, read reader, put
 	return results, nil
 }
 
+const sendings = 2
+
 func (s Service) writeMeta(ctx context.Context, target Target, group []Write) ([]Result, error) {
-	writes := make(map[string]MetaWrite, len(group))
-	for i := range group {
-		writes[group[i].Key.Instance()] = MetaWrite{Value: group[i].Value, Expected: group[i].Expected}
-	}
-	stored, moved, err := s.writers.Plugin.WriteMeta(ctx, target, writes)
-	if err != nil {
-		return nil, err
-	}
-	results := make([]Result, 0, len(group))
-	if len(moved) > 0 {
-		for i := range group {
-			if hash, shifted := moved[group[i].Key.Instance()]; shifted {
-				results = append(results, Result{Key: group[i].Key, Outcome: OutcomeMoved, Hash: hash})
+	written := make(map[field.Key]Result, len(group))
+	pending := group
+	for range sendings {
+		if len(pending) == 0 {
+			break
+		}
+		writes := make(map[string]MetaWrite, len(pending))
+		for i := range pending {
+			writes[pending[i].Key.Instance()] = MetaWrite{Value: pending[i].Value, Expected: pending[i].Expected}
+		}
+		stored, moved, err := s.writers.Plugin.WriteMeta(ctx, target, writes)
+		if err != nil {
+			return nil, err
+		}
+		next := make([]Write, 0, len(pending))
+		shifted := make([]Result, 0)
+		for i := range pending {
+			hash, isMoved := moved[pending[i].Key.Instance()]
+			switch {
+			case len(moved) == 0:
+				held := stored[pending[i].Key.Instance()]
+				written[pending[i].Key] = Result{Key: pending[i].Key, Outcome: OutcomeWritten, Value: held.Value, Hash: held.Hash}
+			case !isMoved:
+				next = append(next, pending[i])
+			case sameStored(hash, pending[i].Value):
+				written[pending[i].Key] = Result{Key: pending[i].Key, Outcome: OutcomeWritten, Value: pending[i].Value, Hash: hash}
+			default:
+				shifted = append(shifted, Result{Key: pending[i].Key, Outcome: OutcomeMoved, Hash: hash})
 			}
 		}
-		return withHeld(results, group), nil
+		if len(shifted) > 0 {
+			return settled(group, written, shifted), nil
+		}
+		pending = next
 	}
-	for i := range group {
-		held := stored[group[i].Key.Instance()]
-		results = append(results, Result{Key: group[i].Key, Outcome: OutcomeWritten, Value: held.Value, Hash: held.Hash})
-	}
-	return results, nil
+	return settled(group, written, nil), nil
 }
 
 func (s Service) writeSEO(ctx context.Context, target Target, group []Write) ([]Result, error) {
-	values := make(map[string]string, 2*len(group))
-	expected := make(map[string]string, 2*len(group))
+	written := make(map[field.Key]Result, len(group))
+	pending := group
+	for range sendings {
+		if len(pending) == 0 {
+			break
+		}
+		values, expected := seoRequest(pending)
+		hashes, moved, err := s.writers.Plugin.WriteSEO(ctx, target, values, expected)
+		if err != nil {
+			return nil, err
+		}
+		next := make([]Write, 0, len(pending))
+		shifted := make([]Result, 0)
+		for i := range pending {
+			name, value := seoNames[pending[i].Key], values[seoNames[pending[i].Key]]
+			hash, isMoved := movedSEO(moved, pending[i])
+			switch {
+			case len(moved) == 0:
+				written[pending[i].Key] = Result{Key: pending[i].Key, Outcome: OutcomeWritten, Value: &value, Hash: new(hashes[name])}
+			case !isMoved:
+				next = append(next, pending[i])
+			case seoStored(moved, values, pending[i]):
+				written[pending[i].Key] = Result{Key: pending[i].Key, Outcome: OutcomeWritten, Value: &value, Hash: new(block.BodyHash(value))}
+			default:
+				shifted = append(shifted, Result{Key: pending[i].Key, Outcome: OutcomeMoved, Hash: &hash})
+			}
+		}
+		if len(shifted) > 0 {
+			return settled(group, written, shifted), nil
+		}
+		pending = next
+	}
+	return settled(group, written, nil), nil
+}
+
+func seoRequest(group []Write) (values, expected map[string]string) {
+	values = make(map[string]string, 2*len(group))
+	expected = make(map[string]string, 2*len(group))
 	for i := range group {
 		name := seoNames[group[i].Key]
 		values[name], expected[name] = text(group[i].Value), expectation(group[i].Expected)
 		if social := group[i].Social; social != nil {
-			values[socialNames[group[i].Key]], expected[socialNames[group[i].Key]] = social.Value, social.Expected
+			twin := socialNames[group[i].Key]
+			values[twin], expected[twin] = social.Value, social.Expected
 		}
 	}
-	hashes, moved, err := s.writers.Plugin.WriteSEO(ctx, target, values, expected)
-	if err != nil {
-		return nil, err
+	return values, expected
+}
+
+func movedSEO(moved map[string]string, write Write) (string, bool) {
+	if hash, shifted := moved[seoNames[write.Key]]; shifted {
+		return hash, true
 	}
-	results := make([]Result, 0, len(group))
-	if len(moved) > 0 {
-		for i := range group {
-			hash, shifted := moved[seoNames[group[i].Key]]
-			if social, twin := moved[socialNames[group[i].Key]]; twin && !shifted {
-				hash, shifted = social, true
-			}
-			if shifted {
-				results = append(results, Result{Key: group[i].Key, Outcome: OutcomeMoved, Hash: &hash})
-			}
+	if write.Social == nil {
+		return "", false
+	}
+	hash, shifted := moved[socialNames[write.Key]]
+	return hash, shifted
+}
+
+func seoStored(moved, values map[string]string, write Write) bool {
+	for _, name := range []string{seoNames[write.Key], socialNames[write.Key]} {
+		if hash, shifted := moved[name]; shifted && (name == "" || hash != block.BodyHash(values[name])) {
+			return false
 		}
-		return withHeld(results, group), nil
 	}
-	for i := range group {
-		value, hash := values[seoNames[group[i].Key]], hashes[seoNames[group[i].Key]]
-		results = append(results, Result{Key: group[i].Key, Outcome: OutcomeWritten, Value: &value, Hash: &hash})
-	}
-	return results, nil
+	return true
 }
 
 func (s Service) writeBody(ctx context.Context, target Target, group []Write) ([]Result, error) {
 	results := make([]Result, 0, len(group))
 	for i := range group {
-		stored, moved, err := s.writers.Plugin.WriteBody(ctx, target, text(group[i].Value), expectation(group[i].Expected))
+		content := text(group[i].Value)
+		stored, moved, err := s.writers.Plugin.WriteBody(ctx, target, content, expectation(group[i].Expected))
 		switch {
 		case err != nil:
 			return nil, err
+		case moved != nil && *moved == block.BodyHash(content):
+			results = append(results, Result{Key: group[i].Key, Outcome: OutcomeWritten, Value: &content, Hash: moved})
 		case moved != nil:
 			results = append(results, Result{Key: group[i].Key, Outcome: OutcomeMoved, Hash: moved})
 			return withHeld(results, group), nil
@@ -310,6 +369,31 @@ func (s Service) writeBody(ctx context.Context, target Target, group []Write) ([
 		}
 	}
 	return results, nil
+}
+
+func sameStored(hash, value *string) bool {
+	if hash == nil || value == nil {
+		return hash == nil && value == nil
+	}
+	return *hash == block.BodyHash(*value)
+}
+
+func settled(group []Write, written map[field.Key]Result, shifted []Result) []Result {
+	results := make([]Result, 0, len(group))
+	for i := range group {
+		if held, done := written[group[i].Key]; done {
+			results = append(results, held)
+			continue
+		}
+		outcome := Result{Key: group[i].Key, Outcome: OutcomeHeld}
+		for k := range shifted {
+			if shifted[k].Key == group[i].Key {
+				outcome = shifted[k]
+			}
+		}
+		results = append(results, outcome)
+	}
+	return results
 }
 
 func holds(current string, expected *string) bool {

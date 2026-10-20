@@ -28,10 +28,10 @@ func publishedIn(t *testing.T, result run.Result) (steps.PublishResult, bool) {
 	return steps.PublishResult{}, false
 }
 
-func failTheWriteAfterTheBody(server *wptest.Server, id int64, onSite string) func(int) bool {
+func failTheWriteAfterTheSEO(server *wptest.Server, id int64) func(int) bool {
 	failed := false
 	return func(int) bool {
-		if stored, _ := server.Lookup(id); !failed && stored.Content != onSite {
+		if stored, _ := server.Lookup(id); !failed && stored.Meta["_yoast_wpseo_title"] != "" {
 			server.FailNext(http.StatusBadRequest, 1)
 			failed = true
 		}
@@ -45,21 +45,20 @@ func TestAPublishPausedAfterItsFirstWriteIsStillRevertible(t *testing.T) {
 	kept := &content.KeptBody{Raw: clientText, Hash: block.BodyHash(clientText)}
 	deps, server, _, sc := keptRun(t, oursBody, kept)
 
-	result, err := driveLosing(t, steps.Publish(deps), sc, failTheWriteAfterTheBody(server, *sc.Page.WPID, clientText))
+	result, err := driveLosing(t, steps.Publish(deps), sc, failTheWriteAfterTheSEO(server, *sc.Page.WPID))
 	if err == nil {
-		t.Fatalf("result = %+v, want the injected failure of the write after the body", result)
+		t.Fatalf("result = %+v, want the injected failure of the body written after the SEO meta", result)
 	}
 	stored, _ := server.Lookup(*sc.Page.WPID)
-	if stored.Content != clientText+"\n\n"+oursBody {
-		t.Fatalf("the site holds %q, want the body written before the update failed", stored.Content)
+	if stored.Content != clientText || stored.Meta["_yoast_wpseo_title"] != "espresso | Shop" {
+		t.Fatalf("the site holds %q with %v, want the SEO meta written and the body not yet", stored.Content, stored.Meta)
 	}
 	published, held := publishedIn(t, result)
 	if !held {
 		t.Fatal("the failed execution carried no publish result, so a revert would find nothing to put back")
 	}
-	if published.PreviousContent != clientText || published.ContentHash != block.BodyHash(stored.Content) {
-		t.Errorf("the record = previous %q hash %q, want the client's body and the hash of what the site holds",
-			published.PreviousContent, published.ContentHash)
+	if published.PreviousMeta == nil || len(published.SEOApplied) == 0 {
+		t.Errorf("the record = %+v, want the SEO meta it wrote and what it replaced", published)
 	}
 }
 

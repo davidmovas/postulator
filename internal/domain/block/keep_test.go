@@ -154,3 +154,63 @@ func TestOursAreTheBlocksTheClientDidNotHave(t *testing.T) {
 		t.Errorf("with no client text every block is ours: %v", all)
 	}
 }
+
+func TestARewriteKeepsTheClientsNonTextBlocks(t *testing.T) {
+	t.Parallel()
+
+	const (
+		intro     = "<p>His intro.</p>"
+		outro     = "<p>His outro.</p>"
+		shortcode = `[products limit="4"]`
+		banner    = `<div class="banner">Sale today</div>`
+		ours      = "<h2>Storage</h2>\n\n<p>Keep them cold.</p>"
+		earlier   = "<p>What we wrote before.</p>"
+		html      = "<!-- wp:html -->\n" + ours + "\n<!-- /wp:html -->"
+		paragraph = "<!-- wp:paragraph -->\n<p>His editor text.</p>\n<!-- /wp:paragraph -->"
+		cart      = "<!-- wp:woocommerce/cart /-->"
+	)
+	cases := []struct {
+		name    string
+		current string
+		written []string
+		want    string
+		theirs  string
+	}{
+		{name: "an empty body is ours alone", current: "", want: ours},
+		{
+			name: "ours takes the first text block and his other text goes", current: intro + "\n\n" + shortcode + "\n\n" + outro + "\n\n" + banner,
+			want: ours + "\n\n" + shortcode + "\n\n" + banner, theirs: shortcode + banner,
+		},
+		{
+			name: "ours takes the place of what we wrote before", current: shortcode + "\n\n" + earlier + "\n\n" + outro,
+			written: []string{block.Hash(earlier)}, want: shortcode + "\n\n" + ours, theirs: shortcode,
+		},
+		{
+			name: "a body with no text keeps everything and takes ours before the grid", current: shortcode,
+			want: ours + "\n\n" + shortcode, theirs: shortcode,
+		},
+		{
+			name: "an editor body takes ours as one html block", current: paragraph + "\n\n" + cart,
+			want: html + "\n\n" + cart, theirs: cart,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			raw, theirs, part, err := block.Rewrite(tc.current, tc.written, ours)
+			if err != nil {
+				t.Fatalf("Rewrite: %v", err)
+			}
+			if raw != tc.want {
+				t.Errorf("the body is\n%q\nwant\n%q", raw, tc.want)
+			}
+			if strings.ReplaceAll(theirs, "\n", "") != tc.theirs {
+				t.Errorf("theirs = %q, want %q", theirs, tc.theirs)
+			}
+			if !strings.Contains(raw, strings.TrimSpace(part)) {
+				t.Errorf("our part %q is not in the body %q", part, raw)
+			}
+		})
+	}
+}

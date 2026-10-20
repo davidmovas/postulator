@@ -73,6 +73,10 @@ func (p pageList) Update(_ context.Context, page pagemap.Page) error {
 	return p.err
 }
 
+func (p pageList) UpdatePublished(ctx context.Context, page pagemap.Page) error {
+	return p.Update(ctx, page)
+}
+
 func (p pageList) Insert(context.Context, pagemap.Page) error {
 	return p.err
 }
@@ -92,6 +96,10 @@ func (p *pageRecorder) Get(_ context.Context, id string) (pagemap.Page, error) {
 func (p *pageRecorder) Update(_ context.Context, page pagemap.Page) error {
 	p.last = page
 	return nil
+}
+
+func (p *pageRecorder) UpdatePublished(ctx context.Context, page pagemap.Page) error {
+	return p.Update(ctx, page)
 }
 
 func (p *pageRecorder) Insert(_ context.Context, page pagemap.Page) error {

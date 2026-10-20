@@ -35,6 +35,7 @@ type pageStore interface {
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
+	UpdatePublished(ctx context.Context, page pagemap.Page) error
 }
 
 type linkStore interface {

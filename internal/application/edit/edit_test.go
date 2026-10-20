@@ -275,6 +275,31 @@ func TestAMovedValueIsNotWrittenOver(t *testing.T) {
 	}
 }
 
+func TestAValueAlreadyStoredIsTakenAsWritten(t *testing.T) {
+	t.Parallel()
+
+	s := newSite()
+	s.core[field.Title], s.body, s.seo["title"], s.meta["subtitle"] = "New title", "<p>New</p>", "New SEO", "New"
+	results, err := serviceOver(s).Write(t.Context(), page, []edit.Write{
+		{Key: field.Title, Value: new("New title"), Expected: hashOf("Old title")},
+		{Key: field.Excerpt, Value: new("Fresh")},
+		{Key: field.Instance(field.Meta, "subtitle"), Value: new("New"), Expected: hashOf("Old")},
+		{Key: field.SEOTitle, Value: new("New SEO"), Expected: hashOf("Old SEO")},
+		{Key: field.Body, Value: new("<p>New</p>"), Expected: hashOf("<p>Old body</p>")},
+	})
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	for _, result := range results {
+		if result.Outcome != edit.OutcomeWritten {
+			t.Errorf("%s is %s, want a value the site already holds taken as written", result.Key, result.Outcome)
+		}
+	}
+	if s.core[field.Excerpt] != "Fresh" {
+		t.Errorf("the excerpt beside an already stored title was not written: %q", s.core[field.Excerpt])
+	}
+}
+
 func TestAnOutdatedPluginWritesNothing(t *testing.T) {
 	t.Parallel()
 

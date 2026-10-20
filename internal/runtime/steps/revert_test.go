@@ -63,6 +63,10 @@ func (p *pageMap) Update(_ context.Context, page pagemap.Page) error {
 	return nil
 }
 
+func (p *pageMap) UpdatePublished(ctx context.Context, page pagemap.Page) error {
+	return p.Update(ctx, page)
+}
+
 type sourceRecord struct {
 	items     []run.Item
 	artifacts map[string][]run.Artifact

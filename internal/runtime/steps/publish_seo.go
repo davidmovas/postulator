@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application/edit"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -74,12 +76,87 @@ func planSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemTy
 	if err != nil {
 		return seoPlan{}, err
 	}
+	if previous != nil {
+		if previous.OGTitle != "" && previous.OGTitle != previous.Title {
+			meta.OGTitle = ""
+		}
+		if previous.OGDescription != "" && previous.OGDescription != previous.Description {
+			meta.OGDescription = ""
+		}
+	}
 	return seoPlan{
 		Previous: previous, Send: true, Canonical: canonical,
 		Meta: wp.SEOMeta{
 			Title: meta.Title, Description: meta.Description, OGTitle: meta.OGTitle, OGDescription: meta.OGDescription,
 		},
 	}, nil
+}
+
+func (p seoPlan) before() wp.SEOMeta {
+	if p.Previous == nil {
+		return wp.SEOMeta{}
+	}
+	return *p.Previous
+}
+
+func (p seoPlan) writes() []edit.Write {
+	before := p.before()
+	out := make([]edit.Write, 0, 3)
+	for _, sent := range []struct {
+		key                     field.Key
+		value, held, og, heldOG string
+	}{
+		{key: field.SEOTitle, value: p.Meta.Title, held: before.Title, og: p.Meta.OGTitle, heldOG: before.OGTitle},
+		{key: field.SEODescription, value: p.Meta.Description, held: before.Description, og: p.Meta.OGDescription, heldOG: before.OGDescription},
+		{key: field.SEOCanonical, value: p.Meta.Canonical, held: before.Canonical},
+	} {
+		if sent.value == "" {
+			continue
+		}
+		write := edit.Write{Key: sent.key, Value: new(sent.value), Expected: new(block.BodyHash(sent.held))}
+		if sent.og != "" {
+			write.Social = &edit.Social{Value: sent.og, Expected: block.BodyHash(sent.heldOG)}
+		}
+		out = append(out, write)
+	}
+	return out
+}
+
+func (p seoPlan) movedSince(held wp.SEOMeta) []string {
+	before := p.before()
+	moved := make([]string, 0, 2)
+	if p.Meta.Title != "" && (held.Title != before.Title || (p.Meta.OGTitle != "" && held.OGTitle != before.OGTitle)) {
+		moved = append(moved, string(field.SEOTitle))
+	}
+	if p.Meta.Description != "" && (held.Description != before.Description ||
+		(p.Meta.OGDescription != "" && held.OGDescription != before.OGDescription)) {
+		moved = append(moved, string(field.SEODescription))
+	}
+	return moved
+}
+
+func appliedOf(plan seoPlan, results []edit.Result) []string {
+	written := make(map[field.Key]bool, len(results))
+	for i := range results {
+		written[results[i].Key] = results[i].Outcome == edit.OutcomeWritten
+	}
+	applied := make([]string, 0, 5)
+	for _, name := range []struct {
+		field string
+		key   field.Key
+		sent  bool
+	}{
+		{field: "title", key: field.SEOTitle, sent: true},
+		{field: "description", key: field.SEODescription, sent: true},
+		{field: "canonical", key: field.SEOCanonical, sent: true},
+		{field: "ogTitle", key: field.SEOTitle, sent: plan.Meta.OGTitle != ""},
+		{field: "ogDescription", key: field.SEODescription, sent: plan.Meta.OGDescription != ""},
+	} {
+		if name.sent && written[name.key] {
+			applied = append(applied, name.field)
+		}
+	}
+	return applied
 }
 
 func (d Deps) canonicalWritten(ctx context.Context, sc *run.StepContext, creating bool) (bool, error) {
@@ -95,20 +172,20 @@ func (d Deps) canonicalWritten(ctx context.Context, sc *run.StepContext, creatin
 }
 
 func sendSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64,
-	plan seoPlan) (seoWrite, error) {
-	result, err := client.SetSEOMeta(ctx, itemType, wpID, plan.Meta, nil)
-	if err != nil {
-		if wp.IsPluginMissing(err) {
-			return metaNotWritten(sc.Page, ReasonNoPlugin), nil
-		}
-		return seoWrite{}, err
+	plan seoPlan) (seo seoWrite, moved []string, err error) {
+	results, err := editorFor(client).Write(ctx, edit.Target{Type: string(itemType), ID: wpID}, plan.writes())
+	switch {
+	case wp.IsPluginMissing(err), refusedFor(err, edit.ReasonNoPlugin):
+		return metaNotWritten(sc.Page, ReasonNoPlugin), nil, nil
+	case wp.IsPluginOutdated(err):
+		return metaNotWritten(sc.Page, ReasonPluginTooOld), nil, nil
+	case err != nil:
+		return seoWrite{}, nil, err
 	}
-	return seoWrite{
-		previous: plan.Previous,
-		applied:  append(make([]string, 0, len(result.Applied)), result.Applied...),
-		skipped:  []string{},
-		findings: nil,
-	}, nil
+	if moved = movedKeys(results); len(moved) > 0 {
+		return seoWrite{}, moved, nil
+	}
+	return seoWrite{previous: plan.Previous, applied: appliedOf(plan, results), skipped: []string{}}, nil, nil
 }
 
 func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.Capabilities,

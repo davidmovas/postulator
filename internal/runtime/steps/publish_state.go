@@ -15,6 +15,7 @@ import (
 const (
 	checkpointPublish = "publish"
 
+	unitCheck = "check"
 	unitRaw   = "raw"
 	unitItem  = "item"
 	unitStore = "store"
@@ -121,23 +122,26 @@ func (p storePlan) update() wp.UpdateProduct {
 }
 
 type publishPlan struct {
-	Store     *storePlan  `json:"store,omitempty"`
-	Item      *itemAnswer `json:"item,omitempty"`
-	Writes    []string    `json:"writes"`
-	Kept      []field.Key `json:"kept"`
-	Request   itemPlan    `json:"request"`
-	SEO       seoPlan     `json:"seo"`
-	Final     string      `json:"final"`
-	Theirs    string      `json:"theirs"`
-	Part      string      `json:"part"`
-	Previous  string      `json:"previous"`
-	SiteHash  string      `json:"siteHash"`
-	SiteTitle string      `json:"siteTitle"`
-	Excerpt   string      `json:"excerpt"`
-	WPID      int64       `json:"wpId"`
-	Create    bool        `json:"create"`
-	Plugin    bool        `json:"plugin"`
-	Product   bool        `json:"product"`
+	Store        *storePlan  `json:"store,omitempty"`
+	Item         *itemAnswer `json:"item,omitempty"`
+	Writes       []string    `json:"writes"`
+	Kept         []field.Key `json:"kept"`
+	Request      itemPlan    `json:"request"`
+	SEO          seoPlan     `json:"seo"`
+	Final        string      `json:"final"`
+	Stored       *string     `json:"stored,omitempty"`
+	Theirs       string      `json:"theirs"`
+	Part         string      `json:"part"`
+	Previous     string      `json:"previous"`
+	SiteHash     string      `json:"siteHash"`
+	SiteTitle    string      `json:"siteTitle"`
+	Excerpt      string      `json:"excerpt"`
+	WPID         int64       `json:"wpId"`
+	SiteFeatured int64       `json:"siteFeatured"`
+	Create       bool        `json:"create"`
+	Plugin       bool        `json:"plugin"`
+	Product      bool        `json:"product"`
+	Unstable     bool        `json:"unstable"`
 }
 
 func (p *publishPlan) kept() keptFields {

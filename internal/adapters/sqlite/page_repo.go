@@ -19,6 +19,7 @@ const (
 	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, slug = ?, parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, canonical = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
 	updateDerived     = `UPDATE pages SET parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, status = ?, updated_at = ? WHERE id = ?`
+	updatePublished   = `UPDATE pages SET wp_id = ?, status = ?, content_hash = ?, wp_link = ?, wp_slug = ?, wp_status = ?, wp_title = ?, wp_h1 = ?, wp_modified_at = ?, last_synced_at = ?, drift = ?, updated_at = ? WHERE id = ?`
 	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE id = ?`
 	autoPageType      = `UPDATE pages SET page_type_id = ?, page_type_source = 'auto', page_type_reason = ?, updated_at = ? WHERE id = ? AND page_type_id IS NULL`
 	reassignPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE page_type_id = ?`
@@ -89,6 +90,14 @@ func (r *PageRepo) UpdateDerived(ctx context.Context, p pagemap.Page) error {
 		nullString(p.ParentPageID), storedParentReason(p.ParentReason), string(p.ParentMethod),
 		string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.Status), formatTime(p.UpdatedAt), p.ID,
 	}, nil, "update the page's derived facts")
+	return requireAffected(affected, err, pageNotFound(p.ID))
+}
+
+func (r *PageRepo) UpdatePublished(ctx context.Context, p pagemap.Page) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updatePublished, []any{
+		nullInt(p.WPID), string(p.Status), p.ContentHash, p.Observed.Link, p.Observed.Slug, p.Observed.Status, p.Observed.Title,
+		p.Observed.H1, nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), boolInt(p.Drift), formatTime(p.UpdatedAt), p.ID,
+	}, nil, "update what a publish wrote to the page")
 	return requireAffected(affected, err, pageNotFound(p.ID))
 }
 
