@@ -23,7 +23,6 @@ const (
 	CodeCommerceForbidden         = "commerce_forbidden"
 	CodeProductNeedsPlugin        = "product_needs_plugin"
 	CodeProductNotInStore         = "product_not_in_store"
-	CodeProductEditedLive         = "product_edited_live"
 	CodeProductCategoryUnwritable = "product_category_unwritable"
 	CodeProductOutputsMissing     = "product_outputs_missing"
 	CodeProductOutputsIgnored     = "product_outputs_ignored"
@@ -142,9 +141,9 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *
 	if state.Plan == nil {
 		stop, planErr := planProduct(ctx, deps, sc, client, state, body, draft)
 		if planErr != nil || stop != nil {
-			return orStopped(stop, planErr)
+			return orStopped(sc, stop, planErr)
 		}
-		return state.wait("planned what to write to the product " + sc.Page.Path)
+		return reviewThePlan(ctx, deps, sc, state, "planned what to write to the product "+sc.Page.Path)
 	}
 	switch state.next() {
 	case unitStore:

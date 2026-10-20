@@ -34,6 +34,7 @@ import (
 	domainrun "github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -324,6 +325,24 @@ const minimalSpec = `{"sections":[{"heading":"Overview","intent":"what it is","t
 	`"keywordRules":{"primaryInTitle":true,"primaryInH1":true,"primaryInFirstParagraph":true,"maxDensity":0.02},` +
 	`"metaRules":{"titlePattern":"{primaryKeyword}","descriptionMax":155},` +
 	`"images":{"featured":false,"inline":0,"source":"ai"}}`
+
+func TestAToolCallActsAsTheAgent(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, seeded := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+	asPerson := kctx.WithActor(t.Context(), kctx.ActorUser)
+
+	out, err := registry.Call(asPerson, binding, "graph_set_anchors",
+		json.RawMessage(`{"entityId":"`+seeded.entity+`","anchors":[{"text":"espresso","weight":1}]}`))
+	if err != nil {
+		t.Fatalf("graph_set_anchors: %v", err)
+	}
+	set, ok := out.(graph.SetAnchorsResponse)
+	if !ok || len(set.Entity.Anchors) != 1 || set.Entity.Anchors[0].Source != "ai" {
+		t.Fatalf("the anchor the agent set = %+v, want it the AI's though the turn began in a person's call", out)
+	}
+}
 
 func TestAProposedCardWaitsForAPersonUnlessTheCallWasApproved(t *testing.T) {
 	t.Parallel()

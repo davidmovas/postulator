@@ -28,16 +28,26 @@ func publishedIn(t *testing.T, result run.Result) (steps.PublishResult, bool) {
 	return steps.PublishResult{}, false
 }
 
+func failTheWriteAfterTheBody(server *wptest.Server, id int64, onSite string) func(int) bool {
+	failed := false
+	return func(int) bool {
+		if stored, _ := server.Lookup(id); !failed && stored.Content != onSite {
+			server.FailNext(http.StatusBadRequest, 1)
+			failed = true
+		}
+		return false
+	}
+}
+
 func TestAPublishPausedAfterItsFirstWriteIsStillRevertible(t *testing.T) {
 	t.Parallel()
 
 	kept := &content.KeptBody{Raw: clientText, Hash: block.BodyHash(clientText)}
 	deps, server, _, sc := keptRun(t, oursBody, kept)
-	server.FailNextItemUpdate(http.StatusBadRequest)
 
-	result, err := drive(t, steps.Publish(deps), sc)
+	result, err := driveLosing(t, steps.Publish(deps), sc, failTheWriteAfterTheBody(server, *sc.Page.WPID, clientText))
 	if err == nil {
-		t.Fatalf("result = %+v, want the injected update failure", result)
+		t.Fatalf("result = %+v, want the injected failure of the write after the body", result)
 	}
 	stored, _ := server.Lookup(*sc.Page.WPID)
 	if stored.Content != clientText+"\n\n"+oursBody {

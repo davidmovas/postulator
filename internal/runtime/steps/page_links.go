@@ -21,7 +21,7 @@ func persist(ctx context.Context, deps Deps, page pagemap.Page, links []pagemap.
 func onTheSite(pages []pagemap.Page) map[string]bool {
 	live := make(map[string]bool, len(pages))
 	for i := range pages {
-		if pages[i].WPID != nil {
+		if pages[i].Live() {
 			live[pages[i].ID] = true
 		}
 	}

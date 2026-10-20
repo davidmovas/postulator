@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/run"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 func (s *Service) Pause(ctx context.Context, req PauseRequest) (PauseResponse, error) {
@@ -22,6 +24,9 @@ func (s *Service) Pause(ctx context.Context, req PauseRequest) (PauseResponse, e
 		allowed := run.PauseReasons()
 		return PauseResponse{}, invalid("pause reason is not recognized; it is one of "+
 			strings.Join(allowed, ", "), "reason").WithDetail("allowed", allowed)
+	}
+	if reason == run.PauseAwaitingReview {
+		return PauseResponse{}, invalid("only a draft run's step holds a page for review, never a pause by hand", "reason")
 	}
 
 	if err := s.engine.Pause(ctx, runID, reason); err != nil {
@@ -59,12 +64,30 @@ func (s *Service) RetryStep(ctx context.Context, req RetryStepRequest) (RetrySte
 	}
 	requeue := s.engine.RetryStep
 	if req.AcceptFindings {
+		if refusal := s.refuseAnAgentsReview(ctx, itemID); refusal != nil {
+			return RetryStepResponse{}, refusal
+		}
 		requeue = s.engine.Accept
 	}
 	if err := requeue(ctx, itemID); err != nil {
 		return RetryStepResponse{}, err
 	}
 	return RetryStepResponse{}, nil
+}
+
+func (s *Service) refuseAnAgentsReview(ctx context.Context, itemID string) error {
+	if actor, ok := kctx.ActorFrom(ctx); !ok || actor != kctx.ActorAgent {
+		return nil
+	}
+	item, err := s.items.Get(ctx, itemID)
+	if err != nil {
+		return err
+	}
+	if item.PauseReason != run.PauseAwaitingReview {
+		return nil
+	}
+	return errors.New(errors.Conflict, "the changes of a draft run are accepted by a person, who reviews them in the run's "+
+		"report; the assistant may not accept them").WithDetail("itemId", itemID).WithDetail("step", item.CurrentStep)
 }
 
 func (s *Service) Regenerate(ctx context.Context, req RegenerateRequest) (RegenerateResponse, error) {

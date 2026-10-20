@@ -175,9 +175,8 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	if len(drafts) != len(degradedTargets) {
 		t.Fatalf("the run wrote %d drafts, want %d: %v", len(drafts), len(degradedTargets), drafts)
 	}
-	if !slices.Contains(standDowns, steps.ReasonNoPlugin) {
-		t.Fatalf("no neighbor stood down for the missing plugin; they stood down for %v, so the gate "+
-			"that needs the plugin was never reached", standDowns)
+	if !slices.Contains(standDowns, content.CodeTargetNotPublished) {
+		t.Fatalf("the neighbors stood down for %v, want them to wait for the drafts to be published", standDowns)
 	}
 	for _, planned := range degradedTargets {
 		wpID, ok := drafts[planned.path]
@@ -586,6 +585,16 @@ func assertRelinkStoodDown(t *testing.T, final steps.FinalReport) []string {
 
 	if final.Relink == nil {
 		t.Fatalf("%s carries no relink result", final.Path)
+	}
+	if final.Publish != nil && final.Publish.Status != "publish" {
+		if final.Relink.Linked != 0 || len(final.Relink.Neighbors) != 0 {
+			t.Fatalf("%s relinked %+v, want no neighbor linked to a draft", final.Path, final.Relink)
+		}
+		if _, ok := findingOf(final.Relink.Findings, content.CodeTargetNotPublished); !ok {
+			t.Fatalf("%s reports the findings %+v, want a %q warning", final.Path,
+				final.Relink.Findings, content.CodeTargetNotPublished)
+		}
+		return []string{content.CodeTargetNotPublished}
 	}
 	if final.Relink.Linked != 0 || final.Relink.Conflicts != 0 || final.Relink.Skipped == 0 {
 		t.Fatalf("%s relinked %+v, want every neighbor skipped", final.Path, final.Relink)

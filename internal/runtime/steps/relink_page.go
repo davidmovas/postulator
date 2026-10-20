@@ -171,6 +171,11 @@ func writeRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *ru
 	if err != nil {
 		return run.Result{}, err
 	}
+	held, err := deps.reviewRelinks(ctx, sc, checkpointRelinkPageReviewed, "the new links of "+sc.Page.Path,
+		[]relinkedBody{{page: sc.Page, before: body.raw.Content, after: linked.raw}})
+	if err != nil || held.held != nil {
+		return orHeld(held, err)
+	}
 	hash, err := body.put(ctx, client, sc.Page, linked.raw)
 	if err != nil {
 		if errors.IsCode(err, errors.Conflict) {
@@ -192,7 +197,11 @@ func writeRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *ru
 		pagemap.NewSite(owner.BaseURL), body.doc, hash); adoptErr != nil {
 		return run.Result{}, adoptErr
 	}
-	return settleRelinkPage(work)
+	settled, err := settleRelinkPage(work)
+	if err != nil {
+		return run.Result{}, err
+	}
+	return withChecks(settled, held.check), nil
 }
 
 func unplaced(placement content.InsertResult, target content.LinkTarget, live bool,

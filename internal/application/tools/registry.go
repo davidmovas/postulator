@@ -25,6 +25,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -85,9 +86,16 @@ func (r *Registry) Build(b Binding) []Tool {
 		if b.Mode == agent.ModeConfirm && tool.Def.Risk.NeedsConfirmation() {
 			tool.Run = r.proposal(tool.Def, tool.Check)
 		}
+		tool.Run = asTheAgent(tool.Run)
 		built = append(built, tool)
 	}
 	return built
+}
+
+func asTheAgent(run func(context.Context, Binding, json.RawMessage) (any, error)) func(context.Context, Binding, json.RawMessage) (any, error) {
+	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
+		return run(kctx.WithActor(ctx, kctx.ActorAgent), b, args)
+	}
 }
 
 func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.RawMessage) (any, error) {
@@ -100,6 +108,7 @@ func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.R
 	if b.Mode == agent.ModeConfirm && !b.Approved && tool.Def.Risk.NeedsConfirmation() {
 		tool.Run = r.proposal(tool.Def, tool.Check)
 	}
+	ctx = kctx.WithActor(ctx, kctx.ActorAgent)
 	if tool.Authorize != nil {
 		if err := tool.Authorize(ctx, b); err != nil {
 			return nil, err

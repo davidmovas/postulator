@@ -109,6 +109,10 @@ type Page struct {
 	UpdatedAt       time.Time
 }
 
+func (p Page) Live() bool {
+	return p.WPID != nil && p.Status == StatusPublished
+}
+
 type LinkType string
 
 const (

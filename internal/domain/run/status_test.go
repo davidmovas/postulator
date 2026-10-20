@@ -64,7 +64,7 @@ func TestTransitionAndPauseReasonAreClosedSets(t *testing.T) {
 
 	reasons := []run.PauseReason{
 		run.PauseBudgetExceeded, run.PauseAwaitingConfirmation, run.PauseNeedsHuman, run.PauseUser,
-		run.PauseAwaitingParent,
+		run.PauseAwaitingParent, run.PauseAwaitingReview,
 	}
 	for _, reason := range reasons {
 		if !reason.Valid() {

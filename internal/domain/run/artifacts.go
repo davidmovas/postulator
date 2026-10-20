@@ -23,13 +23,14 @@ const (
 	ArtifactSyncResult       ArtifactKind = "sync_result"
 	ArtifactFinalReport      ArtifactKind = "final_report"
 	ArtifactRevertResult     ArtifactKind = "revert_result"
+	ArtifactEditPlan         ArtifactKind = "edit_plan"
 )
 
 func ArtifactKinds() []ArtifactKind {
 	return []ArtifactKind{
 		ArtifactLinkContext, ArtifactDraft, ArtifactBodyHTML, ArtifactMeta, ArtifactFields, ArtifactImages,
 		ArtifactValidationReport, ArtifactJudgeReport, ArtifactPublishResult, ArtifactRelinkResult,
-		ArtifactSyncResult, ArtifactFinalReport, ArtifactRevertResult,
+		ArtifactSyncResult, ArtifactFinalReport, ArtifactRevertResult, ArtifactEditPlan,
 	}
 }
 

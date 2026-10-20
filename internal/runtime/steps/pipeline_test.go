@@ -16,6 +16,7 @@ import (
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -265,10 +266,24 @@ func (p *pipeline) generate(t *testing.T) run.Item {
 			}
 			return items[0]
 		}
+		if listErr == nil && len(items) == 1 {
+			p.acceptAReview(t, items[0])
+		}
 		time.Sleep(pollInterval)
 	}
 	t.Fatal("timed out waiting for the pipeline to finish")
 	return run.Item{}
+}
+
+func (p *pipeline) acceptAReview(t *testing.T, item run.Item) {
+	t.Helper()
+
+	if item.Status != run.StatusPaused || item.PauseReason != run.PauseAwaitingReview {
+		return
+	}
+	if err := p.engine.Accept(t.Context(), item.ID); err != nil {
+		t.Fatalf("accept the review of %s: %v", item.CurrentStep, err)
+	}
 }
 
 func (p *pipeline) artifactOf(t *testing.T, itemID string, kind run.ArtifactKind, out any) {
@@ -341,8 +356,13 @@ func TestTheWholeRecipeReachesWordPress(t *testing.T) {
 	}
 
 	parent, ok := p.server.Lookup(p.parent)
-	if !ok || !strings.Contains(parent.Content, `<a href="/drinks/coffee/espresso/">espresso</a>`) {
-		t.Fatalf("the parent did not gain a link to the child:\n%s", parent.Content)
+	if !ok || strings.Contains(parent.Content, `/drinks/coffee/espresso/`) {
+		t.Fatalf("the parent gained a link to a child that is still a draft, which leads a visitor nowhere:\n%s", parent.Content)
+	}
+	var relinked steps.RelinkResult
+	p.artifactOf(t, item.ID, run.ArtifactRelinkResult, &relinked)
+	if relinked.Linked != 0 || len(relinked.Findings) != 1 || relinked.Findings[0].Code != content.CodeTargetNotPublished {
+		t.Fatalf("the relink = %+v, want it to say the neighbors wait for the child to be published", relinked)
 	}
 
 	stored, err := p.pages.Get(t.Context(), p.pageID)
@@ -418,6 +438,9 @@ func (p *pipeline) runKind(t *testing.T, kind run.Kind) run.Item {
 				t.Fatalf("the %s item reached %q: %s", kind, items[0].Status, items[0].Error)
 			}
 			return items[0]
+		}
+		if listErr == nil && len(items) == 1 {
+			p.acceptAReview(t, items[0])
 		}
 		time.Sleep(pollInterval)
 	}

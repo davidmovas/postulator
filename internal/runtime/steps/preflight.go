@@ -164,13 +164,13 @@ func storePreflight(deps Deps) run.Preflight {
 				}
 				owner = &held
 			}
-			findings = append(findings, productFindings(*owner, record, target)...)
+			findings = append(findings, productFindings(*owner, target)...)
 		}
 		return findings, nil
 	}
 }
 
-func productFindings(owner site.Site, record run.Run, target run.Target) []run.EstimateFinding {
+func productFindings(owner site.Site, target run.Target) []run.EstimateFinding {
 	page := target.Page
 	found := make([]run.EstimateFinding, 0, 2)
 	switch owner.Commerce {
@@ -195,11 +195,6 @@ func productFindings(owner site.Site, record run.Run, target run.Target) []run.E
 	}
 	if page.WPID == nil {
 		found = append(found, pageFinding(content.SeverityError, CodeProductNotInStore, page, page.Path+" "+notInStore))
-	}
-	if record.PublishMode != run.PublishLive {
-		found = append(found, pageFinding(content.SeverityError, CodeProductEditedLive, page,
-			page.Path+" is a product, which has no draft copy, so its text goes live the moment it is written; "+
-				"start the run in live mode"))
 	}
 	if target.Spec.Product == nil {
 		found = append(found, pageFinding(content.SeverityWarn, CodeProductOutputsMissing, page,

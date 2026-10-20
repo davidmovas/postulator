@@ -108,6 +108,8 @@ describe("primaryAction", () => {
     it.each([
         { name: "a page held at validate is accepted", item: anItem({ status: "paused", pauseReason: "needs_human", currentStep: "validate" }), want: "accept" },
         { name: "a page held elsewhere for a human is retried", item: anItem({ status: "paused", pauseReason: "needs_human", currentStep: "publish" }), want: "retry" },
+        { name: "a draft run's changes to a live page are accepted", item: anItem({ status: "paused", pauseReason: "awaiting_review", currentStep: "publish" }), want: "accept" },
+        { name: "a draft run's links in a neighbour are accepted", item: anItem({ status: "paused", pauseReason: "awaiting_review", currentStep: "relink_neighbors" }), want: "accept" },
         { name: "a page whose writer gave up is regenerated", item: anItem({ status: "failed", currentStep: "generate_body" }), want: "regenerate" },
         { name: "a page that failed elsewhere is retried", item: anItem({ status: "failed", currentStep: "publish" }), want: "retry" },
         { name: "a cancelled page is regenerated", item: anItem({ status: "cancelled" }), want: "regenerate" },

@@ -527,7 +527,7 @@ func TestPublishPreflightRefusesAProductBeforeItSpends(t *testing.T) {
 			page:   pagemap.Page{ID: "page-product", SiteID: "site", Path: "/espresso-machine/", WPType: pagemap.WPProduct},
 			errors: []string{steps.CodeProductNotInStore},
 		},
-		{name: "a draft run", page: product, outputs: outputs, mode: run.PublishDraft, errors: []string{steps.CodeProductEditedLive}},
+		{name: "a draft run, which waits for a person to review it", page: product, outputs: outputs, mode: run.PublishDraft},
 		{name: "a template with no product outputs", page: product, warns: []string{steps.CodeProductOutputsMissing}},
 		{
 			name: "a product category", outputs: outputs,

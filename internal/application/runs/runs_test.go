@@ -983,6 +983,41 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 	}
 }
 
+func TestTheAgentCannotAcceptADraftReview(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, _ := fixture.seedRun(t, run.StatusPaused)
+	reviewed := run.Item{
+		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: fixture.pages[1], Status: run.StatusPaused,
+		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingReview, Seq: 5,
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), reviewed); err != nil {
+		t.Fatalf("insert the reviewed item: %v", err)
+	}
+
+	asAgent := kctx.WithActor(t.Context(), kctx.ActorAgent)
+	_, err := fixture.service.RetryStep(asAgent, runs.RetryStepRequest{ItemID: reviewed.ID, AcceptFindings: true})
+	if !errors.IsCode(err, errors.Conflict) {
+		t.Fatalf("the agent's acceptance = %v, want a refusal: only a person accepts a draft's changes", err)
+	}
+	if fixture.engine.accepted != "" {
+		t.Fatalf("the engine accepted %q for the agent", fixture.engine.accepted)
+	}
+
+	asPerson := kctx.WithActor(t.Context(), kctx.ActorUser)
+	if _, err = fixture.service.RetryStep(asPerson, runs.RetryStepRequest{ItemID: reviewed.ID, AcceptFindings: true}); err != nil {
+		t.Fatalf("a person's acceptance: %v", err)
+	}
+	if fixture.engine.accepted != reviewed.ID {
+		t.Fatalf("the engine accepted %q, want the reviewed item", fixture.engine.accepted)
+	}
+	if _, err = fixture.service.Pause(t.Context(), runs.PauseRequest{RunID: record.ID, Reason: string(run.PauseAwaitingReview)}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a hand pause for review = %v, want it refused: only a draft run's step holds a page for review", err)
+	}
+}
+
 func TestListItemsNamesTheBlockerAQueuedItemSitsBehind(t *testing.T) {
 	t.Parallel()
 

@@ -3,7 +3,6 @@ package steps_test
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -217,9 +216,8 @@ func TestAPublishRetriedAfterItsRawWriteLeavesOneCopy(t *testing.T) {
 
 	kept := &content.KeptBody{Raw: clientText, Hash: block.BodyHash(clientText)}
 	deps, server, log, sc := keptRun(t, oursBody, kept)
-	server.FailNextItemUpdate(http.StatusBadRequest)
-	if _, err := drive(t, steps.Publish(deps), sc); err == nil {
-		t.Fatal("the first attempt went through, want the injected update failure")
+	if _, err := driveLosing(t, steps.Publish(deps), sc, failTheWriteAfterTheBody(server, *sc.Page.WPID, clientText)); err == nil {
+		t.Fatal("the first attempt went through, want the injected failure of the write after the body")
 	}
 	if len(log.ours(sc.Page.ID)) == 0 {
 		t.Fatal("the blocks the raw write stored were not recorded before the update failed")

@@ -30,6 +30,8 @@ const (
 	CodeImageNotPlaced = "image_not_placed"
 	CodeImagesShort    = "images_short"
 
+	CodeImagesWaitForLive = "images_wait_for_live"
+
 	imageStepTimeout  = 15 * time.Minute
 	imageOutputTokens = 1056
 )
@@ -86,6 +88,12 @@ func GenerateImages(deps Deps) run.StepDef {
 			result.Wanted = wanted
 			if wanted == 0 {
 				return manifest(result, nil, "the template asks for no image")
+			}
+			if reviewing(sc) && sc.Page.WPID != nil {
+				result.skip(sc.Page, CodeImagesWaitForLive,
+					sc.Page.Path+" is on the site and this is a draft run, so no image was drawn or uploaded: an upload "+
+						"writes to the site, which a draft run does not do to a page that is already there", "draft_run")
+				return manifest(result, nil, "no image for a page already on the site in a draft run")
 			}
 
 			doc, err := bodyOf(sc)

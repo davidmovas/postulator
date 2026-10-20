@@ -75,7 +75,7 @@ func relinkContext(t *testing.T, deps steps.Deps) *run.StepContext {
 
 	return unitContext(t, map[run.ArtifactKind][]byte{
 		run.ArtifactLinkContext:   linkContextBlob(t, deps),
-		run.ArtifactPublishResult: []byte(`{"wpId":99,"url":"https://shop.example.com/coffee/espresso/"}`),
+		run.ArtifactPublishResult: []byte(`{"wpId":99,"url":"https://shop.example.com/coffee/espresso/","status":"publish"}`),
 	})
 }
 

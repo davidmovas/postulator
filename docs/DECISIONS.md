@@ -3500,6 +3500,32 @@ on what stage 2 left open and what was decided while building.
   oldest global template of its name, as `templates.EnsureSeeded` finds it; on a database the
   built-ins never reached, nothing is filled. The suites no longer give the types their templates:
   they assert that a fresh site's types carry them.
+- **An existing page's status is never written, and a draft run's writes to existing pages wait for
+  review** (ruling 2, with the owner's answer at the plan that it covers every such write). An
+  update sends no status and `compare` expects none, the page row taking the status the site
+  answered; an update left with nothing to send (the body through the raw route, the title kept) is
+  not made at all. In draft mode `publish`, `relink_page` and `relink_neighbors` compose what they
+  would write over an existing page, keep it as an `edit_plan` artifact (each page's field changes
+  before and after with their hashes, and its blocks kept, added or removed, ours or the client's,
+  by `block.Diff`) and pause the item `awaiting_review`; the publish result carries the same diff
+  once written. Accepting it requeues the step, which plans again and writes only when the new
+  plan's hash equals the one shown (a neighbour relink composes its writes in a dry pass first); a
+  plan that moved is shown again, and an acceptance never writes over a client change, the guard
+  pausing `client_changed` as before. The acceptance is cleared once used, so a later retry is not
+  taken as accepted. **Only a person accepts**: the runs service refuses an acceptance the agent asks
+  for on an item awaiting review, and the tool registry now tags every call it runs as the agent's,
+  which also makes the anchors and moves the agent makes read as the AI's, as the graph already
+  expected. A hand pause cannot claim `awaiting_review`. A planned page is still created as a draft
+  in a draft run, with no review. A draft-mode product run is no longer refused in preflight
+  (`product_edited_live` is gone): it waits for review like any page. The image step draws and
+  uploads nothing over an existing page in a draft run (`images_wait_for_live`), an upload being a
+  write to the site. **A link target is on the site only when it is published** (`Page.Live`: a
+  WordPress id and the `publish` status), so no link plan targets a page that is still a draft, and
+  `relink_neighbors` stands down for a page its publish left a draft (`target_not_published`),
+  instead of linking the client's live pages to an address a visitor cannot open. A page we create
+  as a draft stays one until a person publishes it in WordPress. The suites accept a review as a
+  person would; the full loop and the degraded loop now assert that no neighbour links to their
+  drafts.
 
 ### Decided while building
 
@@ -3520,3 +3546,6 @@ on what stage 2 left open and what was decided while building.
   a publish result is carried only once a write has happened, so a plan that paused leaves nothing
   for a revert. Every wait advances a sequence in the checkpoint, because the checkpoint is part of
   the step's input hash and an unchanged one would let the engine reuse the step as done.
+- **The two tool enums the review touches stay narrowed** (`runs_pause`'s reason and
+  `runs_get_artifact`'s kind): a hand pause cannot claim `awaiting_review`, and the edit plan is the
+  person's to read in the run's report, so neither enum grows and the schemas keep their bytes.

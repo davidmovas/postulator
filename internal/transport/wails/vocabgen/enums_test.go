@@ -13,6 +13,8 @@ import (
 var narrowed = map[string]bool{
 	"graph_list_edges.parameters.sort.field": true,
 	"imports_export.parameters.format":       true,
+	"runs_pause.parameters.reason":           true,
+	"runs_get_artifact.parameters.kind":      true,
 }
 
 var choiceNames = []string{

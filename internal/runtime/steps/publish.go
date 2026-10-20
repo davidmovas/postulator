@@ -41,6 +41,8 @@ type PublishResult struct {
 	Skipped             []string           `json:"skipped"`
 	Findings            []content.Finding  `json:"findings"`
 	Mismatches          []pagemap.Mismatch `json:"mismatches"`
+	Fields              []field.Change     `json:"fields"`
+	Blocks              []block.Change     `json:"blocks"`
 	WPID                int64              `json:"wpId"`
 	Created             bool               `json:"created"`
 }
@@ -87,9 +89,9 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *pub
 	if state.Plan == nil {
 		stop, planErr := planItem(ctx, deps, sc, client, itemType, state, rendered, draft)
 		if planErr != nil || stop != nil {
-			return orStopped(stop, planErr)
+			return orStopped(sc, stop, planErr)
 		}
-		return state.wait("planned what to write to " + sc.Page.Path)
+		return reviewThePlan(ctx, deps, sc, state, "planned what to write to "+sc.Page.Path)
 	}
 	switch state.next() {
 	case unitRaw:
@@ -103,11 +105,98 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *pub
 	}
 }
 
-func orStopped(stop *run.Result, err error) (run.Result, error) {
+const checkpointPublishReviewed = "publish.reviewed"
+
+func orStopped(sc *run.StepContext, stop *run.Result, err error) (run.Result, error) {
 	if err != nil {
 		return run.Result{}, err
 	}
-	return *stop, nil
+	if !sc.Accepted() {
+		return *stop, nil
+	}
+	cleared := run.NewCheckpoint()
+	if setErr := run.Set(cleared, run.CheckpointAccept, ""); setErr != nil {
+		return run.Result{}, setErr
+	}
+	return withChecks(*stop, cleared), nil
+}
+
+func reviewThePlan(ctx context.Context, deps Deps, sc *run.StepContext, state *publishState, message string) (run.Result, error) {
+	edit, err := deps.planEdit(ctx, sc, state.Plan)
+	if err != nil {
+		return run.Result{}, err
+	}
+	state.Result.Fields, state.Result.Blocks = edit.Fields, edit.Blocks
+	hash, err := hashOf(state.Plan, "publish plan")
+	if err != nil {
+		return run.Result{}, err
+	}
+	reviewed := EditPlan{Pages: []PageEdit{edit}, Hash: hash}
+	if state.Plan.Create {
+		reviewed.Pages = nil
+	}
+	held, err := reviewGate(sc, checkpointPublishReviewed, reviewed, "the changes to "+sc.Page.Path)
+	if err != nil || held.held != nil {
+		return orHeld(held, err)
+	}
+	waiting, err := state.wait(message)
+	if err != nil {
+		return run.Result{}, err
+	}
+	return withChecks(waiting, held.check), nil
+}
+
+func orHeld(held gate, err error) (run.Result, error) {
+	if err != nil {
+		return run.Result{}, err
+	}
+	return *held.held, nil
+}
+
+func (d Deps) planEdit(ctx context.Context, sc *run.StepContext, plan *publishPlan) (PageEdit, error) {
+	written, err := d.ourBlocks(ctx, sc.Page.ID)
+	if err != nil {
+		return PageEdit{}, err
+	}
+	return PageEdit{
+		PageID: sc.Page.ID, Path: sc.Page.Path, WPID: plan.WPID, Fields: plan.fieldChanges(),
+		Blocks: block.Diff(plan.Previous, plan.Final, written),
+	}, nil
+}
+
+func (p *publishPlan) fieldChanges() []field.Change {
+	out := make([]field.Change, 0, 5)
+	switch {
+	case p.Product && p.Store != nil && p.Store.ShortDescription != nil:
+		out = append(out, field.NewChange(field.ProductShortDescription, p.Store.Snapshot.ShortDescription, *p.Store.ShortDescription))
+	case !p.Product:
+		if !p.Request.KeepTitle {
+			out = append(out, field.NewChange(field.Title, p.SiteTitle, p.Request.Title))
+		}
+		if p.Request.Excerpt != nil {
+			out = append(out, field.NewChange(field.Excerpt, p.Excerpt, *p.Request.Excerpt))
+		}
+	}
+	if !p.SEO.Send {
+		return out
+	}
+	previous := wp.SEOMeta{}
+	if p.SEO.Previous != nil {
+		previous = *p.SEO.Previous
+	}
+	for _, sent := range []struct {
+		key           field.Key
+		before, after string
+	}{
+		{key: field.SEOTitle, before: previous.Title, after: p.SEO.Meta.Title},
+		{key: field.SEODescription, before: previous.Description, after: p.SEO.Meta.Description},
+		{key: field.SEOCanonical, before: previous.Canonical, after: p.SEO.Meta.Canonical},
+	} {
+		if sent.after != "" {
+			out = append(out, field.NewChange(sent.key, sent.before, sent.after))
+		}
+	}
+	return out
 }
 
 func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, itemType wp.ItemType,
@@ -193,20 +282,25 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 
 	plan := &publishPlan{
 		Writes: make([]string, 0, 3), Kept: kept.keys(), Request: request, SEO: seo, Final: final, Theirs: theirs,
-		Part: part, Previous: previous, SiteHash: site.hash, Excerpt: existing.Excerpt, WPID: existing.ID,
-		Create: !found, Plugin: site.plugin,
+		Part: part, Previous: previous, SiteHash: site.hash, SiteTitle: existing.Title, Excerpt: existing.Excerpt,
+		WPID: existing.ID, Create: !found, Plugin: site.plugin,
 	}
 	if viaRaw {
 		plan.Writes = append(plan.Writes, unitRaw)
 	}
-	plan.Writes = append(plan.Writes, unitItem)
+	if !found || request.carries() {
+		plan.Writes = append(plan.Writes, unitItem)
+	} else {
+		read := answerOf(existing)
+		plan.Item = &read
+	}
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
 	}
 	state.Plan = plan
 	state.Result = PublishResult{
-		WPID: existing.ID, SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: driftFindings(sc.Page),
-		Mismatches: make([]pagemap.Mismatch, 0),
+		WPID: existing.ID, URL: existing.Link, Status: existing.Status, SEOApplied: make([]string, 0),
+		Skipped: make([]string, 0), Findings: driftFindings(sc.Page), Mismatches: make([]pagemap.Mismatch, 0),
 	}
 	if !seo.Send {
 		state.Result.took(seoWrite{applied: []string{}, skipped: seo.Skipped, findings: seo.Findings})
@@ -442,7 +536,7 @@ func upsert(ctx context.Context, client *wp.Client, itemType wp.ItemType, req wr
 		return client.CreateItem(ctx, itemType, in)
 	}
 
-	in := wp.UpdateItem{Status: &req.status, Excerpt: req.excerpt}
+	in := wp.UpdateItem{Excerpt: req.excerpt}
 	if !req.keepTitle {
 		in.Title = &req.title
 	}
@@ -462,7 +556,10 @@ func compare(sc *run.StepContext, asked writeRequest, written wp.Item) []pagemap
 		checked.Title = written.Title
 	}
 	checked.H1 = ""
-	checked.Status = statusOf(sc.Run.PublishMode)
+	checked.Status = pagemap.StatusFromWordPress(written.Status)
+	if asked.created {
+		checked.Status = statusOf(sc.Run.PublishMode)
+	}
 	checked.Observed = observedOf(written)
 	if !asked.created {
 		checked.Slug = ""
@@ -577,7 +674,7 @@ func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item
 	now := deps.now()
 	next := sc.Page
 	next.WPID = &written.ID
-	next.Status = statusOf(sc.Run.PublishMode)
+	next.Status = pagemap.StatusFromWordPress(written.Status)
 	next.ContentHash = result.ContentHash
 	next.Observed = observedOf(written)
 	next.Drift = false

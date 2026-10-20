@@ -170,6 +170,28 @@ func TestNewPageLink(t *testing.T) {
 	}
 }
 
+func TestAPageIsLiveOnlyWhenTheSitePublishesIt(t *testing.T) {
+	t.Parallel()
+
+	wpID := int64(7)
+	cases := []struct {
+		name string
+		page pagemap.Page
+		live bool
+	}{
+		{name: "published with an id", page: pagemap.Page{WPID: &wpID, Status: pagemap.StatusPublished}, live: true},
+		{name: "a draft on the site", page: pagemap.Page{WPID: &wpID, Status: pagemap.StatusExists}},
+		{name: "planned", page: pagemap.Page{Status: pagemap.StatusPlanned}},
+		{name: "published with no id", page: pagemap.Page{Status: pagemap.StatusPublished}},
+		{name: "archived", page: pagemap.Page{WPID: &wpID, Status: pagemap.StatusArchived}},
+	}
+	for _, tc := range cases {
+		if got := tc.page.Live(); got != tc.live {
+			t.Errorf("%s: Live = %v, want %v", tc.name, got, tc.live)
+		}
+	}
+}
+
 func TestEnums(t *testing.T) {
 	t.Parallel()
 

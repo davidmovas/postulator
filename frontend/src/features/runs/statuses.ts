@@ -26,6 +26,7 @@ export const pauseAwaitingConfirmation: PauseReason = "awaiting_confirmation";
 export const pauseNeedsHuman: PauseReason = "needs_human";
 export const pauseByUser: PauseReason = "user";
 export const pauseAwaitingParent: PauseReason = "awaiting_parent";
+export const pauseAwaitingReview: PauseReason = "awaiting_review";
 
 export const retryInputsExpired: RetryBlockedReason = "inputs_expired";
 

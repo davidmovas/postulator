@@ -298,6 +298,7 @@ export const pauseReasons = [
     "needs_human",
     "user",
     "awaiting_parent",
+    "awaiting_review",
 ] as const;
 export type PauseReason = (typeof pauseReasons)[number];
 
@@ -321,6 +322,7 @@ export const artifactKinds = [
     "sync_result",
     "final_report",
     "revert_result",
+    "edit_plan",
 ] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
 

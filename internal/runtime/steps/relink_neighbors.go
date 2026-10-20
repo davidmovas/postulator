@@ -78,24 +78,56 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 		Retry:     run.RetryPolicy{Max: 2},
 		Timeout:   relinkTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
+			if _, err := sc.Artifact(run.ArtifactPublishResult); err != nil {
+				return run.Result{}, err
+			}
+			published, _, err := decodeArtifact[PublishResult](sc, run.ArtifactPublishResult)
+			if err != nil {
+				return run.Result{}, err
+			}
+			if published.Status != wordPressPublished {
+				return relinked(notLiveYet(sc.Page, published.Status), "no neighbor links to "+sc.Page.Path+" yet")
+			}
 			around, err := neighborhoodOf(ctx, deps, sc)
 			if err != nil {
 				return run.Result{}, err
+			}
+			held, err := around.review(ctx, deps, sc)
+			if err != nil || held.held != nil {
+				return orHeld(held, err)
 			}
 			result, err := around.relink(ctx, deps)
 			if err != nil {
 				return run.Result{}, err
 			}
-
-			blob, err := encode(result, "relink result")
+			settled, err := relinked(result, "relinked "+strconv.Itoa(result.Linked)+" neighbors of "+sc.Page.Path)
 			if err != nil {
 				return run.Result{}, err
 			}
-			return run.Result{
-				Artifacts: []run.Artifact{{Kind: run.ArtifactRelinkResult, Blob: blob}},
-				Message:   "relinked " + strconv.Itoa(result.Linked) + " neighbors of " + sc.Page.Path,
-			}, nil
+			return withChecks(settled, held.check), nil
 		},
+	}
+}
+
+const wordPressPublished = "publish"
+
+func relinked(result RelinkResult, message string) (run.Result, error) {
+	blob, err := encode(result, "relink result")
+	if err != nil {
+		return run.Result{}, err
+	}
+	return run.Result{Artifacts: []run.Artifact{{Kind: run.ArtifactRelinkResult, Blob: blob}}, Message: message}, nil
+}
+
+func notLiveYet(page pagemap.Page, status string) RelinkResult {
+	return RelinkResult{
+		Neighbors: make([]NeighborResult, 0),
+		Findings: []content.Finding{{
+			Severity: content.SeverityWarn, Code: content.CodeTargetNotPublished,
+			Message: "no neighbor links to " + page.Path + " while the site holds it as " + status +
+				", since such a link would lead a visitor nowhere; its neighbors are relinked once it is published",
+			Details: map[string]any{"pageId": page.ID, "path": page.Path, "status": status},
+		}},
 	}
 }
 
@@ -108,6 +140,7 @@ type neighborhood struct {
 	index    pagemap.Index
 	graph    graph.Graph
 	types    pagetype.Set
+	planned  *[]relinkedBody
 	runID    string
 	absolute bool
 }
@@ -159,6 +192,19 @@ func neighborhoodOf(ctx context.Context, deps Deps, sc *run.StepContext) (neighb
 		client: client, lc: lc, entity: entity, page: sc.Page, site: pagemap.NewSite(owner.BaseURL),
 		index: pagemap.NewIndex(pages), graph: built, types: types, runID: sc.Run.ID, absolute: absolute,
 	}, nil
+}
+
+func (n neighborhood) review(ctx context.Context, deps Deps, sc *run.StepContext) (gate, error) {
+	if !reviewing(sc) {
+		return reviewGate(sc, checkpointRelinkNeighborsReviewed, EditPlan{}, "")
+	}
+	planned := make([]relinkedBody, 0)
+	dry := n
+	dry.planned = &planned
+	if _, err := dry.relink(ctx, deps); err != nil {
+		return gate{}, err
+	}
+	return deps.reviewRelinks(ctx, sc, checkpointRelinkNeighborsReviewed, "the links "+n.page.Path+"'s neighbors owe it", planned)
 }
 
 func (n neighborhood) relink(ctx context.Context, deps Deps) (RelinkResult, error) {
@@ -310,6 +356,11 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 	updated, err := body.spliced(ctx, deps, neighbor)
 	if err != nil {
 		return skip(outcome, ReasonNeighborUnreadable), nil
+	}
+	if n.planned != nil {
+		*n.planned = append(*n.planned, relinkedBody{page: neighbor, before: body.raw.Content, after: updated.raw})
+		outcome.Outcome = OutcomeLinked
+		return outcome, nil
 	}
 	hash, err := body.put(ctx, n.client, neighbor, updated.raw)
 	if err != nil {

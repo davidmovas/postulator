@@ -83,6 +83,10 @@ type itemPlan struct {
 	KeepTitle bool    `json:"keepTitle"`
 }
 
+func (p itemPlan) carries() bool {
+	return !p.KeepTitle || p.Excerpt != nil || !p.ViaRaw || p.Featured != 0
+}
+
 type seoPlan struct {
 	Previous *wp.SEOMeta       `json:"previous,omitempty"`
 	Meta     wp.SEOMeta        `json:"meta"`
@@ -116,22 +120,23 @@ func (p storePlan) update() wp.UpdateProduct {
 }
 
 type publishPlan struct {
-	Store    *storePlan  `json:"store,omitempty"`
-	Item     *itemAnswer `json:"item,omitempty"`
-	Writes   []string    `json:"writes"`
-	Kept     []field.Key `json:"kept"`
-	Request  itemPlan    `json:"request"`
-	SEO      seoPlan     `json:"seo"`
-	Final    string      `json:"final"`
-	Theirs   string      `json:"theirs"`
-	Part     string      `json:"part"`
-	Previous string      `json:"previous"`
-	SiteHash string      `json:"siteHash"`
-	Excerpt  string      `json:"excerpt"`
-	WPID     int64       `json:"wpId"`
-	Create   bool        `json:"create"`
-	Plugin   bool        `json:"plugin"`
-	Product  bool        `json:"product"`
+	Store     *storePlan  `json:"store,omitempty"`
+	Item      *itemAnswer `json:"item,omitempty"`
+	Writes    []string    `json:"writes"`
+	Kept      []field.Key `json:"kept"`
+	Request   itemPlan    `json:"request"`
+	SEO       seoPlan     `json:"seo"`
+	Final     string      `json:"final"`
+	Theirs    string      `json:"theirs"`
+	Part      string      `json:"part"`
+	Previous  string      `json:"previous"`
+	SiteHash  string      `json:"siteHash"`
+	SiteTitle string      `json:"siteTitle"`
+	Excerpt   string      `json:"excerpt"`
+	WPID      int64       `json:"wpId"`
+	Create    bool        `json:"create"`
+	Plugin    bool        `json:"plugin"`
+	Product   bool        `json:"product"`
 }
 
 func (p *publishPlan) kept() keptFields {

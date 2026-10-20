@@ -50,6 +50,8 @@ export const runs = {
         needs_human: "Paused for a human decision.",
         user: "Paused by you.",
         awaiting_parent: "Waiting for a parent page to reach the site; it goes on by itself once the parent is there.",
+        awaiting_review:
+            "This is a draft run, and the page is already on the site, so nothing was written yet. Review the changes and accept them to write them as shown.",
     },
     pauseReasonShort: {
         budget_exceeded: "budget cap",
@@ -57,6 +59,7 @@ export const runs = {
         needs_human: "needs human",
         user: "paused by you",
         awaiting_parent: "waiting for parent",
+        awaiting_review: "awaiting review",
     },
     unknownPauseReason: "Paused for a reason this build does not recognise.",
     hold: {
@@ -333,6 +336,7 @@ export const runs = {
             sync_result: "Sync",
             final_report: "Report",
             revert_result: "Revert",
+            edit_plan: "Changes to review",
         },
         body: {
             preview: "Sandboxed preview",
