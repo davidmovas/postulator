@@ -281,6 +281,7 @@ func writeImage(ctx context.Context, sc *run.StepContext, client *wp.Client, sta
 	if moved := movedKeys(results); len(moved) > 0 {
 		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 	}
+	state.stored(results)
 	for i := range image.Writes {
 		written, _ := writtenValue(results, image.Writes[i].Key)
 		state.Result.PreviousMedia = append(state.Result.PreviousMedia,
@@ -315,6 +316,7 @@ func writeVariation(ctx context.Context, deps Deps, sc *run.StepContext, client 
 	if moved := movedKeys(results); len(moved) > 0 {
 		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 	}
+	state.stored(results)
 	written, _ := writtenValue(results, key)
 	state.Result.PreviousVariations = append(state.Result.PreviousVariations,
 		FieldWrite{Key: key, Before: planned.Before, Written: written})
@@ -574,6 +576,7 @@ func writeStoreFields(ctx context.Context, deps Deps, sc *run.StepContext, clien
 	if moved := movedKeys(results); len(moved) > 0 {
 		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 	}
+	state.stored(results)
 	written, err := client.GetProduct(ctx, plan.WPID)
 	if err != nil {
 		return state.failed(err)

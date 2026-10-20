@@ -89,8 +89,8 @@ func TestAVariationsDescriptionIsWrittenAloneAndPutBack(t *testing.T) {
 		t.Errorf("the run sent %d variation writes, want one per variation", writes)
 	}
 	want := []steps.FieldWrite{
-		{Key: variationKey(p.small), Before: "<p>Old small.</p>", Written: "<p>A small machine.</p>"},
-		{Key: variationKey(p.large), Before: "", Written: "<p>A large machine.</p>"},
+		{Key: variationKey(p.small), Before: "<p>Old small.</p>\n", Written: "<p>A small machine.</p>\n"},
+		{Key: variationKey(p.large), Before: "", Written: "<p>A large machine.</p>\n"},
 	}
 	if got := p.published.PreviousVariations; len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
 		t.Errorf("the publish kept %+v, want %+v", got, want)
@@ -102,7 +102,7 @@ func TestAVariationsDescriptionIsWrittenAloneAndPutBack(t *testing.T) {
 	}
 	small, _ = p.server.Lookup(p.small.ID)
 	large, _ = p.server.Lookup(p.large.ID)
-	if small.Content != "<p>Old small.</p>" || large.Content != "" {
+	if small.Content != "<p>Old small.</p>\n" || large.Content != "" {
 		t.Errorf("after the revert the variations hold %q and %q, want what they held before", small.Content, large.Content)
 	}
 }
@@ -119,7 +119,7 @@ func TestAVariationTheClientEditedSinceIsHandedBack(t *testing.T) {
 	if large, _ := p.server.Lookup(p.large.ID); large.Content != "<p>The owner's own large.</p>" {
 		t.Errorf("the owner's later variation description became %q", large.Content)
 	}
-	if small, _ := p.server.Lookup(p.small.ID); small.Content != "<p>Old small.</p>" {
+	if small, _ := p.server.Lookup(p.small.ID); small.Content != "<p>Old small.</p>\n" {
 		t.Errorf("the variation nobody touched since holds %q, want it put back: each field reverts on its own", small.Content)
 	}
 	kept, found := findingOf(reverted, steps.CodeRevertFieldKept)

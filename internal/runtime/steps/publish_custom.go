@@ -173,6 +173,7 @@ func writeCustom(ctx context.Context, sc *run.StepContext, client *wp.Client, it
 	if moved := movedKeys(results); len(moved) > 0 {
 		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 	}
+	state.stored(results)
 	for i := range planned {
 		written, _ := writtenValue(results, planned[i].Key)
 		state.Result.PreviousFields = append(state.Result.PreviousFields,

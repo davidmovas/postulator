@@ -538,6 +538,7 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 		if moved := movedKeys(results); len(moved) > 0 {
 			return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 		}
+		state.stored(results)
 		if written, err = client.GetItem(ctx, itemType, plan.WPID); err != nil {
 			return state.failed(err)
 		}

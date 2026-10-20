@@ -3888,6 +3888,23 @@ on what stage 2 left open and what was decided while building.
   password belongs to an editor still has his site observed. `wptest` answers such a post (`Item.Closed`)
   as the plugin does (`TestSyncSiteWalksPastAPageTheSitesUserMayNotEdit`, failing first with the
   stand's message).
+- **A revert found our own variation description to be the client's edit.** The publish result's
+  field diff recorded what a run sent as each field's after value, and the revert writes back under
+  the hash of that value; WooCommerce answers a variation's description through `wc_format_content`
+  in every context, `edit` included (a line end after each paragraph, and texturized quotes), so the
+  live value never hashed as what was sent and every variation was handed back as changed since. Each
+  write now sets its field's after value to what the site answered it stored
+  (`publishState.stored`), so the diff says what the page holds and the revert finds its own write;
+  `wptest` answers a variation's description formatted in every context, as the store does, which
+  made `TestAVariationsDescriptionIsWrittenAloneAndPutBack` fail first as the stand did. A reverted
+  variation gets back the description as the store answered it, so its stored bytes may gain the line
+  end the store's own formatting adds, which it renders the same. The SEO fields keep their own
+  record (`writtenMeta`), which no stand showed moving.
+- **The product proof's own setup.** Its scopes carried no link policy (`field.NoLinks()`, which every
+  other caller passes), its scripted short description lacked the row's primary keyword, which
+  `validate` requires of a short description written in the run, and it compared the reverted
+  variations with a literal the store never answers; it now compares them with what the store
+  answered before the run.
 - **The restricted-user test checked the plugin before anything probed it.** `sites.Create` stores a
   site without asking it anything, so the plugin read as absent on the response of the create; the
   test now checks it through `Sync.CheckPlugin`, as the full loop does.

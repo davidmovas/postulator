@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application/edit"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -219,6 +220,19 @@ func (s *publishState) next() string {
 
 func (s *publishState) wrote(write string) {
 	s.Done = append(s.Done, write)
+}
+
+func (s *publishState) stored(results []edit.Result) {
+	for i := range results {
+		if results[i].Outcome != edit.OutcomeWritten || results[i].Value == nil {
+			continue
+		}
+		for j := range s.Result.Fields {
+			if s.Result.Fields[j].Key == results[i].Key {
+				s.Result.Fields[j] = field.NewChange(results[i].Key, s.Result.Fields[j].Before, *results[i].Value)
+			}
+		}
+	}
 }
 
 func (s *publishState) wroteAny() bool {

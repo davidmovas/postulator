@@ -138,8 +138,8 @@ func TestAVariationIsReadAndWrittenUnderItsProduct(t *testing.T) {
 		Description string `json:"description"`
 	}
 	decode(t, payload, &written)
-	if written.Description != "<p>Five<br />milligrams.</p>" {
-		t.Errorf("description = %q, want it filtered as the user's save filters it", written.Description)
+	if written.Description != "<p>Five<br />milligrams.</p>\n" {
+		t.Errorf("description = %q, want it filtered as the user's save filters it and formatted as the store answers it", written.Description)
 	}
 	parent, _ := server.Lookup(product.ID)
 	if parent.Content != "<p>One<br />two</p>" {

@@ -61,8 +61,6 @@ func (s *Server) handleProductTail(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusBadRequest, "woocommerce_rest_invalid_param", "Invalid parameter(s): "+bad)
 		return
 	}
-	edit := query.Get("context") == "edit"
-
 	s.mu.Lock()
 	parent, found := s.items[id]
 	if !found || parent.Type != TypeProduct {
@@ -77,7 +75,7 @@ func (s *Server) handleProductTail(w http.ResponseWriter, r *http.Request) {
 	end := min(start+perPage, total)
 	payload := make([]map[string]any, 0, end-start)
 	for _, stored := range matched[start:end] {
-		payload = append(payload, narrowFields(s.variationPayload(stored, parent, edit), query.Get("_fields")))
+		payload = append(payload, narrowFields(s.variationPayload(stored, parent), query.Get("_fields")))
 	}
 	s.mu.Unlock()
 
@@ -114,7 +112,7 @@ func (s *Server) handleVariationGet(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusNotFound, "woocommerce_rest_product_variation_invalid_id", "Invalid ID.")
 		return
 	}
-	payload := s.variationPayload(variation, parent, r.URL.Query().Get("context") == "edit")
+	payload := s.variationPayload(variation, parent)
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, narrowFields(payload, r.URL.Query().Get("_fields")))
@@ -146,7 +144,7 @@ func (s *Server) handleVariationUpdate(w http.ResponseWriter, r *http.Request) {
 		parent.Content = kses(parent.Content)
 	}
 	parent.Modified = s.tick()
-	payload := s.variationPayload(variation, parent, true)
+	payload := s.variationPayload(variation, parent)
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, payload)
@@ -172,7 +170,7 @@ func (s *Server) variationIDs(productID int64) []int64 {
 	return ids
 }
 
-func (s *Server) variationPayload(stored, parent *Item, edit bool) map[string]any {
+func (s *Server) variationPayload(stored, parent *Item) map[string]any {
 	var manageStock any = stored.ManageStock
 	if !stored.ManageStock && parent.ManageStock {
 		manageStock = "parent"
@@ -191,7 +189,7 @@ func (s *Server) variationPayload(stored, parent *Item, edit bool) map[string]an
 		"stock_status":      stockStatusOf(stored),
 		"manage_stock":      manageStock,
 		"stock_quantity":    stored.StockQuantity,
-		"description":       rendered(stored.Content, edit),
+		"description":       rendered(stored.Content, false),
 		"permalink":         s.permalink(parent),
 		"status":            stored.Status,
 		"date_modified_gmt": stored.Modified.UTC().Format(wpTimeLayout),

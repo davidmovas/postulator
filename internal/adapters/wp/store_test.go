@@ -146,7 +146,7 @@ func TestListVariationsCarriesSKUPriceStockAndAttributes(t *testing.T) {
 	}
 
 	five, ten := page.Items[0], page.Items[1]
-	if five.ID != store.variations[0].ID || five.ParentID != store.variable.ID || five.SKU != "BPC157-5" || five.Description != "<p>Five.</p>" {
+	if five.ID != store.variations[0].ID || five.ParentID != store.variable.ID || five.SKU != "BPC157-5" || five.Description != "<p>Five.</p>\n" {
 		t.Errorf("five = %+v", five)
 	}
 	if want := []wp.VariationAttribute{{ID: 3, Name: "Size", Option: "5 mg"}}; !slices.Equal(five.Attributes, want) {
@@ -175,7 +175,7 @@ func TestAVariationIsReadAndItsDescriptionWrittenAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetVariation: %v", err)
 	}
-	if held.ID != five.ID || held.ParentID != store.variable.ID || held.Description != "<p>Five.</p>" || held.SKU != "BPC157-5" {
+	if held.ID != five.ID || held.ParentID != store.variable.ID || held.Description != "<p>Five.</p>\n" || held.SKU != "BPC157-5" {
 		t.Fatalf("variation = %+v", held)
 	}
 	if recorded, _ := store.server.LastRequest(); recorded.Query.Get("context") != "edit" {
@@ -186,7 +186,7 @@ func TestAVariationIsReadAndItsDescriptionWrittenAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateVariation: %v", err)
 	}
-	if written.Description != "<p>Five milligrams.</p>" || written.SKU != "BPC157-5" {
+	if written.Description != "<p>Five milligrams.</p>\n" || written.SKU != "BPC157-5" {
 		t.Errorf("written = %+v", written)
 	}
 	recorded, _ := store.server.LastRequest()
