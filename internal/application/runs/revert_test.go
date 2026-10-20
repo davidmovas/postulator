@@ -1,6 +1,7 @@
 package runs_test
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -112,12 +113,12 @@ func TestRevertRefusesWhatCannotBePutBack(t *testing.T) {
 			code: errors.Conflict,
 		},
 		{
-			name: "a second revert of the same run",
+			name: "a revert while another of the same run is still going",
 			setup: func(t *testing.T, f *fixture) string {
 				t.Helper()
 				record, item := f.seedRun(t, run.StatusCompleted)
 				f.seedArtifacts(t, record, item, []run.ArtifactKind{run.ArtifactPublishResult}, nil)
-				f.seedRevert(t, record, run.StatusCompleted)
+				f.seedRevert(t, record, run.StatusRunning)
 				return record.ID
 			},
 			code: errors.Conflict,
@@ -135,6 +136,50 @@ func TestRevertRefusesWhatCannotBePutBack(t *testing.T) {
 				t.Fatalf("Revert = %v, want %s", err, tc.code)
 			}
 		})
+	}
+}
+
+func TestASecondRevertMayPutBackWhatTheFirstLeft(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, item := fixture.seedRun(t, run.StatusCompleted)
+	fixture.seedArtifacts(t, record, item, []run.ArtifactKind{run.ArtifactPublishResult}, nil)
+	fixture.seedRevert(t, record, run.StatusCompleted)
+
+	if _, err := fixture.service.Revert(t.Context(), runs.RevertRequest{RunID: record.ID}); err != nil {
+		t.Fatalf("a second revert after one that finished: %v", err)
+	}
+}
+
+func TestARevertNamesAPageAndItsFields(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, item := fixture.seedRun(t, run.StatusCompleted)
+	fixture.seedArtifacts(t, record, item, []run.ArtifactKind{run.ArtifactPublishResult}, nil)
+
+	answered, err := fixture.service.Revert(t.Context(), runs.RevertRequest{RunID: record.ID, PageID: item.TargetID, Fields: []string{"excerpt", "seo_title"}})
+	if err != nil {
+		t.Fatalf("Revert: %v", err)
+	}
+	queued := fixture.engine.queued
+	if queued.ID != answered.RunID || !slices.Equal(queued.Targets, []string{item.TargetID}) {
+		t.Errorf("targets = %v, want the page the revert named", queued.Targets)
+	}
+	params := run.ParamsFor(queued.Recipe, string(run.StepRevert))
+	if listed, ok := params["fields"].([]any); !ok || len(listed) != 2 || listed[0] != "excerpt" {
+		t.Errorf("the revert step's params = %v, want the fields named", params)
+	}
+
+	for name, req := range map[string]runs.RevertRequest{
+		"a page the run never wrote": {RunID: record.ID, PageID: "page-elsewhere"},
+		"a field no page carries":    {RunID: record.ID, Fields: []string{"rating"}},
+		"a field the store owns":     {RunID: record.ID, Fields: []string{"sku"}},
+	} {
+		if _, err := fixture.service.Revert(t.Context(), req); !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("%s = %v, want invalid", name, err)
+		}
 	}
 }
 

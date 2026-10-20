@@ -41,6 +41,13 @@ func filledByAnOlderRun(t *testing.T, p publishedProduct) publishedProduct {
 	snapshot.AttributesSent, snapshot.Added = true, []string{"form"}
 	snapshot.Written = []steps.SnapshotAttribute{{Name: "form", Options: []string{"Countertop"}, Position: 1}}
 	p.published.PreviousProduct = &snapshot
+	return asOlder(t, p)
+}
+
+func asOlder(t *testing.T, p publishedProduct) publishedProduct {
+	t.Helper()
+
+	p.published.Version, p.published.Fields, p.published.Blocks = 0, nil, nil
 	p.source.items = p.source.items[:0]
 	delete(p.source.artifacts, "item-page-child")
 	p.source.record(t, "page-child", map[run.ArtifactKind]any{run.ArtifactPublishResult: p.published})
@@ -177,13 +184,13 @@ func TestRevertHandsBackAProductAHumanChangedSince(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			p := publishAndRecord(t, storeProduct())
+			p := asOlder(t, publishAndRecord(t, storeProduct()))
 			tc.change(t, p)
 			before, _ := p.server.Lookup(p.held.ID)
 
 			reverted, result := runRevert(t, p.deps, "page-child")
 			if result.Next != run.TransitionPause || reverted.Outcome != steps.OutcomeNeedsHand {
-				t.Fatalf("the revert answered %+v, want it handed to a human", reverted)
+				t.Fatalf("an older record's revert answered %+v, want it handed to a human", reverted)
 			}
 			if !strings.Contains(reverted.Detail, tc.reason) {
 				t.Errorf("detail = %q, want it to name %q", reverted.Detail, tc.reason)
@@ -192,6 +199,30 @@ func TestRevertHandsBackAProductAHumanChangedSince(t *testing.T) {
 				t.Errorf("the refused revert wrote to the product: %+v, was %+v", after, before)
 			}
 		})
+	}
+}
+
+func TestAProductFieldChangedSinceIsHandedBackAndTheRestPutBack(t *testing.T) {
+	t.Parallel()
+
+	p := publishAndRecord(t, storeProduct())
+	short := "<p>a human's short description</p>"
+	if _, err := syncClient(t, p.server).UpdateProduct(t.Context(), p.held.ID, wp.UpdateProduct{ShortDescription: &short}); err != nil {
+		t.Fatalf("edit the short description: %v", err)
+	}
+	reverted, result := runRevert(t, p.deps, "page-child")
+	if result.Next == run.TransitionPause || reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("the revert answered %+v / %s", reverted, result.Message)
+	}
+	stored, _ := p.server.Lookup(p.held.ID)
+	if stored.Excerpt != short {
+		t.Errorf("the human's short description became %q", stored.Excerpt)
+	}
+	if stored.Content != "<p>old description</p>" {
+		t.Errorf("the description is %q, want the one the run replaced", stored.Content)
+	}
+	if _, found := findingOf(reverted, steps.CodeRevertFieldKept); !found {
+		t.Errorf("findings = %+v, want the kept short description named", reverted.Findings)
 	}
 }
 

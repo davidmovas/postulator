@@ -102,7 +102,9 @@ type CancelRequest struct {
 type CancelResponse struct{}
 
 type RevertRequest struct {
-	RunID string `json:"runId" description:"Finished run id"`
+	RunID  string   `json:"runId" description:"Finished run id"`
+	PageID string   `json:"pageId,omitempty" description:"One page of the run to put back; every page it wrote when empty"`
+	Fields []string `json:"fields,omitempty" description:"Field keys to put back; every field it wrote when empty"`
 }
 
 type RevertResponse struct {

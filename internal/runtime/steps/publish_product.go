@@ -451,7 +451,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	state.Result = PublishResult{
 		WPID: held.ID, URL: permalinkOf(wp.Item{Link: held.Permalink}), Status: held.Status, PreviousProduct: &snapshot,
 		SEOApplied: make([]string, 0), Skipped: unattached, Findings: findingsOfProduct(sc.Page, held),
-		Mismatches: make([]pagemap.Mismatch, 0),
+		Mismatches: make([]pagemap.Mismatch, 0), Version: publishRecordVersion,
 	}
 	if !seo.Send {
 		state.Result.took(seoWrite{applied: []string{}, skipped: seo.Skipped, findings: seo.Findings})

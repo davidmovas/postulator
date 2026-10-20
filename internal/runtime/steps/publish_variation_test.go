@@ -115,15 +115,16 @@ func TestAVariationTheClientEditedSinceIsHandedBack(t *testing.T) {
 	edited.Content = "<p>The owner's own large.</p>"
 	p.server.Restore(edited)
 
-	reverted, result := runRevert(t, p.deps, "page-child")
-	if result.Next != run.TransitionPause && reverted.Outcome == steps.OutcomeRestored {
-		t.Fatalf("a revert over a variation the client edited = %+v, want it handed back", reverted)
-	}
+	reverted, _ := runRevert(t, p.deps, "page-child")
 	if large, _ := p.server.Lookup(p.large.ID); large.Content != "<p>The owner's own large.</p>" {
 		t.Errorf("the owner's later variation description became %q", large.Content)
 	}
-	if small, _ := p.server.Lookup(p.small.ID); small.Content != "<p>A small machine.</p>" {
-		t.Errorf("a refused revert still wrote a variation back: %q", small.Content)
+	if small, _ := p.server.Lookup(p.small.ID); small.Content != "<p>Old small.</p>" {
+		t.Errorf("the variation nobody touched since holds %q, want it put back: each field reverts on its own", small.Content)
+	}
+	kept, found := findingOf(reverted, steps.CodeRevertFieldKept)
+	if !found || !strings.Contains(kept.Message, string(variationKey(p.large))) {
+		t.Errorf("findings = %+v, want the edited variation named and handed back", reverted.Findings)
 	}
 }
 

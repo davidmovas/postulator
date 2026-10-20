@@ -65,7 +65,7 @@ func TestACustomFieldIsWrittenThroughThePluginAndPutBack(t *testing.T) {
 	stand.wpIDs[second.ID] = edited[0].ID
 	stand.source.record(t, second.ID, map[run.ArtifactKind]any{run.ArtifactPublishResult: again})
 	refused, _ := stand.revert(t, second.ID)
-	if _, found := findingOf(refused, steps.CodeRevertCustomKept); !found {
+	if _, found := findingOf(refused, steps.CodeRevertFieldKept); !found {
 		t.Errorf("a revert over a custom field the owner edited = %+v, want it kept and said", refused)
 	}
 	if back, _ := stand.server.Lookup(edited[0].ID); back.Meta["dosage_note"] != "The owner changed it after the run." {

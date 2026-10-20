@@ -3,6 +3,7 @@ package block_test
 import (
 	stderrors "errors"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"testing"
 
@@ -628,6 +629,35 @@ func TestEveryOperationKeepsTheBytesItDidNotTouch(t *testing.T) {
 	}
 	if applied < 500 {
 		t.Fatalf("only %d operations were applied, too few to hold the property", applied)
+	}
+}
+
+func TestUndoGivesBackTheBodyEveryOperationChanged(t *testing.T) {
+	t.Parallel()
+
+	source := rand.New(rand.NewPCG(17, 3))
+	undone := 0
+	for round := range 400 {
+		before := randomBody(source, source.IntN(2) == 0)
+		body := block.Parse(before)
+		for range 1 + source.IntN(4) {
+			next, err := randomOperation(source, body).apply(body)
+			if err == nil {
+				body = next
+			}
+		}
+		after := body.Serialize()
+		if after == before {
+			continue
+		}
+		got := block.Undo(after, block.Diff(before, after, []string{}))
+		if want := cores(block.Parse(before).Blocks); !slices.Equal(cores(block.Parse(got.Body).Blocks), want) || got.Kept != 0 {
+			t.Fatalf("round %d: %q became %q and was undone to %q, kept %d", round, before, after, got.Body, got.Kept)
+		}
+		undone++
+	}
+	if undone < 300 {
+		t.Fatalf("only %d bodies were undone, too few to hold the property", undone)
 	}
 }
 

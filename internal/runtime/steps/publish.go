@@ -31,6 +31,7 @@ const (
 
 type PublishResult struct {
 	PreviousMeta        *wp.SEOMeta        `json:"previousMeta,omitempty"`
+	WrittenMeta         *wp.SEOMeta        `json:"writtenMeta,omitempty"`
 	PreviousProduct     *ProductSnapshot   `json:"previousProduct,omitempty"`
 	PreviousVariations  []FieldWrite       `json:"previousVariations,omitempty"`
 	PreviousMedia       []FieldWrite       `json:"previousMedia,omitempty"`
@@ -49,8 +50,11 @@ type PublishResult struct {
 	Fields              []field.Change     `json:"fields"`
 	Blocks              []block.Change     `json:"blocks"`
 	WPID                int64              `json:"wpId"`
+	Version             int                `json:"version,omitempty"`
 	Created             bool               `json:"created"`
 }
+
+const publishRecordVersion = 3
 
 func Publish(deps Deps) run.StepDef {
 	return run.StepDef{
@@ -352,6 +356,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	state.Result = PublishResult{
 		WPID: existing.ID, URL: existing.Link, Status: existing.Status, SEOApplied: make([]string, 0),
 		Skipped: make([]string, 0), Findings: driftFindings(sc.Page), Mismatches: make([]pagemap.Mismatch, 0),
+		Version: publishRecordVersion,
 	}
 	if !seo.Send {
 		state.Result.took(seoWrite{applied: []string{}, skipped: seo.Skipped, findings: seo.Findings})
@@ -659,6 +664,10 @@ func writeSEOMeta(ctx context.Context, sc *run.StepContext, client *wp.Client, i
 		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 	}
 	state.Result.took(seo)
+	if len(seo.applied) > 0 {
+		sent := plan.SEO.Meta
+		state.Result.WrittenMeta = &sent
+	}
 	state.wrote(unitSEO)
 	return state.wait("wrote the SEO meta of " + sc.Page.Path)
 }

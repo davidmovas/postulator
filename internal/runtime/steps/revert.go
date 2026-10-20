@@ -2,6 +2,7 @@ package steps
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"time"
 
@@ -23,7 +24,6 @@ const (
 	CodeRevertNeedsHuman  = "revert_needs_human"
 	CodeRevertMetaKept    = "revert_meta_kept"
 	CodeRevertExcerptKept = "revert_excerpt_kept"
-	CodeRevertCustomKept  = "revert_custom_kept"
 
 	ReasonRevertExcerptEdited = "the excerpt changed on the site since the run wrote it, so the owner's edit is kept"
 
@@ -61,6 +61,7 @@ type RevertResult struct {
 	Detail    string             `json:"detail"`
 	SourceRun string             `json:"sourceRunId"`
 	Neighbors []RevertedNeighbor `json:"neighbors"`
+	Fields    []RevertedField    `json:"fields,omitempty"`
 	Findings  []content.Finding  `json:"findings"`
 	WPID      int64              `json:"wpId"`
 	Created   bool               `json:"created"`
@@ -87,23 +88,27 @@ func Revert(deps Deps) run.StepDef {
 				Neighbors: make([]RevertedNeighbor, 0), Findings: make([]content.Finding, 0),
 			}
 
-			published, relinked, found, err := recordOf(ctx, deps, source, page.ID)
+			record, found, err := recordOf(ctx, deps, source, page.ID)
 			if err != nil {
 				return run.Result{}, err
 			}
 			if !found {
 				return handBack(result, ReasonRevertNoRecord)
 			}
+			published, relinked := record.published, record.relinked
 			result.WPID, result.Created = published.WPID, published.Created
 
 			client, err := clientFor(ctx, deps, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
 			}
-			work := revertWork{page: page, client: client, published: published}
+			work := revertWork{page: page, client: client, published: published, canonical: record.canonical}
 
 			if reason, undone := undoPage(ctx, deps, sc, &result, work); !undone {
 				return handBack(result, reason)
+			}
+			if published.Version >= publishRecordVersion && len(revertFields(sc)) > 0 {
+				return settleRevert(result)
 			}
 			for i := range relinked.Neighbors {
 				if reason, undone := undoNeighbor(ctx, deps, sc, &result, work, relinked.Neighbors[i]); !undone {
@@ -118,7 +123,14 @@ func Revert(deps Deps) run.StepDef {
 type revertWork struct {
 	page      pagemap.Page
 	client    *wp.Client
+	canonical string
 	published PublishResult
+}
+
+type sourceRecord struct {
+	canonical string
+	published PublishResult
+	relinked  RelinkResult
 }
 
 func sourceRun(sc *run.StepContext) (string, error) {
@@ -129,10 +141,14 @@ func sourceRun(sc *run.StepContext) (string, error) {
 	return *sc.Run.ParentRunID, nil
 }
 
-func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (PublishResult, RelinkResult, bool, error) {
+type writtenCanonical struct {
+	Canonical string `json:"canonical"`
+}
+
+func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (sourceRecord, bool, error) {
 	items, err := deps.Items.ByRun(ctx, sourceRunID)
 	if err != nil {
-		return PublishResult{}, RelinkResult{}, false, err
+		return sourceRecord{}, false, err
 	}
 
 	for i := range items {
@@ -141,27 +157,34 @@ func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (Publi
 		}
 		stored, listErr := deps.Artifacts.ByItem(ctx, items[i].ID)
 		if listErr != nil {
-			return PublishResult{}, RelinkResult{}, false, listErr
+			return sourceRecord{}, false, listErr
 		}
 
 		published, ok, decodeErr := blobOf[PublishResult](stored, run.ArtifactPublishResult)
 		if decodeErr != nil {
-			return PublishResult{}, RelinkResult{}, false, decodeErr
+			return sourceRecord{}, false, decodeErr
 		}
 		if !ok {
 			continue
 		}
 		relinked, _, decodeErr := blobOf[RelinkResult](stored, run.ArtifactRelinkResult)
 		if decodeErr != nil {
-			return PublishResult{}, RelinkResult{}, false, decodeErr
+			return sourceRecord{}, false, decodeErr
 		}
-		return published, relinked, true, nil
+		meta, _, decodeErr := blobOf[writtenCanonical](stored, run.ArtifactMeta)
+		if decodeErr != nil {
+			return sourceRecord{}, false, decodeErr
+		}
+		return sourceRecord{published: published, relinked: relinked, canonical: meta.Canonical}, true, nil
 	}
-	return PublishResult{}, RelinkResult{}, false, nil
+	return sourceRecord{}, false, nil
 }
 
 func undoPage(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
 	work revertWork) (reason string, undone bool) {
+	if work.published.Version >= publishRecordVersion {
+		return revertByField(ctx, deps, sc, result, work)
+	}
 	if work.published.Created {
 		return takeOffTheSite(ctx, deps, result, work)
 	}
@@ -266,13 +289,6 @@ func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 			Details: map[string]any{"pageId": work.page.ID, "path": work.page.Path, "reason": reason},
 		})
 	}
-	if reason, back := putTheCustomBack(ctx, deps, sc, work); !back {
-		result.Findings = append(result.Findings, content.Finding{
-			Severity: content.SeverityWarn, Code: CodeRevertCustomKept,
-			Message: "the custom fields of " + work.page.Path + " were not put back: " + reason,
-			Details: map[string]any{"pageId": work.page.ID, "path": work.page.Path, "reason": reason},
-		})
-	}
 	return "", true
 }
 
@@ -308,9 +324,13 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 	if work.published.PreviousMeta == nil {
 		return ReasonRevertNoMeta, false
 	}
+	applied, err := canonicalStillOurs(ctx, work)
+	if err != nil {
+		return err.Error(), false
+	}
 
-	_, err := work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
-		work.published.SEOApplied, nil)
+	_, err = work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
+		applied, nil)
 	switch {
 	case err == nil:
 		return "", true
@@ -323,6 +343,21 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 	default:
 		return err.Error(), false
 	}
+}
+
+func canonicalStillOurs(ctx context.Context, work revertWork) ([]string, error) {
+	applied := slices.Clone(work.published.SEOApplied)
+	if !slices.Contains(applied, "canonical") {
+		return applied, nil
+	}
+	held, err := work.client.GetSEOMeta(ctx, onSiteType(work.page), work.published.WPID)
+	if err != nil {
+		return nil, err
+	}
+	if work.canonical == "" || held.Canonical != work.canonical {
+		applied = slices.DeleteFunc(applied, func(name string) bool { return name == "canonical" })
+	}
+	return applied, nil
 }
 
 func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,

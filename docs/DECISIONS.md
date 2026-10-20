@@ -3850,3 +3850,26 @@ on what stage 2 left open and what was decided while building.
   and every variation's facts read the same before, after and after the revert, and that the revert
   puts back the client's text. The suites' shared recipe gains `generate_fields`, which B.2 made
   the writer of the short description: without it the product loop wrote none.
+- **A revert puts back each field and each block on its own** (C.1, decision 17). A publish
+  result now carries `version` (3) and `writtenMeta`, what its SEO write sent; a result without
+  a version reverts whole, as before. A versioned one is reverted field by field through the
+  registry: each change in its `fields` diff is written back to its before value under the hash
+  of what the run wrote (a custom field that held nothing is deleted), so a field the client
+  changed since is never written over and is reported `kept` with a `revert_field_kept` finding,
+  while the rest go back; the Open Graph twins go back with their SEO field under the hash of the
+  twin the run sent; a product's first image comes off while it is still ours; the status is never
+  touched. The body goes back whole and byte for byte while it is still what the run wrote;
+  otherwise `block.Undo` walks the publish's block diff, finds each run of blocks the run added,
+  intact and in order, among the live blocks (an anchor is the nth copy of its kept neighbour, so
+  repeated blocks resolve), and puts back what each replaced, keeping the client's later edits
+  elsewhere and naming any group he changed (a property test over random operations holds that
+  every block comes back with its own bytes, in order). A created page is trashed only while its
+  body is still what we wrote, else handed back. The revert pauses for a person only when nothing
+  could be put back. `runs.RevertRequest` gains `pageId` and `fields` (checked against the catalog
+  and the deny list) for a person, passed to the revert step as its `fields` param; with fields
+  named, the neighbours are left alone. A second revert is refused only while another is under
+  way, so it can put back what the first left, and a field already put back is written again as
+  itself. `runs_revert` takes its own `{runId}` arguments, its schema unchanged. An older run's
+  canonical is put back only while the live one is still what that run's meta artifact wrote. The
+  old path's restores of variations, images, lists and custom fields are gone: no record before
+  stage 3 wrote them.

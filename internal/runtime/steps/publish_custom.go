@@ -6,7 +6,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/edit"
-	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
@@ -190,62 +189,4 @@ func recordCustom(ctx context.Context, deps Deps, sc *run.StepContext, state *pu
 		}
 	}
 	return nil
-}
-
-func putTheCustomBack(ctx context.Context, deps Deps, sc *run.StepContext, work revertWork) (string, bool) {
-	if len(work.published.PreviousFields) == 0 {
-		return "", true
-	}
-	itemType := onSiteType(work.page)
-	writes := make(map[string]wp.MetaWrite)
-	store := make(map[string]string)
-	for _, written := range work.published.PreviousFields {
-		if written.Provider == field.ProviderStore {
-			store[written.Key.Instance()] = written.Before
-			continue
-		}
-		hash := block.BodyHash(written.Written)
-		var before *string
-		if written.Before != "" {
-			before = &written.Before
-		}
-		writes[written.Key.Instance()] = wp.MetaWrite{Value: before, Expected: &hash}
-	}
-	if len(store) > 0 {
-		held, err := work.client.GetProduct(ctx, work.published.WPID)
-		if err != nil {
-			return storeReason(err), false
-		}
-		for _, written := range work.published.PreviousFields {
-			if written.Provider != field.ProviderStore {
-				continue
-			}
-			current := ""
-			for _, entry := range held.MetaData {
-				if entry.Key == written.Key.Instance() {
-					current = metaText(entry.Value)
-				}
-			}
-			if current != written.Written {
-				return ReasonRevertCustomEdited, false
-			}
-		}
-		if _, err = work.client.UpdateProduct(ctx, work.published.WPID, wp.UpdateProduct{MetaData: store}); err != nil {
-			return storeReason(err), false
-		}
-	}
-	if len(writes) > 0 {
-		if _, err := work.client.PutMeta(ctx, itemType, work.published.WPID, writes); err != nil {
-			if _, conflict := movedOf(err); conflict {
-				return ReasonRevertCustomEdited, false
-			}
-			return err.Error(), false
-		}
-	}
-	for _, written := range work.published.PreviousFields {
-		if err := recordField(ctx, deps, sc, work.page.ID, written.Key, written.Before); err != nil {
-			return err.Error(), false
-		}
-	}
-	return "", true
 }

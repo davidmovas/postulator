@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
-	"github.com/davidmovas/postulator/internal/application/edit"
-	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -17,48 +15,7 @@ const (
 	ReasonRevertStoreRefused = "the WordPress user may not edit products, so the product cannot be put back"
 	ReasonRevertShortEdited  = "the short description was edited in the store since the run wrote it, " +
 		"so putting the old one back would lose that edit"
-	ReasonRevertVariationEdited = "a variation's description was edited in the store since the run wrote it, " +
-		"so putting the old one back would lose that edit"
-	ReasonRevertImageEdited = "an image's alt text or title was edited since the run wrote it, " +
-		"so putting the old one back would lose that edit"
-	ReasonRevertCustomEdited = "a custom field was edited since the run wrote it, " +
-		"so putting the old value back would lose that edit"
-	ReasonRevertListEdited = "the upsells or cross-sells were edited in the store since the run wrote them, " +
-		"so putting the old list back would lose that edit"
 )
-
-func imagesToRestore(ctx context.Context, work revertWork) (restore map[int64]wp.UpdateMedia, reason string) {
-	out := make(map[int64]wp.UpdateMedia)
-	for _, written := range work.published.PreviousMedia {
-		id, named := edit.MediaID(written.Key)
-		if !named {
-			continue
-		}
-		held, err := work.client.GetMedia(ctx, id)
-		switch {
-		case errors.IsCode(err, errors.NotFound):
-			continue
-		case err != nil:
-			return nil, storeReason(err)
-		}
-		current := held.Alt
-		if written.Key.Kind() == field.ImageTitle {
-			current = held.Title
-		}
-		if current != written.Written {
-			return nil, ReasonRevertImageEdited
-		}
-		back := out[id]
-		before := written.Before
-		if written.Key.Kind() == field.ImageTitle {
-			back.Title = &before
-		} else {
-			back.Alt = &before
-		}
-		out[id] = back
-	}
-	return out, ""
-}
 
 func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
 	work revertWork) (string, bool) {
@@ -67,14 +24,6 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 		return storeReason(err), false
 	}
 	update, attributes, reason := productRestore(*work.published.PreviousProduct, held)
-	if reason != "" {
-		return reason, false
-	}
-	variations, reason := variationsToRestore(ctx, work, held.ID)
-	if reason != "" {
-		return reason, false
-	}
-	images, reason := imagesToRestore(ctx, work)
 	if reason != "" {
 		return reason, false
 	}
@@ -93,18 +42,7 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 			return storeReason(err), false
 		}
 	}
-	for _, written := range variations {
-		id, _ := edit.VariationID(written.Key)
-		if _, err = work.client.UpdateVariation(ctx, held.ID, id, written.Before); err != nil {
-			return storeReason(err), false
-		}
-	}
-	for id, back := range images {
-		if _, err = work.client.UpdateMedia(ctx, id, back); err != nil {
-			return storeReason(err), false
-		}
-	}
-	if hasFields(update) || attributes != nil || len(variations) > 0 {
+	if hasFields(update) || attributes != nil {
 		if raw, reason, ok = readRawBack(ctx, work); !ok {
 			return reason, false
 		}
@@ -114,29 +52,7 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 		return reason, false
 	}
 	return bodyRestored(ctx, deps, sc, result, work, hash,
-		"the description, the short description, the variations' descriptions and the attributes the run replaced were written back")
-}
-
-func variationsToRestore(ctx context.Context, work revertWork, productID int64) (restore []FieldWrite, reason string) {
-	out := make([]FieldWrite, 0, len(work.published.PreviousVariations))
-	for _, written := range work.published.PreviousVariations {
-		id, named := edit.VariationID(written.Key)
-		if !named {
-			continue
-		}
-		held, err := work.client.GetVariation(ctx, productID, id)
-		switch {
-		case errors.IsCode(err, errors.NotFound):
-			continue
-		case err != nil:
-			return nil, storeReason(err)
-		case held.Description != written.Written:
-			return nil, ReasonRevertVariationEdited
-		case held.Description != written.Before:
-			out = append(out, written)
-		}
-	}
-	return out, ""
+		"the description, the short description and the attributes the run replaced were written back")
 }
 
 func storeReason(err error) string {
@@ -168,20 +84,6 @@ func productRestore(snapshot ProductSnapshot, held wp.Product) (update wp.Update
 		}
 		if changed {
 			attributes = &restored
-		}
-	}
-	for _, written := range snapshot.Lists {
-		if listOf(held, written.Key) != written.Written {
-			return wp.UpdateProduct{}, nil, ReasonRevertListEdited
-		}
-		before, valid := field.ParseIDList(written.Before)
-		if !valid {
-			continue
-		}
-		if written.Key == field.Upsells {
-			update.UpsellIDs = &before
-		} else {
-			update.CrossSellIDs = &before
 		}
 	}
 	if snapshot.ImageID != 0 {

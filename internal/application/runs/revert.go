@@ -5,7 +5,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -42,6 +44,16 @@ func (s *Service) Revert(ctx context.Context, req RevertRequest) (RevertResponse
 		return RevertResponse{}, errors.New(errors.Invalid,
 			"the run wrote nothing to the site that could be put back").WithDetail("runId", runID)
 	}
+	if pageID := strings.TrimSpace(req.PageID); pageID != "" {
+		if !slices.Contains(targets, pageID) {
+			return RevertResponse{}, invalid("the run wrote nothing to that page", "pageId")
+		}
+		targets = []string{pageID}
+	}
+	recipe, err := revertRecipe(req.Fields)
+	if err != nil {
+		return RevertResponse{}, err
+	}
 
 	actor, ok := kctx.ActorFrom(ctx)
 	if !ok {
@@ -53,7 +65,7 @@ func (s *Service) Revert(ctx context.Context, req RevertRequest) (RevertResponse
 		SiteID:      source.SiteID,
 		Kind:        run.KindRevert,
 		Targets:     targets,
-		Recipe:      run.RevertRecipe(),
+		Recipe:      recipe,
 		TemplateID:  source.TemplateID,
 		PublishMode: source.PublishMode,
 		ParentRunID: &source.ID,
@@ -72,15 +84,33 @@ func (s *Service) refuseSecondRevert(ctx context.Context, runID string) error {
 	}
 
 	for i := range children {
-		if children[i].Kind != run.KindRevert {
-			continue
-		}
-		if children[i].Status == run.StatusCompleted || children[i].Status.Active() {
-			return errors.New(errors.Conflict, "this run has already been reverted").
+		if children[i].Kind == run.KindRevert && children[i].Status.Active() {
+			return errors.New(errors.Conflict, "a revert of this run is still under way").
 				WithDetail("runId", runID).WithDetail("revertRunId", children[i].ID)
 		}
 	}
 	return nil
+}
+
+func revertRecipe(fields []string) ([]template.StepSpec, error) {
+	recipe := run.RevertRecipe()
+	if len(fields) == 0 {
+		return recipe, nil
+	}
+	named := make([]any, 0, len(fields))
+	for _, raw := range fields {
+		key := field.Key(strings.TrimSpace(raw))
+		if spec, known := field.Lookup(key); !known || spec.Denied {
+			return nil, invalid("no field the run could have written is named "+string(key), "fields")
+		}
+		named = append(named, string(key))
+	}
+	for i := range recipe {
+		if recipe[i].Name == string(run.StepRevert) {
+			recipe[i].Params = map[string]any{"fields": named}
+		}
+	}
+	return recipe, nil
 }
 
 func (s *Service) published(ctx context.Context, runID string) ([]string, error) {
