@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	appsync "github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -33,8 +34,12 @@ func TestTheSiteFiltersAreRespectedUnderARestrictedUser(t *testing.T) {
 		t.Fatalf("create the site as the restricted user: %v", err)
 	}
 	siteID := owner.Site.ID
-	if !owner.Site.Plugin.Installed {
-		t.Fatal("the plugin answers nothing to the restricted user")
+	checked, err := core.Sync.CheckPlugin(t.Context(), appsync.CheckPluginRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("check the plugin as the restricted user: %v", err)
+	}
+	if !checked.Plugin.Installed {
+		t.Fatalf("the plugin answers nothing to the restricted user: %+v", checked)
 	}
 	runSync(t, core, siteID)
 	known := pagesByPath(t, core.Pages, siteID)
