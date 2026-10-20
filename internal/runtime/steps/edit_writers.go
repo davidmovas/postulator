@@ -114,7 +114,13 @@ func (w editWriters) WriteStore(ctx context.Context, target edit.Target, values 
 			}
 			in.Images = &[]int64{image}
 		default:
-			return nil, errors.New(errors.Invalid, "the store writer takes no such field").WithDetail("key", string(key))
+			if key.Kind() != field.Meta {
+				return nil, errors.New(errors.Invalid, "the store writer takes no such field").WithDetail("key", string(key))
+			}
+			if in.MetaData == nil {
+				in.MetaData = make(map[string]string)
+			}
+			in.MetaData[key.Instance()] = value
 		}
 	}
 	product, err := w.client.UpdateProduct(ctx, target.ID, in)
@@ -145,7 +151,11 @@ func storeValues(product wp.Product) map[field.Key]string {
 	if len(product.Images) > 0 {
 		first = strconv.FormatInt(product.Images[0].ID, 10)
 	}
-	return map[field.Key]string{field.ProductShortDescription: product.ShortDescription, field.FeaturedImage: first}
+	values := map[field.Key]string{field.ProductShortDescription: product.ShortDescription, field.FeaturedImage: first}
+	for _, entry := range product.MetaData {
+		values[field.Instance(field.Meta, entry.Key)] = metaText(entry.Value)
+	}
+	return values
 }
 
 func (w editWriters) Plugin(ctx context.Context) (bool, error) {

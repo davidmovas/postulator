@@ -33,9 +33,10 @@ const (
 )
 
 type FieldWrite struct {
-	Key     field.Key `json:"key"`
-	Before  string    `json:"before"`
-	Written string    `json:"written"`
+	Key      field.Key      `json:"key"`
+	Before   string         `json:"before"`
+	Written  string         `json:"written"`
+	Provider field.Provider `json:"provider,omitempty"`
 }
 
 type SnapshotAttribute struct {
@@ -131,6 +132,8 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *
 		return writeVariation(ctx, deps, sc, client, state, field.Key(unit))
 	case strings.HasPrefix(unit, unitMedia):
 		return writeImage(ctx, sc, client, state, unit)
+	case unit == unitCustomPlugin, unit == unitCustomStore:
+		return writeCustom(ctx, sc, client, wp.TypeProduct, state, unit)
 	case unit == unitRaw:
 		return writeRawBody(ctx, deps, sc, client, wp.TypeProduct, state)
 	case unit == unitSEO:
@@ -386,12 +389,17 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	if err != nil {
 		return nil, err
 	}
+	custom, err := planCustom(ctx, deps, sc, client, wp.TypeProduct, held.ID, &held)
+	if err != nil {
+		return nil, err
+	}
 
 	saved := productAnswerOf(held)
 	plan := &publishPlan{
 		Writes: make([]string, 0, 4), Kept: kept.keys(), SEO: seo, Final: description, Theirs: theirs, Part: part,
 		Previous: previous, SiteHash: raw.ContentHash, WPID: held.ID, Plugin: true, Product: true,
 		Store: storePlanOf(update, snapshot, &saved), Unstable: !raw.SaveStable, Variations: variations, Media: images,
+		Custom: custom,
 	}
 	plan.Writes = append(plan.Writes, unitCheck)
 	if hasFields(update) && !plan.Unstable {
@@ -405,6 +413,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	for i := range images {
 		plan.Writes = append(plan.Writes, images[i].unit())
 	}
+	plan.Writes = append(plan.Writes, plan.customUnits()...)
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
 	}
@@ -473,6 +482,11 @@ func checkTheProduct(ctx context.Context, sc *run.StepContext, client *wp.Client
 			moved = append(moved, string(planned.Key))
 		}
 	}
+	customMoved, err := checkCustom(ctx, client, wp.TypeProduct, plan)
+	if err != nil {
+		return state.failed(err)
+	}
+	moved = append(moved, customMoved...)
 	for _, image := range plan.Media {
 		held, err := client.GetMedia(ctx, image.ID)
 		if err != nil {
@@ -576,7 +590,7 @@ func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 			recorded[field.ProductShortDescription] = stored.ShortDescription
 		}
 	}
-	for _, written := range append(slices.Clone(state.Result.PreviousVariations), state.Result.PreviousMedia...) {
+	for _, written := range slices.Concat(state.Result.PreviousVariations, state.Result.PreviousMedia, state.Result.PreviousFields) {
 		recorded[written.Key] = written.Written
 	}
 	for key, value := range recorded {

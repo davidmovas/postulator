@@ -34,6 +34,7 @@ type PublishResult struct {
 	PreviousProduct     *ProductSnapshot   `json:"previousProduct,omitempty"`
 	PreviousVariations  []FieldWrite       `json:"previousVariations,omitempty"`
 	PreviousMedia       []FieldWrite       `json:"previousMedia,omitempty"`
+	PreviousFields      []FieldWrite       `json:"previousFields,omitempty"`
 	URL                 string             `json:"url"`
 	Status              string             `json:"status"`
 	ContentHash         string             `json:"contentHash"`
@@ -106,6 +107,8 @@ func publishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *pub
 		return writeItemFields(ctx, deps, sc, client, itemType, state)
 	case unitSEO:
 		return writeSEOMeta(ctx, sc, client, itemType, state)
+	case unitCustomPlugin, unitCustomStore:
+		return writeCustom(ctx, sc, client, itemType, state, state.next())
 	default:
 		return finishItem(ctx, deps, sc, state)
 	}
@@ -185,7 +188,9 @@ func (p *publishPlan) fieldChanges() []field.Change {
 				out = append(out, field.NewChange(planned.Key, planned.Before, planned.Value))
 			}
 		}
+		out = append(out, p.customChanges()...)
 	default:
+		out = append(out, p.customChanges()...)
 		if !p.Request.KeepTitle {
 			out = append(out, field.NewChange(field.Title, p.SiteTitle, p.Request.Title))
 		}
@@ -311,12 +316,16 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	if err != nil {
 		return nil, err
 	}
+	custom, err := planCustom(ctx, deps, sc, client, itemType, existing.ID, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	plan := &publishPlan{
 		Writes: make([]string, 0, 4), Kept: kept.keys(), Request: request, SEO: seo, Final: final, Theirs: theirs,
 		Part: part, Previous: previous, SiteHash: site.hashed(), SiteTitle: existing.Title, Excerpt: existing.Excerpt,
 		WPID: existing.ID, SiteFeatured: existing.FeaturedMedia, Create: !found, Plugin: site.plugin,
-		Unstable: found && !site.stable,
+		Unstable: found && !site.stable, Custom: custom,
 	}
 	if found {
 		plan.Writes = append(plan.Writes, unitCheck)
@@ -327,6 +336,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 		read := answerOf(existing)
 		plan.Item = &read
 	}
+	plan.Writes = append(plan.Writes, plan.customUnits()...)
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
 	}
@@ -417,6 +427,11 @@ func checkBeforeWriting(ctx context.Context, sc *run.StepContext, client *wp.Cli
 		}
 		moved = append(moved, plan.SEO.movedSince(held)...)
 	}
+	customMoved, err := checkCustom(ctx, client, itemType, plan)
+	if err != nil {
+		return state.failed(err)
+	}
+	moved = append(moved, customMoved...)
 	if slices.Contains(plan.Writes, unitRaw) {
 		raw, readErr := client.GetRaw(ctx, itemType, plan.WPID)
 		if readErr != nil {
@@ -672,6 +687,9 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 		if err := recordField(ctx, deps, sc, sc.Page.ID, field.SEOCanonical, canonical); err != nil {
 			return state.failed(err)
 		}
+	}
+	if err := recordCustom(ctx, deps, sc, state); err != nil {
+		return state.failed(err)
 	}
 	if plan.Unstable {
 		state.Finished = true

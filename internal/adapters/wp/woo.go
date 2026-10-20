@@ -3,11 +3,13 @@ package wp
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -76,6 +78,7 @@ type Product struct {
 type UpdateProduct struct {
 	ShortDescription *string
 	Images           *[]int64
+	MetaData         map[string]string
 }
 
 func attributesPayload(held []ProductAttribute) []map[string]any {
@@ -110,7 +113,24 @@ func (in UpdateProduct) payload() map[string]any {
 		}
 		fields["images"] = images
 	}
+	if len(in.MetaData) > 0 {
+		entries := make([]map[string]any, 0, len(in.MetaData))
+		for _, key := range slices.Sorted(maps.Keys(in.MetaData)) {
+			entries = append(entries, map[string]any{"key": key, "value": in.MetaData[key]})
+		}
+		fields["meta_data"] = entries
+	}
 	return fields
+}
+
+func (in UpdateProduct) refused() error {
+	for key := range in.MetaData {
+		if !field.MetaKeyAllowed(key) {
+			return errors.New(errors.Invalid, "the meta key is protected, the store's own, or not a plain key").
+				WithDetail("reason", field.ReasonDenied).WithDetail("key", key)
+		}
+	}
+	return nil
 }
 
 type productAttributePayload struct {
@@ -234,6 +254,9 @@ func (c *Client) GetProduct(ctx context.Context, id int64) (Product, error) {
 }
 
 func (c *Client) UpdateProduct(ctx context.Context, id int64, in UpdateProduct) (Product, error) {
+	if err := in.refused(); err != nil {
+		return Product{}, err
+	}
 	fields := in.payload()
 	if len(fields) == 0 {
 		return Product{}, errors.New(errors.Invalid, "the product update carries no fields")

@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/content"
@@ -83,10 +84,12 @@ type askedField struct {
 }
 
 const (
-	reasonNoWriter    = "nothing on this site writes it yet"
-	reasonUnsupported = "the page's post type carries no excerpt"
-	reasonKept        = "it holds the owner's own text, and the field's rewrites switch is off"
-	reasonNoShort     = "the page's template writes no short description"
+	reasonNoWriter      = "nothing on this site writes it yet"
+	reasonUnsupported   = "the page's post type carries no excerpt"
+	reasonKept          = "it holds the owner's own text, and the field's rewrites switch is off"
+	reasonNoShort       = "the page's template writes no short description"
+	reasonStoreProducts = "the store writes the custom fields of a product only"
+	reasonNoMetaWrite   = "the site has no companion plugin that writes custom fields; install or update it and sync the site"
 )
 
 func GenerateFields(deps Deps) run.StepDef {
@@ -246,7 +249,7 @@ func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]asked
 		if !scope.Enabled || !scope.AIWrites {
 			continue
 		}
-		reason, err := writerFor(ctx, deps, sc, key)
+		reason, err := writerFor(ctx, deps, sc, scope)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -291,7 +294,32 @@ func otherTextFields(page pagemap.Page) []field.Key {
 	return out
 }
 
-func writerFor(ctx context.Context, deps Deps, sc *run.StepContext, key field.Key) (string, error) {
+func customWriter(ctx context.Context, deps Deps, sc *run.StepContext, provider field.Provider) (string, error) {
+	switch provider {
+	case field.ProviderStore:
+		if sc.Page.WPType != pagemap.WPProduct {
+			return reasonStoreProducts, nil
+		}
+		return "", nil
+	case field.ProviderPlugin:
+		owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
+		if err != nil {
+			return "", err
+		}
+		if !owner.Plugin.Installed || !slices.Contains(owner.Plugin.Capabilities, wp.CapabilityMetaWrite) {
+			return reasonNoMetaWrite, nil
+		}
+		return "", nil
+	default:
+		return reasonNoWriter, nil
+	}
+}
+
+func writerFor(ctx context.Context, deps Deps, sc *run.StepContext, scope field.Scope) (string, error) {
+	key := scope.Key
+	if key.Kind() == field.Meta {
+		return customWriter(ctx, deps, sc, scope.Provider)
+	}
 	if key == field.ProductShortDescription && sc.Page.WPType == pagemap.WPProduct {
 		if !content.WritesShortDescription(sc.Spec.Product) {
 			return reasonNoShort, nil

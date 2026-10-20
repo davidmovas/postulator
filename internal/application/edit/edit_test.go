@@ -424,6 +424,36 @@ func TestAnImagesAltAndTitleAreWrittenOnlyWhereItIsAttached(t *testing.T) {
 	}
 }
 
+func TestACustomFieldIsWrittenByTheProviderItsScopeNames(t *testing.T) {
+	t.Parallel()
+
+	dosage := field.Instance(field.Meta, "dosage")
+	store := newSite()
+	results, err := serviceOver(store).Write(t.Context(), product, []edit.Write{{Key: dosage, Value: new("Once a day"), Provider: field.ProviderStore}})
+	if err != nil || len(results) != 1 || results[0].Outcome != edit.OutcomeWritten {
+		t.Fatalf("a store custom field = %+v, %v", results, err)
+	}
+	if !slices.Equal(store.calls, []string{"read store", "write store"}) || store.store[dosage] != "Once a day" {
+		t.Errorf("calls %v, store %v, want it written through the store", store.calls, store.store)
+	}
+
+	plugin := newSite()
+	if _, err = serviceOver(plugin).Write(t.Context(), product, []edit.Write{{Key: dosage, Value: new("Once a day"), Provider: field.ProviderPlugin}}); err != nil ||
+		!slices.Equal(plugin.calls, []string{"write meta"}) {
+		t.Errorf("a plugin custom field = %v with calls %v, want it written through the plugin", err, plugin.calls)
+	}
+
+	page2 := newSite()
+	if _, err = serviceOver(page2).Write(t.Context(), page, []edit.Write{{Key: dosage, Value: new("x"), Provider: field.ProviderStore}}); reasonOf(t, err) != edit.ReasonNoWriter {
+		t.Errorf("a store custom field on a page = %v, want refused", err)
+	}
+	denied := newSite()
+	if _, err = serviceOver(denied).Write(t.Context(), product, []edit.Write{{Key: field.Instance(field.Meta, "_price"), Value: new("1"), Provider: field.ProviderStore}}); reasonOf(t, err) != field.ReasonDenied ||
+		len(denied.calls) != 0 {
+		t.Errorf("the store's own key through the store = %v with calls %v, want refused before anything leaves", err, denied.calls)
+	}
+}
+
 func TestAVariationIsWrittenOnAProductOnly(t *testing.T) {
 	t.Parallel()
 

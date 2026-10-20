@@ -3798,3 +3798,19 @@ on what stage 2 left open and what was decided while building.
   `previousVariations`, both now `FieldWrite`), the field rows are recorded, and the revert puts
   each back while it still holds what the run wrote, handing the product back otherwise. The fake
   seeds an upload under a parent, answers its `post`, and names a product image by its title.
+- **A custom field is written by the provider its scope names** (B.5). `generate_fields` asks an
+  enabled, AI-written `meta:<key>` where its provider can write it: the plugin when the site's
+  plugin answers `meta_write`, the store on a product only, and nothing for a scope with no
+  provider, each skip with its reason. The registry's `Write` names the provider: a store write
+  goes through the store writer as `meta_data` by key (read back from the product's own
+  `meta_data`, a value that is not one text reading as its JSON, so it never matches and is never
+  written over), anything else through the plugin's `PUT /meta`; the deny list is refused before
+  either, and `wp.UpdateProduct` refuses a denied key itself. `publish` reads each field against
+  its provider in the plan (the plugin's meta read, or the product's `meta_data`), re-reads them in
+  its check, and writes one unit per provider after the core or store fields and before the SEO
+  meta; neither is a save of the post (WooCommerce saves the post only when one of its post fields
+  changes), so they are made over an unstable page too. A page we create gets its custom fields
+  after the creation, by the id it answered. The result keeps `previousFields` with each
+  provider, the field rows are recorded, and the revert puts each back under the hash of what the
+  run wrote (a key that held nothing is deleted), naming any the client changed since
+  (`revert_custom_kept`) and putting back the rest of the page.

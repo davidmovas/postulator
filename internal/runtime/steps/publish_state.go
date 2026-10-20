@@ -127,6 +127,7 @@ type publishPlan struct {
 	Store        *storePlan      `json:"store,omitempty"`
 	Variations   []variationPlan `json:"variations,omitempty"`
 	Media        []mediaPlan     `json:"media,omitempty"`
+	Custom       []customPlan    `json:"custom,omitempty"`
 	Item         *itemAnswer     `json:"item,omitempty"`
 	Writes       []string        `json:"writes"`
 	Kept         []field.Key     `json:"kept"`

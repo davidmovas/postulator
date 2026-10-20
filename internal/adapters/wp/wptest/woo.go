@@ -163,6 +163,15 @@ func (s *Server) handleProductUpdate(w http.ResponseWriter, r *http.Request) {
 	if _, present := body["images"]; present {
 		stored.Images = objectIDList(body, "images")
 	}
+	if entries, present := body["meta_data"].([]any); present {
+		for _, raw := range entries {
+			entry, isObject := raw.(map[string]any)
+			key, named := entry["key"].(string)
+			if isObject && named && key != "" {
+				s.setMetaData(stored, key, entry["value"])
+			}
+		}
+	}
 	stored.Modified = s.tick()
 	payload := s.productPayload(stored, true)
 	s.mu.Unlock()
@@ -213,6 +222,17 @@ func rendered(value string, edit bool) string {
 		return value
 	}
 	return value + "\n"
+}
+
+func (s *Server) setMetaData(stored *Item, key string, value any) {
+	for i := range stored.MetaData {
+		if stored.MetaData[i].Key == key {
+			stored.MetaData[i].Value = value
+			return
+		}
+	}
+	s.nextID++
+	stored.MetaData = append(stored.MetaData, MetaEntry{ID: s.nextID, Key: key, Value: value})
 }
 
 func resavesPost(body map[string]any) bool {

@@ -21,6 +21,8 @@ const (
 		"so putting the old one back would lose that edit"
 	ReasonRevertImageEdited = "an image's alt text or title was edited since the run wrote it, " +
 		"so putting the old one back would lose that edit"
+	ReasonRevertCustomEdited = "a custom field was edited since the run wrote it, " +
+		"so putting the old value back would lose that edit"
 )
 
 func imagesToRestore(ctx context.Context, work revertWork) (restore map[int64]wp.UpdateMedia, reason string) {

@@ -191,6 +191,73 @@ func (variationTypes) Set(_ context.Context, siteID string) (pagetype.Set, error
 	return pagetype.NewSet([]pagetype.Type{kind}, append(pagetype.DefaultScopes(pagetype.Product, kind.ID), scope)), nil
 }
 
+type customTypes struct {
+	provider field.Provider
+}
+
+func (c customTypes) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	types := []pagetype.Type{
+		{ID: "type-product", SiteID: siteID, Name: "Product", Preset: pagetype.Product},
+		{ID: "type-entity", SiteID: siteID, Name: "Entity", Preset: pagetype.Entity},
+	}
+	scopes := append(pagetype.DefaultScopes(pagetype.Product, "type-product"), pagetype.DefaultScopes(pagetype.Entity, "type-entity")...)
+	for _, kind := range types {
+		scope := field.Scope{PageTypeID: kind.ID, Key: field.Instance(field.Meta, "dosage_note"), Enabled: true, AIWrites: true,
+			Label: "Dosage note", Provider: c.provider, Links: field.NoLinks()}
+		scopes = append(scopes, scope)
+	}
+	return pagetype.NewSet(types, scopes), nil
+}
+
+func TestACustomFieldIsAskedWhereItsProviderCanWriteIt(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		provider field.Provider
+		wpType   pagemap.WPType
+		plugin   []string
+		asked    bool
+	}{
+		{name: "the plugin writes it", provider: field.ProviderPlugin, wpType: pagemap.WPPage, plugin: []string{"meta_write"}, asked: true},
+		{name: "a plugin too old to write meta", provider: field.ProviderPlugin, wpType: pagemap.WPPage, plugin: []string{"meta"}},
+		{name: "the store writes a product's", provider: field.ProviderStore, wpType: pagemap.WPProduct, asked: true},
+		{name: "the store writes no page's", provider: field.ProviderStore, wpType: pagemap.WPPage},
+		{name: "no provider", wpType: pagemap.WPPage, plugin: []string{"meta_write"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, _ := imageDeps(t)
+			deps.Types = customTypes{provider: tc.provider}
+			owner := storeSite()
+			owner.Plugin.Capabilities = tc.plugin
+			deps.Sites = siteStub{record: owner}
+			recorder := &callRecorder{reply: `{"fields":[{"key":"meta:dosage_note","value":"Once a day, with water."}]}`}
+			deps.LLM = recorder
+			sc := unitContext(t, nil)
+			sc.Page.WPType = tc.wpType
+
+			result, err := steps.GenerateFields(deps).Run(t.Context(), sc)
+			if err != nil {
+				t.Fatalf("GenerateFields: %v", err)
+			}
+			fields := fieldsOf(t, result)
+			got, written := fields.Value(field.Instance(field.Meta, "dosage_note"))
+			if written != tc.asked {
+				t.Fatalf("written = %t (%q), want %t; skipped %+v", written, got, tc.asked, fields.Skipped)
+			}
+			if tc.asked && (got != "Once a day, with water." || !strings.Contains(recorder.prompts[0], "Custom field dosage_note (key meta:dosage_note)")) {
+				t.Errorf("value %q, prompt:\n%s", got, recorder.prompts[0])
+			}
+			if !tc.asked && (len(recorder.prompts) != 0 || len(fields.Skipped) == 0) {
+				t.Errorf("the model was asked %d times, skipped %+v, want the field skipped with its reason", len(recorder.prompts), fields.Skipped)
+			}
+		})
+	}
+}
+
 type imageTypes struct{}
 
 func (imageTypes) Set(_ context.Context, siteID string) (pagetype.Set, error) {

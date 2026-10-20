@@ -23,6 +23,7 @@ const (
 	CodeRevertNeedsHuman  = "revert_needs_human"
 	CodeRevertMetaKept    = "revert_meta_kept"
 	CodeRevertExcerptKept = "revert_excerpt_kept"
+	CodeRevertCustomKept  = "revert_custom_kept"
 
 	ReasonRevertExcerptEdited = "the excerpt changed on the site since the run wrote it, so the owner's edit is kept"
 
@@ -262,6 +263,13 @@ func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 		result.Findings = append(result.Findings, content.Finding{
 			Severity: content.SeverityWarn, Code: CodeRevertExcerptKept,
 			Message: "the excerpt of " + work.page.Path + " was not put back: " + reason,
+			Details: map[string]any{"pageId": work.page.ID, "path": work.page.Path, "reason": reason},
+		})
+	}
+	if reason, back := putTheCustomBack(ctx, deps, sc, work); !back {
+		result.Findings = append(result.Findings, content.Finding{
+			Severity: content.SeverityWarn, Code: CodeRevertCustomKept,
+			Message: "the custom fields of " + work.page.Path + " were not put back: " + reason,
 			Details: map[string]any{"pageId": work.page.ID, "path": work.page.Path, "reason": reason},
 		})
 	}

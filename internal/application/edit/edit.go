@@ -37,6 +37,7 @@ type Write struct {
 	Expected *string
 	Social   *Social
 	Key      field.Key
+	Provider field.Provider
 }
 
 type Social struct {
@@ -159,7 +160,13 @@ func routeOf(target Target, write Write) (route, error) {
 		if !field.MetaKeyAllowed(key.Instance()) {
 			return 0, refused(key, field.ReasonDenied, "the meta key is protected, the store's own, or not a plain key")
 		}
-		return routeMeta, nil
+		if write.Provider != field.ProviderStore {
+			return routeMeta, nil
+		}
+		if !target.Product {
+			return 0, refused(key, ReasonNoWriter, "the store writes the custom fields of a product only")
+		}
+		return routeStore, nil
 	}
 	if key.Kind() == field.VariationDescription {
 		if !target.Product {

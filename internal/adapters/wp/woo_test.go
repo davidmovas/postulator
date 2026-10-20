@@ -196,6 +196,44 @@ func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
 	}
 }
 
+func TestUpdateProductWritesACustomFieldByKeyAndRefusesTheStoresOwn(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := seedProduct(server)
+	client := newClient(t, server)
+
+	product, err := client.UpdateProduct(t.Context(), seeded.ID, wp.UpdateProduct{MetaData: map[string]string{"dosage_note": "Once a day"}})
+	if err != nil {
+		t.Fatalf("UpdateProduct: %v", err)
+	}
+	found := false
+	for _, entry := range product.MetaData {
+		found = found || entry.Key == "dosage_note" && string(entry.Value) == `"Once a day"`
+	}
+	if !found {
+		t.Errorf("meta = %+v, want the custom field written", product.MetaData)
+	}
+	recorded, _ := server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	if _, sent := body["meta_data"]; !sent || len(body) != 1 {
+		t.Errorf("the update sent %v, want the meta data alone", body)
+	}
+
+	sent := len(server.Requests())
+	for _, key := range []string{"_price", "_sku", "total_sales", "TOTAL_SALES", "attribute_pa_size", "rank_math_title", "a key"} {
+		if _, err = client.UpdateProduct(t.Context(), seeded.ID, wp.UpdateProduct{MetaData: map[string]string{key: "x"}}); !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("%q: %v, want refused before it leaves", key, err)
+		}
+	}
+	if len(server.Requests()) != sent {
+		t.Errorf("a refused key still reached the store")
+	}
+}
+
 func TestUpdateProductRefusesAnEmptyUpdate(t *testing.T) {
 	t.Parallel()
 

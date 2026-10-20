@@ -417,7 +417,9 @@ written}]` (the key is `variation_description:<variation id>`) and `previousMedi
 written}]` (`image_alt:<media id>` or `image_title:<media id>`, written through `POST
 wp/v2/media/{id}` with `alt_text` and `title` alone, only for an attachment whose parent is the
 product), what the product held and what the run wrote, which the revert reads; an image attached
-elsewhere is named in `skipped`; `attributes`, `written`, `added` and `attributesSent` are an
+elsewhere is named in `skipped`; a page's or a product's custom fields are `previousFields [{key,
+before, written, provider}]` (`meta:<key>`, written through the plugin's `PUT /meta` or, for a
+product whose scope names the store, `meta_data` by key, never a key the deny list names); `attributes`, `written`, `added` and `attributesSent` are an
 older run's, since no run writes an attribute now. A sync result may carry `product_description_hidden` or `product_page_unread`, both
 warnings. `PagesService.Delete{onSite: true}` refuses a product or a product category with
 `details.field = onSite`. The name, price, stock, SKU, status, slug and categories of a product
