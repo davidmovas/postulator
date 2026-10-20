@@ -200,7 +200,7 @@ func TestAnEditToABodyThatWasAllOursPauses(t *testing.T) {
 	edited := oursBody + "\n\n<p>Added by the owner after the last sync.</p>"
 	server.Rewrite(*sc.Page.WPID, edited)
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestAPublishRetriedAfterItsRawWriteLeavesOneCopy(t *testing.T) {
 	kept := &content.KeptBody{Raw: clientText, Hash: block.BodyHash(clientText)}
 	deps, server, log, sc := keptRun(t, oursBody, kept)
 	server.FailNextItemUpdate(http.StatusBadRequest)
-	if _, err := steps.Publish(deps).Run(t.Context(), sc); err == nil {
+	if _, err := drive(t, steps.Publish(deps), sc); err == nil {
 		t.Fatal("the first attempt went through, want the injected update failure")
 	}
 	if len(log.ours(sc.Page.ID)) == 0 {
@@ -244,7 +244,7 @@ func TestAPageThatGainedItsIdAfterTheWriterRanIsStillGuarded(t *testing.T) {
 	sc := publishContext(t)
 	sc.Page.WPID = &seeded[0].ID
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -334,7 +334,7 @@ func TestAPlannedPageFoundBySlugIsAdoptedOnlyWhenItIsTheRunsOwn(t *testing.T) {
 			seeded := server.Seed(wptest.Item{Type: "page", Title: "Espresso", Slug: "espresso", Status: "publish", Content: tc.onSite})
 			sc := publishContext(t)
 
-			result, err := steps.Publish(deps).Run(t.Context(), sc)
+			result, err := drive(t, steps.Publish(deps), sc)
 			if err != nil {
 				t.Fatalf("Publish: %v", err)
 			}
@@ -372,7 +372,7 @@ func TestAClientEditAfterTheReadPauses(t *testing.T) {
 			deps, server, _, sc := keptRun(t, oursBody, kept)
 			tc.edit(server, *sc.Page.WPID)
 
-			result, err := steps.Publish(deps).Run(t.Context(), sc)
+			result, err := drive(t, steps.Publish(deps), sc)
 			if err != nil {
 				t.Fatalf("Publish: %v", err)
 			}
@@ -398,7 +398,7 @@ func TestAKeptBodyWithoutThePluginPauses(t *testing.T) {
 	sc.Page.WPID = &seeded[0].ID
 	sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: keptDraft(t, kept)}
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}

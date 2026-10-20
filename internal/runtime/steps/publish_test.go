@@ -46,10 +46,44 @@ func nestedContext(t *testing.T) *run.StepContext {
 	return sc
 }
 
+func settle(def run.StepDef, sc *run.StepContext, result run.Result) {
+	sc.Check = sc.Check.MergedWith(result.Checkpoint)
+	for _, kind := range def.Produces {
+		delete(sc.Artifacts, kind)
+	}
+	for i := range result.Artifacts {
+		artifact := result.Artifacts[i]
+		artifact.Size, artifact.Hash = len(artifact.Blob), run.HashBlob(artifact.Blob)
+		sc.Artifacts[artifact.Kind] = artifact
+	}
+}
+
+func driveLosing(t *testing.T, def run.StepDef, sc *run.StepContext, lost func(execution int) bool) (run.Result, error) {
+	t.Helper()
+
+	for execution := range 64 {
+		result, err := def.Run(t.Context(), sc)
+		if lost != nil && lost(execution) {
+			continue
+		}
+		settle(def, sc, result)
+		if err != nil || result.Next != run.TransitionWait {
+			return result, err
+		}
+	}
+	t.Fatalf("step %s never settled", def.Name)
+	return run.Result{}, nil
+}
+
+func drive(t *testing.T, def run.StepDef, sc *run.StepContext) (run.Result, error) {
+	t.Helper()
+	return driveLosing(t, def, sc, nil)
+}
+
 func runPublish(t *testing.T, deps steps.Deps, sc *run.StepContext) steps.PublishResult {
 	t.Helper()
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -76,7 +110,7 @@ func TestPublishWritesAPostWithoutAParent(t *testing.T) {
 		t.Fatalf("a post under a parent that is not on the site = %+v, want it written without waiting", published)
 	}
 
-	held, err := steps.Publish(deps).Run(t.Context(), nestedContext(t))
+	held, err := drive(t, steps.Publish(deps), nestedContext(t))
 	if err != nil || held.Next != run.TransitionPause || held.Reason != run.PauseAwaitingParent {
 		t.Fatalf("the same path as a page = %+v, %v; want it held for its parent", held, err)
 	}
@@ -324,7 +358,7 @@ func TestPublishReportsWhatItCannotDo(t *testing.T) {
 			if tc.with != nil {
 				tc.with(sc)
 			}
-			if _, err := steps.Publish(deps).Run(t.Context(), sc); !errors.IsCode(err, tc.want) {
+			if _, err := drive(t, steps.Publish(deps), sc); !errors.IsCode(err, tc.want) {
 				t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), tc.want, err)
 			}
 		})
@@ -376,7 +410,7 @@ func TestPublishHoldsTheItemForAParentThatIsNotOnTheSite(t *testing.T) {
 	deps, server := imageDeps(t)
 	sc := nestedContext(t)
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -427,7 +461,7 @@ func TestPublishRefusesAnIncompleteAncestorChain(t *testing.T) {
 	sc.Page.Slug = pagemap.Slug(sc.Page.Path)
 	sc.Page.ParentPageID = nil
 
-	_, err := steps.Publish(deps).Run(t.Context(), sc)
+	_, err := drive(t, steps.Publish(deps), sc)
 	if !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Publish of a page whose parent path has no page = %v, want an invalid error", err)
 	}
@@ -446,7 +480,7 @@ func TestPublishRefusesADanglingParent(t *testing.T) {
 	sc := nestedContext(t)
 	sc.Page.ParentPageID = pointer("page-ghost")
 
-	if _, err := steps.Publish(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
+	if _, err := drive(t, steps.Publish(deps), sc); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Publish under a parent that is not in the map = %v, want an invalid error", err)
 	}
 	if len(server.Items()) != 0 {
@@ -559,7 +593,7 @@ func TestPublishStopsWhenTheAddressIsNotTheOneAskedFor(t *testing.T) {
 	sc := nestedContext(t)
 	sc.Run.PublishMode = run.PublishLive
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -628,7 +662,7 @@ func TestPublishRefusesADriftedPage(t *testing.T) {
 	sc.Page.Drift = true
 	sc.Params[steps.ParamRefuseDrift] = true
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}

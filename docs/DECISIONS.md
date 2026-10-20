@@ -3500,3 +3500,23 @@ on what stage 2 left open and what was decided while building.
   oldest global template of its name, as `templates.EnsureSeeded` finds it; on a database the
   built-ins never reached, nothing is filled. The suites no longer give the types their templates:
   they assert that a fresh site's types carry them.
+
+### Decided while building
+
+- **`publish` keeps a durable record, one write per execution.** The engine replaces a step's
+  artifacts and merges its checkpoint at every settle, so a write made inside a long execution
+  was lost to the record whenever the execution paused, failed or died before it settled. Publish
+  now reads everything it will write over in a first execution (the plan, under the checkpoint
+  key `publish`), then makes one write per execution (the raw body, the core item, the store's
+  fields, the SEO meta) and returns `TransitionWait` waking at once, and every return, a pause and
+  an error included, carries the checkpoint and the `publish_result` built so far. A product whose
+  description conflicted after its short description was saved now pauses with that save on
+  record, where it used to pause with nothing a revert could find. A rerun that finds its own raw
+  write on the site (a 409 whose stored body renders as what it sent) takes it as written; a
+  creation whose answer was lost finds its page by slug and, when the body renders as its own,
+  records it as created, so a revert trashes it instead of emptying it. The before values are read
+  in the plan, so a rewrite whose answer was lost keeps the client's body as what it replaced. The
+  record starts again when the step's inputs change (a regenerated draft) or after it finished;
+  a publish result is carried only once a write has happened, so a plan that paused leaves nothing
+  for a revert. Every wait advances a sequence in the checkpoint, because the checkpoint is part of
+  the step's input hash and an unchanged one would let the engine reuse the step as done.

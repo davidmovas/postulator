@@ -33,17 +33,21 @@ func (r *PublishResult) took(seo seoWrite) {
 	r.Findings = append(r.Findings, seo.findings...)
 }
 
-func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64, updating bool,
-	kept keptFields) (seoWrite, error) {
+func unsent(skipped seoWrite) seoPlan {
+	return seoPlan{Skipped: skipped.skipped, Findings: skipped.findings}
+}
+
+func planSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64, updating bool,
+	kept keptFields) (seoPlan, error) {
 	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
 	if err != nil {
-		return seoWrite{}, err
+		return seoPlan{}, err
 	}
 	if !found {
 		if artifact, held := sc.Artifacts[run.ArtifactMeta]; held && artifact.Purged {
-			return metaPurged(sc.Page), nil
+			return unsent(metaPurged(sc.Page)), nil
 		}
-		return noMetaGenerated(), nil
+		return unsent(noMetaGenerated()), nil
 	}
 	if kept[field.SEOTitle] {
 		meta.Title, meta.OGTitle = "", ""
@@ -52,32 +56,36 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemT
 		meta.Description, meta.OGDescription = "", ""
 	}
 	if kept.all(field.SEOTitle, field.SEODescription) {
-		return snippetKept(), nil
+		return unsent(snippetKept()), nil
 	}
 
 	capabilities, err := client.Capabilities(ctx)
 	if err != nil {
 		if wp.IsPluginMissing(err) {
-			return metaNotWritten(sc.Page, ReasonNoPlugin), nil
+			return unsent(metaNotWritten(sc.Page, ReasonNoPlugin)), nil
 		}
-		return seoWrite{}, err
+		return seoPlan{}, err
 	}
 	if !capabilities.Has(CapabilitySEOMeta) {
-		return metaNotWritten(sc.Page, ReasonNoSEOWriter), nil
+		return unsent(metaNotWritten(sc.Page, ReasonNoSEOWriter)), nil
 	}
 
 	previous, err := metaBeingReplaced(ctx, client, capabilities, itemType, wpID, updating)
 	if err != nil {
-		return seoWrite{}, err
+		return seoPlan{}, err
 	}
+	return seoPlan{
+		Previous: previous, Send: true,
+		Meta: wp.SEOMeta{
+			Title: meta.Title, Description: meta.Description, Canonical: meta.Canonical,
+			OGTitle: meta.OGTitle, OGDescription: meta.OGDescription,
+		},
+	}, nil
+}
 
-	result, err := client.SetSEOMeta(ctx, itemType, wpID, wp.SEOMeta{
-		Title:         meta.Title,
-		Description:   meta.Description,
-		Canonical:     meta.Canonical,
-		OGTitle:       meta.OGTitle,
-		OGDescription: meta.OGDescription,
-	})
+func sendSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64,
+	plan seoPlan) (seoWrite, error) {
+	result, err := client.SetSEOMeta(ctx, itemType, wpID, plan.Meta)
 	if err != nil {
 		if wp.IsPluginMissing(err) {
 			return metaNotWritten(sc.Page, ReasonNoPlugin), nil
@@ -85,7 +93,7 @@ func applySEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemT
 		return seoWrite{}, err
 	}
 	return seoWrite{
-		previous: previous,
+		previous: plan.Previous,
 		applied:  append(make([]string, 0, len(result.Applied)), result.Applied...),
 		skipped:  []string{},
 		findings: nil,

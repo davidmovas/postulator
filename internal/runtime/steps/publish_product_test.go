@@ -211,6 +211,7 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 		prepare  func(*testing.T, productHarness, *run.StepContext)
 		commerce site.Commerce
 		message  string
+		written  bool
 	}{
 		{
 			name: "a row with no product",
@@ -236,6 +237,7 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 				h.server.EditBeforeNextRawWrite(h.held.ID, "<p>a human was here</p>")
 			},
 			message: "changed in the store",
+			written: true,
 		},
 		{
 			name: "a drifted product the recipe refuses",
@@ -257,12 +259,19 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 				tc.prepare(t, h, sc)
 			}
 
-			result, err := steps.Publish(h.deps).Run(t.Context(), sc)
+			result, err := drive(t, steps.Publish(h.deps), sc)
 			if err != nil {
 				t.Fatalf("Publish: %v", err)
 			}
-			if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman || len(result.Artifacts) != 0 {
-				t.Fatalf("Publish = %+v, want a pause for a human with nothing kept", result)
+			if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
+				t.Fatalf("Publish = %+v, want a pause for a human", result)
+			}
+			published, kept := publishedIn(t, result)
+			if kept != tc.written {
+				t.Fatalf("the pause kept a publish result %t, want %t: only a write that reached the store is recorded", kept, tc.written)
+			}
+			if kept && (published.PreviousProduct == nil || !published.PreviousProduct.ShortWritten) {
+				t.Errorf("the record = %+v, want the store fields written before the pause, so a revert puts them back", published)
 			}
 			if !strings.Contains(result.Message, tc.message) {
 				t.Errorf("message = %q, want it to say %q", result.Message, tc.message)

@@ -130,7 +130,7 @@ func filled(attribute wp.ProductAttribute) bool {
 	return slices.ContainsFunc(attribute.Options, func(option string) bool { return strings.TrimSpace(option) != "" })
 }
 
-func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []byte,
+func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *publishState, body []byte,
 	draft content.ContentDraft) (run.Result, error) {
 	if sc.Page.WPID == nil {
 		return needsHuman(sc.Page.Path + " " + notInStore), nil
@@ -139,51 +139,79 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 	if err != nil {
 		return run.Result{}, err
 	}
+	if state.Plan == nil {
+		stop, planErr := planProduct(ctx, deps, sc, client, state, body, draft)
+		if planErr != nil || stop != nil {
+			return orStopped(stop, planErr)
+		}
+		return state.wait("planned what to write to the product " + sc.Page.Path)
+	}
+	switch state.next() {
+	case unitStore:
+		return writeStoreFields(ctx, deps, sc, client, state, draft)
+	case unitRaw:
+		return writeRawBody(ctx, deps, sc, client, wp.TypeProduct, state)
+	case unitSEO:
+		return writeSEOMeta(ctx, sc, client, wp.TypeProduct, state)
+	default:
+		return finishProduct(ctx, deps, sc, state)
+	}
+}
+
+func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, state *publishState,
+	body []byte, draft content.ContentDraft) (*run.Result, error) {
 	held, err := client.GetProduct(ctx, *sc.Page.WPID)
 	if err != nil {
-		return refusedByStore(ctx, deps, sc, err)
+		refused, refusedErr := refusedByStore(ctx, deps, sc, err)
+		if refusedErr != nil {
+			return nil, refusedErr
+		}
+		return &refused, nil
 	}
 	if refusesDrift(sc) {
-		return driftRefused(sc.Page, "in the store since it was last written"), nil
+		refused := driftRefused(sc.Page, "in the store since it was last written")
+		return &refused, nil
 	}
 	description, err := descriptionOf(body)
 	if err != nil {
-		return run.Result{}, err
+		return nil, err
 	}
 	raw, err := client.GetRaw(ctx, wp.TypeProduct, held.ID)
 	switch {
 	case wp.IsPluginMissing(err):
-		return needsHuman(sc.Page.Path + " is a product and the site has no companion plugin to write its description"), nil
+		missing := needsHuman(sc.Page.Path + " is a product and the site has no companion plugin to write its description")
+		return &missing, nil
 	case err != nil:
-		return run.Result{}, err
+		return nil, err
 	}
 	featured, _, err := decodeArtifact[ImagesResult](sc, run.ArtifactImages)
 	if err != nil {
-		return run.Result{}, err
+		return nil, err
 	}
 	theirs, part, previous := "", description, raw.Content
 	keeping, err := deps.keepingOf(ctx, sc, draft, true)
 	if err != nil {
-		return run.Result{}, err
+		return nil, err
 	}
 	if keeping != nil {
 		onSite := liveBody{raw: raw.Content, hash: raw.ContentHash, plugin: true}
 		guarded, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, onSite, description)
 		if guardErr != nil {
-			return run.Result{}, guardErr
+			return nil, guardErr
 		}
 		if !same {
-			return needsHuman(sc.Page.Path + ": " + ReasonClientChanged), nil
+			changed := needsHuman(sc.Page.Path + ": " + ReasonClientChanged)
+			return &changed, nil
 		}
 		description, theirs, part, previous = guarded.final, guarded.theirs, guarded.part, guarded.previous
 	}
 	live := map[field.Key]string{field.ProductShortDescription: held.ShortDescription}
 	if seoErr := liveSnippet(ctx, client, wp.TypeProduct, held.ID, true, live); seoErr != nil {
-		return run.Result{}, seoErr
+		return nil, seoErr
 	}
 	kept, err := deps.keptFieldsOf(ctx, sc, true, live, field.SEOTitle, field.SEODescription, field.ProductShortDescription)
 	if err != nil {
-		return run.Result{}, err
+		return nil, err
 	}
 	written := draft.Product
 	if written != nil && kept[field.ProductShortDescription] {
@@ -191,57 +219,87 @@ func publishProduct(ctx context.Context, deps Deps, sc *run.StepContext, body []
 		copied.ShortDescription = ""
 		written = &copied
 	}
-
 	update, snapshot, typed := productUpdate(held, written, featured.FeaturedID)
-	store := productWrite{deps: deps, sc: sc, client: client, held: held, draft: draft.Product}
-	saved, refused, err := store.saveFields(ctx, update, &snapshot, raw.ContentHash)
+	seo, err := planSEO(ctx, client, sc, wp.TypeProduct, held.ID, true, kept)
 	if err != nil {
-		return run.Result{}, err
-	}
-	if refused != nil {
-		return *refused, nil
-	}
-	hash, err := client.PutRaw(ctx, wp.TypeProduct, held.ID, description, saved.expected)
-	if err != nil {
-		if errors.IsCode(err, errors.Conflict) {
-			return needsHuman("the product " + sc.Page.Path + " changed in the store while its description was written: " +
-				"it held " + saved.expected + " and now holds " + currentHashOf(err)), nil
-		}
-		return run.Result{}, err
-	}
-	if recordErr := recordOurBlocks(ctx, deps, sc, client, wp.TypeProduct, held.ID, description, theirs, part); recordErr != nil {
-		return run.Result{}, recordErr
+		return nil, err
 	}
 
-	stored := saved.written
-	result := PublishResult{
-		WPID: held.ID, URL: permalinkOf(wp.Item{Link: stored.Permalink}), Status: stored.Status, ContentHash: hash,
-		PreviousContent: previous, PreviousContentHash: wp.ContentHash(previous), PreviousProduct: &snapshot,
+	saved := productAnswerOf(held)
+	plan := &publishPlan{
+		Writes: make([]string, 0, 3), Kept: kept.keys(), SEO: seo, Final: description, Theirs: theirs, Part: part,
+		Previous: previous, SiteHash: raw.ContentHash, WPID: held.ID, Plugin: true, Product: true,
+		Store: storePlanOf(update, snapshot, &saved),
+	}
+	if hasFields(update) {
+		plan.Writes = append(plan.Writes, unitStore)
+	}
+	plan.Writes = append(plan.Writes, unitRaw)
+	if seo.Send {
+		plan.Writes = append(plan.Writes, unitSEO)
+	}
+	state.Plan = plan
+	state.Result = PublishResult{
+		WPID: held.ID, URL: permalinkOf(wp.Item{Link: held.Permalink}), Status: held.Status, PreviousProduct: &snapshot,
 		SEOApplied: make([]string, 0), Skipped: make([]string, 0), Findings: findingsOfProduct(sc.Page, held, typed),
 		Mismatches: make([]pagemap.Mismatch, 0),
 	}
-	seo, err := applySEO(ctx, client, sc, wp.TypeProduct, held.ID, true, kept)
-	if err != nil {
-		return run.Result{}, err
+	if !seo.Send {
+		state.Result.took(seoWrite{applied: []string{}, skipped: seo.Skipped, findings: seo.Findings})
 	}
-	result.took(seo)
+	return nil, nil
+}
 
-	if recordErr := recordProduct(ctx, deps, sc, stored, hash); recordErr != nil {
-		return run.Result{}, recordErr
+func storePlanOf(update wp.UpdateProduct, snapshot ProductSnapshot, saved *productAnswer) *storePlan {
+	plan := &storePlan{ShortDescription: update.ShortDescription, Snapshot: snapshot, Saved: saved}
+	if update.Attributes != nil {
+		plan.Attributes, plan.AttributesSent = snapshotOf(*update.Attributes), true
 	}
-	if recordErr := recordBody(ctx, deps, sc.Page.ID, description); recordErr != nil {
-		return run.Result{}, recordErr
+	if update.Images != nil {
+		plan.Images, plan.ImagesSent = slices.Clone(*update.Images), true
 	}
-	recorded := map[field.Key]string{field.ProductDescription: description}
-	if !kept[field.ProductShortDescription] {
+	return plan
+}
+
+func writeStoreFields(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Client, state *publishState,
+	draft content.ContentDraft) (run.Result, error) {
+	plan := state.Plan
+	store := productWrite{deps: deps, sc: sc, client: client, held: wp.Product{ID: plan.WPID}, draft: draft.Product}
+	snapshot := plan.Store.Snapshot
+	saved, refused, err := store.saveFields(ctx, plan.Store.update(), &snapshot, plan.SiteHash)
+	if err != nil {
+		return state.failed(err)
+	}
+	if refused != nil {
+		return state.stopped(*refused)
+	}
+	answer := productAnswerOf(saved.written)
+	plan.Store.Snapshot, plan.Store.Saved, plan.SiteHash = snapshot, &answer, saved.expected
+	state.Result.PreviousProduct = &snapshot
+	state.Result.URL, state.Result.Status = permalinkOf(wp.Item{Link: answer.Permalink}), answer.Status
+	state.wrote(unitStore)
+	return state.wait("wrote the store's fields of " + sc.Page.Path)
+}
+
+func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *publishState) (run.Result, error) {
+	plan := state.Plan
+	stored := plan.Store.Saved.product()
+	if err := recordProduct(ctx, deps, sc, stored, state.Result.ContentHash); err != nil {
+		return state.failed(err)
+	}
+	if err := recordBody(ctx, deps, sc.Page.ID, plan.Final); err != nil {
+		return state.failed(err)
+	}
+	recorded := map[field.Key]string{field.ProductDescription: plan.Final}
+	if !plan.kept()[field.ProductShortDescription] {
 		recorded[field.ProductShortDescription] = stored.ShortDescription
 	}
 	for key, value := range recorded {
-		if recordErr := recordField(ctx, deps, sc, sc.Page.ID, key, value); recordErr != nil {
-			return run.Result{}, recordErr
+		if err := recordField(ctx, deps, sc, sc.Page.ID, key, value); err != nil {
+			return state.failed(err)
 		}
 	}
-	return publishedAs(result, "updated the product "+sc.Page.Path+" as "+strconv.FormatInt(held.ID, 10))
+	return state.finish("updated the product " + sc.Page.Path + " as " + strconv.FormatInt(plan.WPID, 10))
 }
 
 func descriptionOf(body []byte) (string, error) {
