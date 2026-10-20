@@ -72,7 +72,7 @@ func TestEveryPromptExecutes(t *testing.T) {
 		NameGenerateMeta: metaPrompt{
 			Page: page, Entity: entity, Keywords: keyword.Of("peptides", "research peptides"), Spec: spec,
 			Draft:    content.ContentDraft{Title: "Peptides", H1: "Research peptides", Summary: "All about them."},
-			SiteName: "Lab", Canonical: "https://lab.example.com/peptides/", Pattern: "Peptides | Lab",
+			SiteName: "Lab", Pattern: "Peptides | Lab",
 			Picture: fullPicture, Description: []string{"Field: SEO description", "Length: at most 155 characters"},
 		},
 		NameGenerateFields: fieldsPrompt{

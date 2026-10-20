@@ -2,6 +2,7 @@ package steps
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -190,7 +191,6 @@ func (p *publishPlan) fieldChanges() []field.Change {
 	}{
 		{key: field.SEOTitle, before: previous.Title, after: p.SEO.Meta.Title},
 		{key: field.SEODescription, before: previous.Description, after: p.SEO.Meta.Description},
-		{key: field.SEOCanonical, before: previous.Canonical, after: p.SEO.Meta.Canonical},
 	} {
 		if sent.after != "" {
 			out = append(out, field.NewChange(sent.key, sent.before, sent.after))
@@ -275,7 +275,11 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	if excerpt, written := answered.Value(field.Excerpt); written && !kept[field.Excerpt] {
 		request.Excerpt = &excerpt
 	}
-	seo, err := planSEO(ctx, client, sc, itemType, existing.ID, found, kept)
+	canonical, err := deps.canonicalWritten(ctx, sc, !found)
+	if err != nil {
+		return nil, err
+	}
+	seo, err := planSEO(ctx, client, sc, itemType, existing.ID, found, kept, canonical)
 	if err != nil {
 		return nil, err
 	}
@@ -439,6 +443,9 @@ func writeSEOMeta(ctx context.Context, sc *run.StepContext, client *wp.Client, i
 	wpID := plan.WPID
 	if plan.Item != nil {
 		wpID = plan.Item.ID
+		if plan.SEO.Canonical {
+			plan.SEO.Meta.Canonical = permalinkOf(plan.Item.item())
+		}
 	}
 	seo, err := sendSEO(ctx, client, sc, itemType, wpID, plan.SEO)
 	if err != nil {
@@ -465,6 +472,11 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 	}
 	if plan.Request.Excerpt != nil {
 		if err := recordField(ctx, deps, sc, sc.Page.ID, field.Excerpt, *plan.Request.Excerpt); err != nil {
+			return state.failed(err)
+		}
+	}
+	if canonical := plan.SEO.Meta.Canonical; canonical != "" && slices.Contains(state.Result.SEOApplied, "canonical") {
+		if err := recordField(ctx, deps, sc, sc.Page.ID, field.SEOCanonical, canonical); err != nil {
 			return state.failed(err)
 		}
 	}

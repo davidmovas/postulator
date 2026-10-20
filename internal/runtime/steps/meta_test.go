@@ -77,9 +77,6 @@ func TestGenerateMetaSettlesWhatTheModelReturns(t *testing.T) {
 				if meta.Description != "A short guide to espresso." {
 					t.Errorf("description = %q, want the draft summary", meta.Description)
 				}
-				if meta.Canonical != "https://shop.example.com/coffee/espresso/" {
-					t.Errorf("canonical = %q", meta.Canonical)
-				}
 				if meta.OGTitle != meta.Title || meta.OGDescription != meta.Description {
 					t.Errorf("the open graph pair did not fall back: %+v", meta)
 				}
@@ -180,47 +177,24 @@ func detailList(held any) []string {
 	return out
 }
 
-func TestGenerateMetaCanonicalJoinsTheOriginOnce(t *testing.T) {
+func TestGenerateMetaAnswersNoCanonical(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name    string
-		baseURL string
-		path    string
-		want    string
-	}{
-		{
-			name: "a root install", baseURL: "https://shop.example.com", path: "/coffee/espresso/",
-			want: "https://shop.example.com/coffee/espresso/",
-		},
-		{
-			name: "a subdirectory install", baseURL: "https://shop.example.com/blog", path: "/blog/coffee/espresso/",
-			want: "https://shop.example.com/blog/coffee/espresso/",
-		},
+	sc, deps := metaContext(t, `{"title":"espresso | Shop","canonical":"https://shop.example.com/planned/path/"}`)
+	deps.Sites = siteStub{record: site.Site{
+		ID: "site", Name: "Shop", BaseURL: "https://shop.example.com", Username: "editor", Status: site.StatusActive,
+	}}
+
+	result, err := steps.GenerateMeta(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("GenerateMeta: %v", err)
 	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			sc, deps := metaContext(t, `{"title":"espresso | Shop","canonical":""}`)
-			deps.Sites = siteStub{record: site.Site{
-				ID: "site", Name: "Shop", BaseURL: tc.baseURL, Username: "editor", Status: site.StatusActive,
-			}}
-			sc.Page.Path = tc.path
-
-			result, err := steps.GenerateMeta(deps).Run(t.Context(), sc)
-			if err != nil {
-				t.Fatalf("GenerateMeta: %v", err)
-			}
-			var meta steps.Meta
-			if err = json.Unmarshal(result.Artifacts[0].Blob, &meta); err != nil {
-				t.Fatalf("decode the meta artifact: %v", err)
-			}
-			if meta.Canonical != tc.want {
-				t.Errorf("canonical = %q, want %q", meta.Canonical, tc.want)
-			}
-		})
+	var stored map[string]any
+	if err = json.Unmarshal(result.Artifacts[0].Blob, &stored); err != nil {
+		t.Fatalf("decode the meta artifact: %v", err)
+	}
+	if canonical, held := stored["canonical"]; held {
+		t.Errorf("the meta carries the canonical %v, which is written only as the permalink of a page we create", canonical)
 	}
 }
 

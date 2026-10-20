@@ -219,7 +219,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		written = &copied
 	}
 	update, snapshot, typed := productUpdate(held, written, featured.FeaturedID)
-	seo, err := planSEO(ctx, client, sc, wp.TypeProduct, held.ID, true, kept)
+	seo, err := planSEO(ctx, client, sc, wp.TypeProduct, held.ID, true, kept, false)
 	if err != nil {
 		return nil, err
 	}

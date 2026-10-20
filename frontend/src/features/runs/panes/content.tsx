@@ -71,7 +71,6 @@ export function MetaPane({ payload }: PayloadPaneProps): ReactElement {
             entries={[
                 [copy.pages.detail.metaTitle, view.title],
                 [copy.pages.detail.metaDescription, view.description],
-                [copy.pages.detail.canonicalUrl, view.canonical],
                 ["og:title", view.ogTitle],
                 ["og:description", view.ogDescription],
             ]}

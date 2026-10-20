@@ -125,8 +125,8 @@ func TestSeedingGivesASiteThePresetsOnce(t *testing.T) {
 	if excerpt := scopeOf(hub, field.Excerpt); excerpt.Enabled || excerpt.Stored || excerpt.Field != string(field.Excerpt) {
 		t.Errorf("the hub's excerpt = %+v, want it listed and off", excerpt)
 	}
-	if canonical := scopeOf(hub, field.SEOCanonical); canonical.Field != "" {
-		t.Errorf("the canonical is listed as a scope: %+v", canonical)
+	if canonical := scopeOf(hub, field.SEOCanonical); canonical.Field == "" || canonical.Enabled || canonical.AIWrites {
+		t.Errorf("the canonical = %+v, want it listed for a person to switch on, off and never AI-written", canonical)
 	}
 	if !hub.Writable || h.typeOf(t, h.siteID, pagetype.StoreCategory).Writable {
 		t.Error("the roles' writability is not shown")
@@ -245,6 +245,25 @@ func TestATypeCreatedFromAPresetInheritsItsTemplate(t *testing.T) {
 		if got := templateOf(created); got != tc.want {
 			t.Errorf("%s (%s) template = %q, want %q", tc.name, tc.preset, got, tc.want)
 		}
+	}
+}
+
+func TestACanonicalScopeIsNeverAIWritten(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	hub := h.typeOf(t, h.siteID, pagetype.Hub)
+
+	_, err := h.service.SetScope(t.Context(), pagetypes.SetScopeRequest{
+		PageTypeID: hub.ID, Field: string(field.SEOCanonical), Enabled: true, AIWrites: true, Links: field.NoLinks(),
+	})
+	if name, reason := reasonOf(t, err); name != "aiWrites" || reason != "field_not_ai_written" {
+		t.Fatalf("an AI-written canonical = %v (%s, %s), want it refused", err, name, reason)
+	}
+	set, err := h.service.SetScope(t.Context(), pagetypes.SetScopeRequest{
+		PageTypeID: hub.ID, Field: string(field.SEOCanonical), Enabled: true, Links: field.NoLinks(),
+	})
+	if err != nil || !set.Enabled || set.AIWrites {
+		t.Fatalf("a person's canonical scope = %+v, %v; want it on and set from the permalink, not by the AI", set, err)
 	}
 }
 

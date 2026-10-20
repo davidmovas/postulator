@@ -181,5 +181,5 @@ func catalog() []vocabulary {
 
 func packable(value string) bool {
 	spec, known := field.Lookup(field.Key(value))
-	return known && spec.Text && field.CheckScope(field.Key(value)) == nil
+	return known && spec.Text && spec.AIWritable() && field.CheckScope(field.Key(value)) == nil
 }

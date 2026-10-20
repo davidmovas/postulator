@@ -122,7 +122,7 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 		"runKindsWithTheirOwnRecipe": {"relink", "sync", "revert"},
 		"startableRunKinds":          {"generate", "relink", "audit", "sync", "import", "custom"},
 		"scopableFieldKeys": {
-			"title", "excerpt", "body", "seo_title", "seo_description", "product_description",
+			"title", "excerpt", "body", "seo_title", "seo_description", "seo_canonical", "product_description",
 			"product_short_description", "variation_description", "image_alt", "image_title", "upsells", "cross_sells",
 		},
 		"packFieldKeys": {

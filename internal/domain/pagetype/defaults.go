@@ -24,7 +24,8 @@ func LinkField(preset Preset) field.Key {
 }
 
 func DefaultScope(preset Preset, key field.Key, typeID string) field.Scope {
-	scope := field.Scope{PageTypeID: typeID, Key: key, AIWrites: true, Links: field.NoLinks()}
+	spec, known := field.Lookup(key)
+	scope := field.Scope{PageTypeID: typeID, Key: key, AIWrites: !known || spec.AIWritable(), Links: field.NoLinks()}
 	for _, on := range defaultsOn[preset] {
 		if on == key {
 			scope.Enabled = true

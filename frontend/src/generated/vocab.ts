@@ -184,6 +184,7 @@ export const scopableFieldKeys: readonly FieldKey[] = [
     "body",
     "seo_title",
     "seo_description",
+    "seo_canonical",
     "product_description",
     "product_short_description",
     "variation_description",

@@ -22,6 +22,7 @@ const (
 	reasonLastOfPreset     = "last_of_preset"
 	reasonReadOnlyRole     = "role_read_only"
 	reasonExcerptOnProduct = "excerpt_is_short_description"
+	reasonPersonOnly       = "field_not_ai_written"
 )
 
 type typeStore interface {
@@ -361,6 +362,10 @@ func (s *Service) SetScope(ctx context.Context, req SetScopeRequest) (Scope, err
 		if scope.Enabled && !kind.Preset.Writable() {
 			return errors.New(errors.Invalid, "a "+kind.Preset.DefaultName()+" page is read only, so no field of it is written").
 				WithDetail("field", "enabled").WithDetail("reason", reasonReadOnlyRole)
+		}
+		if spec, known := field.Lookup(scope.Key); known && !spec.AIWritable() && scope.AIWrites {
+			return errors.New(errors.Invalid, "the "+string(scope.Key)+" is set by the site or a person, never written by the AI").
+				WithDetail("field", "aiWrites").WithDetail("reason", reasonPersonOnly)
 		}
 		if scope.Key == field.Excerpt && kind.Preset == pagetype.Product {
 			return errors.New(errors.Invalid, "a product's excerpt is its short description, which has a scope of its own").

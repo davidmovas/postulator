@@ -3526,6 +3526,15 @@ on what stage 2 left open and what was decided while building.
   as a draft stays one until a person publishes it in WordPress. The suites accept a review as a
   person would; the full loop and the degraded loop now assert that no neighbour links to their
   drafts.
+- **The canonical is never written to an existing page** (ruling 3). `generate_meta` no longer asks
+  the model for one, nor builds one from the planned path; an update never sends it. On a page we
+  create, it is written only when the page type's `seo_canonical` scope enables it and the page
+  goes out live, as the `link` WordPress answered, since a draft's link is `?page_id=` and stays
+  wrong once it is published. The scope is a person's switch: `field.Spec.Person` marks the
+  canonical, `CheckScope` admits it, the pagetypes service refuses AI writes on it
+  (`field_not_ai_written`), the pack leaves it out, every preset has it off, and the agent's
+  `pagetypes_set_scope` enum stays without it, so the schemas keep their bytes. A revert puts the SEO
+  fields back field by field, as it always did; an older run's canonical is put back by C.1's rule.
 
 ### Decided while building
 

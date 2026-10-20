@@ -145,7 +145,7 @@ func CheckScope(key Key) error {
 	switch {
 	case known && spec.Denied:
 		return refused(key, ReasonDenied, "the field is never written")
-	case !known || !spec.Text && !scopedWithoutText(spec.Key) || spec.Key == SEOCanonical:
+	case !known || !spec.Text && !scopedWithoutText(spec.Key):
 		return refused(key, ReasonUnknown, "no scope may name the field")
 	case spec.Key != Meta && key.Instance() != "":
 		return refused(key, ReasonUnknown, "a scope names a field for every instance")

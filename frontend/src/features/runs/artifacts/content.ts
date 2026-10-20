@@ -160,7 +160,6 @@ export function draftView(held: unknown): DraftView | null {
 export interface MetaView {
     title: string;
     description: string;
-    canonical: string;
     ogTitle: string;
     ogDescription: string;
 }
@@ -172,7 +171,6 @@ export function metaView(held: unknown): MetaView | null {
     return {
         title: stringAt(held, "title"),
         description: stringAt(held, "description"),
-        canonical: stringAt(held, "canonical"),
         ogTitle: stringAt(held, "ogTitle"),
         ogDescription: stringAt(held, "ogDescription"),
     };

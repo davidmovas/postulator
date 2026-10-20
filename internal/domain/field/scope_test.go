@@ -30,29 +30,28 @@ func TestCheckScopeRefusesWhatNoScopeMayName(t *testing.T) {
 		key    field.Key
 		reason string
 	}{
-		"the slug":                       {field.Slug, field.ReasonDenied},
-		"the status":                     {field.Status, field.ReasonDenied},
-		"the parent":                     {field.Parent, field.ReasonDenied},
-		"the price":                      {field.Price, field.ReasonDenied},
-		"the regular price":              {field.RegularPrice, field.ReasonDenied},
-		"the sale price":                 {field.SalePrice, field.ReasonDenied},
-		"the SKU":                        {field.SKU, field.ReasonDenied},
-		"the stock status":               {field.StockStatus, field.ReasonDenied},
-		"the stock quantity":             {field.StockQuantity, field.ReasonDenied},
-		"stock management":               {field.ManageStock, field.ReasonDenied},
-		"the attributes":                 {field.Attributes, field.ReasonDenied},
-		"a variation's facts":            {field.Instance(field.Variation, "42"), field.ReasonDenied},
-		"the terms":                      {field.Terms, field.ReasonDenied},
-		"a protected meta key":           {field.Instance(field.Meta, "_price"), field.ReasonDenied},
-		"a store's sales counter":        {field.Instance(field.Meta, "total_sales"), field.ReasonDenied},
-		"an SEO plugin's own key":        {field.Instance(field.Meta, "rank_math_focus_keyword"), field.ReasonDenied},
-		"the plugin's own key":           {field.Instance(field.Meta, "_postulator_seo_title"), field.ReasonDenied},
-		"a meta field without a key":     {field.Meta, field.ReasonUnknown},
-		"a meta key with a comma":        {field.Instance(field.Meta, "spec,sheet"), field.ReasonUnknown},
-		"a meta key with a space":        {field.Instance(field.Meta, "spec sheet"), field.ReasonUnknown},
-		"a field the catalog lacks":      {field.Key("rating"), field.ReasonUnknown},
-		"one variation's description":    {field.Instance(field.VariationDescription, "42"), field.ReasonUnknown},
-		"the canonical, no written text": {field.SEOCanonical, field.ReasonUnknown},
+		"the slug":                    {field.Slug, field.ReasonDenied},
+		"the status":                  {field.Status, field.ReasonDenied},
+		"the parent":                  {field.Parent, field.ReasonDenied},
+		"the price":                   {field.Price, field.ReasonDenied},
+		"the regular price":           {field.RegularPrice, field.ReasonDenied},
+		"the sale price":              {field.SalePrice, field.ReasonDenied},
+		"the SKU":                     {field.SKU, field.ReasonDenied},
+		"the stock status":            {field.StockStatus, field.ReasonDenied},
+		"the stock quantity":          {field.StockQuantity, field.ReasonDenied},
+		"stock management":            {field.ManageStock, field.ReasonDenied},
+		"the attributes":              {field.Attributes, field.ReasonDenied},
+		"a variation's facts":         {field.Instance(field.Variation, "42"), field.ReasonDenied},
+		"the terms":                   {field.Terms, field.ReasonDenied},
+		"a protected meta key":        {field.Instance(field.Meta, "_price"), field.ReasonDenied},
+		"a store's sales counter":     {field.Instance(field.Meta, "total_sales"), field.ReasonDenied},
+		"an SEO plugin's own key":     {field.Instance(field.Meta, "rank_math_focus_keyword"), field.ReasonDenied},
+		"the plugin's own key":        {field.Instance(field.Meta, "_postulator_seo_title"), field.ReasonDenied},
+		"a meta field without a key":  {field.Meta, field.ReasonUnknown},
+		"a meta key with a comma":     {field.Instance(field.Meta, "spec,sheet"), field.ReasonUnknown},
+		"a meta key with a space":     {field.Instance(field.Meta, "spec sheet"), field.ReasonUnknown},
+		"a field the catalog lacks":   {field.Key("rating"), field.ReasonUnknown},
+		"one variation's description": {field.Instance(field.VariationDescription, "42"), field.ReasonUnknown},
 	}
 	for name, tc := range refused {
 		t.Run(name, func(t *testing.T) {
@@ -65,7 +64,11 @@ func TestCheckScopeRefusesWhatNoScopeMayName(t *testing.T) {
 		})
 	}
 
+	if spec, _ := field.Lookup(field.SEOCanonical); spec.AIWritable() || field.CheckScope(field.SEOCanonical) != nil {
+		t.Error("the canonical must be scopable by a person and never written by the AI")
+	}
 	allowed := []field.Key{
+		field.SEOCanonical,
 		field.Title, field.Excerpt, field.Body, field.SEOTitle, field.SEODescription, field.ProductDescription,
 		field.ProductShortDescription, field.VariationDescription, field.ImageAlt, field.ImageTitle, field.Upsells,
 		field.CrossSells, field.Instance(field.Meta, "spec_sheet"), field.Instance(field.Meta, "wpcf-dosage"),

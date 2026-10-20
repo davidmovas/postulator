@@ -38,7 +38,7 @@ func unsent(skipped seoWrite) seoPlan {
 }
 
 func planSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64, updating bool,
-	kept keptFields) (seoPlan, error) {
+	kept keptFields, canonical bool) (seoPlan, error) {
 	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
 	if err != nil {
 		return seoPlan{}, err
@@ -55,7 +55,7 @@ func planSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemTy
 	if kept[field.SEODescription] {
 		meta.Description, meta.OGDescription = "", ""
 	}
-	if kept.all(field.SEOTitle, field.SEODescription) {
+	if kept.all(field.SEOTitle, field.SEODescription) && !canonical {
 		return unsent(snippetKept()), nil
 	}
 
@@ -75,12 +75,23 @@ func planSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemTy
 		return seoPlan{}, err
 	}
 	return seoPlan{
-		Previous: previous, Send: true,
+		Previous: previous, Send: true, Canonical: canonical,
 		Meta: wp.SEOMeta{
-			Title: meta.Title, Description: meta.Description, Canonical: meta.Canonical,
-			OGTitle: meta.OGTitle, OGDescription: meta.OGDescription,
+			Title: meta.Title, Description: meta.Description, OGTitle: meta.OGTitle, OGDescription: meta.OGDescription,
 		},
 	}, nil
+}
+
+func (d Deps) canonicalWritten(ctx context.Context, sc *run.StepContext, creating bool) (bool, error) {
+	if !creating || sc.Run.PublishMode != run.PublishLive {
+		return false, nil
+	}
+	set, err := d.Types.Set(ctx, sc.Run.SiteID)
+	if err != nil {
+		return false, err
+	}
+	scope, _ := set.Scope(claimedType(set, sc).ID, field.SEOCanonical)
+	return scope.Enabled, nil
 }
 
 func sendSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64,

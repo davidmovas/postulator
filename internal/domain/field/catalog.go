@@ -51,6 +51,11 @@ type Spec struct {
 	Write     Source
 	Denied    bool
 	Text      bool
+	Person    bool
+}
+
+func (s Spec) AIWritable() bool {
+	return !s.Denied && !s.Person
 }
 
 var catalog = []Spec{
@@ -59,7 +64,7 @@ var catalog = []Spec{
 	{Key: Body, Read: Plugin, Write: Plugin, Text: true},
 	{Key: SEOTitle, Read: Plugin, Write: Plugin, Text: true},
 	{Key: SEODescription, Read: Plugin, Write: Plugin, Text: true},
-	{Key: SEOCanonical, Read: Plugin, Write: Plugin, Text: true},
+	{Key: SEOCanonical, Read: Plugin, Write: Plugin, Text: true, Person: true},
 	{Key: ProductDescription, Read: Store, Write: Plugin, Text: true},
 	{Key: ProductShortDescription, Read: Store, Write: Store, Text: true},
 	{Key: VariationDescription, Instanced: true, Read: Store, Write: Store, Text: true},

@@ -118,9 +118,10 @@ func (s siteStub) Get(context.Context, string) (site.Site, error) {
 }
 
 type typesStub struct {
-	rules   field.LinkRules
-	perPage map[string]field.LinkRules
-	err     error
+	rules     field.LinkRules
+	perPage   map[string]field.LinkRules
+	err       error
+	canonical bool
 }
 
 func linksOf(rules field.LinkRules) field.LinkPolicy {
@@ -147,6 +148,11 @@ func (s typesStub) Set(_ context.Context, siteID string) (pagetype.Set, error) {
 		scopes = append(scopes, pagetype.DefaultScope(pagetype.Entity, key, "type-entity"), pagetype.DefaultScope(pagetype.Product, key, "type-product"))
 	}
 	scopes = append(scopes, pagetype.DefaultScope(pagetype.Product, field.ProductShortDescription, "type-product"))
+	if s.canonical {
+		canonical := pagetype.DefaultScope(pagetype.Entity, field.SEOCanonical, "type-entity")
+		canonical.Enabled, canonical.AIWrites = true, false
+		scopes = append(scopes, canonical)
+	}
 	for pageID, rules := range s.perPage {
 		if rules == (field.LinkRules{}) {
 			rules = s.rules

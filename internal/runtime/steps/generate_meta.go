@@ -28,7 +28,6 @@ const (
 type metaAnswer struct {
 	Title         string `json:"title" description:"The meta title of the page, following the title pattern"`
 	Description   string `json:"description" description:"The meta description, one sentence that earns the click"`
-	Canonical     string `json:"canonical" description:"The absolute canonical URL of the page"`
 	OGTitle       string `json:"ogTitle" description:"The Open Graph title, which may be shorter than the meta title"`
 	OGDescription string `json:"ogDescription" description:"The Open Graph description"`
 }
@@ -36,7 +35,6 @@ type metaAnswer struct {
 type Meta struct {
 	Title         string            `json:"title"`
 	Description   string            `json:"description"`
-	Canonical     string            `json:"canonical"`
 	OGTitle       string            `json:"ogTitle"`
 	OGDescription string            `json:"ogDescription"`
 	Findings      []content.Finding `json:"findings,omitempty"`
@@ -49,7 +47,6 @@ type metaPrompt struct {
 	Spec        template.TemplateSpec
 	Draft       content.ContentDraft
 	SiteName    string
-	Canonical   string
 	Pattern     string
 	Picture     string
 	Description []string
@@ -83,12 +80,10 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
 			keywords := pagemap.Keywords(sc.Page, entity)
 			prompt := metaPrompt{
 				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
-				SiteName:  owner.Name,
-				Canonical: canonical,
+				SiteName: owner.Name,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
 					PrimaryKeyword: keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
 				}),
@@ -116,7 +111,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			settled := settleMeta(answer, draft, canonical, sc.Spec.MetaRules, sc.Page)
+			settled := settleMeta(answer, draft, sc.Spec.MetaRules, sc.Page)
 			blob, err := encode(settled, "page meta")
 			if err != nil {
 				return run.Result{}, err
@@ -131,12 +126,10 @@ func GenerateMeta(deps Deps) run.StepDef {
 	}
 }
 
-func settleMeta(answer metaAnswer, draft content.ContentDraft, canonical string, rules template.MetaRules,
-	page pagemap.Page) Meta {
+func settleMeta(answer metaAnswer, draft content.ContentDraft, rules template.MetaRules, page pagemap.Page) Meta {
 	meta := Meta{
 		Title:         strings.TrimSpace(answer.Title),
 		Description:   strings.TrimSpace(answer.Description),
-		Canonical:     strings.TrimSpace(answer.Canonical),
 		OGTitle:       strings.TrimSpace(answer.OGTitle),
 		OGDescription: strings.TrimSpace(answer.OGDescription),
 	}
@@ -149,9 +142,6 @@ func settleMeta(answer metaAnswer, draft content.ContentDraft, canonical string,
 	if meta.Description == "" {
 		meta.Description = strings.TrimSpace(draft.Summary)
 		borrowed = append(borrowed, "description")
-	}
-	if meta.Canonical == "" {
-		meta.Canonical = canonical
 	}
 	if meta.OGTitle == "" {
 		meta.OGTitle = meta.Title

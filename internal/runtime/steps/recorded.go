@@ -29,7 +29,7 @@ func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, 
 		return err
 	}
 	for key, value := range map[field.Key]string{
-		field.SEOTitle: meta.Title, field.SEODescription: meta.Description, field.SEOCanonical: meta.Canonical,
+		field.SEOTitle: meta.Title, field.SEODescription: meta.Description,
 	} {
 		if kept[key] {
 			continue

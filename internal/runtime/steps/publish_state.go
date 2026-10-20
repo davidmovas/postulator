@@ -88,11 +88,12 @@ func (p itemPlan) carries() bool {
 }
 
 type seoPlan struct {
-	Previous *wp.SEOMeta       `json:"previous,omitempty"`
-	Meta     wp.SEOMeta        `json:"meta"`
-	Skipped  []string          `json:"skipped"`
-	Findings []content.Finding `json:"findings"`
-	Send     bool              `json:"send"`
+	Previous  *wp.SEOMeta       `json:"previous,omitempty"`
+	Meta      wp.SEOMeta        `json:"meta"`
+	Skipped   []string          `json:"skipped"`
+	Findings  []content.Finding `json:"findings"`
+	Send      bool              `json:"send"`
+	Canonical bool              `json:"canonical"`
 }
 
 type storePlan struct {
