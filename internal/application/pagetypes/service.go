@@ -10,10 +10,12 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const (
@@ -42,6 +44,11 @@ type pageStore interface {
 
 type templateReader interface {
 	Get(ctx context.Context, id string) (template.Template, error)
+	List(ctx context.Context, q template.Query, page paging.Request) (paging.List[template.Template], error)
+}
+
+type siteReader interface {
+	Get(ctx context.Context, id string) (site.Site, error)
 }
 
 type unitOfWork interface {
@@ -53,6 +60,7 @@ type Deps struct {
 	Scopes     scopeStore
 	Pages      pageStore
 	Templates  templateReader
+	Sites      siteReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock
@@ -80,10 +88,20 @@ func (s *Service) Seed(ctx context.Context, siteID string) error {
 		if err != nil || len(existing) > 0 {
 			return err
 		}
+		owner, err := s.deps.Sites.Get(c, siteID)
+		if err != nil {
+			return err
+		}
 		now := s.now()
 		for i, preset := range pagetype.Presets() {
+			var templateID *string
+			if owner.Defaults.TemplateID == nil {
+				if templateID, err = s.builtIn(c, preset); err != nil {
+					return err
+				}
+			}
 			kind := pagetype.Type{
-				ID: id.New(), SiteID: siteID, Name: preset.DefaultName(), Preset: preset,
+				ID: id.New(), SiteID: siteID, Name: preset.DefaultName(), Preset: preset, TemplateID: templateID,
 				CreatedAt: now.Add(time.Duration(i) * time.Second), UpdatedAt: now,
 			}
 			if insertErr := s.insert(c, kind, now); insertErr != nil {
@@ -190,6 +208,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Type, error) {
 	}
 	err := s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
 		templateID, templateErr := s.templateFor(c, req.SiteID, req.TemplateID)
+		if req.TemplateID == nil {
+			templateID, templateErr = s.builtIn(c, kind.Preset)
+		}
 		if templateErr != nil {
 			return templateErr
 		}
@@ -236,6 +257,19 @@ func (s *Service) Save(ctx context.Context, req SaveRequest) (Type, error) {
 		return Type{}, publishErr
 	}
 	return s.view(ctx, saved)
+}
+
+func (s *Service) builtIn(ctx context.Context, preset pagetype.Preset) (*string, error) {
+	name := preset.DefaultTemplate()
+	if name == "" {
+		return nil, nil
+	}
+	global := template.ScopeGlobal
+	shipped, err := s.deps.Templates.List(ctx, template.Query{Scope: &global, Name: name, Sort: template.SortCreatedAt}, paging.Request{Limit: 1})
+	if err != nil || len(shipped.Items) == 0 {
+		return nil, err
+	}
+	return &shipped.Items[0].ID, nil
 }
 
 func (s *Service) templateFor(ctx context.Context, siteID string, requested *string) (*string, error) {

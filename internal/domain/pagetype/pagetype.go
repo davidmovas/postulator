@@ -24,6 +24,8 @@ var presetNames = map[Preset]string{
 	Hub: "Hub", Entity: "Entity", Product: "Product", StoreCategory: "Store category", Catalog: "Catalog", Technical: "Technical",
 }
 
+var presetTemplates = map[Preset]string{Hub: "Hub", Entity: "Guide", Product: "Product"}
+
 func Presets() []Preset {
 	return []Preset{Hub, Entity, Product, StoreCategory, Catalog, Technical}
 }
@@ -39,6 +41,10 @@ func (p Preset) DefaultName() string {
 
 func (p Preset) Writable() bool {
 	return p == Hub || p == Entity || p == Product
+}
+
+func (p Preset) DefaultTemplate() string {
+	return presetTemplates[p]
 }
 
 type Type struct {

@@ -34,7 +34,7 @@ func newHarness(t *testing.T) harness {
 	recorder := &applicationtest.Recorder{}
 	service := pagetypes.New(pagetypes.Deps{
 		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
-		Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: recorder,
+		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: recorder,
 		Clock: clock.NewFake(time.Date(2026, time.October, 18, 9, 0, 0, 0, time.UTC)),
 	})
 	h := harness{service: service, store: store, recorder: recorder, siteID: owner.ID, otherID: other.ID}
@@ -164,6 +164,87 @@ func TestEachTypeCountsItsPagesTheUntypedByTheirIdentity(t *testing.T) {
 	}
 	if counts["hub"] != 1 || counts["entity"] != 1 {
 		t.Errorf("pages per type = %v, want the typed hub and the untyped page read as an entity", counts)
+	}
+}
+
+func builtIns(t *testing.T, store *sqlite.Store) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for _, name := range []string{"Hub", "Guide", "Product", "Category"} {
+		out[name] = sqlitetest.Template(t, store, name).ID
+	}
+	return out
+}
+
+func templateOf(kind pagetypes.Type) string {
+	if kind.TemplateID == nil {
+		return ""
+	}
+	return *kind.TemplateID
+}
+
+func TestASeededTypeCarriesItsPresetsTemplate(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	shipped := builtIns(t, h.store)
+	fresh := sqlitetest.Site(t, h.store, "fresh").ID
+	if err := h.service.Seed(t.Context(), fresh); err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+
+	want := map[pagetype.Preset]string{
+		pagetype.Hub: shipped["Hub"], pagetype.Entity: shipped["Guide"], pagetype.Product: shipped["Product"],
+		pagetype.StoreCategory: "", pagetype.Catalog: "", pagetype.Technical: "",
+	}
+	for preset, templateID := range want {
+		if got := templateOf(h.typeOf(t, fresh, preset)); got != templateID {
+			t.Errorf("the seeded %s type's template = %q, want %q", preset, got, templateID)
+		}
+	}
+	if got := templateOf(h.typeOf(t, h.siteID, pagetype.Hub)); got != "" {
+		t.Errorf("a site seeded before the built-ins existed got %q", got)
+	}
+
+	chosen := sqlitetest.Site(t, h.store, "chosen")
+	chosen.Defaults.TemplateID = new(shipped["Category"])
+	if err := sqlite.NewSiteRepo(h.store).Update(t.Context(), chosen); err != nil {
+		t.Fatalf("give the site a default template: %v", err)
+	}
+	if err := h.service.Seed(t.Context(), chosen.ID); err != nil {
+		t.Fatalf("Seed the site with a default: %v", err)
+	}
+	if got := templateOf(h.typeOf(t, chosen.ID, pagetype.Hub)); got != "" {
+		t.Errorf("a site whose default is chosen seeded its Hub type with %q, which would win over that default", got)
+	}
+}
+
+func TestATypeCreatedFromAPresetInheritsItsTemplate(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	shipped := builtIns(t, h.store)
+
+	cases := []struct {
+		name, preset string
+		requested    *string
+		want         string
+	}{
+		{name: "Pillar", preset: "hub", want: shipped["Hub"]},
+		{name: "Article", preset: "entity", want: shipped["Guide"]},
+		{name: "Item", preset: "product", want: shipped["Product"]},
+		{name: "Archive", preset: "store_category", want: ""},
+		{name: "Plain", preset: "hub", requested: new(""), want: ""},
+		{name: "Chosen", preset: "hub", requested: new(shipped["Category"]), want: shipped["Category"]},
+	}
+	for _, tc := range cases {
+		created, err := h.service.Create(t.Context(), pagetypes.CreateRequest{
+			SiteID: h.siteID, Name: tc.name, Preset: tc.preset, TemplateID: tc.requested,
+		})
+		if err != nil {
+			t.Fatalf("Create %s: %v", tc.name, err)
+		}
+		if got := templateOf(created); got != tc.want {
+			t.Errorf("%s (%s) template = %q, want %q", tc.name, tc.preset, got, tc.want)
+		}
 	}
 }
 

@@ -145,7 +145,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	templateService := templates.New(templateRepo, pageRepo, entityRepo, siteRepo, sqlite.NewPageTypeRepo(store), store, bus, now)
 	types := pagetypes.New(pagetypes.Deps{
 		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
-		UnitOfWork: store, Publisher: bus, Clock: now,
+		Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now,
 	})
 	if seedErr := types.Seed(t.Context(), owner.ID); seedErr != nil {
 		t.Fatalf("seed the page types: %v", seedErr)

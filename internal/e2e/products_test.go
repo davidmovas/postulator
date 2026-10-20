@@ -157,22 +157,24 @@ func templateNamed(t *testing.T, core *app.Core, name string) string {
 	return ""
 }
 
-func templateTheTypes(t *testing.T, core *app.Core, siteID string) {
+func assertTheTypesCarryTheShippedTemplates(t *testing.T, core *app.Core, siteID string) {
 	t.Helper()
 
 	listed, err := core.PageTypes.List(t.Context(), pagetypes.ListRequest{SiteID: siteID})
 	if err != nil {
 		t.Fatalf("list the page types: %v", err)
 	}
-	shipped := map[pagetype.Preset]string{pagetype.Hub: "Hub", pagetype.Entity: "Guide", pagetype.Product: "Product"}
 	for i := range listed.Types {
-		name, writable := shipped[pagetype.Preset(listed.Types[i].Preset)]
-		if !writable {
-			continue
+		want := ""
+		if name := pagetype.Preset(listed.Types[i].Preset).DefaultTemplate(); name != "" {
+			want = templateNamed(t, core, name)
 		}
-		templateID := templateNamed(t, core, name)
-		if _, err = core.PageTypes.Save(t.Context(), pagetypes.SaveRequest{ID: listed.Types[i].ID, TemplateID: &templateID}); err != nil {
-			t.Fatalf("give the %s type the %s template: %v", listed.Types[i].Name, name, err)
+		got := ""
+		if listed.Types[i].TemplateID != nil {
+			got = *listed.Types[i].TemplateID
+		}
+		if got != want {
+			t.Fatalf("the fresh site's %s type carries the template %q, want %q", listed.Types[i].Name, got, want)
 		}
 	}
 }

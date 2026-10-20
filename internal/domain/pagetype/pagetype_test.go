@@ -51,6 +51,23 @@ func TestThePresetsAndTheirNames(t *testing.T) {
 	}
 }
 
+func TestEachWritablePresetNamesItsBuiltInTemplate(t *testing.T) {
+	t.Parallel()
+
+	want := map[pagetype.Preset]string{
+		pagetype.Hub: "Hub", pagetype.Entity: "Guide", pagetype.Product: "Product",
+		pagetype.StoreCategory: "", pagetype.Catalog: "", pagetype.Technical: "",
+	}
+	for _, preset := range pagetype.Presets() {
+		if got := preset.DefaultTemplate(); got != want[preset] {
+			t.Errorf("%s.DefaultTemplate = %q, want %q", preset, got, want[preset])
+		}
+		if (preset.DefaultTemplate() != "") != preset.Writable() {
+			t.Errorf("%s names a template %q while writable is %v", preset, preset.DefaultTemplate(), preset.Writable())
+		}
+	}
+}
+
 func TestATypeValidatesItsNameAndPreset(t *testing.T) {
 	t.Parallel()
 

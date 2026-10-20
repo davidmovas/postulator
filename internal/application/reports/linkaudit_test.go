@@ -7,12 +7,14 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -280,6 +282,19 @@ func TestLinkAuditAuditsAPageWithoutATemplateByItsType(t *testing.T) {
 	other := sqlitetest.Site(t, f.store, "bare")
 	if err := f.types.Seed(t.Context(), other.ID); err != nil {
 		t.Fatalf("seed the bare site's types: %v", err)
+	}
+	seeded, err := f.types.List(t.Context(), pagetypes.ListRequest{SiteID: other.ID})
+	if err != nil {
+		t.Fatalf("list the bare site's types: %v", err)
+	}
+	none := ""
+	for i := range seeded.Types {
+		if seeded.Types[i].Preset != string(pagetype.Entity) {
+			continue
+		}
+		if _, err = f.types.Save(t.Context(), pagetypes.SaveRequest{ID: seeded.Types[i].ID, TemplateID: &none}); err != nil {
+			t.Fatalf("take the Entity type's template away: %v", err)
+		}
 	}
 	page := sqlitetest.Page(t, f.store, other.ID, "/alone/")
 	entity := sqlitetest.Entity(t, f.store, other.ID, "Alone")

@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 65
+const latestMigration = 66
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -86,6 +86,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0063_kinds_become_types.sql",
 		"0064_conversation_brief.sql",
 		"0065_page_links_absolute.sql",
+		"0066_page_types_default_templates.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1686,6 +1687,107 @@ func TestTheKindsBecomeTypesAndADownBringsThemBack(t *testing.T) {
 		if got := text(query); got != want {
 			t.Errorf("%s after the down = %q, want %q", query, got, want)
 		}
+	}
+}
+
+func typesBeforeTheBackfill(t *testing.T) *Store {
+	t.Helper()
+
+	store := storeAt(t, 65)
+	const at = "2026-10-20T09:00:00Z"
+	for _, setup := range []struct {
+		query string
+		args  []any
+	}{
+		{query: `INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`},
+		{query: `INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s2', 'Kept', 'https://kept', 'site:s2:wp_password', 'active', ?, ?)`},
+		{query: `INSERT INTO templates (id, scope, name, version, spec, created_at, updated_at) VALUES ('tpl-hub', 'global', 'Hub', 1, '{}', ?, ?)`},
+		{query: `INSERT INTO templates (id, scope, name, version, spec, created_at, updated_at) VALUES ('tpl-guide', 'global', 'Guide', 1, '{}', ?, ?)`},
+		{query: `INSERT INTO templates (id, scope, name, version, spec, created_at, updated_at) VALUES ('tpl-product', 'global', 'Product', 1, '{}', ?, ?)`},
+		{query: `INSERT INTO templates (id, scope, site_id, name, version, spec, created_at, updated_at) VALUES ('tpl-site-guide', 'site', 's1', 'Guide', 1, '{}', ?, ?)`},
+		{query: `INSERT INTO templates (id, scope, name, version, spec, created_at, updated_at) VALUES ('tpl-mine', 'global', 'Mine', 1, '{}', ?, ?)`},
+		{query: `UPDATE sites SET default_template_id = 'tpl-mine', updated_at = ? WHERE id = 's2' AND created_at = ?`},
+	} {
+		if _, err := store.writer.ExecContext(t.Context(), setup.query, at, at); err != nil {
+			t.Fatalf("%s: %v", setup.query, err)
+		}
+	}
+	for _, kind := range []struct{ id, site, name, preset, template string }{
+		{id: "t-hub", site: "s1", name: "Hub", preset: "hub"},
+		{id: "t-entity", site: "s1", name: "Entity", preset: "entity"},
+		{id: "t-product", site: "s1", name: "Product", preset: "product"},
+		{id: "t-store", site: "s1", name: "Store category", preset: "store_category"},
+		{id: "t-catalog", site: "s1", name: "Catalog", preset: "catalog"},
+		{id: "t-technical", site: "s1", name: "Technical", preset: "technical"},
+		{id: "t-chosen", site: "s1", name: "Pillar", preset: "hub", template: "tpl-mine"},
+		{id: "t-kept", site: "s2", name: "Hub", preset: "hub"},
+	} {
+		var chosen any
+		if kind.template != "" {
+			chosen = kind.template
+		}
+		if _, err := store.writer.ExecContext(t.Context(),
+			`INSERT INTO page_types (id, site_id, name, preset, template_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			kind.id, kind.site, kind.name, kind.preset, chosen, at, at); err != nil {
+			t.Fatalf("insert the type %s: %v", kind.id, err)
+		}
+	}
+	return store
+}
+
+func templatesOfTheTypes(t *testing.T, store *Store) map[string]string {
+	t.Helper()
+
+	out := map[string]string{}
+	for _, row := range rowsOf(t, store, `SELECT id, coalesce(template_id, '') FROM page_types ORDER BY id`) {
+		typeID, templateID, _ := strings.Cut(row, " | ")
+		out[typeID] = templateID
+	}
+	return out
+}
+
+func TestTheBackfillFillsOnlyATypeWithoutATemplate(t *testing.T) {
+	t.Parallel()
+
+	store := typesBeforeTheBackfill(t)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	if _, err = provider.UpTo(t.Context(), 66); err != nil {
+		t.Fatalf("up to 66: %v", err)
+	}
+
+	want := map[string]string{
+		"t-hub": "tpl-hub", "t-entity": "tpl-guide", "t-product": "tpl-product",
+		"t-store": "", "t-catalog": "", "t-technical": "", "t-chosen": "tpl-mine", "t-kept": "",
+	}
+	if got := templatesOfTheTypes(t, store); !reflect.DeepEqual(got, want) {
+		t.Errorf("the types' templates after 0066 = %v, want %v", got, want)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 65); err != nil {
+		t.Fatalf("down to 65: %v", err)
+	}
+	want["t-hub"], want["t-entity"], want["t-product"] = "", "", ""
+	if got := templatesOfTheTypes(t, store); !reflect.DeepEqual(got, want) {
+		t.Errorf("the types' templates after the down = %v, want %v", got, want)
+	}
+}
+
+func TestTheBackfillLeavesASiteWithADefaultTemplate(t *testing.T) {
+	t.Parallel()
+
+	store := typesBeforeTheBackfill(t)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	if _, err = provider.UpTo(t.Context(), 66); err != nil {
+		t.Fatalf("up to 66: %v", err)
+	}
+	if got := templatesOfTheTypes(t, store)["t-kept"]; got != "" {
+		t.Errorf("a type of a site whose default is chosen took %q, which would win over that default", got)
 	}
 }
 

@@ -104,7 +104,7 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 		Findings: sqlite.NewFindingRepo(store), UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
 		Types: pagetypes.New(pagetypes.Deps{
 			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
-			Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
+			Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
 		}),
 	})
 	registry := run.NewRegistry()

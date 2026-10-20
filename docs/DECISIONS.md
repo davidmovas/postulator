@@ -3476,3 +3476,27 @@ Open with the owner: **a fresh site cannot start a run on "auto"** until a perso
 or the site, a template. The seeded writable types could point at the matching built-ins (Hub,
 Guide, Product), as the page kind once did; that is a seeding rule and a backfill, so it waits for
 a ruling.
+
+## 2026-10-20 — stage 3: editing the client's pages field by field and block by block
+
+Stage 3 is the first stage that writes the client's live sites: every enabled field through the
+field registry under the hash of what it read, the body block by block, never the deny list, a
+revert per field and per block. The twenty-three decisions taken at the plan, with the owner's four
+answers and an Opus critic's findings, are under "Decided at the plan" in the stage 3 tasks of
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`; this section holds the owner's rulings
+on what stage 2 left open and what was decided while building.
+
+### The owner's rulings on stage 2's open items
+
+- **The seeded page types carry their preset's template** (ruling 1). A fresh site's Hub type
+  points at the Hub built-in, its Entity type at Guide and its Product type at Product
+  (`pagetype.Preset.DefaultTemplate`), so a run on "auto" works without a person assigning one;
+  Store category, Catalog and Technical stay without, nothing on them being writable. A type the
+  client creates from a preset inherits that preset's built-in unless the request names one or
+  names none (an empty id). Migration 0066 backfills, once, a writable type whose template is null,
+  so a type a person sets to none afterwards keeps none. A site whose default template a person
+  chose is left alone by the seeding and the backfill both, since a type's template wins over the
+  site's default in `ResolveForPage` and would silently replace that choice. The built-in is the
+  oldest global template of its name, as `templates.EnsureSeeded` finds it; on a database the
+  built-ins never reached, nothing is filled. The suites no longer give the types their templates:
+  they assert that a fresh site's types carry them.

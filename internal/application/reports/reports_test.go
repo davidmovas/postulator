@@ -63,7 +63,7 @@ func newFixture(t *testing.T) *fixture {
 
 	types := pagetypes.New(pagetypes.Deps{
 		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
-		Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: &applicationtest.Recorder{},
+		Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: &applicationtest.Recorder{},
 		Clock: clock.NewFake(sqlitetest.Stamp),
 	})
 	if err := types.Seed(t.Context(), owner.ID); err != nil {

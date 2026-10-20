@@ -50,7 +50,7 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 	wordpress := registry.New(stores.sites, stores.secrets, append(wp.FromSettings(stores.values), c.cfg.WordPress...)...)
 	pageTypes := pagetypes.New(pagetypes.Deps{
 		Types: stores.pageTypes, Scopes: stores.scopes, Pages: stores.pages, Templates: stores.templates,
-		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
+		Sites: stores.sites, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 	})
 
 	reportsService := reports.New(reports.Deps{

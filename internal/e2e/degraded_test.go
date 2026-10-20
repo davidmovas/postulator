@@ -76,7 +76,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
-	templateTheTypes(t, core, siteID)
+	assertTheTypesCarryTheShippedTemplates(t, core, siteID)
 
 	checked, err := core.Sync.CheckPlugin(t.Context(), appsync.CheckPluginRequest{SiteID: siteID})
 	if err != nil {

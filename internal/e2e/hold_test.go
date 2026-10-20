@@ -82,7 +82,7 @@ func TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated(t *testing.T
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
-	templateTheTypes(t, core, siteID)
+	assertTheTypesCarryTheShippedTemplates(t, core, siteID)
 
 	synced, err := core.Sync.SyncSite(t.Context(), appsync.SyncSiteRequest{SiteID: siteID})
 	if err != nil {
