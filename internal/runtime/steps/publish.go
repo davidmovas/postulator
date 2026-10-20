@@ -66,7 +66,7 @@ func Publish(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			state, err := publishStateOf(sc)
+			state, err := publishStateOf(sc, deps.now())
 			if err != nil {
 				return run.Result{}, err
 			}

@@ -88,7 +88,7 @@ func RelinkNeighbors(deps Deps) run.StepDef {
 			if published.Status != wordPressPublished {
 				return relinked(notLiveYet(sc.Page, published.Status), "no neighbor links to "+sc.Page.Path+" yet")
 			}
-			state, err := relinkStateOf(sc, checkpointRelinkNeighbors, run.ArtifactLinkContext, run.ArtifactPublishResult)
+			state, err := relinkStateOf(sc, deps.now(), checkpointRelinkNeighbors, run.ArtifactLinkContext, run.ArtifactPublishResult)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -491,7 +491,7 @@ func (n neighborhood) settled(state *relinkState, message string) (run.Result, e
 		return run.Result{}, err
 	}
 	if !finished && state.Done == 0 {
-		return run.Result{Next: run.TransitionWait, Checkpoint: check, Message: message}, nil
+		return run.Result{Next: run.TransitionWait, WakeAt: state.wake, Checkpoint: check, Message: message}, nil
 	}
 	carried, err := relinked(state.Result, message)
 	if err != nil {
@@ -499,7 +499,7 @@ func (n neighborhood) settled(state *relinkState, message string) (run.Result, e
 	}
 	carried.Checkpoint = check
 	if !finished {
-		carried.Next = run.TransitionWait
+		carried.Next, carried.WakeAt = run.TransitionWait, state.wake
 	} else {
 		carried.Message = "relinked " + strconv.Itoa(state.Result.Linked) + " neighbors of " + n.page.Path
 	}

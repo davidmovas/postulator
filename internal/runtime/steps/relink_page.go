@@ -61,7 +61,7 @@ func RelinkPage(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			state, err := relinkStateOf(sc, checkpointRelinkPage, run.ArtifactLinkContext)
+			state, err := relinkStateOf(sc, deps.now(), checkpointRelinkPage, run.ArtifactLinkContext)
 			if err != nil {
 				return run.Result{}, err
 			}

@@ -148,6 +148,7 @@ func (k keptFields) keys() []field.Key {
 }
 
 type publishState struct {
+	wake     time.Time
 	Plan     *publishPlan  `json:"plan,omitempty"`
 	Inputs   string        `json:"inputs"`
 	Done     []string      `json:"done"`
@@ -156,15 +157,16 @@ type publishState struct {
 	Finished bool          `json:"finished"`
 }
 
-func publishStateOf(sc *run.StepContext) (publishState, error) {
+func publishStateOf(sc *run.StepContext, wake time.Time) (publishState, error) {
 	inputs := publishInputs(sc)
 	held, found, err := run.Get[publishState](sc.Check, checkpointPublish)
 	if err != nil {
 		return publishState{}, err
 	}
 	if !found || held.Finished || held.Plan == nil || held.Inputs != inputs {
-		return publishState{Inputs: inputs, Done: []string{}, Seq: held.Seq}, nil
+		return publishState{wake: wake, Inputs: inputs, Done: []string{}, Seq: held.Seq}, nil
 	}
+	held.wake = wake
 	return held, nil
 }
 
@@ -220,7 +222,7 @@ func (s *publishState) carry(result run.Result) (run.Result, error) {
 }
 
 func (s *publishState) wait(message string) (run.Result, error) {
-	return s.carry(run.Result{Next: run.TransitionWait, Message: message})
+	return s.carry(run.Result{Next: run.TransitionWait, WakeAt: s.wake, Message: message})
 }
 
 func (s *publishState) stopped(result run.Result) (run.Result, error) {

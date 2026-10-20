@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/block"
@@ -25,6 +26,7 @@ type relinkWrite struct {
 }
 
 type relinkState struct {
+	wake     time.Time
 	Writes   []relinkWrite    `json:"writes"`
 	Inputs   string           `json:"inputs"`
 	Result   RelinkResult     `json:"result"`
@@ -52,15 +54,16 @@ func relinkInputs(sc *run.StepContext, kinds ...run.ArtifactKind) string {
 	return hex.EncodeToString(digest.Sum(nil))
 }
 
-func relinkStateOf(sc *run.StepContext, key string, kinds ...run.ArtifactKind) (relinkState, error) {
+func relinkStateOf(sc *run.StepContext, wake time.Time, key string, kinds ...run.ArtifactKind) (relinkState, error) {
 	inputs := relinkInputs(sc, kinds...)
 	held, found, err := run.Get[relinkState](sc.Check, key)
 	if err != nil {
 		return relinkState{}, err
 	}
 	if !found || held.Finished || !held.Planned || held.Inputs != inputs {
-		return relinkState{Inputs: inputs, Writes: []relinkWrite{}, Seq: held.Seq}, nil
+		return relinkState{wake: wake, Inputs: inputs, Writes: []relinkWrite{}, Seq: held.Seq}, nil
 	}
+	held.wake = wake
 	return held, nil
 }
 
@@ -78,7 +81,7 @@ func (s *relinkState) wait(key, message string) (run.Result, error) {
 	if err != nil {
 		return run.Result{}, err
 	}
-	return run.Result{Next: run.TransitionWait, Checkpoint: check, Message: message}, nil
+	return run.Result{Next: run.TransitionWait, WakeAt: s.wake, Checkpoint: check, Message: message}, nil
 }
 
 type landing struct {

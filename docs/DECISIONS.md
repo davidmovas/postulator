@@ -3742,3 +3742,11 @@ on what stage 2 left open and what was decided while building.
   shipped Product template carries the step. Like any field, a short description the client wrote is
   kept unless the scope or the run rewrites it, where the body writer used to draft one anyway that
   `publish` then dropped; the harness's product now starts with none, so its run writes one.
+- **A write unit wakes at once** (found by the harness, fixing 0.2 and 0.6). The durable record's
+  waits carried no wake time, which the engine reads as one sweep interval (`runs.sweepInterval`,
+  5 s), so every publish idled about twenty-five seconds between its units and every relink a sweep
+  per neighbour; the harness's suite ran past its fifteen minutes (it had taken 377 s). `publish`,
+  `relink_page` and `relink_neighbors` now wake at the steps' clock, truncated to the second and so
+  never after the engine's, as `sync_site` already did, and the engine dispatches the item again at
+  once; the harness's suite takes 107 s. `TestEveryWriteUnitWakesAtOnce` drives each of the three
+  and fails on a wait without its wake.
