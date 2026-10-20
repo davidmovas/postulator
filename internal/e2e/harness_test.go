@@ -87,11 +87,13 @@ func replies() []fake.Reply {
 }
 
 type environment struct {
-	baseURL string
-	user    string
-	pass    string
-	stand   string
-	project string
+	baseURL        string
+	user           string
+	pass           string
+	stand          string
+	project        string
+	restrictedUser string
+	restrictedPass string
 }
 
 func repoRoot(t *testing.T) string {
@@ -160,6 +162,9 @@ func loadEnvironment(t *testing.T) environment {
 		pass:    values["E2E_WP_APP_PASSWORD"],
 		stand:   values["E2E_STAND"],
 		project: values["E2E_PROJECT"],
+
+		restrictedUser: values["E2E_RESTRICTED_USER"],
+		restrictedPass: values["E2E_RESTRICTED_APP_PASSWORD"],
 	}
 	if env.baseURL == "" || env.user == "" || env.pass == "" || env.stand == "" || env.project == "" {
 		t.Fatalf("%s does not carry the stand, its project, the site, the user and the application password", path)

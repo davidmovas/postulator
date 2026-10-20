@@ -41,3 +41,12 @@ ensure_page reconstitution Reconstitution 0 "$RECONSTITUTION_BODY"
 
 set_option show_on_front page
 set_option page_on_front "$home_id"
+
+if ! wp role exists restricted_editor >/dev/null 2>&1; then
+	wp eval "add_role( 'restricted_editor', 'Restricted Editor', array_diff_key( get_role( 'editor' )->capabilities, array( 'unfiltered_html' => true ) ) );"
+fi
+RESTRICTED_USER="restricted-editor"
+if ! wp user get "$RESTRICTED_USER" --field=ID >/dev/null 2>&1; then
+	wp user create "$RESTRICTED_USER" restricted-editor@example.test --role=restricted_editor >/dev/null
+fi
+wp user set-role "$RESTRICTED_USER" restricted_editor >/dev/null

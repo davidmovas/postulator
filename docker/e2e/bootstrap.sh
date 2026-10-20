@@ -263,6 +263,13 @@ if [ "$(wp user application-password list "$ADMIN_USER" --format=count)" != "0" 
 	wp user application-password delete "$ADMIN_USER" --all
 fi
 APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" e2e --porcelain)"
+RESTRICTED_PASSWORD=""
+if [ -n "${RESTRICTED_USER:-}" ]; then
+	if [ "$(wp user application-password list "$RESTRICTED_USER" --format=count)" != "0" ]; then
+		wp user application-password delete "$RESTRICTED_USER" --all
+	fi
+	RESTRICTED_PASSWORD="$(wp user application-password create "$RESTRICTED_USER" e2e --porcelain)"
+fi
 
 {
 	echo "E2E_STAND=$STAND"
@@ -273,6 +280,10 @@ APP_PASSWORD="$(wp user application-password create "$ADMIN_USER" e2e --porcelai
 	echo "E2E_SEO=$SEO"
 	echo "E2E_WOO=$WOO"
 	echo "E2E_PLUGIN=$PLUGIN"
+	if [ -n "$RESTRICTED_PASSWORD" ]; then
+		echo "E2E_RESTRICTED_USER=$RESTRICTED_USER"
+		echo "E2E_RESTRICTED_APP_PASSWORD=$RESTRICTED_PASSWORD"
+	fi
 } > "$OUT"
 
 echo "the $STAND stand is provisioned at $SITE_URL"
