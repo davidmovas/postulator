@@ -204,3 +204,94 @@ func TestPageBodyRepoReplacesTheWrittenBlocks(t *testing.T) {
 		t.Errorf("ListWritten after the page is deleted = %+v, %v", got, err)
 	}
 }
+
+func TestPageBodyRepoDriftedNamesTheBodiesThatMovedFromTheirBase(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	other := sqlitetest.Site(t, store, "other")
+	edited := sqlitetest.Page(t, store, owner.ID, "/edited/")
+	ours := sqlitetest.Page(t, store, owner.ID, "/ours/")
+	oursEdited := sqlitetest.Page(t, store, owner.ID, "/ours-edited/")
+	untouched := sqlitetest.Page(t, store, owner.ID, "/untouched/")
+	sqlitetest.Page(t, store, owner.ID, "/no-body/")
+	elsewhere := sqlitetest.Page(t, store, other.ID, "/elsewhere/")
+	repo := sqlite.NewPageBodyRepo(store)
+	later := sqlitetest.Stamp.Add(time.Hour)
+
+	for _, step := range []func() error{
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(edited.ID, block.Current, "<p>First.</p>", sqlitetest.Stamp))
+		},
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(edited.ID, block.Current, "<p>Edited.</p>", later))
+		},
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(ours.ID, block.Current, "<p>Before.</p>", sqlitetest.Stamp))
+		},
+		func() error { return repo.Record(t.Context(), ours.ID, "<p>Ours.</p>", later) },
+		func() error { return repo.Record(t.Context(), oursEdited.ID, "<p>Ours.</p>", sqlitetest.Stamp) },
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(oursEdited.ID, block.Current, "<p>Ours, edited.</p>", later))
+		},
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(untouched.ID, block.Current, "<p>Same.</p>", sqlitetest.Stamp))
+		},
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(untouched.ID, block.Current, "<p>Same.</p>", later))
+		},
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(elsewhere.ID, block.Current, "<p>One.</p>", sqlitetest.Stamp))
+		},
+		func() error {
+			return repo.Observe(t.Context(), snapshotOf(elsewhere.ID, block.Current, "<p>Two.</p>", later))
+		},
+	} {
+		if err := step(); err != nil {
+			t.Fatalf("store a body: %v", err)
+		}
+	}
+
+	got, err := repo.Drifted(t.Context(), owner.ID)
+	if err != nil {
+		t.Fatalf("Drifted: %v", err)
+	}
+	want := []string{edited.ID, oursEdited.ID}
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Errorf("Drifted = %v, want the two bodies that moved from their base on this site, %v", got, want)
+	}
+	if got, err = repo.Drifted(t.Context(), "no-such-site"); err != nil || len(got) != 0 {
+		t.Errorf("Drifted of no site = %v, %v; want none", got, err)
+	}
+}
+
+func TestPageBodyRepoListsTheWrittenBlocksOfSeveralPages(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	first := sqlitetest.Page(t, store, owner.ID, "/first/")
+	second := sqlitetest.Page(t, store, owner.ID, "/second/")
+	third := sqlitetest.Page(t, store, owner.ID, "/third/")
+	repo := sqlite.NewPageBodyRepo(store)
+
+	if err := repo.ReplaceWritten(t.Context(), first.ID, []string{"aaa"}, "run-1", sqlitetest.Stamp); err != nil {
+		t.Fatalf("ReplaceWritten: %v", err)
+	}
+	if err := repo.ReplaceWritten(t.Context(), third.ID, []string{"bbb", "ccc"}, "run-2", sqlitetest.Stamp); err != nil {
+		t.Fatalf("ReplaceWritten: %v", err)
+	}
+
+	got, err := repo.ListWrittenFor(t.Context(), []string{first.ID, second.ID})
+	if err != nil {
+		t.Fatalf("ListWrittenFor: %v", err)
+	}
+	if len(got) != 1 || got[0].PageID != first.ID || got[0].BlockHash != "aaa" {
+		t.Errorf("ListWrittenFor = %+v, want the first page's block alone", got)
+	}
+	if got, err = repo.ListWrittenFor(t.Context(), nil); err != nil || len(got) != 0 {
+		t.Errorf("ListWrittenFor of no page = %+v, %v", got, err)
+	}
+}

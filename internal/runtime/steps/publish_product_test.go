@@ -184,7 +184,7 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 		t.Error("the publish kept no previous meta")
 	}
 
-	if h.recorded.ContentHash != published.ContentHash || h.recorded.Status != pagemap.StatusPublished || h.recorded.Drift {
+	if h.recorded.WPID == nil || *h.recorded.WPID != published.WPID || h.recorded.Status != pagemap.StatusPublished {
 		t.Errorf("the page records %+v", h.recorded)
 	}
 	if len(h.sites.updates) != 0 {
@@ -225,21 +225,21 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 	cases := []struct {
 		name     string
 		options  []wptest.Option
-		prepare  func(*testing.T, productHarness, *run.StepContext)
+		prepare  func(*testing.T, *productHarness, *run.StepContext)
 		commerce site.Commerce
 		message  string
 		written  bool
 	}{
 		{
 			name: "a row with no product",
-			prepare: func(_ *testing.T, _ productHarness, sc *run.StepContext) {
+			prepare: func(_ *testing.T, _ *productHarness, sc *run.StepContext) {
 				sc.Page.WPID = nil
 			},
 			message: "create it in WooCommerce",
 		},
 		{
 			name: "a product the store no longer holds",
-			prepare: func(t *testing.T, h productHarness, _ *run.StepContext) {
+			prepare: func(t *testing.T, h *productHarness, _ *run.StepContext) {
 				if !h.server.Delete(h.held.ID) {
 					t.Fatal("the seeded product could not be removed")
 				}
@@ -250,7 +250,7 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 		{name: "a user who may not edit products", options: []wptest.Option{wptest.WithoutProductEdit()}, commerce: site.CommerceForbidden, message: "may not edit products"},
 		{
 			name: "a description a human changed while it was written",
-			prepare: func(_ *testing.T, h productHarness, _ *run.StepContext) {
+			prepare: func(_ *testing.T, h *productHarness, _ *run.StepContext) {
 				h.server.EditBeforeNextRawWrite(h.held.ID, "<p>a human was here</p>")
 			},
 			message: "changed in the store",
@@ -258,8 +258,8 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 		},
 		{
 			name: "a drifted product the recipe refuses",
-			prepare: func(_ *testing.T, _ productHarness, sc *run.StepContext) {
-				sc.Page.Drift = true
+			prepare: func(_ *testing.T, h *productHarness, sc *run.StepContext) {
+				h.deps.Bodies = driftedBodies(sc.Page.ID)
 				sc.Params[steps.ParamRefuseDrift] = true
 			},
 			message: "edited",
@@ -273,7 +273,7 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 			h := newProductHarness(t, storeProduct(), tc.options...)
 			sc := storeContext(t, h.held.ID)
 			if tc.prepare != nil {
-				tc.prepare(t, h, sc)
+				tc.prepare(t, &h, sc)
 			}
 
 			result, err := drive(t, steps.Publish(h.deps), sc)
@@ -341,7 +341,7 @@ func TestPublishWritesOverDriftAndSaysSoForAPageAndAProductAlike(t *testing.T) {
 			t.Parallel()
 
 			deps, sc := tc.setup(t)
-			sc.Page.Drift = true
+			deps.Bodies = driftedBodies(sc.Page.ID)
 
 			published := runPublish(t, deps, sc)
 			if published.WPID == 0 {

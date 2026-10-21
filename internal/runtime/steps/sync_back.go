@@ -114,8 +114,6 @@ func SyncBack(deps Deps) run.StepDef {
 
 			next := sc.Page
 			next.WPID = &item.ID
-			next.ContentHash = wp.ContentHash(body)
-			next.Drift = false
 			next.LastSyncedAt = &now
 			next.UpdatedAt = now
 			if !item.Modified.IsZero() {
@@ -131,7 +129,7 @@ func SyncBack(deps Deps) run.StepDef {
 				link: permalinkOf(item), slug: item.Slug, status: item.Status, title: item.Title, h1: headingOne(doc),
 			})
 			result := SyncResult{
-				WPID: item.ID, URL: item.Link, Status: item.Status, ContentHash: next.ContentHash,
+				WPID: item.ID, URL: item.Link, Status: item.Status, ContentHash: wp.ContentHash(body),
 				Source: source, Links: len(links), ModifiedAt: item.Modified.UTC(),
 				Mismatches: differs, Findings: planFindings(next, differs),
 			}

@@ -125,9 +125,17 @@ func (a *absorber) lastSeen(ctx context.Context, items []item) (map[string]lastS
 	if err != nil {
 		return nil, err
 	}
+	written, err := a.service.deps.Bodies.ListWrittenFor(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	blocks := make(map[string]bool, len(written))
+	for i := range written {
+		blocks[written[i].PageID] = true
+	}
 	for _, pageID := range ids {
 		identity, held := byPage[pageID]
-		seen[pageID] = seenOf(identity, held, fields[pageID])
+		seen[pageID] = seenOf(identity, held, fields[pageID], blocks[pageID])
 	}
 	return seen, nil
 }
@@ -173,7 +181,7 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 			}
 		}
 		planned := hasPlan(current, known, a.seen[current.ID])
-		next, _ := merge(current, known, planned, items[i], a.state.SiteID, a.now)
+		next := merge(current, known, planned, items[i], a.state.SiteID, a.now)
 		if known && current.Path != next.Path {
 			delete(a.rows.byPath, current.Path)
 		}

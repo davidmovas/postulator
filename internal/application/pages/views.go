@@ -34,7 +34,6 @@ type Page struct {
 	PageTypeID      *string       `json:"pageTypeId"`
 	TypeSource      string        `json:"typeSource"`
 	TypeReason      string        `json:"typeReason"`
-	ContentHash     string        `json:"contentHash"`
 	WPModifiedAt    dto.Time      `json:"wpModifiedAt"`
 	LastSyncedAt    dto.Time      `json:"lastSyncedAt"`
 	Drift           bool          `json:"drift"`
@@ -70,7 +69,7 @@ type Conflict struct {
 	EntityID string `json:"entityId,omitempty"`
 }
 
-func view(p pagemap.Page) Page {
+func view(p pagemap.Page, drifted bool) Page {
 	return Page{
 		ID:              p.ID,
 		SiteID:          p.SiteID,
@@ -93,10 +92,9 @@ func view(p pagemap.Page) Page {
 		PageTypeID:      p.PageTypeID,
 		TypeSource:      string(p.TypeSource),
 		TypeReason:      string(p.TypeReason),
-		ContentHash:     p.ContentHash,
 		WPModifiedAt:    dto.TimeOf(p.WPModifiedAt),
 		LastSyncedAt:    dto.TimeOf(p.LastSyncedAt),
-		Drift:           p.Drift,
+		Drift:           drifted,
 		CreatedAt:       dto.NewTime(p.CreatedAt),
 		UpdatedAt:       dto.NewTime(p.UpdatedAt),
 	}
@@ -136,10 +134,10 @@ func linkViews(links []pagemap.PageLink) []PageLink {
 	return out
 }
 
-func nodeViews(nodes []pagemap.Node) []TreeNode {
+func nodeViews(nodes []pagemap.Node, drifted map[string]bool) []TreeNode {
 	out := make([]TreeNode, 0, len(nodes))
 	for i := range nodes {
-		out = append(out, TreeNode{Page: view(nodes[i].Page), Children: nodeViews(nodes[i].Children)})
+		out = append(out, TreeNode{Page: view(nodes[i].Page, drifted[nodes[i].Page.ID]), Children: nodeViews(nodes[i].Children, drifted)})
 	}
 	return out
 }

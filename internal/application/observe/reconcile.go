@@ -127,16 +127,18 @@ type lastSeen struct {
 	title    string
 	h1       string
 	observed bool
+	wrote    bool
 }
 
-func seenOf(identity pagemap.Identity, held bool, values []field.Value) lastSeen {
-	seen := lastSeen{observed: held}
+func seenOf(identity pagemap.Identity, held bool, values []field.Value, blocks bool) lastSeen {
+	seen := lastSeen{observed: held, wrote: blocks}
 	if held && !queryPermalink(identity.URL) {
 		if path, err := pagemap.NormalizePath(identity.URL); err == nil {
 			seen.path = path
 		}
 	}
 	for i := range values {
+		seen.wrote = seen.wrote || values[i].WrittenRunID != nil
 		switch values[i].Key {
 		case field.Title:
 			seen.title = values[i].Current
@@ -165,13 +167,11 @@ func pathTaken(it item, row pagemap.Page) content.Finding {
 	}
 }
 
-func merge(current pagemap.Page, known, planned bool, it item, siteID string, now time.Time) (next pagemap.Page, drifted bool) {
-	next = current
+func merge(current pagemap.Page, known, planned bool, it item, siteID string, now time.Time) pagemap.Page {
+	next := current
 	if !known {
 		next = pagemap.Page{ID: id.New(), SiteID: siteID, CreatedAt: now}
 	}
-
-	drifted = known && next.ContentHash != "" && next.ContentHash != it.ContentHash
 
 	if !planned {
 		next.Path = it.Path
@@ -199,21 +199,20 @@ func merge(current pagemap.Page, known, planned bool, it item, siteID string, no
 		next.Status = pagemap.StatusFromWordPress(it.Status)
 	}
 	next.WPID = &it.WPID
-	next.Drift = drifted
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
 	if !it.Modified.IsZero() {
 		modified := it.Modified.UTC()
 		next.WPModifiedAt = &modified
 	}
-	return next, drifted
+	return next
 }
 
 func hasPlan(current pagemap.Page, known bool, seen lastSeen) bool {
 	switch {
 	case !known:
 		return false
-	case current.Status == pagemap.StatusPlanned, current.ContentHash != "", !seen.observed:
+	case current.Status == pagemap.StatusPlanned, seen.wrote, !seen.observed:
 		return true
 	default:
 		return seen.movedFrom(current.Path) || current.Title != seen.title || current.H1 != seen.h1

@@ -55,6 +55,7 @@ type bodyStore interface {
 	Get(ctx context.Context, pageID string) (current, base block.Snapshot, found bool, err error)
 	ListBySite(ctx context.Context, siteID string) ([]block.Snapshot, error)
 	ListWritten(ctx context.Context, pageID string) ([]block.Written, error)
+	ListWrittenFor(ctx context.Context, pageIDs []string) ([]block.Written, error)
 }
 
 type renderStore interface {

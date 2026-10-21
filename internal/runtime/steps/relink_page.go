@@ -121,8 +121,7 @@ func newPageRelink(page pagemap.Page, targets int) pageRelink {
 			Placed: make([]PlacedLink, 0, targets), Findings: make([]content.Finding, 0),
 		},
 		published: PublishResult{
-			WPID: *page.WPID, URL: page.Path, Status: string(page.Status),
-			ContentHash: page.ContentHash, SEOApplied: make([]string, 0),
+			WPID: *page.WPID, URL: page.Path, Status: string(page.Status), SEOApplied: make([]string, 0),
 			Skipped: make([]string, 0), Findings: make([]content.Finding, 0),
 			Mismatches: make([]Mismatch, 0),
 		},
@@ -246,7 +245,7 @@ func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run
 		}
 	}
 	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), write.After,
-		landed.hash, placed); adoptErr != nil {
+		placed); adoptErr != nil {
 		return run.Result{}, adoptErr
 	}
 	state.Finished = true

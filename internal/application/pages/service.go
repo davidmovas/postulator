@@ -48,6 +48,10 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
+type bodyReader interface {
+	Drifted(ctx context.Context, siteID string) ([]string, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -59,6 +63,7 @@ type Deps struct {
 	Entities   entityStore
 	Edges      edgeReader
 	Sites      siteReader
+	Bodies     bodyReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock
@@ -72,6 +77,7 @@ type Service struct {
 	entities  entityStore
 	edges     edgeReader
 	sites     siteReader
+	bodies    bodyReader
 	uow       unitOfWork
 	publisher application.Publisher
 	clock     clock.Clock
@@ -81,8 +87,28 @@ type Service struct {
 func New(deps Deps) *Service {
 	return &Service{
 		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
-		uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
+		bodies: deps.Bodies, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
 	}
+}
+
+func (s *Service) drifted(ctx context.Context, siteID string) (map[string]bool, error) {
+	ids, err := s.bodies.Drifted(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	drifted := make(map[string]bool, len(ids))
+	for _, pageID := range ids {
+		drifted[pageID] = true
+	}
+	return drifted, nil
+}
+
+func (s *Service) viewOf(ctx context.Context, page pagemap.Page) (Page, error) {
+	drifted, err := s.drifted(ctx, page.SiteID)
+	if err != nil {
+		return Page{}, err
+	}
+	return view(page, drifted[page.ID]), nil
 }
 
 func (s *Service) now() time.Time {

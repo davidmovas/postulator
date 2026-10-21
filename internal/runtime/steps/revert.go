@@ -222,11 +222,10 @@ func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result 
 	if !ok {
 		return reason, false
 	}
-	hash, reason, ok := writeBodyBack(ctx, work, raw)
-	if !ok {
+	if reason, ok = writeBodyBack(ctx, work, raw); !ok {
 		return reason, false
 	}
-	return bodyRestored(ctx, deps, sc, result, work, hash, "the body the run replaced was written back")
+	return bodyRestored(ctx, deps, sc, result, work, "the body the run replaced was written back")
 }
 
 func bodyToRestore(ctx context.Context, work revertWork) (wp.RawContent, string, bool) {
@@ -257,24 +256,24 @@ func readRawBack(ctx context.Context, work revertWork) (wp.RawContent, string, b
 	}
 }
 
-func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (hash, reason string, ok bool) {
+func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (reason string, ok bool) {
 	if raw.ContentHash == work.published.PreviousContentHash {
-		return raw.ContentHash, "", true
+		return "", true
 	}
-	written, err := work.client.PutRaw(ctx, onSiteType(work.page), work.published.WPID, work.published.PreviousContent, raw.ContentHash)
+	_, err := work.client.PutRaw(ctx, onSiteType(work.page), work.published.WPID, work.published.PreviousContent, raw.ContentHash)
 	switch {
 	case err == nil:
-		return written.Hash, "", true
+		return "", true
 	case errors.IsCode(err, errors.Conflict):
-		return "", writtenUnderUs(raw.ContentHash), false
+		return writtenUnderUs(raw.ContentHash), false
 	default:
-		return "", err.Error(), false
+		return err.Error(), false
 	}
 }
 
 func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult, work revertWork,
-	hash, detail string) (string, bool) {
-	if adoptErr := readopt(ctx, deps, sc, work.page, work.published.PreviousContent, hash); adoptErr != nil {
+	detail string) (string, bool) {
+	if adoptErr := readopt(ctx, deps, sc, work.page, work.published.PreviousContent); adoptErr != nil {
 		return adoptErr.Error(), false
 	}
 	result.Outcome = OutcomeRestored
@@ -388,26 +387,29 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 		return err.Error(), false
 	}
 
-	hash := raw.ContentHash
+	left := ""
+	if known {
+		if left, err = deps.baseHash(ctx, stored); err != nil {
+			return err.Error(), false
+		}
+	}
 	switch {
 	case raw.ContentHash == neighbor.Before.Hash:
-	case !known || stored.ContentHash == "":
+	case left == "":
 		return unknownSince(raw.ContentHash), false
-	case raw.ContentHash != stored.ContentHash:
-		return editedSince(stored.ContentHash, raw.ContentHash), false
+	case raw.ContentHash != left:
+		return editedSince(left, raw.ContentHash), false
 	default:
-		written, putErr := work.client.PutRaw(ctx, itemType, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash)
-		if putErr != nil {
+		if _, putErr := work.client.PutRaw(ctx, itemType, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash); putErr != nil {
 			if errors.IsCode(putErr, errors.Conflict) {
 				return writtenUnderUs(raw.ContentHash), false
 			}
 			return putErr.Error(), false
 		}
-		hash = written.Hash
 	}
 
 	if known {
-		if adoptErr := readopt(ctx, deps, sc, stored, neighbor.Before.HTML, hash); adoptErr != nil {
+		if adoptErr := readopt(ctx, deps, sc, stored, neighbor.Before.HTML); adoptErr != nil {
 			return adoptErr.Error(), false
 		}
 	}
@@ -446,15 +448,13 @@ func replan(ctx context.Context, deps Deps, page pagemap.Page) error {
 	next := page
 	next.WPID = nil
 	next.Status = pagemap.StatusPlanned
-	next.ContentHash = ""
 	next.WPModifiedAt = nil
 	next.LastSyncedAt = nil
-	next.Drift = false
 	next.UpdatedAt = now
 	return persist(ctx, deps, next, []pagemap.PageLink{})
 }
 
-func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.Page, body, hash string) error {
+func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.Page, body string) error {
 	owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 	if err != nil {
 		return err
@@ -469,7 +469,7 @@ func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.P
 	if err := recordBody(ctx, deps, page.ID, body); err != nil {
 		return err
 	}
-	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), body, hash, nil)
+	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), body, nil)
 }
 
 func metaKept(page pagemap.Page, applied []string, reason string) content.Finding {

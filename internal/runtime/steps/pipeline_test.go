@@ -372,8 +372,12 @@ func TestTheWholeRecipeReachesWordPress(t *testing.T) {
 	if stored.WPID == nil || *stored.WPID != published.WPID || stored.Status != pagemap.StatusExists {
 		t.Fatalf("the page row is %+v", stored)
 	}
-	if stored.ContentHash == "" || stored.LastSyncedAt == nil || stored.Drift {
+	if stored.LastSyncedAt == nil {
 		t.Fatalf("the page row is %+v", stored)
+	}
+	current, base, found, err := sqlite.NewPageBodyRepo(p.store).Get(t.Context(), p.pageID)
+	if err != nil || !found || current.Hash == "" || current.Hash != base.Hash {
+		t.Fatalf("the body = %+v over %+v (%t, %v), want what was written on both sides", current, base, found, err)
 	}
 
 	links, err := p.links.ListForPage(t.Context(), p.pageID)

@@ -245,8 +245,12 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	if err != nil {
 		return nil, err
 	}
-	if refusesDrift(sc) {
-		refused := driftRefused(sc.Page, "on the site since it was last published")
+	drifted, err := deps.drifted(ctx, sc.Page)
+	if err != nil {
+		return nil, err
+	}
+	if refusesDrift(sc, drifted) {
+		refused := driftRefused(sc.Page, "on the site since it was last read or written")
 		return &refused, nil
 	}
 	var site liveBody
@@ -353,7 +357,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	state.Plan = plan
 	state.Result = PublishResult{
 		WPID: existing.ID, URL: existing.Link, Status: existing.Status, SEOApplied: make([]string, 0),
-		Skipped: make([]string, 0), Findings: driftFindings(sc.Page), Mismatches: make([]Mismatch, 0),
+		Skipped: make([]string, 0), Findings: driftFindings(sc.Page, drifted), Mismatches: make([]Mismatch, 0),
 		Version: publishRecordVersion,
 	}
 	if !seo.Send {
@@ -564,7 +568,7 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 			return state.failed(recordErr)
 		}
 	}
-	if recordErr := record(ctx, deps, sc, written, state.Result); recordErr != nil {
+	if recordErr := record(ctx, deps, sc, written); recordErr != nil {
 		return state.failed(recordErr)
 	}
 	state.wrote(unitItem)
@@ -674,7 +678,7 @@ func writeSEOMeta(ctx context.Context, sc *run.StepContext, client *wp.Client, i
 func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publishState) (run.Result, error) {
 	plan := state.Plan
 	written := plan.Item.item()
-	if err := record(ctx, deps, sc, written, state.Result); err != nil {
+	if err := record(ctx, deps, sc, written); err != nil {
 		return state.failed(err)
 	}
 	kept := plan.kept()
@@ -793,17 +797,17 @@ func refuseMismatch(sc *run.StepContext, found []Mismatch) run.Result {
 	return needsHuman("the site did not take " + sc.Page.Path + " as it was asked for: " + strings.Join(said, "; "))
 }
 
-func refusesDrift(sc *run.StepContext) bool {
-	return sc.Page.Drift && sc.BoolParam(ParamRefuseDrift)
+func refusesDrift(sc *run.StepContext, drifted bool) bool {
+	return drifted && sc.BoolParam(ParamRefuseDrift)
 }
 
 func driftRefused(page pagemap.Page, since string) run.Result {
 	return needsHuman("a human edited " + page.Path + " " + since)
 }
 
-func driftFindings(page pagemap.Page) []content.Finding {
+func driftFindings(page pagemap.Page, drifted bool) []content.Finding {
 	findings := make([]content.Finding, 0, 2)
-	if page.Drift {
+	if drifted {
 		findings = append(findings, driftFinding(page))
 	}
 	return findings
@@ -813,7 +817,7 @@ func driftFinding(page pagemap.Page) content.Finding {
 	return content.Finding{
 		Severity: content.SeverityWarn,
 		Code:     CodePublishOverDrift,
-		Message:  "the page " + page.Path + " changed on the site since it was last published",
+		Message:  "the page " + page.Path + " changed on the site since it was last read or written",
 		Details:  map[string]any{"class": ClassNeedsHuman, "pageId": page.ID, "path": page.Path},
 	}
 }
@@ -875,13 +879,11 @@ func bySlug(items []wp.Item, page pagemap.Page, parent int64) (wp.Item, bool, er
 	}
 }
 
-func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item, result PublishResult) error {
+func record(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Item) error {
 	now := deps.now()
 	next := sc.Page
 	next.WPID = &written.ID
 	next.Status = pagemap.StatusFromWordPress(written.Status)
-	next.ContentHash = result.ContentHash
-	next.Drift = false
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
 	if !written.Modified.IsZero() {

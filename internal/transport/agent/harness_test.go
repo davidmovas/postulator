@@ -205,7 +205,7 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 		}), nil, bus, now),
 		Pages: pages.New(pages.Deps{
 			Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
-			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+			Bodies: sqlite.NewPageBodyRepo(store), UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 		}),
 		Templates: templateService,
 		Reports: reports.New(reports.Deps{

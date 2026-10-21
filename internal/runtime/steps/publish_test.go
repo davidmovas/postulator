@@ -628,7 +628,7 @@ func TestPublishWarnsOverADriftedPage(t *testing.T) {
 
 	deps, _ := imageDeps(t)
 	sc := publishContext(t)
-	sc.Page.Drift = true
+	deps.Bodies = driftedBodies(sc.Page.ID)
 
 	published := runPublish(t, deps, sc)
 	if published.WPID == 0 {
@@ -648,7 +648,7 @@ func TestPublishRefusesADriftedPage(t *testing.T) {
 
 	deps, server := imageDeps(t)
 	sc := publishContext(t)
-	sc.Page.Drift = true
+	deps.Bodies = driftedBodies(sc.Page.ID)
 	sc.Params[steps.ParamRefuseDrift] = true
 
 	result, err := drive(t, steps.Publish(deps), sc)

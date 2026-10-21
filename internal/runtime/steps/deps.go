@@ -61,6 +61,7 @@ type unitOfWork interface {
 
 type bodyRecorder interface {
 	Record(ctx context.Context, pageID, raw string, at time.Time) error
+	Get(ctx context.Context, pageID string) (current, base block.Snapshot, found bool, err error)
 	ReplaceWritten(ctx context.Context, pageID string, hashes []string, runID string, at time.Time) error
 	ListWritten(ctx context.Context, pageID string) ([]block.Written, error)
 }
@@ -144,6 +145,28 @@ func (d Deps) namedIndex(ctx context.Context, siteID string, pages []pagemap.Pag
 		return pagemap.Index{}, err
 	}
 	return pagemap.NewIndexNamed(pages, pagemap.Names(stored)), nil
+}
+
+func (d Deps) drifted(ctx context.Context, page pagemap.Page) (bool, error) {
+	if d.Bodies == nil {
+		return false, nil
+	}
+	current, base, found, err := d.Bodies.Get(ctx, page.ID)
+	if err != nil {
+		return false, err
+	}
+	return found && current.Hash != base.Hash, nil
+}
+
+func (d Deps) baseHash(ctx context.Context, page pagemap.Page) (string, error) {
+	if d.Bodies == nil {
+		return "", nil
+	}
+	_, base, found, err := d.Bodies.Get(ctx, page.ID)
+	if err != nil || !found {
+		return "", err
+	}
+	return base.Hash, nil
 }
 
 func (d Deps) storeName(ctx context.Context, page pagemap.Page) (string, error) {

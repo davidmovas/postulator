@@ -28,7 +28,31 @@ const (
 type bodyLog struct {
 	mu      sync.Mutex
 	bodies  map[string]string
+	edited  map[string]string
 	written map[string][]string
+}
+
+func driftedBodies(pageID string) *bodyLog {
+	return &bodyLog{
+		bodies: map[string]string{pageID: "<p>What the page held when it was last read.</p>"},
+		edited: map[string]string{pageID: "<p>What a human wrote on the site since.</p>"},
+	}
+}
+
+func (b *bodyLog) Get(_ context.Context, pageID string) (current, base block.Snapshot, found bool, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	raw, held := b.bodies[pageID]
+	if !held {
+		return block.Snapshot{}, block.Snapshot{}, false, nil
+	}
+	base = block.Snapshot{PageID: pageID, Side: block.Base, Raw: raw, Hash: block.BodyHash(raw)}
+	current = base
+	current.Side = block.Current
+	if edited, moved := b.edited[pageID]; moved {
+		current.Raw, current.Hash = edited, block.BodyHash(edited)
+	}
+	return current, base, true, nil
 }
 
 func (b *bodyLog) Record(_ context.Context, pageID, raw string, _ time.Time) error {

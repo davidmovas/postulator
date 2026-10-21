@@ -3890,6 +3890,18 @@ on what stage 2 left open and what was decided while building.
   the page model. `Mismatch` lives in `runtime/steps`, built from what a write asked for and what
   the site answered, and is encoded `{field, planned, actual}` (the old type carried no tags, so
   an older artifact's keys still decode).
+- **Drift is the body's move from its base** (C.2b). A page drifted when its current body's hash is
+  not its base's (`PageBodyRepo.Drifted`, one hash-only query per site), the condition the
+  observation raises `body_changed_on_site` on; so drift now covers every page whose body moved
+  from its first observation or from our last write, not only a page we wrote, and it clears when
+  we write the page again or a person accepts the site's body. The pages DTO computes `drift`
+  per site and loses `contentHash`; `publish` warns over drift and refuses it under
+  `refuseDrift` from the body record, saying the page changed since it was last read or written.
+  Nothing writes the page row's hash or drift any more: `record`, `adopt`, the read back and the
+  revert leave the body to `page_bodies`, a relinked neighbour is reverted only while it holds the
+  base the relink recorded (else it is handed back, as before when its hash differed or was
+  unknown), and the observation tells a page we wrote by a field row with a written run or a block
+  of ours, read for the batch with the fields.
 
 ### The image step never draws over the client's image (session 2, the open item)
 

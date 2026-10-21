@@ -29,7 +29,7 @@ func onTheSite(pages []pagemap.Page) map[string]bool {
 }
 
 func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Index, site pagemap.Site,
-	raw, hash string, placed []block.LinkKey) error {
+	raw string, placed []block.LinkKey) error {
 	written, err := deps.ourBlocks(ctx, page.ID)
 	if err != nil {
 		return err
@@ -45,8 +45,6 @@ func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Inde
 
 	now := deps.now()
 	next := page
-	next.ContentHash = hash
-	next.Drift = false
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
 	return persist(ctx, deps, next, observedOn(page, index, site, block.LinksOf(raw, written), held, now))

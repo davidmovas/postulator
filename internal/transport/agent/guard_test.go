@@ -95,8 +95,8 @@ func newBareRunnerOver(t *testing.T, resultCap int, wrap func(*fake.Client) llmp
 	registered := tools.New(tools.Deps{
 		Pages: pages.New(pages.Deps{
 			Pages: sqlite.NewPageRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
-			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: bus,
-			Clock: now, Preview: stubPreview{},
+			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
+			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 		}),
 		Actions:   sqlite.NewPendingActionRepo(store),
 		Publisher: bus,

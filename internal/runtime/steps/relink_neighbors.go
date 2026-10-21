@@ -471,7 +471,7 @@ func (n neighborhood) writeNext(ctx context.Context, deps Deps, state *relinkSta
 	}
 	if !landed.written {
 		outcome.Outcome, outcome.Detail = OutcomeConflict, "the neighbor changed on the site after its links were planned"
-	} else if recorded := n.recordLanded(ctx, deps, neighbor, write, landed.hash); recorded != nil {
+	} else if recorded := n.recordLanded(ctx, deps, neighbor, write); recorded != nil {
 		return run.Result{}, recorded
 	}
 	state.Result.tally(outcome, n.page)
@@ -479,12 +479,12 @@ func (n neighborhood) writeNext(ctx context.Context, deps Deps, state *relinkSta
 	return n.settled(state, "relinked "+outcome.Path)
 }
 
-func (n neighborhood) recordLanded(ctx context.Context, deps Deps, neighbor pagemap.Page, write relinkWrite, hash string) error {
+func (n neighborhood) recordLanded(ctx context.Context, deps Deps, neighbor pagemap.Page, write relinkWrite) error {
 	if err := recordSpliced(ctx, deps, neighbor.ID, n.runID, splicedBody{raw: write.After, ours: write.Ours}); err != nil {
 		return err
 	}
 	placed := []block.LinkKey{{To: n.page.Path, Anchor: write.Outcome.Anchor}}
-	return adopt(ctx, deps, neighbor, n.index, n.site, write.After, hash, placed)
+	return adopt(ctx, deps, neighbor, n.index, n.site, write.After, placed)
 }
 
 func (n neighborhood) settled(state *relinkState, message string) (run.Result, error) {

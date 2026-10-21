@@ -805,18 +805,27 @@ func TestAnOutdatedPluginIsAFindingThatClearsWhenUpdated(t *testing.T) {
 func TestAPlanIsTheTitleAndAddressThatDifferFromWhatTheLastWalkSaw(t *testing.T) {
 	t.Parallel()
 
+	runID := "run-1"
 	cases := []struct {
 		name    string
-		edit    func(page *pagemap.Page)
+		edit    func(s *stores, page *pagemap.Page)
 		title   string
 		path    string
 		finding bool
 	}{
-		{name: "an untouched page follows the site", edit: func(*pagemap.Page) {}, title: "TB-500 Research", path: "/tb-500/"},
-		{name: "a title a person changed is kept", edit: func(page *pagemap.Page) { page.Title = "TB-500 for Labs" },
+		{name: "an untouched page follows the site", edit: func(*stores, *pagemap.Page) {}, title: "TB-500 Research", path: "/tb-500/"},
+		{name: "a title a person changed is kept", edit: func(_ *stores, page *pagemap.Page) { page.Title = "TB-500 for Labs" },
 			title: "TB-500 for Labs", path: "/tb-500/", finding: true},
-		{name: "an address a person moved is kept with its title", edit: func(page *pagemap.Page) { page.Path = "/peptides/tb-500/" },
+		{name: "an address a person moved is kept with its title", edit: func(_ *stores, page *pagemap.Page) { page.Path = "/peptides/tb-500/" },
 			title: "TB-500", path: "/peptides/tb-500/", finding: true},
+		{name: "a page whose field we wrote keeps its plan", edit: func(s *stores, page *pagemap.Page) {
+			written := s.fields[page.ID][field.Excerpt]
+			written.WrittenRunID = &runID
+			s.fields[page.ID][field.Excerpt] = written
+		}, title: "TB-500", path: "/tb-500/", finding: true},
+		{name: "a page whose block we wrote keeps its plan", edit: func(s *stores, page *pagemap.Page) {
+			s.written[page.ID] = []block.Written{{PageID: page.ID, BlockHash: "ours", RunID: runID, WrittenAt: earlier}}
+		}, title: "TB-500", path: "/tb-500/", finding: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -827,7 +836,7 @@ func TestAPlanIsTheTitleAndAddressThatDifferFromWhatTheLastWalkSaw(t *testing.T)
 			adopted := s.pageAt(t, "/tb-500/")
 			s.stores.mu.Lock()
 			edited := s.stores.pages[adopted.ID]
-			tc.edit(&edited)
+			tc.edit(s.stores, &edited)
 			s.stores.pages[adopted.ID] = edited
 			s.stores.mu.Unlock()
 			for i := range s.plugin.items {

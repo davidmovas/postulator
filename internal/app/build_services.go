@@ -81,7 +81,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	values := stores.values
 	pagesService := pages.New(pages.Deps{
 		Pages: stores.pages, Types: stores.pageTypes, Links: stores.links, Entities: stores.entities, Edges: stores.edges,
-		Sites: stores.sites, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
+		Sites: stores.sites, Bodies: stores.bodies, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 		Preview: previewIssuer{clients: writing.wordpress},
 	})
 	runsService := runs.New(running.engine, stores.runs, stores.items, stores.artifacts, stores.runEvents,

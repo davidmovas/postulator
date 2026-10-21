@@ -3,6 +3,7 @@ package pages_test
 import (
 	"encoding/json"
 	stderrors "errors"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/note"
@@ -48,7 +50,7 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	return harness{
 		service: pages.New(pages.Deps{
 			Pages: sqlite.NewPageRepo(store), Types: sqlite.NewPageTypeRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
-			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store),
+			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
 			UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
 		}),
 		store:    store,
@@ -552,6 +554,55 @@ func TestListAndTree(t *testing.T) {
 	}
 	if _, err = h.service.Tree(t.Context(), pages.TreeRequest{}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("missing site code = %q, want INVALID", errors.CodeOf(err))
+	}
+}
+
+func TestAPageDriftedWhenItsBodyMovedFromItsBase(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	edited := h.page(t, "/edited/", nil)
+	ours := h.page(t, "/ours/", nil)
+	h.page(t, "/planned/", nil)
+	bodies := sqlite.NewPageBodyRepo(h.store)
+	later := sqlitetest.Stamp.Add(time.Hour)
+	for _, step := range []func() error{
+		func() error { return bodies.Record(t.Context(), ours.ID, "<p>Ours.</p>", sqlitetest.Stamp) },
+		func() error { return bodies.Record(t.Context(), edited.ID, "<p>Ours.</p>", sqlitetest.Stamp) },
+		func() error {
+			return bodies.Observe(t.Context(), block.Snapshot{
+				PageID: edited.ID, Raw: "<p>Edited by the client.</p>", Hash: block.BodyHash("<p>Edited by the client.</p>"),
+				Kind: block.Classic, ObservedAt: later,
+			})
+		},
+	} {
+		if err := step(); err != nil {
+			t.Fatalf("store a body: %v", err)
+		}
+	}
+
+	listed, err := h.service.List(t.Context(), pages.ListRequest{SiteID: h.siteID, ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: "path"}}})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	drifted := map[string]bool{}
+	for _, page := range listed.Items {
+		drifted[page.Path] = page.Drift
+	}
+	if want := map[string]bool{"/edited/": true, "/ours/": false, "/planned/": false}; !maps.Equal(drifted, want) {
+		t.Errorf("drift = %v, want %v", drifted, want)
+	}
+	tree, err := h.service.Tree(t.Context(), pages.TreeRequest{SiteID: h.siteID})
+	if err != nil || len(tree.Roots) != 3 || !tree.Roots[0].Page.Drift || tree.Roots[1].Page.Drift {
+		t.Errorf("Tree = %+v, %v; want the edited page alone drifted", tree, err)
+	}
+	got, err := h.service.Get(t.Context(), pages.GetRequest{ID: edited.ID})
+	if err != nil || !got.Page.Drift {
+		t.Errorf("Get = %+v, %v; want the edited page drifted", got.Page, err)
+	}
+	updated, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: edited.ID, Title: ptr("Edited, renamed")})
+	if err != nil || !updated.Page.Drift {
+		t.Errorf("Update = %+v, %v; want the page still drifted", updated.Page, err)
 	}
 }
 

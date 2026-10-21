@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
@@ -109,6 +110,7 @@ type revertStand struct {
 	server *wptest.Server
 	pages  *pageMap
 	links  *linkRecorder
+	bodies *bodyLog
 	source *sourceRecord
 	wpIDs  map[string]int64
 }
@@ -128,7 +130,6 @@ func newRevertStand(t *testing.T, opts ...wptest.Option) *revertStand {
 		pagemap.Page{
 			ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
 			Status: pagemap.StatusPublished, EntityID: pointer("parent"), WPID: &neighbor,
-			ContentHash: wp.ContentHash(neighborBefore),
 		},
 		pagemap.Page{
 			ID: "page-filter", SiteID: "site", Path: "/filter/", Slug: "filter", WPType: pagemap.WPPage,
@@ -145,14 +146,16 @@ func newRevertStand(t *testing.T, opts ...wptest.Option) *revertStand {
 	)
 
 	links := &linkRecorder{}
+	bodies := &bodyLog{bodies: map[string]string{"page-parent": neighborBefore}}
 	deps.Pages = pages
 	deps.Links = links
+	deps.Bodies = bodies
 	source := newSourceRecord()
 	deps.Items = source
 	deps.Artifacts = source
 
 	return &revertStand{
-		deps: deps, server: server, pages: pages, links: links, source: source,
+		deps: deps, server: server, pages: pages, links: links, bodies: bodies, source: source,
 		wpIDs: map[string]int64{
 			"page-parent": neighbor, "page-filter": updated,
 			"page-child": espresso, "page-ristretto": ristretto,
@@ -175,9 +178,9 @@ func (s *revertStand) created(t *testing.T, pageID string) {
 	}
 	page := s.pages.items[pageID]
 	page.WPID = &wpID
-	page.ContentHash = wp.ContentHash(body)
 	s.pages.items[pageID] = page
 	s.wpIDs[pageID] = wpID
+	s.recorded(t, pageID, body)
 
 	s.source.record(t, pageID, map[run.ArtifactKind]any{
 		run.ArtifactPublishResult: steps.PublishResult{
@@ -202,8 +205,7 @@ func (s *revertStand) updatedOverMeta(t *testing.T, pageID, body string, previou
 		t.Fatalf("write the run body to %s: %v", pageID, err)
 	}
 
-	page.ContentHash = wp.ContentHash(body)
-	s.pages.items[pageID] = page
+	s.recorded(t, pageID, body)
 
 	applied := []string{"title"}
 	if previous != nil {
@@ -299,8 +301,7 @@ func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, befo
 		t.Fatalf("write the relinked body to %s: %v", neighborID, err)
 	}
 
-	neighbor.ContentHash = wp.ContentHash(body)
-	s.pages.items[neighborID] = neighbor
+	s.recorded(t, neighborID, body)
 
 	itemID := "item-" + pageID
 	encoded, err := json.Marshal(steps.RelinkResult{
@@ -317,6 +318,13 @@ func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, befo
 		ID: itemID + "-relink", RunID: sourceRunID, ItemID: itemID, Step: "relink_neighbors",
 		Kind: run.ArtifactRelinkResult, Blob: encoded,
 	})
+}
+
+func (s *revertStand) recorded(t *testing.T, pageID, body string) {
+	t.Helper()
+	if err := s.bodies.Record(t.Context(), pageID, body, time.Time{}); err != nil {
+		t.Fatalf("record the body the run left on %s: %v", pageID, err)
+	}
 }
 
 func (s *revertStand) revert(t *testing.T, pageID string) (steps.RevertResult, run.Result) {
@@ -402,8 +410,9 @@ func TestRevertAdoptsTheContentItPutBack(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			page := stand.pages.items[tc.pageID]
-			if page.ContentHash != wp.ContentHash(tc.body) || page.Drift || page.LastSyncedAt == nil {
-				t.Fatalf("the local row of %s reads %+v, want it on the content put back", tc.pageID, page)
+			current, base, found, err := stand.bodies.Get(t.Context(), tc.pageID)
+			if err != nil || !found || current.Raw != tc.body || current.Hash != base.Hash || page.LastSyncedAt == nil {
+				t.Fatalf("the local row of %s reads %+v over the body %+v, want it on the content put back", tc.pageID, page, current)
 			}
 			links, replaced := stand.links.byPage[tc.pageID]
 			if !replaced {
@@ -462,6 +471,57 @@ func TestRevertTellsAnEmptyNeighborFromOneItKeptNoCopyOf(t *testing.T) {
 			}
 			if got := stand.body(t, stand.wpIDs["page-parent"]); got != tc.body {
 				t.Fatalf("the neighbor holds %q, want %q", got, tc.body)
+			}
+		})
+	}
+}
+
+func TestRevertHandsBackANeighborWhoseBodyIsNotWhatTheRelinkLeft(t *testing.T) {
+	t.Parallel()
+
+	sentence := `<p>Read about <a href="/coffee/espresso/">espresso</a>.</p>`
+	edited := `<p>The client rewrote the coffee page after the relink.</p>`
+	cases := []struct {
+		name    string
+		prepare func(t *testing.T, s *revertStand)
+		detail  string
+		holds   string
+	}{
+		{
+			name: "a neighbor the client edited since",
+			prepare: func(t *testing.T, s *revertStand) {
+				t.Helper()
+				if _, err := syncClient(t, s.server).PutRaw(t.Context(), wp.TypePage, s.wpIDs["page-parent"], edited, ""); err != nil {
+					t.Fatalf("edit the neighbor on the site: %v", err)
+				}
+			},
+			detail: "edited on the site since the run wrote it",
+			holds:  edited,
+		},
+		{
+			name: "a neighbor with no record of its body",
+			prepare: func(_ *testing.T, s *revertStand) {
+				delete(s.bodies.bodies, "page-parent")
+			},
+			detail: "nothing here records what the relink left",
+			holds:  sentence,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stand := newRevertStand(t)
+			stand.updated(t, "page-filter", runBody)
+			stand.relinked(t, "page-filter", "page-parent", sentence)
+			tc.prepare(t, stand)
+
+			reverted, result := stand.revert(t, "page-filter")
+			if result.Next != run.TransitionPause || !strings.Contains(reverted.Detail, tc.detail) {
+				t.Fatalf("result = %s, detail %q, want a hand-back saying %q", result.Next, reverted.Detail, tc.detail)
+			}
+			if got := stand.body(t, stand.wpIDs["page-parent"]); got != tc.holds {
+				t.Fatalf("the neighbor holds %q, want it untouched", got)
 			}
 		})
 	}

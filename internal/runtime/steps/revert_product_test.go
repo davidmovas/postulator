@@ -17,6 +17,7 @@ type publishedProduct struct {
 	published steps.PublishResult
 	pages     *pageMap
 	source    *sourceRecord
+	bodies    *bodyLog
 }
 
 func filledByAnOlderRun(t *testing.T, p publishedProduct) publishedProduct {
@@ -66,11 +67,13 @@ func publishAndRecord(t *testing.T, item wptest.Item, opts ...wptest.Option) pub
 	pages := newPageMap(page)
 	source := newSourceRecord()
 	source.record(t, page.ID, map[run.ArtifactKind]any{run.ArtifactPublishResult: published})
+	bodies := &bodyLog{}
 	h.deps.Pages = pages
 	h.deps.Links = &linkRecorder{}
 	h.deps.Items = source
 	h.deps.Artifacts = source
-	return publishedProduct{productHarness: h, published: published, pages: pages, source: source}
+	h.deps.Bodies = bodies
+	return publishedProduct{productHarness: h, published: published, pages: pages, source: source, bodies: bodies}
 }
 
 func TestRevertPutsAProductBackAsTheClientHadIt(t *testing.T) {
@@ -120,8 +123,9 @@ func TestRevertPutsAProductBackAsTheClientHadIt(t *testing.T) {
 			if stored.Meta["_yoast_wpseo_title"] != "" {
 				t.Errorf("meta = %v, want the run's title taken back", stored.Meta)
 			}
-			if page := p.pages.items["page-child"]; page.ContentHash != wp.ContentHash(tc.description) || page.Drift {
-				t.Errorf("the page records %+v", page)
+			current, base, found, err := p.bodies.Get(t.Context(), "page-child")
+			if err != nil || !found || current.Raw != tc.description || current.Hash != base.Hash {
+				t.Errorf("the page records the body %+v over %+v (%v), want the description put back on both sides", current, base, err)
 			}
 		})
 	}

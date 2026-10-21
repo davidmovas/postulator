@@ -334,8 +334,12 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		}
 		return &refused, nil
 	}
-	if refusesDrift(sc) {
-		refused := driftRefused(sc.Page, "in the store since it was last written")
+	drifted, err := deps.drifted(ctx, sc.Page)
+	if err != nil {
+		return nil, err
+	}
+	if refusesDrift(sc, drifted) {
+		refused := driftRefused(sc.Page, "in the store since it was last read or written")
 		return &refused, nil
 	}
 	description, err := descriptionOf(body)
@@ -452,7 +456,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	state.Plan = plan
 	state.Result = PublishResult{
 		WPID: held.ID, URL: permalinkOf(wp.Item{Link: held.Permalink}), Status: held.Status, PreviousProduct: &snapshot,
-		SEOApplied: make([]string, 0), Skipped: unattached, Findings: findingsOfProduct(sc.Page, held),
+		SEOApplied: make([]string, 0), Skipped: unattached, Findings: findingsOfProduct(sc.Page, held, drifted),
 		Mismatches: make([]Mismatch, 0), Version: publishRecordVersion,
 	}
 	if !seo.Send {
@@ -615,7 +619,7 @@ func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 	if plan.Unstable {
 		body = plan.Previous
 	}
-	if err := recordProduct(ctx, deps, sc, stored, state.Result.ContentHash); err != nil {
+	if err := recordProduct(ctx, deps, sc, stored); err != nil {
 		return state.failed(err)
 	}
 	if err := recordBody(ctx, deps, sc.Page.ID, body); err != nil {
@@ -655,8 +659,8 @@ func descriptionOf(body []byte) (string, error) {
 	return doc.RenderWithoutHeadingOne()
 }
 
-func findingsOfProduct(page pagemap.Page, held wp.Product) []content.Finding {
-	findings := driftFindings(page)
+func findingsOfProduct(page pagemap.Page, held wp.Product, drifted bool) []content.Finding {
+	findings := driftFindings(page, drifted)
 	if differs := nameDiffers(page, held); differs != nil {
 		findings = append(findings, *differs)
 	}
@@ -741,13 +745,11 @@ func keepCommerce(ctx context.Context, deps Deps, siteID string, commerce site.C
 	return deps.SiteWriter.Update(ctx, owner)
 }
 
-func recordProduct(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Product, hash string) error {
+func recordProduct(ctx context.Context, deps Deps, sc *run.StepContext, written wp.Product) error {
 	now := deps.now()
 	next := sc.Page
 	next.WPID = &written.ID
 	next.Status = pagemap.StatusFromWordPress(written.Status)
-	next.ContentHash = hash
-	next.Drift = false
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
 	if !written.Modified.IsZero() {

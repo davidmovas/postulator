@@ -26,7 +26,6 @@ function page(id: string, path: string): Page {
         pageTypeId: null,
         typeSource: "",
         typeReason: "",
-        contentHash: "",
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,

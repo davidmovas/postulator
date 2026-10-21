@@ -394,7 +394,7 @@ func TestSyncSiteAsksTheStoreOnceAndRecordsWhatItFound(t *testing.T) {
 	}
 }
 
-func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T) {
+func TestSyncSiteFlagsDriftWhereTheBodyMovedFromItsBaseAndArchivesWhatIsGone(t *testing.T) {
 	t.Parallel()
 
 	h := newSyncHarness(t, 0)
@@ -404,18 +404,16 @@ func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T)
 	child := h.byPath(t, "/coffee/espresso/")
 	filter := h.byPath(t, "/coffee/filter/")
 	hub := h.byPath(t, "/coffee/")
-	if child.Drift || child.ContentHash != "" {
-		t.Fatalf("the first sync must neither claim the content nor report drift: %+v", child)
+	if drifted, err := h.bodies.Drifted(t.Context(), h.siteID); err != nil || len(drifted) != 0 {
+		t.Fatalf("the first sync drifted %v (%v), want nothing: every base is what it read", drifted, err)
 	}
 
 	stored, ok := h.server.Lookup(*child.WPID)
 	if !ok {
 		t.Fatal("the child page is not on the site")
 	}
-	ours := child
-	ours.ContentHash = wp.ContentHash(stored.Content)
-	if err := h.pages.Update(t.Context(), ours); err != nil {
-		t.Fatalf("claim the child page: %v", err)
+	if err := h.bodies.Record(t.Context(), child.ID, stored.Content, sqlitetest.Stamp); err != nil {
+		t.Fatalf("record our write of the child page: %v", err)
 	}
 
 	h.server.Rewrite(*child.WPID, `<h1>Espresso</h1><p>Edited by a human.</p>`)
@@ -431,12 +429,18 @@ func TestSyncSiteFlagsDriftOnlyOverOurOwnHashAndArchivesWhatIsGone(t *testing.T)
 	if state.Archived != 1 {
 		t.Fatalf("state = %+v", state)
 	}
-	drifted := h.byPath(t, "/coffee/espresso/")
-	if !drifted.Drift || drifted.ContentHash != ours.ContentHash {
-		t.Fatalf("the edited page is %+v; the hash we published stands until we publish again", drifted)
+	drifted, err := h.bodies.Drifted(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("Drifted: %v", err)
 	}
-	if unclaimed := h.byPath(t, "/coffee/"); unclaimed.Drift {
-		t.Fatalf("a page we never published cannot drift: %+v", unclaimed)
+	want := []string{child.ID, hub.ID}
+	slices.Sort(want)
+	if !slices.Equal(drifted, want) {
+		t.Fatalf("drifted = %v, want the page we wrote and the page we only read, both edited since: %v", drifted, want)
+	}
+	_, base, _, err := h.bodies.Get(t.Context(), child.ID)
+	if err != nil || base.Hash != wp.ContentHash(stored.Content) {
+		t.Fatalf("the base = %+v (%v); what we wrote stands until we write again", base, err)
 	}
 	if archived := h.byPath(t, "/coffee/filter/"); archived.Status != pagemap.StatusArchived {
 		t.Fatalf("the deleted page is %+v", archived)

@@ -420,6 +420,16 @@ func (b bodyStore) ListWritten(_ context.Context, pageID string) ([]block.Writte
 	return b.s.written[pageID], nil
 }
 
+func (b bodyStore) ListWrittenFor(_ context.Context, pageIDs []string) ([]block.Written, error) {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	out := make([]block.Written, 0)
+	for _, pageID := range pageIDs {
+		out = append(out, b.s.written[pageID]...)
+	}
+	return out, nil
+}
+
 type renderStore struct{ s *stores }
 
 func (r renderStore) Put(_ context.Context, record render.Record) error {

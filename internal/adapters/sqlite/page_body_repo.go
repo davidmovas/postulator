@@ -18,11 +18,17 @@ const (
 		FROM page_bodies AS b JOIN pages AS p ON p.id = b.page_id WHERE p.site_id = ? ORDER BY b.page_id, b.side`
 	selectCurrentBodies = `SELECT ` + bodyColumns + ` FROM page_bodies WHERE side = 'current' AND page_id IN `
 	orderBodies         = ` ORDER BY page_id`
+	selectDrifted       = `SELECT c.page_id FROM page_bodies AS c
+		JOIN page_bodies AS b ON b.page_id = c.page_id AND b.side = 'base'
+		JOIN pages AS p ON p.id = c.page_id
+		WHERE c.side = 'current' AND p.site_id = ? AND c.hash <> b.hash ORDER BY c.page_id`
 
 	deleteWritten = `DELETE FROM page_blocks_written WHERE page_id = ?`
 	insertWritten = `INSERT INTO page_blocks_written (page_id, block_hash, run_id, written_at) VALUES (?, ?, ?, ?)
 		ON CONFLICT (page_id, block_hash) DO NOTHING`
-	selectWritten = `SELECT page_id, block_hash, run_id, written_at FROM page_blocks_written WHERE page_id = ? ORDER BY block_hash`
+	selectWritten    = `SELECT page_id, block_hash, run_id, written_at FROM page_blocks_written WHERE page_id = ? ORDER BY block_hash`
+	selectWrittenFor = `SELECT page_id, block_hash, run_id, written_at FROM page_blocks_written WHERE page_id IN `
+	orderWritten     = ` ORDER BY page_id, block_hash`
 )
 
 type PageBodyRepo struct {
@@ -83,6 +89,16 @@ func (r *PageBodyRepo) ListCurrent(ctx context.Context, pageIDs []string) ([]blo
 	return selectByIDs(ctx, r.store.execFrom(ctx), selectCurrentBodies, orderBodies, pageIDs, scanSnapshot, "list the current bodies of the pages")
 }
 
+func (r *PageBodyRepo) Drifted(ctx context.Context, siteID string) ([]string, error) {
+	return selectAll(ctx, r.store.execFrom(ctx), selectDrifted, []any{siteID}, scanPageID, "list the bodies that moved from their base")
+}
+
+func scanPageID(rows *sql.Rows) (string, error) {
+	var pageID string
+	err := rows.Scan(&pageID)
+	return pageID, err
+}
+
 func (r *PageBodyRepo) ReplaceWritten(ctx context.Context, pageID string, hashes []string, runID string, at time.Time) error {
 	return r.store.Do(ctx, func(c context.Context) error {
 		if _, err := execWrite(c, r.store.writeFrom(c), deleteWritten, []any{pageID}, nil, "clear the written blocks"); err != nil {
@@ -99,6 +115,10 @@ func (r *PageBodyRepo) ReplaceWritten(ctx context.Context, pageID string, hashes
 
 func (r *PageBodyRepo) ListWritten(ctx context.Context, pageID string) ([]block.Written, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectWritten, []any{pageID}, scanWritten, "list the written blocks")
+}
+
+func (r *PageBodyRepo) ListWrittenFor(ctx context.Context, pageIDs []string) ([]block.Written, error) {
+	return selectByIDs(ctx, r.store.execFrom(ctx), selectWrittenFor, orderWritten, pageIDs, scanWritten, "list the written blocks of the pages")
 }
 
 func scanSnapshot(rows *sql.Rows) (block.Snapshot, error) {
