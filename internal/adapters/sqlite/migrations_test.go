@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 67
+const latestMigration = 68
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -88,6 +88,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0065_page_links_absolute.sql",
 		"0066_page_types_default_templates.sql",
 		"0067_template_specifications_retired.sql",
+		"0068_pages_site_copies_dropped.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1865,6 +1866,100 @@ func TestAStoredSpecWithSpecificationsStillDecodes(t *testing.T) {
 	}
 	if resolved.Tone != "plain" || resolved.Product == nil || !resolved.Product.ShortDescription.Enabled {
 		t.Errorf("the resolved spec lost what it held beside the retired key: %+v", resolved)
+	}
+}
+
+func TestThePagesCopiesOfTheSiteAreDroppedAndADownBringsThemBackAsMigration45MadeThem(t *testing.T) {
+	t.Parallel()
+
+	copies := []string{"canonical", "content_hash", "drift", "wp_link", "wp_slug", "wp_status", "wp_title", "wp_h1"}
+	made := storeAt(t, 67)
+	want := make(map[string]string, len(copies))
+	for _, column := range copies {
+		if want[column] = columnOf(t, made, "pages", column); want[column] == "" {
+			t.Fatalf("migration 67 holds no pages.%s", column)
+		}
+	}
+
+	store := storeAt(t, 67)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const (
+		at       = "2026-10-17T09:00:00Z"
+		synced   = "2026-10-18T09:00:00Z"
+		observed = "2026-10-19T09:00:00Z"
+		title    = "Peptides für Labore"
+	)
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	page := `INSERT INTO pages (id, site_id, path, slug, wp_type, wp_id, title, status, content_hash, drift, last_synced_at, wp_link, wp_slug, wp_status, wp_title, wp_h1, created_at, updated_at)
+		VALUES (?, 's1', ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?, ?, 'publish', ?, ?, ?, ?)`
+	must(page, "pg1", "/peptides/", "peptides", "page", 1, "Peptides", "abc", 1, synced, "https://shop/peptides/", "peptides", title, "All peptides", at, at)
+	must(page, "pg2", "/bpc-157/", "bpc-157", "page", 2, "BPC-157", "", 0, nil, "https://shop/bpc-157/", "bpc-157", "An old copy", "", at, at)
+	must(page, "pg3", "/blank/", "blank", "page", 3, "Blank", "", 0, nil, "", "", "", "", at, at)
+	must(page, "pg4", "/product-category/peptides/", "peptides", "product_cat", 4, "Peptides", "", 0, nil, "", "", "Peptides", "Peptides", at, at)
+	must(`INSERT INTO page_fields (page_id, field_key, current_value, current_hash, base_value, base_hash, observed_at) VALUES ('pg2', 'title', 'Today''s title', ?, 'Today''s title', ?, ?)`,
+		field.Hash("Today's title"), field.Hash("Today's title"), observed)
+
+	if _, err = provider.UpTo(t.Context(), 68); err != nil {
+		t.Fatalf("up to 68: %v", err)
+	}
+	for _, column := range copies {
+		if got := columnOf(t, store, "pages", column); got != "" {
+			t.Fatalf("pages still carries %s (%s) after the up migration", column, got)
+		}
+	}
+	wantFields := []string{
+		"pg1 | h1 | All peptides | " + field.Hash("All peptides") + " | All peptides | " + field.Hash("All peptides") + " | " + synced + " | <nil>",
+		"pg1 | title | " + title + " | " + field.Hash(title) + " | " + title + " | " + field.Hash(title) + " | " + synced + " | <nil>",
+		"pg2 | title | Today's title | " + field.Hash("Today's title") + " | Today's title | " + field.Hash("Today's title") + " | " + observed + " | <nil>",
+		"pg4 | title | Peptides | " + field.Hash("Peptides") + " | Peptides | " + field.Hash("Peptides") + " | " + at + " | <nil>",
+	}
+	if got := rowsOf(t, store, `SELECT page_id, field_key, current_value, current_hash, base_value, base_hash, observed_at, written_run_id FROM page_fields ORDER BY page_id, field_key`); !slices.Equal(got, wantFields) {
+		t.Fatalf("the backfilled fields are\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(wantFields, "\n"))
+	}
+
+	must(`INSERT INTO page_identity (page_id, url, status, wp_type, observed_at) VALUES ('pg1', 'https://shop/peptides/', 'draft', 'page', ?)`, observed)
+	must(`UPDATE page_fields SET written_run_id = 'r1' WHERE page_id = 'pg1' AND field_key = 'title'`)
+	body := `INSERT INTO page_bodies (page_id, side, raw, hash, kind, observed_at) VALUES (?, ?, ?, ?, 'classic', ?)`
+	must(body, "pg1", "base", "<p>Ours.</p>", field.Hash("<p>Ours.</p>"), observed)
+	must(body, "pg1", "current", "<p>Edited.</p>", field.Hash("<p>Edited.</p>"), observed)
+	must(body, "pg2", "base", "<p>Theirs.</p>", field.Hash("<p>Theirs.</p>"), observed)
+	must(body, "pg2", "current", "<p>Theirs, edited.</p>", field.Hash("<p>Theirs, edited.</p>"), observed)
+
+	if _, err = provider.DownTo(t.Context(), 67); err != nil {
+		t.Fatalf("down to 67: %v", err)
+	}
+	for _, column := range copies {
+		if got := columnOf(t, store, "pages", column); got != want[column] {
+			t.Fatalf("the down migration made pages.%s %q, want %q as migration 45 made it", column, got, want[column])
+		}
+	}
+	wantPages := []string{
+		"pg1 | " + title + " | All peptides | draft | https://shop/peptides/ | " + field.Hash("<p>Ours.</p>") + " | 1 |  | ",
+		"pg2 | Today's title |  |  |  |  | 0 |  | ",
+		"pg3 |  |  |  |  |  | 0 |  | ",
+		"pg4 | Peptides |  |  |  |  | 0 |  | ",
+	}
+	if got := rowsOf(t, store, `SELECT id, wp_title, wp_h1, wp_status, wp_link, content_hash, drift, wp_slug, canonical FROM pages ORDER BY id`); !slices.Equal(got, wantPages) {
+		t.Fatalf("the down refilled the pages as\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(wantPages, "\n"))
+	}
+	if _, execErr := store.writer.ExecContext(t.Context(), `UPDATE pages SET drift = 2 WHERE id = 'pg1'`); execErr == nil {
+		t.Fatal("the restored drift check accepted a value that is neither 0 nor 1")
+	}
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT count(*) FROM pages`); !slices.Equal(got, []string{"4"}) {
+		t.Fatalf("the second up left %v pages, want all four", got)
 	}
 }
 

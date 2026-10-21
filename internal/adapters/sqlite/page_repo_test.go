@@ -23,14 +23,10 @@ func fullPage(siteID, path string, at time.Time) pagemap.Page {
 		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPost, WPID: &wpID,
 		ParentReason: pagemap.ParentJSONLD, ParentMethod: pagemap.MethodRedirect, PageTypeID: &pageType, TypeSource: pagemap.TypeSourceAuto, TypeReason: pagemap.TypeByKind,
 		TechnicalReason: pagemap.TechnicalShop, ReadOnlyReason: pagemap.ReadOnlyBuilder("elementor"),
-		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description", Canonical: "https://shop.example.com" + path,
+		Title: "Title", H1: "Heading", MetaTitle: "Meta", MetaDescription: "Description",
 		Keywords: keyword.New([]keyword.Keyword{{Text: "title keyword", Volume: new(5400)}, {Text: "one", Volume: new(0)}, {Text: "two"}}),
 		Notes:    []note.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Notes", Text: "the liquid form"}},
-		Status:   pagemap.StatusExists, ContentHash: "abc", WPModifiedAt: &modified, LastSyncedAt: &at, Drift: true, CreatedAt: at, UpdatedAt: at,
-		Observed: pagemap.Observed{
-			Link: "https://shop.example.com" + path, Slug: pagemap.Slug(path), Status: "draft",
-			Title: "Title", H1: "Heading",
-		},
+		Status:   pagemap.StatusExists, WPModifiedAt: &modified, LastSyncedAt: &at, CreatedAt: at, UpdatedAt: at,
 	}
 }
 
@@ -161,7 +157,6 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	want.TechnicalReason = pagemap.TechnicalNone
 	want.ReadOnlyReason = pagemap.ReadOnlyTerm
 	want.LastSyncedAt = nil
-	want.Drift = false
 	want.UpdatedAt = sqlitetest.Stamp.Add(time.Minute)
 	if err = repo.Update(t.Context(), want); err != nil {
 		t.Fatalf("Update: %v", err)
@@ -217,9 +212,6 @@ func TestPageRepoUpdatePublishedTouchesOnlyWhatAPublishOwns(t *testing.T) {
 	published := read
 	published.WPID = &wpID
 	published.Status = pagemap.StatusPublished
-	published.ContentHash = "published-hash"
-	published.Observed = pagemap.Observed{Link: "https://shop.test/bpc-157/", Slug: "bpc-157", Status: "publish", Title: "On the site", H1: "Heading"}
-	published.Drift = false
 	published.LastSyncedAt = &synced
 	published.WPModifiedAt = &synced
 	published.UpdatedAt = sqlitetest.Stamp.Add(2 * time.Minute)
@@ -232,8 +224,8 @@ func TestPageRepoUpdatePublishedTouchesOnlyWhatAPublishOwns(t *testing.T) {
 		t.Fatalf("Get: %v", err)
 	}
 	want := edited
-	want.WPID, want.Status, want.ContentHash, want.Observed = &wpID, pagemap.StatusPublished, "published-hash", published.Observed
-	want.Drift, want.LastSyncedAt, want.WPModifiedAt, want.UpdatedAt = false, &synced, &synced, published.UpdatedAt
+	want.WPID, want.Status = &wpID, pagemap.StatusPublished
+	want.LastSyncedAt, want.WPModifiedAt, want.UpdatedAt = &synced, &synced, published.UpdatedAt
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Get = %+v\nwant %+v", got, want)
 	}

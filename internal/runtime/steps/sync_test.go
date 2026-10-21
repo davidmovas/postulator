@@ -251,8 +251,11 @@ func TestSyncSitePullsThroughThePluginAndThroughCore(t *testing.T) {
 			if child.WPID == nil || child.Title != "Espresso" || child.H1 != "Espresso" {
 				t.Fatalf("the child page is %+v", child)
 			}
-			if child.Status != pagemap.StatusPublished || child.ContentHash != "" {
-				t.Fatalf("the child page is %+v; a page we never wrote carries no hash of ours", child)
+			if child.Status != pagemap.StatusPublished {
+				t.Fatalf("the child page is %+v", child)
+			}
+			if written, err := h.bodies.ListWritten(t.Context(), child.ID); err != nil || len(written) != 0 {
+				t.Fatalf("the child page holds the blocks %+v (%v); a page we never wrote holds none of ours", written, err)
 			}
 			parent := h.byPath(t, "/coffee/")
 			if child.ParentPageID == nil || *child.ParentPageID != parent.ID || child.ParentReason != pagemap.ParentWP {
@@ -460,11 +463,13 @@ func TestSyncSiteKeepsThePlanAndRecordsWhatTheSiteHolds(t *testing.T) {
 	planned := pagemap.Page{
 		ID: id.New(), SiteID: h.siteID, Path: "/components/batteries/e-bike-range/", Slug: "e-bike-range",
 		WPType: pagemap.WPPage, WPID: &wpID, Title: "How Far Can an E-Bike Go?",
-		Status: pagemap.StatusPublished, ContentHash: wp.ContentHash(`<h1>How Far Can an E-Bike Go?</h1><p>How far.</p>`),
-		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		Status: pagemap.StatusPublished, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if err := h.pages.Insert(t.Context(), planned); err != nil {
 		t.Fatalf("insert the planned page: %v", err)
+	}
+	if err := h.bodies.Record(t.Context(), planned.ID, `<h1>How Far Can an E-Bike Go?</h1><p>How far.</p>`, sqlitetest.Stamp); err != nil {
+		t.Fatalf("record the body we wrote: %v", err)
 	}
 
 	h.all(t)

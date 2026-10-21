@@ -575,10 +575,10 @@ func TestRevertPutsBackWhatTheRunWroteToTheSite(t *testing.T) {
 			t.Fatalf("the page the run created is %q on the site, want it in the trash", got)
 		}
 		page := stand.pages.items[pageID]
-		if page.WPID != nil || page.Status != pagemap.StatusPlanned || page.ContentHash != "" {
+		if page.WPID != nil || page.Status != pagemap.StatusPlanned {
 			t.Fatalf("the local row of %s reads %+v, want it planned again", pageID, page)
 		}
-		if page.LastSyncedAt != nil || page.Drift {
+		if page.LastSyncedAt != nil || page.WPModifiedAt != nil {
 			t.Fatalf("the local row of %s still mirrors the site: %+v", pageID, page)
 		}
 		if len(stand.links.byPage[pageID]) != 0 {

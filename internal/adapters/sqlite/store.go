@@ -10,6 +10,7 @@ import (
 	"github.com/ncruces/go-sqlite3"
 	"github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
+	"github.com/ncruces/go-sqlite3/ext/hash"
 	_ "github.com/ncruces/go-sqlite3/vfs/adiantum"
 	"github.com/pressly/goose/v3"
 
@@ -44,7 +45,7 @@ func Open(cfg Config) (*Store, error) {
 		return nil, errors.Wrap(err, errors.Internal, "create the database directory")
 	}
 
-	writer, err := driver.Open(dsn(cfg.Path, cfg.Key, false))
+	writer, err := driver.Open(dsn(cfg.Path, cfg.Key, false), hash.Register)
 	if err != nil {
 		return nil, dbx.Convert(err, "open the database for writing")
 	}

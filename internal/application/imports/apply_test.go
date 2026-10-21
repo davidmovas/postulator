@@ -61,7 +61,7 @@ func TestApplyWritesTheGraphAndThePageMapOnce(t *testing.T) {
 		if pages[i].EntityID == nil {
 			t.Fatalf("%s is not mapped to an entity", pages[i].Path)
 		}
-		if pages[i].WPID != nil || pages[i].ContentHash != "" {
+		if pages[i].WPID != nil || pages[i].LastSyncedAt != nil {
 			t.Fatalf("%s carries wordpress state", pages[i].Path)
 		}
 	}

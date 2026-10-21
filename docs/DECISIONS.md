@@ -3908,6 +3908,18 @@ on what stage 2 left open and what was decided while building.
   `pages_update` with them), the pages DTO, the drawer's form and summary and the agent's page
   cards, and the observation no longer copies the site's canonical into it; the site's canonical
   is the `seo_canonical` field. The schemas fall from 62,174 to 62,033 bytes (ceiling 62,046).
+- **0068 drops the pages' old copies of the site** (C.2d). Before it drops `drift`,
+  `content_hash`, `wp_link`, `wp_slug`, `wp_status`, `wp_title`, `wp_h1` and `canonical`, it
+  writes a `title` field from `wp_title` and an `h1` field from `wp_h1` (not for a term, as the
+  observation writes none) wherever the copy holds one and no row exists, its base its current and
+  its time the last sync, else the row's update; the hash is `lower(hex(sha256(v)))`, which the
+  writer connection can compute because it registers the driver's hash functions
+  (`ext/hash.Register`, the same module), and the test proves it equal to `field.Hash` on UTF-8.
+  The down restores the columns as 0045 made them and refills the titles from the fields, the
+  status and the link from the identity, and, for a page we wrote (a written field or block), the
+  hash from the base body and the drift from current against base, as the old row meant them.
+  `pagemap.Observed`, `Page.Mismatches`, `Page.Drift`, `Page.ContentHash` and `Page.Canonical`
+  are gone; `StatusFromWordPress` lives in `pagemap/status.go`.
 
 ### The image step never draws over the client's image (session 2, the open item)
 

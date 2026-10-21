@@ -94,17 +94,13 @@ type Page struct {
 	H1              string
 	MetaTitle       string
 	MetaDescription string
-	Canonical       string
 	Keywords        keyword.List
 	Notes           []note.Note
 	Status          Status
 	EntityID        *string
 	TemplateID      *string
-	ContentHash     string
-	Observed        Observed
 	WPModifiedAt    *time.Time
 	LastSyncedAt    *time.Time
-	Drift           bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -219,7 +215,6 @@ func NewPage(p Page) (Page, error) {
 	p.H1 = strings.TrimSpace(p.H1)
 	p.MetaTitle = strings.TrimSpace(p.MetaTitle)
 	p.MetaDescription = strings.TrimSpace(p.MetaDescription)
-	p.Canonical = strings.TrimSpace(p.Canonical)
 	p.Keywords = keyword.New(p.Keywords)
 	p.Notes = note.Clean(p.Notes)
 	return p, nil

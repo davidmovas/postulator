@@ -385,11 +385,10 @@ func TestByNameAnswersEveryOnSitePageThatCarriesTheName(t *testing.T) {
 	}
 }
 
-func TestByNameReadsTheTitleAndH1FieldsAndThePlanNotTheObservedCopy(t *testing.T) {
+func TestByNameReadsTheTitleAndH1FieldsAndThePlan(t *testing.T) {
 	t.Parallel()
 
 	renamed := sitePage("renamed", "/renamed/", pagemap.WPPage, 50)
-	renamed.Observed.Title = "What the copy once said"
 	planned := sitePage("planned", "/planned/", pagemap.WPPage, 51)
 	planned.H1 = "The Workbook's H1"
 	index := pagemap.NewIndexNamed([]pagemap.Page{renamed, planned}, map[string][]string{
@@ -402,7 +401,7 @@ func TestByNameReadsTheTitleAndH1FieldsAndThePlanNotTheObservedCopy(t *testing.T
 			t.Errorf("ByName(%q) = %+v, want %s", name, got, want)
 		}
 	}
-	if got := index.ByName("What the copy once said"); len(got) != 0 {
-		t.Errorf("ByName found %s by the observed copy, which the fields replace", got[0].ID)
+	if got := index.ByName("A name nothing holds"); len(got) != 0 {
+		t.Errorf("ByName found %s by a name neither its fields nor its plan hold", got[0].ID)
 	}
 }
