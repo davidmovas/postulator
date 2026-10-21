@@ -11,10 +11,40 @@ answers landed on 2026-10-17, stage 1a (the plugin's reads, its client and the t
 same day, stage 1b (the page model, its storage and the observation) and **stage 1c (1b's gaps
 closed and the screens) on 2026-10-18, which closes stage 1**; **stage 2 (2a, page types and
 their scopes, and 2b, the read layer with the writer's pack and the agent's view) on 2026-10-19,
-its stand legs green on both stands on 2026-10-20**; stage 3, the field writers and the editable
-body, is next.
+its stand legs green on both stands on 2026-10-20**; **stage 3, the field writers and the editable
+body, is underway: Part 0 to C landed on 2026-10-20/21, D (the screens) and G (the review and the
+gate) are next.**
 
 ## Where we are
+
+**2026-10-20/21, stage 3 of the site model: editing the client's pages field by field and block by
+block, Part 0 to C.** The reasoning is under **stage 3** in `DECISIONS.md`; the task list, both
+sessions' checkpoints and the commands still owed are under stage 3 in
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **Part 0, the owner's rulings on stage 2's open items** (`c366e79` to `4d5762f`): the seeded types
+  carry their preset's template (0066); an existing page's status is never written and a draft run's
+  writes wait for a person's review; the canonical is written once, as WordPress's permalink; the
+  agent cannot switch a page into rewriting, or trash one, unseen; a relink's lost answer is
+  recognised; our links are ours by their mark.
+- **Part A, block operations and the field registry** (`3b4e1a4` to `0c130b2`): `domain/block`'s
+  operations keep every untouched byte; `application/edit` writes through a core, a store and a
+  plugin writer under the hash read; plugin 1.5.0 writes meta and SEO under expected hashes and says
+  whether a save is stable; `publish` writes every field through the registry, the body last.
+- **Part B, products through the registry** (`76fb97f` to `388ce72`): the attribute filling retired
+  (0067), the short description, variation descriptions, image alt and title, custom fields by key,
+  upsells and cross-sells as fields.
+- **Part C** (`4f27f48`, `d60922e` to `fb77a22`): the revert per field and per block; 0068 drops the
+  pages' old copies of the site (the site's title and H1 read from the fields, drift as the body's
+  move from its base, no canonical in the plan); 0069 drops the link origin and `pages_replace_links`
+  goes.
+- **What the stands found** (`76bc5e1` to `e2080f7`): a page the site's user may not edit stopped
+  every walk; a revert took our own variation description, which WooCommerce formats on every read,
+  for the client's edit. And the image step no longer draws over a page's or product's own image
+  (`7fe0c6c`).
+- **Owed:** `TestAnExistingPageIsEditedBlockByBlock` on both stands (the memory guard stopped the
+  stand's start), the Go suite in groups after C.2, `task lint:e2e`, and stage 3's whole gate.
+- The tool schemas went from 63,107 to 61,343 bytes (90 tools, ceiling 61,356); bound methods 129.
 
 **2026-10-19, stage 2b of the site model: one read layer, the writer's pack and the agent's
 view. Stage 2 is done, its stand legs green on both stands on 2026-10-20.** The reasoning is

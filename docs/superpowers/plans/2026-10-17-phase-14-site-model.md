@@ -683,7 +683,7 @@ under stage 1c in `DECISIONS.md`.
 
 #### 3 tasks
 
-**Status, 2026-10-20: planned.**
+**Status, 2026-10-21: Part 0 to C landed (C.4's stand run owed); D and G next.** The checkpoints below say what each session did.
 
 **Part 0 lands the owner's rulings on stage 2's open items; Parts A to D are the stage, each ending on a committed, green boundary.** Execution: `superpowers:executing-plans`, one accountable owner for every untagged Go package and the plugin, at most two agents at once and only on disjoint packages (F: `frontend/`; H: `cmd/postulator`, `internal/e2e`, `internal/adapters/wp/e2e`, `docker/e2e`). Every commit uses `git commit -- <paths>` with `gofmt -l` checked inside; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; a commit that regenerates `vocab.ts` carries the frontend copy, labels and icons it needs; F regenerates the bindings only at my commit points; one stand up at a time and one heavy leg at a time, and a leg the memory guard or `0xc0000142` stops is listed for the owner, never retried in a loop; a zombie test process is rerun alone first. Each ruling's commit carries its `DECISIONS.md` entry and the spec's amendment. The plan was reviewed by an Opus critic before the owner saw it; its three blocking and twelve serious findings are folded into the decisions below.
 
@@ -726,11 +726,81 @@ under stage 1c in `DECISIONS.md`.
 - Windows flakes, green alone: openai `TestAClientWithoutATimeoutWaits`; wp `TestTheSocksProxyDialerCarriesTheConnect` under load; wp and wptest dial timeouts in parallel, so run adapter packages `-p 1`.
 - Gate legs owed (none run on a stand this session; memory allows one stand at a time): `go test -count=1 -p 1 ./...` (stopped once by the memory guard; optionally after `wsl --shutdown`); per stand, `task plugin:deploy STAND=<stand>` then `E2E_STAND=<stand> go test -tags e2e -count=1 -run 'TestMetaWritesOnlyWhatTheUserMayEdit|TestTheRawWriteAnswersWhatWasStored|TestSaveStabilityFollowsTheUsersFilters|TestSEOMetaWritesUnderTheHashesRead|TestManifestDescribesTheSite|TestMetaReadsOnlyTheKeysAsked' ./internal/adapters/wp/e2e/`, then `E2E_STAND=<stand> go test -tags e2e -count=1 -timeout 30m -run 'TestAProductIsEditedThroughTheRegistry|TestTheProductLoopEditsWhatTheClientCreatedInTheStore' ./internal/e2e/`; on the replica, `TestTheSiteFiltersAreRespectedUnderARestrictedUser`; then the whole G gate.
 
-#### Session 2, 2026-10-20/21 (in progress)
+#### Checkpoint, 2026-10-21 (end of the second session; the next session resumes at D.1)
 
-- **Part 1, the stand proofs: done.** Replica: the six plugin 1.5.0 proofs green; `TestTheSiteFiltersAreRespectedUnderARestrictedUser` red, then green after `76bc5e1` (the test read the plugin off the create) and `bd4bc4d` (a page the user may not edit stopped the walk); `TestAProductIsEditedThroughTheRegistry` red, then green after `205d8fb` (its setup) and `e2080f7` (a revert took our own variation description for the client's); `TestTheProductLoopEditsWhatTheClientCreatedInTheStore` green. Vanilla: all of it green, the restricted test skipping by design. The Go suite: kernel+domain, application and runtime green; **the memory guard stopped it in the adapters group**, owed below.
-- **Part 2, the image step: done** (`7fe0c6c`).
-- **Next:** C.2 (as four commits: fields, drift, canonical, 0068), C.3, C.4.
+**Landed on `dev`, the tree clean at `fb77a22`:**
+- **The stand proofs (Part 1):**
+  - On the replica, the six plugin 1.5.0 proofs went green at once.
+  - `TestTheSiteFiltersAreRespectedUnderARestrictedUser` went green after two fixes:
+    - `76bc5e1`: the test read the plugin off the create, which probes nothing.
+    - `bd4bc4d`: a page the site's user may not `edit_post` (WordPress's privacy page, for an editor) stopped the whole walk.
+  - `TestAProductIsEditedThroughTheRegistry` went green after two fixes:
+    - `205d8fb`: its setup.
+    - `e2080f7`: the field diff recorded what was sent, so the revert took our own variation description, which WooCommerce answers through `wc_format_content` in every context, for the client's edit.
+  - `TestTheProductLoopEditsWhatTheClientCreatedInTheStore` was green.
+  - On vanilla, all of it was green; the restricted test skips there by design.
+- **The image step (Part 2):** `7fe0c6c`.
+- **C.2:** four commits instead of one, plus the review's fix:
+  - `d60922e`: the site's title and H1 are read from the fields.
+  - `acb9f61`: drift is the body's move from its base.
+  - `7dd11a3`: the plan carries no canonical.
+  - `18f5a2a`: migration 0068, with the writer registering the driver's `sha256`.
+  - `ae39852`: the review's fix. A neighbour is put back only while it holds what its relink left (`NeighborResult.After`).
+- **C.3:** `770ae24` (0069; `pages_replace_links` and `PagesService.ReplaceLinks` gone, 129 bound methods).
+- **C.4:** `fb77a22`. `TestAnExistingPageIsEditedBlockByBlock` compiles, vets and lints, but **no stand has run it**: the memory guard stopped the stand's start, and the half-started stand was taken down.
+- Each item has its entry in `DECISIONS.md` under stage 3.
+
+**Schema bytes now:** 90 tools, 61,343 bytes, ceiling 61,356 (from 62,174 after B.1: C.2c's canonicals took 141 bytes, C.3's tool 690).
+
+**Next, in order:**
+1. The owed commands below.
+2. D.1 to D.4.
+3. G.
+
+At most two agents, on disjoint packages. This session ran its C.2 and C.3 through one agent at a time, which kept the owner's context.
+
+**Commands owed (none ran after C.2):** one stand up at a time, one heavy leg at a time, optionally after `wsl --shutdown`.
+- **The Go suite in groups.** It stopped once in the adapters group before C.2, and the domain, application and runtime groups were green then.
+  - `go test -count=1 ./internal/kernel/... ./internal/domain/...`
+  - `go test -count=1 ./internal/application/...`
+  - `go test -count=1 ./internal/runtime/...`
+  - `go test -count=1 -p 1 ./internal/adapters/...`
+  - `go test -count=1 ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...`
+  - `go test -count=1 -tags uiharness -timeout 15m ./cmd/postulator/...`
+- **Per stand** (`task e2e:up STAND=<stand>`, then `task e2e:down STAND=<stand>`):
+
+  ```
+  E2E_STAND=<stand> go test -tags e2e -count=1 -timeout 45m -run 'TestAnExistingPageIsEditedBlockByBlock|TestTheSiteFiltersAreRespectedUnderARestrictedUser|TestAProductIsEditedThroughTheRegistry|TestTheProductLoopEditsWhatTheClientCreatedInTheStore' ./internal/e2e/
+  ```
+
+  This also re-proves Part 1 over C.2 and C.3, which changed the observation and the records.
+- **`task lint:e2e`**, alone.
+- **G's whole gate.**
+
+**For the final report (beyond the first session's list):**
+- **Client-ownership paths closed this session**, each failing first:
+  - the image step uploaded over a page's or product's own image;
+  - a revert handed back our variation description as the client's (formatting store);
+  - a page the site's user may not edit stopped every observation;
+  - a neighbour revert would have trusted a base taken after the relink (introduced by C.2b, closed in `ae39852`).
+- **Open for G:**
+  - `relink_page`/`relink_neighbors` record the body they sent, not what the site stored (decision 11 holds for publish only). A filtered relink then reads as drift, and its blocks as the client's.
+  - The `sync_back` read-back takes the site's body as ours on both sides, so a client edit in the seconds after our write becomes the base.
+  - Our mark is carried forward by target and anchor, so a client's later link with the same target and anchor in a block of his reads as ours.
+  - The SEO fields keep `writtenMeta` and are not set from what the plugin stored.
+  - A rerun after a lost answer over a formatting store pauses rather than taking the write as ours.
+- **Deviations:**
+  - C.2 landed as four commits.
+  - `pagemap.FieldNames`; the named index in every link plan, the link audit and the judge included.
+  - The read layer loads the whole site's fields once. CLAUDE.md's "a writer's pack loads only the page's neighbourhood" no longer holds for fields; correct it in G, together with CLAUDE.md's stale ceiling numbers.
+  - `Mismatch` lives in `steps`, with lowercase JSON (older artifacts still decode).
+  - The pages DTO lost `observed`, `mismatches`, `contentHash` and `canonical`, and kept a derived `drift`.
+  - 0068's down refills `content_hash` and `drift` only for pages we wrote.
+  - 0069 marks `generated` rows `ours` before the drop, and its down adds `origin` with a default.
+  - The link owner labels in the UI ("Written by a run", "The client's own").
+  - The image estimate stays an upper bound.
+  - `wptest` answers a variation's description formatted, as the store does.
+- **Stage 4 must know:** `observe.ClosedToUser` is how an adapter says a page is closed to the site's user; the walk counts such pages in `closed`.
 
 ##### 0.0 — the plan
 - This task list. Commit `docs(plan): stage 3's task list`.
