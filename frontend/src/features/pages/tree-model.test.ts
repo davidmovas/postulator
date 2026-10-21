@@ -17,7 +17,6 @@ function page(id: string, path: string): Page {
         h1: id,
         metaTitle: "",
         metaDescription: "",
-        canonical: "",
         keywords: [],
         notes: [],
         status: "planned",

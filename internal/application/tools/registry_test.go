@@ -164,7 +164,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 62187
+	schemaCeilingBytes = 62046
 	charactersPerToken = 4
 	widestLogged       = 8
 )
@@ -373,6 +373,21 @@ func TestSchemaIsDerivedFromTheRequest(t *testing.T) {
 	}
 	if _, unknown := registry.Lookup("no_such_tool"); unknown {
 		t.Error("Lookup answered for a tool that is not registered")
+	}
+}
+
+func TestThePageToolsOfferNoCanonical(t *testing.T) {
+	t.Parallel()
+
+	registry := newRegistry(&actionRecorder{}, &busRecorder{})
+	for _, name := range []string{"pages_create", "pages_update"} {
+		def, known := registry.Lookup(name)
+		if !known {
+			t.Fatalf("%s is not registered", name)
+		}
+		if def.Schema.Properties["canonical"] != nil {
+			t.Errorf("%s offers a canonical; a creation's comes from WordPress's link and an update never sends one", name)
+		}
 	}
 }
 

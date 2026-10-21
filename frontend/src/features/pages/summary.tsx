@@ -165,9 +165,6 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                                 {copy.pages.detail.characters(page.metaDescription.length)}
                             </span>
                         </Row>
-                        <Row label={copy.pages.detail.canonicalUrl}>
-                            <span className="font-mono text-xs">{page.canonical}</span>
-                        </Row>
                         <Row label={copy.pages.columns.synced}>
                             <span title={absoluteTime(page.lastSyncedAt)}>{relativeTime(page.lastSyncedAt)}</span>
                         </Row>

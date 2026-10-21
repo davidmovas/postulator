@@ -68,7 +68,7 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
             { name: "Insulated Mugs", kind: "topic", keywords: [{ text: "insulated mugs" }], parent: "Mugs" },
         ],
     },
-    pages_create: { path: "/mugs/travel/", title: "Travel Mugs", h1: "Travel mugs", wpType: "page", status: "planned", entityId: "e2", templateId: "t1", metaTitle: "", metaDescription: "", canonical: "" },
+    pages_create: { path: "/mugs/travel/", title: "Travel Mugs", h1: "Travel mugs", wpType: "page", status: "planned", entityId: "e2", templateId: "t1", metaTitle: "", metaDescription: "" },
     pages_update: { id: "p1", title: "Travel mugs that keep coffee hot", status: "exists", pageTypeId: "pt-hub" },
     pagetypes_save: { siteId: "s1", name: "Category", preset: "hub", templateId: "t1" },
     pagetypes_delete: { id: "pt-guide", reassignTo: "pt-entity" },

@@ -3902,6 +3902,12 @@ on what stage 2 left open and what was decided while building.
   base the relink recorded (else it is handed back, as before when its hash differed or was
   unknown), and the observation tells a page we wrote by a field row with a written run or a block
   of ours, read for the batch with the fields.
+- **The plan carries no canonical** (C.2c). Decision 12 writes a creation's canonical from the link
+  WordPress answered and an update never sends one, so the plan's own canonical, which nothing
+  wrote to the site, leaves `pages.CreateRequest`, `pages.UpdateRequest` (and `pages_create` and
+  `pages_update` with them), the pages DTO, the drawer's form and summary and the agent's page
+  cards, and the observation no longer copies the site's canonical into it; the site's canonical
+  is the `seo_canonical` field. The schemas fall from 62,174 to 62,033 bytes (ceiling 62,046).
 
 ### The image step never draws over the client's image (session 2, the open item)
 

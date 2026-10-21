@@ -302,7 +302,6 @@ export const agent = {
             status: (status: string) => `Status ${status}`,
             metaTitle: (title: string) => `Meta title "${title}"`,
             metaDescription: (text: string) => `Meta description "${text}"`,
-            canonicalUrl: (url: string) => `Canonical ${url}`,
             entity: "Entity",
             template: "Template",
             pageType: "Page type",

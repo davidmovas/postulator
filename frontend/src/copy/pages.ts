@@ -173,7 +173,6 @@ export const pages = {
         h1: "H1",
         metaTitle: "Meta title",
         metaDescription: "Meta description",
-        canonicalUrl: "Canonical URL",
         keywords: "Keywords",
         keywordsOwn: "The page is written for these. The most searched comes first and is the main keyword.",
         keywordsInherited: "None of its own, so the page is written for the keywords of its entity.",

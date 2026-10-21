@@ -180,7 +180,6 @@ func merge(current pagemap.Page, known, planned bool, it item, siteID string, no
 		next.H1 = orKept(it.H1, next.H1)
 		next.MetaTitle = orKept(it.Meta.Title, next.MetaTitle)
 		next.MetaDescription = orKept(it.Meta.Description, next.MetaDescription)
-		next.Canonical = orKept(it.Meta.Canonical, next.Canonical)
 		next.Status = pagemap.StatusFromWordPress(it.Status)
 	}
 	next.WPType = it.mappedType()

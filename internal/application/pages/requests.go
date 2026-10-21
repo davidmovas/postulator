@@ -13,7 +13,6 @@ type CreateRequest struct {
 	H1              string        `json:"h1,omitempty" description:"H1; default the title"`
 	MetaTitle       string        `json:"metaTitle,omitempty" description:"SEO title; default from the template"`
 	MetaDescription string        `json:"metaDescription,omitempty" description:"SEO description; default from the template"`
-	Canonical       string        `json:"canonical,omitempty" description:"Canonical URL; default its own"`
 	Keywords        []dto.Keyword `json:"keywords,omitempty" description:"Search phrases; default its entity's"`
 	Status          string        `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Default planned"`
 	EntityID        *string       `json:"entityId,omitempty" description:"Id of the entity it is about"`
@@ -32,7 +31,6 @@ type UpdateRequest struct {
 	H1              *string        `json:"h1,omitempty" description:"New H1"`
 	MetaTitle       *string        `json:"metaTitle,omitempty" description:"New SEO title"`
 	MetaDescription *string        `json:"metaDescription,omitempty" description:"New SEO description"`
-	Canonical       *string        `json:"canonical,omitempty" description:"New canonical URL"`
 	Keywords        *[]dto.Keyword `json:"keywords,omitempty" description:"Whole new keyword list; empty follows its entity"`
 	Status          *string        `json:"status,omitempty" enum:"planned,exists,published,archived" description:"New status"`
 	TemplateID      *string        `json:"templateId,omitempty" description:"New template id"`

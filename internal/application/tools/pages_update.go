@@ -18,7 +18,7 @@ type pagesUpdateArgs struct {
 func (in *pagesUpdateArgs) touchesPage() bool {
 	r := &in.UpdateRequest
 	return r.Path != nil || r.WPType != nil || r.Title != nil || r.H1 != nil || r.MetaTitle != nil ||
-		r.MetaDescription != nil || r.Canonical != nil || r.Keywords != nil || r.Status != nil || r.TemplateID != nil
+		r.MetaDescription != nil || r.Keywords != nil || r.Status != nil || r.TemplateID != nil
 }
 
 func pagesUpdate(deps Deps) Tool {

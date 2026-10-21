@@ -16,7 +16,6 @@ function pageFields(args: Args): Line[] {
         ["status", said.status],
         ["metaTitle", said.metaTitle],
         ["metaDescription", said.metaDescription],
-        ["canonical", said.canonicalUrl],
     ];
     for (const [key, phrase] of fields) {
         const held = text(args, key);

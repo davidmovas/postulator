@@ -17,7 +17,6 @@ function page(overrides: Partial<Page> = {}): Page {
         h1: "A",
         metaTitle: "",
         metaDescription: "",
-        canonical: "",
         keywords: [],
         notes: [],
         status: "published",

@@ -26,7 +26,6 @@ interface Draft {
     h1: string;
     metaTitle: string;
     metaDescription: string;
-    canonical: string;
     wpType: string;
     status: string;
 }
@@ -38,7 +37,6 @@ function draftOf(page: Page): Draft {
         h1: page.h1,
         metaTitle: page.metaTitle,
         metaDescription: page.metaDescription,
-        canonical: page.canonical,
         wpType: page.wpType,
         status: page.status,
     };
@@ -244,20 +242,6 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                         value={draft.metaDescription}
                         onChange={(event) => {
                             edit({ metaDescription: event.target.value });
-                        }}
-                    />
-                )}
-            </Field>
-            <Field label={copy.pages.detail.canonicalUrl} error={fieldErrorOf(update.error, "canonical")}>
-                {(control) => (
-                    <Input
-                        id={control.id}
-                        aria-describedby={control["aria-describedby"]}
-                        invalid={control.invalid}
-                        mono={true}
-                        value={draft.canonical}
-                        onChange={(event) => {
-                            edit({ canonical: event.target.value });
                         }}
                     />
                 )}

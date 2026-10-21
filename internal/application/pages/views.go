@@ -25,7 +25,6 @@ type Page struct {
 	H1              string        `json:"h1"`
 	MetaTitle       string        `json:"metaTitle"`
 	MetaDescription string        `json:"metaDescription"`
-	Canonical       string        `json:"canonical"`
 	Keywords        []dto.Keyword `json:"keywords"`
 	Notes           []Note        `json:"notes"`
 	Status          string        `json:"status"`
@@ -85,7 +84,6 @@ func view(p pagemap.Page, drifted bool) Page {
 		MetaDescription: p.MetaDescription,
 		Keywords:        application.KeywordViews(p.Keywords),
 		Notes:           noteViews(p.Notes),
-		Canonical:       p.Canonical,
 		Status:          string(p.Status),
 		EntityID:        p.EntityID,
 		TemplateID:      p.TemplateID,

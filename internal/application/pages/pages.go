@@ -44,7 +44,6 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 		H1:              req.H1,
 		MetaTitle:       req.MetaTitle,
 		MetaDescription: req.MetaDescription,
-		Canonical:       req.Canonical,
 		Keywords:        keywords,
 		Status:          status,
 		EntityID:        req.EntityID,
@@ -123,9 +122,6 @@ func applyUpdate(current *pagemap.Page, req *UpdateRequest) (pagemap.Page, error
 	}
 	if req.MetaDescription != nil {
 		next.MetaDescription = *req.MetaDescription
-	}
-	if req.Canonical != nil {
-		next.Canonical = *req.Canonical
 	}
 	if req.Keywords != nil {
 		keywords, err := application.KeywordList(*req.Keywords, "keywords")

@@ -14,7 +14,6 @@ export function aPage(id: string, path: string, overrides: Partial<Page> = {}): 
         h1: "",
         metaTitle: "",
         metaDescription: "",
-        canonical: "",
         keywords: [],
         notes: [],
         status: "planned",

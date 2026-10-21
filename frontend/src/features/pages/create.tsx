@@ -74,7 +74,6 @@ export function PlanPageDialog({
                 h1: title,
                 metaTitle: "",
                 metaDescription: "",
-                canonical: "",
                 wpType,
                 status,
                 entityId: entityId === noEntity ? null : entityId,
