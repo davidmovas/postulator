@@ -29,8 +29,7 @@ type typeReader interface {
 	Get(ctx context.Context, id string) (pagetype.Type, error)
 }
 
-type linkStore interface {
-	ReplaceForPage(ctx context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error
+type linkReader interface {
 	ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 }
 
@@ -59,7 +58,7 @@ type unitOfWork interface {
 type Deps struct {
 	Pages      pageStore
 	Types      typeReader
-	Links      linkStore
+	Links      linkReader
 	Entities   entityStore
 	Edges      edgeReader
 	Sites      siteReader
@@ -73,7 +72,7 @@ type Deps struct {
 type Service struct {
 	pages     pageStore
 	types     typeReader
-	links     linkStore
+	links     linkReader
 	entities  entityStore
 	edges     edgeReader
 	sites     siteReader

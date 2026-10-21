@@ -45,7 +45,7 @@ func (l LinkAt) Ours(path string, held map[LinkKey]bool) bool {
 func HeldOurs(stored []pagemap.PageLink) map[LinkKey]bool {
 	held := make(map[LinkKey]bool, len(stored))
 	for i := range stored {
-		if stored[i].Source == pagemap.SourceRaw && (stored[i].Ours || stored[i].Origin == pagemap.OriginGenerated) {
+		if stored[i].Source == pagemap.SourceRaw && stored[i].Ours {
 			held[LinkKey{To: stored[i].ToURL, Anchor: stored[i].AnchorText}] = true
 		}
 	}

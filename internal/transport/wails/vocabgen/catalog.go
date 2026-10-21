@@ -31,7 +31,6 @@ func catalog() []vocabulary {
 		{export: "urlForms", tsType: "UrlForm", pkg: "internal/domain/site", typeName: "URLForm"},
 		{export: "pageStatuses", tsType: "PageStatus", pkg: "internal/domain/pagemap", typeName: "Status"},
 		{export: "pageWpTypes", tsType: "PageWpType", pkg: "internal/domain/pagemap", typeName: "WPType"},
-		{export: "linkOrigins", tsType: "LinkOrigin", pkg: "internal/domain/pagemap", typeName: "LinkOrigin"},
 		{export: "linkTypes", tsType: "LinkType", pkg: "internal/domain/pagemap", typeName: "LinkType"},
 		{export: "linkSources", tsType: "LinkSource", pkg: "internal/domain/pagemap", typeName: "LinkSource"},
 		{export: "parentReasons", tsType: "ParentReason", pkg: "internal/domain/pagemap", typeName: "ParentReason"},

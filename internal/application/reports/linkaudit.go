@@ -254,7 +254,7 @@ func auditPage(state *siteLinks, page pagemap.Page) pageDetail {
 		if !class.OffGraph() {
 			continue
 		}
-		extra := ExtraLink{ToURL: links[i].ToURL, Anchor: links[i].AnchorText, Kind: string(class), Origin: string(links[i].Origin)}
+		extra := ExtraLink{ToURL: links[i].ToURL, Anchor: links[i].AnchorText, Kind: string(class), Ours: links[i].Ours}
 		if links[i].ToPageID != nil {
 			extra.ToPageID = *links[i].ToPageID
 		}

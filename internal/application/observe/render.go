@@ -372,7 +372,7 @@ func renderLinks(page pagemap.Page, extraction render.Extraction, index pagemap.
 		}
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: found.Path, AnchorText: found.Anchor,
-			Origin: pagemap.OriginObserved, Type: found.Type, Region: string(found.Region), Source: pagemap.SourceRender, ObservedAt: now,
+			Type: found.Type, Region: string(found.Region), Source: pagemap.SourceRender, ObservedAt: now,
 		}
 		if target, ok := index.ByPath(found.Path); ok {
 			link.ToPageID = &target.ID

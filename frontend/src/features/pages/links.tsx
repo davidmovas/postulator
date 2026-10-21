@@ -6,7 +6,7 @@ import type { PageLink } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { LinkIcon, OpenInNewIcon, Panel, PanelHeader, PublicIcon, toneClasses } from "../../ui/index.js";
-import { originIcon, originLabel, originTone } from "./labels.js";
+import { linkOwnerIcon, linkOwnerLabel, linkOwnerTone } from "./labels.js";
 import { linkSourceLabel, linkTypeLabel } from "./model/labels.js";
 
 export interface PageLinksProps {
@@ -16,13 +16,13 @@ export interface PageLinksProps {
 }
 
 export function PageLinks({ links, siteId, search }: PageLinksProps): ReactElement {
-    const generated = links.filter((held) => held.origin === "generated").length;
+    const ours = links.filter((held) => held.ours).length;
 
     return (
         <Panel>
             <PanelHeader title={copy.pages.detail.links}>
                 <span className="shrink-0 font-mono text-2xs text-ink-faint">
-                    {copy.pages.detail.linksSummary(links.length, generated)}
+                    {copy.pages.detail.linksSummary(links.length, ours)}
                 </span>
             </PanelHeader>
             {links.length === 0 ? (
@@ -30,8 +30,8 @@ export function PageLinks({ links, siteId, search }: PageLinksProps): ReactEleme
             ) : (
                 <ul className="flex flex-col">
                     {links.map((held) => {
-                        const Icon = originIcon(held.origin);
-                        const tone = toneClasses[originTone(held.origin)];
+                        const Icon = linkOwnerIcon(held.ours);
+                        const tone = toneClasses[linkOwnerTone(held.ours)];
                         return (
                             <li
                                 key={held.id}
@@ -39,8 +39,8 @@ export function PageLinks({ links, siteId, search }: PageLinksProps): ReactEleme
                             >
                                 <span
                                     className="flex shrink-0"
-                                    title={originLabel(held.origin)}
-                                    aria-label={originLabel(held.origin)}
+                                    title={linkOwnerLabel(held.ours)}
+                                    aria-label={linkOwnerLabel(held.ours)}
                                 >
                                     <Icon size={13} className={tone.ink} />
                                 </span>

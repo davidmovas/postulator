@@ -15,7 +15,7 @@ var groups = []Group{
 	{Name: "graph", Description: "The entity graph: entities, keywords, anchors, parent and related edges, " +
 		"proposals from pages or keywords, authority scores."},
 	{Name: "pages", Description: "The page map: plan, change or delete pages, map them to entities, " +
-		"set canonicals, replace recorded links, preview a page."},
+		"name an entity's canonical page, preview a page."},
 	{Name: "pagetypes", Description: "Page types: the client's types over presets, their field scopes and link policies."},
 	{Name: "templates", Description: "Content templates, and their overrides for one site or one page."},
 	{Name: "runs", Description: "Runs that write, relink, audit, repair or revert pages: start, pause, resume, " +

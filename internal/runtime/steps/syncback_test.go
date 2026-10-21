@@ -90,7 +90,7 @@ func TestSyncBackReadsThroughThePlugin(t *testing.T) {
 	if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != "page-parent" {
 		t.Fatalf("the recorded links are %+v", links)
 	}
-	if links[0].Origin != pagemap.OriginObserved || links[0].AnchorText != "coffee" {
+	if links[0].Ours || links[0].AnchorText != "coffee" {
 		t.Fatalf("link = %+v", links[0])
 	}
 }

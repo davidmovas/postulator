@@ -58,22 +58,6 @@ func (s Status) Valid() bool {
 	}
 }
 
-type LinkOrigin string
-
-const (
-	OriginGenerated LinkOrigin = "generated"
-	OriginObserved  LinkOrigin = "observed"
-)
-
-func (o LinkOrigin) valid() bool {
-	switch o {
-	case OriginGenerated, OriginObserved:
-		return true
-	default:
-		return false
-	}
-}
-
 type Page struct {
 	ID              string
 	SiteID          string
@@ -146,7 +130,6 @@ type PageLink struct {
 	ToPageID   *string
 	ToURL      string
 	AnchorText string
-	Origin     LinkOrigin
 	Type       LinkType
 	Region     string
 	Source     LinkSource
@@ -248,8 +231,6 @@ func NewPageLink(l PageLink) (PageLink, error) {
 		return PageLink{}, invalid("target page id must not be empty when set", "toPageId")
 	case l.ToURL == "":
 		return PageLink{}, invalid("link needs a target url, whether or not it names a target page", "toUrl")
-	case !l.Origin.valid():
-		return PageLink{}, invalid("link origin is not recognized", "origin")
 	case !l.Type.Valid():
 		return PageLink{}, invalid("link type is not recognized", "type")
 	case !l.Source.Valid():

@@ -1,10 +1,8 @@
 import { copy } from "../../../../copy/index.js";
-import type { Args, Describer, Line, Part } from "./card.js";
-import { line, records, ref, text, view } from "./card.js";
+import type { Args, Describer, Line } from "./card.js";
+import { line, ref, text, view } from "./card.js";
 
 const said = copy.agent.describe.pages;
-
-const maxLinksShown = 8;
 
 function pageFields(args: Args): Line[] {
     const lines: Line[] = [];
@@ -38,11 +36,6 @@ function pageFields(args: Args): Line[] {
     return lines;
 }
 
-function linkLine(held: Args): Line {
-    const target: Part = text(held, "toPageId") !== null ? ref("page", text(held, "toPageId") ?? "") : (text(held, "toUrl") ?? "");
-    return line("link", [`${said.link(text(held, "anchorText") ?? "")} `, target]);
-}
-
 export const describePages: Describer = (tool, args) => {
     switch (tool) {
         case "pages_create": {
@@ -70,14 +63,6 @@ export const describePages: Describer = (tool, args) => {
                 ],
                 [],
             );
-        case "pages_replace_links": {
-            const links = records(args, "links");
-            const lines: Line[] = [line("list", said.linksCount(links.length)), ...links.slice(0, maxLinksShown).map(linkLine)];
-            if (links.length > maxLinksShown) {
-                lines.push(line("list", copy.agent.describe.more(links.length - maxLinksShown)));
-            }
-            return view([`${said.replaceLinks} `, ref("page", text(args, "pageId") ?? "")], lines);
-        }
         default:
             return null;
     }

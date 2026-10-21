@@ -20,7 +20,7 @@ var narrowed = map[string]bool{
 
 var choiceNames = []string{
 	"kind", "source", "status", "scope", "wpType", "anchorStrategy", "role", "mode", "format",
-	"risk", "relation", "linkClass", "publishMode", "step", "field", "action", "reason", "origin",
+	"risk", "relation", "linkClass", "publishMode", "step", "field", "action", "reason",
 }
 
 var freeText = map[string]bool{

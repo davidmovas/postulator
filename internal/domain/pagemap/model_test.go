@@ -88,7 +88,7 @@ func TestNewPageLinkRefusesAnUnknownTypeOrSource(t *testing.T) {
 
 	position := 2
 	link := pagemap.PageLink{
-		ID: "l", SiteID: "s", FromPageID: "a", ToURL: "/b/", AnchorText: "b", Origin: pagemap.OriginObserved,
+		ID: "l", SiteID: "s", FromPageID: "a", ToURL: "/b/", AnchorText: "b",
 		Type: pagemap.LinkContextual, Region: "content", Source: pagemap.SourceRaw, Position: &position, Ours: true,
 		ObservedAt: time.Now(),
 	}

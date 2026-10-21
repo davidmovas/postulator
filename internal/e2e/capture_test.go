@@ -220,7 +220,7 @@ func compareLinks(ids map[string]string, a, b *pagemap.PageLink) int {
 		strings.Compare(a.ToURL, b.ToURL),
 		strings.Compare(a.AnchorText, b.AnchorText),
 		strings.Compare(string(a.Type), string(b.Type)),
-		strings.Compare(string(a.Origin), string(b.Origin)),
+		compareOurs(a.Ours, b.Ours),
 	)
 }
 
@@ -229,6 +229,17 @@ func positionOf(position *int) int {
 		return -1
 	}
 	return *position
+}
+
+func compareOurs(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
+	default:
+		return -1
+	}
 }
 
 func known(ids map[string]string, text string) string {

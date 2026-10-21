@@ -79,7 +79,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
     }
 
     const links = detail.data?.links ?? [];
-    const generated = links.filter((held) => held.origin === "generated").length;
+    const ours = links.filter((held) => held.ours).length;
     const url = liveUrl(site.data?.site.baseUrl ?? "", page.path);
     const reachable = isBrowsable(url) && page.wpId !== null && page.status !== "archived";
     const canonical = entity.data?.entity.canonicalPageId === page.id;
@@ -175,7 +175,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                     <div className="flex items-baseline justify-between gap-2">
                         <SectionLabel>{copy.pages.summary.links}</SectionLabel>
                         <span className="font-mono text-2xs text-ink-faint">
-                            {copy.pages.detail.linksSummary(links.length, generated)}
+                            {copy.pages.detail.linksSummary(links.length, ours)}
                         </span>
                     </div>
                     {links.length === 0 ? (

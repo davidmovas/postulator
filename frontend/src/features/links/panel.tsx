@@ -23,6 +23,7 @@ import {
 } from "../../ui/index.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
 import { PageStatusBadge } from "../pages/badges.js";
+import { linkOwnerLabel } from "../pages/labels.js";
 import { blockedReasonLabel, classLabel, classTone, relationIcon } from "./labels.js";
 import { groups } from "./model/detail.js";
 
@@ -128,7 +129,7 @@ function ExtraRow({ siteId, link }: ExtraRowProps): ReactElement {
                 </Link>
             )}
             <span className="font-mono text-2xs text-ink-faint">
-                {copy.links.panel.anchor(link.anchor)} · {link.origin}
+                {copy.links.panel.anchor(link.anchor)} · {linkOwnerLabel(link.ours)}
             </span>
         </li>
     );

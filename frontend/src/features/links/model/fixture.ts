@@ -104,7 +104,7 @@ export function extra(seed: Partial<ExtraLink> & { kind: string }): ExtraLink {
         toPageId: seed.toPageId ?? "",
         anchor: seed.anchor ?? "x",
         kind: seed.kind,
-        origin: seed.origin ?? "observed",
+        ours: seed.ours ?? false,
     };
 }
 

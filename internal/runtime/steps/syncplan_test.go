@@ -174,12 +174,12 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	if err := h.links.ReplaceForPage(t.Context(), espresso.ID, pagemap.SourceRaw, []pagemap.PageLink{
 		{
 			ID: id.New(), SiteID: h.siteID, FromPageID: espresso.ID, ToPageID: &coffee.ID, ToURL: coffee.Path,
-			AnchorText: "coffee", Origin: pagemap.OriginGenerated, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+			AnchorText: "coffee", Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
 			Ours: true, ObservedAt: sqlitetest.Stamp,
 		},
 		{
 			ID: id.New(), SiteID: h.siteID, FromPageID: espresso.ID, ToURL: gone,
-			AnchorText: "gone", Origin: pagemap.OriginGenerated, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+			AnchorText: "gone", Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
 			Ours: true, ObservedAt: sqlitetest.Stamp,
 		},
 	}); err != nil {
@@ -196,8 +196,8 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	if stored[0].ToURL != coffee.Path {
 		t.Fatalf("the kept link points at %q", stored[0].ToURL)
 	}
-	if stored[0].Origin != pagemap.OriginGenerated {
-		t.Fatalf("origin = %q, want the run's own %q", stored[0].Origin, pagemap.OriginGenerated)
+	if !stored[0].Ours {
+		t.Fatalf("the kept link = %+v, want it still the run's own", stored[0])
 	}
 }
 

@@ -30,7 +30,7 @@ the composition root binds the two.
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard` |
-| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink SetType Model ModelSummary WriterPack` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical PreviewLink SetType Model ModelSummary WriterPack` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope` |
 | `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
@@ -559,8 +559,8 @@ list items included: the rule is that a field is required only when the use case
 absence, because the runner checks the arguments against the whole tree before the tool runs
 (`transport/agent/arguments.go`, the check gollem used to make) and its refusal teaches the model
 nothing. `dto.Sort.desc`, `graph.Anchor.weight` and `.source`,
-`graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`,
-`pages.ReplaceLinksRequest.links` and the eight prices and three capability flags of
+`graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`
+and the eight prices and three capability flags of
 `models.UpsertModelRequest` are all optional. Where a tool's input reaches into
 `internal/domain/template` it takes a tool-owned argument struct instead of the window's DTO,
 so `templates_create` asks for a name, a page kind and one section with a heading rather than

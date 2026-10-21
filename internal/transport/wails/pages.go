@@ -22,7 +22,6 @@ type PagesUseCase interface {
 	MapToEntity(ctx context.Context, req pages.MapToEntityRequest) (pages.MapToEntityResponse, error)
 	Unmap(ctx context.Context, req pages.UnmapRequest) (pages.UnmapResponse, error)
 	SetCanonical(ctx context.Context, req pages.SetCanonicalRequest) (pages.SetCanonicalResponse, error)
-	ReplaceLinks(ctx context.Context, req pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error)
 	PreviewLink(ctx context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error)
 	SetType(ctx context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error)
 }
@@ -46,7 +45,6 @@ type PagesService struct {
 	mapToEntity  middleware.Handler[pages.MapToEntityRequest, pages.MapToEntityResponse]
 	unmap        middleware.Handler[pages.UnmapRequest, pages.UnmapResponse]
 	setCanonical middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
-	replaceLinks middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
 	previewLink  middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
 	setType      middleware.Handler[pages.SetTypeRequest, pages.SetTypeResponse]
 	model        middleware.Handler[observe.ModelRequest, observe.ModelView]
@@ -65,7 +63,6 @@ func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models So
 		mapToEntity:  Wrap(logger, "pages.mapToEntity", call(useCase, PagesUseCase.MapToEntity)),
 		unmap:        Wrap(logger, "pages.unmap", call(useCase, PagesUseCase.Unmap)),
 		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
-		replaceLinks: Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
 		previewLink:  Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
 		setType:      Wrap(logger, "pages.setType", call(useCase, PagesUseCase.SetType)),
 		model:        Wrap(logger, "pages.model", call(models, ModelUseCase.Model)),
@@ -120,10 +117,6 @@ func (s *PagesService) Unmap(c context.Context, req pages.UnmapRequest) (pages.U
 
 func (s *PagesService) SetCanonical(c context.Context, req pages.SetCanonicalRequest) (pages.SetCanonicalResponse, error) {
 	return s.setCanonical(c, req)
-}
-
-func (s *PagesService) ReplaceLinks(c context.Context, req pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error) {
-	return s.replaceLinks(c, req)
 }
 
 func (s *PagesService) PreviewLink(c context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error) {

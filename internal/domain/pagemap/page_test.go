@@ -125,7 +125,7 @@ func TestNewPageLink(t *testing.T) {
 
 	valid := pagemap.PageLink{
 		ID: "l1", SiteID: siteA, FromPageID: pageA, ToPageID: new(pageB), ToURL: " https://a/b/ ", AnchorText: " bags ",
-		Origin: pagemap.OriginGenerated, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, ObservedAt: stamp,
+		Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, ObservedAt: stamp,
 	}
 	link, err := pagemap.NewPageLink(valid)
 	if err != nil {
@@ -134,10 +134,10 @@ func TestNewPageLink(t *testing.T) {
 	if link.ToURL != "https://a/b/" || link.AnchorText != "bags" {
 		t.Errorf("NewPageLink did not trim: %+v", link)
 	}
-	observed := valid
-	observed.Origin = pagemap.OriginObserved
-	if _, err = pagemap.NewPageLink(observed); err != nil {
-		t.Fatalf("NewPageLink of an observed link: %v", err)
+	theirs := valid
+	theirs.Ours = false
+	if _, err = pagemap.NewPageLink(theirs); err != nil {
+		t.Fatalf("NewPageLink of the client's link: %v", err)
 	}
 
 	cases := []struct {
@@ -151,7 +151,6 @@ func TestNewPageLink(t *testing.T) {
 		{name: "empty target page", mutate: func(l *pagemap.PageLink) { l.ToPageID = new("") }, field: "toPageId"},
 		{name: "no target at all", mutate: func(l *pagemap.PageLink) { l.ToPageID = nil; l.ToURL = " " }, field: "toUrl"},
 		{name: "target page without a url", mutate: func(l *pagemap.PageLink) { l.ToURL = " " }, field: "toUrl"},
-		{name: "unknown origin", mutate: func(l *pagemap.PageLink) { l.Origin = "guessed" }, field: "origin"},
 	}
 
 	for _, tc := range cases {

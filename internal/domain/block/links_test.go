@@ -1,6 +1,7 @@
 package block_test
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
@@ -40,12 +41,13 @@ func TestTheLinksAlreadyOursAreHeldByTargetAndAnchor(t *testing.T) {
 
 	held := block.HeldOurs([]pagemap.PageLink{
 		{ToURL: "/coffee/", AnchorText: "coffee", Source: pagemap.SourceRaw, Ours: true},
-		{ToURL: "/tea/", AnchorText: "tea", Source: pagemap.SourceRaw, Origin: pagemap.OriginGenerated},
+		{ToURL: "/tea/", AnchorText: "tea", Source: pagemap.SourceRaw, Ours: true},
+		{ToURL: "/tea/", AnchorText: "green tea", Source: pagemap.SourceRaw},
 		{ToURL: "/milk/", AnchorText: "milk", Source: pagemap.SourceRaw},
 		{ToURL: "/sugar/", AnchorText: "sugar", Source: pagemap.SourceRender, Ours: true},
 	})
 	want := map[block.LinkKey]bool{{To: "/coffee/", Anchor: "coffee"}: true, {To: "/tea/", Anchor: "tea"}: true}
-	if len(held) != len(want) || !held[block.LinkKey{To: "/coffee/", Anchor: "coffee"}] || !held[block.LinkKey{To: "/tea/", Anchor: "tea"}] {
-		t.Fatalf("HeldOurs = %v, want only the raw links already ours, %v", held, want)
+	if !maps.Equal(held, want) {
+		t.Fatalf("HeldOurs = %v, want only the raw links marked ours, %v", held, want)
 	}
 }

@@ -55,10 +55,6 @@ func (f pagesFake) PreviewLink(context.Context, pages.PreviewLinkRequest) (pages
 	return answer[pages.PreviewLinkResponse](f.mode)
 }
 
-func (f pagesFake) ReplaceLinks(context.Context, pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error) {
-	return answer[pages.ReplaceLinksResponse](f.mode)
-}
-
 func (f pagesFake) SetType(context.Context, pages.SetTypeRequest) (pages.SetTypeResponse, error) {
 	return answer[pages.SetTypeResponse](f.mode)
 }
@@ -88,7 +84,7 @@ func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, pagesService(missing), []string{
-		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "ReplaceLinks", "SetCanonical",
+		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "SetCanonical",
 		"SetType", "Tree", "Unmap", "Update", "WriterPack",
 	})
 	assertEveryMethodConverts(t, pagesService(missing), missingBody)

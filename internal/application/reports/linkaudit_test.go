@@ -22,7 +22,7 @@ import (
 func (f *fixture) storedLink(from pagemap.Page, toPageID *string, toURL, anchor string, order int) pagemap.PageLink {
 	return pagemap.PageLink{
 		ID: id.New(), SiteID: f.siteID, FromPageID: from.ID, ToPageID: toPageID, ToURL: toURL,
-		AnchorText: anchor, Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+		AnchorText: anchor, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
 		ObservedAt: sqlitetest.Stamp.Add(time.Duration(order) * time.Second),
 	}
 }
@@ -45,10 +45,12 @@ func auditFixture(t *testing.T) *fixture {
 	espresso := f.pages["/coffee/espresso/"]
 	coffee := f.pages["/coffee/"]
 	tea := f.pages["/tea/"]
+	ours := f.storedLink(espresso, &tea.ID, "/tea/", "tea", 2)
+	ours.Ours = true
 	f.replaceLinks(t, espresso,
 		f.storedLink(espresso, &coffee.ID, "/coffee/", "Coffee", 0),
 		f.storedLink(espresso, nil, "https://example.org/", "elsewhere", 1),
-		f.storedLink(espresso, &tea.ID, "/tea/", "tea", 2),
+		ours,
 		f.storedLink(espresso, &espresso.ID, "/coffee/espresso/", "here", 3),
 	)
 	return f
@@ -152,9 +154,9 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 		t.Fatalf("required =\n%+v\nwant\n%+v", espresso.Required, wantRequired)
 	}
 	wantExtra := []reports.ExtraLink{
-		{ToURL: "https://example.org/", Anchor: "elsewhere", Kind: "external", Origin: "observed"},
-		{ToURL: "/tea/", ToPageID: f.pages["/tea/"].ID, Anchor: "tea", Kind: "unknown_internal", Origin: "observed"},
-		{ToURL: "/coffee/espresso/", ToPageID: f.pages["/coffee/espresso/"].ID, Anchor: "here", Kind: "self", Origin: "observed"},
+		{ToURL: "https://example.org/", Anchor: "elsewhere", Kind: "external"},
+		{ToURL: "/tea/", ToPageID: f.pages["/tea/"].ID, Anchor: "tea", Kind: "unknown_internal", Ours: true},
+		{ToURL: "/coffee/espresso/", ToPageID: f.pages["/coffee/espresso/"].ID, Anchor: "here", Kind: "self"},
 	}
 	if !reflect.DeepEqual(espresso.Extra, wantExtra) {
 		t.Fatalf("extra =\n%+v\nwant\n%+v", espresso.Extra, wantExtra)

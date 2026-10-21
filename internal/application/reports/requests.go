@@ -195,7 +195,7 @@ type ExtraLink struct {
 	ToPageID string `json:"toPageId"`
 	Anchor   string `json:"anchor"`
 	Kind     string `json:"kind"`
-	Origin   string `json:"origin"`
+	Ours     bool   `json:"ours"`
 }
 
 type LinkAuditPageResponse struct {

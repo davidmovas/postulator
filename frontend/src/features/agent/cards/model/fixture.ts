@@ -90,7 +90,6 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
     pages_map_to_entity: { pageId: "p1", entityId: "e2" },
     pages_unmap: { pageId: "p1" },
     pages_set_canonical: { entityId: "e2", pageId: "p1" },
-    pages_replace_links: { pageId: "p1", links: [{ toPageId: "p2", toUrl: "/mugs/", anchorText: "ceramic mugs" }, { toUrl: "https://example.com", anchorText: "the source" }] },
     templates_create: { scope: "site", siteId: "s1", name: "Product page", spec },
     templates_update: { id: "t1", name: "Product page v2", spec },
     templates_delete: { id: "t1" },

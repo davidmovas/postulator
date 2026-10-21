@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 68
+const latestMigration = 69
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -89,6 +89,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0066_page_types_default_templates.sql",
 		"0067_template_specifications_retired.sql",
 		"0068_pages_site_copies_dropped.sql",
+		"0069_page_links_origin_dropped.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1963,6 +1964,84 @@ func TestThePagesCopiesOfTheSiteAreDroppedAndADownBringsThemBackAsMigration45Mad
 	}
 }
 
+func TestTheLinksOriginIsDroppedAndADownBringsItBackFromTheirMark(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 68)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) error {
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if execErr := exec(query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-21T09:00:00Z"
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	page := `INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES (?, 's1', ?, ?, 'page', 'exists', ?, ?)`
+	must(page, "pg1", "/a/", "a", at, at)
+	must(page, "pg2", "/b/", "b", at, at)
+	before := `INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, region, source, ours, observed_at) VALUES (?, 's1', 'pg1', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	must(before, "l1", "pg2", "/b/", "b", "generated", "contextual", "content", "raw", 1, at)
+	must(before, "l2", nil, "/c/", "c", "observed", "contextual", "content", "raw", 0, at)
+	must(before, "l3", "pg2", "/b/", "bee", "generated", "contextual", "content", "raw", 0, at)
+	must(before, "l4", "pg2", "/b/", "B", "observed", "breadcrumb", "breadcrumb", "render", 0, at)
+
+	if _, err = provider.UpTo(t.Context(), 69); err != nil {
+		t.Fatalf("up to 69: %v", err)
+	}
+	if got := columnOf(t, store, "page_links", "origin"); got != "" {
+		t.Fatalf("page_links still carries origin (%s) after the up migration", got)
+	}
+	marked := []string{"l1 | 1", "l2 | 0", "l3 | 1", "l4 | 0"}
+	if got := rowsOf(t, store, `SELECT id, ours FROM page_links ORDER BY id`); !slices.Equal(got, marked) {
+		t.Fatalf("the up marked the links\n%s\nwant every generated link ours\n%s", strings.Join(got, "\n"), strings.Join(marked, "\n"))
+	}
+	must(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, type, region, source, ours, observed_at) VALUES ('l5', 's1', 'pg2', 'pg1', '/a/', 'a', 'contextual', 'content', 'raw', 1, ?)`, at)
+
+	if _, err = provider.DownTo(t.Context(), 68); err != nil {
+		t.Fatalf("down to 68: %v", err)
+	}
+	if got, want := columnOf(t, store, "page_links", "origin"), "TEXT notnull=1 default='observed' pk=0"; got != want {
+		t.Fatalf("the down migration made page_links.origin %q, want %q", got, want)
+	}
+	restored := []string{
+		"l1 | generated | 1",
+		"l2 | observed | 0",
+		"l3 | generated | 1",
+		"l4 | observed | 0",
+		"l5 | generated | 1",
+	}
+	if got := rowsOf(t, store, `SELECT id, origin, ours FROM page_links ORDER BY id`); !slices.Equal(got, restored) {
+		t.Fatalf("the down gave the links the origins\n%s\nwant each told by its mark\n%s", strings.Join(got, "\n"), strings.Join(restored, "\n"))
+	}
+	if execErr := exec(`UPDATE page_links SET origin = 'guessed' WHERE id = 'l1'`); execErr == nil {
+		t.Fatal("the restored origin check accepted a value that is neither generated nor observed")
+	}
+
+	if _, err = provider.DownTo(t.Context(), 51); err != nil {
+		t.Fatalf("down to 51 through the restored origin: %v", err)
+	}
+	old := []string{"l1 | generated", "l2 | observed", "l3 | generated", "l4 | observed", "l5 | generated"}
+	if got := rowsOf(t, store, `SELECT id, origin FROM page_links ORDER BY id`); !slices.Equal(got, old) {
+		t.Fatalf("the links reached migration 51 as\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(old, "\n"))
+	}
+
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	again := []string{"l1 | 1", "l2 | 0", "l3 | 1", "l4 | 0", "l5 | 1"}
+	if got := rowsOf(t, store, `SELECT id, ours FROM page_links ORDER BY id`); !slices.Equal(got, again) {
+		t.Fatalf("the second up marked the links\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(again, "\n"))
+	}
+}
+
 func TestFindingsSubjectIsUniquePerSite(t *testing.T) {
 	t.Parallel()
 
@@ -2380,8 +2459,8 @@ func TestSchemaCascades(t *testing.T) {
 	exec(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, entity_id, template_id, created_at, updated_at) VALUES ('pg1', 's1', '/shoes/', 'shoes', 'page', 'planned', 'e1', 't1', ?, ?)`, at, at)
 	exec(`INSERT INTO pages (id, site_id, path, slug, parent_page_id, wp_type, status, entity_id, created_at, updated_at) VALUES ('pg2', 's1', '/shoes/boots/', 'boots', 'pg1', 'page', 'planned', 'e2', ?, ?)`, at, at)
 	exec(`UPDATE entities SET canonical_page_id = 'pg1' WHERE id = 'e1'`)
-	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, source, ours, observed_at) VALUES ('l1', 's1', 'pg2', 'pg1', '/shoes/', 'shoes', 'generated', 'contextual', 'raw', 1, ?)`, at)
-	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, origin, type, source, ours, observed_at) VALUES ('l2', 's1', 'pg1', 'pg2', '/shoes/boots/', 'boots', 'generated', 'contextual', 'raw', 1, ?)`, at)
+	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, type, source, ours, observed_at) VALUES ('l1', 's1', 'pg2', 'pg1', '/shoes/', 'shoes', 'contextual', 'raw', 1, ?)`, at)
+	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, type, source, ours, observed_at) VALUES ('l2', 's1', 'pg1', 'pg2', '/shoes/boots/', 'boots', 'contextual', 'raw', 1, ?)`, at)
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o1', 't1', 'site', 's1', NULL, '{}', ?, ?)`, at, at)
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o2', 't1', 'page', NULL, 'pg1', '{}', ?, ?)`, at, at)
 

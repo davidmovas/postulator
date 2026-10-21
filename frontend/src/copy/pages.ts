@@ -202,7 +202,7 @@ export const pages = {
     save: "Save",
         revert: "Revert",
         links: "Outgoing links",
-        linksSummary: (total: number, generated: number) => `${total} links · ${generated} written by a run`,
+        linksSummary: (total: number, ours: number) => `${total} links · ${ours} written by a run`,
         report: "Last report",
         noReport: "No run has touched this page yet",
         noReportBody: "Send this page through a generate run and its report lands here.",
@@ -222,9 +222,9 @@ export const pages = {
         deleteConfirm: "Delete",
         cancel: "Cancel",
     },
-    origins: {
-        generated: "Written by a run",
-        observed: "Read from the site",
+    owners: {
+        ours: "Written by a run",
+        theirs: "The client's own",
     },
     linkKind: (type: string, source: string) => (source === "" ? type : `${type} · ${source}`),
     model,

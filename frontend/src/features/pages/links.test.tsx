@@ -14,7 +14,6 @@ function link(overrides: Partial<PageLink>): PageLink {
         toPageId: "p2",
         toUrl: "/peptides/",
         anchorText: "Peptides",
-        origin: "observed",
         type: "breadcrumb",
         region: "breadcrumb",
         source: "render",
@@ -31,7 +30,7 @@ describe("the drawer's links tab", () => {
             <PageLinks
                 links={[
                     link({ id: "l1" }),
-                    link({ id: "l2", toUrl: "/bpc-157/", type: "contextual", region: "content", source: "raw", origin: "generated", ours: true }),
+                    link({ id: "l2", toUrl: "/bpc-157/", type: "contextual", region: "content", source: "raw", ours: true }),
                 ]}
                 siteId="s1"
                 search=""
@@ -40,9 +39,10 @@ describe("the drawer's links tab", () => {
 
         expect(screen.getByText("Breadcrumb · in the render")).toBeDefined();
         expect(screen.getByText("Contextual · in the body")).toBeDefined();
-        expect(screen.getByLabelText(copy.pages.origins.generated)).toBeDefined();
-        expect(screen.getByLabelText(copy.pages.origins.observed)).toBeDefined();
-        expect(container.innerHTML).not.toContain('title="observed"');
-        expect(container.innerHTML).not.toContain('title="generated"');
+        expect(screen.getByLabelText(copy.pages.owners.ours)).toBeDefined();
+        expect(screen.getByLabelText(copy.pages.owners.theirs)).toBeDefined();
+        expect(screen.getByText(copy.pages.detail.linksSummary(2, 1))).toBeDefined();
+        expect(container.innerHTML).not.toContain('title="true"');
+        expect(container.innerHTML).not.toContain('title="false"');
     });
 });

@@ -16,9 +16,6 @@ export type PageStatus = (typeof pageStatuses)[number];
 export const pageWpTypes = ["page", "post", "product", "product_cat"] as const;
 export type PageWpType = (typeof pageWpTypes)[number];
 
-export const linkOrigins = ["generated", "observed"] as const;
-export type LinkOrigin = (typeof linkOrigins)[number];
-
 export const linkTypes = ["breadcrumb", "listing", "navigation", "contextual", "unknown"] as const;
 export type LinkType = (typeof linkTypes)[number];
 

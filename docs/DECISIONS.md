@@ -3946,6 +3946,19 @@ on what stage 2 left open and what was decided while building.
   back only while the live body is the base and the base is that run's own (its blocks recorded under
   the run in `page_blocks_written`), and is handed back otherwise.
 
+### C.3
+
+- **Our links are told by their mark alone.** Migration 0069 drops `page_links.origin`, first marking
+  `ours` on any row still recorded `generated`, so the old rule (`ours`, or `origin` generated) holds
+  for every stored link; its down brings the column back, `generated` where a link is ours and
+  `observed` elsewhere. `pagemap.LinkOrigin` and `PageLink.Origin` are gone, `block.HeldOurs` reads
+  `ours` alone, and the page's links and the link audit's extra links answer `ours` where they
+  answered `origin` (the `linkOrigins` vocabulary goes with it). `pages_replace_links`,
+  `pages.ReplaceLinks` and `PagesService.ReplaceLinks` are gone: a list of links written over the
+  model is a link no site holds, so the agent and the person change links through runs (a relink, a
+  rewrite, a revert), which write the site and record what it stored. The schemas fall from 62,033
+  to 61,343 bytes for 90 tools (ceiling 61,356); 129 methods are bound.
+
 ### What the stands found (session 2, 2026-10-20)
 
 - **A page the site's user may not edit no longer stops the walk.** Under the replica's restricted

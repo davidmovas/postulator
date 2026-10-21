@@ -441,12 +441,9 @@ func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, raw string) 
 		position := found.Position
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: found.Anchor,
-			Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Region: string(regionContent),
+			Type: pagemap.LinkContextual, Region: string(regionContent),
 			Source: pagemap.SourceRaw, Position: &position, Ours: found.Ours(path, held),
 			Absolute: pagemap.AbsoluteHref(found.Href), ObservedAt: a.now,
-		}
-		if link.Ours {
-			link.Origin = pagemap.OriginGenerated
 		}
 		if target, ok := a.stored(path); ok {
 			link.ToPageID = &target.ID
@@ -484,11 +481,8 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 		ours := held[block.LinkKey{To: path, Anchor: it.Links[i].Anchor}]
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: it.Links[i].Anchor,
-			Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Region: string(regionContent),
+			Type: pagemap.LinkContextual, Region: string(regionContent),
 			Source: pagemap.SourceRaw, Ours: ours, Absolute: pagemap.AbsoluteHref(it.Links[i].Href), ObservedAt: a.now,
-		}
-		if ours {
-			link.Origin = pagemap.OriginGenerated
 		}
 		if target, ok := a.stored(path); ok {
 			link.ToPageID = &target.ID

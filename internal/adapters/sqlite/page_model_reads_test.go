@@ -43,7 +43,7 @@ func TestThePageModelIsReadByPageIDs(t *testing.T) {
 	}
 	links := sqlite.NewPageLinkRepo(store)
 	link := func(from, to string) pagemap.PageLink {
-		return pagemap.PageLink{ID: id.New(), SiteID: owner.ID, FromPageID: from, ToPageID: &to, ToURL: "/x/", Origin: pagemap.OriginObserved,
+		return pagemap.PageLink{ID: id.New(), SiteID: owner.ID, FromPageID: from, ToPageID: &to, ToURL: "/x/",
 			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, ObservedAt: sqlitetest.Stamp}
 	}
 	if err := links.ReplaceForPage(t.Context(), child.ID, pagemap.SourceRaw, []pagemap.PageLink{link(child.ID, hub.ID)}); err != nil {

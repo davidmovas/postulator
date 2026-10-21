@@ -57,7 +57,6 @@ func registered() []string {
 		"pages_map_to_entity",
 		"pages_unmap",
 		"pages_set_canonical",
-		"pages_replace_links",
 		"pagetypes_list",
 		"pagetypes_save",
 		"pagetypes_delete",
@@ -164,7 +163,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 62046
+	schemaCeilingBytes = 61356
 	charactersPerToken = 4
 	widestLogged       = 8
 )

@@ -110,22 +110,6 @@ type TreeResponse struct {
 	Roots []TreeNode `json:"roots"`
 }
 
-type LinkInput struct {
-	ToPageID   *string `json:"toPageId,omitempty" description:"Target page id; omit for an external link"`
-	ToURL      string  `json:"toUrl" description:"Link address"`
-	AnchorText string  `json:"anchorText" description:"Link text"`
-	Origin     string  `json:"origin,omitempty" enum:"generated,observed" description:"Default generated; observed is read off the live page"`
-}
-
-type ReplaceLinksRequest struct {
-	PageID string      `json:"pageId" description:"Page id"`
-	Links  []LinkInput `json:"links,omitempty" description:"Whole new list; omit to clear all"`
-}
-
-type ReplaceLinksResponse struct {
-	Links []PageLink `json:"links"`
-}
-
 type PreviewLinkRequest struct {
 	PageID string `json:"pageId" description:"Page id"`
 }

@@ -715,7 +715,7 @@ func TestARelinkedClientParagraphsLinkReadsAsOursAfterASync(t *testing.T) {
 	s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished})
 	placed := pagemap.PageLink{
 		ID: "link-ours", SiteID: siteID, FromPageID: "tb", ToURL: "/bpc-157/", AnchorText: "BPC-157",
-		Origin: pagemap.OriginObserved, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, ObservedAt: earlier,
+		Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, ObservedAt: earlier,
 	}
 	s.stores.links["tb"] = map[pagemap.LinkSource][]pagemap.PageLink{pagemap.SourceRaw: {placed}}
 
