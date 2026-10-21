@@ -3935,6 +3935,17 @@ on what stage 2 left open and what was decided while building.
   so a person who wants a new one removes his own in WordPress first. The estimate still counts the
   featured image of every page, being an upper bound read from no site.
 
+### What the review of C.2 found
+
+- **A neighbour's revert keeps its own record of what the relink left.** With `pages.content_hash`
+  gone, the neighbour revert compared the live body with the body's base, which for a neighbour
+  relinked before the bodies were stored (stage 1b) is the first observation: a client's edit made
+  between that relink and the first walk would have been written over. A relink now records, per
+  neighbour, the hash the site answered for its write (`NeighborResult.After`), and the revert puts
+  a neighbour back only while its live body still hashes as that; an older result without it is put
+  back only while the live body is the base and the base is that run's own (its blocks recorded under
+  the run in `page_blocks_written`), and is handed back otherwise.
+
 ### What the stands found (session 2, 2026-10-20)
 
 - **A page the site's user may not edit no longer stops the walk.** Under the replica's restricted

@@ -288,10 +288,11 @@ func TestRevertKeepsTheSEOMetaItHasNoCopyOf(t *testing.T) {
 
 func (s *revertStand) relinked(t *testing.T, pageID, neighborID, body string) {
 	t.Helper()
-	s.relinkedOver(t, pageID, neighborID, steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore}, body)
+	s.relinkedOver(t, pageID, neighborID, steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore}, body,
+		wp.ContentHash(body))
 }
 
-func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, before steps.NeighborBefore, body string) {
+func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, before steps.NeighborBefore, body, after string) {
 	t.Helper()
 
 	wpID := s.wpIDs[neighborID]
@@ -308,7 +309,7 @@ func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, befo
 		Linked: 1,
 		Neighbors: []steps.NeighborResult{{
 			PageID: neighborID, Path: s.pages.items[neighborID].Path, WPID: wpID,
-			Outcome: steps.OutcomeLinked, Anchor: "espresso", Before: before,
+			Outcome: steps.OutcomeLinked, Anchor: "espresso", Before: before, After: after,
 		}},
 	})
 	if err != nil {
@@ -391,7 +392,8 @@ func TestRevertAdoptsTheContentItPutBack(t *testing.T) {
 	linked := `<h1>Coffee</h1><p>We roast for <a href="/filter/">filter</a> too.</p>`
 	stand := newRevertStand(t)
 	stand.updated(t, "page-filter", runBody)
-	stand.relinkedOver(t, "page-filter", "page-parent", steps.NeighborBefore{Hash: wp.ContentHash(linked), HTML: linked}, relinkedBody())
+	stand.relinkedOver(t, "page-filter", "page-parent", steps.NeighborBefore{Hash: wp.ContentHash(linked), HTML: linked}, relinkedBody(),
+		wp.ContentHash(relinkedBody()))
 
 	if _, result := stand.revert(t, "page-filter"); result.Next == run.TransitionPause {
 		t.Fatalf("the revert paused: %s", result.Message)
@@ -460,7 +462,7 @@ func TestRevertTellsAnEmptyNeighborFromOneItKeptNoCopyOf(t *testing.T) {
 
 			stand := newRevertStand(t)
 			stand.updated(t, "page-filter", runBody)
-			stand.relinkedOver(t, "page-filter", "page-parent", tc.before, sentence)
+			stand.relinkedOver(t, "page-filter", "page-parent", tc.before, sentence, wp.ContentHash(sentence))
 
 			reverted, result := stand.revert(t, "page-filter")
 			if paused := result.Next == run.TransitionPause; paused != tc.paused {
@@ -486,7 +488,15 @@ func TestRevertHandsBackANeighborWhoseBodyIsNotWhatTheRelinkLeft(t *testing.T) {
 		prepare func(t *testing.T, s *revertStand)
 		detail  string
 		holds   string
+		older   bool
 	}{
+		{
+			name:    "an older relink whose run left no record of the body it wrote",
+			prepare: func(*testing.T, *revertStand) {},
+			detail:  "nothing here records what the relink left",
+			holds:   sentence,
+			older:   true,
+		},
 		{
 			name: "a neighbor the client edited since",
 			prepare: func(t *testing.T, s *revertStand) {
@@ -505,6 +515,7 @@ func TestRevertHandsBackANeighborWhoseBodyIsNotWhatTheRelinkLeft(t *testing.T) {
 			},
 			detail: "nothing here records what the relink left",
 			holds:  sentence,
+			older:  true,
 		},
 	}
 	for _, tc := range cases {
@@ -513,7 +524,12 @@ func TestRevertHandsBackANeighborWhoseBodyIsNotWhatTheRelinkLeft(t *testing.T) {
 
 			stand := newRevertStand(t)
 			stand.updated(t, "page-filter", runBody)
-			stand.relinked(t, "page-filter", "page-parent", sentence)
+			after := wp.ContentHash(sentence)
+			if tc.older {
+				after = ""
+			}
+			stand.relinkedOver(t, "page-filter", "page-parent",
+				steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore}, sentence, after)
 			tc.prepare(t, stand)
 
 			reverted, result := stand.revert(t, "page-filter")

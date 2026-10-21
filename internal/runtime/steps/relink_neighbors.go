@@ -56,6 +56,7 @@ type NeighborResult struct {
 	Sentence string         `json:"sentence,omitempty"`
 	Detail   string         `json:"detail"`
 	Before   NeighborBefore `json:"before"`
+	After    string         `json:"after,omitempty"`
 	WPID     int64          `json:"wpId"`
 	missing  bool
 }
@@ -473,6 +474,8 @@ func (n neighborhood) writeNext(ctx context.Context, deps Deps, state *relinkSta
 		outcome.Outcome, outcome.Detail = OutcomeConflict, "the neighbor changed on the site after its links were planned"
 	} else if recorded := n.recordLanded(ctx, deps, neighbor, write); recorded != nil {
 		return run.Result{}, recorded
+	} else {
+		outcome.After = landed.hash
 	}
 	state.Result.tally(outcome, n.page)
 	state.Done++

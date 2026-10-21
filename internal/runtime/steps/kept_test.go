@@ -26,10 +26,11 @@ const (
 )
 
 type bodyLog struct {
-	mu      sync.Mutex
-	bodies  map[string]string
-	edited  map[string]string
-	written map[string][]string
+	mu        sync.Mutex
+	bodies    map[string]string
+	edited    map[string]string
+	written   map[string][]string
+	writtenBy map[string]string
 }
 
 func driftedBodies(pageID string) *bodyLog {
@@ -65,13 +66,17 @@ func (b *bodyLog) Record(_ context.Context, pageID, raw string, _ time.Time) err
 	return nil
 }
 
-func (b *bodyLog) ReplaceWritten(_ context.Context, pageID string, hashes []string, _ string, _ time.Time) error {
+func (b *bodyLog) ReplaceWritten(_ context.Context, pageID string, hashes []string, runID string, _ time.Time) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.written == nil {
 		b.written = map[string][]string{}
 	}
+	if b.writtenBy == nil {
+		b.writtenBy = map[string]string{}
+	}
 	b.written[pageID] = append([]string(nil), hashes...)
+	b.writtenBy[pageID] = runID
 	return nil
 }
 
@@ -80,7 +85,7 @@ func (b *bodyLog) ListWritten(_ context.Context, pageID string) ([]block.Written
 	defer b.mu.Unlock()
 	out := make([]block.Written, 0, len(b.written[pageID]))
 	for _, hash := range b.written[pageID] {
-		out = append(out, block.Written{PageID: pageID, BlockHash: hash})
+		out = append(out, block.Written{PageID: pageID, BlockHash: hash, RunID: b.writtenBy[pageID]})
 	}
 	return out, nil
 }

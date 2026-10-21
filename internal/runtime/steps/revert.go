@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -359,6 +360,28 @@ func canonicalStillOurs(ctx context.Context, work revertWork) ([]string, error) 
 	return applied, nil
 }
 
+func (d Deps) leftByRelink(ctx context.Context, sc *run.StepContext, page pagemap.Page, known bool,
+	neighbor NeighborResult) (string, error) {
+	if neighbor.After != "" {
+		return neighbor.After, nil
+	}
+	if !known || d.Bodies == nil {
+		return "", nil
+	}
+	runID, err := sourceRun(sc)
+	if err != nil {
+		return "", err
+	}
+	written, err := d.Bodies.ListWritten(ctx, page.ID)
+	if err != nil {
+		return "", err
+	}
+	if !slices.ContainsFunc(written, func(held block.Written) bool { return held.RunID == runID }) {
+		return "", nil
+	}
+	return d.baseHash(ctx, page)
+}
+
 func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
 	work revertWork, neighbor NeighborResult) (string, bool) {
 	if neighbor.Outcome != OutcomeLinked {
@@ -387,11 +410,9 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 		return err.Error(), false
 	}
 
-	left := ""
-	if known {
-		if left, err = deps.baseHash(ctx, stored); err != nil {
-			return err.Error(), false
-		}
+	left, err := deps.leftByRelink(ctx, sc, stored, known, neighbor)
+	if err != nil {
+		return err.Error(), false
 	}
 	switch {
 	case raw.ContentHash == neighbor.Before.Hash:
