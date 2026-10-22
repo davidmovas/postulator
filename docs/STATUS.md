@@ -12,9 +12,9 @@ same day, stage 1b (the page model, its storage and the observation) and **stage
 closed and the screens) on 2026-10-18, which closes stage 1**; **stage 2 (2a, page types and
 their scopes, and 2b, the read layer with the writer's pack and the agent's view) on 2026-10-19,
 its stand legs green on both stands on 2026-10-20**; **stage 3, the field writers and the editable
-body, is underway: Part 0 to C landed on 2026-10-20/21 and G's safety work on 2026-10-22 (the owed
-stand runs, four client-ownership items, the closing review's fixes, plugin 1.5.1); D (the screens),
-then the gate, the docs and the final report are next.**
+body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1, then the stored
+diff, per-field acceptance and the screens; its gate is partly run, the machine's memory having
+stopped two legs, and the legs owed are listed under The gate. Stage 4 is next.**
 
 ## Where we are
 
@@ -55,10 +55,22 @@ sessions' checkpoints and the commands still owed are under stage 3 in
   revert gives `page_blocks_written` back, an older run's SEO meta is guarded, a lost answer keeps the
   client's text on record, and our textless blocks survive a relink. Four minors are kept with their
   reasons; one (`PublishResult.Blocks` as the composed diff) is open for the next session.
-- **Owed:** the stand legs after `task plugin:deploy` on each stand, `task lint:e2e`, and stage 3's
-  whole gate (the exact commands are in the 2026-10-22 checkpoint).
+- **2026-10-22/23, session 4** (`929613b` to `6441006`; the reasoning under "Session 4" in
+  `DECISIONS.md`):
+  - the publish result's blocks and `page_blocks_written` are what the site stored
+    (`block.Landed`, owner `site`);
+  - a person accepts a draft run's review field by field (`RetryStep.fields`; the agent's tool
+    keeps its schema);
+  - the page model answers the fields a run wrote, and the catalog whether a model may write each;
+  - the screens: the diff per field and per block, the review with its ticks, revert per field
+    from the run and the Pages drawer, the canonical as a person's switch, the confirmation
+    summaries, the plugin's capability labels; the harness seeds them;
+  - a field revert never trashes a page the run created;
+  - our H1 is never written into an existing page with no text of the client's (found on the
+    replica's main hub by the gate);
+  - two e2e fixes: the cancelled-run sync point, and the product proof's wire log.
 - The tool schemas stay at 61,343 bytes (90 tools, ceiling 61,356); bound methods 129; migrations to
-  0070.
+  0070; plugin 1.5.1.
 
 **2026-10-19, stage 2b of the site model: one read layer, the writer's pack and the agent's
 view. Stage 2 is done, its stand legs green on both stands on 2026-10-20.** The reasoning is
@@ -390,6 +402,48 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
+**2026-10-23, on Windows, stage 3's gate. Partial: the memory guard stopped the runtime race group
+and the replica's fresh `e2e:full`, with another workload holding about 5 GB.**
+- **Run and green:**
+  - `gofmt -l .` silent; the comment check; `go vet` plain, `-tags uiharness` and `-tags e2e`
+    clean; `golangci-lint run` plain and `--build-tags uiharness` 0 issues; `task lint:e2e` alone
+    0 issues;
+  - `task build` green with no generated drift at `11f095c`, the last commit that changed a bound
+    shape;
+  - `go test -race -count=1 -p 2 -covermode=atomic` over kernel and domain (28 packages) and
+    application (21 packages);
+  - `TestMigrationsRoundTrip` to 0070; `task plugin:lint` (12 files) and `task plugin:test` (53
+    href cases, 35 meta-key cases) on PHP 7.4;
+  - on the replica after `task plugin:deploy`: the six plugin contract tests, and the four exit
+    tests on the final code (`TestAnExistingPageIsEditedBlockByBlock`,
+    `TestTheSiteFiltersAreRespectedUnderARestrictedUser`, `TestAProductIsEditedThroughTheRegistry`,
+    `TestTheProductLoopEditsWhatTheClientCreatedInTheStore`, 188 s);
+  - `TestTheClientLoopFromTheSamples` alone after its fix;
+  - the packages each fix touched (`block`, `steps`, `runs`, `tools`, `runtime`, `observe`,
+    `pagetypes`, `transport/wails`);
+  - the agents' runs: vitest 1,790 tests in 170 files, and the harness suite in 609 s (both
+    before `9499faa` and `8acd0ec`).
+- **The first replica `e2e:full`** (on a stand the exit tests had edited) failed two tests: the
+  client loop's sync point, fixed in `6441006`, and the writer's picture, which refuses an edited
+  stand. Its rerun from a fresh reset was stopped by the memory guard while provisioning; the stand
+  was taken down.
+- **Owed, one at a time on an idle machine** (close the Rust builds and browsers first):
+  ```
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
+  go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  (merge the five profiles into coverage.out) ; go run ./cmd/covergate
+  task build ; git status --short
+  cd frontend ; npm run typecheck ; npm run test:run -- --maxWorkers=2 ; cd ..
+  task ui:lint
+  task e2e:reset STAND=replica ; task plugin:deploy STAND=replica ; task e2e:full STAND=replica ; task e2e:down STAND=replica
+  task e2e:up STAND=vanilla ; task plugin:deploy STAND=vanilla
+  E2E_STAND=vanilla go test -tags e2e -count=1 -run 'TestMetaWritesOnlyWhatTheUserMayEdit|TestTheRawWriteAnswersWhatWasStored|TestSaveStabilityFollowsTheUsersFilters|TestSEOMetaWritesUnderTheHashesRead|TestManifestDescribesTheSite|TestMetaReadsOnlyTheKeysAsked' ./internal/adapters/wp/e2e/
+  E2E_STAND=vanilla go test -tags e2e -count=1 -timeout 45m -run 'TestAnExistingPageIsEditedBlockByBlock|TestTheSiteFiltersAreRespectedUnderARestrictedUser|TestAProductIsEditedThroughTheRegistry|TestTheProductLoopEditsWhatTheClientCreatedInTheStore' ./internal/e2e/
+  task e2e:reset STAND=vanilla ; task plugin:deploy STAND=vanilla ; task e2e:full STAND=vanilla
+  task e2e:full:noplugin STAND=vanilla ; task e2e:up STAND=vanilla ; task e2e:down STAND=vanilla
+  ```
+
 **2026-10-20, on Windows, stage 2b's stand legs on both stands. Green on the final code
 (`07d4b70`).**
 - **The captures, from fresh resets:** the replica's `sitemodel/testdata/replica` holds 23 pages,
@@ -626,7 +680,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 2 done (2b on 2026-10-19, its stand legs waiting for Docker), stage 3 next |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 3 done (stage 3 on 2026-10-20 to 23, part of its gate owed), stage 4 next |
 
 ## Known gaps
 
@@ -722,16 +776,10 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Stage 2's stand legs** (the commands under **The gate**), then **stage 3 of the site model**:
-   the field writers and the editable body (migrations from 0066). What stage 2 hands it:
-   `generate_fields` asks only for the excerpt, and widens as each field writer lands; the
-   product's short description stays in `generate_body` until then; every write over an existing
-   page goes through the client-block guard in `steps/kept.go`, and a new writer must too;
-   `page_blocks_written` must be recorded straight after every raw write; nothing writes a body by
-   re-rendering it whole (`block.Splice`); `Index.ByName` still reads `Observed.Title`/`H1`, which
-   stage 3 drops; the open items under "What stays open" in `DECISIONS.md` (a draft run's status
-   on a live page, the canonical, a relink's lost answer, the agent typing a page into a rewriting
-   type) wait for the owner.
+1. **Stage 3's gate legs owed** (the commands under **The gate**, 2026-10-23), then **stage 4 of
+   the site model**: reconciliation with the workbook, the findings inbox and its resolution, the
+   site map and the agent's tools over the model, re-planned in its own session. What stage 3
+   hands it is under "Stage 4 must know" in the phase plan's session-4 checkpoint.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the

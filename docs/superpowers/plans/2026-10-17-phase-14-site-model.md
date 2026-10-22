@@ -683,7 +683,7 @@ under stage 1c in `DECISIONS.md`.
 
 #### 3 tasks
 
-**Status, 2026-10-22: Part 0 to C landed, and G's safety work (session 3: the owed stand runs, the four client-ownership items, the closing review's fixes, plugin 1.5.1); D (the screens), then the gate, the docs and the final report are next.** The checkpoints below say what each session did.
+**Status, 2026-10-23: stage 3 is closed.** Part 0 to D and G are landed; the gate is partly run, and the legs the machine's memory stopped are listed for the owner in the session-4 checkpoint and in `STATUS.md`. The checkpoints below say what each session did.
 
 **Part 0 lands the owner's rulings on stage 2's open items; Parts A to D are the stage, each ending on a committed, green boundary.** Execution: `superpowers:executing-plans`, one accountable owner for every untagged Go package and the plugin, at most two agents at once and only on disjoint packages (F: `frontend/`; H: `cmd/postulator`, `internal/e2e`, `internal/adapters/wp/e2e`, `docker/e2e`). Every commit uses `git commit -- <paths>` with `gofmt -l` checked inside; edits go through Write and Edit; every gate command runs under `set -o pipefail` with its exit code read; a test that pins an old value moves in the same commit; a commit that regenerates `vocab.ts` carries the frontend copy, labels and icons it needs; F regenerates the bindings only at my commit points; one stand up at a time and one heavy leg at a time, and a leg the memory guard or `0xc0000142` stops is listed for the owner, never retried in a loop; a zombie test process is rerun alone first. Each ruling's commit carries its `DECISIONS.md` entry and the spec's amendment. The plan was reviewed by an Opus critic before the owner saw it; its three blocking and twelve serious findings are folded into the decisions below.
 
@@ -838,7 +838,29 @@ The owner chose per-field acceptance of a draft run's review, built in Go before
 - [x] **2. Per-field acceptance**: `RetryStepRequest.fields` (a person's), `runs_retry_step`'s own arguments (schema unchanged, 61,343 bytes), `Engine.Accept(itemID, fields)`, `run.ClearAcceptance`, `PageEdit.body`, publish narrowed after the gate, `PublishResult.Declined`, a relink's review accepted whole.
 - [x] **3. What the screens read**: `observe.ModelView.fields` (`FieldView{key, writtenRunId, writtenAt, ours}`), `pagetypes.Field.aiWritable`, `blockOwners` and `blockChanges` in `vocab.ts`; `task build` green, 129 methods. Not recorded anywhere, so no screen shows it: where a site-injected region sits among the body's blocks (a region knows only whether it is inside the content root).
 - [x] **D.1–D.3** (agent F: `e22429d`, `2fb1d7d`, `7ba5389`; 1,790 vitest tests in 170 files) and **D.4** (agent H: `f268454`; the harness suite green in 609 s beside vitest). A field revert of a page the run created no longer trashes it (found from D.2).
-- [ ] **G**: the gate, the docs, the report.
+- [x] **Found by the gate and fixed:**
+  - `8acd0ec`: our H1 was written into an existing page with no client text (the replica's main hub);
+  - `958cefe`: the product proof's wire log hid a request per route;
+  - `6441006`: the client loop cancelled on the plan's wait, before any write.
+- [~] **G, the gate.** Green: the static legs, `task build` at `11f095c`, the race groups for kernel, domain and application, the migrations to 0070, the plugin on 7.4, and on the replica the contract and exit tests. Stopped by the memory guard: the runtime race group, and the replica's `e2e:full` from a fresh reset. Not started: the adapters and transport race groups, covergate, the final `task build`, the frontend legs, `ui:lint`, and every vanilla leg. The exact commands are under The gate in `STATUS.md`.
+- [x] **Docs:** CONTRACTS (`6aa1c1b`), the spec's part 16 (`8621635`, `6aa1c1b`), ARCHITECTURE and CLAUDE.md's stage 3 ruling (`a9e41e6`), STATUS and this plan.
+
+**Deviations in session 4:**
+- Per-field acceptance was built in Go (the owner's answer), with a task of its own.
+- `PageEdit.body` and `PublishResult.declined` are new shapes.
+- `OwnerSite` is a third block owner.
+- The plan's `TestARelinkReviewIsAcceptedWhole` became a case of the service's refusal table.
+- `TestADeclinedFieldIsNeverRecordedAsOurs` asserts that no record reaches `Fields.Record`, instead of running a second publish.
+- The created-page guard lives in the revert step alone.
+- `block.Ours` stays, but only for the guard's recognition of an earlier write.
+
+**Stage 4 must know:**
+- A review's acceptance may carry fields: `run.CheckpointAcceptFields`, and `run.ClearAcceptance` clears both keys.
+- A publish result's `blocks` are the stored ones, `site` being an owner.
+- `observe.ModelView.fields` names the run behind each field.
+- A page we create still carries its H1 in the content (open with the owner).
+- A field's revert outcome has no vocabulary.
+- The harness restore puts back the model's bodies.
 
 ##### 0.0 — the plan
 - This task list. Commit `docs(plan): stage 3's task list`.
