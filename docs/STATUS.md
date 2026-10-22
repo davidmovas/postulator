@@ -12,8 +12,9 @@ same day, stage 1b (the page model, its storage and the observation) and **stage
 closed and the screens) on 2026-10-18, which closes stage 1**; **stage 2 (2a, page types and
 their scopes, and 2b, the read layer with the writer's pack and the agent's view) on 2026-10-19,
 its stand legs green on both stands on 2026-10-20**; **stage 3, the field writers and the editable
-body, is underway: Part 0 to C landed on 2026-10-20/21, D (the screens) and G (the review and the
-gate) are next.**
+body, is underway: Part 0 to C landed on 2026-10-20/21 and G's safety work on 2026-10-22 (the owed
+stand runs, four client-ownership items, the closing review's fixes, plugin 1.5.1); D (the screens),
+then the gate, the docs and the final report are next.**
 
 ## Where we are
 
@@ -42,9 +43,22 @@ sessions' checkpoints and the commands still owed are under stage 3 in
   every walk; a revert took our own variation description, which WooCommerce formats on every read,
   for the client's edit. And the image step no longer draws over a page's or product's own image
   (`7fe0c6c`).
-- **Owed:** `TestAnExistingPageIsEditedBlockByBlock` on both stands (the memory guard stopped the
-  stand's start), the Go suite in groups after C.2, `task lint:e2e`, and stage 3's whole gate.
-- The tool schemas went from 63,107 to 61,343 bytes (90 tools, ceiling 61,356); bound methods 129.
+- **2026-10-22, G's safety work** (`462696c` to `c8aef9c`; the reasoning under "G's safety work" and
+  "What the closing review found" in `DECISIONS.md`, the checkpoint under stage 3 in the phase plan):
+  the owed stand runs are green (the block edit on both stands, vanilla after a fix to the test's own
+  whitespace comparison; the adapters group on an idle machine); a relink and a revert record what
+  the site stored and a relink keeps off a page its save would alter; `sync_back` keeps the base of
+  what the run wrote; our mark on a link is tied to the block that holds it (0070) and moves only
+  with our own changes to that block; the closing review's one blocking and five serious findings are
+  closed, each failing first: the plugin's save-stability probe covers the title and the excerpt
+  (**plugin 1.5.1**, required), the SEO record and the excerpt's base are what the site stored, a
+  revert gives `page_blocks_written` back, an older run's SEO meta is guarded, a lost answer keeps the
+  client's text on record, and our textless blocks survive a relink. Four minors are kept with their
+  reasons; one (`PublishResult.Blocks` as the composed diff) is open for the next session.
+- **Owed:** the stand legs after `task plugin:deploy` on each stand, `task lint:e2e`, and stage 3's
+  whole gate (the exact commands are in the 2026-10-22 checkpoint).
+- The tool schemas stay at 61,343 bytes (90 tools, ceiling 61,356); bound methods 129; migrations to
+  0070.
 
 **2026-10-19, stage 2b of the site model: one read layer, the writer's pack and the agent's
 view. Stage 2 is done, its stand legs green on both stands on 2026-10-20.** The reasoning is
