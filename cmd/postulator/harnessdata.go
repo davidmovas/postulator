@@ -227,6 +227,12 @@ const (
 	storeCategorySlug = "espresso-machines"
 	storeCategoryPath = "/product-category/" + storeCategorySlug + "/"
 
+	editedPath     = "/brewing/extraction-ratios/"
+	editedPhrase   = "we weigh the shot, never its volume"
+	reviewedPath   = "/grinders/grind-size/"
+	reviewedPhrase = "only by one step at a time"
+	revertedField  = field.SEOTitle
+
 	proposedDefinition = "An espresso machine forces water at about nine bar through a puck of finely ground coffee; " +
 		"the boiler, the group and the pump decide how steady that shot is."
 	proposedReason = "Read from the hub's own text and the machines the store sells under it."
@@ -237,6 +243,10 @@ func seedBodies() map[string]string {
 		hubPath: "<p>Single boilers, heat exchangers, dual boilers and levers: " + hubBodyPhrase +
 			", and each one asks something different of the person pulling the shot.</p>\n\n" +
 			"<p>Start with the boiler, because it decides whether you can steam milk while the next shot runs.</p>",
+		editedPath: "<p>We pull a normale at one to two, eighteen grams in and thirty-six out, and " + editedPhrase + ".</p>\n\n" +
+			"<p>A ristretto stops near one to one and a half and a lungo runs past one to three; beyond that the cup turns thin.</p>",
+		reviewedPath: "<p>Grind size is the one setting we change between shots, and " + reviewedPhrase + ".</p>\n\n" +
+			"<p>When the shot runs under twenty-five seconds we go finer, over thirty-five we go coarser, and then we taste before touching it again.</p>",
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"go.uber.org/zap/zaptest"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/graph"
@@ -29,6 +30,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -362,6 +364,135 @@ func TestTheSeededRunsCoverEveryKindAScreenOffers(t *testing.T) {
 				kind, shown[kind])
 		}
 	}
+}
+
+func TestTheHarnessSeedsAnEditItsReviewAndTheRevertOfAField(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	held := pagesByPath(t, core, listed.Items[0].ID)
+
+	cases := []struct {
+		name     string
+		kind     run.Kind
+		mode     run.PublishMode
+		path     string
+		status   run.Status
+		pause    run.PauseReason
+		artifact run.ArtifactKind
+		check    func(t *testing.T, content string)
+	}{
+		{
+			name: "a live edit of a page the client wrote", kind: run.KindGenerate, mode: run.PublishLive, path: editedPath,
+			status: run.StatusCompleted, artifact: run.ArtifactPublishResult,
+			check: func(t *testing.T, content string) {
+				var published steps.PublishResult
+				decodeArtifact(t, content, &published)
+				if !slices.ContainsFunc(published.Fields, func(change field.Change) bool {
+					return change.Key == revertedField && change.Moves()
+				}) {
+					t.Errorf("the publish result's fields are %+v, want the %s it wrote among them", published.Fields, revertedField)
+				}
+				if !oursBesideTheClients(published.Blocks, editedPhrase) {
+					t.Errorf("the publish result's blocks are %+v, want ours added beside the client's kept block", published.Blocks)
+				}
+			},
+		},
+		{
+			name: "a draft edit waiting for a person", kind: run.KindGenerate, mode: run.PublishDraft, path: reviewedPath,
+			status: run.StatusPaused, pause: run.PauseAwaitingReview, artifact: run.ArtifactEditPlan,
+			check: func(t *testing.T, content string) {
+				var plan steps.EditPlan
+				decodeArtifact(t, content, &plan)
+				if len(plan.Pages) != 1 || plan.Pages[0].Path != reviewedPath {
+					t.Fatalf("the edit plan holds %+v, want the one page %s", plan.Pages, reviewedPath)
+				}
+				if len(plan.Pages[0].Fields) == 0 || !oursBesideTheClients(plan.Pages[0].Blocks, reviewedPhrase) {
+					t.Errorf("the edit plan of %s changes the fields %+v and the blocks %+v, want fields and ours beside the client's",
+						reviewedPath, plan.Pages[0].Fields, plan.Pages[0].Blocks)
+				}
+			},
+		},
+		{
+			name: "the revert of one field of the live edit", kind: run.KindRevert, mode: run.PublishLive, path: editedPath,
+			status: run.StatusCompleted, artifact: run.ArtifactRevertResult,
+			check: func(t *testing.T, content string) {
+				var reverted steps.RevertResult
+				decodeArtifact(t, content, &reverted)
+				if len(reverted.Fields) != 1 || reverted.Fields[0].Key != revertedField || reverted.Fields[0].Outcome != steps.OutcomeRestored {
+					t.Errorf("the revert result names %+v, want the %s alone, put back", reverted.Fields, revertedField)
+				}
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			page, found := held[tc.path]
+			if !found || page.WPID == nil {
+				t.Fatalf("the seed holds no page on the site at %s", tc.path)
+			}
+			item := seededItem(t, core, tc.kind, tc.mode, page.ID)
+			if item.Status != string(tc.status) || item.PauseReason != string(tc.pause) {
+				t.Fatalf("the %s %s item for %s is %s %q (%s), want %s %q", tc.mode, tc.kind, tc.path, item.Status,
+					item.PauseReason, item.Note, tc.status, tc.pause)
+			}
+			stored, getErr := core.Runs.GetArtifact(t.Context(), runs.GetArtifactRequest{ItemID: item.ID, Kind: string(tc.artifact)})
+			if getErr != nil {
+				t.Fatalf("the %s item for %s holds no %s: %v", tc.kind, tc.path, tc.artifact, getErr)
+			}
+			tc.check(t, stored.Artifact.Content)
+		})
+	}
+}
+
+func seededItem(t *testing.T, core *app.Core, kind run.Kind, mode run.PublishMode, pageID string) runs.Item {
+	t.Helper()
+
+	listed, err := core.Runs.List(t.Context(), runs.ListRequest{Kind: string(kind), ListRequest: dto.ListRequest{Limit: 50}})
+	if err != nil {
+		t.Fatalf("List runs: %v", err)
+	}
+	found := make([]runs.Item, 0, 1)
+	for index := range listed.Items {
+		if listed.Items[index].PublishMode != string(mode) {
+			continue
+		}
+		items, itemsErr := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
+			RunID: listed.Items[index].ID, ListRequest: dto.ListRequest{Limit: 20},
+		})
+		if itemsErr != nil {
+			t.Fatalf("ListItems: %v", itemsErr)
+		}
+		for item := range items.Items {
+			if items.Items[item].TargetID == pageID {
+				found = append(found, items.Items[item])
+			}
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("the seed holds %d %s %s items for %s, want one", len(found), mode, kind, pageID)
+	}
+	return found[0]
+}
+
+func decodeArtifact(t *testing.T, content string, out any) {
+	t.Helper()
+
+	if err := json.Unmarshal([]byte(content), out); err != nil {
+		t.Fatalf("decode the artifact %s: %v", content, err)
+	}
+}
+
+func oursBesideTheClients(changes []block.Change, phrase string) bool {
+	return slices.ContainsFunc(changes, func(change block.Change) bool {
+		return change.Owner == block.OwnerOurs && change.Change == block.ChangeAdded
+	}) && slices.ContainsFunc(changes, func(change block.Change) bool {
+		return change.Owner == block.OwnerClient && change.Change == block.ChangeKept && strings.Contains(change.Raw, phrase)
+	})
 }
 
 func TestASeededHomeIsNotSeededTwice(t *testing.T) {
@@ -807,6 +938,37 @@ func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
 		}
 		if link.Kind == "preview" && !link.ExpiresAt.Std().After(time.Now()) {
 			t.Fatalf("the preview link for %s expired at %s, which is already past", page.Path, link.ExpiresAt)
+		}
+	}
+}
+
+func TestARestorePutsBackTheBodiesTheSiteHeld(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	restored := wptest.New(t)
+	if err = placeOnSite(t.Context(), core, restored, siteID); err != nil {
+		t.Fatalf("placeOnSite: %v", err)
+	}
+
+	held := pagesByPath(t, core, siteID)
+	for _, path := range []string{hubPath, editedPath, reviewedPath, completedRun[0]} {
+		page := held[path]
+		if page.WPID == nil {
+			t.Fatalf("the seed holds no page on the site at %s", path)
+		}
+		model, modelErr := core.Observe.Page(t.Context(), page.ID)
+		if modelErr != nil || model.Body == nil {
+			t.Fatalf("the model of %s holds no body (%v)", path, modelErr)
+		}
+		item, found := restored.Lookup(*page.WPID)
+		if !found || item.Content != model.Body.Raw {
+			t.Errorf("the restore put %q at %s, want the body the site held %q", item.Content, path, model.Body.Raw)
 		}
 	}
 }

@@ -12,10 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/pages"
-	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
-	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
@@ -76,10 +73,6 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 	if err != nil {
 		return err
 	}
-	bodies, err := generatedBodies(ctx, core, siteID)
-	if err != nil {
-		return err
-	}
 
 	sort.SliceStable(mapped, func(a, b int) bool {
 		return depthOf(mapped[a].Path) < depthOf(mapped[b].Path)
@@ -99,11 +92,7 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 			continue
 		}
 
-		generated, held := bodies[page.ID]
-		if !held {
-			generated = seedBodies()[page.Path]
-		}
-		body, bodyErr := restoredContent(page, generated)
+		body, bodyErr := heldBody(ctx, core, page)
 		if bodyErr != nil {
 			return bodyErr
 		}
@@ -143,15 +132,15 @@ func crumbsOf(path, title string, titles map[string]string) []wptest.Crumb {
 	return append(crumbs, wptest.Crumb{Name: title, Path: path})
 }
 
-func restoredContent(page *pages.Page, body string) (string, error) {
-	if page.WPType != wptest.TypeProduct || body == "" {
-		return body, nil
-	}
-	doc, err := content.Parse(body)
+func heldBody(ctx context.Context, core *app.Core, page *pages.Page) (string, error) {
+	model, err := core.Observe.Page(ctx, page.ID)
 	if err != nil {
 		return "", err
 	}
-	return doc.RenderWithoutHeadingOne()
+	if model.Body != nil {
+		return model.Body.Raw, nil
+	}
+	return seedBodies()[page.Path], nil
 }
 
 func depthOf(path string) int {
@@ -184,39 +173,6 @@ func allPages(ctx context.Context, core *app.Core, siteID string) ([]pages.Page,
 		}
 		cursor = string(page.Next)
 	}
-}
-
-func generatedBodies(ctx context.Context, core *app.Core, siteID string) (map[string]string, error) {
-	bodies := make(map[string]string, len(completedRun))
-
-	listed, err := core.Runs.List(ctx, runs.ListRequest{
-		SiteID: siteID, ListRequest: dto.ListRequest{Limit: 20},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	for index := range listed.Items {
-		items, itemsErr := core.Runs.ListItems(ctx, runs.ListItemsRequest{
-			RunID: listed.Items[index].ID, ListRequest: dto.ListRequest{Limit: 50},
-		})
-		if itemsErr != nil {
-			return nil, itemsErr
-		}
-		for item := range items.Items {
-			target := items.Items[item]
-			held, getErr := core.Runs.GetArtifact(ctx, runs.GetArtifactRequest{
-				ItemID: target.ID, Kind: string(run.ArtifactBodyHTML),
-			})
-			if getErr != nil {
-				continue
-			}
-			if held.Artifact.Content != "" {
-				bodies[target.TargetID] = held.Artifact.Content
-			}
-		}
-	}
-	return bodies, nil
 }
 
 func slugOf(path string) string {

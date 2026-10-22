@@ -100,7 +100,14 @@ func harnessReplies() []fake.Reply {
 	targets = append(targets, revertedRun...)
 	targets = append(targets, heldChildPath, heldParentPath)
 
-	out := make([]fake.Reply, 0, 2*len(targets)+2)
+	out := make([]fake.Reply, 0, 2*len(targets)+6)
+	for _, path := range []string{editedPath, reviewedPath} {
+		subject := subjectOf(path)
+		out = append(out,
+			fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + path + "\n", Text: draftOf(subject)},
+			fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + path + "\n", Text: metaOf(subject)},
+		)
+	}
 	for _, path := range targets {
 		subject := subjectOf(path)
 		out = append(out,
@@ -821,7 +828,7 @@ func exchange(ctx context.Context, core *app.Core, conversation, text string) er
 }
 
 func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, provider *pacedProvider) error {
-	completed, err := startRun(ctx, core, siteID, guide, byPath, completedRun)
+	completed, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, completedRun)
 	if err != nil {
 		return err
 	}
@@ -833,7 +840,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	}
 
 	provider.failOn(failingPath)
-	failed, err := startRun(ctx, core, siteID, guide, byPath, failedRun)
+	failed, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, failedRun)
 	if err != nil {
 		return err
 	}
@@ -848,9 +855,12 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	if revertErr := seedRevertRun(ctx, core, siteID, guide, byPath); revertErr != nil {
 		return revertErr
 	}
+	if editErr := seedEditRuns(ctx, core, siteID, guide, byPath); editErr != nil {
+		return editErr
+	}
 
 	provider.failOn("Path: " + heldParentPath + "\n")
-	held, err := startRun(ctx, core, siteID, guide, byPath, heldRun)
+	held, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, heldRun)
 	if err != nil {
 		return err
 	}
@@ -860,7 +870,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	provider.failOn("")
 
 	provider.hold()
-	running, err := startRun(ctx, core, siteID, guide, byPath, runningRun)
+	running, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, runningRun)
 	if err != nil {
 		return err
 	}
@@ -868,7 +878,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 		return waitErr
 	}
 
-	paused, err := startRun(ctx, core, siteID, guide, byPath, pausedRun)
+	paused, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, pausedRun)
 	if err != nil {
 		return err
 	}
@@ -876,7 +886,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 		return err
 	}
 
-	cancelled, err := startRun(ctx, core, siteID, guide, byPath, cancelledRun)
+	cancelled, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, cancelledRun)
 	if err != nil {
 		return err
 	}
@@ -900,7 +910,7 @@ func seedRelinkRun(ctx context.Context, core *app.Core, siteID string, byPath ma
 }
 
 func seedRevertRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string) error {
-	source, err := startRun(ctx, core, siteID, guide, byPath, revertedRun)
+	source, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, revertedRun)
 	if err != nil {
 		return err
 	}
@@ -915,7 +925,51 @@ func seedRevertRun(ctx context.Context, core *app.Core, siteID, guide string, by
 	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
 }
 
-func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, paths []string) (string, error) {
+func seedEditRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string) error {
+	edited, err := startRun(ctx, core, siteID, guide, byPath, run.PublishLive, []string{editedPath})
+	if err != nil {
+		return err
+	}
+	if waitErr := waitForRun(ctx, core, edited, run.StatusCompleted); waitErr != nil {
+		return waitErr
+	}
+
+	reviewed, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, []string{reviewedPath})
+	if err != nil {
+		return err
+	}
+	if waitErr := waitForReview(ctx, core, reviewed); waitErr != nil {
+		return waitErr
+	}
+
+	started, err := core.Runs.Revert(ctx, runs.RevertRequest{
+		RunID: edited, PageID: byPath[editedPath], Fields: []string{string(revertedField)},
+	})
+	if err != nil {
+		return err
+	}
+	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
+}
+
+func waitForReview(ctx context.Context, core *app.Core, runID string) error {
+	if err := waitForRun(ctx, core, runID, run.StatusPaused); err != nil {
+		return err
+	}
+	listed, err := core.Runs.ListItems(ctx, runs.ListItemsRequest{RunID: runID, ListRequest: dto.ListRequest{Limit: 20}})
+	if err != nil {
+		return err
+	}
+	for index := range listed.Items {
+		if listed.Items[index].PauseReason != string(run.PauseAwaitingReview) {
+			return errors.New(errors.Conflict, "the draft run paused for something other than a review"+
+				itemStates(ctx, core, runID)).WithDetail("runId", runID)
+		}
+	}
+	return nil
+}
+
+func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, mode run.PublishMode,
+	paths []string) (string, error) {
 	targets := make([]string, 0, len(paths))
 	for _, path := range paths {
 		pageID, known := byPath[path]
@@ -927,7 +981,7 @@ func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 
 	started, err := core.Runs.Start(ctx, runs.StartRequest{
 		SiteID: siteID, PageIDs: targets, TemplateID: guide,
-		PublishMode: string(run.PublishDraft), Recipe: harnessRecipe(),
+		PublishMode: string(mode), Recipe: harnessRecipe(),
 	})
 	if err != nil {
 		return "", err
