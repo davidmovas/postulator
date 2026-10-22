@@ -223,10 +223,11 @@ func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result 
 	if !ok {
 		return reason, false
 	}
-	if reason, ok = writeBodyBack(ctx, work, raw); !ok {
+	stored, reason, ok := writeBodyBack(ctx, work, raw)
+	if !ok {
 		return reason, false
 	}
-	return bodyRestored(ctx, deps, sc, result, work, "the body the run replaced was written back")
+	return bodyRestored(ctx, deps, sc, result, work, stored, "the body the run replaced was written back")
 }
 
 func bodyToRestore(ctx context.Context, work revertWork) (wp.RawContent, string, bool) {
@@ -257,24 +258,24 @@ func readRawBack(ctx context.Context, work revertWork) (wp.RawContent, string, b
 	}
 }
 
-func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (reason string, ok bool) {
+func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (stored, reason string, ok bool) {
 	if raw.ContentHash == work.published.PreviousContentHash {
-		return "", true
+		return raw.Content, "", true
 	}
-	_, err := work.client.PutRaw(ctx, onSiteType(work.page), work.published.WPID, work.published.PreviousContent, raw.ContentHash)
+	written, err := work.client.PutRaw(ctx, onSiteType(work.page), work.published.WPID, work.published.PreviousContent, raw.ContentHash)
 	switch {
 	case err == nil:
-		return "", true
+		return written.Content, "", true
 	case errors.IsCode(err, errors.Conflict):
-		return writtenUnderUs(raw.ContentHash), false
+		return "", writtenUnderUs(raw.ContentHash), false
 	default:
-		return err.Error(), false
+		return "", err.Error(), false
 	}
 }
 
 func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult, work revertWork,
-	detail string) (string, bool) {
-	if adoptErr := readopt(ctx, deps, sc, work.page, work.published.PreviousContent); adoptErr != nil {
+	stored, detail string) (string, bool) {
+	if adoptErr := readopt(ctx, deps, sc, work.page, stored); adoptErr != nil {
 		return adoptErr.Error(), false
 	}
 	result.Outcome = OutcomeRestored
@@ -414,6 +415,7 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	if err != nil {
 		return err.Error(), false
 	}
+	held := raw.Content
 	switch {
 	case raw.ContentHash == neighbor.Before.Hash:
 	case left == "":
@@ -421,16 +423,18 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	case raw.ContentHash != left:
 		return editedSince(left, raw.ContentHash), false
 	default:
-		if _, putErr := work.client.PutRaw(ctx, itemType, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash); putErr != nil {
+		written, putErr := work.client.PutRaw(ctx, itemType, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash)
+		if putErr != nil {
 			if errors.IsCode(putErr, errors.Conflict) {
 				return writtenUnderUs(raw.ContentHash), false
 			}
 			return putErr.Error(), false
 		}
+		held = written.Content
 	}
 
 	if known {
-		if adoptErr := readopt(ctx, deps, sc, stored, neighbor.Before.HTML); adoptErr != nil {
+		if adoptErr := readopt(ctx, deps, sc, stored, held); adoptErr != nil {
 			return adoptErr.Error(), false
 		}
 	}

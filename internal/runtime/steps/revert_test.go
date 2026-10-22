@@ -543,6 +543,64 @@ func TestRevertHandsBackANeighborWhoseBodyIsNotWhatTheRelinkLeft(t *testing.T) {
 	}
 }
 
+func TestARevertRecordsWhatTheSiteStored(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a neighbor", func(t *testing.T) {
+		t.Parallel()
+
+		before := `<h1>Coffee</h1><p>We roast<br>every espresso blend we sell.</p>`
+		sentence := `<h1>Coffee</h1><p>We roast every espresso blend we sell.</p><p>Read about <a href="/coffee/espresso/">espresso</a>.</p>`
+		stand := newRevertStand(t, wptest.WithFilteredHTML())
+		stand.updated(t, "page-filter", runBody)
+		stand.relinkedOver(t, "page-filter", "page-parent",
+			steps.NeighborBefore{Hash: wp.ContentHash(before), HTML: before}, sentence, wp.ContentHash(sentence))
+
+		reverted, _ := stand.revert(t, "page-filter")
+		if len(reverted.Neighbors) != 1 || reverted.Neighbors[0].Outcome != steps.OutcomeRestored {
+			t.Fatalf("neighbors = %+v, want the neighbor restored", reverted.Neighbors)
+		}
+		held := stand.body(t, stand.wpIDs["page-parent"])
+		if held == before || !strings.Contains(held, "<br />") {
+			t.Fatalf("the neighbor holds %q, want the site's own form of the content put back", held)
+		}
+		if recorded := stand.bodies.bodies["page-parent"]; recorded != held {
+			t.Errorf("the body recorded is %q, want what the site stored %q", recorded, held)
+		}
+	})
+
+	t.Run("the page itself", func(t *testing.T) {
+		t.Parallel()
+
+		before := `<h1>Filter</h1><p>What a human wrote<br>about filter coffee.</p>`
+		stand := newRevertStand(t, wptest.WithFilteredHTML())
+		wpID := stand.wpIDs["page-filter"]
+		if _, err := syncClient(t, stand.server).PutRaw(t.Context(), wp.TypePage, wpID, runBody, ""); err != nil {
+			t.Fatalf("write the run body: %v", err)
+		}
+		stand.recorded(t, "page-filter", runBody)
+		stand.source.record(t, "page-filter", map[run.ArtifactKind]any{
+			run.ArtifactPublishResult: steps.PublishResult{
+				WPID: wpID, ContentHash: wp.ContentHash(runBody),
+				PreviousContent: before, PreviousContentHash: wp.ContentHash(before),
+				SEOApplied: []string{}, Skipped: []string{},
+			},
+		})
+
+		reverted, _ := stand.revert(t, "page-filter")
+		if reverted.Outcome != steps.OutcomeRestored {
+			t.Fatalf("reverted = %+v, want the page restored", reverted)
+		}
+		held := stand.body(t, wpID)
+		if held == before || !strings.Contains(held, "<br />") {
+			t.Fatalf("the page holds %q, want the site's own form of the content put back", held)
+		}
+		if recorded := stand.bodies.bodies["page-filter"]; recorded != held {
+			t.Errorf("the body recorded is %q, want what the site stored %q", recorded, held)
+		}
+	})
+}
+
 func TestRevertHandsBackANeighborItCannotTellTheKindOf(t *testing.T) {
 	t.Parallel()
 
