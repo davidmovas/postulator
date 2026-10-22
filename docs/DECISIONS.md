@@ -4110,3 +4110,12 @@ Each is closed below with a test that failed first, or kept with its reason.
   `TestARevertKeepsTheMarksOfTheLinksItLeavesInPlace`, failing first with B's hashes kept). A
   whole-body revert of a result from before stage 3 has no diff, so an article an older run wrote
   under it comes back as the client's: an older record, the owner's call.
+- **The SEO record was what the write sent, not what the plugin stored.** The plugin answers the
+  hash of what each SEO field stores after the SEO plugin's own sanitizer (Yoast collapses whitespace
+  and strips tags from a title), and the write dropped it: `WrittenMeta`, the field diff and the
+  field's base all held the sent value, so our own title read as the client's edit on the next walk,
+  was kept as his by the next run, and a revert's expected hash never matched. The write now keeps the
+  answered hashes and, where one differs from the sent value's, reads the SEO meta back once and takes
+  the stored values for the record, the diff and the base (`storedSEO`;
+  `TestTheSEORecordIsWhatThePluginStored`, failing first on `WrittenMeta`); the fake hashes what it
+  stored, as the plugin does, and `WithSEOSanitized` is the sanitizer's case.

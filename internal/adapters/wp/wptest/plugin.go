@@ -335,6 +335,7 @@ func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, http.StatusBadRequest, "invalid_param", field+" must be a string.")
 			return
 		}
+		value = s.seoStored(value)
 		if value == "" {
 			delete(stored.Meta, keys[field])
 		} else {

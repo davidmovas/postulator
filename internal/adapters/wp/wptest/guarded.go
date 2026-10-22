@@ -52,6 +52,13 @@ func (s *Server) saveStable(content, title, excerpt string) bool {
 	return s.saveFilter(content) == content && s.saveFilter(title) == title && s.saveFilter(excerpt) == excerpt
 }
 
+func (s *Server) seoStored(value string) string {
+	if !s.seoSanitized {
+		return value
+	}
+	return strings.Join(strings.Fields(value), " ")
+}
+
 func (s *Server) saved(content string) string {
 	if s.saveFilter != nil {
 		return s.saveFilter(content)

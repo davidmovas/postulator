@@ -172,20 +172,62 @@ func (d Deps) canonicalWritten(ctx context.Context, sc *run.StepContext, creatin
 }
 
 func sendSEO(ctx context.Context, client *wp.Client, sc *run.StepContext, itemType wp.ItemType, wpID int64,
-	plan seoPlan) (seo seoWrite, moved []string, err error) {
-	results, err := editorFor(client).Write(ctx, edit.Target{Type: string(itemType), ID: wpID}, plan.writes())
+	plan seoPlan) (seo seoWrite, results []edit.Result, moved []string, err error) {
+	results, err = editorFor(client).Write(ctx, edit.Target{Type: string(itemType), ID: wpID}, plan.writes())
 	switch {
 	case wp.IsPluginMissing(err), refusedFor(err, edit.ReasonNoPlugin):
-		return metaNotWritten(sc.Page, ReasonNoPlugin), nil, nil
+		return metaNotWritten(sc.Page, ReasonNoPlugin), nil, nil, nil
 	case wp.IsPluginOutdated(err):
-		return metaNotWritten(sc.Page, ReasonPluginTooOld), nil, nil
+		return metaNotWritten(sc.Page, ReasonPluginTooOld), nil, nil, nil
 	case err != nil:
-		return seoWrite{}, nil, err
+		return seoWrite{}, nil, nil, err
 	}
 	if moved = movedKeys(results); len(moved) > 0 {
-		return seoWrite{}, moved, nil
+		return seoWrite{}, nil, moved, nil
 	}
-	return seoWrite{previous: plan.Previous, applied: appliedOf(plan, results), skipped: []string{}}, nil, nil
+	return seoWrite{previous: plan.Previous, applied: appliedOf(plan, results), skipped: []string{}}, results, nil, nil
+}
+
+func storedSEO(ctx context.Context, client *wp.Client, itemType wp.ItemType, wpID int64, sent wp.SEOMeta,
+	results []edit.Result) (wp.SEOMeta, []edit.Result, error) {
+	altered := false
+	for i := range results {
+		if results[i].Outcome == edit.OutcomeWritten && results[i].Value != nil && results[i].Hash != nil &&
+			*results[i].Hash != block.BodyHash(*results[i].Value) {
+			altered = true
+		}
+	}
+	if !altered {
+		return sent, results, nil
+	}
+	held, err := client.GetSEOMeta(ctx, itemType, wpID)
+	if err != nil {
+		return wp.SEOMeta{}, nil, err
+	}
+	stored := sent
+	for i := range results {
+		if results[i].Outcome != edit.OutcomeWritten || results[i].Value == nil {
+			continue
+		}
+		switch results[i].Key {
+		case field.SEOTitle:
+			stored.Title = held.Title
+			if sent.OGTitle != "" {
+				stored.OGTitle = held.OGTitle
+			}
+			results[i].Value = &stored.Title
+		case field.SEODescription:
+			stored.Description = held.Description
+			if sent.OGDescription != "" {
+				stored.OGDescription = held.OGDescription
+			}
+			results[i].Value = &stored.Description
+		case field.SEOCanonical:
+			stored.Canonical = held.Canonical
+			results[i].Value = &stored.Canonical
+		}
+	}
+	return stored, results, nil
 }
 
 func metaBeingReplaced(ctx context.Context, client *wp.Client, capabilities wp.Capabilities,

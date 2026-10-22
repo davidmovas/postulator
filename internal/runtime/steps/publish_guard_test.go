@@ -237,6 +237,35 @@ func TestTheExcerptBaseIsWhatTheSiteStored(t *testing.T) {
 	}
 }
 
+func TestTheSEORecordIsWhatThePluginStored(t *testing.T) {
+	t.Parallel()
+
+	deps, _, sc, _ := existingPage(t, []wptest.Option{wptest.WithSEOSanitized()}, wptest.Item{Title: "Espresso", Content: "<p>Only prose.</p>"})
+	sc.Artifacts[run.ArtifactMeta] = run.Artifact{Kind: run.ArtifactMeta, Blob: []byte(`{"title":"Espresso  guide","description":"Pull a shot."}`)}
+	log := &fieldLog{}
+	deps.Fields = log
+
+	published := runPublish(t, deps, sc)
+	if published.WrittenMeta == nil || published.WrittenMeta.Title != "Espresso guide" {
+		t.Fatalf("writtenMeta = %+v, want the title as the plugin stored it", published.WrittenMeta)
+	}
+	if after, held := storedAfterOf(published, field.SEOTitle); !held || after != "Espresso guide" {
+		t.Errorf("the seo_title change says %q (%t), want the stored value", after, held)
+	}
+	if got := log.recordedValue(field.SEOTitle); got != "Espresso guide" {
+		t.Errorf("the seo_title base is %q, want the stored value", got)
+	}
+}
+
+func storedAfterOf(published steps.PublishResult, key field.Key) (string, bool) {
+	for i := range published.Fields {
+		if published.Fields[i].Key == key {
+			return published.Fields[i].After, true
+		}
+	}
+	return "", false
+}
+
 func TestAWriteAgainstAStaleHashPauses(t *testing.T) {
 	t.Parallel()
 

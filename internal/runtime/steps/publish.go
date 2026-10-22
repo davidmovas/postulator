@@ -668,18 +668,22 @@ func writeSEOMeta(ctx context.Context, sc *run.StepContext, client *wp.Client, i
 			plan.SEO.Meta.Canonical = permalinkOf(plan.Item.item())
 		}
 	}
-	seo, moved, err := sendSEO(ctx, client, sc, itemType, wpID, plan.SEO)
+	seo, results, moved, err := sendSEO(ctx, client, sc, itemType, wpID, plan.SEO)
 	if err != nil {
 		return state.failed(err)
 	}
 	if len(moved) > 0 {
 		return state.stopped(needsHuman(fieldsMoved(sc.Page.Path, moved)))
 	}
+	stored, results, err := storedSEO(ctx, client, itemType, wpID, plan.SEO.Meta, results)
+	if err != nil {
+		return state.failed(err)
+	}
 	state.Result.took(seo)
 	if len(seo.applied) > 0 {
-		sent := plan.SEO.Meta
-		state.Result.WrittenMeta = &sent
+		state.Result.WrittenMeta = &stored
 	}
+	state.stored(results)
 	state.wrote(unitSEO)
 	return state.wait("wrote the SEO meta of " + sc.Page.Path)
 }
@@ -701,7 +705,7 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 	if plan.Unstable {
 		body = plan.Previous
 	}
-	if err := recordWritten(ctx, deps, sc, sc.Page.ID, body, title, state.Result.SEOApplied, kept); err != nil {
+	if err := recordWritten(ctx, deps, sc, sc.Page.ID, body, title, state.Result.SEOApplied, state.Result.WrittenMeta, kept); err != nil {
 		return state.failed(err)
 	}
 	if plan.Request.Excerpt != nil {

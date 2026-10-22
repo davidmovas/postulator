@@ -84,6 +84,7 @@ type Server struct {
 	noStoreSettings bool
 	rawAnswerFaults []int
 	saveFilter      func(string) string
+	seoSanitized    bool
 	mu              sync.Mutex
 }
 
@@ -121,6 +122,10 @@ func WithFilteredHTML() Option {
 
 func WithSaveFilter(filter func(string) string) Option {
 	return func(s *Server) { s.saveFilter = filter }
+}
+
+func WithSEOSanitized() Option {
+	return func(s *Server) { s.seoSanitized = true }
 }
 
 func WithBuilderLayout() Option {

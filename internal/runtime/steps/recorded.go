@@ -3,12 +3,13 @@ package steps
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
 func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, body, title string, seoApplied []string,
-	kept keptFields) error {
+	meta *wp.SEOMeta, kept keptFields) error {
 	now := deps.now()
 	if err := recordBody(ctx, deps, pageID, body); err != nil {
 		return err
@@ -21,12 +22,8 @@ func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, 
 			return err
 		}
 	}
-	if len(seoApplied) == 0 {
+	if len(seoApplied) == 0 || meta == nil {
 		return nil
-	}
-	meta, found, err := decodeArtifact[Meta](sc, run.ArtifactMeta)
-	if err != nil || !found {
-		return err
 	}
 	for key, value := range map[field.Key]string{
 		field.SEOTitle: meta.Title, field.SEODescription: meta.Description,
