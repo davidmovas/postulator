@@ -554,7 +554,7 @@ func waitForPublish(t *testing.T, core *app.Core, runID string) {
 	t.Helper()
 
 	var seq int64
-	published := ""
+	publishing := make([]string, 0)
 	waitFor(t, "the first item of run "+runID+" to reach the site", func() bool {
 		listed, err := core.Runs.ListEvents(t.Context(), runs.ListEventsRequest{
 			RunID: runID, SinceSeq: seq, Limit: 200,
@@ -572,11 +572,23 @@ func waitForPublish(t *testing.T, core *app.Core, runID string) {
 			if decodeErr := json.Unmarshal(event.Payload, &said); decodeErr != nil {
 				t.Fatalf("decode a step.done payload: %v", decodeErr)
 			}
-			if said.Step == steps.NamePublish {
-				published = said.ItemID
+			if said.Step == steps.NamePublish && !slices.Contains(publishing, said.ItemID) {
+				publishing = append(publishing, said.ItemID)
 			}
 		}
-		return published != ""
+		return slices.ContainsFunc(publishing, func(itemID string) bool { return holdsAPublishResult(t, core, itemID) })
+	})
+}
+
+func holdsAPublishResult(t *testing.T, core *app.Core, itemID string) bool {
+	t.Helper()
+
+	held, err := core.Runs.ListArtifacts(t.Context(), runs.ListArtifactsRequest{ItemID: itemID})
+	if err != nil {
+		t.Fatalf("list the artifacts of %s: %v", itemID, err)
+	}
+	return slices.ContainsFunc(held.Artifacts, func(artifact runs.ArtifactSummary) bool {
+		return artifact.Kind == string(run.ArtifactPublishResult)
 	})
 }
 
