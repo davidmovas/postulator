@@ -121,6 +121,7 @@ export const hubModel: PageModel = {
             ours: true,
         },
     ],
+    fields: [],
     findings: [
         {
             id: "f-unresolved",

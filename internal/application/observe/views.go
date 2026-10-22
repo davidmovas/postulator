@@ -114,6 +114,13 @@ type BlockView struct {
 	Ours    bool   `json:"ours"`
 }
 
+type FieldView struct {
+	Key          string   `json:"key"`
+	WrittenRunID string   `json:"writtenRunId"`
+	WrittenAt    dto.Time `json:"writtenAt"`
+	Ours         bool     `json:"ours"`
+}
+
 type FindingView struct {
 	ID        string         `json:"id"`
 	Code      string         `json:"code"`
@@ -138,6 +145,7 @@ type ModelView struct {
 	Links           []LinkView    `json:"links"`
 	BodyKind        string        `json:"bodyKind"`
 	Blocks          []BlockView   `json:"blocks"`
+	Fields          []FieldView   `json:"fields"`
 	Findings        []FindingView `json:"findings"`
 }
 
@@ -203,6 +211,21 @@ func titleOf(page pagemap.Page, values []field.Value) string {
 	return page.Title
 }
 
+func writtenFields(values []field.Value) []FieldView {
+	out := make([]FieldView, 0)
+	for i := range values {
+		if values[i].WrittenRunID == nil {
+			continue
+		}
+		out = append(out, FieldView{
+			Key: string(values[i].Key), WrittenRunID: *values[i].WrittenRunID, WrittenAt: dto.TimeOf(values[i].WrittenAt),
+			Ours: values[i].CurrentHash == values[i].BaseHash,
+		})
+	}
+	slices.SortFunc(out, func(a, b FieldView) int { return strings.Compare(a.Key, b.Key) })
+	return out
+}
+
 func modelView(model PageModel, index pagemap.Index, written []block.Written, named map[string][]field.Value) ModelView {
 	page := model.Page
 	view := ModelView{
@@ -210,7 +233,7 @@ func modelView(model PageModel, index pagemap.Index, written []block.Written, na
 		Hierarchy:       HierarchyView{Reason: string(page.ParentReason), Method: string(page.ParentMethod)},
 		TechnicalReason: string(page.TechnicalReason), ReadOnlyReason: string(page.ReadOnlyReason),
 		Terms: make([]TermView, 0, len(model.Terms)), Links: make([]LinkView, 0, len(model.Links)),
-		Blocks: make([]BlockView, 0), Findings: make([]FindingView, 0, len(model.Findings)),
+		Blocks: make([]BlockView, 0), Fields: writtenFields(model.Fields), Findings: make([]FindingView, 0, len(model.Findings)),
 	}
 	if page.ParentPageID != nil {
 		view.Hierarchy.ParentID = *page.ParentPageID

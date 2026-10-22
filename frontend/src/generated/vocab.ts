@@ -106,6 +106,12 @@ export type BlockKind = (typeof blockKinds)[number];
 export const bodyKinds = ["classic", "blocks"] as const;
 export type BodyKind = (typeof bodyKinds)[number];
 
+export const blockOwners = ["ours", "client", "site"] as const;
+export type BlockOwner = (typeof blockOwners)[number];
+
+export const blockChanges = ["kept", "added", "removed"] as const;
+export type BlockChange = (typeof blockChanges)[number];
+
 export const previewKinds = ["public", "preview"] as const;
 export type PreviewKind = (typeof previewKinds)[number];
 

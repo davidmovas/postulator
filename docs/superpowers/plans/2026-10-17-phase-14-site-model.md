@@ -836,7 +836,7 @@ At most two agents, on disjoint packages. This session ran its C.2 and C.3 throu
 The owner chose per-field acceptance of a draft run's review, built in Go before D. A Fable critic read the session's plan (one blocking, six serious, five minor findings, folded in).
 - [x] **1. The stored diff** (`929613b`): `block.Landed`, `OwnerSite`, `recordOurBlocks` from the landed diff; the open review item is closed.
 - [x] **2. Per-field acceptance**: `RetryStepRequest.fields` (a person's), `runs_retry_step`'s own arguments (schema unchanged, 61,343 bytes), `Engine.Accept(itemID, fields)`, `run.ClearAcceptance`, `PageEdit.body`, publish narrowed after the gate, `PublishResult.Declined`, a relink's review accepted whole.
-- [ ] **3. What the screens read**: `observe.ModelView.fields`, `pagetypes.Field.aiWritable`, `blockOwners` and `blockChanges` in `vocab.ts`.
+- [x] **3. What the screens read**: `observe.ModelView.fields` (`FieldView{key, writtenRunId, writtenAt, ours}`), `pagetypes.Field.aiWritable`, `blockOwners` and `blockChanges` in `vocab.ts`; `task build` green, 129 methods. Not recorded anywhere, so no screen shows it: where a site-injected region sits among the body's blocks (a region knows only whether it is inside the content root).
 - [ ] **D.1–D.3** (agent F) and **D.4** (agent H).
 - [ ] **G**: the gate, the docs, the report.
 

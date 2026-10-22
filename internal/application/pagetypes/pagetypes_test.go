@@ -133,6 +133,12 @@ func TestSeedingGivesASiteThePresetsOnce(t *testing.T) {
 	}
 	denied := 0
 	for _, f := range listed.Fields {
+		if wantAI := f.Key == string(field.Excerpt) || f.Key == string(field.SEOTitle); wantAI && !f.AIWritable {
+			t.Errorf("%s reads as no model's to write", f.Key)
+		}
+		if f.Key == string(field.SEOCanonical) && f.AIWritable {
+			t.Error("the canonical reads as AI-writable, want it a person's switch")
+		}
 		if f.Denied {
 			denied++
 			if f.Scopable {

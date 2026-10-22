@@ -1,12 +1,16 @@
 package observe_test
 
 import (
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -64,6 +68,38 @@ func TestThePageModelViewShowsAPageAsTheModel(t *testing.T) {
 
 	if _, err := s.service.Model(t.Context(), observe.ModelRequest{PageID: " "}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a model without a page = %v, want INVALID", err)
+	}
+}
+
+func TestThePageModelNamesTheFieldsARunWrote(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	s.run(t, observe.Options{})
+
+	tb500 := s.pageAt(t, "/tb-500/")
+	runID, at := "run-written", start.Add(time.Hour)
+	s.stores.mu.Lock()
+	s.stores.fields[tb500.ID][field.SEOTitle] = field.Value{
+		PageID: tb500.ID, Key: field.SEOTitle, Current: "TB-500 guide", CurrentHash: field.Hash("TB-500 guide"),
+		Base: "TB-500 guide", BaseHash: field.Hash("TB-500 guide"), WrittenAt: &at, WrittenRunID: &runID,
+	}
+	s.stores.fields[tb500.ID][field.Excerpt] = field.Value{
+		PageID: tb500.ID, Key: field.Excerpt, Current: "The owner's excerpt.", CurrentHash: field.Hash("The owner's excerpt."),
+		Base: "Our excerpt.", BaseHash: field.Hash("Our excerpt."), WrittenAt: &at, WrittenRunID: &runID,
+	}
+	s.stores.mu.Unlock()
+
+	view, err := s.service.Model(t.Context(), observe.ModelRequest{PageID: tb500.ID})
+	if err != nil {
+		t.Fatalf("Model: %v", err)
+	}
+	want := []observe.FieldView{
+		{Key: string(field.Excerpt), WrittenRunID: runID, WrittenAt: dto.NewTime(at), Ours: false},
+		{Key: string(field.SEOTitle), WrittenRunID: runID, WrittenAt: dto.NewTime(at), Ours: true},
+	}
+	if !slices.Equal(view.Fields, want) {
+		t.Errorf("fields = %+v, want the two fields the run wrote, the excerpt changed on the site since", view.Fields)
 	}
 }
 

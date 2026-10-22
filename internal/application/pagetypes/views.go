@@ -34,13 +34,14 @@ type Scope struct {
 }
 
 type Field struct {
-	Key       string `json:"key"`
-	Read      string `json:"read"`
-	Write     string `json:"write"`
-	Text      bool   `json:"text"`
-	Instanced bool   `json:"instanced"`
-	Denied    bool   `json:"denied"`
-	Scopable  bool   `json:"scopable"`
+	Key        string `json:"key"`
+	Read       string `json:"read"`
+	Write      string `json:"write"`
+	Text       bool   `json:"text"`
+	Instanced  bool   `json:"instanced"`
+	Denied     bool   `json:"denied"`
+	Scopable   bool   `json:"scopable"`
+	AIWritable bool   `json:"aiWritable"`
 }
 
 func scopeView(s field.Scope, stored bool) Scope {
@@ -84,7 +85,7 @@ func catalogView() []Field {
 	for _, spec := range specs {
 		out = append(out, Field{
 			Key: string(spec.Key), Read: string(spec.Read), Write: string(spec.Write), Text: spec.Text, Instanced: spec.Instanced,
-			Denied: spec.Denied, Scopable: spec.Key == field.Meta || field.CheckScope(spec.Key) == nil,
+			Denied: spec.Denied, Scopable: spec.Key == field.Meta || field.CheckScope(spec.Key) == nil, AIWritable: spec.AIWritable(),
 		})
 	}
 	return out
