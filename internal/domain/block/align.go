@@ -92,19 +92,19 @@ func pairGaps(out []int, left, right []Block) {
 		if i < len(out) {
 			nextRight = out[i]
 		}
-		for _, at := range align(texts(left[prevLeft+1:i], "\x00left"), texts(right[prevRight+1:nextRight], "\x00right")) {
+		for _, at := range align(texts(left[prevLeft+1:i]), texts(right[prevRight+1:nextRight])) {
 			out[prevLeft+1+at.left] = prevRight + 1 + at.right
 		}
 		prevLeft, prevRight = i, nextRight
 	}
 }
 
-func texts(blocks []Block, empty string) []string {
+func texts(blocks []Block) []string {
 	out := make([]string, 0, len(blocks))
 	for i := range blocks {
 		text := blocks[i].Text()
 		if text == "" {
-			text = empty
+			text = "\x00" + rendered(blocks[i].Raw)
 		}
 		out = append(out, text)
 	}

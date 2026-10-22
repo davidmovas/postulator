@@ -4062,3 +4062,16 @@ on what stage 2 left open and what was decided while building.
   ours from the item's links, there being no block to check. The observation keys against the body it
   stored before this walk's own read, `sync_back` against the body before its read-back, and a revert
   against the body before its put-back; `0070`'s down drops the column.
+
+### What the closing review found (session 3)
+
+A fresh reviewer walked the eight paths the brief named with one question: is there any path where a
+run, a relink, a revert, a sync, an image step or an agent tool changes what the client owns, or
+records his change as ours, or ours as his. It found one blocking path, five serious and five minor.
+Each is closed below with a test that failed first, or kept with its reason.
+
+- **Our textless blocks stayed ours across a relink only by luck.** `block.Align` paired the blocks in
+  a gap by their text, and a block with no text (a figure we drew, a rule) never paired, so a relink
+  over a page that holds our inline images recorded `page_blocks_written` without them and the next
+  run kept our figures as the client's and drew them again. A textless block now pairs by its render
+  (`TestARelinkKeepsOurTextlessBlocksOurs`, failing first with the figure gone from ours).

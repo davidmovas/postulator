@@ -79,6 +79,13 @@ func TestAlignAnswersMinusOneForABlockTheSiteDidNotKeep(t *testing.T) {
 			want:     []int{0, 1},
 		},
 		{
+			name:     "our figure, which has no text, between ours and the client's",
+			composed: join(ours, `<figure><img src="/wp-content/uploads/roast.jpg" alt="The roastery"></figure>`, client),
+			stored:   join(filtered, `<figure><img src="/wp-content/uploads/roast.jpg" alt="The roastery"></figure>`, client),
+			ours:     []string{block.Hash(ours), block.Hash(`<figure><img src="/wp-content/uploads/roast.jpg" alt="The roastery"></figure>`)},
+			want:     []int{0, 1, 2},
+		},
+		{
 			name:     "the client's block changed by the site",
 			composed: join(client, ours),
 			stored:   join(second, filtered),

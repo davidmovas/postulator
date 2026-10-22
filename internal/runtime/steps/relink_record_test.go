@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -144,6 +145,21 @@ func TestARelinkRecordsWhatTheSiteStored(t *testing.T) {
 			t.Errorf("contentHash = %s, want the stored hash %s", published.ContentHash, wp.ContentHash(stored.Content))
 		}
 	})
+}
+
+func TestARelinkKeepsOurTextlessBlocksOurs(t *testing.T) {
+	t.Parallel()
+
+	figure := `<figure><img src="/wp-content/uploads/roast.jpg" alt="The roastery"></figure>`
+	deps, _, _, _ := relinkDeps(t, clientParagraph+"\n\n"+ourParagraph+"\n\n"+figure)
+	log := &bodyLog{written: map[string][]string{"page-parent": {block.Hash(ourParagraph), block.Hash(figure)}}}
+	deps.Bodies = log
+	runRelink(t, deps)
+
+	written := log.ours("page-parent")
+	if !slices.Contains(written, block.Hash(figure)) || !slices.Contains(written, block.Hash(ourLinked)) || len(written) != 2 {
+		t.Errorf("ours = %v, want the linked paragraph and the figure we drew, both still ours", written)
+	}
 }
 
 func TestARelinkWritesNothingOverAPageItsSaveWouldAlter(t *testing.T) {
