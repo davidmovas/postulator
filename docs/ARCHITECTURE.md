@@ -147,9 +147,14 @@ keys) — and keeps the `observe.State` in its checkpoint, so a crash resumes at
 batch. The first observation, one asked for with `full`, every Nth (`fullWalkEvery`) and every
 one without the plugin walk the whole site; the others pass `since`. The step's adapters in
 `observe_readers.go` are the only place `*wp.Client` meets the observation's reader
-interfaces, which the use case declares over its own item types. `publish`, `publish_product`,
-`relink_page`, `relink_neighbors`, `revert` and `sync_back` record the body they wrote as the
-page's current and base, so the next observation raises no finding over our own write.
+interfaces, which the use case declares over its own item types. Writes go the other way through
+`application/edit`, the field registry, which declares a core, a store and a plugin writer over
+its own types; `edit_writers.go` adapts `*wp.Client` to them as `observe_readers.go` does for the
+readers, and a run builds the service per site client. `publish`, `relink_page`,
+`relink_neighbors` and `revert` record the body **the site stored** as the page's current and
+base, with the blocks of ours carried onto it (`block.Landed`, `block.Align`), so the next
+observation raises no finding over our own write; `sync_back` records its read-back as the
+current body only and reports a difference from the base.
 
 `relink_page` places the links a page's own rules ask for against the page's own cap and
 writes the body back under a hash compare-and-swap. It calls no model, so a relink, a repair
@@ -263,9 +268,10 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` **1.4.1** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies, `Update URI`
+`wp-plugin/postulator-companion` **1.5.1** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies, `Update URI`
 so wordpress.org never offers a plugin of the same slug) serves `/wp-json/postulator/v1` and
-advertises `bulk seo_meta seo_meta_read content_hash raw preview rendered meta terms settings`;
+advertises `bulk seo_meta seo_meta_read content_hash raw preview rendered meta terms settings
+meta_write guarded_write`; a client below 1.5.1 or missing one of them writes nothing through it;
 every permission callback requires `edit_posts`, and the password must belong to an
 **administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not
 name is refused from the cached manifest before any request, so a site on an older plugin answers
@@ -285,9 +291,10 @@ never firing one.
 | `GET /meta/{id}?keys=` | at most 50 keys asked, `is_protected_meta` keys refused with `meta_key_denied` (since 1.4.0) |
 | `GET /terms/{id}` | every term of every taxonomy the post's type carries, custom and internal ones included (since 1.4.0) |
 | `GET /settings` | the front, posts and privacy pages and the store's shop, cart, checkout, account and terms pages (since 1.4.0) |
-| `PUT /seo-meta/{id}` | writes the SEO fields present in the body, deleting a key given an empty value; posts only |
+| `PUT /seo-meta/{id}` | writes the SEO fields present in the body under an `expected` hash each, answering `409 hash_mismatch` naming what moved, and the hashes of what the SEO plugin stored; posts only |
+| `PUT /meta/{id}` | writes post meta by key under an expected hash each, refusing the deny set, protected keys and keys the user may not edit, and answers each key's stored value and hash (since 1.5.0) |
 | `GET /seo-meta/{id}` | the five SEO fields the post holds and the detected SEO plugin, behind the `seo_meta_read` capability; posts only (since 1.2.0) |
-| `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256; the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash |
+| `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256, and `saveStable` (whether this user's whole-post save leaves the content, title and excerpt as stored; the title and excerpt since 1.5.1); the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash and answers the content WordPress stored |
 | `POST /content/{id}/preview` | an hour-long link that renders a draft through the theme; the token is kept only as its sha256 and carried in `preview_token` (since 1.4.0), and `posts_results` flips that one post to `publish` for that request, uncached and noindex under core, Rank Math and Yoast alike (since 1.1.0) |
 
 | Field | Yoast | Rank Math | none |
