@@ -40,7 +40,8 @@ const (
 	ReasonRevertNoKind     = "nothing records whether the neighbor is a page, a post or a product, " +
 		"so the item that carries its number cannot be told apart from it"
 
-	ReasonRevertNoMeta = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
+	ReasonRevertMetaEdited = "the SEO meta was edited on the site since the run wrote it, so it was kept as it stands"
+	ReasonRevertNoMeta     = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
 		"plugin that can read it"
 	ReasonRevertNoMetaWriter = "the companion plugin on this site cannot put the SEO meta back"
 
@@ -103,7 +104,7 @@ func Revert(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			work := revertWork{page: page, client: client, published: published, canonical: record.canonical}
+			work := revertWork{page: page, client: client, published: published, meta: record.meta}
 
 			if reason, undone := undoPage(ctx, deps, sc, &result, work); !undone {
 				return handBack(result, reason)
@@ -124,12 +125,12 @@ func Revert(deps Deps) run.StepDef {
 type revertWork struct {
 	page      pagemap.Page
 	client    *wp.Client
-	canonical string
+	meta      writtenMeta
 	published PublishResult
 }
 
 type sourceRecord struct {
-	canonical string
+	meta      writtenMeta
 	published PublishResult
 	relinked  RelinkResult
 }
@@ -142,8 +143,24 @@ func sourceRun(sc *run.StepContext) (string, error) {
 	return *sc.Run.ParentRunID, nil
 }
 
-type writtenCanonical struct {
-	Canonical string `json:"canonical"`
+type writtenMeta struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Canonical   string `json:"canonical"`
+}
+
+func (m writtenMeta) expected(applied []string) map[string]string {
+	values := map[string]string{
+		"title": m.Title, "description": m.Description, "canonical": m.Canonical,
+		"ogTitle": m.Title, "ogDescription": m.Description,
+	}
+	out := make(map[string]string, len(applied))
+	for _, name := range applied {
+		if value, known := values[name]; known {
+			out[name] = block.BodyHash(value)
+		}
+	}
+	return out
 }
 
 func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (sourceRecord, bool, error) {
@@ -172,11 +189,11 @@ func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (sourc
 		if decodeErr != nil {
 			return sourceRecord{}, false, decodeErr
 		}
-		meta, _, decodeErr := blobOf[writtenCanonical](stored, run.ArtifactMeta)
+		meta, _, decodeErr := blobOf[writtenMeta](stored, run.ArtifactMeta)
 		if decodeErr != nil {
 			return sourceRecord{}, false, decodeErr
 		}
-		return sourceRecord{published: published, relinked: relinked, canonical: meta.Canonical}, true, nil
+		return sourceRecord{published: published, relinked: relinked, meta: meta}, true, nil
 	}
 	return sourceRecord{}, false, nil
 }
@@ -331,10 +348,12 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 	}
 
 	_, err = work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
-		applied, nil)
+		applied, work.meta.expected(applied))
 	switch {
 	case err == nil:
 		return "", true
+	case errors.IsCode(err, errors.Conflict):
+		return ReasonRevertMetaEdited, false
 	case wp.IsPluginMissing(err):
 		return ReasonRevertNoPlugin, false
 	case wp.IsPluginOutdated(err):
@@ -355,7 +374,7 @@ func canonicalStillOurs(ctx context.Context, work revertWork) ([]string, error) 
 	if err != nil {
 		return nil, err
 	}
-	if work.canonical == "" || held.Canonical != work.canonical {
+	if work.meta.Canonical == "" || held.Canonical != work.meta.Canonical {
 		applied = slices.DeleteFunc(applied, func(name string) bool { return name == "canonical" })
 	}
 	return applied, nil

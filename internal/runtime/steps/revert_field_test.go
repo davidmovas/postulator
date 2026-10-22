@@ -290,6 +290,47 @@ func TestAnOlderRunStillRevertsWhole(t *testing.T) {
 	}
 }
 
+func TestAnOlderRunsSEOMetaIsPutBackOnlyWhileItHoldsWhatThatRunWrote(t *testing.T) {
+	t.Parallel()
+
+	for _, edited := range []bool{false, true} {
+		s := publishedPost(t)
+		client := syncClient(t, s.server)
+		if _, err := client.SetSEOMeta(t.Context(), wp.TypePost, *s.page.WPID, wp.SEOMeta{Title: "Ours"}, nil); err != nil {
+			t.Fatalf("write the older run's SEO title: %v", err)
+		}
+		if edited {
+			if _, err := client.SetSEOMeta(t.Context(), wp.TypePost, *s.page.WPID, wp.SEOMeta{Title: "What the client wrote since"}, nil); err != nil {
+				t.Fatalf("edit the SEO title: %v", err)
+			}
+		}
+		older := s.published
+		older.Version, older.Fields, older.Blocks = 0, nil, nil
+		older.SEOApplied = []string{"title"}
+		previous := wp.SEOMeta{Title: "The owner's SEO title"}
+		older.PreviousMeta = &previous
+		source := newSourceRecord()
+		source.record(t, s.page.ID, map[run.ArtifactKind]any{
+			run.ArtifactPublishResult: older,
+			run.ArtifactMeta:          map[string]string{"title": "Ours", "description": "Ours."},
+		})
+		s.deps.Items, s.deps.Artifacts = source, source
+
+		reverted, _ := revertOf(t, s.deps, s.page.ID)
+		meta := seoOf(t, s.server, *s.page.WPID)
+		want := "The owner's SEO title"
+		if edited {
+			want = "What the client wrote since"
+		}
+		if meta.Title != want {
+			t.Errorf("edited %t: the SEO title is %q, want %q", edited, meta.Title, want)
+		}
+		if _, kept := findingOf(reverted, steps.CodeRevertMetaKept); kept != edited {
+			t.Errorf("edited %t: the revert reported the meta kept = %t, want it kept only over the client's edit", edited, kept)
+		}
+	}
+}
+
 func TestAnOlderRunsCanonicalIsPutBackOnlyWhileItHoldsWhatThatRunWrote(t *testing.T) {
 	t.Parallel()
 
@@ -312,7 +353,10 @@ func TestAnOlderRunsCanonicalIsPutBackOnlyWhileItHoldsWhatThatRunWrote(t *testin
 		source := newSourceRecord()
 		source.record(t, s.page.ID, map[run.ArtifactKind]any{
 			run.ArtifactPublishResult: older,
-			run.ArtifactMeta:          map[string]string{"title": "Ours", "description": "Ours.", "canonical": "https://shop.example.com/ours/"},
+			run.ArtifactMeta: map[string]string{
+				"title": s.published.WrittenMeta.Title, "description": s.published.WrittenMeta.Description,
+				"canonical": "https://shop.example.com/ours/",
+			},
 		})
 		s.deps.Items, s.deps.Artifacts = source, source
 

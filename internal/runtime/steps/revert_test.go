@@ -219,14 +219,18 @@ func (s *revertStand) updatedOverMeta(t *testing.T, pageID, body string, previou
 		}
 	}
 
-	s.source.record(t, pageID, map[run.ArtifactKind]any{
+	artifacts := map[run.ArtifactKind]any{
 		run.ArtifactPublishResult: steps.PublishResult{
 			WPID: wpID, Created: false, ContentHash: wp.ContentHash(body),
 			PreviousContent: updatedBefore, PreviousContentHash: wp.ContentHash(updatedBefore),
 			PreviousMeta: previous,
 			SEOApplied:   applied, Skipped: []string{},
 		},
-	})
+	}
+	if previous != nil {
+		artifacts[run.ArtifactMeta] = map[string]string{"title": "written by the run", "description": "written by the run"}
+	}
+	s.source.record(t, pageID, artifacts)
 }
 
 func findingOf(reverted steps.RevertResult, code string) (content.Finding, bool) {
