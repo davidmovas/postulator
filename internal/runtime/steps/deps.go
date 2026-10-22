@@ -61,6 +61,7 @@ type unitOfWork interface {
 
 type bodyRecorder interface {
 	Record(ctx context.Context, pageID, raw string, at time.Time) error
+	Observe(ctx context.Context, snapshot block.Snapshot) error
 	Get(ctx context.Context, pageID string) (current, base block.Snapshot, found bool, err error)
 	ReplaceWritten(ctx context.Context, pageID string, hashes []string, runID string, at time.Time) error
 	ListWritten(ctx context.Context, pageID string) ([]block.Written, error)

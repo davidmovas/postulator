@@ -6,10 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -71,6 +74,35 @@ func runSyncBack(t *testing.T, deps steps.Deps, sc *run.StepContext) steps.SyncR
 		t.Fatalf("decode the sync result: %v", err)
 	}
 	return synced
+}
+
+func TestSyncBackKeepsTheBaseOfWhatTheRunWrote(t *testing.T) {
+	t.Parallel()
+
+	edited := `<h1>Espresso</h1><p>The owner rewrote the page seconds after the run.</p>`
+	deps, server, _, wpID := syncBackDeps(t)
+	log := &bodyLog{}
+	deps.Bodies = log
+	if err := log.Record(t.Context(), "page-child", syncedBody, time.Time{}); err != nil {
+		t.Fatalf("record the body the run wrote: %v", err)
+	}
+	server.Rewrite(wpID, edited)
+
+	synced := runSyncBack(t, deps, syncBackContext(t, wpID))
+
+	current, base, found, err := log.Get(t.Context(), "page-child")
+	if err != nil || !found {
+		t.Fatalf("Get = %v, found %t", err, found)
+	}
+	if base.Hash != block.BodyHash(syncedBody) {
+		t.Errorf("the base is %q, want what the run wrote kept as the base", base.Raw)
+	}
+	if current.Hash != block.BodyHash(edited) {
+		t.Errorf("the current body is %q, want the owner's edit", current.Raw)
+	}
+	if !slices.ContainsFunc(synced.Findings, func(f content.Finding) bool { return f.Code == string(finding.BodyChangedOnSite) }) {
+		t.Errorf("findings = %+v, want the owner's edit reported as a change on the site", synced.Findings)
+	}
 }
 
 func TestSyncBackReadsThroughThePlugin(t *testing.T) {

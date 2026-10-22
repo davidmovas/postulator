@@ -4014,3 +4014,20 @@ on what stage 2 left open and what was decided while building.
   still takes the write as ours only while the stored body renders as the composed one, so a filter
   that changes a render (an attribute added to our link) pauses the page or reports the neighbour's
   conflict rather than claim a body it cannot tell from the client's edit.
+- **A revert records what the site stored.** The whole-body put-back of an older publish result, of
+  a product and of a relinked neighbour (`writeBodyBack`, `undoNeighbor`) dropped the raw PUT's
+  answer and recorded the body it had sent as current and base, so on a site whose save filters
+  reformat it the next walk raised `body_changed_on_site` against the client and the link marks were
+  rebuilt from a body the site did not hold. Each now records the content the site answered, or the
+  live content where the site already held the before hash and nothing was sent
+  (`TestARevertRecordsWhatTheSiteStored`, failing first for the page and the neighbour). The
+  per-block revert of a versioned result already did (`revertBody`).
+- **`sync_back` keeps the base of what the run wrote.** It read the page back and recorded the site's
+  body as current and base both, so an edit the client made in the seconds between our write and the
+  read-back became the base, and no later walk raised `body_changed_on_site` for it. It now records
+  the read-back as the current body only (`Bodies.Observe`; the base stays what `publish` or the
+  relink recorded from the site's answer) and, where the two differ, reports the difference in the
+  sync result as a warning coded `body_changed_on_site`; the next `sync_site` raises the persistent
+  finding from the same difference. It writes no field: `publish` records every field's base from
+  the value the site answered (`TestSyncBackKeepsTheBaseOfWhatTheRunWrote`, failing first with the
+  edit as the base and nothing reported).

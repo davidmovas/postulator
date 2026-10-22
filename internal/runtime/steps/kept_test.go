@@ -56,6 +56,22 @@ func (b *bodyLog) Get(_ context.Context, pageID string) (current, base block.Sna
 	return current, base, true, nil
 }
 
+func (b *bodyLog) Observe(_ context.Context, snapshot block.Snapshot) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.bodies == nil {
+		b.bodies = map[string]string{}
+	}
+	if b.edited == nil {
+		b.edited = map[string]string{}
+	}
+	if _, held := b.bodies[snapshot.PageID]; !held {
+		b.bodies[snapshot.PageID] = snapshot.Raw
+	}
+	b.edited[snapshot.PageID] = snapshot.Raw
+	return nil
+}
+
 func (b *bodyLog) Record(_ context.Context, pageID, raw string, _ time.Time) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()

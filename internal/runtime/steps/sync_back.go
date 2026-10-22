@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -42,6 +43,28 @@ func headingOne(doc *content.Document) string {
 		}
 	}
 	return ""
+}
+
+func observeReadBack(ctx context.Context, deps Deps, page pagemap.Page, body string, at time.Time) (*content.Finding, error) {
+	if deps.Bodies == nil {
+		return nil, nil
+	}
+	if err := deps.Bodies.Observe(ctx, block.Snapshot{
+		PageID: page.ID, Side: block.Current, Raw: body, Hash: block.BodyHash(body), Kind: block.Parse(body).Kind, ObservedAt: at,
+	}); err != nil {
+		return nil, err
+	}
+	current, base, found, err := deps.Bodies.Get(ctx, page.ID)
+	if err != nil || !found || current.Hash == base.Hash {
+		return nil, err
+	}
+	return &content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     string(finding.BodyChangedOnSite),
+		Message: "the body of " + page.Path + " read back from the site is not what the run wrote there: it was edited on " +
+			"the site since, and the edit is kept as the site's current body, never as the base of what the run wrote",
+		Details: map[string]any{"pageId": page.ID, "path": page.Path, "baseHash": base.Hash, "currentHash": current.Hash},
+	}, nil
 }
 
 func SyncBack(deps Deps) run.StepDef {
@@ -106,10 +129,9 @@ func SyncBack(deps Deps) run.StepDef {
 			index := pagemap.NewIndex(pages)
 			links := observedOn(sc.Page, index, pagemap.NewSite(owner.BaseURL), block.LinksOf(body, written),
 				block.HeldOurs(stored), now)
-			if deps.Bodies != nil {
-				if recordErr := deps.Bodies.Record(ctx, sc.Page.ID, body, now); recordErr != nil {
-					return run.Result{}, recordErr
-				}
+			moved, err := observeReadBack(ctx, deps, sc.Page, body, now)
+			if err != nil {
+				return run.Result{}, err
 			}
 
 			next := sc.Page
@@ -132,6 +154,9 @@ func SyncBack(deps Deps) run.StepDef {
 				WPID: item.ID, URL: item.Link, Status: item.Status, ContentHash: wp.ContentHash(body),
 				Source: source, Links: len(links), ModifiedAt: item.Modified.UTC(),
 				Mismatches: differs, Findings: planFindings(next, differs),
+			}
+			if moved != nil {
+				result.Findings = append(result.Findings, *moved)
 			}
 			if seen := storefrontFinding(ctx, client, next, item, body); seen != nil {
 				result.Findings = append(result.Findings, *seen)
