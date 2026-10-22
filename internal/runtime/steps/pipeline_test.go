@@ -281,7 +281,7 @@ func (p *pipeline) acceptAReview(t *testing.T, item run.Item) {
 	if item.Status != run.StatusPaused || item.PauseReason != run.PauseAwaitingReview {
 		return
 	}
-	if err := p.engine.Accept(t.Context(), item.ID); err != nil {
+	if err := p.engine.Accept(t.Context(), item.ID, nil); err != nil {
 		t.Fatalf("accept the review of %s: %v", item.CurrentStep, err)
 	}
 }

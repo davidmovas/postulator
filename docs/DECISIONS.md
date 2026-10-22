@@ -4174,3 +4174,34 @@ each is folded into the entries below.
   (`TestARevertFindsOurBlocksTheSiteReformatted`, the reviewer's proof with a linkless client body so
   the save stays stable; `TestOurBlocksStayOursUnderARenderChangingFilter`; both failing first). The
   plan's `theirs` and `part` had no reader left and are gone; an older checkpoint still decodes.
+- **A person accepts a draft run's review field by field** (the owner's answer at this session's
+  plan). `RunsService.RetryStep` takes `fields` with `acceptFindings`: the keys a person ticked in
+  the review, each one the catalog knows, not on the deny list, and among what the item's newest
+  `edit_plan` offers (its field changes, and the body under `PageEdit.body`, `body` or
+  `product_description`, when its blocks change). Anything else is refused as invalid. So are an
+  explicit empty set, fields on a plain retry, fields on an item no review holds, and fields on a
+  review that changes bodies only (a relink's), which is accepted whole. The agent's
+  `runs_retry_step` takes its own arguments, so its schema keeps its bytes (90 tools, 61,343).
+  `Engine.Accept(itemID, fields)` writes the set beside the acceptance on every accept, empty
+  meaning all, and `run.ClearAcceptance` clears both wherever the acceptance was cleared, so a
+  partial acceptance never outlives the plan it was given for: accept {title}, the site moves,
+  the plan is shown again, a whole acceptance writes everything. `publish` narrows only after
+  the review gate has compared the hash of the plan it shows, before its first write unit:
+  - a declined key joins the plan's kept keys, so nothing records it under the run and the next
+    run still reads it as the client's;
+  - its write is emptied (the title kept, the excerpt and an SEO field with its Open Graph twin
+    unsent, a variation, an image's text, a list or a custom field dropped);
+  - a declined body sets `keepBody`, so neither the raw route nor core's update sends it, and the
+    body is neither recorded nor its blocks claimed;
+  - a unit left with nothing to send leaves the plan, and the check reads only what is still
+    written;
+  - the result names what was declined (`PublishResult.declined`) and its field and block diffs
+    hold only what was written, the product snapshot included.
+
+  A page we found keeps the item the site answered from its plan, so a page whose item unit drops
+  out still records what the site holds. `TestADeclinedFieldIsNeverRecordedAsOurs` proves that a
+  declined key never reaches `Fields.Record`, the only writer of `written_run_id`, rather than
+  running a second live publish, because the step harness's field log does not feed a recorded
+  row back. A page's featured image and a product's first image are filled only where none exists
+  and are no part of the diff; a draft run uploads none over an existing page
+  (`images_wait_for_live`).

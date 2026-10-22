@@ -206,7 +206,7 @@ func TestAcceptLetsAHeldStepGoOnWithItsFindings(t *testing.T) {
 		t.Fatalf("the note reads %q", items[0].Note)
 	}
 
-	if err = engine.Accept(t.Context(), items[0].ID); err != nil {
+	if err = engine.Accept(t.Context(), items[0].ID, nil); err != nil {
 		t.Fatalf("Accept: %v", err)
 	}
 	finished := harness.waitForRun(t, queued.ID, run.StatusCompleted)

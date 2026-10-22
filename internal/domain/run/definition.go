@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	MaxRetryAttempts = 10
-	CheckpointAccept = "accept"
+	MaxRetryAttempts       = 10
+	CheckpointAccept       = "accept"
+	CheckpointAcceptFields = "accept.fields"
 )
 
 type RetryPolicy struct {
@@ -55,6 +56,24 @@ func (c *StepContext) Artifact(kind ArtifactKind) (Artifact, error) {
 func (c *StepContext) Accepted() bool {
 	step, found, err := Get[string](c.Check, CheckpointAccept)
 	return err == nil && found && step == c.Item.CurrentStep
+}
+
+func (c *StepContext) AcceptedFields() []field.Key {
+	if !c.Accepted() {
+		return nil
+	}
+	keys, found, err := Get[[]field.Key](c.Check, CheckpointAcceptFields)
+	if err != nil || !found || len(keys) == 0 {
+		return nil
+	}
+	return keys
+}
+
+func ClearAcceptance(c Checkpoint) error {
+	if err := Set(c, CheckpointAccept, ""); err != nil {
+		return err
+	}
+	return Set(c, CheckpointAcceptFields, []field.Key{})
 }
 
 func (c *StepContext) Param(name string) (any, bool) {

@@ -311,7 +311,7 @@ func TestAcceptingAHeldValidationLetsThePageGoOn(t *testing.T) {
 	if err != nil || len(items) != 1 {
 		t.Fatalf("ByRun = %+v, %v", items, err)
 	}
-	if err = engine.Accept(t.Context(), items[0].ID); err != nil {
+	if err = engine.Accept(t.Context(), items[0].ID, nil); err != nil {
 		t.Fatalf("Accept: %v", err)
 	}
 

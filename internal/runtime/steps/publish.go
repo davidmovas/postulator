@@ -47,6 +47,7 @@ type PublishResult struct {
 	Mismatches          []Mismatch        `json:"mismatches"`
 	Fields              []field.Change    `json:"fields"`
 	Blocks              []block.Change    `json:"blocks"`
+	Declined            []field.Key       `json:"declined,omitempty"`
 	WPID                int64             `json:"wpId"`
 	Version             int               `json:"version,omitempty"`
 	Created             bool              `json:"created"`
@@ -126,7 +127,7 @@ func orStopped(sc *run.StepContext, stop *run.Result, err error) (run.Result, er
 		return *stop, nil
 	}
 	cleared := run.NewCheckpoint()
-	if setErr := run.Set(cleared, run.CheckpointAccept, ""); setErr != nil {
+	if setErr := run.ClearAcceptance(cleared); setErr != nil {
 		return run.Result{}, setErr
 	}
 	return withChecks(*stop, cleared), nil
@@ -150,6 +151,7 @@ func reviewThePlan(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 	if err != nil || held.held != nil {
 		return orHeld(held, err)
 	}
+	state.narrow(sc.AcceptedFields(), planned.Body)
 	waiting, err := state.wait(message)
 	if err != nil {
 		return run.Result{}, err
@@ -169,10 +171,21 @@ func (d Deps) planEdit(ctx context.Context, sc *run.StepContext, plan *publishPl
 	if err != nil {
 		return PageEdit{}, err
 	}
-	return PageEdit{
+	page := PageEdit{
 		PageID: sc.Page.ID, Path: sc.Page.Path, WPID: plan.WPID, Fields: plan.fieldChanges(),
 		Blocks: block.Diff(plan.Previous, plan.Final, written),
-	}, nil
+	}
+	if slices.ContainsFunc(page.Blocks, func(c block.Change) bool { return c.Change != block.ChangeKept }) {
+		page.Body = plan.bodyKey()
+	}
+	return page, nil
+}
+
+func (p *publishPlan) bodyKey() field.Key {
+	if p.Product {
+		return field.ProductDescription
+	}
+	return field.Body
 }
 
 func (p *publishPlan) fieldChanges() []field.Change {
@@ -339,13 +352,12 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 		Unstable: found && !site.stable, Custom: custom,
 	}
 	if found {
+		read := answerOf(existing)
+		plan.Item = &read
 		plan.Writes = append(plan.Writes, unitCheck)
 	}
 	if (!found || request.carries()) && !plan.Unstable {
 		plan.Writes = append(plan.Writes, unitItem)
-	} else {
-		read := answerOf(existing)
-		plan.Item = &read
 	}
 	plan.Writes = append(plan.Writes, plan.customUnits()...)
 	if seo.Send {
@@ -419,7 +431,7 @@ func checkBeforeWriting(ctx context.Context, sc *run.StepContext, client *wp.Cli
 			{key: field.Title, moved: !request.KeepTitle && item.Title != plan.SiteTitle},
 			{key: field.Excerpt, moved: request.Excerpt != nil && item.Excerpt != plan.Excerpt},
 			{key: field.FeaturedImage, moved: request.Featured != 0 && item.FeaturedMedia != plan.SiteFeatured},
-			{key: field.Body, moved: !request.ViaRaw && wp.ContentHash(item.Content) != plan.SiteHash},
+			{key: field.Body, moved: request.sendsBody() && wp.ContentHash(item.Content) != plan.SiteHash},
 		} {
 			if check.moved {
 				moved = append(moved, string(check.key))
@@ -565,7 +577,7 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 		excerpt := plan.Excerpt
 		state.Result.Excerpt, state.Result.PreviousExcerpt = *plan.Request.Excerpt, &excerpt
 	}
-	if !plan.Request.ViaRaw {
+	if plan.Request.sendsBody() {
 		plan.Stored = &stored
 		state.Result.ContentHash = wp.ContentHash(stored)
 		if plan.Plugin {
@@ -597,7 +609,7 @@ func (p *publishPlan) coreWrites() []edit.Write {
 	if p.Request.Featured != 0 {
 		writes = append(writes, edit.Write{Key: field.FeaturedImage, Value: new(strconv.FormatInt(p.Request.Featured, 10))})
 	}
-	if !p.Request.ViaRaw {
+	if p.Request.sendsBody() {
 		writes = append(writes, edit.Write{Key: field.Body, Value: new(p.Final), Expected: new(p.SiteHash)})
 	}
 	return writes
@@ -704,7 +716,12 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 	if plan.Unstable {
 		body = plan.Previous
 	}
-	if err := recordWritten(ctx, deps, sc, sc.Page.ID, body, title, state.Result.SEOApplied, state.Result.WrittenMeta, kept); err != nil {
+	if !plan.Request.KeepBody {
+		if err := recordBody(ctx, deps, sc.Page.ID, body); err != nil {
+			return state.failed(err)
+		}
+	}
+	if err := recordWritten(ctx, deps, sc, sc.Page.ID, title, state.Result.SEOApplied, state.Result.WrittenMeta, kept); err != nil {
 		return state.failed(err)
 	}
 	if plan.Request.Excerpt != nil {

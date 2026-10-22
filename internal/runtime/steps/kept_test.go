@@ -106,6 +106,12 @@ func (b *bodyLog) ListWritten(_ context.Context, pageID string) ([]block.Written
 	return out, nil
 }
 
+func (b *bodyLog) recorded(pageID string) string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.bodies[pageID]
+}
+
 func (b *bodyLog) ours(pageID string) []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()

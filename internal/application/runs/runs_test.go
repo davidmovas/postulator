@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -25,20 +26,21 @@ import (
 )
 
 type fakeEngine struct {
-	assigned    map[string]string
-	queued      run.Run
-	estimated   run.Run
-	estimate    run.Estimate
-	enqueueErr  error
-	failWith    error
-	paused      string
-	reason      run.PauseReason
-	resumed     string
-	cancelled   string
-	retried     string
-	accepted    string
-	regenerated string
-	restarted   []string
+	assigned       map[string]string
+	queued         run.Run
+	estimated      run.Run
+	estimate       run.Estimate
+	enqueueErr     error
+	failWith       error
+	paused         string
+	reason         run.PauseReason
+	resumed        string
+	cancelled      string
+	retried        string
+	accepted       string
+	regenerated    string
+	restarted      []string
+	acceptedFields []field.Key
 }
 
 func (f *fakeEngine) Enqueue(_ context.Context, record run.Run) (run.Run, error) {
@@ -78,8 +80,8 @@ func (f *fakeEngine) RetryStep(_ context.Context, itemID string) error {
 	return f.failWith
 }
 
-func (f *fakeEngine) Accept(_ context.Context, itemID string) error {
-	f.accepted = itemID
+func (f *fakeEngine) Accept(_ context.Context, itemID string, fields []field.Key) error {
+	f.accepted, f.acceptedFields = itemID, fields
 	return f.failWith
 }
 

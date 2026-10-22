@@ -622,12 +622,16 @@ func finishProduct(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 	if err := recordProduct(ctx, deps, sc, stored); err != nil {
 		return state.failed(err)
 	}
-	if err := recordBody(ctx, deps, sc.Page.ID, body); err != nil {
-		return state.failed(err)
-	}
 	recorded := map[field.Key]string{}
+	if !plan.Request.KeepBody {
+		if err := recordBody(ctx, deps, sc.Page.ID, body); err != nil {
+			return state.failed(err)
+		}
+		if !plan.Unstable {
+			recorded[field.ProductDescription] = body
+		}
+	}
 	if !plan.Unstable {
-		recorded[field.ProductDescription] = body
 		if !plan.kept()[field.ProductShortDescription] {
 			recorded[field.ProductShortDescription] = stored.ShortDescription
 		}

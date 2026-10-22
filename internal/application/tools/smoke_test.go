@@ -30,6 +30,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	domainrun "github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -80,7 +81,7 @@ func (stubEngine) Cancel(context.Context, string) error { return nil }
 
 func (stubEngine) RetryStep(context.Context, string) error { return nil }
 
-func (stubEngine) Accept(context.Context, string) error { return nil }
+func (stubEngine) Accept(context.Context, string, []field.Key) error { return nil }
 
 func (stubEngine) Regenerate(context.Context, string, []string) error { return nil }
 

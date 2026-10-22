@@ -225,6 +225,15 @@ func (s *Service) GetArtifact(ctx context.Context, req GetArtifactRequest) (GetA
 		return GetArtifactResponse{}, err
 	}
 
+	latest := latestOf(stored, kind)
+	if latest == nil {
+		return GetArtifactResponse{}, errors.New(errors.NotFound, "the run item has no artifact of this kind").
+			WithDetail("itemId", itemID).WithDetail("kind", req.Kind)
+	}
+	return GetArtifactResponse{Artifact: artifactView(*latest)}, nil
+}
+
+func latestOf(stored []run.Artifact, kind run.ArtifactKind) *run.Artifact {
 	var latest *run.Artifact
 	for i := range stored {
 		if stored[i].Kind != kind {
@@ -234,9 +243,5 @@ func (s *Service) GetArtifact(ctx context.Context, req GetArtifactRequest) (GetA
 			latest = &stored[i]
 		}
 	}
-	if latest == nil {
-		return GetArtifactResponse{}, errors.New(errors.NotFound, "the run item has no artifact of this kind").
-			WithDetail("itemId", itemID).WithDetail("kind", req.Kind)
-	}
-	return GetArtifactResponse{Artifact: artifactView(*latest)}, nil
+	return latest
 }

@@ -8,12 +8,9 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
-func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, body, title string, seoApplied []string,
+func recordWritten(ctx context.Context, deps Deps, sc *run.StepContext, pageID, title string, seoApplied []string,
 	meta *wp.SEOMeta, kept keptFields) error {
 	now := deps.now()
-	if err := recordBody(ctx, deps, pageID, body); err != nil {
-		return err
-	}
 	if deps.Fields == nil {
 		return nil
 	}

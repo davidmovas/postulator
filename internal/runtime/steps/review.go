@@ -19,6 +19,7 @@ const ReasonAwaitingReview = "this is a draft run, so nothing is written to a pa
 type PageEdit struct {
 	PageID string         `json:"pageId"`
 	Path   string         `json:"path"`
+	Body   field.Key      `json:"body,omitempty"`
 	Fields []field.Change `json:"fields"`
 	Blocks []block.Change `json:"blocks"`
 	WPID   int64          `json:"wpId"`
@@ -51,7 +52,7 @@ func reviewGate(sc *run.StepContext, key string, plan EditPlan, message string) 
 	check := run.NewCheckpoint()
 	accepted := sc.Accepted()
 	if accepted {
-		if err := run.Set(check, run.CheckpointAccept, ""); err != nil {
+		if err := run.ClearAcceptance(check); err != nil {
 			return gate{}, err
 		}
 	}

@@ -831,6 +831,15 @@ At most two agents, on disjoint packages. This session ran its C.2 and C.3 throu
 - **Deviations:** the plugin's `saveStable` contract moved, so the client's minimum is 1.5.1; `bodyRecorder` gains `Observe`; `adopt` takes an `adoption{raw, last, placed, moved}`; `recordWritten` takes the stored meta, not the artifact; `relinkWrite` gains `placed` (an older state decodes without it and its links are keyed as legacy marks); `block.Align` pairs the client's blocks by render and the rest by text in order, a textless block by its render; the plan's `TestTheLinkFormCountsTheClientsLinksOnly` never existed (`TestOurLinksFollowTheSitesContextualFormInTheSnapshot` is the one); `TestPageLinkRepoReplaceForPage` carries the block hash instead of a new round-trip test.
 - **Stage 4 must know:** a link's row carries the hash of the block it sits in when it is ours; a legacy row with none is keyed once against the last stored body; `sync_back` reports a body difference as a step finding and the next `sync_site` raises the persistent one; the revert's `ReasonRevertBodyUnproven` and `ReasonRevertMetaEdited` are hand-backs a person resolves.
 
+#### Session 4, 2026-10-22 (the stored diff, per-field acceptance, D, the gate, the docs)
+
+The owner chose per-field acceptance of a draft run's review, built in Go before D. A Fable critic read the session's plan (one blocking, six serious, five minor findings, folded in).
+- [x] **1. The stored diff** (`929613b`): `block.Landed`, `OwnerSite`, `recordOurBlocks` from the landed diff; the open review item is closed.
+- [x] **2. Per-field acceptance**: `RetryStepRequest.fields` (a person's), `runs_retry_step`'s own arguments (schema unchanged, 61,343 bytes), `Engine.Accept(itemID, fields)`, `run.ClearAcceptance`, `PageEdit.body`, publish narrowed after the gate, `PublishResult.Declined`, a relink's review accepted whole.
+- [ ] **3. What the screens read**: `observe.ModelView.fields`, `pagetypes.Field.aiWritable`, `blockOwners` and `blockChanges` in `vocab.ts`.
+- [ ] **D.1–D.3** (agent F) and **D.4** (agent H).
+- [ ] **G**: the gate, the docs, the report.
+
 ##### 0.0 — the plan
 - This task list. Commit `docs(plan): stage 3's task list`.
 

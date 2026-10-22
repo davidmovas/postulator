@@ -84,10 +84,15 @@ type itemPlan struct {
 	Featured  int64   `json:"featured"`
 	ViaRaw    bool    `json:"viaRaw"`
 	KeepTitle bool    `json:"keepTitle"`
+	KeepBody  bool    `json:"keepBody,omitempty"`
 }
 
 func (p itemPlan) carries() bool {
-	return !p.KeepTitle || p.Excerpt != nil || !p.ViaRaw || p.Featured != 0
+	return !p.KeepTitle || p.Excerpt != nil || p.sendsBody() || p.Featured != 0
+}
+
+func (p itemPlan) sendsBody() bool {
+	return !p.ViaRaw && !p.KeepBody
 }
 
 type seoPlan struct {
