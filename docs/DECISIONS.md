@@ -4213,6 +4213,16 @@ each is folded into the entries below.
   (`TestAFieldRevertOfAPageTheRunCreatedLeavesItOnTheSite`). The publish pane offers no field ticks
   for a created page; the Model tab, which does not know whether the writing run created the page,
   says so in its confirmation.
+- **Our H1 is never written into an existing page with no text of the client's** (found by the gate's
+  stand run on the replica's main hub). With `rewrites` off, the composition wrote the whole rendered
+  body, its `<h1>` included, wherever the page held no client block, so the client's hubs, whose raw
+  is empty and whose theme prints the title as the H1, gained a second H1. A.5's "ours carries no
+  H1, as the kept path already did" held only where the client had blocks. The body written over an
+  existing page is now ours without its H1 in every case
+  (`TestAnExistingPageWithAnEmptyBodyGetsNoHeadingOfOurs`, failing first with the H1 on the site).
+  The guard recognises our own earlier write in either form, with the H1 (a page we created, or one
+  written before this) or without (`TestARerunOverAnEmptyPageTakesTheFirstRunsBodyForOurs`). A page
+  we create still carries its H1 in the content, as it always has; that is left for the owner.
 - **The screens (D.1 to D.4).** The run report's publish pane shows each field before and after and
   the body's blocks as the site stored them, marked ours, the client's or the site's and kept, added
   or removed, with the regions the site injects read from the page model (whether inside the content

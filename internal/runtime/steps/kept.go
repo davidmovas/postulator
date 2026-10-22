@@ -131,12 +131,22 @@ type guarded struct {
 	client   bool
 }
 
-func composed(raw string, written []string, ours, rendered string) (final, part string, client bool) {
+func composed(raw string, written []string, ours, whole string) (final, part string, client bool) {
 	final, client = block.Keep(raw, written, ours)
 	if !client {
-		return rendered, rendered, false
+		return whole, whole, false
 	}
 	return final, block.Part(raw, written, ours), true
+}
+
+func earlierWrite(onSite string, kept *content.KeptBody, ours, rendered string) (string, bool) {
+	for _, whole := range []string{ours, rendered} {
+		earlier, part, _ := composed(kept.Raw, kept.Written, ours, whole)
+		if block.SameRender(onSite, earlier) {
+			return part, true
+		}
+	}
+	return "", false
 }
 
 func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, site liveBody, rendered string) (guarded, bool, error) {
@@ -151,8 +161,8 @@ func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, 
 	read := block.Client(kept.Raw, kept.Written)
 	theirs := block.Client(site.raw, written)
 	if block.Hash(read) != block.Hash(theirs) {
-		earlier, part, _ := composed(kept.Raw, kept.Written, ours, rendered)
-		if !block.SameRender(site.raw, earlier) {
+		part, held := earlierWrite(site.raw, kept, ours, rendered)
+		if !held {
 			return guarded{}, false, nil
 		}
 		written = append(slices.Clone(written), block.Ours(site.raw, read, part)...)
@@ -161,7 +171,7 @@ func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, 
 			return guarded{}, false, nil
 		}
 	}
-	final, _, client := composed(site.raw, written, ours, rendered)
+	final, _, client := composed(site.raw, written, ours, ours)
 	previous := site.raw
 	if site.hashed() != kept.Hash {
 		previous = kept.Raw

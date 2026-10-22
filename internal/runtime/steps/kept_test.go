@@ -184,6 +184,39 @@ func TestTheClientsBlocksAreKeptWhenRewritesIsOff(t *testing.T) {
 	}
 }
 
+func TestAnExistingPageWithAnEmptyBodyGetsNoHeadingOfOurs(t *testing.T) {
+	t.Parallel()
+
+	kept := &content.KeptBody{Raw: "", Hash: block.BodyHash("")}
+	deps, server, _, sc := keptRunOver(t, "", oursBody, kept)
+
+	published := runPublish(t, deps, sc)
+	stored, _ := server.Lookup(published.WPID)
+	if stored.Content != oursBody {
+		t.Errorf("the site holds %q, want our body with its H1 left to the theme, which prints the page's title", stored.Content)
+	}
+}
+
+func TestARerunOverAnEmptyPageTakesTheFirstRunsBodyForOurs(t *testing.T) {
+	t.Parallel()
+
+	kept := &content.KeptBody{Raw: "", Hash: block.BodyHash("")}
+	deps, server, _, sc := keptRunOver(t, "", oursBody, kept)
+	deps.Bodies = nil
+	first := runPublish(t, deps, sc)
+
+	result, err := drive(t, steps.Publish(deps), sc)
+	if err != nil {
+		t.Fatalf("the rerun: %v", err)
+	}
+	if result.Next == run.TransitionPause {
+		t.Fatalf("the rerun paused with %q, want the site's body, our own first write without its H1, taken for ours", result.Message)
+	}
+	if stored, _ := server.Lookup(first.WPID); stored.Content != oursBody {
+		t.Errorf("the site holds %q, want our body once", stored.Content)
+	}
+}
+
 func TestTwoRunsLeaveOneCopyOfOurSections(t *testing.T) {
 	t.Parallel()
 
