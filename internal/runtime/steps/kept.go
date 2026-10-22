@@ -127,8 +127,6 @@ func readLiveBody(ctx context.Context, client *wp.Client, itemType wp.ItemType, 
 
 type guarded struct {
 	final    string
-	theirs   string
-	part     string
 	previous string
 	client   bool
 }
@@ -163,12 +161,12 @@ func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, 
 			return guarded{}, false, nil
 		}
 	}
-	final, part, client := composed(site.raw, written, ours, rendered)
+	final, _, client := composed(site.raw, written, ours, rendered)
 	previous := site.raw
 	if site.hashed() != kept.Hash {
 		previous = kept.Raw
 	}
-	return guarded{final: final, theirs: theirs, part: part, previous: previous, client: client}, true, nil
+	return guarded{final: final, previous: previous, client: client}, true, nil
 }
 
 func (d Deps) writtenOf(ctx context.Context, pageID string, kept *content.KeptBody) ([]string, error) {
@@ -186,9 +184,9 @@ func (d Deps) writtenOf(ctx context.Context, pageID string, kept *content.KeptBo
 	return out, nil
 }
 
-func recordOurBlocks(ctx context.Context, deps Deps, sc *run.StepContext, stored, theirs, part string) error {
+func recordOurBlocks(ctx context.Context, deps Deps, sc *run.StepContext, landed []block.Change) error {
 	if deps.Bodies == nil {
 		return nil
 	}
-	return deps.Bodies.ReplaceWritten(ctx, sc.Page.ID, block.Ours(stored, theirs, part), sc.Run.ID, deps.now())
+	return deps.Bodies.ReplaceWritten(ctx, sc.Page.ID, block.OursOf(landed), sc.Run.ID, deps.now())
 }

@@ -4148,3 +4148,29 @@ Each is closed below with a test that failed first, or kept with its reason.
   a restricted user a title write with an ampersand pauses `refuseMismatch` because kses stores
   `&amp;`: noise, not ownership (the title is ours and nothing of the client's moves), left for the
   gate's residue list.
+
+### Session 4 (2026-10-22): the stored diff, per-field acceptance, the screens
+
+A Fable critic read the session's plan before it ran and found one blocking path (a declined field
+recorded under the run, so the next run would write over the client's value) and six serious ones;
+each is folded into the entries below.
+
+- **The publish result's blocks are what the site stored** (the closing review's open item (2)). The
+  diff was computed once from the composed body and never carried onto the stored one, so on a site
+  whose save filters reformat our bytes (kses, a filter adding `rel` to a link) a later client edit
+  anywhere made `block.Undo` miss our run and the revert hand the body back. Worse, the stage's own
+  proof showed that `page_blocks_written` held nothing of ours under such a filter: `block.Ours`
+  matched our part by its render, which the filter had changed, so the next run kept our article as
+  the client's. `block.Landed` now carries the composed diff onto the stored body through
+  `block.Align`, the relink's way: a kept or added block takes the bytes and hash the site stored and
+  keeps its owner, and a removed one is unchanged. In a gap that Align leaves, a textless block of
+  ours (a figure whose link the filter changed) pairs with the one textless stored block there. A gap
+  holding a client block keeps every stored block nothing pairs with as the client's and kept, so a
+  revert never removes it. A gap of ours alone marks such a block `added` with the new owner `site`:
+  it is never ours, and a revert removes it with our run, restoring the body as it was. Entries keep
+  the stored order, so `Undo`'s runs stay contiguous. `writeRawBody` (on the answer and on the 409
+  rerun) and the core or creation path of `writeItemFields` set the result's blocks to the landed
+  diff, and `recordOurBlocks` records its ours, so `page_blocks_written` and the diff agree
+  (`TestARevertFindsOurBlocksTheSiteReformatted`, the reviewer's proof with a linkless client body so
+  the save stays stable; `TestOurBlocksStayOursUnderARenderChangingFilter`; both failing first). The
+  plan's `theirs` and `part` had no reader left and are gone; an older checkpoint still decodes.

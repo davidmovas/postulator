@@ -7,6 +7,7 @@ type Owner string
 const (
 	OwnerOurs   Owner = "ours"
 	OwnerClient Owner = "client"
+	OwnerSite   Owner = "site"
 )
 
 type ChangeKind string

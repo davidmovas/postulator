@@ -262,7 +262,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 			return stop, guardErr
 		}
 	}
-	final, theirs, part, previous := rendered, "", rendered, site.raw
+	final, previous := rendered, site.raw
 	if found && sc.Page.WPID == nil && !block.SameRender(site.raw, rendered) {
 		taken := needsHuman(sc.Page.Path + ": " + ReasonSlugTaken + " (" + existing.Link + ")")
 		return &taken, nil
@@ -284,14 +284,14 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 			needsPlugin := needsHuman(sc.Page.Path + ": " + ReasonKeptNeedsPlugin)
 			return &needsPlugin, nil
 		}
-		final, theirs, part, previous = held.final, held.theirs, held.part, held.previous
+		final, previous = held.final, held.previous
 	}
 	if keeping == nil && found {
 		rewrote, stop, rewriteErr := deps.rewrite(ctx, sc, site, rendered)
 		if rewriteErr != nil || stop != nil {
 			return stop, rewriteErr
 		}
-		final, theirs, part = rewrote.final, rewrote.theirs, rewrote.part
+		final = rewrote
 	}
 	live := map[field.Key]string{}
 	if found {
@@ -333,8 +333,8 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	}
 
 	plan := &publishPlan{
-		Writes: make([]string, 0, 4), Kept: kept.keys(), Request: request, SEO: seo, Final: final, Theirs: theirs,
-		Part: part, Previous: previous, SiteHash: site.hashed(), SiteTitle: existing.Title, Excerpt: existing.Excerpt,
+		Writes: make([]string, 0, 4), Kept: kept.keys(), Request: request, SEO: seo, Final: final,
+		Previous: previous, SiteHash: site.hashed(), SiteTitle: existing.Title, Excerpt: existing.Excerpt,
 		WPID: existing.ID, SiteFeatured: existing.FeaturedMedia, Create: !found, Plugin: site.plugin,
 		Unstable: found && !site.stable, Custom: custom,
 	}
@@ -382,30 +382,24 @@ func guardedPlugin(ctx context.Context, client *wp.Client, sc *run.StepContext, 
 	}
 }
 
-type rewrittenBody struct {
-	final  string
-	theirs string
-	part   string
-}
-
-func (d Deps) rewrite(ctx context.Context, sc *run.StepContext, site liveBody, rendered string) (rewrittenBody, *run.Result, error) {
+func (d Deps) rewrite(ctx context.Context, sc *run.StepContext, site liveBody, rendered string) (string, *run.Result, error) {
 	written, err := d.ourBlocks(ctx, sc.Page.ID)
 	if err != nil {
-		return rewrittenBody{}, nil, err
+		return "", nil, err
 	}
 	ours, err := withoutHeadingOne(rendered)
 	if err != nil {
-		return rewrittenBody{}, nil, err
+		return "", nil, err
 	}
-	final, theirs, part, err := block.Rewrite(site.raw, written, ours)
+	final, _, _, err := block.Rewrite(site.raw, written, ours)
 	switch {
 	case errors.IsCode(err, errors.Invalid):
 		refused := needsHuman(sc.Page.Path + ": " + ReasonRewriteRefused + ": " + err.Error())
-		return rewrittenBody{}, &refused, nil
+		return "", &refused, nil
 	case err != nil:
-		return rewrittenBody{}, nil, err
+		return "", nil, err
 	}
-	return rewrittenBody{final: final, theirs: theirs, part: part}, nil, nil
+	return final, nil, nil
 }
 
 func checkBeforeWriting(ctx context.Context, sc *run.StepContext, client *wp.Client, itemType wp.ItemType,
@@ -490,7 +484,8 @@ func writeRawBody(ctx context.Context, deps Deps, sc *run.StepContext, client *w
 		}
 		stored, hash = held.Content, held.ContentHash
 	}
-	if recordErr := recordOurBlocks(ctx, deps, sc, stored, plan.Theirs, plan.Part); recordErr != nil {
+	state.Result.Blocks = block.Landed(state.Result.Blocks, plan.Final, stored)
+	if recordErr := recordOurBlocks(ctx, deps, sc, state.Result.Blocks); recordErr != nil {
 		return state.failed(recordErr)
 	}
 	plan.Stored = &stored
@@ -576,7 +571,8 @@ func writeItemFields(ctx context.Context, deps Deps, sc *run.StepContext, client
 		if plan.Plugin {
 			state.Result.PreviousContent, state.Result.PreviousContentHash = plan.Previous, wp.ContentHash(plan.Previous)
 		}
-		if recordErr := recordOurBlocks(ctx, deps, sc, stored, plan.Theirs, plan.Part); recordErr != nil {
+		state.Result.Blocks = block.Landed(state.Result.Blocks, plan.Final, stored)
+		if recordErr := recordOurBlocks(ctx, deps, sc, state.Result.Blocks); recordErr != nil {
 			return state.failed(recordErr)
 		}
 	}

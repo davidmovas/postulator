@@ -136,7 +136,13 @@ func keptRun(t *testing.T, ours string, kept *content.KeptBody) (steps.Deps, *wp
 func keptRunOver(t *testing.T, onSite, ours string, kept *content.KeptBody) (steps.Deps, *wptest.Server, *bodyLog, *run.StepContext) {
 	t.Helper()
 
-	deps, server := imageDeps(t)
+	return keptRunOverWith(t, nil, onSite, ours, kept)
+}
+
+func keptRunOverWith(t *testing.T, opts []wptest.Option, onSite, ours string, kept *content.KeptBody) (steps.Deps, *wptest.Server, *bodyLog, *run.StepContext) {
+	t.Helper()
+
+	deps, server := imageDepsWith(t, opts...)
 	log := &bodyLog{}
 	deps.Bodies = log
 	seeded := server.Seed(wptest.Item{Type: "page", Title: "Espresso", Slug: "espresso", Status: "publish", Content: onSite})

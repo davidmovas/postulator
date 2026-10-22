@@ -137,8 +137,6 @@ type publishPlan struct {
 	SEO          seoPlan         `json:"seo"`
 	Final        string          `json:"final"`
 	Stored       *string         `json:"stored,omitempty"`
-	Theirs       string          `json:"theirs"`
-	Part         string          `json:"part"`
 	Previous     string          `json:"previous"`
 	SiteHash     string          `json:"siteHash"`
 	SiteTitle    string          `json:"siteTitle"`

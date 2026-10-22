@@ -358,7 +358,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	if err != nil {
 		return nil, err
 	}
-	theirs, part, previous := "", description, raw.Content
+	previous := raw.Content
 	keeping, err := deps.keepingOf(ctx, sc, draft, true)
 	if err != nil {
 		return nil, err
@@ -376,7 +376,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 			changed := needsHuman(sc.Page.Path + ": " + ReasonClientChanged)
 			return &changed, nil
 		}
-		description, theirs, part, previous = guarded.final, guarded.theirs, guarded.part, guarded.previous
+		description, previous = guarded.final, guarded.previous
 	}
 	live := map[field.Key]string{
 		field.ProductShortDescription: held.ShortDescription,
@@ -428,7 +428,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 
 	saved := productAnswerOf(held)
 	plan := &publishPlan{
-		Writes: make([]string, 0, 4), Kept: kept.keys(), SEO: seo, Final: description, Theirs: theirs, Part: part,
+		Writes: make([]string, 0, 4), Kept: kept.keys(), SEO: seo, Final: description,
 		Previous: previous, SiteHash: raw.ContentHash, WPID: held.ID, Plugin: true, Product: true,
 		Store: storePlanOf(update, snapshot, &saved), Unstable: !raw.SaveStable, Variations: variations, Media: images,
 		Custom: custom,
