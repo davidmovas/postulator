@@ -38,15 +38,17 @@ func readSiteBody(ctx context.Context, client *wp.Client, page pagemap.Page,
 }
 
 type splicedBody struct {
-	raw  string
-	ours []string
+	raw    string
+	ours   []string
+	placed []block.Placed
 }
 
 const unwritableDetail = "the anchor sits where the link cannot be written into its block's own bytes"
 
 type linkWriter struct {
-	body block.Body
-	ours map[string]bool
+	body   block.Body
+	ours   map[string]bool
+	placed []block.Placed
 }
 
 func (b siteBody) writer(ctx context.Context, deps Deps, page pagemap.Page) (*linkWriter, error) {
@@ -79,7 +81,7 @@ func (w *linkWriter) insert(lc content.LinkContext, policy field.LinkPolicy, tar
 	if err != nil {
 		return content.InsertResult{}, err
 	}
-	if w.write(anchor, lc.Href(target), oracle) {
+	if w.write(anchor, lc.Href(target), target.URL, oracle) {
 		return placement, nil
 	}
 	return content.InsertResult{
@@ -88,7 +90,7 @@ func (w *linkWriter) insert(lc content.LinkContext, policy field.LinkPolicy, tar
 	}, nil
 }
 
-func (w *linkWriter) write(anchor, href, oracle string) bool {
+func (w *linkWriter) write(anchor, href, to, oracle string) bool {
 	at, single := block.ChangedBlock(w.body.Serialize(), oracle)
 	if !single {
 		return false
@@ -99,9 +101,16 @@ func (w *linkWriter) write(anchor, href, oracle string) bool {
 			return false
 		}
 		if block.SameRender(placed.Serialize(), oracle) {
-			if w.ours[w.body.Blocks[at].Hash] {
-				w.ours[placed.Blocks[at].Hash] = true
+			before, after := w.body.Blocks[at].Hash, placed.Blocks[at].Hash
+			if w.ours[before] {
+				w.ours[after] = true
 			}
+			for i := range w.placed {
+				if w.placed[i].Block == before {
+					w.placed[i].Block = after
+				}
+			}
+			w.placed = append(w.placed, block.Placed{To: to, Anchor: anchor, Block: after})
 			w.body = placed
 			return true
 		}
@@ -166,7 +175,7 @@ func (w *linkWriter) result() splicedBody {
 			ours = append(ours, hash)
 		}
 	}
-	return splicedBody{raw: w.body.Serialize(), ours: ours}
+	return splicedBody{raw: w.body.Serialize(), ours: ours, placed: slices.Clone(w.placed)}
 }
 
 func recordSpliced(ctx context.Context, deps Deps, pageID, runID string, body splicedBody) error {

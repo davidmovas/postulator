@@ -23,6 +23,7 @@ type relinkWrite struct {
 	Outcome NeighborResult `json:"outcome"`
 	After   string         `json:"after"`
 	Ours    []string       `json:"ours"`
+	Placed  []block.Placed `json:"placed,omitempty"`
 	Planned bool           `json:"planned"`
 }
 
@@ -110,19 +111,32 @@ func landRelinkedBody(ctx context.Context, client *wp.Client, page pagemap.Page,
 	return landing{content: stored.Content, hash: stored.ContentHash, written: true}, nil
 }
 
-func (w relinkWrite) stored(content string) splicedBody {
+func (w relinkWrite) landed(content string) (splicedBody, adoption) {
 	composed, held := block.Parse(w.After).Blocks, block.Parse(content).Blocks
 	at := block.Align(w.After, content, w.Ours)
-	ours := make([]string, 0, len(w.Ours))
-	for i := range composed {
-		if at[i] < 0 || !slices.Contains(w.Ours, composed[i].Hash) {
-			continue
+	storedOf := func(hash string) (string, bool) {
+		for i := range composed {
+			if composed[i].Hash == hash && at[i] >= 0 {
+				return held[at[i]].Hash, true
+			}
 		}
-		if hash := held[at[i]].Hash; !slices.Contains(ours, hash) {
-			ours = append(ours, hash)
+		return "", false
+	}
+	ours := make([]string, 0, len(w.Ours))
+	for _, hash := range w.Ours {
+		if stored, ok := storedOf(hash); ok && !slices.Contains(ours, stored) {
+			ours = append(ours, stored)
 		}
 	}
-	return splicedBody{raw: content, ours: ours}
+	placed := make([]block.PlacedKey, 0, len(w.Placed))
+	for i := range w.Placed {
+		if stored, ok := storedOf(w.Placed[i].Block); ok {
+			placed = append(placed, block.PlacedKey{To: w.Placed[i].To, Anchor: w.Placed[i].Anchor, BlockHash: stored})
+		}
+	}
+	before := w.Outcome.Before.HTML
+	return splicedBody{raw: content, ours: ours},
+		adoption{raw: content, last: before, placed: placed, moved: block.Lineage(before, content, nil)}
 }
 
 func (s *relinkState) bodies(index pagemap.Index) []relinkedBody {

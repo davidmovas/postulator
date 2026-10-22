@@ -4037,3 +4037,28 @@ on what stage 2 left open and what was decided while building.
   which the stage's ruling on whitespace between blocks allows. The test now compares each client
   block's own bytes, the whitespace around it aside, and is green on both stands; the revert put the
   body back byte for byte on both.
+- **Our mark on a link is tied to the block that holds it, never to a target and anchor alone.** Ruling
+  6 of Part 0 carried `ours` forward by target and anchor, page-wide, so a link the client added
+  later with the same target and anchor read as ours wherever it stood. A link is now ours while it
+  sits in a block `page_blocks_written` holds, or in a block whose stored hash its own row records
+  (`page_links.block_hash`, migration 0070, `pagemap.PageLink.BlockHash`, `block.PlacedKey`): a relink
+  names each link it placed by the composed block that holds it (`block.Placed`, re-keyed when a later
+  link lands in the same block, so a sentence inserted before it never shifts it) and, once the site
+  has answered, by that block's stored hash through `block.Align`. **A mark moves only when we change
+  the block**: a relink and a revert hand `adopt` the lineage of every block they changed
+  (`block.Lineage`, the before body against the stored one, the client's blocks paired by render and
+  the rest by their text in order), and `block.HeldOurs` re-keys the marks through it, so a second
+  relink into the same paragraph keeps the first link ours and a revert keeps the marks of the links
+  it leaves in place (`TestASecondRelinkIntoTheSameParagraphKeepsTheFirstLinkOurs`,
+  `TestARevertKeepsTheMarksOfTheLinksItLeavesInPlace`, `TestALinkPlacedBeforeAnInsertedSentenceKeepsItsBlock`).
+  A link the client adds is never ours, whatever its target and anchor
+  (`TestALinkTheClientAddsWithOurTargetAndAnchorIsNeverOurs`); and a client's edit to a block that
+  holds our link, an unrelated re-serialisation included, hands that link to him, by design, since
+  nothing can then tell our link from one he kept. A row marked ours before the block was recorded
+  is keyed, once, to the one block of the page's last stored body that holds its target and anchor,
+  and left unkeyed when none or several do (`TestALegacyMarkIsKeyedToTheOneBlockThatHeldIt`); a
+  relink state settled before this change carries no `placed` and its links are keyed the same way.
+  A plugin that cannot answer the raw body (below `raw`, so already refused for writes) marks nothing
+  ours from the item's links, there being no block to check. The observation keys against the body it
+  stored before this walk's own read, `sync_back` against the body before its read-back, and a revert
+  against the body before its put-back; `0070`'s down drops the column.

@@ -8,6 +8,9 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -188,21 +191,93 @@ func TestAdoptMarksTheLinksOfOurBlocksAsOurs(t *testing.T) {
 	t.Parallel()
 
 	theirs := `<p>We roast every espresso blend we sell, beside our <a href="/coffee/filter/">filter</a> range.</p>`
-	deps, _, recorder, _ := relinkDeps(t, theirs)
+	deps, server, recorder, wpID := relinkDeps(t, theirs)
 	deps.Bodies = &bodyLog{}
 	if _, err := drive(t, steps.RelinkNeighbors(deps), relinkContext(t, deps)); err != nil {
 		t.Fatalf("RelinkNeighbors: %v", err)
 	}
 
-	byTarget := map[string]bool{}
+	stored, _ := server.Lookup(wpID)
+	byTarget := map[string]pagemap.PageLink{}
 	for _, link := range recorder.byPage["page-parent"] {
-		byTarget[link.ToURL] = link.Ours
+		byTarget[link.ToURL] = link
 	}
-	if ours, held := byTarget["/coffee/espresso/"]; !held || !ours {
-		t.Errorf("the link the relink placed = %v (held %v), want it ours though it sits in the client's paragraph", ours, held)
+	if placed, held := byTarget["/coffee/espresso/"]; !held || !placed.Ours || placed.BlockHash != block.Parse(stored.Content).Blocks[0].Hash {
+		t.Errorf("the link the relink placed = %+v (held %v), want it ours, keyed to the client's paragraph as the site stored it", placed, held)
 	}
-	if ours := byTarget["/coffee/filter/"]; ours {
-		t.Error("the client's own link was recorded as ours")
+	if his := byTarget["/coffee/filter/"]; his.Ours || his.BlockHash != "" {
+		t.Errorf("the client's own link was recorded as ours: %+v", his)
+	}
+}
+
+func withRistretto(deps steps.Deps, wpID int64) steps.Deps {
+	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
+		ID: "ristretto", SiteID: "site", Name: "Ristretto", Keywords: keyword.Of("ristretto"),
+		Anchors: []graph.Anchor{{Text: "ristretto", Source: graph.AnchorUser, Weight: 1}},
+		Source:  graph.SourceUser, CanonicalPageID: pointer("page-ristretto"),
+	})}
+	deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
+		ID: "e2", SiteID: "site", FromEntityID: "ristretto", ToEntityID: "parent",
+		Kind: graph.EdgeParent, Weight: 1, Source: graph.SourceUser, Status: graph.StatusApproved,
+	})}
+	deps.Pages = pageList{items: append(relinkPages(wpID), ristrettoPage())}
+	return deps
+}
+
+func ristrettoPage() pagemap.Page {
+	return pagemap.Page{
+		ID: "page-ristretto", SiteID: "site", Path: "/coffee/ristretto/", Slug: "ristretto",
+		WPType: pagemap.WPPage, Status: pagemap.StatusExists, EntityID: pointer("ristretto"),
+	}
+}
+
+func linkContextFor(t *testing.T, deps steps.Deps, page pagemap.Page) []byte {
+	t.Helper()
+
+	sc := unitContext(t, nil)
+	sc.Page, sc.Item.TargetID = page, page.ID
+	result, err := steps.ResolveContext(deps).Run(t.Context(), sc)
+	if err != nil {
+		t.Fatalf("ResolveContext for %s: %v", page.Path, err)
+	}
+	return result.Artifacts[0].Blob
+}
+
+func TestASecondRelinkIntoTheSameParagraphKeepsTheFirstLinkOurs(t *testing.T) {
+	t.Parallel()
+
+	deps, server, recorder, wpID := relinkDeps(t, "<p>We roast every espresso and ristretto blend we sell.</p>")
+	deps = withRistretto(deps, wpID)
+	deps.Bodies = &bodyLog{}
+	runRelink(t, deps)
+	onceLinked, _ := server.Lookup(wpID)
+	first := recorder.byPage["page-parent"]
+	if len(first) != 1 || !first[0].Ours || first[0].BlockHash != block.Parse(onceLinked.Content).Blocks[0].Hash {
+		t.Fatalf("after the first relink the links are %+v, want the espresso link ours in its block", first)
+	}
+
+	sc := unitContext(t, map[run.ArtifactKind][]byte{
+		run.ArtifactLinkContext:   linkContextFor(t, deps, ristrettoPage()),
+		run.ArtifactPublishResult: []byte(`{"wpId":98,"url":"https://shop.example.com/coffee/ristretto/","status":"publish"}`),
+	})
+	sc.Run.ID, sc.Page, sc.Item.TargetID = "run-b", ristrettoPage(), "page-ristretto"
+	if _, err := drive(t, steps.RelinkNeighbors(deps), sc); err != nil {
+		t.Fatalf("the second relink: %v", err)
+	}
+
+	twiceLinked, _ := server.Lookup(wpID)
+	if !strings.Contains(twiceLinked.Content, `href="/coffee/espresso/"`) || !strings.Contains(twiceLinked.Content, `href="/coffee/ristretto/"`) {
+		t.Fatalf("the parent holds %q, want both links in its paragraph", twiceLinked.Content)
+	}
+	inBlock := block.Parse(twiceLinked.Content).Blocks[0].Hash
+	rows := recorder.byPage["page-parent"]
+	if len(rows) != 2 {
+		t.Fatalf("after the second relink the links are %+v, want two", rows)
+	}
+	for _, row := range rows {
+		if !row.Ours || row.BlockHash != inBlock {
+			t.Errorf("link = %+v, want it ours and keyed to the paragraph as the second relink left it", row)
+		}
 	}
 }
 

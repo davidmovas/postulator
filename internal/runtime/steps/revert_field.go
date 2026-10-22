@@ -203,7 +203,7 @@ func revertBody(ctx context.Context, deps Deps, sc *run.StepContext, work revert
 	case err != nil:
 		return RevertedField{Key: key, Outcome: OutcomeKept, Detail: err.Error()}
 	}
-	if adoptErr := readopt(ctx, deps, sc, work.page, written.Content); adoptErr != nil {
+	if adoptErr := readopt(ctx, deps, sc, work.page, raw.Content, written.Content); adoptErr != nil {
 		return RevertedField{Key: key, Outcome: OutcomeKept, Detail: adoptErr.Error()}
 	}
 	return RevertedField{Key: key, Outcome: OutcomeRestored, Detail: detail}

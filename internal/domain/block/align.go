@@ -92,15 +92,34 @@ func pairGaps(out []int, left, right []Block) {
 		if i < len(out) {
 			nextRight = out[i]
 		}
-		if i-prevLeft == nextRight-prevRight {
-			for k := 1; k < i-prevLeft; k++ {
-				if left[prevLeft+k].Text() == right[prevRight+k].Text() {
-					out[prevLeft+k] = prevRight + k
-				}
-			}
+		for _, at := range align(texts(left[prevLeft+1:i], "\x00left"), texts(right[prevRight+1:nextRight], "\x00right")) {
+			out[prevLeft+1+at.left] = prevRight + 1 + at.right
 		}
 		prevLeft, prevRight = i, nextRight
 	}
+}
+
+func texts(blocks []Block, empty string) []string {
+	out := make([]string, 0, len(blocks))
+	for i := range blocks {
+		text := blocks[i].Text()
+		if text == "" {
+			text = empty
+		}
+		out = append(out, text)
+	}
+	return out
+}
+
+func Lineage(from, to string, ours []string) []Moved {
+	left, right := Parse(from).Blocks, Parse(to).Blocks
+	out := make([]Moved, 0)
+	for i, at := range Align(from, to, ours) {
+		if at >= 0 && left[i].Hash != right[at].Hash {
+			out = append(out, Moved{From: left[i].Hash, To: right[at].Hash})
+		}
+	}
+	return out
 }
 
 func SameRender(left, right string) bool {

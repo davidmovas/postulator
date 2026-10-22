@@ -135,6 +135,7 @@ type PageLink struct {
 	Source     LinkSource
 	Position   *int
 	Ours       bool
+	BlockHash  string
 	Absolute   bool
 	ObservedAt time.Time
 }

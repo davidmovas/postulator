@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -599,6 +601,40 @@ func TestARevertRecordsWhatTheSiteStored(t *testing.T) {
 			t.Errorf("the body recorded is %q, want what the site stored %q", recorded, held)
 		}
 	})
+}
+
+func TestARevertKeepsTheMarksOfTheLinksItLeavesInPlace(t *testing.T) {
+	t.Parallel()
+
+	onceLinked := `<h1>Coffee</h1><p>We roast every <a href="/coffee/espresso/">espresso</a> and ristretto blend we sell.</p>`
+	twiceLinked := `<h1>Coffee</h1><p>We roast every <a href="/coffee/espresso/">espresso</a> and <a href="/coffee/ristretto/">ristretto</a> blend we sell.</p>`
+	stand := newRevertStand(t)
+	stand.updated(t, "page-filter", runBody)
+	stand.relinkedOver(t, "page-filter", "page-parent",
+		steps.NeighborBefore{Hash: wp.ContentHash(onceLinked), HTML: onceLinked}, twiceLinked, wp.ContentHash(twiceLinked))
+	paragraph := block.Parse(twiceLinked).Blocks[1].Hash
+	stand.links.byPage = map[string][]pagemap.PageLink{"page-parent": {
+		{
+			ID: "l-espresso", SiteID: "site", FromPageID: "page-parent", ToURL: "/coffee/espresso/", AnchorText: "espresso",
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, BlockHash: paragraph, ObservedAt: sqlitetest.Stamp,
+		},
+		{
+			ID: "l-ristretto", SiteID: "site", FromPageID: "page-parent", ToURL: "/coffee/ristretto/", AnchorText: "ristretto",
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, BlockHash: paragraph, ObservedAt: sqlitetest.Stamp,
+		},
+	}}
+
+	reverted, _ := stand.revert(t, "page-filter")
+	if len(reverted.Neighbors) != 1 || reverted.Neighbors[0].Outcome != steps.OutcomeRestored {
+		t.Fatalf("neighbors = %+v, want the neighbor restored", reverted.Neighbors)
+	}
+	if got := stand.body(t, stand.wpIDs["page-parent"]); got != onceLinked {
+		t.Fatalf("the neighbor holds %q, want the body before the relink", got)
+	}
+	rows := stand.links.byPage["page-parent"]
+	if len(rows) != 1 || rows[0].ToURL != "/coffee/espresso/" || !rows[0].Ours || rows[0].BlockHash != block.Parse(onceLinked).Blocks[1].Hash {
+		t.Fatalf("the links after the revert are %+v, want the earlier run's espresso link still ours, keyed to the paragraph as put back", rows)
+	}
 }
 
 func TestRevertHandsBackANeighborItCannotTellTheKindOf(t *testing.T) {

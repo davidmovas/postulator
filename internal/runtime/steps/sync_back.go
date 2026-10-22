@@ -45,6 +45,17 @@ func headingOne(doc *content.Document) string {
 	return ""
 }
 
+func lastBody(ctx context.Context, deps Deps, pageID string) (string, error) {
+	if deps.Bodies == nil {
+		return "", nil
+	}
+	current, _, found, err := deps.Bodies.Get(ctx, pageID)
+	if err != nil || !found {
+		return "", err
+	}
+	return current.Raw, nil
+}
+
 func observeReadBack(ctx context.Context, deps Deps, page pagemap.Page, body string, at time.Time) (*content.Finding, error) {
 	if deps.Bodies == nil {
 		return nil, nil
@@ -125,10 +136,15 @@ func SyncBack(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			last, err := lastBody(ctx, deps, sc.Page.ID)
+			if err != nil {
+				return run.Result{}, err
+			}
 			now := deps.now()
 			index := pagemap.NewIndex(pages)
-			links := observedOn(sc.Page, index, pagemap.NewSite(owner.BaseURL), block.LinksOf(body, written),
-				block.HeldOurs(stored), now)
+			site := pagemap.NewSite(owner.BaseURL)
+			links := observedOn(sc.Page, index, site, block.LinksOf(body, written),
+				block.HeldOurs(stored, block.LinksOf(last, written), resolver(site), nil), now)
 			moved, err := observeReadBack(ctx, deps, sc.Page, body, now)
 			if err != nil {
 				return run.Result{}, err

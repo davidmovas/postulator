@@ -28,8 +28,21 @@ func onTheSite(pages []pagemap.Page) map[string]bool {
 	return live
 }
 
-func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Index, site pagemap.Site,
-	raw string, placed []block.LinkKey) error {
+type adoption struct {
+	raw    string
+	last   string
+	placed []block.PlacedKey
+	moved  []block.Moved
+}
+
+func resolver(site pagemap.Site) func(href string) (string, bool) {
+	return func(href string) (string, bool) {
+		path, kind := site.Resolve(href)
+		return path, kind == pagemap.LinkPath && path != ""
+	}
+}
+
+func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Index, site pagemap.Site, held adoption) error {
 	written, err := deps.ourBlocks(ctx, page.ID)
 	if err != nil {
 		return err
@@ -38,20 +51,20 @@ func adopt(ctx context.Context, deps Deps, page pagemap.Page, index pagemap.Inde
 	if err != nil {
 		return err
 	}
-	held := block.HeldOurs(stored)
-	for _, key := range placed {
-		held[key] = true
+	marks := block.HeldOurs(stored, block.LinksOf(held.last, written), resolver(site), held.moved)
+	for _, key := range held.placed {
+		marks[key] = true
 	}
 
 	now := deps.now()
 	next := page
 	next.LastSyncedAt = &now
 	next.UpdatedAt = now
-	return persist(ctx, deps, next, observedOn(page, index, site, block.LinksOf(raw, written), held, now))
+	return persist(ctx, deps, next, observedOn(page, index, site, block.LinksOf(held.raw, written), marks, now))
 }
 
 func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found []block.LinkAt,
-	held map[block.LinkKey]bool, at time.Time) []pagemap.PageLink {
+	held map[block.PlacedKey]bool, at time.Time) []pagemap.PageLink {
 	out := make([]pagemap.PageLink, 0, len(found))
 	for i := range found {
 		path, kind := site.Resolve(found[i].Href)
@@ -65,6 +78,9 @@ func observedOn(page pagemap.Page, index pagemap.Index, site pagemap.Site, found
 			ToURL: path, AnchorText: found[i].Anchor, Position: &position,
 			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: found[i].Ours(path, held),
 			Absolute: pagemap.AbsoluteHref(found[i].Href), ObservedAt: at,
+		}
+		if link.Ours {
+			link.BlockHash = found[i].BlockHash
 		}
 		if target, ok := index.ByPath(path); ok {
 			link.ToPageID = &target.ID

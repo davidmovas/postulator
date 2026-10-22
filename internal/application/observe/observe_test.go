@@ -709,28 +709,90 @@ func TestOurOwnWriteRaisesNoFinding(t *testing.T) {
 	}
 }
 
+func tb500LinkedBlock() string {
+	return block.Parse(tb500Raw).Blocks[1].Hash
+}
+
+func (s *scenario) linksTo(pageID, path, anchor string) []pagemap.PageLink {
+	s.stores.mu.Lock()
+	defer s.stores.mu.Unlock()
+	out := make([]pagemap.PageLink, 0)
+	held := s.stores.links[pageID][pagemap.SourceRaw]
+	for i := range held {
+		if held[i].ToURL == path && held[i].AnchorText == anchor {
+			out = append(out, held[i])
+		}
+	}
+	return out
+}
+
 func TestARelinkedClientParagraphsLinkReadsAsOursAfterASync(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
 	s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished})
 	placed := pagemap.PageLink{
 		ID: "link-ours", SiteID: siteID, FromPageID: "tb", ToURL: "/bpc-157/", AnchorText: "BPC-157",
-		Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, ObservedAt: earlier,
+		Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, BlockHash: tb500LinkedBlock(), ObservedAt: earlier,
 	}
 	s.stores.links["tb"] = map[pagemap.LinkSource][]pagemap.PageLink{pagemap.SourceRaw: {placed}}
 
 	s.run(t, observe.Options{})
-	var kept *pagemap.PageLink
-	for i, link := range s.stores.links["tb"][pagemap.SourceRaw] {
-		if link.ToURL == "/bpc-157/" && link.AnchorText == "BPC-157" {
-			kept = &s.stores.links["tb"][pagemap.SourceRaw][i]
-		}
-	}
-	if kept == nil || !kept.Ours {
-		t.Fatalf("the link we placed in the client's paragraph = %+v, want it still ours after the sync", kept)
+	kept := s.linksTo("tb", "/bpc-157/", "BPC-157")
+	if len(kept) != 1 || !kept[0].Ours || kept[0].BlockHash != tb500LinkedBlock() {
+		t.Fatalf("the link we placed in the client's paragraph = %+v, want it still ours after the sync, keyed to its block", kept)
 	}
 	if written := s.stores.written["tb"]; len(written) != 0 {
 		t.Errorf("the client's paragraph was recorded as ours: %v", written)
+	}
+}
+
+func TestALinkTheClientAddsWithOurTargetAndAnchorIsNeverOurs(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished})
+	placed := pagemap.PageLink{
+		ID: "link-ours", SiteID: siteID, FromPageID: "tb", ToURL: "/bpc-157/", AnchorText: "BPC-157",
+		Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, BlockHash: tb500LinkedBlock(), ObservedAt: earlier,
+	}
+	s.stores.links["tb"] = map[pagemap.LinkSource][]pagemap.PageLink{pagemap.SourceRaw: {placed}}
+	added := tb500Raw + "\n\nAlso see <a href=\"" + baseURL + "/bpc-157/\">BPC-157</a> when you compare."
+	s.plugin.raws[tb500ID] = rawOf(added)
+	for i := range s.plugin.items {
+		if s.plugin.items[i].ID == tb500ID {
+			s.plugin.items[i].ContentHash = block.BodyHash(added)
+		}
+	}
+
+	s.run(t, observe.Options{})
+	rows := s.linksTo("tb", "/bpc-157/", "BPC-157")
+	if len(rows) != 2 {
+		t.Fatalf("the page carries %d links to BPC-157, want both: %+v", len(rows), rows)
+	}
+	for _, row := range rows {
+		if inOurs := row.BlockHash == tb500LinkedBlock(); row.Ours != inOurs {
+			t.Errorf("link = %+v, want ours only in the block we placed it in", row)
+		}
+	}
+}
+
+func TestALegacyMarkIsKeyedToTheOneBlockThatHeldIt(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished})
+	stored := block.Snapshot{PageID: "tb", Raw: tb500Raw, Hash: block.BodyHash(tb500Raw), Kind: block.Classic, ObservedAt: earlier}
+	current, base := stored, stored
+	current.Side, base.Side = block.Current, block.Base
+	s.stores.bodies["tb"] = map[block.Side]block.Snapshot{block.Current: current, block.Base: base}
+	legacy := pagemap.PageLink{
+		ID: "link-ours", SiteID: siteID, FromPageID: "tb", ToURL: "/bpc-157/", AnchorText: "BPC-157",
+		Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, ObservedAt: earlier,
+	}
+	s.stores.links["tb"] = map[pagemap.LinkSource][]pagemap.PageLink{pagemap.SourceRaw: {legacy}}
+
+	s.run(t, observe.Options{Full: true})
+	kept := s.linksTo("tb", "/bpc-157/", "BPC-157")
+	if len(kept) != 1 || !kept[0].Ours || kept[0].BlockHash != tb500LinkedBlock() {
+		t.Fatalf("the link marked ours before the block was recorded = %+v, want it still ours and keyed to the one block that held it", kept)
 	}
 }
 

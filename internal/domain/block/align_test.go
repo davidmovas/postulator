@@ -62,7 +62,7 @@ func TestAlignAnswersMinusOneForABlockTheSiteDidNotKeep(t *testing.T) {
 			composed: join(client, ours, sentence),
 			stored:   join(client, sentence),
 			ours:     []string{block.Hash(ours), block.Hash(sentence)},
-			want:     []int{0, -1, -1},
+			want:     []int{0, -1, 1},
 		},
 		{
 			name:     "the client's block repeated",

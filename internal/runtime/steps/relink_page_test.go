@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
@@ -162,6 +163,40 @@ func TestARelinkTouchesOnlyTheBlockItLinks(t *testing.T) {
 	want := "<p>Tea &amp; <a href=\"/coffee/\">coffee</a>&nbsp;now, <em class='x'>freshly</em> roasted.</p>\n\n" + other
 	if stored.Content != want {
 		t.Errorf("the page holds\n%q\nwant\n%q: the link alone, every other byte of the client's as he wrote it", stored.Content, want)
+	}
+}
+
+func TestALinkPlacedBeforeAnInsertedSentenceKeepsItsBlock(t *testing.T) {
+	t.Parallel()
+
+	deps, server, recorder, wpID := relinkPageDeps(t, espressoBody)
+	deps = parentOnTheSite(withGrandparent(deps, wpID))
+	deps.Bodies = &bodyLog{}
+	relinked, _, _ := runRelinkPage(t, deps, relinkPageContext(t, deps, wpID))
+	if relinked.Linked != 2 {
+		t.Fatalf("relinked = %+v, want the parent linked in its paragraph and the grandparent in a sentence of its own", relinked)
+	}
+
+	stored, _ := server.Lookup(wpID)
+	holding := map[string]string{}
+	for _, held := range block.Parse(stored.Content).Blocks {
+		for _, path := range []string{"/coffee/", "/drinks/"} {
+			if strings.Contains(held.Raw, `href="`+path+`"`) {
+				holding[path] = held.Hash
+			}
+		}
+	}
+	if len(holding) != 2 || holding["/coffee/"] == holding["/drinks/"] {
+		t.Fatalf("the page holds %q, want the two links in two blocks", stored.Content)
+	}
+	byTarget := map[string]pagemap.PageLink{}
+	for _, link := range recorder.byPage["page-child"] {
+		byTarget[link.ToURL] = link
+	}
+	for path, hash := range holding {
+		if row := byTarget[path]; !row.Ours || row.BlockHash != hash {
+			t.Errorf("the link to %s = %+v, want it ours and keyed to the block that holds it (%s)", path, row, hash)
+		}
 	}
 }
 

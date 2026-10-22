@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 69
+const latestMigration = 70
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -90,6 +90,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0067_template_specifications_retired.sql",
 		"0068_pages_site_copies_dropped.sql",
 		"0069_page_links_origin_dropped.sql",
+		"0070_page_links_block_hash.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1961,6 +1962,55 @@ func TestThePagesCopiesOfTheSiteAreDroppedAndADownBringsThemBackAsMigration45Mad
 	}
 	if got := rowsOf(t, store, `SELECT count(*) FROM pages`); !slices.Equal(got, []string{"4"}) {
 		t.Fatalf("the second up left %v pages, want all four", got)
+	}
+}
+
+func TestALinkKeepsTheBlockItWasPlacedInAndADownDropsIt(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 69)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-22T09:00:00Z"
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	page := `INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES (?, 's1', ?, ?, 'page', 'exists', ?, ?)`
+	must(page, "pg1", "/a/", "a", at, at)
+	must(page, "pg2", "/b/", "b", at, at)
+	must(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, type, region, source, ours, observed_at) VALUES ('l1', 's1', 'pg1', 'pg2', '/b/', 'b', 'contextual', 'content', 'raw', 1, ?)`, at)
+	if got := columnOf(t, store, "page_links", "block_hash"); got != "" {
+		t.Fatalf("page_links carries block_hash (%s) before the up migration", got)
+	}
+
+	if _, err = provider.UpTo(t.Context(), 70); err != nil {
+		t.Fatalf("up to 70: %v", err)
+	}
+	if got, want := columnOf(t, store, "page_links", "block_hash"), "TEXT notnull=0 default=NULL pk=0"; got != want {
+		t.Fatalf("the up migration made page_links.block_hash %q, want %q", got, want)
+	}
+	must(`UPDATE page_links SET block_hash = 'h1' WHERE id = 'l1'`)
+	must(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, type, region, source, ours, block_hash, observed_at) VALUES ('l2', 's1', 'pg1', NULL, '/c/', 'c', 'contextual', 'content', 'raw', 0, NULL, ?)`, at)
+	keyed := []string{"l1 | h1", "l2 | -"}
+	if got := rowsOf(t, store, `SELECT id, coalesce(block_hash, '-') FROM page_links ORDER BY id`); !slices.Equal(got, keyed) {
+		t.Fatalf("the links carry\n%s\nwant the placed one keyed to its block and the client's unkeyed\n%s", strings.Join(got, "\n"), strings.Join(keyed, "\n"))
+	}
+
+	if _, err = provider.DownTo(t.Context(), 69); err != nil {
+		t.Fatalf("down to 69: %v", err)
+	}
+	if got := columnOf(t, store, "page_links", "block_hash"); got != "" {
+		t.Fatalf("page_links still carries block_hash (%s) after the down migration", got)
+	}
+	kept := []string{"l1 | 1", "l2 | 0"}
+	if got := rowsOf(t, store, `SELECT id, ours FROM page_links ORDER BY id`); !slices.Equal(got, kept) {
+		t.Fatalf("the down lost links:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(kept, "\n"))
 	}
 }
 

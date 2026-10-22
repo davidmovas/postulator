@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
-	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -201,7 +200,7 @@ func planRelinkedPage(ctx context.Context, deps Deps, sc *run.StepContext, state
 			PageID: sc.Page.ID, Path: sc.Page.Path, WPID: *sc.Page.WPID,
 			Before: NeighborBefore{Hash: body.raw.ContentHash, HTML: body.raw.Content},
 		},
-		After: linked.raw, Ours: linked.ours,
+		After: linked.raw, Ours: linked.ours, Placed: linked.placed,
 	}}
 	held, err := deps.reviewRelinks(ctx, sc, checkpointRelinkPageReviewed, "the new links of "+sc.Page.Path,
 		[]relinkedBody{{page: sc.Page, before: body.raw.Content, after: linked.raw}})
@@ -230,7 +229,7 @@ func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run
 			write.Outcome.Before.Hash + " and now holds " + landed.held + "; sync the site and relink it again"), nil
 	}
 	state.Publish.ContentHash = landed.hash
-	record := write.stored(landed.content)
+	record, held := write.landed(landed.content)
 	if recordErr := recordSpliced(ctx, deps, sc.Page.ID, sc.Run.ID, record); recordErr != nil {
 		return run.Result{}, recordErr
 	}
@@ -242,14 +241,7 @@ func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run
 	if err != nil {
 		return run.Result{}, err
 	}
-	placed := make([]block.LinkKey, 0, len(state.Page.Placed))
-	for i := range state.Page.Placed {
-		if state.Page.Placed[i].Outcome == OutcomeLinked {
-			placed = append(placed, block.LinkKey{To: state.Page.Placed[i].Path, Anchor: state.Page.Placed[i].Anchor})
-		}
-	}
-	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), record.raw,
-		placed); adoptErr != nil {
+	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), held); adoptErr != nil {
 		return run.Result{}, adoptErr
 	}
 	state.Finished = true

@@ -51,7 +51,7 @@ func putTheProductBack(ctx context.Context, deps Deps, sc *run.StepContext, resu
 	if !ok {
 		return reason, false
 	}
-	return bodyRestored(ctx, deps, sc, result, work, stored,
+	return bodyRestored(ctx, deps, sc, result, work, raw.Content, stored,
 		"the description, the short description and the attributes the run replaced were written back")
 }
 

@@ -365,13 +365,13 @@ func (a *absorber) readBody(ctx context.Context, page pagemap.Page, it item) (bo
 	}
 	switch {
 	case it.HasContent:
-		return bodyRead{raw: it.Content, hash: it.ContentHash, fetched: true}, nil
+		return bodyRead{raw: it.Content, hash: it.ContentHash, fetched: true, current: current}, nil
 	case a.readers.plugin(capabilityRaw):
 		read, readErr := a.readers.Plugin.GetRaw(ctx, string(it.mappedType()), it.WPID)
 		if readErr != nil {
 			return bodyRead{}, readErr
 		}
-		return bodyRead{raw: read.Content, hash: read.Hash, fetched: true}, nil
+		return bodyRead{raw: read.Content, hash: read.Hash, fetched: true, current: current}, nil
 	default:
 		return bodyRead{}, nil
 	}
@@ -383,7 +383,7 @@ func (a *absorber) body(ctx context.Context, page pagemap.Page, it item, read bo
 		return nil
 	case read.stored:
 		if a.state.Full {
-			if err := a.rawLinks(ctx, page, read.current.Raw); err != nil {
+			if err := a.rawLinks(ctx, page, read.current.Raw, read.current.Raw); err != nil {
 				return err
 			}
 		}
@@ -398,7 +398,7 @@ func (a *absorber) body(ctx context.Context, page pagemap.Page, it item, read bo
 	}); err != nil {
 		return err
 	}
-	if err := a.rawLinks(ctx, page, read.raw); err != nil {
+	if err := a.rawLinks(ctx, page, read.raw, read.current.Raw); err != nil {
 		return err
 	}
 	current, base, _, err := a.service.deps.Bodies.Get(ctx, page.ID)
@@ -418,7 +418,7 @@ func (a *absorber) bodyFinding(ctx context.Context, page pagemap.Page, current, 
 	return a.tracked.clear(ctx, finding.BodyChangedOnSite, subject)
 }
 
-func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, raw string) error {
+func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, raw, last string) error {
 	stored, err := a.service.deps.Bodies.ListWritten(ctx, page.ID)
 	if err != nil {
 		return err
@@ -427,7 +427,7 @@ func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, raw string) 
 	for i := range stored {
 		written = append(written, stored[i].BlockHash)
 	}
-	held, err := a.heldOurs(ctx, page.ID)
+	held, err := a.heldOurs(ctx, page, last, written)
 	if err != nil {
 		return err
 	}
@@ -444,6 +444,9 @@ func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, raw string) 
 			Type: pagemap.LinkContextual, Region: string(regionContent),
 			Source: pagemap.SourceRaw, Position: &position, Ours: found.Ours(path, held),
 			Absolute: pagemap.AbsoluteHref(found.Href), ObservedAt: a.now,
+		}
+		if link.Ours {
+			link.BlockHash = found.BlockHash
 		}
 		if target, ok := a.stored(path); ok {
 			link.ToPageID = &target.ID
@@ -468,21 +471,16 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 	if len(it.Links) == 0 {
 		return nil
 	}
-	held, err := a.heldOurs(ctx, page.ID)
-	if err != nil {
-		return err
-	}
 	links := make([]pagemap.PageLink, 0, len(it.Links))
 	for i := range it.Links {
 		path, normalizeErr := pagemap.NormalizePath(it.Links[i].Href)
 		if normalizeErr != nil {
 			continue
 		}
-		ours := held[block.LinkKey{To: path, Anchor: it.Links[i].Anchor}]
 		link := pagemap.PageLink{
 			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: it.Links[i].Anchor,
 			Type: pagemap.LinkContextual, Region: string(regionContent),
-			Source: pagemap.SourceRaw, Ours: ours, Absolute: pagemap.AbsoluteHref(it.Links[i].Href), ObservedAt: a.now,
+			Source: pagemap.SourceRaw, Absolute: pagemap.AbsoluteHref(it.Links[i].Href), ObservedAt: a.now,
 		}
 		if target, ok := a.stored(path); ok {
 			link.ToPageID = &target.ID
@@ -494,12 +492,16 @@ func (a *absorber) linksFromItem(ctx context.Context, page pagemap.Page, it item
 	return a.service.deps.Links.ReplaceForPage(ctx, page.ID, pagemap.SourceRaw, links)
 }
 
-func (a *absorber) heldOurs(ctx context.Context, pageID string) (map[block.LinkKey]bool, error) {
-	stored, err := a.service.deps.Links.ListForPage(ctx, pageID)
+func (a *absorber) heldOurs(ctx context.Context, page pagemap.Page, last string, written []string) (map[block.PlacedKey]bool, error) {
+	stored, err := a.service.deps.Links.ListForPage(ctx, page.ID)
 	if err != nil {
 		return nil, err
 	}
-	return block.HeldOurs(stored), nil
+	resolve := func(href string) (string, bool) {
+		path, kind := a.install.ResolveAt(page.Path, href)
+		return path, kind == pagemap.LinkPath && path != ""
+	}
+	return block.HeldOurs(stored, block.LinksOf(last, written), resolve, nil), nil
 }
 
 func (a *absorber) plan(ctx context.Context, current pagemap.Page, planned bool, next pagemap.Page, it item) error {

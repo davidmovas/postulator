@@ -29,7 +29,8 @@ func TestPageLinkRepoReplaceForPage(t *testing.T) {
 	position := 2
 	links := []pagemap.PageLink{
 		{ID: id.New(), SiteID: owner.ID, FromPageID: from.ID, ToPageID: &to.ID, ToURL: "/shop/shoes/", AnchorText: "shoes",
-			Type: pagemap.LinkContextual, Region: "content", Source: pagemap.SourceRaw, Position: &position, Ours: true, ObservedAt: sqlitetest.Stamp},
+			Type: pagemap.LinkContextual, Region: "content", Source: pagemap.SourceRaw, Position: &position, Ours: true,
+			BlockHash: "2bd806c97f0e00af1a1fc3328fa763a9269723c8db8fac4f93af71db186d6e90", ObservedAt: sqlitetest.Stamp},
 		{ID: id.New(), SiteID: owner.ID, FromPageID: from.ID, ToURL: "https://elsewhere.example.com/", AnchorText: "elsewhere",
 			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Absolute: true, ObservedAt: sqlitetest.Stamp.Add(time.Second)},
 	}

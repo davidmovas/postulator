@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
-	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -362,7 +361,7 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 	outcome.Anchor = anchor
 	outcome.Sentence = sentence
 	outcome.Before = NeighborBefore{Hash: body.raw.ContentHash, HTML: body.raw.Content}
-	return outcome, &relinkWrite{Outcome: outcome, After: updated.raw, Ours: updated.ours}, nil
+	return outcome, &relinkWrite{Outcome: outcome, After: updated.raw, Ours: updated.ours, Placed: updated.placed}, nil
 }
 
 func owedReason(lc content.LinkContext, page pagemap.Page) string {
@@ -488,12 +487,11 @@ func (n neighborhood) writeNext(ctx context.Context, deps Deps, state *relinkSta
 }
 
 func (n neighborhood) recordLanded(ctx context.Context, deps Deps, neighbor pagemap.Page, write relinkWrite, landed landing) error {
-	record := write.stored(landed.content)
+	record, held := write.landed(landed.content)
 	if err := recordSpliced(ctx, deps, neighbor.ID, n.runID, record); err != nil {
 		return err
 	}
-	placed := []block.LinkKey{{To: n.page.Path, Anchor: write.Outcome.Anchor}}
-	return adopt(ctx, deps, neighbor, n.index, n.site, record.raw, placed)
+	return adopt(ctx, deps, neighbor, n.index, n.site, held)
 }
 
 func (n neighborhood) settled(state *relinkState, message string) (run.Result, error) {
