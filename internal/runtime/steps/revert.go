@@ -40,8 +40,10 @@ const (
 	ReasonRevertNoKind     = "nothing records whether the neighbor is a page, a post or a product, " +
 		"so the item that carries its number cannot be told apart from it"
 
-	ReasonRevertMetaEdited = "the SEO meta was edited on the site since the run wrote it, so it was kept as it stands"
-	ReasonRevertNoMeta     = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
+	ReasonRevertMetaEdited   = "the SEO meta was edited on the site since the run wrote it, so it was kept as it stands"
+	ReasonRevertBodyUnproven = "the run's body write was answered with a conflict after its answer was lost, so what the site " +
+		"holds may be the run's own write under the site's save filters or the client's edit; compare it and put it back by hand"
+	ReasonRevertNoMeta = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
 		"plugin that can read it"
 	ReasonRevertNoMetaWriter = "the companion plugin on this site cannot put the SEO meta back"
 

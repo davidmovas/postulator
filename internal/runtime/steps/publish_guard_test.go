@@ -257,6 +257,42 @@ func TestTheSEORecordIsWhatThePluginStored(t *testing.T) {
 	}
 }
 
+func TestALostAnswerOverARenderChangingFilterKeepsTheClientsTextOnRecord(t *testing.T) {
+	t.Parallel()
+
+	deps, server, sc, _ := existingPage(t, []wptest.Option{wptest.WithSaveFilter(addingNoopener)}, wptest.Item{Title: "Espresso", Content: hisIntro})
+	server.LoseTheAnswerOfTheNextRawWrite(http.StatusBadGateway)
+
+	result, err := driveRetrying(t, steps.Publish(deps), sc)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if result.Next != run.TransitionPause {
+		t.Fatalf("result.Next = %s, want the page paused: the site holds a body the run cannot tell from the client's edit", result.Next)
+	}
+	var published steps.PublishResult
+	for i := range result.Artifacts {
+		if result.Artifacts[i].Kind == run.ArtifactPublishResult {
+			if err = json.Unmarshal(result.Artifacts[i].Blob, &published); err != nil {
+				t.Fatalf("decode the publish result: %v", err)
+			}
+		}
+	}
+	if published.PreviousContent != hisIntro || published.PreviousContentHash == "" {
+		t.Fatalf("the carried result holds %q as the text the write replaced, want the client's text on record", published.PreviousContent)
+	}
+
+	recordedFor(t, &deps, sc.Page, published)
+	reverted, _ := revertOf(t, deps, sc.Page.ID)
+	body, held := slices.IndexFunc(reverted.Fields, func(f steps.RevertedField) bool { return f.Key == field.Body }), false
+	if body >= 0 {
+		held = reverted.Fields[body].Outcome == steps.OutcomeKept
+	}
+	if !held {
+		t.Errorf("the revert's fields are %+v, want the body reported as kept, since nothing records what the lost write stored", reverted.Fields)
+	}
+}
+
 func storedAfterOf(published steps.PublishResult, key field.Key) (string, bool) {
 	for i := range published.Fields {
 		if published.Fields[i].Key == key {

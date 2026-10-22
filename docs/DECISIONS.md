@@ -4119,3 +4119,32 @@ Each is closed below with a test that failed first, or kept with its reason.
   the stored values for the record, the diff and the base (`storedSEO`;
   `TestTheSEORecordIsWhatThePluginStored`, failing first on `WrittenMeta`); the fake hashes what it
   stored, as the plugin does, and `WithSEOSanitized` is the sanitizer's case.
+- **A lost answer over a render-changing save filter left the client's text off the record and let a
+  revert claim success.** A rewrite's raw PUT lands, the process dies before the settle, and the site's
+  own filter adds an attribute to our link: the rerun's 409 reads back a body that renders as neither
+  what was read nor what was sent, and the step pauses (rightly: it cannot tell its own filtered write
+  from the client's edit), but the carried `publish_result` held no `previousContent`, so a revert put
+  the title and the excerpt back, skipped the body without a word and answered `restored` while the
+  site held our rewrite. The conflict path now carries the text the write replaced, and a revert of a
+  result whose body write was never answered reports the body `kept` with the reason
+  (`revert_field_kept`, `ReasonRevertBodyUnproven`) instead of silence
+  (`TestALostAnswerOverARenderChangingFilterKeepsTheClientsTextOnRecord`, failing first with nothing on
+  record). The neighbour's variant stays a `relink_conflict` the person resolves: the relink cannot
+  tell its filtered link from the client's edit either, and the conflict names the page.
+- **Kept with their reasons.** (1) A variation's description is put back as the store answered it,
+  texturized and autop'd by `wc_format_content`, so a client's `Don't miss` comes back as
+  `Don&#8217;t miss` in the editor's textarea; WooCommerce's API answers no raw form of a variation's
+  description, the rendered page is the same, and the ruling of 2026-10-20 already accepts the line
+  end: the owner's call whether that form is acceptable. (2) `PublishResult.Blocks` holds the diff of
+  the composed body, not of the stored one, so on a site that reformats our bytes a later client edit
+  elsewhere makes `block.Undo` miss our run and the revert answers `revert_field_kept`: conservative,
+  ours stays and nothing of the client's moves; recomputing the diff from the stored body is listed
+  for the next session with the reviewer's proof (a save filter reformatting ours plus a client edit
+  in another block, revert, our block gone). (3) A row marked ours before migration 0070 is keyed
+  once to the one block of the last stored body that holds its target and anchor; if our link had
+  been deleted and the client's own link with the same target and anchor stands alone in one block,
+  that row is keyed to his block. Accepted: the old rule had already marked such a link ours, the
+  keying never claims a second block, and every row written since 0070 carries its block. (4) Under
+  a restricted user a title write with an ampersand pauses `refuseMismatch` because kses stores
+  `&amp;`: noise, not ownership (the title is ours and nothing of the client's moves), left for the
+  gate's residue list.

@@ -84,7 +84,11 @@ func revertByField(ctx context.Context, deps Deps, sc *run.StepContext, result *
 		work.published.PreviousProduct.ImageID != 0 {
 		result.Fields = append(result.Fields, revertImage(ctx, work))
 	}
-	if wantedField(wanted, body) && work.published.PreviousContentHash != "" && work.published.ContentHash != "" {
+	switch {
+	case !wantedField(wanted, body) || work.published.PreviousContentHash == "":
+	case work.published.ContentHash == "":
+		result.Fields = append(result.Fields, RevertedField{Key: body, Outcome: OutcomeKept, Detail: ReasonRevertBodyUnproven})
+	default:
 		result.Fields = append(result.Fields, revertBody(ctx, deps, sc, work, body))
 	}
 	return settleReverted(result)

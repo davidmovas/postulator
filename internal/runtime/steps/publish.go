@@ -483,6 +483,9 @@ func writeRawBody(ctx context.Context, deps Deps, sc *run.StepContext, client *w
 			return state.failed(readErr)
 		}
 		if !block.SameRender(held.Content, plan.Final) {
+			if plan.Plugin {
+				state.Result.PreviousContent, state.Result.PreviousContentHash = plan.Previous, wp.ContentHash(plan.Previous)
+			}
 			return state.stopped(rawConflict(sc, plan, held.ContentHash))
 		}
 		stored, hash = held.Content, held.ContentHash
