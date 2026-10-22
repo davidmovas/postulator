@@ -112,6 +112,8 @@ export const runs = {
     retryBusy: "The item has not stopped, so there is nothing to retry.",
     accept: "Accept as it is",
     acceptHint: "The findings stay in the report and the page goes on to its next step as it is.",
+    acceptReview: "Accept and write",
+    acceptReviewHint: "Writes the ticked changes to the site, and an unticked one leaves the site's value as it is.",
     decisionTitle: (count: number) =>
         count === 1 ? "1 page waits for your decision" : `${count} pages wait for your decision`,
     decisionBody: "Open each held page to accept it as it is or to regenerate it.",
@@ -321,7 +323,39 @@ export const runs = {
             `Bodies, drafts and images are dropped ${days} days after the page publishes. The row stays, and the compliance findings and the judge score below are untouched.`,
         purgedBodyUnknown:
             "Bodies, drafts and images are dropped once the retention window passes on a published page. The row stays, and the compliance findings and the judge score below are untouched.",
-        noDiff: "There is no comparison with the live page — raw WordPress content is not exposed by any binding.",
+        noDiff: "Each field and block is set against what the site held before this write.",
+        diff: {
+            fields: "Fields",
+            noFields: "No field was written.",
+            before: "Before",
+            after: "After",
+            empty: "empty",
+            hashes: (before: string, after: string) =>
+                `Hash before ${before === "" ? "none" : before}, after ${after === "" ? "none" : after}.`,
+            body: "Body",
+            noBlocks: "The body was not written.",
+            noText: "no text",
+            owners: {
+                ours: "ours",
+                client: "the client's",
+                site: "the site's",
+            },
+            changes: {
+                kept: "Kept",
+                added: "Added",
+                removed: "Removed",
+            },
+            state: (change: string, owner: string) => `${change}: ${owner}`,
+            rendered: "Rendered by the site",
+            renderedHint: "A shortcode, so what shows in its place is rendered by the site.",
+            declined: "Left unticked, not written",
+            regions: "What the site adds around the body",
+        },
+        plan: {
+            none: "This review holds no change.",
+            noImages: "A draft run draws and uploads no image for a page already on the site.",
+            nothingTicked: "Tick at least one change to accept, or cancel the run to leave the page as it is.",
+        },
         kinds: {
             link_context: "Targets",
             draft: "Draft",
@@ -410,6 +444,11 @@ export const runs = {
             } as Readonly<Record<string, string>>,
             neighbours: "Neighbouring pages",
             none: "No neighbouring page was touched.",
+            fields: "Fields",
+            fieldOutcomes: {
+                restored: "Put back",
+                kept: "Handed back",
+            } as Readonly<Record<string, string>>,
         },
         draft: {
             sections: "Sections",

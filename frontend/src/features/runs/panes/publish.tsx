@@ -3,13 +3,22 @@ import type { ReactElement, ReactNode } from "react";
 import { copy } from "../../../copy/index.js";
 import { absoluteTime } from "../../../domain/format.js";
 import { SectionLabel } from "../../../ui/index.js";
+import { fieldLabel } from "../../settings/types/labels.js";
+import type { RevertedFieldView } from "../artifacts.js";
 import { finalView, publishView, relinkView, revertView, syncView } from "../artifacts.js";
+import { revertedFieldLabel } from "../diff-labels.js";
 import { FindingList, FindingTotals } from "../findings.js";
 import { revertOutcomeLabel } from "../labels.js";
+import { BlockDiff, Declined, FieldDiff } from "./diff.js";
+import { SiteRegions } from "./regions.js";
 import { ExternalUrl, Rows, Unreadable } from "./shared.js";
 
 export interface PayloadPaneProps {
     payload: unknown;
+}
+
+export interface PublishPaneProps extends PayloadPaneProps {
+    pageId: string;
 }
 
 function LiveUrl({ url }: { url: string }): ReactElement | null {
@@ -24,7 +33,7 @@ function LiveUrl({ url }: { url: string }): ReactElement | null {
     );
 }
 
-export function PublishPane({ payload }: PayloadPaneProps): ReactElement {
+export function PublishPane({ payload, pageId }: PublishPaneProps): ReactElement {
     const view = publishView(payload);
     if (view === null) {
         return <Unreadable />;
@@ -54,9 +63,40 @@ export function PublishPane({ payload }: PayloadPaneProps): ReactElement {
         <div className="flex flex-col gap-2 pb-3" title={copy.runs.review.noDiff}>
             <Rows entries={entries} />
             <LiveUrl url={view.url} />
+            {view.recorded ? (
+                <>
+                    <FieldDiff fields={view.fields} empty={copy.runs.review.diff.noFields} />
+                    <Declined keys={view.declined} />
+                    <BlockDiff blocks={view.blocks} empty={copy.runs.review.diff.noBlocks} />
+                </>
+            ) : null}
+            {pageId === "" ? null : <SiteRegions pageId={pageId} />}
             <FindingTotals findings={view.findings} />
             <FindingList findings={view.findings} empty={copy.runs.review.links.clean} />
         </div>
+    );
+}
+
+function RevertedFields({ fields }: { fields: readonly RevertedFieldView[] }): ReactElement | null {
+    if (fields.length === 0) {
+        return null;
+    }
+    const said = copy.runs.review.revert;
+    return (
+        <section aria-label={said.fields} className="flex flex-col">
+            <SectionLabel className="px-3">{said.fields}</SectionLabel>
+            <ul className="flex flex-col">
+                {fields.map((field) => (
+                    <li key={field.key} className="flex flex-col gap-0.5 border-b border-inset px-3 py-1.5 text-xs last:border-b-0">
+                        <span className="flex items-center gap-2">
+                            <span className="min-w-0 flex-1 truncate text-ink">{fieldLabel(field.key)}</span>
+                            <span className="shrink-0 text-2xs text-ink-faint">{revertedFieldLabel(field.outcome)}</span>
+                        </span>
+                        {field.detail === "" ? null : <p className="text-2xs text-ink-dim">{field.detail}</p>}
+                    </li>
+                ))}
+            </ul>
+        </section>
     );
 }
 
@@ -75,6 +115,7 @@ export function RevertPane({ payload }: PayloadPaneProps): ReactElement {
                     [said.detail, view.detail],
                 ]}
             />
+            <RevertedFields fields={view.fields} />
             <SectionLabel className="px-3">{said.neighbours}</SectionLabel>
             {view.neighbours.length === 0 ? (
                 <p className="px-3 text-xs text-ink-dim">{said.none}</p>

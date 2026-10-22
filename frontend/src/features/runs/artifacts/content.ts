@@ -1,8 +1,6 @@
-import { plainText } from "../../../domain/text.js";
 import type { Finding } from "./decode.js";
-import { boolAt, findingsAt, listAt, numberAt, record, stringAt, stringsAt } from "./decode.js";
-
-const htmlFields: ReadonlySet<string> = new Set(["product_short_description", "variation_description"]);
+import { findingsAt, listAt, numberAt, record, stringAt, stringsAt } from "./decode.js";
+import { fieldText } from "./diff.js";
 
 export interface JudgeView {
     score: number;
@@ -19,89 +17,6 @@ export function judgeView(held: unknown): JudgeView | null {
         return null;
     }
     return { score, issues: stringsAt(held, "issues"), suggestions: stringsAt(held, "suggestions") };
-}
-
-export interface ProductEditView {
-    shortWritten: boolean;
-    added: readonly string[];
-    imageSet: boolean;
-}
-
-export interface PublishView {
-    url: string;
-    status: string;
-    contentHash: string;
-    wpId: number | null;
-    created: boolean;
-    seoApplied: readonly string[];
-    skipped: readonly string[];
-    findings: readonly Finding[];
-    product: ProductEditView | null;
-}
-
-function productEditOf(held: unknown): ProductEditView | null {
-    if (record(held) === null) {
-        return null;
-    }
-    const image = numberAt(held, "imageId");
-    return { shortWritten: boolAt(held, "shortWritten"), added: stringsAt(held, "added"), imageSet: image !== null && image !== 0 };
-}
-
-export function publishView(held: unknown): PublishView | null {
-    const root = record(held);
-    if (root === null) {
-        return null;
-    }
-    return {
-        url: stringAt(held, "url"),
-        status: stringAt(held, "status"),
-        contentHash: stringAt(held, "contentHash"),
-        wpId: numberAt(held, "wpId"),
-        created: boolAt(held, "created"),
-        seoApplied: stringsAt(held, "seoApplied"),
-        skipped: stringsAt(held, "skipped"),
-        findings: findingsAt(held, "findings"),
-        product: productEditOf(root["previousProduct"]),
-    };
-}
-
-export interface RevertNeighbourView {
-    pageId: string;
-    path: string;
-    outcome: string;
-    detail: string;
-}
-
-export interface RevertView {
-    path: string;
-    outcome: string;
-    detail: string;
-    neighbours: readonly RevertNeighbourView[];
-    findings: readonly Finding[];
-}
-
-export function revertView(held: unknown): RevertView | null {
-    if (record(held) === null) {
-        return null;
-    }
-    const neighbours: RevertNeighbourView[] = [];
-    for (const entry of listAt(held, "neighbors")) {
-        if (record(entry) !== null) {
-            neighbours.push({
-                pageId: stringAt(entry, "pageId"),
-                path: stringAt(entry, "path"),
-                outcome: stringAt(entry, "outcome"),
-                detail: stringAt(entry, "detail"),
-            });
-        }
-    }
-    return {
-        path: stringAt(held, "path"),
-        outcome: stringAt(held, "outcome"),
-        detail: stringAt(held, "detail"),
-        neighbours,
-        findings: findingsAt(held, "findings"),
-    };
 }
 
 export interface DraftSectionView {
@@ -202,8 +117,7 @@ export function fieldsView(held: unknown): FieldsView | null {
     for (const entry of listAt(held, "values")) {
         const key = stringAt(entry, "key");
         if (key !== "") {
-            const value = stringAt(entry, "value");
-            values.push({ key, value: htmlFields.has(key.split(":")[0] ?? key) ? plainText(value) : value });
+            values.push({ key, value: fieldText(key, stringAt(entry, "value")) });
         }
     }
     const skipped: FieldSkipView[] = [];

@@ -8,9 +8,11 @@ import type { ArtifactKind } from "../../../generated/vocab.js";
 import { Banner, EmptyState, SkeletonRows, TaskAltIcon } from "../../../ui/index.js";
 import { decodeArtifact, linkContextView } from "../artifacts.js";
 import { retentionIcon, stepLabel } from "../labels.js";
+import type { ReviewChoice } from "../review-choice.js";
 import {
     artifactBodyHtml,
     artifactDraft,
+    artifactEditPlan,
     artifactFields,
     artifactFinalReport,
     artifactImages,
@@ -26,6 +28,7 @@ import {
 import { BodyPane, DraftPane, FieldsPane, ImagesPane, MetaPane } from "./content.js";
 import { JudgePane } from "./judge.js";
 import { LinkContextPane, ValidationPane } from "./links.js";
+import { EditPlanPane } from "./plan.js";
 import { FinalPane, PublishPane, RelinkPane, RevertPane, SyncPane } from "./publish.js";
 import { Unreadable } from "./shared.js";
 
@@ -34,9 +37,10 @@ interface PayloadProps {
     kind: ArtifactKind;
     pageId: string;
     payload: unknown;
+    choice: ReviewChoice | null;
 }
 
-function Payload({ itemId, kind, pageId, payload }: PayloadProps): ReactElement {
+function Payload({ itemId, kind, pageId, payload, choice }: PayloadProps): ReactElement {
     switch (kind) {
         case artifactLinkContext:
             return <LinkContextPane context={linkContextView(payload)} />;
@@ -53,7 +57,9 @@ function Payload({ itemId, kind, pageId, payload }: PayloadProps): ReactElement 
         case artifactJudgeReport:
             return <JudgePane payload={payload} pageId={pageId} />;
         case artifactPublishResult:
-            return <PublishPane payload={payload} />;
+            return <PublishPane payload={payload} pageId={pageId} />;
+        case artifactEditPlan:
+            return <EditPlanPane payload={payload} choice={choice} />;
         case artifactRelinkResult:
             return <RelinkPane payload={payload} />;
         case artifactSyncResult:
@@ -72,9 +78,10 @@ export interface ArtifactPaneProps {
     kind: ArtifactKind;
     pageId: string;
     retentionDays: number | null;
+    choice?: ReviewChoice | null;
 }
 
-export function ArtifactPane({ itemId, kind, pageId, retentionDays }: ArtifactPaneProps): ReactElement {
+export function ArtifactPane({ itemId, kind, pageId, retentionDays, choice = null }: ArtifactPaneProps): ReactElement {
     const artifact = useArtifact(itemId, kind);
 
     if (artifact.isPending) {
@@ -130,7 +137,13 @@ export function ArtifactPane({ itemId, kind, pageId, retentionDays }: ArtifactPa
                 <span title={absoluteTime(row.createdAt)}>{`${stepLabel(row.step)} · ${relativeTime(row.createdAt)}`}</span>
                 <span>{bytes(row.size)}</span>
             </div>
-            <Payload itemId={itemId} kind={kind} pageId={pageId} payload={decodeArtifact(row.content)} />
+            <Payload
+                itemId={itemId}
+                kind={kind}
+                pageId={pageId}
+                payload={decodeArtifact(row.content)}
+                choice={choice}
+            />
         </div>
     );
 }

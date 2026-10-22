@@ -51,5 +51,6 @@ export const artifactRelinkResult: ArtifactKind = "relink_result";
 export const artifactSyncResult: ArtifactKind = "sync_result";
 export const artifactFinalReport: ArtifactKind = "final_report";
 export const artifactRevertResult: ArtifactKind = "revert_result";
+export const artifactEditPlan: ArtifactKind = "edit_plan";
 
 export const retentionDaysKey = "runs.artifactRetentionDays";

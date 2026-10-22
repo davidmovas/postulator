@@ -20,24 +20,28 @@ import {
 import type { RetryNotice, StepEntry } from "./log-view.js";
 import { ArtifactPane } from "./panes/index.js";
 import { driftRefusal } from "./refusal.js";
-import { neighbourOf, positionOf } from "./review-nav.js";
+import { positionOf } from "./review-nav.js";
 import { finishedShort, heldForParent, itemBadge, primaryAction, regenerateState } from "./hold.js";
+import { ReviewActions } from "./review-actions.js";
+import { useReviewChoice } from "./review-choice.js";
 import { ParentHold } from "./review-hold.js";
-import { DriftRefused, ReviewActions, ReviewEmpty, ReviewMeta, ReviewMissing, Timeline } from "./review-states.js";
-import { artifactBodyHtml, artifactPublishResult, retentionDaysKey } from "./statuses.js";
+import { useItemKeys } from "./review-keys.js";
+import { DriftRefused, ReviewEmpty, ReviewMeta, ReviewMissing, Timeline } from "./review-states.js";
+import { acceptRequest } from "./review-ticks.js";
+import {
+    artifactBodyHtml,
+    artifactEditPlan,
+    artifactPublishResult,
+    itemPaused,
+    pauseAwaitingReview,
+    retentionDaysKey,
+} from "./statuses.js";
 import { stepText } from "./step-cell.js";
 
 const drawerWidth = 688;
 
 function retentionOf(held: unknown): number | null {
     return typeof held === "number" && Number.isFinite(held) ? held : null;
-}
-
-function typing(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) {
-        return false;
-    }
-    return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 export interface ReviewDrawerProps {
@@ -83,6 +87,9 @@ export function ReviewDrawer({
     const regenerate = useRegenerate();
     const resume = useResumeRun();
     const [active, setActive] = useState<ArtifactKind | null>(null);
+    const reviewing = item !== null && item.status === itemPaused && item.pauseReason === pauseAwaitingReview;
+    const choice = useReviewChoice(itemId, reviewing);
+    const accepting = acceptRequest(itemId, choice);
 
     const kinds = useMemo(
         () => orderedKinds((listed.data?.artifacts ?? []).map((artifact) => artifact.kind)),
@@ -95,30 +102,12 @@ export function ReviewDrawer({
 
     useEffect(() => {
         if (active === null && kinds.length > 0) {
-            setActive(kinds.includes(artifactBodyHtml) ? artifactBodyHtml : kinds[kinds.length - 1]);
+            const opening = reviewing && kinds.includes(artifactEditPlan) ? artifactEditPlan : artifactBodyHtml;
+            setActive(kinds.includes(opening) ? opening : kinds[kinds.length - 1]);
         }
-    }, [active, kinds]);
+    }, [active, kinds, reviewing]);
 
-    useEffect(() => {
-        const onKeyDown = (event: KeyboardEvent): void => {
-            if (event.ctrlKey || event.metaKey || event.altKey || typing(event.target)) {
-                return;
-            }
-            const pressed = event.key.toLowerCase();
-            if (pressed !== "j" && pressed !== "k") {
-                return;
-            }
-            const next = neighbourOf(siblings, itemId, pressed === "j" ? 1 : -1);
-            if (next !== null) {
-                event.preventDefault();
-                onMove(next);
-            }
-        };
-        window.addEventListener("keydown", onKeyDown);
-        return () => {
-            window.removeEventListener("keydown", onKeyDown);
-        };
-    }, [siblings, itemId, onMove]);
+    useItemKeys(siblings, itemId, onMove);
 
     const retentionDays = retentionOf(retention.data?.value);
     const state = item === null ? null : retryState(item);
@@ -182,13 +171,17 @@ export function ReviewDrawer({
                         busy={retryStep.isPending}
                         regeneration={regeneration}
                         regenerating={regenerate.isPending}
+                        review={reviewing}
+                        nothingTicked={accepting === null}
                         onOpenPage={onOpenPage}
                         onRerun={onRerun}
                         onRetry={() => {
                             retryStep.mutate({ itemId: item.id });
                         }}
                         onAccept={() => {
-                            retryStep.mutate({ itemId: item.id, acceptFindings: true });
+                            if (accepting !== null) {
+                                retryStep.mutate(accepting);
+                            }
                         }}
                         onRegenerate={() => {
                             restart(item.runId, item.id);
@@ -292,6 +285,7 @@ export function ReviewDrawer({
                                     kind={active}
                                     pageId={item.targetId}
                                     retentionDays={retentionDays}
+                                    choice={choice}
                                 />
                             </TabPanel>
                         </div>
