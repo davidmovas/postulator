@@ -189,6 +189,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request, itemType s
 
 	applyUpdate(stored, body)
 	stored.Content = s.saved(stored.Content)
+	stored.Title, stored.Excerpt = s.saved(stored.Title), s.saved(stored.Excerpt)
 	if slug := stringField(body, "slug"); slug != "" {
 		stored.Slug = s.uniqueSlug(slug, stored.Type, stored.Parent, stored.ID)
 	}

@@ -26,7 +26,8 @@ func TestAnOutdatedPluginIsNamedByVersionAndCapabilities(t *testing.T) {
 		outdated     bool
 	}{
 		{name: "the version the client needs with every capability", version: wp.PluginVersion, capabilities: currentCapabilities},
-		{name: "the contract this client needs", version: "1.5.0", capabilities: currentCapabilities},
+		{name: "the contract this client needs", version: "1.5.1", capabilities: currentCapabilities},
+		{name: "the contract before the save probe covered the title and the excerpt", version: "1.5.0", capabilities: currentCapabilities, outdated: true},
 		{name: "the contract before writes were guarded", version: "1.4.1", capabilities: currentCapabilities, outdated: true},
 		{
 			name: "the guarded write missing", version: wp.PluginVersion, missing: []string{"guarded_write"}, outdated: true,

@@ -343,16 +343,22 @@ function raw_get( \WP_REST_Request $request ) {
 			'type'        => (string) $post->post_type,
 			'content'     => $content,
 			'contentHash' => content_hash( $content ),
-			'saveStable'  => save_stable( $content ),
+			'saveStable'  => save_stable( $post ),
 		),
 		200
 	);
 }
 
-function save_stable( string $content ): bool {
-	$filtered = apply_filters( 'pre_post_content', wp_slash( $content ) );
-	$filtered = apply_filters( 'content_save_pre', $filtered );
-	return is_string( $filtered ) && wp_unslash( $filtered ) === $content;
+function save_stable( \WP_Post $post ): bool {
+	return save_keeps( 'pre_post_content', 'content_save_pre', (string) $post->post_content )
+		&& save_keeps( 'pre_post_title', 'title_save_pre', (string) $post->post_title )
+		&& save_keeps( 'pre_post_excerpt', 'excerpt_save_pre', (string) $post->post_excerpt );
+}
+
+function save_keeps( string $pre, string $save, string $value ): bool {
+	$filtered = apply_filters( $pre, wp_slash( $value ) );
+	$filtered = apply_filters( $save, $filtered );
+	return is_string( $filtered ) && wp_unslash( $filtered ) === $value;
 }
 
 function rendered_get( \WP_REST_Request $request ) {

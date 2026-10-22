@@ -4075,3 +4075,15 @@ Each is closed below with a test that failed first, or kept with its reason.
   over a page that holds our inline images recorded `page_blocks_written` without them and the next
   run kept our figures as the client's and drew them again. A textless block now pairs by its render
   (`TestARelinkKeepsOurTextlessBlocksOurs`, failing first with the figure gone from ours).
+- **The save-stability probe covered the body alone; a whole-post save also runs kses over the
+  client's title and excerpt** (the review's one blocking path). `wp_update_post` merges every stored
+  field and `wp_insert_post` sanitizes the merged title and excerpt for the database, and for a user
+  without `unfiltered_html` kses hooks `title_save_pre` and `excerpt_save_pre` as it hooks
+  `content_save_pre`: our raw write, a core title write or a store save over a product whose name
+  holds a `<sup>` or whose short description holds an iframe stripped them, nothing had read or
+  recorded those fields, and the next walk raised `field_changed_on_site` against the client. The
+  plugin's `saveStable` (1.5.1) now answers false when the stored title or excerpt would not pass
+  their own `pre_post_*` and `*_save_pre` filters either, the fake mirrors it over the three fields,
+  and the client requires 1.5.1, so a 1.5.0 plugin reads as outdated and writes nothing
+  (`TestAPageWhoseTitleOrExcerptASaveWouldAlterIsNotResaved`, failing first with the page written;
+  `TestSaveStabilityFollowsTheUsersFilters` gains a title with an ampersand on the stand).

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Postulator companion plugin
-  version: 1.5.0
+  version: 1.5.1
   summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
   description: >-
     Every route lives under the WordPress REST namespace postulator/v1 and is
@@ -194,9 +194,11 @@ paths:
         Post-only; a taxonomy term id answers 404 with the code not_found. From
         plugin version 1.5.0 saveStable says whether the stored content passes
         the current user's pre_post_content and content_save_pre filters
-        unchanged, kses and balanceTags among them, which is whether any save
-        of the whole post (a title, an excerpt, the raw write, a store save)
-        would leave the body as it stands.
+        unchanged, kses and balanceTags among them, and from 1.5.1 whether the
+        stored title and excerpt pass their own pre_post_* and *_save_pre
+        filters unchanged too, which is whether any save of the whole post (a
+        title, an excerpt, the raw write, a store save) would leave the post as
+        it stands.
       parameters:
         - $ref: "#/components/parameters/PostID"
       responses:
@@ -903,7 +905,8 @@ components:
           type: boolean
           description: >-
             From 1.5.0, whether a save of the whole post by the current user
-            would store the content unchanged.
+            would store the content unchanged, and from 1.5.1 the title and
+            the excerpt too.
     TechnicalPages:
       type: object
       required:

@@ -161,6 +161,7 @@ func TestSaveStabilityFollowsTheUsersFilters(t *testing.T) {
 
 	framed := createPage(t, c, pageSpec{title: "Framed", slug: uniqueSlug("framed"), content: `<p>Map</p><iframe src="https://example.test/map"></iframe>`})
 	plain := createPage(t, c, pageSpec{title: "Plain", slug: uniqueSlug("plain"), content: "<p>Only prose.</p>"})
+	salted := createPage(t, c, pageSpec{title: "Salt & Pepper", slug: uniqueSlug("salted"), content: "<p>Only prose.</p>"})
 	cases := []struct {
 		name   string
 		reader *client
@@ -170,6 +171,8 @@ func TestSaveStabilityFollowsTheUsersFilters(t *testing.T) {
 		{name: "an administrator over an iframe", reader: c, page: framed, stable: true},
 		{name: "a restricted user over an iframe", reader: restricted, page: framed},
 		{name: "a restricted user over plain prose", reader: restricted, page: plain, stable: true},
+		{name: "an administrator over a title with an ampersand", reader: c, page: salted, stable: true},
+		{name: "a restricted user over a title kses would change", reader: restricted, page: salted},
 	}
 	for _, tc := range cases {
 		var raw rawRead

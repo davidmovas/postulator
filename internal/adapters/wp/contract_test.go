@@ -153,7 +153,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
 		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
-		{name: "plugin version", snippet: "\n  version: 1.5.0\n"},
+		{name: "plugin version", snippet: "\n  version: 1.5.1\n"},
 		{name: "meta write request schema", snippet: "\n    MetaWriteRequest:\n"},
 		{name: "meta write result schema", snippet: "\n    MetaWriteResult:\n"},
 		{name: "moved conflict schema", snippet: "\n    MovedConflict:\n"},

@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -175,6 +176,64 @@ func TestAPageThatIsNotSaveStableIsNotResaved(t *testing.T) {
 	}
 	if held.Meta["_yoast_wpseo_title"] != "espresso | Shop" {
 		t.Errorf("the SEO meta, which never re-saves the post, was not written: %v", held.Meta)
+	}
+}
+
+func TestAPageWhoseTitleOrExcerptASaveWouldAlterIsNotResaved(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		item wptest.Item
+	}{
+		{name: "a title kses would change", item: wptest.Item{Title: "Salt & Pepper", Content: "<p>Only prose.</p>"}},
+		{name: "an excerpt kses would strip", item: wptest.Item{Title: "Espresso", Excerpt: "<p>Map</p><script>window.map = 1;</script>", Content: "<p>Only prose.</p>"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps, server, sc, id := existingPage(t, []wptest.Option{wptest.WithFilteredHTML()}, tc.item)
+			server.ResetRequests()
+
+			result, err := drive(t, steps.Publish(deps), sc)
+			if err != nil {
+				t.Fatalf("Publish: %v", err)
+			}
+			if result.Next != run.TransitionPause || !strings.Contains(result.Message, "unfiltered_html") {
+				t.Fatalf("result = %+v, want a pause naming the user's missing unfiltered_html", result)
+			}
+			held, _ := server.Lookup(id)
+			if held.Title != tc.item.Title || held.Excerpt != tc.item.Excerpt || held.Content != tc.item.Content {
+				t.Errorf("the page was saved again: %q %q %q", held.Title, held.Excerpt, held.Content)
+			}
+			for _, request := range writesSince(server, 0) {
+				if !strings.Contains(request.Path, "/seo-meta/") {
+					t.Errorf("%s %s re-saved a page whose title or excerpt a save would change", request.Method, request.Path)
+				}
+			}
+		})
+	}
+}
+
+func TestTheExcerptBaseIsWhatTheSiteStored(t *testing.T) {
+	t.Parallel()
+
+	deps, server, sc, id := existingPage(t, []wptest.Option{wptest.WithFilteredHTML()}, wptest.Item{Title: "Espresso", Content: "<p>Only prose.</p>"})
+	deps.Types = scopedTypes{keys: []field.Key{field.Excerpt}}
+	log := &fieldLog{}
+	deps.Fields = log
+	withFields(t, sc, steps.FieldValue{Key: string(field.Excerpt), Value: "Salt & pepper notes."})
+
+	if _, err := drive(t, steps.Publish(deps), sc); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	held, _ := server.Lookup(id)
+	if held.Excerpt != "Salt &amp; pepper notes." {
+		t.Fatalf("the site stored the excerpt as %q, want kses' form", held.Excerpt)
+	}
+	if got := log.recordedValue(field.Excerpt); got != held.Excerpt {
+		t.Errorf("the excerpt's base is %q, want what the site stored %q", got, held.Excerpt)
 	}
 }
 

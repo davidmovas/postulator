@@ -369,7 +369,7 @@ func (s *Server) handleRawGet(w http.ResponseWriter, r *http.Request) {
 			"type":        stored.Type,
 			"content":     stored.Content,
 			"contentHash": s.reportedHash(stored.Content),
-			"saveStable":  s.saveStable(stored.Content),
+			"saveStable":  s.saveStable(stored.Content, stored.Title, stored.Excerpt),
 		}
 	}
 	s.mu.Unlock()
@@ -425,6 +425,7 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stored.Content = s.saved(content)
+	stored.Title, stored.Excerpt = s.saved(stored.Title), s.saved(stored.Excerpt)
 	stored.Modified = s.tick()
 	kept := stored.Content
 	lost := 0

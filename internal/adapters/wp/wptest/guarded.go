@@ -45,8 +45,11 @@ func (s *Server) EditMeta(id int64, key, value string) {
 	stored.Modified = s.tick()
 }
 
-func (s *Server) saveStable(content string) bool {
-	return s.saveFilter == nil || s.saveFilter(content) == content
+func (s *Server) saveStable(content, title, excerpt string) bool {
+	if s.saveFilter == nil {
+		return true
+	}
+	return s.saveFilter(content) == content && s.saveFilter(title) == title && s.saveFilter(excerpt) == excerpt
 }
 
 func (s *Server) saved(content string) string {

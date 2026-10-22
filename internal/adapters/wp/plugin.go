@@ -30,7 +30,7 @@ const (
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 
-	PluginVersion = "1.5.0"
+	PluginVersion = "1.5.1"
 )
 
 var requiredCapabilities = []string{

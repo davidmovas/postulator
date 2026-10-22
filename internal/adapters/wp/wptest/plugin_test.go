@@ -37,7 +37,7 @@ func TestTheManifestReportsTheFrozenCapabilities(t *testing.T) {
 		"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms", "settings",
 		"meta_write", "guarded_write",
 	}
-	if manifest.Version != "1.5.0" || len(manifest.Capabilities) != len(want) {
+	if manifest.Version != "1.5.1" || len(manifest.Capabilities) != len(want) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	for index, capability := range want {
