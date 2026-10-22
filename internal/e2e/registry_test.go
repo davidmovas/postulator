@@ -333,7 +333,7 @@ func TestAProductIsEditedThroughTheRegistry(t *testing.T) {
 		}
 	}
 
-	wireKeys := make(map[string][]string)
+	wireKeys := make([]string, 0)
 	for _, record := range proxy.writes() {
 		if !strings.Contains(record.Path, "/wc/v3/products") {
 			continue
@@ -344,7 +344,7 @@ func TestAProductIsEditedThroughTheRegistry(t *testing.T) {
 			continue
 		}
 		keys := slices.Sorted(maps.Keys(body))
-		wireKeys[record.Method+" "+record.Path] = keys
+		wireKeys = append(wireKeys, record.Method+" "+record.Path+" "+strings.Join(keys, ","))
 		for _, denied := range deniedOnTheWire {
 			if slices.Contains(keys, denied) {
 				t.Errorf("%s %s sent %s, which the store owns: %s", record.Method, record.Path, denied, record.Body)
@@ -362,8 +362,8 @@ func TestAProductIsEditedThroughTheRegistry(t *testing.T) {
 	if !reflect.DeepEqual(beforeFacts, afterFacts) || !reflect.DeepEqual(beforeVariations, afterVariations) {
 		t.Errorf("the store's own facts moved:\nbefore %+v %+v\nafter  %+v %+v", beforeFacts, beforeVariations, afterFacts, afterVariations)
 	}
-	t.Logf("written: short description, meta:dosage_note, %d variation descriptions, the description; the wire's store writes: %v",
-		len(variationIDs), wireKeys)
+	t.Logf("written: short description, meta:dosage_note, %d variation descriptions, the description; the wire's store writes, "+
+		"each request's keys: %s; never sent: %s", len(variationIDs), strings.Join(wireKeys, " | "), strings.Join(deniedOnTheWire, ", "))
 
 	reverted, err := core.Runs.Revert(t.Context(), runs.RevertRequest{RunID: started.RunID})
 	if err != nil {
