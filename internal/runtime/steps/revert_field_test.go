@@ -269,6 +269,30 @@ func TestACreatedPageTheClientEditedIsHandedBack(t *testing.T) {
 	}
 }
 
+func TestAFieldRevertOfAPageTheRunCreatedLeavesItOnTheSite(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	sc := publishContext(t)
+	sc.Run.PublishMode = run.PublishLive
+	published := runPublish(t, deps, sc)
+	if !published.Created {
+		t.Fatalf("the publish did not create the page: %+v", published)
+	}
+	page := sc.Page
+	page.WPID = &published.WPID
+	recordedFor(t, &deps, page, published)
+
+	reverted, result := revertOf(t, deps, page.ID, string(field.SEOTitle))
+	stored, _ := server.Lookup(published.WPID)
+	if reverted.Outcome == steps.OutcomeTrashed || stored.Status == "trash" {
+		t.Fatalf("a revert of one field took the page the run created off the site: %+v (status %s)", reverted, stored.Status)
+	}
+	if result.Next != run.TransitionPause || !strings.Contains(result.Message, steps.ReasonRevertCreatedWhole) {
+		t.Errorf("result = %+v, want the page handed back saying a created page is reverted whole", result)
+	}
+}
+
 func TestAnOlderRunStillRevertsWhole(t *testing.T) {
 	t.Parallel()
 

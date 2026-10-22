@@ -4205,3 +4205,24 @@ each is folded into the entries below.
   row back. A page's featured image and a product's first image are filled only where none exists
   and are no part of the diff; a draft run uploads none over an existing page
   (`images_wait_for_live`).
+- **A field revert never takes a page the run created off the site** (found while building D.2's
+  Pages-drawer revert). The revert step trashed a created page whatever fields the request named, so
+  a person putting back one SEO title would have removed the whole page. A field of a page that did
+  not exist has no earlier value to put back, so a revert that names fields over a created page now
+  hands it back with `ReasonRevertCreatedWhole`, and only a revert of the page whole takes it down
+  (`TestAFieldRevertOfAPageTheRunCreatedLeavesItOnTheSite`). The publish pane offers no field ticks
+  for a created page; the Model tab, which does not know whether the writing run created the page,
+  says so in its confirmation.
+- **The screens (D.1 to D.4).** The run report's publish pane shows each field before and after and
+  the body's blocks as the site stored them, marked ours, the client's or the site's and kept, added
+  or removed, with the regions the site injects read from the page model (whether inside the content
+  root; no position among the blocks is recorded, so none is shown). The `edit_plan` pane is the
+  review with a tick per field and on the body. The revert pane lists each field's outcome. A field
+  is reverted from the publish pane or from the Pages drawer's Model tab, whose rows are the page
+  model's `fields`. The canonical's AI-writes switch is disabled as a person's switch, a confirmation
+  card shows a per-call summary, `runs_revert` has a card, and the plugin panel labels the 1.5.1
+  capabilities. The harness seeds a live edit with its diff, a draft review left waiting and a
+  revert of one field, and a restart now puts back the body the model holds rather than a run's
+  draft. A field's revert outcome (`restored`, `kept`) has no vocabulary in `vocab.ts`, and the
+  publish result does not name its body key (the screens take `product_description` when a product
+  snapshot is present); both are left as they are.

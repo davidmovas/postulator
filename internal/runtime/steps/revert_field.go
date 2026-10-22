@@ -23,6 +23,8 @@ const (
 
 	ReasonRevertCreatedEdited = "the page the run created was edited on the site since, so it stays; " +
 		"take it down by hand if it should go"
+	ReasonRevertCreatedWhole = "the run created this page, so it is reverted whole, never field by field; " +
+		"revert the page without naming fields to take it off the site"
 	ReasonRevertFieldMoved = "it changed on the site since the run wrote it, so the edit is kept"
 	ReasonRevertBlocksKept = "the blocks the run wrote were edited on the site since, so they stay"
 	ReasonRevertNothing    = "every field the run wrote was changed on the site since, so nothing was put back"
@@ -60,10 +62,13 @@ func bodyKeyOf(page pagemap.Page) field.Key {
 }
 
 func revertByField(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult, work revertWork) (string, bool) {
+	wanted := revertFields(sc)
 	if work.published.Created {
+		if len(wanted) > 0 {
+			return ReasonRevertCreatedWhole, false
+		}
 		return revertCreated(ctx, deps, result, work)
 	}
-	wanted := revertFields(sc)
 	result.Fields = make([]RevertedField, 0, len(work.published.Fields)+1)
 	target := edit.Target{Type: string(onSiteType(work.page)), ID: work.published.WPID, Product: work.page.WPType == pagemap.WPProduct}
 	editor := editorFor(work.client)

@@ -837,7 +837,7 @@ The owner chose per-field acceptance of a draft run's review, built in Go before
 - [x] **1. The stored diff** (`929613b`): `block.Landed`, `OwnerSite`, `recordOurBlocks` from the landed diff; the open review item is closed.
 - [x] **2. Per-field acceptance**: `RetryStepRequest.fields` (a person's), `runs_retry_step`'s own arguments (schema unchanged, 61,343 bytes), `Engine.Accept(itemID, fields)`, `run.ClearAcceptance`, `PageEdit.body`, publish narrowed after the gate, `PublishResult.Declined`, a relink's review accepted whole.
 - [x] **3. What the screens read**: `observe.ModelView.fields` (`FieldView{key, writtenRunId, writtenAt, ours}`), `pagetypes.Field.aiWritable`, `blockOwners` and `blockChanges` in `vocab.ts`; `task build` green, 129 methods. Not recorded anywhere, so no screen shows it: where a site-injected region sits among the body's blocks (a region knows only whether it is inside the content root).
-- [ ] **D.1–D.3** (agent F) and **D.4** (agent H).
+- [x] **D.1–D.3** (agent F: `e22429d`, `2fb1d7d`, `7ba5389`; 1,790 vitest tests in 170 files) and **D.4** (agent H: `f268454`; the harness suite green in 609 s beside vitest). A field revert of a page the run created no longer trashes it (found from D.2).
 - [ ] **G**: the gate, the docs, the report.
 
 ##### 0.0 — the plan
