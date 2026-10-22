@@ -4099,3 +4099,14 @@ Each is closed below with a test that failed first, or kept with its reason.
   kept as the client's. The base is now the stored value the write answered
   (`TestTheExcerptBaseIsWhatTheSiteStored`, failing first; the fake now runs its filter over a page's
   title and excerpt on every whole-post save, as WordPress does).
+- **A revert never gave `page_blocks_written` back.** A publish replaces the page's whole set and a
+  revert left it, so after run B's rewrite was reverted the body held run A's article again while the
+  set still named B's blocks: A's article read as the client's, the next run kept it as his text and
+  wrote a second one, and its links read as his. `readopt` now records the set the put-back leaves
+  (`block.Restored`): the blocks of the body that were ours and stand, those our own lineage put back
+  (a relinked paragraph of ours returned to its earlier bytes), and those the reverted result's diff
+  names as ours and removed, which the per-block revert uncovers
+  (`TestARevertGivesBackTheBlocksOfTheRunItUncovers`,
+  `TestARevertKeepsTheMarksOfTheLinksItLeavesInPlace`, failing first with B's hashes kept). A
+  whole-body revert of a result from before stage 3 has no diff, so an article an older run wrote
+  under it comes back as the client's: an older record, the owner's call.

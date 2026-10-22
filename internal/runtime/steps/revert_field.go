@@ -203,10 +203,20 @@ func revertBody(ctx context.Context, deps Deps, sc *run.StepContext, work revert
 	case err != nil:
 		return RevertedField{Key: key, Outcome: OutcomeKept, Detail: err.Error()}
 	}
-	if adoptErr := readopt(ctx, deps, sc, work.page, raw.Content, written.Content); adoptErr != nil {
+	if adoptErr := readopt(ctx, deps, sc, work.page, raw.Content, written.Content, uncoveredOf(work.published.Blocks)); adoptErr != nil {
 		return RevertedField{Key: key, Outcome: OutcomeKept, Detail: adoptErr.Error()}
 	}
 	return RevertedField{Key: key, Outcome: OutcomeRestored, Detail: detail}
+}
+
+func uncoveredOf(changes []block.Change) []string {
+	out := make([]string, 0)
+	for i := range changes {
+		if changes[i].Owner == block.OwnerOurs && changes[i].Change == block.ChangeRemoved {
+			out = append(out, changes[i].Hash)
+		}
+	}
+	return out
 }
 
 func revertCreated(ctx context.Context, deps Deps, result *RevertResult, work revertWork) (string, bool) {

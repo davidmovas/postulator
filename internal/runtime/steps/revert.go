@@ -292,7 +292,7 @@ func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (sto
 
 func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult, work revertWork,
 	last, stored, detail string) (string, bool) {
-	if adoptErr := readopt(ctx, deps, sc, work.page, last, stored); adoptErr != nil {
+	if adoptErr := readopt(ctx, deps, sc, work.page, last, stored, nil); adoptErr != nil {
 		return adoptErr.Error(), false
 	}
 	result.Outcome = OutcomeRestored
@@ -453,7 +453,7 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 	}
 
 	if known {
-		if adoptErr := readopt(ctx, deps, sc, stored, raw.Content, held); adoptErr != nil {
+		if adoptErr := readopt(ctx, deps, sc, stored, raw.Content, held, nil); adoptErr != nil {
 			return adoptErr.Error(), false
 		}
 	}
@@ -498,7 +498,7 @@ func replan(ctx context.Context, deps Deps, page pagemap.Page) error {
 	return persist(ctx, deps, next, []pagemap.PageLink{})
 }
 
-func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.Page, last, body string) error {
+func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.Page, last, body string, uncovered []string) error {
 	owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 	if err != nil {
 		return err
@@ -514,11 +514,17 @@ func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.P
 	if err != nil {
 		return err
 	}
+	moved := block.Lineage(last, body, written)
 	if err := recordBody(ctx, deps, page.ID, body); err != nil {
 		return err
 	}
+	if deps.Bodies != nil {
+		if err := deps.Bodies.ReplaceWritten(ctx, page.ID, block.Restored(body, written, moved, uncovered), sc.Run.ID, deps.now()); err != nil {
+			return err
+		}
+	}
 	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL),
-		adoption{raw: body, last: last, moved: block.Lineage(last, body, written)})
+		adoption{raw: body, last: last, moved: moved})
 }
 
 func metaKept(page pagemap.Page, applied []string, reason string) content.Finding {

@@ -617,6 +617,7 @@ func TestARevertKeepsTheMarksOfTheLinksItLeavesInPlace(t *testing.T) {
 	stand.relinkedOver(t, "page-filter", "page-parent",
 		steps.NeighborBefore{Hash: wp.ContentHash(onceLinked), HTML: onceLinked}, twiceLinked, wp.ContentHash(twiceLinked))
 	paragraph := block.Parse(twiceLinked).Blocks[1].Hash
+	stand.bodies.written = map[string][]string{"page-parent": {paragraph}}
 	stand.links.byPage = map[string][]pagemap.PageLink{"page-parent": {
 		{
 			ID: "l-espresso", SiteID: "site", FromPageID: "page-parent", ToURL: "/coffee/espresso/", AnchorText: "espresso",
@@ -638,6 +639,49 @@ func TestARevertKeepsTheMarksOfTheLinksItLeavesInPlace(t *testing.T) {
 	rows := stand.links.byPage["page-parent"]
 	if len(rows) != 1 || rows[0].ToURL != "/coffee/espresso/" || !rows[0].Ours || rows[0].BlockHash != block.Parse(onceLinked).Blocks[1].Hash {
 		t.Fatalf("the links after the revert are %+v, want the earlier run's espresso link still ours, keyed to the paragraph as put back", rows)
+	}
+	if written := stand.bodies.ours("page-parent"); len(written) != 1 || written[0] != block.Parse(onceLinked).Blocks[1].Hash {
+		t.Errorf("ours after the revert = %v, want the paragraph as put back, which was ours before the relink", written)
+	}
+}
+
+func TestARevertGivesBackTheBlocksOfTheRunItUncovers(t *testing.T) {
+	t.Parallel()
+
+	const (
+		earlier = "<p>What the earlier run wrote about filter coffee.</p>"
+		rewrite = "<p>What the reverted run wrote over it.</p>"
+	)
+	before := updatedBefore + "\n\n" + earlier
+	after := updatedBefore + "\n\n" + rewrite
+	stand := newRevertStand(t)
+	wpID := stand.wpIDs["page-filter"]
+	if _, err := syncClient(t, stand.server).PutRaw(t.Context(), wp.TypePage, wpID, after, ""); err != nil {
+		t.Fatalf("write the reverted run's body: %v", err)
+	}
+	stand.recorded(t, "page-filter", after)
+	stand.bodies.written = map[string][]string{"page-filter": {block.Hash(rewrite)}}
+	stand.source.record(t, "page-filter", map[run.ArtifactKind]any{
+		run.ArtifactPublishResult: steps.PublishResult{
+			WPID: wpID, Version: 3, ContentHash: wp.ContentHash(after),
+			PreviousContent: before, PreviousContentHash: wp.ContentHash(before),
+			SEOApplied: []string{}, Skipped: []string{},
+			Blocks: []block.Change{
+				{Kind: block.Paragraph, Hash: block.Hash(earlier), Raw: earlier, Owner: block.OwnerOurs, Change: block.ChangeRemoved},
+				{Kind: block.Paragraph, Hash: block.Hash(rewrite), Raw: rewrite, Owner: block.OwnerOurs, Change: block.ChangeAdded},
+			},
+		},
+	})
+
+	reverted, _ := stand.revert(t, "page-filter")
+	if reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("reverted = %+v, want the page restored", reverted)
+	}
+	if got := stand.body(t, wpID); got != before {
+		t.Fatalf("the page holds %q, want the earlier run's body back", got)
+	}
+	if written := stand.bodies.ours("page-filter"); len(written) != 1 || written[0] != block.Hash(earlier) {
+		t.Errorf("ours after the revert = %v, want the earlier run's article alone, uncovered by the revert", written)
 	}
 }
 
