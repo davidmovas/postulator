@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -78,6 +79,107 @@ func TestARelinkWhoseAnswerWasLostRecordsItsBlocks(t *testing.T) {
 		linked := `<p>Espresso is the shortest way to make <a href="/coffee/">coffee</a> at home.</p>`
 		if written := log.ours("page-child"); len(written) != 1 || written[0] != block.Hash(linked) {
 			t.Errorf("ours = %v, want the linked block recorded as ours", written)
+		}
+	})
+}
+
+func addingNoopener(content string) string {
+	return strings.ReplaceAll(content, `<a href=`, `<a rel="noopener" href=`)
+}
+
+func TestARelinkRecordsWhatTheSiteStored(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a neighbor", func(t *testing.T) {
+		t.Parallel()
+
+		deps, server, recorder, wpID := relinkDeps(t, clientParagraph+"\n\n"+ourParagraph, wptest.WithSaveFilter(addingNoopener))
+		log := &bodyLog{written: map[string][]string{"page-parent": {block.Hash(ourParagraph)}}}
+		deps.Bodies = log
+		relinked := runRelink(t, deps)
+
+		stored, _ := server.Lookup(wpID)
+		linked := clientParagraph + "\n\n" + addingNoopener(ourLinked)
+		if stored.Content != linked {
+			t.Fatalf("the parent holds %q, want the site's own form of the link", stored.Content)
+		}
+		if held := log.bodies["page-parent"]; held != stored.Content {
+			t.Errorf("the body recorded is %q, want what the site stored %q", held, stored.Content)
+		}
+		if written := log.ours("page-parent"); len(written) != 1 || written[0] != block.Hash(addingNoopener(ourLinked)) {
+			t.Errorf("ours = %v, want the stored form of the linked block", written)
+		}
+		if relinked.Neighbors[0].After != wp.ContentHash(stored.Content) {
+			t.Errorf("after = %s, want the stored hash %s", relinked.Neighbors[0].After, wp.ContentHash(stored.Content))
+		}
+		if links := recorder.byPage["page-parent"]; len(links) != 1 || !links[0].Ours {
+			t.Errorf("links = %+v, want the placed link recorded ours", links)
+		}
+	})
+
+	t.Run("the page itself", func(t *testing.T) {
+		t.Parallel()
+
+		ours := "<p>Espresso is the shortest way to make coffee at home.</p>"
+		deps, server, _, wpID := relinkPageDeps(t, espressoBody, wptest.WithSaveFilter(addingNoopener))
+		log := &bodyLog{written: map[string][]string{"page-child": {block.Hash(ours)}}}
+		deps.Bodies = log
+		_, published, _ := runRelinkPage(t, deps, relinkPageContext(t, deps, wpID))
+
+		stored, _ := server.Lookup(wpID)
+		linked := `<p>Espresso is the shortest way to make <a rel="noopener" href="/coffee/">coffee</a> at home.</p>`
+		if !strings.Contains(stored.Content, linked) {
+			t.Fatalf("the page holds %q, want the site's own form of the link", stored.Content)
+		}
+		if held := log.bodies["page-child"]; held != stored.Content {
+			t.Errorf("the body recorded is %q, want what the site stored %q", held, stored.Content)
+		}
+		if written := log.ours("page-child"); len(written) != 1 || written[0] != block.Hash(linked) {
+			t.Errorf("ours = %v, want the stored form of the linked block", written)
+		}
+		if published.ContentHash != wp.ContentHash(stored.Content) {
+			t.Errorf("contentHash = %s, want the stored hash %s", published.ContentHash, wp.ContentHash(stored.Content))
+		}
+	})
+}
+
+func TestARelinkWritesNothingOverAPageItsSaveWouldAlter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a neighbor", func(t *testing.T) {
+		t.Parallel()
+
+		body := "<p>Fresh roasted<br>daily, with every espresso blend we sell.</p>"
+		deps, server, _, wpID := relinkDeps(t, body, wptest.WithFilteredHTML())
+		deps.Bodies = &bodyLog{}
+		relinked := runRelink(t, deps)
+
+		if stored, _ := server.Lookup(wpID); stored.Content != body {
+			t.Fatalf("the neighbor was written: %q", stored.Content)
+		}
+		if relinked.Linked != 0 || relinked.Skipped != 1 || len(relinked.Neighbors) != 1 {
+			t.Fatalf("relinked = %+v, want the neighbor skipped", relinked)
+		}
+		if got := relinked.Neighbors[0]; got.Outcome != steps.OutcomeSkipped || got.Detail != steps.ReasonNeighborSaveAlters {
+			t.Errorf("neighbor = %+v, want it skipped because its save would alter the client's content", got)
+		}
+	})
+
+	t.Run("the page itself", func(t *testing.T) {
+		t.Parallel()
+
+		body := `<h1>Espresso</h1><p>Espresso is the shortest<br>way to make coffee at home.</p>`
+		deps, server, _, wpID := relinkPageDeps(t, body, wptest.WithFilteredHTML())
+		deps.Bodies = &bodyLog{}
+		result, err := drive(t, steps.RelinkPage(deps), relinkPageContext(t, deps, wpID))
+		if err != nil {
+			t.Fatalf("RelinkPage: %v", err)
+		}
+		if result.Next != run.TransitionPause || !strings.Contains(result.Message, steps.ReasonSaveAltersClient) {
+			t.Fatalf("result = %+v, want the page paused because its save would alter the client's content", result)
+		}
+		if stored, _ := server.Lookup(wpID); stored.Content != body {
+			t.Fatalf("the page was written: %q", stored.Content)
 		}
 	})
 }

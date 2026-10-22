@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"slices"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -85,6 +86,7 @@ func (s *relinkState) wait(key, message string) (run.Result, error) {
 }
 
 type landing struct {
+	content string
 	hash    string
 	held    string
 	written bool
@@ -93,7 +95,7 @@ type landing struct {
 func landRelinkedBody(ctx context.Context, client *wp.Client, page pagemap.Page, after, beforeHash string) (landing, error) {
 	written, err := client.PutRaw(ctx, onSiteType(page), *page.WPID, after, beforeHash)
 	if err == nil {
-		return landing{hash: written.Hash, written: true}, nil
+		return landing{content: written.Content, hash: written.Hash, written: true}, nil
 	}
 	if !errors.IsCode(err, errors.Conflict) {
 		return landing{}, err
@@ -105,7 +107,22 @@ func landRelinkedBody(ctx context.Context, client *wp.Client, page pagemap.Page,
 	if !block.SameRender(stored.Content, after) {
 		return landing{held: stored.ContentHash}, nil
 	}
-	return landing{hash: stored.ContentHash, written: true}, nil
+	return landing{content: stored.Content, hash: stored.ContentHash, written: true}, nil
+}
+
+func (w relinkWrite) stored(content string) splicedBody {
+	composed, held := block.Parse(w.After).Blocks, block.Parse(content).Blocks
+	at := block.Align(w.After, content, w.Ours)
+	ours := make([]string, 0, len(w.Ours))
+	for i := range composed {
+		if at[i] < 0 || !slices.Contains(w.Ours, composed[i].Hash) {
+			continue
+		}
+		if hash := held[at[i]].Hash; !slices.Contains(ours, hash) {
+			ours = append(ours, hash)
+		}
+	}
+	return splicedBody{raw: content, ours: ours}
 }
 
 func (s *relinkState) bodies(index pagemap.Index) []relinkedBody {

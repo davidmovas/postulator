@@ -83,6 +83,7 @@ type Server struct {
 
 	noStoreSettings bool
 	rawAnswerFaults []int
+	saveFilter      func(string) string
 	mu              sync.Mutex
 }
 
@@ -112,7 +113,14 @@ func WithoutProductEdit() Option {
 }
 
 func WithFilteredHTML() Option {
-	return func(s *Server) { s.filteredHTML = true }
+	return func(s *Server) {
+		s.filteredHTML = true
+		s.saveFilter = kses
+	}
+}
+
+func WithSaveFilter(filter func(string) string) Option {
+	return func(s *Server) { s.saveFilter = filter }
 }
 
 func WithBuilderLayout() Option {

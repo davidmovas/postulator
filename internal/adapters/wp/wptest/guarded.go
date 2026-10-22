@@ -46,12 +46,12 @@ func (s *Server) EditMeta(id int64, key, value string) {
 }
 
 func (s *Server) saveStable(content string) bool {
-	return !s.filteredHTML || kses(content) == content
+	return s.saveFilter == nil || s.saveFilter(content) == content
 }
 
 func (s *Server) saved(content string) string {
-	if s.filteredHTML {
-		return kses(content)
+	if s.saveFilter != nil {
+		return s.saveFilter(content)
 	}
 	return content
 }

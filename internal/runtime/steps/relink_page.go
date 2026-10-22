@@ -77,6 +77,9 @@ func RelinkPage(deps Deps) run.StepDef {
 			if reason != "" {
 				return standDown(work, sc, reason)
 			}
+			if !body.raw.SaveStable {
+				return needsHuman(sc.Page.Path + ": " + ReasonSaveAltersClient), nil
+			}
 
 			pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
 			if err != nil {
@@ -227,7 +230,8 @@ func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run
 			write.Outcome.Before.Hash + " and now holds " + landed.held + "; sync the site and relink it again"), nil
 	}
 	state.Publish.ContentHash = landed.hash
-	if recordErr := recordSpliced(ctx, deps, sc.Page.ID, sc.Run.ID, splicedBody{raw: write.After, ours: write.Ours}); recordErr != nil {
+	record := write.stored(landed.content)
+	if recordErr := recordSpliced(ctx, deps, sc.Page.ID, sc.Run.ID, record); recordErr != nil {
 		return run.Result{}, recordErr
 	}
 	owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
@@ -244,7 +248,7 @@ func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run
 			placed = append(placed, block.LinkKey{To: state.Page.Placed[i].Path, Anchor: state.Page.Placed[i].Anchor})
 		}
 	}
-	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), write.After,
+	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), record.raw,
 		placed); adoptErr != nil {
 		return run.Result{}, adoptErr
 	}

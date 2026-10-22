@@ -3993,3 +3993,24 @@ on what stage 2 left open and what was decided while building.
 - **The restricted-user test checked the plugin before anything probed it.** `sites.Create` stores a
   site without asking it anything, so the plugin read as absent on the response of the create; the
   test now checks it through `Sync.CheckPlugin`, as the full loop does.
+
+### G's safety work (session 3, 2026-10-22)
+
+- **A relink records what the site stored, and keeps off a page its save would alter.** Both
+  relinks kept only the hash of the raw PUT's answer and recorded the body they had composed as
+  current and base, with the composed blocks' hashes as ours; on a site whose save filters
+  reformat our bytes (kses, a filter adding `rel` to every link) our relinked block then read as
+  the client's and the page as drifted on the next walk. `landRelinkedBody` now keeps the stored
+  content, on the answer and on the 409 rerun alike, and `relinkWrite.stored` maps the composed
+  blocks onto it through `block.Align`: the client's blocks pair by render, in order, and ours by
+  position between them where each pair agrees by text, so a block the site prepended or dropped is
+  never taken for ours (`TestAlignAnswersMinusOneForABlockTheSiteDidNotKeep`). The body snapshot,
+  `page_blocks_written` and the adopted links are read from the stored content
+  (`TestARelinkRecordsWhatTheSiteStored`, failing first with the composed body on record). As
+  `publish` has done since A.5, no relink writes over a page whose raw read is not save-stable: the
+  page relink pauses `save_alters_client`, a neighbour is skipped naming the reason, and nothing is
+  PUT (`TestARelinkWritesNothingOverAPageItsSaveWouldAlter`). The fake gains `WithSaveFilter`, the
+  site's own save filter, of which `WithFilteredHTML` is the kses case. A rerun after a lost answer
+  still takes the write as ours only while the stored body renders as the composed one, so a filter
+  that changes a render (an attribute added to our link) pauses the page or reports the neighbour's
+  conflict rather than claim a body it cannot tell from the client's edit.

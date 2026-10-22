@@ -33,6 +33,8 @@ const (
 	ReasonNeighborUnreadable = "the stored content of the neighbor could not be read as HTML"
 	ReasonNeighborUnmapped   = "the neighbor is not mapped to an entity, so it has no rules of its own"
 	ReasonNeighborIsATerm    = "the neighbor is a product category, whose description the companion plugin does not write"
+	ReasonNeighborSaveAlters = "a save of the neighbor by the site's user would change its owner's content, so it was " +
+		"not written; give that user unfiltered_html, or add the link by hand"
 
 	ReasonNeighborOwesNothing = "the rules of the neighbor do not ask it to link to this page"
 
@@ -335,6 +337,9 @@ func (n neighborhood) placeOwed(ctx context.Context, deps Deps, neighbor pagemap
 	if reason != "" {
 		return skip(outcome, reason), nil, nil
 	}
+	if !body.raw.SaveStable {
+		return skip(outcome, ReasonNeighborSaveAlters), nil, nil
+	}
 
 	writer, err := body.writer(ctx, deps, neighbor)
 	if err != nil {
@@ -472,7 +477,7 @@ func (n neighborhood) writeNext(ctx context.Context, deps Deps, state *relinkSta
 	}
 	if !landed.written {
 		outcome.Outcome, outcome.Detail = OutcomeConflict, "the neighbor changed on the site after its links were planned"
-	} else if recorded := n.recordLanded(ctx, deps, neighbor, write); recorded != nil {
+	} else if recorded := n.recordLanded(ctx, deps, neighbor, write, landed); recorded != nil {
 		return run.Result{}, recorded
 	} else {
 		outcome.After = landed.hash
@@ -482,12 +487,13 @@ func (n neighborhood) writeNext(ctx context.Context, deps Deps, state *relinkSta
 	return n.settled(state, "relinked "+outcome.Path)
 }
 
-func (n neighborhood) recordLanded(ctx context.Context, deps Deps, neighbor pagemap.Page, write relinkWrite) error {
-	if err := recordSpliced(ctx, deps, neighbor.ID, n.runID, splicedBody{raw: write.After, ours: write.Ours}); err != nil {
+func (n neighborhood) recordLanded(ctx context.Context, deps Deps, neighbor pagemap.Page, write relinkWrite, landed landing) error {
+	record := write.stored(landed.content)
+	if err := recordSpliced(ctx, deps, neighbor.ID, n.runID, record); err != nil {
 		return err
 	}
 	placed := []block.LinkKey{{To: n.page.Path, Anchor: write.Outcome.Anchor}}
-	return adopt(ctx, deps, neighbor, n.index, n.site, write.After, placed)
+	return adopt(ctx, deps, neighbor, n.index, n.site, record.raw, placed)
 }
 
 func (n neighborhood) settled(state *relinkState, message string) (run.Result, error) {
