@@ -62,7 +62,9 @@ service's second source; `PagesService.SetType{pageId, pageTypeId}` types a page
 `GraphService.LoadGraph` names each mapped page's `pageTypeId`. `PagesService.Model{pageId}` answers a page as the model
 (`observe.ModelView`: identity, the parent with its reason and method, the render's root, regions
 and trails with each crumb's link, redirect and page, typed links, the blocks read-only, the open
-findings) and `ModelSummary{siteId}` the site's (`observe.Summary`); both resolve
+findings, and since 2026-10-22 `fields`, each field row a run wrote as `{key, writtenRunId,
+writtenAt, ours}`, `ours` false once the site's value moved from what the run wrote) and
+`ModelSummary{siteId}` the site's (`observe.Summary`); both resolve
 `application/observe` through the service's second source. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
@@ -77,10 +79,13 @@ since the previous one.
 
 `GraphService.MoveEntity{entityId, newParentId, keepBoth?}` adds the parent edge, checks the
 graph is still acyclic and drops the approved parent edges it replaces inside one unit of
-work, and answers `removedEdgeIds`; running it again is quiet. `RunsService.RevertRun{runId}`
-enqueues the revert of a finished run and answers `{runId}`; it refuses a revert of a revert,
-a run that has not finished ("cancel it first"), a second revert while one is `completed` or
-still active, and a run that wrote nothing to the site.
+work, and answers `removedEdgeIds`; running it again is quiet. `RunsService.RevertRun{runId,
+pageId?, fields?}` enqueues the revert of a finished run and answers `{runId}`; it refuses a revert
+of a revert, a run that has not finished ("cancel it first"), a second revert while another is
+under way, and a run that wrote nothing to the site. `pageId` names one page the run wrote and
+`fields` the keys to put back on it (each known to the catalog and off the deny list; `body` or
+`product_description` for the body); a field the client changed since is handed back, never
+written over. The agent's `runs_revert` takes `{runId}` alone.
 
 `ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
 judge rubric against it and answers with the report, one model call inside the request.
@@ -273,8 +278,15 @@ a schedule's `templateId` does the same on every firing. `ResolveForPageRequest.
 resolves that template in place of the page's own and refuses one of another site with
 `INVALID`.
 
-`RunsService.RetryStep{itemId, acceptFindings?}` requeues the current step; with
-`acceptFindings` a page held at `validate` goes on with its findings as they are. An item
+`RunsService.RetryStep{itemId, acceptFindings?, fields?}` requeues the current step; with
+`acceptFindings` a page held at `validate` goes on with its findings as they are, and an item
+paused `awaiting_review` writes the plan it showed. Only a person accepts a review; the agent's
+call is refused with `CONFLICT`. `fields` (since 2026-10-22) narrows a review's acceptance to the
+keys a person ticked, each among the item's newest `edit_plan` (its field changes and its page's
+`body` key); the rest are not written and the publish result names them in `declined`. An empty
+list, `fields` without `acceptFindings`, on an item no review holds, or on a review that changes
+bodies only (a relink's) is refused with `INVALID`. The agent's `runs_retry_step` takes `{itemId,
+acceptFindings?}` alone. An item
 carries `seq`, its place in the run, and `blockedBy`, the item of the parent it is queued
 behind, and `waitingFor` names that parent's page whenever the item has a blocker.
 
@@ -293,6 +305,17 @@ the write replaced, kept only for an update and only where the site can answer â
 `RelinkPageResult` under the same `relink_result` kind, with `placed[]` rather than
 `neighbors`, so a revert does not try to restore a page nothing wrote to. `revert_result` is
 the artifact kind a revert produces. `ImagesResult` no longer carries `skipped`.
+
+Since stage 3 (2026-10-20 to 22) `publish_result` carries `version` (3) and the diff of what it
+wrote: `fields [{key, before, beforeHash, after, afterHash}]`, each `after` being what the site
+answered it stored, and `blocks [{kind, hash, raw, owner, change}]`, the body's blocks **as the
+site stored them** (`owner` one of `blockOwners`: `ours`, `client`, or `site` for a block the
+site's own save added; `change` one of `blockChanges`: `kept`, `added`, `removed`), with
+`writtenMeta` (the SEO meta the plugin stored) and `declined` (the keys a person left unticked in
+a review). A result without `version` is reverted whole. A draft run's item paused
+`awaiting_review` carries `edit_plan` `{pages: [{pageId, path, body?, fields, blocks, wpId}],
+hash}`, `body` naming the key the body is written under when its blocks change. `revert_result`
+carries `fields [{key, outcome, detail?}]`, a field `kept` with a reason being one handed back.
 
 New warning findings, each carrying `details.pageId` and `details.path`: `judge_unavailable`
 (`reason`), `artifact_purged` (`kind`), `image_not_placed` (`reason`), `meta_not_written`
@@ -393,7 +416,7 @@ status`. A site that cannot issue a link answers `INVALID` with `details.code` s
 
 `SyncService.CheckPlugin{siteId}` answers `{plugin, commerce}`; `plugin` is `{installed, version,
 requiredVersion, outdated, capabilities, seoPlugin}`. `outdated` is true when the manifest's
-version is below `requiredVersion` (1.4.1 since 2026-10-18, 1.4.0 the day before) or a capability the client needs is
+version is below `requiredVersion` (1.5.1 since 2026-10-22, 1.5.0 since 2026-10-20, 1.4.1 since 2026-10-18) or a capability the client needs is
 missing, and the Sites panel then says to upload the new zip over the old one, which WordPress
 offers as "Replace current with uploaded". The verdict is the probe's and is never stored.
 
@@ -452,11 +475,37 @@ model, tier, tokens (`input cachedInput cacheWrite output reasoning total`), `us
 
 ## The companion plugin's version
 
-The shipped plugin is **1.2.0** and advertises `bulk seo_meta seo_meta_read content_hash raw
-preview`. A capability the manifest does not name is refused from the cached manifest, before
-any request: `GET /seo-meta/{id}` needs `seo_meta_read`, so a site still running 1.1.0 answers
-`plugin_outdated` with `details.capability` and a revert keeps its `revert_meta_kept` warning
-instead of restoring the search snippet. Everything else works against 1.1.0 unchanged.
+The shipped plugin is **1.5.1** and advertises `bulk seo_meta seo_meta_read content_hash raw
+preview rendered meta terms settings meta_write guarded_write`, every one of which the client
+requires (`wp.requiredCapabilities`, the fake's defaults, the PHP `CAPABILITIES`, `openapi.yaml`
+and three pinned test lists move together). A capability the manifest does not name is refused
+from the cached manifest, before any request, and **an outdated plugin writes nothing**: `PutRaw`,
+`SetSEOMeta`, `ReplaceSEOMeta` and `PutMeta` answer `plugin_outdated`, since an older SEO route
+ignores the expected hashes and an older raw write answers no content.
+
+Stage 3's routes, every write under the hash it was read with (`wp-plugin/openapi.yaml` is the
+contract):
+- `PUT /meta/{id}` takes each key with the hash of the value it was read with (null for one the
+  post did not carry), refuses the deny set (`x-denied-meta`: the store's keys behind the denied
+  fields, the `_`, `attribute_` and `rank_math_` prefixes, `total_sales`), a protected key, a key
+  the user may not `edit_post_meta` and a stored value that is not one plain text, answers `409
+  hash_mismatch` with `moved` naming each key that moved and then writes nothing, deletes on a
+  null, and answers each key's stored value and hash.
+- `PUT /seo-meta/{id}` takes `expected` per field and answers the hashes of what the SEO plugin
+  stored after its own sanitizer.
+- The raw `PUT /content/{id}/raw` answers the content WordPress stored beside its hash, which is
+  what `page_blocks_written` records.
+- The raw `GET` answers `saveStable`: whether a whole-post save by this user would leave the
+  stored content, **title and excerpt** unchanged (since 1.5.1; 1.5.0 probed the content alone),
+  each run through its own `pre_post_*` and `*_save_pre` filters, which is how kses reaches a user
+  without `unfiltered_html`. Over a page that is not save-stable nothing that re-saves the post
+  is sent: meta and SEO writes still go, and the item pauses `save_alters_client`.
+- The manifest answers `unfilteredHtml`.
+
+A link the model records as ours carries the hash of the block that holds it
+(`page_links.block_hash`, migration 0070): the mark moves only with our own changes to that block,
+so a link the client adds with our target and anchor is never ours, and a client's edit to a block
+holding our link hands that link to him.
 
 ## Agent chat
 
