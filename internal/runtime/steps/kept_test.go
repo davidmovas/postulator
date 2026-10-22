@@ -344,12 +344,25 @@ func TestAFieldTheOwnerChangedAfterTheReadIsKept(t *testing.T) {
 }
 
 type fieldLog struct {
-	mu     sync.Mutex
-	values []field.Value
+	mu       sync.Mutex
+	values   []field.Value
+	recorded map[field.Key]string
 }
 
-func (f *fieldLog) Record(context.Context, string, field.Key, string, string, time.Time) error {
+func (f *fieldLog) Record(_ context.Context, _ string, key field.Key, value, _ string, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.recorded == nil {
+		f.recorded = map[field.Key]string{}
+	}
+	f.recorded[key] = value
 	return nil
+}
+
+func (f *fieldLog) recordedValue(key field.Key) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.recorded[key]
 }
 
 func (f *fieldLog) ListForPage(context.Context, string) ([]field.Value, error) {

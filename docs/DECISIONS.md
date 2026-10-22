@@ -4087,3 +4087,15 @@ Each is closed below with a test that failed first, or kept with its reason.
   and the client requires 1.5.1, so a 1.5.0 plugin reads as outdated and writes nothing
   (`TestAPageWhoseTitleOrExcerptASaveWouldAlterIsNotResaved`, failing first with the page written;
   `TestSaveStabilityFollowsTheUsersFilters` gains a title with an ampersand on the stand).
+- **A result from before stage 3 put the SEO meta back blindly.** `putTheMetaBack` sent the previous
+  meta with no expected hashes, so a revert of an older run wrote over an SEO title the client had
+  edited in Yoast since. The revert now expects, per applied field, the hash of what that run's `meta`
+  artifact wrote, and a 409 keeps the client's value with `revert_meta_kept` naming the edit
+  (`TestAnOlderRunsSEOMetaIsPutBackOnlyWhileItHoldsWhatThatRunWrote`, failing first with the edit
+  overwritten).
+- **The excerpt's base was the value sent, not the one stored.** `finishItem` recorded the request's
+  excerpt as the field's base while the registry had already answered the stored value, so under a
+  restricted user an excerpt with an ampersand read as changed on the site on the next walk and was
+  kept as the client's. The base is now the stored value the write answered
+  (`TestTheExcerptBaseIsWhatTheSiteStored`, failing first; the fake now runs its filter over a page's
+  title and excerpt on every whole-post save, as WordPress does).

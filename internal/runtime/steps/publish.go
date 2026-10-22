@@ -499,6 +499,15 @@ func writeRawBody(ctx context.Context, deps Deps, sc *run.StepContext, client *w
 	return state.wait("wrote the body of " + sc.Page.Path)
 }
 
+func storedAfter(changes []field.Change, key field.Key) (string, bool) {
+	for i := range changes {
+		if changes[i].Key == key {
+			return changes[i].After, true
+		}
+	}
+	return "", false
+}
+
 func rawConflict(sc *run.StepContext, plan *publishPlan, current string) run.Result {
 	if plan.Product {
 		return needsHuman("the product " + sc.Page.Path + " changed in the store while its description was written: " +
@@ -696,7 +705,11 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 		return state.failed(err)
 	}
 	if plan.Request.Excerpt != nil {
-		if err := recordField(ctx, deps, sc, sc.Page.ID, field.Excerpt, *plan.Request.Excerpt); err != nil {
+		excerpt := *plan.Request.Excerpt
+		if stored, held := storedAfter(state.Result.Fields, field.Excerpt); held {
+			excerpt = stored
+		}
+		if err := recordField(ctx, deps, sc, sc.Page.ID, field.Excerpt, excerpt); err != nil {
 			return state.failed(err)
 		}
 	}
