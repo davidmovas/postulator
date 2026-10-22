@@ -2,11 +2,11 @@ import type { ReactElement } from "react";
 import { useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import type { PageType } from "../../../data/types.js";
+import type { CatalogField, PageType } from "../../../data/types.js";
 import { Banner, Button, DeleteIcon, Drawer, EditNoteIcon, SectionLabel, StatusBadge, toneClasses } from "../../../ui/index.js";
 import { CustomFieldForm } from "./custom-field.js";
 import { presetHint, presetIcon, presetLabel, presetTone } from "./labels.js";
-import { lastOfPreset, orderedScopes, usualFor } from "./model.js";
+import { aiWritableOf, lastOfPreset, orderedScopes, usualFor } from "./model.js";
 import { ScopeCard } from "./scope-card.js";
 import type { TemplateChoice } from "./type-dialogs.js";
 import { DeleteTypeDialog, TypeFormDialog } from "./type-dialogs.js";
@@ -17,12 +17,13 @@ export interface TypeDrawerProps {
     siteId: string;
     type: PageType;
     types: readonly PageType[];
+    catalog: readonly CatalogField[];
     templates: readonly TemplateChoice[];
     templateName: string;
     onClose: () => void;
 }
 
-export function TypeDrawer({ siteId, type, types, templates, templateName, onClose }: TypeDrawerProps): ReactElement {
+export function TypeDrawer({ siteId, type, types, catalog, templates, templateName, onClose }: TypeDrawerProps): ReactElement {
     const [editing, setEditing] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [showOthers, setShowOthers] = useState(false);
@@ -101,7 +102,12 @@ export function TypeDrawer({ siteId, type, types, templates, templateName, onClo
                     )}
                     <ul className="flex flex-col gap-1.5">
                         {usual.map((scope) => (
-                            <ScopeCard key={scope.field} type={type} scope={scope} />
+                            <ScopeCard
+                                key={scope.field}
+                                type={type}
+                                scope={scope}
+                                aiWritable={aiWritableOf(catalog, scope.field)}
+                            />
                         ))}
                     </ul>
                     {others.length === 0 ? null : (
@@ -120,7 +126,12 @@ export function TypeDrawer({ siteId, type, types, templates, templateName, onClo
                             {showOthers ? (
                                 <ul className="flex flex-col gap-1.5">
                                     {others.map((scope) => (
-                                        <ScopeCard key={scope.field} type={type} scope={scope} />
+                                        <ScopeCard
+                                            key={scope.field}
+                                            type={type}
+                                            scope={scope}
+                                            aiWritable={aiWritableOf(catalog, scope.field)}
+                                        />
                                     ))}
                                 </ul>
                             ) : null}

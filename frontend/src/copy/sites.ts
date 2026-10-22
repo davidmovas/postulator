@@ -73,9 +73,16 @@ export const sites = {
         capabilityNames: {
             bulk: "bulk writes",
             seo_meta: "SEO meta",
+            seo_meta_read: "SEO meta reads",
             content_hash: "change detection",
             raw: "raw content",
             preview: "draft previews",
+            rendered: "rendered pages",
+            meta: "custom fields",
+            terms: "taxonomy terms",
+            settings: "site settings",
+            meta_write: "custom field writes",
+            guarded_write: "guarded writes",
         } as Readonly<Record<string, string>>,
         seo: "SEO plugin",
         seoNames: {

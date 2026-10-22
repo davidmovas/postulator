@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
-import type { PageType } from "../../../data/types.js";
+import type { CatalogField, PageType } from "../../../data/types.js";
 import { aPageType, aScope, hubLinks } from "../../../testing/pagetypes.js";
 import { renderScreen } from "../../../testing/render.js";
 import { aSite } from "../../../testing/sites.js";
@@ -37,9 +37,16 @@ const hub = aPageType("t-hub", "hub", {
         aScope("title"),
         aScope("body", { enabled: true, links: hubLinks(), stored: true }),
         aScope("seo_title", { enabled: true }),
+        aScope("seo_canonical", { enabled: true, aiWrites: true }),
         aScope("product_short_description"),
     ],
 });
+
+function aField(key: string, aiWritable: boolean): CatalogField {
+    return { key, read: "core", write: "core", text: true, instanced: false, denied: false, scopable: true, aiWritable };
+}
+
+const catalog: CatalogField[] = [aField("title", true), aField("body", true), aField("seo_title", true), aField("seo_canonical", false)];
 
 const category = aPageType("t-cat", "hub", { name: "Category", pages: 3, scopes: [aScope("body", { enabled: true, links: hubLinks() })] });
 
@@ -58,7 +65,7 @@ vi.mock("../../../data/hooks/sites.js", () => ({
 }));
 
 vi.mock("../../../data/hooks/templates.js", () => ({
-    usePageTypes: () => ({ data: { types, fields: [] }, isPending: false, error: null, refetch: () => undefined }),
+    usePageTypes: () => ({ data: { types, fields: catalog }, isPending: false, error: null, refetch: () => undefined }),
     useTemplates: (filter: { scope?: string }) => ({
         data:
             filter.scope === "global"
@@ -124,6 +131,30 @@ describe("Settings, Page types", () => {
         expand(said.fields.body);
         expect(screen.getByRole("switch", { name: said.scope.rewritesLabel })).toHaveProperty("checked", false);
         expect(screen.getByText(said.scope.rewritesHint)).toBeDefined();
+    });
+
+    it("keeps the model off a field a person writes, says why, and saves it so", () => {
+        calls.scoped.length = 0;
+        renderScreen(<PageTypesScreen />, "/settings/types?site=s1&type=t-hub");
+
+        expand(said.fields.seo_canonical);
+        const writes = screen.getByRole("switch", { name: said.scope.aiWrites });
+        expect(writes).toHaveProperty("disabled", true);
+        expect(writes).toHaveProperty("checked", false);
+        expect(writes.getAttribute("title")).toBe(said.scope.personOnly);
+
+        fireEvent.change(screen.getByRole("textbox", { name: said.scope.instruction }), {
+            target: { value: "The canonical is set by hand." },
+        });
+        fireEvent.click(screen.getByRole("button", { name: said.scope.save }));
+        expect(calls.scoped[0]).toMatchObject({ field: "seo_canonical", aiWrites: false });
+    });
+
+    it("leaves the model's switch to a person on a field the model may write", () => {
+        renderScreen(<PageTypesScreen />, "/settings/types?site=s1&type=t-hub");
+
+        expand(said.fields.body);
+        expect(screen.getByRole("switch", { name: said.scope.aiWrites })).toHaveProperty("disabled", false);
     });
 
     it("edits the link rules of the field that carries the links", () => {

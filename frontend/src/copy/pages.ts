@@ -62,7 +62,8 @@ export const pages = {
         needsPluginBody:
             "Without the plugin WordPress shows a draft only to a logged-in editor. Published pages still open by their address.",
         outdatedPlugin: "Update the companion plugin to preview drafts",
-        outdatedPluginBody: "The plugin on this site predates draft previews. Version 1.1.0 or later issues them.",
+        outdatedPluginBody:
+            "The plugin on this site predates draft previews. Save the plugin zip from the site's panel on the Sites screen and upload it over the old one.",
         viewports: { desktop: "Desktop", tablet: "Tablet", phone: "Phone" },
         viewport: "Preview width",
     },

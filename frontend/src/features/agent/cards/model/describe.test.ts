@@ -75,6 +75,17 @@ describe("the run card", () => {
     });
 });
 
+describe("the revert card", () => {
+    it("names the run it puts back and warns of what it takes off the site", () => {
+        const view = describeAction("runs_revert", confirmableArgs["runs_revert"] ?? {}, null, none);
+        expect(texts(view.title).join("")).toBe(`${copy.agent.describe.runs.revert} `);
+        expect(refs(view.title)).toStrictEqual(["run:r1"]);
+        expect(view.lines.map((line) => [line.tone, texts(line.parts).join("")])).toStrictEqual([
+            ["warn", copy.agent.describe.runs.revertBody],
+        ]);
+    });
+});
+
 describe("the template cards", () => {
     it("reads a created template's spec as sentences", () => {
         const view = describeAction("templates_create", confirmableArgs["templates_create"] ?? {}, null, none);

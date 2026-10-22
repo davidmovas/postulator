@@ -20,9 +20,10 @@ const bannerFields: readonly string[] = ["field", "enabled", "provider", "pageTy
 export interface ScopeCardProps {
     type: PageType;
     scope: FieldScope;
+    aiWritable?: boolean;
 }
 
-export function ScopeCard({ type, scope }: ScopeCardProps): ReactElement {
+export function ScopeCard({ type, scope, aiWritable = true }: ScopeCardProps): ReactElement {
     const save = useSetScope();
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState<ScopeDraft>(() => draftOf(scope));
@@ -52,7 +53,7 @@ export function ScopeCard({ type, scope }: ScopeCardProps): ReactElement {
         if (problem !== null) {
             return;
         }
-        save.mutate(requestOf(type.id, scope.field, draft), {
+        save.mutate(requestOf(type.id, scope.field, aiWritable ? draft : { ...draft, aiWrites: false }), {
             onSuccess: () => {
                 pushToast("info", said.saved(label));
             },
@@ -77,7 +78,7 @@ export function ScopeCard({ type, scope }: ScopeCardProps): ReactElement {
                         {said.custom}
                     </StatusBadge>
                 ) : null}
-                {scope.enabled && scope.aiWrites ? (
+                {scope.enabled && scope.aiWrites && aiWritable ? (
                     <StatusBadge tone="accent" dot={false}>
                         {said.modelWrites}
                     </StatusBadge>
@@ -118,14 +119,14 @@ export function ScopeCard({ type, scope }: ScopeCardProps): ReactElement {
                     <Switch
                         className="w-full"
                         label={said.aiWrites}
-                        title={said.aiWritesHint}
-                        checked={draft.aiWrites}
-                        disabled={readOnly}
+                        title={aiWritable ? said.aiWritesHint : said.personOnly}
+                        checked={aiWritable && draft.aiWrites}
+                        disabled={readOnly || !aiWritable}
                         onChange={(event) => {
                             edit({ aiWrites: event.target.checked });
                         }}
                     />
-                    <p className="text-2xs text-ink-faint">{said.aiWritesHint}</p>
+                    <p className="text-2xs text-ink-faint">{aiWritable ? said.aiWritesHint : said.personOnly}</p>
                     {custom ? (
                         <div className="grid grid-cols-2 gap-2">
                             <Field label={said.label} required={true} error={fieldErrorOf(thrown, "label")}>

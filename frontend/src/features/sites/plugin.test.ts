@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { copy } from "../../copy/index.js";
 import { capabilityLabel, pluginBanner, seoPluginLabel, storeBanner } from "./plugin.js";
 
 const current = {
@@ -40,12 +41,31 @@ describe("what the panel says about the companion plugin", () => {
 
 describe("what the companion plugin reports, in words", () => {
     it("names every capability the plugin manifest can carry", () => {
-        for (const capability of ["bulk", "seo_meta", "content_hash", "raw", "preview"]) {
+        const carried = [
+            "bulk",
+            "seo_meta",
+            "seo_meta_read",
+            "content_hash",
+            "raw",
+            "preview",
+            "rendered",
+            "meta",
+            "terms",
+            "settings",
+            "meta_write",
+            "guarded_write",
+        ];
+        expect(new Set(carried.map(capabilityLabel)).size).toBe(carried.length);
+        for (const capability of carried) {
             const label = capabilityLabel(capability);
             expect(label).not.toBe("");
             expect(label).not.toContain("_");
             expect(label).not.toBe(capability);
         }
+    });
+
+    it("names no plugin version of its own where a page preview needs a newer plugin", () => {
+        expect(copy.pages.preview.outdatedPluginBody).not.toMatch(/\d+\.\d+/);
     });
 
     it("shows a capability it has never heard of without its underscores", () => {

@@ -165,6 +165,7 @@ function SiteTypes({ siteId, typeId, onOpen }: SiteTypesProps): ReactElement {
                     siteId={siteId}
                     type={open}
                     types={types}
+                    catalog={listed.data?.fields ?? []}
                     templates={templates}
                     templateName={templateOf(open)}
                     onClose={() => {

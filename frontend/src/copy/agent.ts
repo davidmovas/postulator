@@ -381,6 +381,9 @@ export const agent = {
             regenerate: (count: number) =>
                 `Regenerate ${count === 1 ? "1 item" : `${count} items`} from the start in the run`,
             regenerateBody: "Each item is written again with the template as it is now; nothing already on the site is touched.",
+            revert: "Revert the run",
+            revertBody:
+                "Every page it created goes to the trash and every page it updated gets back what it replaced; whatever changed on the site since stays.",
         },
         sync: {
             site: "Pull the site's live content into the page map",

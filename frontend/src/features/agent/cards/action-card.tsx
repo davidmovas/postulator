@@ -9,6 +9,7 @@ import { ConfirmationCard } from "./card.js";
 import { Lines, Parts } from "./lines.js";
 import { isArgs, text } from "./model/card.js";
 import { describeAction } from "./model/describe.js";
+import { ownSummary } from "./model/summary.js";
 
 function templateIdOf(tool: string, args: unknown): string | null {
     if (!isArgs(args)) {
@@ -27,6 +28,7 @@ function templateIdOf(tool: string, args: unknown): string | null {
 export interface ActionCardProps {
     tool: string;
     args: unknown;
+    summary: string;
     risk: string | null;
     status: string;
     createdAt: Timestamp;
@@ -42,6 +44,7 @@ export interface ActionCardProps {
 export function ActionCard({
     tool,
     args,
+    summary,
     risk,
     status,
     createdAt,
@@ -72,6 +75,7 @@ export function ActionCard({
             outcome={outcome}
             title={<Parts parts={view.title} />}
             lines={<Lines lines={view.lines} />}
+            summary={ownSummary(summary, registered?.description ?? null)}
             busy={busy}
             focus={focus}
             keys={keys}

@@ -41,6 +41,7 @@ export interface ConfirmationCardProps {
     outcome: string | null;
     title: ReactNode;
     lines?: ReactNode;
+    summary?: string | null;
     busy: CardBusy;
     focus?: boolean;
     keys?: CardKeys;
@@ -75,6 +76,7 @@ export function ConfirmationCard({
     outcome,
     title,
     lines,
+    summary = null,
     busy,
     focus = false,
     keys = "none",
@@ -161,6 +163,9 @@ export function ConfirmationCard({
                     </div>
                 </div>
                 {lines === undefined ? null : <div className="flex flex-col gap-1.5">{lines}</div>}
+                {summary === null ? null : (
+                    <p className="border-l-2 border-hairline pl-2.5 text-xs leading-snug text-ink-soft">{summary}</p>
+                )}
                 {dangerous && pending ? (
                     <div className={cx("flex items-start gap-2 rounded-md border px-2.5 py-2", classes.soft, classes.border)}>
                         <WarningIcon size={15} className={cx("mt-px shrink-0", classes.ink)} />

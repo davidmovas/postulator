@@ -154,6 +154,7 @@ export const pageTypes = {
         enabled: "Write this field",
         aiWrites: "The model writes it",
         aiWritesHint: "Off, the field is left for a person to write.",
+        personOnly: "A person or the site sets this field, so the model never writes it.",
         instruction: "What the writer is told",
         instructionHint: "One or two sentences about this field on these pages.",
         minLength: "Fewest characters",

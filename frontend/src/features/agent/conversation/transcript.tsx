@@ -199,6 +199,7 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
                                     key={row.id}
                                     tool={tool}
                                     args={row.action?.args ?? row.live?.args ?? null}
+                                    summary={row.action?.summary ?? row.live?.summary ?? ""}
                                     risk={row.live?.risk ?? null}
                                     status={row.action?.status ?? "pending"}
                                     createdAt={row.action?.createdAt ?? null}

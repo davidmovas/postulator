@@ -1,4 +1,4 @@
-import type { FieldScope, LinkPolicy, LinkRules, PageType, SetScopeRequest } from "../../../data/types.js";
+import type { CatalogField, FieldScope, LinkPolicy, LinkRules, PageType, SetScopeRequest } from "../../../data/types.js";
 import { anchorStrategies, isOneOf, pageTypePresets, scopableFieldKeys } from "../../../generated/vocab.js";
 import { metaKeyOf, metaPrefix } from "./labels.js";
 
@@ -107,6 +107,12 @@ function asAnchor(value: string): Anchor {
 
 export function anchorOf(value: string, fallback: Anchor): Anchor {
     return isOneOf(anchorStrategies, value) ? asAnchor(value) : fallback;
+}
+
+export function aiWritableOf(catalog: readonly CatalogField[], field: string): boolean {
+    const base = field.split(":")[0] ?? field;
+    const held = catalog.find((entry) => entry.key === field) ?? catalog.find((entry) => entry.key === base);
+    return held === undefined || held.aiWritable;
 }
 
 export function linkField(preset: string): string {
