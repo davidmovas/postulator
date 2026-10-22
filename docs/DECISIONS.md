@@ -4031,3 +4031,9 @@ on what stage 2 left open and what was decided while building.
   finding from the same difference. It writes no field: `publish` records every field's base from
   the value the site answered (`TestSyncBackKeepsTheBaseOfWhatTheRunWrote`, failing first with the
   edit as the base and nothing reported).
+- **What the stands found (session 3).** `TestAnExistingPageIsEditedBlockByBlock` was green on the
+  replica as written and red on vanilla on its own assertion: a parsed block's raw bytes run to the
+  next block's start, so the client's last block gains the separator when ours is added after it,
+  which the stage's ruling on whitespace between blocks allows. The test now compares each client
+  block's own bytes, the whitespace around it aside, and is green on both stands; the revert put the
+  body back byte for byte on both.

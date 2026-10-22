@@ -205,13 +205,13 @@ func assertTheClientsBlocksStand(t *testing.T, base, edited block.Body) {
 		for next < len(edited.Blocks) {
 			candidate := edited.Blocks[next]
 			next++
-			if candidate.Raw == kept.Raw {
+			if strings.TrimSpace(candidate.Raw) == strings.TrimSpace(kept.Raw) {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Fatalf("the client's block %q is not in the edited body byte for byte and in order", kept.Raw)
+			t.Fatalf("the client's block %q is not in the edited body byte for byte and in order, the whitespace between blocks aside", kept.Raw)
 		}
 	}
 	if len(edited.Blocks) <= len(base.Blocks) {
