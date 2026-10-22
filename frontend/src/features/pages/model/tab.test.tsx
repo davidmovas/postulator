@@ -1,15 +1,27 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
 import type { PageModel } from "../../../data/types.js";
 import { renderScreen } from "../../../testing/render.js";
-import { frontModel, hubModel, plannedModel, unrenderedModel } from "./fixture.js";
+import { frontModel, hubModel, plannedModel, unrenderedModel, writtenModel } from "./fixture.js";
 
 const held: { model: PageModel | undefined } = { model: hubModel };
 
+const reverted: unknown[] = [];
+
 vi.mock("../../../data/hooks/pages.js", () => ({
     usePageModel: () => ({ data: held.model, isPending: held.model === undefined, error: null }),
+}));
+
+vi.mock("../../../data/hooks/runs.js", () => ({
+    useRevertRun: () => ({
+        mutate: (request: unknown) => {
+            reverted.push(request);
+        },
+        isPending: false,
+        error: null,
+    }),
 }));
 
 const { PageModelTab } = await import("./tab.js");
@@ -97,6 +109,38 @@ describe("the page model tab", () => {
         expect(blocks.getAllByText(said.blocks.ours)).toHaveLength(1);
         expect(blocks.queryByRole("button")).toBeNull();
         expect(blocks.queryByRole("textbox")).toBeNull();
+    });
+
+    it("lists each field a run wrote with the run, when, and whether it is still as the run wrote it", () => {
+        tab(writtenModel);
+
+        const fields = within(pane(said.fields.title));
+        expect(fields.getByText(copy.pageTypes.fields.excerpt)).toBeDefined();
+        expect(fields.getByText(copy.pageTypes.fields.seo_title)).toBeDefined();
+        expect(fields.getByText(said.fields.ours)).toBeDefined();
+        expect(fields.getByText(said.fields.changed)).toBeDefined();
+        expect(fields.getByText(said.fields.handBack)).toBeDefined();
+        for (const link of fields.getAllByRole("link")) {
+            expect(link.getAttribute("href")).toBe("/s/s1/runs/r7");
+        }
+    });
+
+    it("reverts one field through a revert of the run that wrote it, after asking", () => {
+        reverted.length = 0;
+        tab(writtenModel);
+
+        fireEvent.click(screen.getByRole("button", { name: said.fields.revertOne(copy.pageTypes.fields.seo_title) }));
+        expect(screen.getByText(said.fields.handBackBody(copy.pageTypes.fields.seo_title))).toBeDefined();
+        expect(reverted).toStrictEqual([]);
+        fireEvent.click(screen.getByRole("button", { name: copy.runs.revertFields.confirm }));
+
+        expect(reverted).toStrictEqual([{ runId: "r7", pageId: "p-tb500", fields: ["seo_title"] }]);
+    });
+
+    it("says so when no run has written a field of the page", () => {
+        tab(hubModel);
+
+        expect(within(pane(said.fields.title)).getByText(said.fields.none)).toBeDefined();
     });
 
     it("words every open finding from its subject and offers no action", () => {

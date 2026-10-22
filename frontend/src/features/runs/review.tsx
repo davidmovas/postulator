@@ -282,6 +282,7 @@ export function ReviewDrawer({
                                 <ArtifactPane
                                     key={`${item.id}:${active}`}
                                     itemId={item.id}
+                                    runId={item.runId}
                                     kind={active}
                                     pageId={item.targetId}
                                     retentionDays={retentionDays}

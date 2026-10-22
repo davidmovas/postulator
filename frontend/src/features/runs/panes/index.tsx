@@ -34,13 +34,14 @@ import { Unreadable } from "./shared.js";
 
 interface PayloadProps {
     itemId: string;
+    runId: string;
     kind: ArtifactKind;
     pageId: string;
     payload: unknown;
     choice: ReviewChoice | null;
 }
 
-function Payload({ itemId, kind, pageId, payload, choice }: PayloadProps): ReactElement {
+function Payload({ itemId, runId, kind, pageId, payload, choice }: PayloadProps): ReactElement {
     switch (kind) {
         case artifactLinkContext:
             return <LinkContextPane context={linkContextView(payload)} />;
@@ -57,7 +58,7 @@ function Payload({ itemId, kind, pageId, payload, choice }: PayloadProps): React
         case artifactJudgeReport:
             return <JudgePane payload={payload} pageId={pageId} />;
         case artifactPublishResult:
-            return <PublishPane payload={payload} pageId={pageId} />;
+            return <PublishPane payload={payload} pageId={pageId} runId={runId} />;
         case artifactEditPlan:
             return <EditPlanPane payload={payload} choice={choice} />;
         case artifactRelinkResult:
@@ -75,13 +76,14 @@ function Payload({ itemId, kind, pageId, payload, choice }: PayloadProps): React
 
 export interface ArtifactPaneProps {
     itemId: string;
+    runId: string;
     kind: ArtifactKind;
     pageId: string;
     retentionDays: number | null;
     choice?: ReviewChoice | null;
 }
 
-export function ArtifactPane({ itemId, kind, pageId, retentionDays, choice = null }: ArtifactPaneProps): ReactElement {
+export function ArtifactPane({ itemId, runId, kind, pageId, retentionDays, choice = null }: ArtifactPaneProps): ReactElement {
     const artifact = useArtifact(itemId, kind);
 
     if (artifact.isPending) {
@@ -139,6 +141,7 @@ export function ArtifactPane({ itemId, kind, pageId, retentionDays, choice = nul
             </div>
             <Payload
                 itemId={itemId}
+                runId={runId}
                 kind={kind}
                 pageId={pageId}
                 payload={decodeArtifact(row.content)}

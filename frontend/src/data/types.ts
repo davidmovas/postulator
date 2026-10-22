@@ -53,6 +53,7 @@ export type ModelTrail = Wire<ObserveModels.TrailView>;
 export type ModelCrumb = Wire<ObserveModels.CrumbView>;
 export type ModelLink = Wire<ObserveModels.LinkView>;
 export type ModelBlock = Wire<ObserveModels.BlockView>;
+export type ModelField = Wire<ObserveModels.FieldView>;
 export type ModelFinding = Wire<ObserveModels.FindingView>;
 export type ModelSummary = Wire<ObserveModels.Summary>;
 

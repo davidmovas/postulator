@@ -140,6 +140,14 @@ export const hubModel: PageModel = {
     ],
 };
 
+export const writtenModel: PageModel = {
+    ...hubModel,
+    fields: [
+        { key: "excerpt", writtenRunId: "r7", writtenAt: "2026-10-20T09:00:00Z", ours: true },
+        { key: "seo_title", writtenRunId: "r7", writtenAt: "2026-10-20T09:00:00Z", ours: false },
+    ],
+};
+
 export const plannedModel: PageModel = {
     ...hubModel,
     pageId: "p-cjc",

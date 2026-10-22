@@ -108,6 +108,17 @@ export const runs = {
         "Every page this run created goes to the WordPress trash and its row here goes back to planned. Every page it updated gets the body it replaced, and every neighbour it relinked gets the content it replaced. A page a human has edited since is left alone and held for you. Images it uploaded stay in the media library, and the SEO meta it wrote stays as it is.",
     revertConfirm: "Revert the run",
     revertKeep: "Leave it as it is",
+    revertFields: {
+        action: (count: number) => (count === 0 ? "Revert fields" : count === 1 ? "Revert 1 field" : `Revert ${count} fields`),
+        none: "Tick the fields to put back first.",
+        created: "This run created the page, so only a revert of the whole run takes it down.",
+        title: "Put these fields back",
+        body: (labels: string) =>
+            `${labels}: each gets the value it had before this run, and one changed on the site since keeps the client's value and is handed back.`,
+        confirm: "Put them back",
+        started: "A revert run started.",
+        open: "Open the revert",
+    },
     retryStep: "Retry this step",
     retryBusy: "The item has not stopped, so there is nothing to retry.",
     accept: "Accept as it is",

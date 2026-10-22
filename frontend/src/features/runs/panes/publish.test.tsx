@@ -1,19 +1,64 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
-import type { PageModel } from "../../../data/types.js";
+import type { PageModel, Run } from "../../../data/types.js";
+import { renderScreen } from "../../../testing/render.js";
 import { hubModel } from "../../pages/model/fixture.js";
 
-const held: { model: PageModel | undefined } = { model: undefined };
+const held: { model: PageModel | undefined; run: Run | undefined } = { model: undefined, run: undefined };
+
+const asked: unknown[] = [];
 
 vi.mock("../../../data/hooks/pages.js", () => ({
     usePageModel: () => ({ data: held.model }),
 }));
 
-const { PublishPane, RevertPane, SyncPane } = await import("./publish.js");
+vi.mock("../../../data/hooks/runs.js", () => ({
+    useRun: () => ({ data: held.run === undefined ? undefined : { run: held.run } }),
+    useRevertRun: () => ({
+        mutate: (request: unknown) => {
+            asked.push(request);
+        },
+        isPending: false,
+        error: null,
+    }),
+}));
+
+const { PublishPane: Pane, RevertPane, SyncPane } = await import("./publish.js");
+
+function PublishPane({ payload, pageId }: { payload: unknown; pageId: string }) {
+    return <Pane payload={payload} pageId={pageId} runId="r1" />;
+}
+
+function aRun(overrides: Partial<Run> = {}): Run {
+    return {
+        id: "r1",
+        siteId: "s1",
+        kind: "generate",
+        status: "completed",
+        targets: ["p1"],
+        recipe: [],
+        templateId: "t1",
+        templateVersion: 1,
+        publishMode: "publish",
+        budget: { maxUsd: 5, maxTokens: 0 },
+        stats: { items: 1, done: 1, failed: 0, tokens: 100, usd: 0.1 },
+        createdBy: "user",
+        parentRunId: null,
+        pauseReason: "",
+        error: "",
+        deadlineAt: "2026-10-22T18:00:00Z",
+        createdAt: "2026-10-22T10:00:00Z",
+        startedAt: "2026-10-22T10:00:01Z",
+        finishedAt: "2026-10-22T10:30:00Z",
+        ...overrides,
+    };
+}
 
 const said = copy.runs.review.diff;
+
+const reverting = copy.runs.revertFields;
 
 function aPublishResult(skipped: readonly string[]): Record<string, unknown> {
     return {
@@ -133,6 +178,49 @@ describe("the publish pane", () => {
 
         expect(screen.queryByRole("region", { name: said.fields })).toBeNull();
         expect(screen.queryByRole("region", { name: said.body })).toBeNull();
+    });
+});
+
+describe("putting fields back from the publish pane", () => {
+    it("reverts the fields a person ticks, and the body, through a revert of this run's page", () => {
+        asked.length = 0;
+        held.run = aRun();
+        renderScreen(<Pane payload={aDiffedResult()} pageId="p1" runId="r1" />);
+
+        expect(screen.getByRole("button", { name: reverting.action(0) })).toHaveProperty("disabled", true);
+        fireEvent.click(screen.getByRole("checkbox", { name: copy.pageTypes.fields.excerpt }));
+        fireEvent.click(screen.getByRole("checkbox", { name: copy.pageTypes.fields.body }));
+        fireEvent.click(screen.getByRole("button", { name: reverting.action(2) }));
+
+        expect(screen.getByText(reverting.title)).toBeDefined();
+        expect(asked).toStrictEqual([]);
+        fireEvent.click(screen.getByRole("button", { name: reverting.confirm }));
+        expect(asked).toStrictEqual([{ runId: "r1", pageId: "p1", fields: ["excerpt", "body"] }]);
+    });
+
+    it("waits for nothing to be ticked before it says what to do", () => {
+        held.run = aRun();
+        render(<PublishPane payload={aDiffedResult()} pageId="p1" />);
+
+        expect(screen.getByRole("button", { name: reverting.action(0) }).getAttribute("title")).toBe(reverting.none);
+    });
+
+    it("refuses while the run is still going and says to cancel it first", () => {
+        held.run = aRun({ status: "running", finishedAt: null });
+        render(<PublishPane payload={aDiffedResult()} pageId="p1" />);
+
+        fireEvent.click(screen.getByRole("checkbox", { name: copy.pageTypes.fields.excerpt }));
+        const action = screen.getByRole("button", { name: reverting.action(1) });
+        expect(action).toHaveProperty("disabled", true);
+        expect(action.getAttribute("title")).toBe(copy.runs.revertRunning);
+    });
+
+    it("offers no field of a page the run created, whose revert takes the page down", () => {
+        held.run = aRun();
+        render(<PublishPane payload={{ ...aDiffedResult(), created: true }} pageId="p1" />);
+
+        expect(screen.queryByRole("checkbox")).toBeNull();
+        expect(screen.getByRole("button", { name: reverting.action(0) }).getAttribute("title")).toBe(reverting.created);
     });
 });
 

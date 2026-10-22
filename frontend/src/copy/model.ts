@@ -74,6 +74,20 @@ export const model = {
         dynamic: "dynamic",
         ours: "written by a run",
     },
+    fields: {
+        title: "Fields a run wrote",
+        none: "No run has written a field of this page.",
+        written: (when: string) => `run of ${when}`,
+        ours: "as the run wrote it",
+        changed: "changed on the site since",
+        handBack: "A revert hands it back and keeps the client's value.",
+        revert: "Revert",
+        revertOne: (label: string) => `Revert ${label}`,
+        ourBody: (label: string) =>
+            `${label} gets the value it had before the run that wrote it; a page that run created goes to the trash whole.`,
+        handBackBody: (label: string) =>
+            `${label} changed on the site since the run wrote it, so the revert keeps the client's value and hands the field back.`,
+    },
     findings: {
         title: "Open findings",
         none: "No open findings.",

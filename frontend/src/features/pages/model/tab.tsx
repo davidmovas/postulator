@@ -5,6 +5,7 @@ import { failure } from "../../../data/errors.js";
 import { usePageModel } from "../../../data/hooks/pages.js";
 import { SkeletonRows } from "../../../ui/index.js";
 import { BlocksPane } from "./blocks.js";
+import { WrittenFieldsPane } from "./fields.js";
 import { FindingsPane } from "./findings.js";
 import { HierarchyPane } from "./hierarchy.js";
 import { IdentityPane } from "./identity.js";
@@ -52,6 +53,7 @@ export function PageModelTab({ pageId, siteId, search }: PageModelTabProps): Rea
                     {render === null ? null : <TrailsPane trails={render.trails ?? []} siteId={siteId} search={search} />}
                     <ModelLinksPane links={held.links ?? []} siteId={siteId} search={search} />
                     <BlocksPane bodyKind={held.bodyKind} blocks={held.blocks ?? []} />
+                    <WrittenFieldsPane fields={held.fields ?? []} pageId={held.pageId} siteId={siteId} />
                 </>
             ) : null}
             <FindingsPane findings={held.findings ?? []} />

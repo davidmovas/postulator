@@ -15,6 +15,11 @@ const shortcode = "shortcode";
 export interface Ticks {
     ticked: (key: string) => boolean;
     onToggle: (key: string) => void;
+    offers?: (key: string) => boolean;
+}
+
+function offered(ticks: Ticks | null, key: string): ticks is Ticks {
+    return ticks !== null && (ticks.offers === undefined || ticks.offers(key));
 }
 
 function Value({ label, fieldKey, value }: { label: string; fieldKey: string; value: string }): ReactElement {
@@ -52,7 +57,7 @@ export function FieldDiff({ fields, empty, ticks = null }: FieldDiffProps): Reac
                             title={said.hashes(change.beforeHash, change.afterHash)}
                             className="flex flex-col gap-0.5 border-b border-inset px-3 py-1.5 last:border-b-0"
                         >
-                            {ticks === null ? (
+                            {!offered(ticks, change.key) ? (
                                 <span className="text-2xs font-medium text-ink-dim">{fieldLabel(change.key)}</span>
                             ) : (
                                 <Checkbox

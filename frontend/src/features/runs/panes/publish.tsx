@@ -9,9 +9,9 @@ import { finalView, publishView, relinkView, revertView, syncView } from "../art
 import { revertedFieldLabel } from "../diff-labels.js";
 import { FindingList, FindingTotals } from "../findings.js";
 import { revertOutcomeLabel } from "../labels.js";
-import { BlockDiff, Declined, FieldDiff } from "./diff.js";
 import { SiteRegions } from "./regions.js";
 import { ExternalUrl, Rows, Unreadable } from "./shared.js";
+import { PublishDiff } from "./written.js";
 
 export interface PayloadPaneProps {
     payload: unknown;
@@ -19,6 +19,7 @@ export interface PayloadPaneProps {
 
 export interface PublishPaneProps extends PayloadPaneProps {
     pageId: string;
+    runId: string;
 }
 
 function LiveUrl({ url }: { url: string }): ReactElement | null {
@@ -33,7 +34,7 @@ function LiveUrl({ url }: { url: string }): ReactElement | null {
     );
 }
 
-export function PublishPane({ payload, pageId }: PublishPaneProps): ReactElement {
+export function PublishPane({ payload, pageId, runId }: PublishPaneProps): ReactElement {
     const view = publishView(payload);
     if (view === null) {
         return <Unreadable />;
@@ -63,13 +64,7 @@ export function PublishPane({ payload, pageId }: PublishPaneProps): ReactElement
         <div className="flex flex-col gap-2 pb-3" title={copy.runs.review.noDiff}>
             <Rows entries={entries} />
             <LiveUrl url={view.url} />
-            {view.recorded ? (
-                <>
-                    <FieldDiff fields={view.fields} empty={copy.runs.review.diff.noFields} />
-                    <Declined keys={view.declined} />
-                    <BlockDiff blocks={view.blocks} empty={copy.runs.review.diff.noBlocks} />
-                </>
-            ) : null}
+            {view.recorded ? <PublishDiff view={view} pageId={pageId} runId={runId} /> : null}
             {pageId === "" ? null : <SiteRegions pageId={pageId} />}
             <FindingTotals findings={view.findings} />
             <FindingList findings={view.findings} empty={copy.runs.review.links.clean} />
