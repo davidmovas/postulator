@@ -229,5 +229,5 @@ func (s siteState) after(p *plan, now time.Time) (siteState, error) {
 		entities[at].ScopeID, entities[at].UpdatedAt = moved[i].ScopeID, now
 	}
 	sortStored(entities, edges, pages)
-	return newSiteState(s.siteID, entities, edges, pages, s.pageTypes, s.fields), err
+	return newSiteState(s.siteID, entities, edges, pages, s.siteFacts), err
 }

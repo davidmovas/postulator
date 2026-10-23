@@ -57,6 +57,7 @@ func matchRows(rows []rowDraft, rowType importmap.RowType, state *siteState, p *
 		switch {
 		case row.match.Ambiguous():
 			p.noteAt(row.at, string(ruleFields[row.match.Rule]), CodeRowAmbiguous, ambiguity(row))
+			p.keepAmbiguous(row)
 			p.report.Skipped++
 		case row.path == "" && row.name == "" && len(row.levels) == 0 && !row.unreadable:
 			noTarget(row.at, p)

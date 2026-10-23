@@ -13,27 +13,32 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
-type siteState struct {
-	siteID    string
-	entities  []graph.Entity
-	edges     []graph.Edge
-	pages     []pagemap.Page
-	site      pagemap.RowSite
-	trails    pagemap.TrailSite
-	byName    map[string][]graph.Entity
-	byPath    map[string]pagemap.Page
-	edgeKeys  map[string]struct{}
-	types     map[pagemap.WPType]struct{}
-	pageTypes []pagetype.Type
-	fields    map[string][]field.Value
+type siteFacts struct {
+	pageTypes   []pagetype.Type
+	fields      map[string][]field.Value
+	terms       map[string][]pagemap.Term
+	termParents map[int64]int64
 }
 
-func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, pageTypes []pagetype.Type,
-	fields map[string][]field.Value) siteState {
+type siteState struct {
+	siteFacts
+	siteID   string
+	entities []graph.Entity
+	edges    []graph.Edge
+	pages    []pagemap.Page
+	site     pagemap.RowSite
+	trails   pagemap.TrailSite
+	byName   map[string][]graph.Entity
+	byPath   map[string]pagemap.Page
+	edgeKeys map[string]struct{}
+	types    map[pagemap.WPType]struct{}
+}
+
+func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, facts siteFacts) siteState {
 	state := siteState{
-		siteID: siteID, entities: entities, edges: edges, pages: pages, pageTypes: pageTypes, fields: fields,
-		site:     pagemap.NewRowSite(pages, fields, entities),
-		trails:   pagemap.NewTrailSite(pagemap.NewIndexNamed(pages, pagemap.Names(fields)), nil, nil),
+		siteFacts: facts, siteID: siteID, entities: entities, edges: edges, pages: pages,
+		site:     pagemap.NewRowSite(pages, facts.fields, entities),
+		trails:   pagemap.NewTrailSite(pagemap.NewIndexNamed(pages, pagemap.Names(facts.fields)), facts.terms, facts.termParents),
 		byName:   make(map[string][]graph.Entity, len(entities)),
 		byPath:   make(map[string]pagemap.Page, len(pages)),
 		edgeKeys: make(map[string]struct{}, len(edges)),
@@ -88,7 +93,35 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	if err != nil {
 		return siteState{}, err
 	}
-	return newSiteState(siteID, entities, edges, pages, pageTypes, fields), nil
+	identities, err := s.deps.Terms.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	terms, err := s.deps.Terms.ListTermsBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	facts := siteFacts{pageTypes: pageTypes, fields: fields, terms: terms, termParents: termParents(pages, identities)}
+	return newSiteState(siteID, entities, edges, pages, facts), nil
+}
+
+func termParents(pages []pagemap.Page, identities []pagemap.Identity) map[int64]int64 {
+	observed := make(map[string]pagemap.Identity, len(identities))
+	for i := range identities {
+		observed[identities[i].PageID] = identities[i]
+	}
+	out := make(map[int64]int64)
+	for i := range pages {
+		identity, seen := observed[pages[i].ID]
+		if !pages[i].WPType.Term() || pages[i].WPID == nil || !seen {
+			continue
+		}
+		out[*pages[i].WPID] = 0
+		if identity.WPParentID != nil {
+			out[*pages[i].WPID] = *identity.WPParentID
+		}
+	}
+	return out
 }
 
 func (s *siteState) storeName(pageID string) string {

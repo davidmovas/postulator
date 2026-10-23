@@ -183,6 +183,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Types: sqlite.NewPageTypeRepo(store),
 			Fields:   sqlite.NewPageFieldRepo(store),
 			Mappings: sqlite.NewImportMappingRepo(store), Sites: siteRepo, UnitOfWork: store,
+			Findings: sqlite.NewFindingRepo(store), Terms: sqlite.NewPageIdentityRepo(store),
 			Publisher: bus, Clock: now,
 		}),
 		Models: models.New(built, modelRepo, modelProfiles, book,

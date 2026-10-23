@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -61,6 +62,17 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
+type findingStore interface {
+	Upsert(ctx context.Context, f finding.Finding) error
+	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
+	OpenBySite(ctx context.Context, siteID string, code finding.Code) ([]finding.Finding, error)
+}
+
+type termReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error)
+	ListTermsBySite(ctx context.Context, siteID string) (map[string][]pagemap.Term, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -74,6 +86,8 @@ type Deps struct {
 	Fields     fieldReader
 	Mappings   mappingStore
 	Sites      siteReader
+	Findings   findingStore
+	Terms      termReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

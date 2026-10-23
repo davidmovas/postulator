@@ -32,6 +32,9 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 			if writeErr := s.write(c, &book.plans[i]); writeErr != nil {
 				return writeErr
 			}
+			if keepErr := s.keep(c, &book.plans[i]); keepErr != nil {
+				return keepErr
+			}
 		}
 		return s.remember(c, req, book.plans)
 	})

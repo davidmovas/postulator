@@ -20,6 +20,7 @@ const (
 
 type rowDraft struct {
 	at           importmap.Origin
+	key          string
 	path         string
 	url          string
 	title        string
@@ -57,7 +58,7 @@ func (r *rowDraft) names() bool {
 }
 
 func (r *rowDraft) asked(product bool) pagemap.Row {
-	return pagemap.Row{Path: r.url, Entity: r.name, Parent: r.parent, Title: r.title, H1: r.h1, SKU: r.sku, Product: product}
+	return pagemap.Row{Key: r.key, Path: r.url, Entity: r.name, Parent: r.parent, Title: r.title, H1: r.h1, SKU: r.sku, Product: product}
 }
 
 func (r *rowDraft) trailBelow(slug string) []string {
@@ -160,6 +161,8 @@ func readRow(binding importmap.Binding, row []string, raw string, at importmap.O
 	draft.own = rowOwnership(binding, row, at, p)
 	draft.keywords = rowKeywords(binding, row, at, p)
 	draft.url, draft.unreadable = rowURL(raw, at, p)
+	draft.key = pagemap.RowKey(p.sheetAt(at), draft.asked(false))
+	p.sawRow(p.sheetAt(at), draft.key)
 	return draft, true
 }
 

@@ -37,12 +37,19 @@ type plan struct {
 	pages     []plannedPage
 	canonical []canonical
 	rows      int
+	lasting   []lasting
+	agreed    []string
+	keys      map[string]map[string]struct{}
 }
 
 func newPlan(siteID string, mapping importmap.Mapping, table importmap.Table) plan {
 	p := plan{siteID: siteID, read: sheetsRead(mapping, table), mapping: mapping, rows: len(table.Rows)}
 	if len(p.read) == 1 {
 		p.sheet = p.read[0]
+	}
+	p.keys = make(map[string]map[string]struct{}, len(p.read))
+	for _, sheet := range p.read {
+		p.sawRow(sheet, "")
 	}
 	p.report.Columns = columnViews(p.sheet, mapping.Uses(table.Headers))
 	p.noteDropped(mapping, table.Headers)

@@ -133,6 +133,7 @@ func (b *builder) createPage(draft *pageDraft, entityID *string) error {
 	if err != nil {
 		return err
 	}
+	b.keepPlanned(draft, &page)
 	b.p.pages = append(b.p.pages, plannedPage{page: page, created: true})
 	b.p.report.Pages = append(b.p.report.Pages, b.pageView(page, draft, ActionCreate))
 	return nil
@@ -160,17 +161,21 @@ func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, entityID *s
 	if err := b.compareTrail(current, draft); err != nil {
 		return err
 	}
+	if current.WPID == nil && current.Status != pagemap.StatusArchived {
+		b.keepPlanned(draft, &next)
+	}
 	return b.planUpdate(current, next, draft)
 }
 
 func (b *builder) compareTrail(current pagemap.Page, draft *pageDraft) error {
-	if current.WPID == nil || current.WPType == pagemap.WPProduct || current.Status == pagemap.StatusArchived {
+	if current.WPID == nil || current.Status == pagemap.StatusArchived || len(draft.trail) == 0 {
 		return nil
 	}
 	expected := current
 	expected.PlannedTrail = draft.trail
 	diff, differs := pagemap.TrailDiffers(expected, b.state.trails)
 	if !differs {
+		b.p.agreed = append(b.p.agreed, current.ID)
 		return nil
 	}
 	subject, err := json.Marshal(diff)
@@ -180,6 +185,7 @@ func (b *builder) compareTrail(current pagemap.Page, draft *pageDraft) error {
 	b.p.noteAbout(draft.at, "", CodeParentDiffers, subject,
 		"the sheet places "+draft.path+" under "+strings.Join(diff.Sheet, " › ")+", where the site shows it "+placed(diff.Site)+
 			"; the import writes no parent to the site, so the difference stays a finding")
+	b.p.keepTrail(&current, diff)
 	return nil
 }
 
