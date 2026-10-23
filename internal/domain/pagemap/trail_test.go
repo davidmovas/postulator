@@ -5,8 +5,25 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
+
+func TestAProductsTrailCannotBePinnedToTheWorkbook(t *testing.T) {
+	t.Parallel()
+
+	cases := map[pagemap.WPType][]finding.Option{
+		pagemap.WPPage:            {finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore},
+		pagemap.WPPost:            {finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore},
+		pagemap.WPProductCategory: {finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore},
+		pagemap.WPProduct:         {finding.AcceptSite, finding.Ignore},
+	}
+	for wpType, want := range cases {
+		if got := pagemap.TrailOptions(wpType); !slices.Equal(got, want) {
+			t.Errorf("TrailOptions(%s) = %v, want %v", wpType, got, want)
+		}
+	}
+}
 
 func beneath(page pagemap.Page, parentID string) pagemap.Page {
 	page.ParentPageID = &parentID

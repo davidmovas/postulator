@@ -6,7 +6,16 @@ import (
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/davidmovas/postulator/internal/domain/finding"
 )
+
+func TrailOptions(wpType WPType) []finding.Option {
+	if wpType == WPProduct {
+		return []finding.Option{finding.AcceptSite, finding.Ignore}
+	}
+	return []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}
+}
 
 type TrailDiff struct {
 	Sheet []string `json:"sheet"`

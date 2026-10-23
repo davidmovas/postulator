@@ -365,18 +365,11 @@ func (s *Service) trails(ctx context.Context, tracked *findings, m siteModel, ca
 			}
 			continue
 		}
-		if err := tracked.raise(ctx, finding.ParentDiffers, &page.ID, subject, diff, trailOptions(page.WPType)...); err != nil {
+		if err := tracked.raise(ctx, finding.ParentDiffers, &page.ID, subject, diff, pagemap.TrailOptions(page.WPType)...); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func trailOptions(wpType pagemap.WPType) []finding.Option {
-	if wpType == pagemap.WPProduct {
-		return []finding.Option{finding.AcceptSite, finding.Ignore}
-	}
-	return []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}
 }
 
 func (m siteModel) termParents() map[int64]int64 {
