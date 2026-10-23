@@ -162,6 +162,52 @@ func TestAFindingAPersonResolvedStaysResolvedWhileItsFactsStand(t *testing.T) {
 	}
 }
 
+func TestAFindingMovesOntoAPageOfItsSite(t *testing.T) {
+	t.Parallel()
+
+	store := findingStore(t)
+	if _, err := store.writer.ExecContext(t.Context(),
+		`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg3', 's2', '/x/', 'x', 'page', 'exists', ?, ?)`,
+		formatTime(findingStamp), formatTime(findingStamp)); err != nil {
+		t.Fatalf("insert another site's page: %v", err)
+	}
+	repo := NewFindingRepo(store)
+	planned := "pg2"
+	row := newFinding(t, "s1", &planned, finding.RowWithoutPage, "row::guide", `{"sheet":"","plannedPath":"/news/","product":false}`, findingStamp)
+	if err := repo.Upsert(t.Context(), row); err != nil {
+		t.Fatalf("Upsert: %v", err)
+	}
+
+	later := findingStamp.Add(time.Hour)
+	if err := repo.MoveToPage(t.Context(), row.ID, "pg1", later); err != nil {
+		t.Fatalf("MoveToPage: %v", err)
+	}
+	want := row
+	moved := "pg1"
+	want.PageID, want.UpdatedAt = &moved, later
+	if got, err := repo.Get(t.Context(), row.ID); err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("the moved finding = %+v, %v\nwant %+v", got, err, want)
+	}
+
+	cases := []struct {
+		name      string
+		findingID string
+		pageID    string
+	}{
+		{name: "a page of another site", findingID: row.ID, pageID: "pg3"},
+		{name: "an unknown page", findingID: row.ID, pageID: "missing"},
+		{name: "an unknown finding", findingID: "missing", pageID: "pg1"},
+	}
+	for _, tc := range cases {
+		if err := repo.MoveToPage(t.Context(), tc.findingID, tc.pageID, later); !errors.IsCode(err, errors.NotFound) {
+			t.Errorf("%s: MoveToPage = %v, want NotFound", tc.name, err)
+		}
+	}
+	if got, err := repo.Get(t.Context(), row.ID); err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("the finding after the refusals = %+v, %v; want it where it was moved", got, err)
+	}
+}
+
 func TestAPersonSettlesAnOpenFindingOnce(t *testing.T) {
 	t.Parallel()
 

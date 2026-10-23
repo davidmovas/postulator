@@ -18,6 +18,7 @@ const (
 	raiseAgain      = `UPDATE findings SET severity = ?, subject = ?, options = ?, status = ?, resolution = '', resolved_by = '', updated_at = ? WHERE id = ?`
 	clearFinding    = `UPDATE findings SET status = ?, resolution = ?, resolved_by = ?, updated_at = ? WHERE site_id = ? AND code = ? AND subject_key = ? AND status = ?`
 	settleFinding   = `UPDATE findings SET status = ?, resolution = ?, resolved_by = ?, updated_at = ? WHERE id = ? AND status = ?`
+	moveFinding     = `UPDATE findings SET page_id = ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM pages WHERE pages.id = ? AND pages.site_id = findings.site_id)`
 	selectFinding   = `SELECT ` + findingColumns + ` FROM findings WHERE id = ?`
 	findingOrder    = ` ORDER BY created_at, id`
 	selectFindings  = `SELECT ` + findingColumns + ` FROM findings`
@@ -106,6 +107,13 @@ func (r *FindingRepo) Settle(ctx context.Context, id string, status finding.Stat
 		}
 		return errors.New(errors.Conflict, "the finding is no longer open").WithDetail("findingId", id)
 	})
+}
+
+func (r *FindingRepo) MoveToPage(ctx context.Context, id, pageID string, at time.Time) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), moveFinding, []any{pageID, formatTime(at), id, pageID}, nil,
+		"move the finding onto the page")
+	return requireAffected(affected, err,
+		errors.New(errors.NotFound, "no finding of the page's site has this id").WithDetail("findingId", id).WithDetail("pageId", pageID))
 }
 
 func (r *FindingRepo) OpenBySite(ctx context.Context, siteID string, code finding.Code) ([]finding.Finding, error) {

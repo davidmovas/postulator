@@ -204,6 +204,98 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	}
 }
 
+func TestPageRepoSetRowKeyMovesTheKeyOntoOnePage(t *testing.T) {
+	t.Parallel()
+
+	const key = "row:Catalog:bpc-157 guide"
+	later := sqlitetest.Stamp.Add(time.Hour)
+	cases := []struct {
+		name    string
+		trailed []string
+		given   []string
+		want    []string
+	}{
+		{name: "a page without a trail takes the one it is given", given: []string{"Peptides", "BPC-157"}, want: []string{"Peptides", "BPC-157"}},
+		{name: "a page keeps the trail it carries", trailed: []string{"Guides"}, given: []string{"Peptides"}, want: []string{"Guides"}},
+		{name: "no trail given leaves none", want: nil},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := sqlitetest.Open(t)
+			owner := sqlitetest.Site(t, store, "shop")
+			other := sqlitetest.Site(t, store, "other")
+			repo := sqlite.NewPageRepo(store)
+			held := fullPage(owner.ID, "/bpc-157-guide/", sqlitetest.Stamp)
+			held.WPID, held.Status, held.RowKey = nil, pagemap.StatusPlanned, key
+			chosen := fullPage(owner.ID, "/guides/bpc-157/", sqlitetest.Stamp)
+			chosen.PlannedTrail = tc.trailed
+			elsewhere := fullPage(other.ID, "/bpc-157-guide/", sqlitetest.Stamp)
+			elsewhere.RowKey = key
+			for _, page := range []pagemap.Page{held, chosen, elsewhere} {
+				if err := repo.Insert(t.Context(), page); err != nil {
+					t.Fatalf("Insert %s: %v", page.Path, err)
+				}
+			}
+
+			if err := repo.SetRowKey(t.Context(), owner.ID, chosen.ID, key, tc.given, later); err != nil {
+				t.Fatalf("SetRowKey: %v", err)
+			}
+			want := chosen
+			want.RowKey, want.PlannedTrail, want.UpdatedAt = key, tc.want, later
+			if got, err := repo.Get(t.Context(), chosen.ID); err != nil || !reflect.DeepEqual(got, want) {
+				t.Fatalf("the chosen page = %+v, %v\nwant %+v", got, err, want)
+			}
+			released := held
+			released.RowKey, released.UpdatedAt = "", later
+			if got, err := repo.Get(t.Context(), held.ID); err != nil || !reflect.DeepEqual(got, released) {
+				t.Fatalf("the page that held the key = %+v, %v\nwant %+v", got, err, released)
+			}
+			if got, err := repo.Get(t.Context(), elsewhere.ID); err != nil || !reflect.DeepEqual(got, elsewhere) {
+				t.Fatalf("another site's page = %+v, %v; want it untouched", got, err)
+			}
+		})
+	}
+}
+
+func TestPageRepoSetRowKeyRefusesWhatItCannotMove(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	other := sqlitetest.Site(t, store, "other")
+	repo := sqlite.NewPageRepo(store)
+	held := fullPage(owner.ID, "/guide/", sqlitetest.Stamp)
+	held.RowKey = "row::guide"
+	stranger := fullPage(other.ID, "/guide/", sqlitetest.Stamp)
+	for _, page := range []pagemap.Page{held, stranger} {
+		if err := repo.Insert(t.Context(), page); err != nil {
+			t.Fatalf("Insert: %v", err)
+		}
+	}
+
+	cases := []struct {
+		name   string
+		pageID string
+		key    string
+		code   errors.Code
+	}{
+		{name: "an empty key", pageID: held.ID, key: " ", code: errors.Invalid},
+		{name: "a page of another site", pageID: stranger.ID, key: "row::other", code: errors.NotFound},
+		{name: "an unknown page", pageID: id.New(), key: "row::other", code: errors.NotFound},
+	}
+	for _, tc := range cases {
+		if err := repo.SetRowKey(t.Context(), owner.ID, tc.pageID, tc.key, nil, sqlitetest.Stamp); !errors.IsCode(err, tc.code) {
+			t.Errorf("%s: SetRowKey = %v, want %s", tc.name, err, tc.code)
+		}
+	}
+	if got, err := repo.Get(t.Context(), held.ID); err != nil || got.RowKey != "row::guide" {
+		t.Fatalf("the page = %+v, %v; want its key kept after the refusals", got, err)
+	}
+}
+
 func TestPageRepoUpdatePublishedTouchesOnlyWhatAPublishOwns(t *testing.T) {
 	t.Parallel()
 

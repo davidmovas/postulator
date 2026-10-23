@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -40,6 +41,9 @@ type pageStore interface {
 	Insert(ctx context.Context, p pagemap.Page) error
 	Update(ctx context.Context, p pagemap.Page) error
 	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+	SetRowKey(ctx context.Context, siteID, pageID, rowKey string, trail []string, at time.Time) error
+	Get(ctx context.Context, id string) (pagemap.Page, error)
+	Delete(ctx context.Context, id string) error
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 }
 
@@ -66,11 +70,18 @@ type findingStore interface {
 	Upsert(ctx context.Context, f finding.Finding) error
 	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
 	OpenBySite(ctx context.Context, siteID string, code finding.Code) ([]finding.Finding, error)
+	Get(ctx context.Context, id string) (finding.Finding, error)
+	MoveToPage(ctx context.Context, id, pageID string, at time.Time) error
+	Settle(ctx context.Context, id string, status finding.Status, resolution, resolvedBy string, at time.Time) error
 }
 
 type termReader interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error)
 	ListTermsBySite(ctx context.Context, siteID string) (map[string][]pagemap.Term, error)
+}
+
+type itemReader interface {
+	ByTarget(ctx context.Context, targetID string, limit int) ([]run.Item, error)
 }
 
 type unitOfWork interface {
@@ -88,6 +99,7 @@ type Deps struct {
 	Sites      siteReader
 	Findings   findingStore
 	Terms      termReader
+	Items      itemReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

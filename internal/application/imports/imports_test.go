@@ -59,6 +59,7 @@ func newHarnessWithRows(t *testing.T, maxRows int) harness {
 			Sites:      sqlite.NewSiteRepo(store),
 			Findings:   sqlite.NewFindingRepo(store),
 			Terms:      sqlite.NewPageIdentityRepo(store),
+			Items:      sqlite.NewRunItemRepo(store),
 			UnitOfWork: store,
 			Publisher:  recorder,
 			Clock:      clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)),

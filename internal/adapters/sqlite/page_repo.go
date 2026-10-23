@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -19,6 +20,8 @@ const (
 	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, planned_trail = ?, row_key = ?, slug = ?, parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
 	setParentSource   = `UPDATE pages SET parent_source = ?, updated_at = ? WHERE id = ?`
+	setRowKey         = `UPDATE pages SET row_key = ?, planned_trail = CASE WHEN planned_trail = '[]' THEN ? ELSE planned_trail END, updated_at = ? WHERE id = ? AND site_id = ?`
+	releaseRowKey     = `UPDATE pages SET row_key = '', updated_at = ? WHERE site_id = ? AND row_key = ? AND id <> ?`
 	updateDerived     = `UPDATE pages SET parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, status = ?, updated_at = ? WHERE id = ?`
 	updatePublished   = `UPDATE pages SET wp_id = ?, status = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
 	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE id = ?`
@@ -84,6 +87,29 @@ func (r *PageRepo) SetParentSource(ctx context.Context, pageID string, source pa
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), setParentSource, []any{storedParentSource(source), formatTime(at), pageID},
 		nil, "set the page's parent source")
 	return requireAffected(affected, err, pageNotFound(pageID))
+}
+
+func (r *PageRepo) SetRowKey(ctx context.Context, siteID, pageID, rowKey string, trail []string, at time.Time) error {
+	if strings.TrimSpace(rowKey) == "" {
+		return errors.New(errors.Invalid, "a row key must not be empty").WithDetail("field", "rowKey")
+	}
+	if trail == nil {
+		trail = []string{}
+	}
+	encoded, err := encodeJSON(trail)
+	if err != nil {
+		return err
+	}
+	return r.store.Do(ctx, func(c context.Context) error {
+		affected, setErr := execWrite(c, r.store.writeFrom(c), setRowKey, []any{rowKey, encoded, formatTime(at), pageID, siteID}, nil,
+			"move the row key onto the page")
+		if missing := requireAffected(affected, setErr, pageNotFound(pageID).WithDetail("siteId", siteID)); missing != nil {
+			return missing
+		}
+		_, releaseErr := execWrite(c, r.store.writeFrom(c), releaseRowKey, []any{formatTime(at), siteID, rowKey, pageID}, nil,
+			"take the row key off the site's other pages")
+		return releaseErr
+	})
 }
 
 func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
