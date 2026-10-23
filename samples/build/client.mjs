@@ -9,6 +9,9 @@ export const groupsRows = [
   ["Peptides", "TB-500", "Liquid", "/peptides/tb-500/liquid/", "TB-500 liquid", "TB-500 Liquid", "tb 500 liquid (480)"],
   ["Peptides", "TB-500", "Capsules", "/peptides/tb-500/capsules/", "TB-500 capsules", "TB-500 Capsules", "tb 500 capsules [1.2k]"],
   ["Peptides", "—", "", "/peptides/storage/", "How to store peptides", "Storing peptides", "how to store peptides (320); peptide storage"],
+  ["Peptides", "", "", "", "Reconstitution", "", "peptide reconstitution (590)"],
+  ["Peptides", "", "", "", "Healing Peptides", "", "healing peptides (1,600)"],
+  ["Peptides", "BPC-157", "", "", "BPC-157 dosing guide", "", "bpc 157 dosage (2,900)"],
 ];
 
 export const catalogHeaders = ["Category", "Subcategory", "URL", "Title", "H1", "Keywords"];
@@ -34,6 +37,11 @@ export const wideRows = [
   [
     "E-030", "NO", "GEO", "Geographic Entity", "Peptides in Canada", "/peptides/canada/", "Peptides", "Peptides", "",
     "Peptides in Canada", "Buying peptides in Canada", "GEO Commercial", "", "Shipping rules differ by province",
+  ],
+  ["E-015", "NO", "Compound/Product", "Product Owner", "TB-500", "", "Peptides", "", "", "", "", "Commercial Product", "", "Sold as a 5 mg vial"],
+  [
+    "E-041", "NO", "Topic", "Topical Entity", "Tissue repair", "", "Peptides", "", "", "", "", "Informational", "",
+    "What the healing peptides are researched for",
   ],
 ];
 

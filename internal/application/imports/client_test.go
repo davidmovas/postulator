@@ -67,8 +67,8 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	groups := h.sheet(t, path, "Groups")
 	first := h.apply(t, path, groups)
 	clean(t, "Groups", first)
-	if first.Counts.EntitiesCreated != 8 || first.Counts.PagesCreated != 8 || first.Counts.EdgesCreated != 7 {
-		t.Fatalf("the group sheet wrote %+v, want eight entities, eight pages and seven edges", first.Counts)
+	if first.Counts.EntitiesCreated != 11 || first.Counts.PagesCreated != 11 || first.Counts.EdgesCreated != 10 {
+		t.Fatalf("the group sheet wrote %+v, want eleven entities, eleven pages and ten edges", first.Counts)
 	}
 	if left := ignored(first.Report); len(left) != 0 {
 		t.Fatalf("the group sheet ignored %v, want every column read", left)
@@ -79,9 +79,15 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	for path, want := range map[string][]string{
 		"/peptides/": nil, "/peptides/bpc-157/": {"Peptides"}, "/peptides/bpc-157/liquid/": {"Peptides", "BPC-157"},
 		"/peptides/tb-500/capsules/": {"Peptides", "TB-500"}, "/peptides/storage/": {"Peptides"},
+		"/reconstitution/": {"Peptides"}, "/healing-peptides/": {"Peptides"}, "/bpc-157-dosing-guide/": {"Peptides", "BPC-157"},
 	} {
 		if got := h.trailAt(t, path); !slices.Equal(got, want) {
 			t.Errorf("the trail of %s = %q, want %q", path, got, want)
+		}
+	}
+	for _, path := range []string{"/reconstitution/", "/healing-peptides/", "/bpc-157-dosing-guide/"} {
+		if view, found := page(first.Report, path); !found || view.Action != string(imports.ActionCreate) || view.MatchedBy != "" {
+			t.Errorf("the row without a URL at %s = %+v, want it planned at the slug of its title on a site without it", path, view)
 		}
 	}
 	if orphaned := findings(first.Report.Warnings, imports.CodeGroupWithoutPage); len(orphaned) != 0 {
@@ -90,6 +96,7 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	for _, want := range [][2]string{
 		{"BPC-157", "Peptides"}, {"TB-500", "Peptides"}, {"Storing peptides", "Peptides"}, {"BPC-157 Liquid", "BPC-157"},
 		{"BPC-157 Powder", "BPC-157"}, {"TB-500 Liquid", "TB-500"}, {"TB-500 Capsules", "TB-500"},
+		{"Reconstitution", "Peptides"}, {"Healing Peptides", "Peptides"}, {"BPC-157 dosing guide", "Peptides"},
 	} {
 		if !hasEdge(first.Report, want[0], want[1], string(graph.EdgeParent)) {
 			t.Errorf("edges = %+v, want %s under %s", first.Report.Edges, want[0], want[1])
@@ -132,13 +139,27 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 
 	wide := h.apply(t, path, h.sheet(t, path, "Entities"))
 	clean(t, "Entities", wide)
-	if wide.Counts.EntitiesCreated != 1 {
-		t.Fatalf("the wide sheet wrote %+v, want Canada alone created", wide.Counts)
+	if wide.Counts.EntitiesCreated != 2 || wide.Counts.PagesCreated != 1 {
+		t.Fatalf("the wide sheet wrote %+v, want Canada with its page and Tissue repair alone created", wide.Counts)
 	}
 	if canada, found := entity(wide.Report, "Peptides in Canada"); !found || canada.Parent != "Peptides" {
 		t.Fatalf("Canada = %+v, want an entity under Peptides", canada)
 	}
-	wantTypes := map[string]string{"/peptides/": "Hub", "/peptides/bpc-157/": "Product", "/peptides/canada/": "Entity"}
+	if repair, found := entity(wide.Report, "Tissue repair"); !found || repair.Parent != "Peptides" || repair.Action != string(imports.ActionCreate) {
+		t.Fatalf("Tissue repair = %+v, want an entity under Peptides", repair)
+	}
+	if _, planned := h.pageAt(t, "/tissue-repair/"); planned {
+		t.Fatal("the row that names only Tissue repair planned a page")
+	}
+	if got := cardNotesOf(t, h, "Tissue repair"); len(got) != 2 {
+		t.Fatalf("the card of Tissue repair = %+v, want the row's notes on the entity it names", got)
+	}
+	if tb, found := page(wide.Report, "/peptides/tb-500/"); !found || tb.MatchedBy != "entity" || tb.Action != string(imports.ActionUpdate) {
+		t.Fatalf("the row that names TB-500 = %+v, want the entity's page updated", tb)
+	}
+	wantTypes := map[string]string{
+		"/peptides/": "Hub", "/peptides/bpc-157/": "Product", "/peptides/tb-500/": "Product", "/peptides/canada/": "Entity",
+	}
 	if got := h.typeNames(t); !maps.Equal(got, wantTypes) {
 		t.Fatalf("the wide sheet typed the pages %v, want the types its entity level says %v", got, wantTypes)
 	}
@@ -149,7 +170,7 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 		t.Fatalf("the wide sheet ignored %v", left)
 	}
 	for path, want := range map[string][]string{
-		"/peptides/": nil, "/peptides/bpc-157/": {"Peptides"}, "/peptides/canada/": {"Peptides"},
+		"/peptides/": nil, "/peptides/bpc-157/": {"Peptides"}, "/peptides/canada/": {"Peptides"}, "/peptides/tb-500/": {"Peptides"},
 	} {
 		if got := h.trailAt(t, path); !slices.Equal(got, want) {
 			t.Errorf("after the wide sheet the trail of %s = %q, want %q", path, got, want)
@@ -162,6 +183,10 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	want := []note.Note{{Label: "Intent Owner", Text: "Commercial Product"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
 	if got := notesAt(t, h, "/peptides/bpc-157/"); !slices.Equal(got, want) {
 		t.Fatalf("the notes of BPC-157 = %+v, want %+v", got, want)
+	}
+	want = []note.Note{{Label: "Intent Owner", Text: "Commercial Product"}, {Label: "Notes", Text: "Sold as a 5 mg vial"}}
+	if got := notesAt(t, h, "/peptides/tb-500/"); !slices.Equal(got, want) {
+		t.Fatalf("the notes of TB-500 = %+v, want %+v", got, want)
 	}
 
 	variations := h.apply(t, path, h.sheet(t, path, "Variations"))
@@ -184,6 +209,56 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	again := h.apply(t, path, groups)
 	if again.Counts.EntitiesCreated != 0 || again.Counts.PagesCreated != 0 || again.Counts.EdgesCreated != 0 {
 		t.Fatalf("the group sheet imported again wrote %+v", again.Counts)
+	}
+}
+
+func pageOf(report imports.PreviewReport, sheet, path string) (imports.PreviewPage, bool) {
+	for i := range report.Pages {
+		if report.Pages[i].Sheet == sheet && report.Pages[i].Path == path {
+			return report.Pages[i], true
+		}
+	}
+	return imports.PreviewPage{}, false
+}
+
+func TestTheClientWorkbookFindsTheReplicasPagesWithoutAURL(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	for at, held := range []struct{ path, title string }{
+		{"/", "Home"}, {"/peptides/", "Peptides"}, {"/bpc-157/", "BPC-157"}, {"/tb-500/", "TB-500"},
+		{"/healing-peptides/", "Healing Peptides"}, {"/lab-guides/", "Lab Guides"}, {"/reconstitution/", "Reconstitution"},
+	} {
+		h.sitePage(t, held.path, held.title, int64(10+at), nil)
+	}
+	peptides := int64(90)
+	h.termPage(t, "/product-category/peptides/", "Peptides", peptides, nil)
+	h.termPage(t, "/product-category/peptides/healing-peptides/", "Healing Peptides", 100, &peptides)
+	h.storeProduct(t, "bpc-157-peptide", "BPC-157 Peptide", 501)
+	h.storeProduct(t, "tb-500-peptide", "TB-500 Peptide", 502)
+
+	report := h.workbookPreview(t, clientWorkbook, clientSheets...)
+	if len(report.Errors) != 0 || len(findings(report.Warnings, imports.CodeRowAmbiguous)) != 0 {
+		t.Fatalf("errors = %+v, warnings = %+v, want every row to find one page or none", report.Errors, report.Warnings)
+	}
+	cases := []struct {
+		name, sheet, path, rule string
+		action                  imports.Action
+	}{
+		{name: "a row by its title", sheet: "Groups", path: "/reconstitution/", rule: "title", action: imports.ActionUpdate},
+		{name: "a hub its store category shares a name with", sheet: "Groups", path: "/healing-peptides/", rule: "title", action: imports.ActionUpdate},
+		{name: "a row no page answers, under its level's page", sheet: "Groups", path: "/bpc-157/bpc-157-dosing-guide/", action: imports.ActionCreate},
+		{name: "a row by its entity's name", sheet: "Entities", path: "/tb-500/", rule: "entity", action: imports.ActionUpdate},
+	}
+	for _, tc := range cases {
+		if view, found := pageOf(report, tc.sheet, tc.path); !found || view.MatchedBy != tc.rule || view.Action != string(tc.action) {
+			t.Errorf("%s: the %s sheet shows %s as %+v (%t), want %s by %q", tc.name, tc.sheet, tc.path, view, found, tc.action, tc.rule)
+		}
+	}
+	for i := range report.Pages {
+		if report.Pages[i].Path == "/tissue-repair/" || report.Pages[i].Path == "/product-category/peptides/healing-peptides/" {
+			t.Errorf("the workbook plans or writes %+v", report.Pages[i])
+		}
 	}
 }
 
@@ -279,8 +354,8 @@ func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
 	clean(t, "whole", applied)
 
 	want, got := sheetBySheet.labels(t), whole.labels(t)
-	if len(want.entities) != 8+5+1+2 || len(want.pages) == 0 || len(want.edges) == 0 {
-		t.Fatalf("the sheets imported one by one hold %d entities, %d pages and %d edges, want sixteen entities",
+	if len(want.entities) != 11+5+2+2 || len(want.pages) == 0 || len(want.edges) == 0 {
+		t.Fatalf("the sheets imported one by one hold %d entities, %d pages and %d edges, want twenty entities",
 			len(want.entities), len(want.pages), len(want.edges))
 	}
 	for _, compared := range []struct {
