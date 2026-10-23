@@ -4449,3 +4449,29 @@ rulings and what was decided while building.
   owner accepted that for 4.1 only, and 4.2 skips what the scope does not need.
 - **The drawer's `parent_differs` sentence read the subject from before `2f1813f`** (`reason`,
   `workbookPath`) and said only "a different parent"; it now reads `{sheet, site}`, failing first.
+
+### What the stands found at 4.1's close (2026-10-23)
+
+- **The client's workbook on the replica** (`TestTheWorkbookReconcilesWithTheSite`, all four sheets
+  in their order): 9 rows update a page (4 by URL, 2 by slug, 2 by title, 1 by entity name), none
+  by a person's mapping, H1 or SKU, none ambiguous, 13 plan a page (the 4 Catalog rows wait for
+  their products), and 2 rows carry only an entity (TB-500, matched by its entity; "Tissue
+  repair", an entity alone, planning nothing). After one import and one sync the open findings are
+  `row_without_page` 14, `technical_detected` 7, `parent_differs` 3, `parent_unresolved` 1 and
+  `render_redirected` 1. The import and the observation raise the same three `parent_differs`
+  (Reconstitution under Peptides in the sheet and Lab Guides on the site; BPC-157 and TB-500 under
+  Peptides in the sheet and under Peptides › Healing Peptides on the site), and a sync changes no
+  count.
+- **A row that matches a page the import itself planned keeps a `row_without_page` too**: it has
+  no page on the site either. That is why 13 planned rows give 14 findings (the Variations sheet's
+  TB-500 liquid matches the Groups sheet's planned page by URL). The preview warns only where it
+  creates a draft; the persisted finding names every row still waiting for its page, and the
+  observation closes all of a page's row findings when it lands.
+- **Resolved through `core.Findings` on the stand**: the dosing guide's row ignored by a person,
+  Reconstitution's trail pinned to the workbook by the agent (its model parent becomes Peptides on
+  the next sync), `rescan` answering a full sync; a second import created nothing and reopened
+  nothing, and a sync after it kept the dismissal.
+- **Vanilla** matches `/guide/` by URL and the sheet's `/brewing/setup/` by slug onto
+  `/guide/setup/`, and plans the URL-less "Cold brew at home" with its `row_without_page`. The
+  import also plans a `/brewing/` gap page from the matched row's URL, the long-standing gap
+  filling; it is put to the owner at the close of 4.1.

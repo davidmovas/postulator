@@ -15,8 +15,8 @@ its stand legs green on both stands on 2026-10-20**; **stage 3, the field writer
 body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1, then the stored
 diff, per-field acceptance and the screens; its gate is green on both stands (2026-10-23). Stage 4
 is re-planned as 4.1 (the matcher and the findings), 4.2 (the agent works the loop) and 4.3 (the
-screens, the gate and the report); 4.1's code is done to 4.1.6 (2026-10-23), and it resumes at
-4.1.7, the reconcile proof and the stands.**
+screens, the gate and the report); 4.1 is done (2026-10-23), green on both stands, with four gate
+legs owed; 4.2 is next.**
 
 ## Where we are
 
@@ -34,7 +34,13 @@ reasoning is under "The owner's answers to 4.1's first session" and "4.1, the se
   fields publish writes (`9bc1f59`), a card accepted by the agent recorded as the agent's
   (`8aac371`).
 - **4.1.6**: the client's sheets carry URL-less rows the replica answers (`4f4f62d`).
-- **Owed in 4.1:** `TestTheWorkbookReconcilesWithTheSite` and both stands, then the docs.
+- **4.1.7**: `TestTheWorkbookReconcilesWithTheSite` (`d13ff6c`, `4116950`), green on both stands
+  beside `TestTheWholeLoopReachesTheDockerSite`. On the replica the client's workbook updates 9
+  pages (4 by URL, 2 by slug, 2 by title, 1 by entity name), plans 13, finds no ambiguous row and
+  carries 2 entity-only rows; after one import and one sync the open findings are
+  `row_without_page` 14, `technical_detected` 7, `parent_differs` 3, `parent_unresolved` 1 and
+  `render_redirected` 1 (under "What the stands found at 4.1's close" in `DECISIONS.md`).
+- **4.1.8**: spec 16.8 and the docs.
 - Schemas unchanged (61,361 bytes, 90 tools); migrations to 0072; bound methods 129 (`StartRequest`
   gains `fields`); plugin 1.5.1.
 
@@ -452,6 +458,25 @@ docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now
 by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
 
 ## The gate
+
+**2026-10-23, on Windows, at the close of stage 4.1. Partial: the memory guard stopped the adapters
+race group.**
+- **Run and green:** on the replica, then vanilla, each after `task plugin:deploy`:
+  `TestTheWorkbookReconcilesWithTheSite` and `TestTheWholeLoopReachesTheDockerSite` (no draft of
+  ours carries an H1, the first stand run of that assertion); both stands taken down. `task lint:e2e`
+  0 issues; `task build` with no generated drift; `npm run typecheck`; `go test -race -count=1 -p 2
+  -covermode=atomic` over kernel and domain, application and runtime. Every touched package's
+  tests, golangci-lint and `gofmt` during the session; the comment check.
+- **Not finished:** the adapters race group. Its first run hit the default 10-minute test timeout
+  in `internal/adapters/sqlite` (57 s without race; the package has outgrown ten minutes under the
+  race detector); the rerun with `-timeout 30m` was stopped by the session's memory guard. Owed, one
+  at a time on an idle machine:
+  ```
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  (merge cov1.out to cov5.out into coverage.out) ; go run ./cmd/covergate
+  cd frontend ; npm run test:run -- --maxWorkers=2 ; cd .. ; task ui:lint
+  ```
 
 **2026-10-23, on Windows, stage 3's gate, completed after the memory freed. Green on the final
 code.**

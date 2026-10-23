@@ -1055,8 +1055,8 @@ The owner chose per-field acceptance of a draft run's review, built in Go before
 - [x] **4.1.4 — findings that last** (`f34a492` the codes, `pagemap.RowKey` and their words; `9488023` one `TrailOptions`; `0c5a6e0` the import persists and closes, agent; `a64f5da`, `b0411b6` the observation closes `row_without_page`; plus the settled rule `b3e4f27` and the option kinds `14e5cc2` of the first session). `row_ambiguous`, `row_without_page`, option kinds; decision 5 in `FindingRepo` and the trackers; the import persists its row findings and `parent_differs`; the observation closes `row_without_page` and `parent_differs`. Test: `TestAFindingLivesOnce`. Commit `feat(findings): a finding lives once and closes when its cause goes`.
 - [x] **4.1.5 — `application/findings`** (`04caaf5`; with `5a0fbd2` `set_type` keeps the detection off, `9bc1f59` the field scope, `8aac371` a card accepted by the agent, `6e341ea` `imports.MapRow`, agent; the owner's answer 2 is `a480bbb`, agent; its writes landed earlier: `PageFieldRepo.AcceptSite`, `PageBodyRepo.AcceptSite` in `7287d4e`, `PageRepo.SetParentSource` in `079f791`). `List` (cursor) and `Resolve`, decision 6; `imports.MapRow`; publish's `params.fields`; `core.Findings`; `vocab.ts` with its copy. Test: `TestEachResolutionOptionPerCode`. Commit `feat(findings): one use case resolves a finding`.
 - [x] **4.1.6 — the samples** (`4f4f62d`, agent). URL-less rows in `samples/build/client.mjs` (by entity, by title, none, a hub and a store category sharing a name); the pins move. Commit `test(samples): the client's sheets carry rows without a URL`.
-- [ ] **4.1.7 — `TestTheWorkbookReconcilesWithTheSite`.** Commit `test(e2e): the workbook reconciles with the site`.
-- [ ] **4.1.8 — the docs and the checkpoint.** Commit `docs: stage 4.1, the matcher and the findings`.
+- [x] **4.1.7 — `TestTheWorkbookReconcilesWithTheSite`** (`d13ff6c`, `4116950`), green on both stands with `TestTheWholeLoopReachesTheDockerSite`.
+- [x] **4.1.8 — the docs and the checkpoint.** Commit `docs: stage 4.1, the matcher and the findings`.
 
 #### Checkpoint, 2026-10-23 (end of 4.1's first session; the next session resumes at 4.1.4)
 
@@ -1119,7 +1119,7 @@ task e2e:down STAND=replica
 ```
 The full loop asserts that no created draft carries an H1 in its content (P0.1); it has not run on a stand yet.
 
-#### Checkpoint, 2026-10-23 (end of 4.1's second session; the next session resumes at 4.1.7)
+#### Checkpoint, 2026-10-23 (4.1's second session; 4.1 closed the same day but for the gate legs below, and 4.2 is next)
 
 **Landed on `dev`**, the tree clean at the checkpoint's commit; the reasoning is under "4.1, the second session" in `DECISIONS.md`:
 - `92eb616`: the owner's two answers (field-scoped runs move into 4.2; an entity-only row plans no page);
@@ -1141,6 +1141,19 @@ The full loop asserts that no created draft carries an H1 in its content (P0.1);
 - The import's row findings carry no row number; a `row_ambiguous` subject is `{sheet, rule, candidates, pageIds, product}`, a `row_without_page` subject `{sheet, plannedPath, product}`, the subject key the row key `row:<sheet>:<identity>`.
 - `TestTheWholeLoopReachesTheDockerSite` and the client loop import other workbooks; an entity-only row in them now plans nothing (owner's answer 2), so a pinned page count may move on the stand.
 - Every CSV shares the sheet name `""`, so one CSV's import clears another CSV's open row findings as `row_left_sheet`; a row named by its SKU alone has no row key and no persisted finding. Neither touches the client's workbooks.
+
+**Closed later the same session** (the owner: the window is 1M, continue):
+- 4.1.7 `d13ff6c`, `4116950`; spec 16.8 and these docs in the 4.1.8 commit.
+- **The stands, one at a time after `task plugin:deploy`:** on the replica, `TestTheWorkbookReconcilesWithTheSite` (32 s, after one fix to the test's own preview check, which counted the first sync's findings) and `TestTheWholeLoopReachesTheDockerSite` (45 s; no draft of ours carries an H1, the first stand run of P0.1); on vanilla, both (65 s). Both stands were taken down.
+- **The gate legs run and green:** `task lint:e2e` 0 issues (after two lint fixes in the new test); `task build` with no generated drift; `npm run typecheck` against the regenerated bindings; `go test -race -count=1 -p 2 -covermode=atomic` over kernel and domain (`cov1.out`), application (`cov2.out`) and runtime (`cov3.out`).
+- **Stopped, not failed:** the adapters race group. Its first run hit Go's default 10-minute timeout in `internal/adapters/sqlite`, which passes in 57 s without race; its new tests pass alone under race; the package has grown past ten minutes under the race detector. The rerun with `-timeout 30m` was stopped by the session's memory guard. Group 5, `covergate`, the whole vitest and `ui:lint` were not started.
+- **Commands owed, one at a time on an idle machine:**
+  ```
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  (merge cov1.out to cov5.out into coverage.out) ; go run ./cmd/covergate
+  cd frontend ; npm run test:run -- --maxWorkers=2 ; cd .. ; task ui:lint
+  ```
 
 **What 4.2 starts with:** the field-scoped run (the owner's answer 1, under 4.2 above), then the three tools over `core.Findings`, fields and blocks. `findings.Resolve` already takes `By` (`agent` records the agent), and a run option answers a `runs.StartRequest` (with `fields` and `rewrite`) or a `sync.SyncSiteRequest`, which the agent's tool hands to the normal start. `StartRequest.fields` exists and is bound; `runs_start`'s own argument struct does not carry it yet.
 
