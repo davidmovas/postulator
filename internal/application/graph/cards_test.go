@@ -88,6 +88,33 @@ func TestAProposedCardIsWrittenOnlyOnceAccepted(t *testing.T) {
 	}
 }
 
+func TestACardAcceptedByTheAgentIsRecordedAsTheAgents(t *testing.T) {
+	t.Parallel()
+
+	h, entityID := carded(t)
+	proposed, err := h.service.ProposeCards(t.Context(), graph.ProposeCardsRequest{
+		SiteID: h.siteID, Cards: []graph.CardInput{cardOf(entityID, "A peptide.")},
+	})
+	if err != nil {
+		t.Fatalf("ProposeCards: %v", err)
+	}
+	shown := proposed.Proposals[0]
+	if _, err = h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{
+		FindingID: shown.FindingID, ProposalHash: shown.ProposalHash, By: "someone",
+	}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("accepting by someone = %v, want Invalid", err)
+	}
+	if _, err = h.service.AcceptCard(t.Context(), graph.AcceptCardRequest{
+		FindingID: shown.FindingID, ProposalHash: shown.ProposalHash, By: finding.ResolvedByAgent,
+	}); err != nil {
+		t.Fatalf("AcceptCard by the agent: %v", err)
+	}
+	settled, err := sqlite.NewFindingRepo(h.store).Get(t.Context(), shown.FindingID)
+	if err != nil || settled.ResolvedBy != finding.ResolvedByAgent {
+		t.Errorf("the finding = %+v, %v; want it resolved by the agent", settled, err)
+	}
+}
+
 func TestACardThatChangedSinceItsProposalIsRefused(t *testing.T) {
 	t.Parallel()
 

@@ -80,6 +80,7 @@ type ApplyCardsResponse struct {
 type AcceptCardRequest struct {
 	FindingID    string `json:"findingId"`
 	ProposalHash string `json:"proposalHash"`
+	By           string `json:"-"`
 }
 
 type AcceptCardResponse struct {
@@ -187,6 +188,13 @@ func (s *Service) AcceptCard(ctx context.Context, req AcceptCardRequest) (Accept
 	if strings.TrimSpace(req.ProposalHash) == "" {
 		return AcceptCardResponse{}, errors.New(errors.Invalid, "name the proposal as it was shown").WithDetail("field", "proposalHash")
 	}
+	by := req.By
+	if by == "" {
+		by = ResolvedByPerson
+	}
+	if by != finding.ResolvedByPerson && by != finding.ResolvedByAgent {
+		return AcceptCardResponse{}, errors.New(errors.Invalid, "a card is accepted by a person or the agent").WithDetail("field", "by")
+	}
 	var written graphdomain.Entity
 	now := s.now()
 	err := s.uow.Do(ctx, func(c context.Context) error {
@@ -213,7 +221,7 @@ func (s *Service) AcceptCard(ctx context.Context, req AcceptCardRequest) (Accept
 		if written, err = s.writeCard(c, current, subject.Definition, facts, now); err != nil {
 			return err
 		}
-		return s.findings.Settle(c, held.ID, finding.Resolved, ResolutionAccepted, ResolvedByPerson, now)
+		return s.findings.Settle(c, held.ID, finding.Resolved, ResolutionAccepted, by, now)
 	})
 	if err != nil {
 		return AcceptCardResponse{}, err
