@@ -38,6 +38,8 @@ func factories() []factory {
 		pagesMapToEntity,
 		pagesUnmap,
 		pagesSetCanonical,
+		pagesFields,
+		pagesBlocks,
 		pagetypesList,
 		pagetypesSave,
 		pagetypesDelete,
