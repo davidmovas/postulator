@@ -4475,3 +4475,19 @@ rulings and what was decided while building.
   `/guide/setup/`, and plans the URL-less "Cold brew at home" with its `row_without_page`. The
   import also plans a `/brewing/` gap page from the matched row's URL, the long-standing gap
   filling; it is put to the owner at the close of 4.1.
+
+### The owner's answers at 4.2's plan (2026-10-23)
+
+- **The agent's writes to the site wait for the person in either mode.** A field or a block the
+  agent writes to a page (`pages_fields set`, every `pages_blocks` write) is proposed in an
+  autonomous conversation too, as `pages_delete` of a page on the site already is. Resolving a
+  finding and starting a run change the model or start work the estimate prices, and follow the
+  conversation's mode.
+- **A title scoped without the body is answered by one editor call.** A run scoped to the title
+  alone drafted each page whole, because the body writer writes the title. When the title is in a
+  run's scope and the body is not, `generate_fields` answers it in its one structured call, briefed
+  with the workbook's planned title, so a title sweep costs about what a meta sweep costs.
+- **Gaps, CSV keys and the SKU key** (the owner's answers to 4.1's close, in the brief of 4.2): a
+  row that matched an existing page at another address plans nothing, gaps included; a CSV's row
+  keys name its file, so two CSVs never touch each other's findings; a row named by its SKU alone
+  has a key. The import and the observation share one term-parent helper.
