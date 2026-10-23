@@ -153,6 +153,35 @@ func TestPageBodyRepoRecordSetsBothSides(t *testing.T) {
 	}
 }
 
+func TestABodyTheSiteChangedBecomesTheBaseWhenAPersonAcceptsIt(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	page := sqlitetest.Page(t, store, owner.ID, "/tb-500/")
+	unseen := sqlitetest.Page(t, store, owner.ID, "/new/")
+	repo := sqlite.NewPageBodyRepo(store)
+
+	if err := repo.Record(t.Context(), page.ID, "<p>Ours.</p>", sqlitetest.Stamp); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	edited := "<p>Ours, then the client's edit.</p>"
+	if err := repo.Observe(t.Context(), snapshotOf(page.ID, block.Current, edited, sqlitetest.Stamp.Add(time.Hour))); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	accepted := sqlitetest.Stamp.Add(2 * time.Hour)
+	if err := repo.AcceptSite(t.Context(), page.ID, accepted); err != nil {
+		t.Fatalf("AcceptSite: %v", err)
+	}
+	current, base, found, err := repo.Get(t.Context(), page.ID)
+	if err != nil || !found || base.Hash != current.Hash || base.Raw != edited || !base.ObservedAt.Equal(accepted) {
+		t.Errorf("after AcceptSite the base is %+v (current %+v), %v; want the site's body", base, current, err)
+	}
+	if err = repo.AcceptSite(t.Context(), unseen.ID, accepted); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("accepting the body of a page never read code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
 func TestPageBodyRepoReplacesTheWrittenBlocks(t *testing.T) {
 	t.Parallel()
 

@@ -172,3 +172,34 @@ func TestPageFieldRepoRecordSetsBothSidesAndTheRun(t *testing.T) {
 		t.Errorf("recording a field of no page code = %q, want INVALID", errors.CodeOf(err))
 	}
 }
+
+func TestAFieldTheSiteChangedIsTakenAsTheClientsWhenAPersonAcceptsIt(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	page := sqlitetest.Page(t, store, owner.ID, "/tb-500/")
+	repo := sqlite.NewPageFieldRepo(store)
+
+	if err := repo.Record(t.Context(), page.ID, field.Title, "Ours", "run-1", sqlitetest.Stamp); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	edited := field.NewValue(page.ID, field.Title, "The client's own", sqlitetest.Stamp.Add(time.Hour))
+	if err := repo.Observe(t.Context(), page.ID, []field.Value{edited}); err != nil {
+		t.Fatalf("Observe: %v", err)
+	}
+	accepted := sqlitetest.Stamp.Add(2 * time.Hour)
+	if err := repo.AcceptSite(t.Context(), page.ID, field.Title, accepted); err != nil {
+		t.Fatalf("AcceptSite: %v", err)
+	}
+	got, err := repo.ListForPage(t.Context(), page.ID)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("ListForPage = %+v, %v", got, err)
+	}
+	if title := got[0]; title.Base != "The client's own" || title.Changed() || title.WrittenRunID != nil || title.WrittenAt != nil {
+		t.Errorf("after AcceptSite the title is %+v, want the client's value as the base and no run of ours behind it, or the next run writes over it", title)
+	}
+	if err = repo.AcceptSite(t.Context(), page.ID, field.Excerpt, accepted); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("accepting a field the page never had code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
@@ -13,6 +14,9 @@ const (
 	upsertBody  = `INSERT INTO page_bodies (` + bodyColumns + `) VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT (page_id, side) DO UPDATE SET raw = excluded.raw, hash = excluded.hash, kind = excluded.kind, observed_at = excluded.observed_at`
 	insertBodyIfAbsent = `INSERT INTO page_bodies (` + bodyColumns + `) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (page_id, side) DO NOTHING`
+	acceptSiteBody     = `INSERT INTO page_bodies (page_id, side, raw, hash, kind, observed_at)
+		SELECT page_id, 'base', raw, hash, kind, ? FROM page_bodies WHERE page_id = ? AND side = 'current'
+		ON CONFLICT (page_id, side) DO UPDATE SET raw = excluded.raw, hash = excluded.hash, kind = excluded.kind, observed_at = excluded.observed_at`
 	selectBodies       = `SELECT ` + bodyColumns + ` FROM page_bodies WHERE page_id = ?`
 	selectBodiesBySite = `SELECT b.page_id, b.side, b.raw, b.hash, b.kind, b.observed_at
 		FROM page_bodies AS b JOIN pages AS p ON p.id = b.page_id WHERE p.site_id = ? ORDER BY b.page_id, b.side`
@@ -56,6 +60,12 @@ func (r *PageBodyRepo) Record(ctx context.Context, pageID, raw string, at time.T
 		}
 		return r.write(c, upsertBody, snapshot, block.Base, "record the written body as the base")
 	})
+}
+
+func (r *PageBodyRepo) AcceptSite(ctx context.Context, pageID string, at time.Time) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), acceptSiteBody, []any{formatTime(at), pageID}, nil,
+		"take the site's body as the base")
+	return requireAffected(affected, err, errors.New(errors.NotFound, "the page has no body read from the site").WithDetail("pageId", pageID))
 }
 
 func (r *PageBodyRepo) write(ctx context.Context, query string, snapshot block.Snapshot, side block.Side, message string) error {

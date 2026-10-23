@@ -16,7 +16,9 @@ const (
 	recordField = `INSERT INTO page_fields (` + fieldColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (page_id, field_key) DO UPDATE SET current_value = excluded.current_value, current_hash = excluded.current_hash,
 		base_value = excluded.base_value, base_hash = excluded.base_hash, written_at = excluded.written_at, written_run_id = excluded.written_run_id`
-	agreeField          = `UPDATE page_fields SET base_value = current_value, base_hash = current_hash, observed_at = ? WHERE page_id = ? AND field_key = ?`
+	agreeField      = `UPDATE page_fields SET base_value = current_value, base_hash = current_hash, observed_at = ? WHERE page_id = ? AND field_key = ?`
+	acceptSiteField = `UPDATE page_fields SET base_value = current_value, base_hash = current_hash, written_at = NULL, written_run_id = NULL, observed_at = ?
+		WHERE page_id = ? AND field_key = ?`
 	selectFieldsForPage = `SELECT ` + fieldColumns + ` FROM page_fields WHERE page_id = ? ORDER BY field_key`
 	selectFieldsBySite  = `SELECT f.page_id, f.field_key, f.current_value, f.current_hash, f.base_value, f.base_hash, f.observed_at, f.written_at, f.written_run_id
 		FROM page_fields AS f JOIN pages AS p ON p.id = f.page_id WHERE p.site_id = ? ORDER BY f.page_id, f.field_key`
@@ -67,6 +69,12 @@ func fieldNotFound(pageID string, key field.Key) *errors.Error {
 
 func (r *PageFieldRepo) Agree(ctx context.Context, pageID string, key field.Key, at time.Time) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), agreeField, []any{formatTime(at), pageID, string(key)}, nil, "agree the page field")
+	return requireAffected(affected, err, fieldNotFound(pageID, key))
+}
+
+func (r *PageFieldRepo) AcceptSite(ctx context.Context, pageID string, key field.Key, at time.Time) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), acceptSiteField, []any{formatTime(at), pageID, string(key)}, nil,
+		"take the site's value of the page field as the client's")
 	return requireAffected(affected, err, fieldNotFound(pageID, key))
 }
 
