@@ -34,6 +34,21 @@ type trailNode struct {
 	shown string
 }
 
+func TermParents(pages []Page, identities map[string]Identity) map[int64]int64 {
+	out := make(map[int64]int64)
+	for i := range pages {
+		identity, observed := identities[pages[i].ID]
+		if !pages[i].WPType.Term() || pages[i].WPID == nil || !observed {
+			continue
+		}
+		out[*pages[i].WPID] = 0
+		if identity.WPParentID != nil {
+			out[*pages[i].WPID] = *identity.WPParentID
+		}
+	}
+	return out
+}
+
 func NewTrailSite(index Index, carried map[string][]Term, parents map[int64]int64) TrailSite {
 	site := TrailSite{index: index, terms: make(map[int64]Term), carried: make(map[string][]Term, len(carried))}
 	for _, pageID := range slices.Sorted(maps.Keys(carried)) {

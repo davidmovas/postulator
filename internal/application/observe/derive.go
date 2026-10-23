@@ -362,7 +362,7 @@ func pinToWorkbook(ctx context.Context, tracked *findings, page *pagemap.Page, m
 }
 
 func (s *Service) trails(ctx context.Context, tracked *findings, m siteModel, carried map[string][]pagemap.Term) error {
-	shown := pagemap.NewTrailSite(m.index, carried, m.termParents())
+	shown := pagemap.NewTrailSite(m.index, carried, pagemap.TermParents(m.pages, m.identities))
 	for i := range m.pages {
 		page := m.pages[i]
 		if page.WPID == nil || page.Status == pagemap.StatusArchived {
@@ -381,22 +381,6 @@ func (s *Service) trails(ctx context.Context, tracked *findings, m siteModel, ca
 		}
 	}
 	return nil
-}
-
-func (m siteModel) termParents() map[int64]int64 {
-	out := make(map[int64]int64)
-	for i := range m.pages {
-		page := m.pages[i]
-		identity, observed := m.identities[page.ID]
-		if !page.WPType.Term() || page.WPID == nil || !observed {
-			continue
-		}
-		out[*page.WPID] = 0
-		if identity.WPParentID != nil {
-			out[*page.WPID] = *identity.WPParentID
-		}
-	}
-	return out
 }
 
 func (m siteModel) pathOf(pageID string) string {

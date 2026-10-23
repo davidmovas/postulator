@@ -101,27 +101,12 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	if err != nil {
 		return siteState{}, err
 	}
-	facts := siteFacts{pageTypes: pageTypes, fields: fields, terms: terms, termParents: termParents(pages, identities)}
-	return newSiteState(siteID, entities, edges, pages, facts), nil
-}
-
-func termParents(pages []pagemap.Page, identities []pagemap.Identity) map[int64]int64 {
 	observed := make(map[string]pagemap.Identity, len(identities))
 	for i := range identities {
 		observed[identities[i].PageID] = identities[i]
 	}
-	out := make(map[int64]int64)
-	for i := range pages {
-		identity, seen := observed[pages[i].ID]
-		if !pages[i].WPType.Term() || pages[i].WPID == nil || !seen {
-			continue
-		}
-		out[*pages[i].WPID] = 0
-		if identity.WPParentID != nil {
-			out[*pages[i].WPID] = *identity.WPParentID
-		}
-	}
-	return out
+	facts := siteFacts{pageTypes: pageTypes, fields: fields, terms: terms, termParents: pagemap.TermParents(pages, observed)}
+	return newSiteState(siteID, entities, edges, pages, facts), nil
 }
 
 func (s *siteState) storeName(pageID string) string {

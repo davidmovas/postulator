@@ -2,6 +2,7 @@ package pagemap_test
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"testing"
 
@@ -139,6 +140,56 @@ func TestATrailDiffMarshalsBothListsWhateverTheyHold(t *testing.T) {
 			}
 			if string(encoded) != tc.want {
 				t.Errorf("subject = %s, want %s", encoded, tc.want)
+			}
+		})
+	}
+}
+
+func TestTermParents(t *testing.T) {
+	t.Parallel()
+
+	parent := int64(90)
+	healing := sitePage("healing", "/product-category/peptides/healing/", pagemap.WPProductCategory, 100)
+	peptides := sitePage("peptides", "/product-category/peptides/", pagemap.WPProductCategory, 90)
+	waiting := pagemap.Page{ID: "waiting", SiteID: "site", Path: "/product-category/waiting/", WPType: pagemap.WPProductCategory, Status: pagemap.StatusPlanned}
+	hub := sitePage("hub", "/peptides/", pagemap.WPPage, 5)
+	cases := []struct {
+		name       string
+		pages      []pagemap.Page
+		identities map[string]pagemap.Identity
+		want       map[int64]int64
+	}{
+		{
+			name: "a term under its parent", pages: []pagemap.Page{healing},
+			identities: map[string]pagemap.Identity{"healing": {PageID: "healing", WPParentID: &parent}}, want: map[int64]int64{100: 90},
+		},
+		{
+			name: "a term at the top", pages: []pagemap.Page{peptides},
+			identities: map[string]pagemap.Identity{"peptides": {PageID: "peptides"}}, want: map[int64]int64{90: 0},
+		},
+		{name: "a term the sync has not observed", pages: []pagemap.Page{healing}, want: map[int64]int64{}},
+		{
+			name: "a term without a WordPress id", pages: []pagemap.Page{waiting},
+			identities: map[string]pagemap.Identity{"waiting": {PageID: "waiting", WPParentID: &parent}}, want: map[int64]int64{},
+		},
+		{
+			name: "a page that is no term", pages: []pagemap.Page{hub},
+			identities: map[string]pagemap.Identity{"hub": {PageID: "hub", WPParentID: &parent}}, want: map[int64]int64{},
+		},
+		{
+			name: "every observed term of the site", pages: []pagemap.Page{healing, peptides, waiting, hub},
+			identities: map[string]pagemap.Identity{
+				"healing": {PageID: "healing", WPParentID: &parent}, "peptides": {PageID: "peptides"}, "hub": {PageID: "hub"},
+			},
+			want: map[int64]int64{100: 90, 90: 0},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := pagemap.TermParents(tc.pages, tc.identities); !maps.Equal(got, tc.want) {
+				t.Errorf("TermParents = %v, want %v", got, tc.want)
 			}
 		})
 	}
