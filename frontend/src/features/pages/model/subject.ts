@@ -1,5 +1,5 @@
 import { copy } from "../../../copy/index.js";
-import { fieldLabel, parentSourceLabel, technicalReasonLabel } from "./labels.js";
+import { fieldLabel, technicalReasonLabel } from "./labels.js";
 
 const said = copy.pages.model.findings;
 
@@ -34,7 +34,11 @@ export function findingSentence(code: string, subject: Subject): string {
         case "parent_name_twin":
             return said.twin(text(subject, "name"), text(subject, "page"), texts(subject, "terms"));
         case "parent_differs":
-            return said.differs(parentSourceLabel(text(subject, "reason")), text(subject, "workbookPath"));
+            return said.differs(texts(subject, "sheet"), texts(subject, "site"));
+        case "row_ambiguous":
+            return said.rowAmbiguous(text(subject, "sheet"), texts(subject, "candidates"));
+        case "row_without_page":
+            return said.rowWithoutPage(text(subject, "sheet"), text(subject, "plannedPath"), subject?.["product"] === true);
         case "plugin_outdated":
             return said.outdated(text(subject, "version"), text(subject, "required"));
         case "field_changed_on_site":

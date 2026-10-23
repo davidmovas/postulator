@@ -30,6 +30,23 @@ type Row struct {
 	Product bool
 }
 
+func RowKeyPrefix(sheet string) string {
+	return "row:" + sheet + ":"
+}
+
+func RowKey(sheet string, row Row) string {
+	identity := strings.TrimSpace(row.Path)
+	for _, name := range []string{row.Title, row.Entity, row.H1} {
+		if identity == "" {
+			identity = nameKey(name)
+		}
+	}
+	if identity == "" {
+		return ""
+	}
+	return RowKeyPrefix(sheet) + identity
+}
+
 type Match struct {
 	Page       Page
 	Rule       MatchRule

@@ -25,9 +25,32 @@ describe("a finding's subject in words", () => {
         ["parent_name_twin", { name: "Peptides", page: "", terms: [] }, "A crumb's name is shared by a page and a store category, so the page was taken."],
         [
             "parent_differs",
-            { workbook: "p1", derived: "p2", reason: "jsonld_breadcrumb", workbookPath: "/peptides/", derivedPath: "/healing/" },
-            "The workbook puts this page under /peptides/; the parent above comes from the JSON-LD breadcrumb.",
+            { sheet: ["Peptides", "Healing Peptides"], site: ["Peptides"] },
+            "The workbook puts this page under Peptides › Healing Peptides; the site shows it under Peptides.",
         ],
+        [
+            "parent_differs",
+            { sheet: ["Peptides"], site: [] },
+            "The workbook puts this page under Peptides; the site shows it at the top.",
+        ],
+        ["parent_differs", { sheet: [], site: ["Peptides"] }, "The workbook places this page under other parents than the site shows."],
+        [
+            "row_ambiguous",
+            { sheet: "Groups", rule: "title", candidates: ["/lab/guides/", "/shop/guides/"], pageIds: ["p1", "p2"] },
+            "A row of the sheet Groups matches 2 pages: /lab/guides/, /shop/guides/.",
+        ],
+        ["row_ambiguous", { sheet: "", candidates: [] }, "A row of the workbook matches several pages."],
+        [
+            "row_without_page",
+            { sheet: "Groups", plannedPath: "/peptides/kpv/", product: false },
+            "A row of the sheet Groups has no page on the site yet; it is planned at /peptides/kpv/.",
+        ],
+        [
+            "row_without_page",
+            { sheet: "Catalog", plannedPath: "/product/kpv/", product: true },
+            "A product row of the sheet Catalog waits for its product in the store.",
+        ],
+        ["row_without_page", { sheet: "", plannedPath: "" }, "A row of the workbook has no page on the site yet."],
         ["plugin_outdated", { version: "1.4.0", required: "1.4.1" }, "The companion plugin is version 1.4.0 and 1.4.1 is needed."],
         [
             "field_changed_on_site",

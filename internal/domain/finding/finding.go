@@ -27,6 +27,8 @@ const (
 	PageH1Differs      Code = "page_h1_differs"
 	URLFormMixed       Code = "url_form_mixed"
 	EntityCardProposed Code = "entity_card_proposed"
+	RowAmbiguous       Code = "row_ambiguous"
+	RowWithoutPage     Code = "row_without_page"
 )
 
 type Severity string
@@ -123,6 +125,8 @@ var rules = map[Code]rule{
 	PageH1Differs:      {Warning, []Option{AcceptSite, Ignore}},
 	URLFormMixed:       {Info, []Option{Ignore}},
 	EntityCardProposed: {Info, []Option{Accept, Ignore}},
+	RowAmbiguous:       {Warning, []Option{MapToPage, Ignore}},
+	RowWithoutPage:     {Info, []Option{MapToPage, Ignore}},
 }
 
 func (c Code) Valid() bool {

@@ -116,11 +116,27 @@ export const model = {
             paths.length === 0
                 ? "The parents loop, so the loop is broken here."
                 : `The parents loop through ${paths.join(" › ")}, so the loop is broken here.`,
-        differs: (source: string, workbook: string) => {
-            const named = workbook === "" ? "a different parent" : workbook;
-            return source === ""
-                ? `The workbook puts this page under ${named}, not under the parent above.`
-                : `The workbook puts this page under ${named}; the parent above comes ${source}.`;
+        differs: (sheet: readonly string[], site: readonly string[]) => {
+            if (sheet.length === 0) {
+                return "The workbook places this page under other parents than the site shows.";
+            }
+            const shown = site.length === 0 ? "at the top" : `under ${site.join(" › ")}`;
+            return `The workbook puts this page under ${sheet.join(" › ")}; the site shows it ${shown}.`;
+        },
+        rowAmbiguous: (sheet: string, candidates: readonly string[]) => {
+            const from = sheet === "" ? "the workbook" : `the sheet ${sheet}`;
+            return candidates.length === 0
+                ? `A row of ${from} matches several pages.`
+                : `A row of ${from} matches ${candidates.length} pages: ${candidates.join(", ")}.`;
+        },
+        rowWithoutPage: (sheet: string, planned: string, product: boolean) => {
+            const from = sheet === "" ? "the workbook" : `the sheet ${sheet}`;
+            if (product) {
+                return `A product row of ${from} waits for its product in the store.`;
+            }
+            return planned === ""
+                ? `A row of ${from} has no page on the site yet.`
+                : `A row of ${from} has no page on the site yet; it is planned at ${planned}.`;
         },
         outdated: (version: string, required: string) =>
             required === ""
@@ -275,6 +291,8 @@ export const model = {
         page_h1_differs: "H1 differs from the plan",
         url_form_mixed: "Mixed link forms",
         entity_card_proposed: "Card proposed",
+        row_ambiguous: "Workbook row matches several pages",
+        row_without_page: "Workbook row without a page",
     },
     severities: {
         info: "Note",

@@ -1,6 +1,7 @@
 package pagemap_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -108,5 +109,33 @@ func TestMatchRow(t *testing.T) {
 				t.Errorf("matched %q (%+v), want %q", got.Page.ID, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestARowKeyNamesTheRowByItsFirstIdentity(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		row  pagemap.Row
+		want string
+	}{
+		{name: "its address first", row: pagemap.Row{Path: "/peptides/bpc-157/", Title: "BPC-157", Entity: "BPC 157"}, want: "row:Groups:/peptides/bpc-157/"},
+		{name: "its title without an address", row: pagemap.Row{Title: " Healing Peptides ", Entity: "Healing"}, want: "row:Groups:healing peptides"},
+		{name: "its entity without a title", row: pagemap.Row{Entity: "TB-500", H1: "TB-500 Peptide"}, want: "row:Groups:tb-500"},
+		{name: "its H1 alone", row: pagemap.Row{H1: "Caf&eacute; Guide"}, want: "row:Groups:café guide"},
+		{name: "nothing to name it by", row: pagemap.Row{SKU: "SKU-1"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := pagemap.RowKey("Groups", tc.row); got != tc.want {
+				t.Errorf("RowKey = %q, want %q", got, tc.want)
+			}
+		})
+	}
+	if !strings.HasPrefix(pagemap.RowKey("Groups", pagemap.Row{Title: "A"}), pagemap.RowKeyPrefix("Groups")) {
+		t.Errorf("a row key does not start with its sheet's prefix %q", pagemap.RowKeyPrefix("Groups"))
 	}
 }
