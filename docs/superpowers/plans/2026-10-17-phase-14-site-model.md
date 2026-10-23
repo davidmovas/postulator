@@ -1254,7 +1254,43 @@ go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/
 (merge cov1.out to cov5.out into coverage.out) ; go run ./cmd/covergate
 ```
 
-### 4.3 — the screens, the gate and the phase report (planned at its start)
+### 4.3 — split in two (the owner, 2026-10-23)
+
+- **4.3a**: real token counts as a local metric beside bytes, and 4.2's two loose ends (the replica's client-block proof and the runtime flake). Below.
+- **4.3b**: the screens, the full gate and phase 14's closing report, as planned at the end of this stage. It writes its task list at its own start.
+
+### 4.3a — tokens beside bytes (2026-10-23)
+
+- **Touches.** `go.mod`/`go.sum` (`github.com/tiktoken-go/tokenizer` v0.8.1), `cmd/tokenreport` (new), `internal/application/sitemodel/sitemodeltest` (new, with the stand captures), the `sitemodel` tests, `internal/application/agent` (the chat prompts move in), `internal/transport/agent`, `internal/application/tools/registry_test.go`, `internal/runtime/budget.go`, `internal/app/deps_test.go`, `internal/e2e/{capture,agent_edit,writer}_test.go`, the docs.
+- **Migrations, tools, bound methods.** None; no schema moves (92 tools, 65,722 bytes, ceiling 65,735).
+- **Exit.** The tokenizer's vectors table and the catalog's encoding map; the tokenizer absent from `go list -deps ./cmd/postulator`; the two token tripwires; `go run ./cmd/tokenreport` over both captures; `TestTheAgentEditsABlock` on the replica over a hub holding the client's paragraphs, then on vanilla; the runtime flake found and fixed, or its attempts recorded.
+
+#### 4.3a tasks
+
+**Decided at the plan** (a Sonnet researcher chose the tokenizer; a Fable critic read the plan, no blocking and five serious findings folded in; the owner chose the replica's hub):
+1. **`github.com/tiktoken-go/tokenizer` v0.8.1**: MIT, pure Go, no cgo, `o200k_base` compiled in as generated source, nothing fetched. v0.10.0 (two days old, a BPE rewrite) is the cross-check of every count the report makes, once, in a scratch module. `pkoukk/tiktoken-go` downloads by default, its offline loader is from 2024 and it knows no gpt-5. Verified by the library's own o200k vectors, read from the module cache.
+2. **Imported only from `_test.go` files and `cmd/tokenreport`**, which `TestTheTokenizerStaysOutOfTheBinary` in `deps_test.go` proves over `go list -deps ./cmd/postulator` (plain and `uiharness`) and every non-test import; the existing rules stay as they are.
+3. **The encoding map is the command's**, after tiktoken's names and prefixes; the catalog's `gpt-5.6-*` are `o200k_base`, `gpt-image-2` falls back to it and the report says so.
+4. **The report runs the real code over the captures, with no stand and no new golden.** The captures move into `sitemodeltest/testdata` and are embedded; `sitemodeltest` holds the capture format and the in-memory store the `sitemodel` tests use. The chat prompts move into `application/agent` (`Instructions`, `Situation`), which owns `SiteContext`, so no package outside `app` imports `transport`. The schemas come from the registry in the tripwire's wire JSON, the deferred round from `tools.OnDemand`. The steps run as they are (`ResolveContext`, `GenerateBody`, `RepairLinks`, `Judge`) over a recording client that answers nothing, with templates expanded by `templates.ResolveForPage` over the seeds, the real catalog and the tuning defaults; every page is a row, measured or not with its reason, and a recorded prompt holds no placeholder. `runtime.EstimatedInput` is the estimate's input for one step on one target, and `price` calls it. A page with no body is marked and left out of the spread and the proposal; the judge's estimate has no body term, and the report says so.
+5. **Two token tripwires**, `schemaCeilingTokens` beside `schemaCeilingBytes` and `instructionsCeilingTokens` (the instructions with the replica's brief, the wider mode) in `application/agent`; a change moves them in the same commit.
+6. **The replica's proof uses `/tb-500/`** (the owner), a typed hub that already holds two paragraphs and a link of the client's: `writerStand.clientHub`, the client's blocks asserted after the run and after the agent's edit. The stand, its pins and the captures do not move.
+7. **The flake is hunted with whole logs** under `set -o pipefail`: `-count=10 -p 1`, then `-cpu 1,4`, then once beside `application/runs` with `-p 2` (the original condition, an addition to the request).
+
+- [ ] **0.0 — the plan.** This list. Commit `docs(plan): stage 4.3a's task list`.
+- [ ] **T1 — the tokenizer.** `go get`; the command's `count` and `encodingFor`; the vectors table; the catalog map; the deps rule, proven red once by a scratch import. Commit `build(tokenreport): count o200k tokens offline, in tests and one command`.
+- [ ] **T2 — `sitemodeltest`.** The captures move and embed; the `sitemodel` tests and the e2e capture writer load and write through it; both packs goldens unchanged. Commit `refactor(sitemodel): the stand captures load through sitemodeltest`.
+- [ ] **T3 — the schemas in tokens.** `schemaCeilingTokens`, red at 0, then set. Commit `test(tools): the tool schemas carry a token ceiling`.
+- [ ] **T4 — the instructions in tokens.** The chat prompts move into `application/agent`; then `instructionsCeilingTokens`. Commits `refactor(agent): the chat prompts belong to the agent's use case`, `test(agent): the instructions and the replica's brief carry a token ceiling`.
+- [ ] **T5 — one input estimate.** `runtime.EstimatedInput`; a one-step estimate equals it plus the output and the reasoning. Commit `refactor(runtime): one function prices a step's input`.
+- [ ] **T6 — the agent per round.** The instructions in both modes, the context message, every schema sorted, all of them, the deferred round, each stand's brief, the sum. Commit `feat(tokenreport): what every agent round costs`.
+- [ ] **T7 — the steps per page.** The writer, the linker (per call, and the calls the estimate prices) and the judge, split into instructions, the pack by section, the rest and the schema. Commit `feat(tokenreport): the writer's, linker's and judge's prompts per stand page`.
+- [ ] **T8 — the estimate against reality.** Input estimated against real; `llm.Tokens` against real per pack and section; `Fit` at 4096, 3000 and 1500; tokens per word of the bodies against 2.2 and 3; the spread; the proposal; `-json`; the footnotes. Commit `feat(tokenreport): the estimate against the real count`.
+- [ ] **T9 — the run.** `go run ./cmd/tokenreport` and the v0.10.0 cross-check, recorded in `DECISIONS.md`; no constant changes.
+- [ ] **P2.1 — the replica's client hub.** `clientHub`, the assertion after the run; `TestTheAgentEditsABlock` on the replica, then vanilla. Commit `test(e2e): the agent's edit and a run keep a hub's client paragraph`.
+- [ ] **P2.2 — the runtime flake.** Decision 7; found, a test that shows it and a fix; not found, the attempts in `DECISIONS.md`.
+- [ ] **D — the docs and the checkpoint.** `CONVENTIONS.md`, `STATUS.md`, `CLAUDE.md`, `DECISIONS.md`, this checkpoint. Commit `docs: stage 4.3a, tokens beside bytes`.
+
+### 4.3b — the screens, the gate and the phase report (planned at its start)
 
 - The Findings inbox with each code's options; the Site map (hierarchy by reason, types, technical and read-only pages, link counts by type); the import preview naming each row's match rule; the agent's cards for the 4.2 tools; the harness.
 - The full gate on both stands, then phase 14's closing report.
