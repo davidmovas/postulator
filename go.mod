@@ -20,6 +20,7 @@ require (
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
+	github.com/dlclark/regexp2/v2 v2.5.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
@@ -33,6 +34,7 @@ require (
 	github.com/sethvargo/go-retry v0.4.0 // indirect
 	github.com/tetratelabs/wazero v1.10.0 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
+	github.com/tiktoken-go/tokenizer v0.8.1 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

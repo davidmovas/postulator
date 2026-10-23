@@ -23,9 +23,14 @@ const (
 	providerTree    = "internal/adapters/llm/openai"
 	fakeSiteTree    = "internal/adapters/wp/wptest"
 	siteClient      = "internal/adapters/wp"
+	binaryTree      = "cmd/postulator"
+	reportCommand   = "cmd/tokenreport"
 )
 
-const squirrel = "github.com/Masterminds/squirrel"
+const (
+	squirrel  = "github.com/Masterminds/squirrel"
+	tokenizer = "github.com/tiktoken-go/tokenizer"
+)
 
 func repoRoot(t *testing.T) string {
 	t.Helper()
@@ -52,14 +57,24 @@ func treeExists(t *testing.T, tree string) bool {
 func transitiveDeps(t *testing.T, tree string) []string {
 	t.Helper()
 
-	cmd := exec.Command("go", "list", "-deps", "-f", "{{.ImportPath}}", "./"+tree+"/...")
+	return taggedDeps(t, tree, "")
+}
+
+func taggedDeps(t *testing.T, tree, tags string) []string {
+	t.Helper()
+
+	cmd := exec.Command("go", "list", "-deps", "-tags", tags, "-f", "{{.ImportPath}}", "./"+tree+"/...")
 	cmd.Dir = repoRoot(t)
 
 	out, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("go list -deps ./%s/...: %v", tree, err)
+		t.Fatalf("go list -deps -tags %q ./%s/...: %v", tags, tree, err)
 	}
 	return strings.Fields(string(out))
+}
+
+func isTokenizer(path string) bool {
+	return path == tokenizer || strings.HasPrefix(path, tokenizer+"/")
 }
 
 func directImports(t *testing.T) map[string][]string {
@@ -197,6 +212,29 @@ func TestTheFakeSiteIsIndependentOfTheClient(t *testing.T) {
 	for _, dep := range transitiveDeps(t, fakeSiteTree) {
 		if dep == modulePath+"/"+siteClient {
 			t.Errorf("%s depends on %s; the fake is a second, independent implementation of the contract", fakeSiteTree, dep)
+		}
+	}
+}
+
+func TestTheTokenizerStaysOutOfTheBinary(t *testing.T) {
+	t.Parallel()
+
+	for _, tags := range []string{"", "uiharness"} {
+		for _, dep := range taggedDeps(t, binaryTree, tags) {
+			if isTokenizer(dep) {
+				t.Errorf("%s built with tags %q depends on %s; token counts are measured in tests and %s only",
+					binaryTree, tags, dep, reportCommand)
+			}
+		}
+	}
+	for pkg, imports := range directImports(t) {
+		if ownPackage(pkg, reportCommand) {
+			continue
+		}
+		for _, imported := range imports {
+			if isTokenizer(imported) {
+				t.Errorf("%s imports %s; only %s and _test.go files may", pkg, imported, reportCommand)
+			}
 		}
 	}
 }
