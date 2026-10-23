@@ -359,9 +359,10 @@ func TestPreviewFallsBackOnUnknownVocabulary(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	report := h.preview(t, h.file(t, "kinds.csv", "path,entity,post type,page type\n/a/,Alpha,gadget,sprocket\n,Beta,,widget\n"),
+	report := h.preview(t, h.file(t, "kinds.csv", "path,title,entity,post type,page type\n/a/,,Alpha,gadget,sprocket\n,Beta,Beta,,widget\n"),
 		h.mapping(map[string]string{
 			string(importmap.FieldPath):     "path",
+			string(importmap.FieldTitle):    "title",
 			string(importmap.FieldEntity):   "entity",
 			string(importmap.FieldWPType):   "post type",
 			string(importmap.FieldPageType): "page type",
@@ -379,7 +380,7 @@ func TestPreviewFallsBackOnUnknownVocabulary(t *testing.T) {
 		}
 	}
 	if beta, found := page(report, "/beta/"); !found || beta.PageType != "" {
-		t.Fatalf("the row without a URL = %+v, want an untyped page at the slug of its entity", beta)
+		t.Fatalf("the row without a URL = %+v, want an untyped page at the slug of its title", beta)
 	}
 	if found, _ := page(report, "/a/"); found.WPType != "page" || found.PageType != "" {
 		t.Fatalf("the page = %+v, want an untyped page", found)

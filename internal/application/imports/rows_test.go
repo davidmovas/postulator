@@ -1,6 +1,7 @@
 package imports_test
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -8,8 +9,10 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -137,8 +140,9 @@ func TestARowWithoutAURLOrAPageIsPlannedUnderTheLevelItNames(t *testing.T) {
 			columns: leveled, want: "/peptides/bpc-157-guide/", parent: true,
 		},
 		{
-			name: "the slug of its entity name when it has no title", sheet: "Root Entity,Entity\nPeptides,TB-500 dosing\n",
-			columns: map[string]string{string(importmap.FieldEntity): "Entity"}, want: "/peptides/tb-500-dosing/", parent: true,
+			name: "the slug of its heading when it has no title", sheet: "Root Entity,Entity,H1\nPeptides,TB-500,TB-500 dosing\n",
+			columns: map[string]string{string(importmap.FieldEntity): "Entity", string(importmap.FieldH1): "H1"},
+			want:    "/peptides/tb-500-dosing/", parent: true,
 		},
 		{
 			name: "at the root when its level names no page", sheet: "Root Entity,Title,Keywords\nNowhere,Loose guide,loose\n",
@@ -177,6 +181,78 @@ func TestARowWithoutAURLOrAPageIsPlannedUnderTheLevelItNames(t *testing.T) {
 				t.Fatalf("the planned page's parent = %v, want the level's page %s", stored.ParentPageID, peptides.ID)
 			case !tc.parent && stored.ParentPageID != nil:
 				t.Fatalf("the planned page's parent = %s, want the site root", *stored.ParentPageID)
+			}
+		})
+	}
+}
+
+func TestARowThatNamesOnlyAnEntityPlansNoPage(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		sheet   func(*testing.T, harness) (string, imports.Mapping)
+		created int
+		updated int
+	}{
+		{
+			name: "a plain sheet row",
+			sheet: func(t *testing.T, h harness) (string, imports.Mapping) {
+				return h.file(t, "rows.csv", "entity,keywords\nSupport,support desk\n"),
+					h.mapping(map[string]string{string(importmap.FieldEntity): "entity", string(importmap.FieldKeywords): "keywords"})
+			},
+			created: 1,
+		},
+		{
+			name: "an exported entity without a page, imported again",
+			sheet: func(t *testing.T, h harness) (string, imports.Mapping) {
+				source := newHarness(t)
+				support, err := graph.NewEntity(graph.Entity{
+					ID: id.New(), SiteID: source.siteID, Name: "Support", Keywords: keyword.New([]keyword.Keyword{{Text: "support desk"}}),
+					Source: graph.SourceImport, CreatedAt: observedAt, UpdatedAt: observedAt,
+				})
+				if err != nil {
+					t.Fatalf("NewEntity: %v", err)
+				}
+				if err = sqlite.NewEntityRepo(source.store).Insert(t.Context(), support); err != nil {
+					t.Fatalf("insert the entity: %v", err)
+				}
+				exported := filepath.Join(source.dir, "export.xlsx")
+				if _, err = source.service.Export(t.Context(), imports.ExportRequest{SiteID: source.siteID, Path: exported}); err != nil {
+					t.Fatalf("Export: %v", err)
+				}
+				h.siteEntity(t, "Support")
+				return exported, h.detected(t, exported)
+			},
+			updated: 1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			path, mapping := tc.sheet(t, h)
+			report := h.preview(t, path, mapping)
+			if len(report.Pages) != 0 || len(findings(report.Warnings, imports.CodeRowWithoutPage)) != 0 {
+				t.Fatalf("the preview plans %+v and warns %+v, want no page for a row that names only an entity", report.Pages, report.Warnings)
+			}
+
+			applied := h.apply(t, path, mapping)
+			if applied.Counts.PagesCreated != 0 || applied.Counts.EntitiesCreated != tc.created || applied.Counts.EntitiesUpdated != tc.updated {
+				t.Fatalf("counts = %+v, want the entity written and no page", applied.Counts)
+			}
+			if held := h.pages(t); len(held) != 0 {
+				t.Fatalf("pages = %+v, want none", held)
+			}
+			if held := h.lasting(t, finding.RowWithoutPage); len(held) != 0 {
+				t.Fatalf("row findings = %+v, want none", held)
+			}
+			for _, held := range h.entities(t) {
+				if held.Name == "Support" && held.Keywords.Main() != "support desk" {
+					t.Fatalf("Support reads %+v, want the row's keyword on it", held)
+				}
 			}
 		})
 	}

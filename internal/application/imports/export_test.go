@@ -112,8 +112,8 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 
 	source := newHarness(t)
 	source.apply(t, source.file(t, "rich.csv", richSheet), richMapping(source))
-	if typed := source.typeNames(t); !maps.Equal(typed, map[string]string{"/hosting/": "Hub", "/domains/": "Entity", "/support/": "Entity"}) {
-		t.Fatalf("the source typed its pages %v", typed)
+	if typed := source.typeNames(t); !maps.Equal(typed, map[string]string{"/hosting/": "Hub", "/domains/": "Entity"}) {
+		t.Fatalf("the source typed its pages %v, want the two pages its rows name and none for the entity-only row", typed)
 	}
 
 	exported := filepath.Join(source.dir, "export.xlsx")
@@ -121,7 +121,7 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
-	if got.Pages != 3 || got.Entities != 4 {
+	if got.Pages != 2 || got.Entities != 4 {
 		t.Fatalf("export = %+v", got)
 	}
 
@@ -152,9 +152,8 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if !slices.Equal(before.edges, after.edges) {
 		t.Fatalf("edges\n before %v\n after  %v", before.edges, after.edges)
 	}
-	pageless := "/shop/|Shop||||page|planned|Shop|Shop|"
-	if !slices.Equal(slices.Sorted(slices.Values(append(slices.Clone(before.pages), pageless))), after.pages) {
-		t.Fatalf("pages\n before %v\n after  %v\n want the site's pages and one planned for the entity the root left without a page",
+	if !slices.Equal(before.pages, after.pages) {
+		t.Fatalf("pages\n before %v\n after  %v\n want the site's pages alone: an exported entity without a page plans none",
 			before.pages, after.pages)
 	}
 }
@@ -313,7 +312,7 @@ func TestTheExportWritesThePageTypeByName(t *testing.T) {
 	for _, row := range table.Rows {
 		cells[binding.Text(row, importmap.FieldPath)+"#"+binding.Text(row, importmap.FieldEntity)] = binding.Text(row, importmap.FieldPageType)
 	}
-	want := map[string]string{"/hub/#Hub": "Collection", "/plain/#Plain": "", "/loose/#Loose": "Collection"}
+	want := map[string]string{"/hub/#Hub": "Collection", "/plain/#Plain": "", "#Loose": ""}
 	if !maps.Equal(cells, want) {
 		t.Fatalf("the exported page types = %v, want %v", cells, want)
 	}

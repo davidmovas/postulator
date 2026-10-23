@@ -157,7 +157,7 @@ func (s *siteState) plannedAt(row *rowDraft) string {
 	if row.url != "" {
 		return row.url
 	}
-	for _, name := range []string{row.title, row.name, row.h1} {
+	for _, name := range []string{row.title, row.h1} {
 		slug := slugOf(name)
 		if slug == "" {
 			continue

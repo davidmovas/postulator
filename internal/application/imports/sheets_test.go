@@ -747,11 +747,11 @@ func TestANoteThatDescribesTheEntityGoesToItsCard(t *testing.T) {
 		if got := cardNotesOf(t, h, "BPC-157"); !slices.Equal(got, []note.Note{{Label: "Entity notes", Text: "A pentadecapeptide"}}) {
 			t.Fatalf("%s: BPC-157's card = %+v, want the note that names the entity", when, got)
 		}
-		if got := notesAt(t, h, "/healing/"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Peptides that repair tissue"}}) {
-			t.Fatalf("%s: the notes of the page a row without a URL plans = %+v, want the note about the page", when, got)
+		if _, planned := h.pageAt(t, "/healing/"); planned {
+			t.Fatalf("%s: a row that names only an entity planned /healing/", when)
 		}
-		if got := cardNotesOf(t, h, "Healing"); len(got) != 0 {
-			t.Fatalf("%s: Healing's card = %+v, want no note: the row's one note is about its page", when, got)
+		if got := cardNotesOf(t, h, "Healing"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Peptides that repair tissue"}}) {
+			t.Fatalf("%s: Healing's card = %+v, want the row's note: a row with no page keeps every note on its entity", when, got)
 		}
 	}
 	check(h, "after the import")

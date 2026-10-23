@@ -157,14 +157,14 @@ func TestARowWithoutAURLTypesThePageItPlans(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	mapping := h.mapping(map[string]string{string(importmap.FieldEntity): "entity", string(importmap.FieldPageType): "page type"})
-	applied := h.apply(t, h.file(t, "entities.csv", "entity,page type\nTea,Sprocket\nCoffee,Hub\n"), mapping)
+	mapping := h.mapping(map[string]string{string(importmap.FieldTitle): "title", string(importmap.FieldPageType): "page type"})
+	applied := h.apply(t, h.file(t, "titles.csv", "title,page type\nTea,Sprocket\nCoffee,Hub\n"), mapping)
 	if left := besidesPlanned(applied.Report.Warnings); len(applied.Report.Errors) != 0 || len(left) != 1 ||
 		left[0].Code != string(imports.CodeUnknownPageType) || left[0].Row != 2 {
 		t.Fatalf("findings = %+v %+v, want the type no page type answers to named on its row", left, applied.Report.Errors)
 	}
 	if applied.Counts.EntitiesCreated != 2 || applied.Counts.PagesCreated != 2 {
-		t.Fatalf("counts = %+v, want a page planned for each entity", applied.Counts)
+		t.Fatalf("counts = %+v, want a page planned for each title and its entity", applied.Counts)
 	}
 	if typed := h.typeNames(t); len(typed) != 1 || typed["/coffee/"] != "Hub" {
 		t.Fatalf("types = %v, want the coffee page typed by its cell and the tea page left untyped", typed)
