@@ -63,10 +63,12 @@ type Page struct {
 	SiteID          string
 	Path            string
 	PlannedPath     string
+	PlannedTrail    []string
 	RowKey          string
 	Slug            string
 	ParentPageID    *string
 	ParentReason    ParentReason
+	ParentSource    ParentSource
 	ParentMethod    ParentMethod
 	PageTypeID      *string
 	TypeSource      TypeSource

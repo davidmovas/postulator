@@ -22,6 +22,17 @@ func (r ParentReason) Valid() bool {
 	}
 }
 
+type ParentSource string
+
+const (
+	ParentFromSite     ParentSource = ""
+	ParentFromWorkbook ParentSource = "workbook"
+)
+
+func (s ParentSource) Valid() bool {
+	return s == ParentFromSite || s == ParentFromWorkbook
+}
+
 type TypeSource string
 
 const (

@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	pageColumns       = `id, site_id, path, planned_path, slug, parent_page_id, parent_reason, parent_method, page_type_id, page_type_source, page_type_reason, technical_reason, read_only_reason, wp_type, wp_id, title, h1, meta_title, meta_description, keywords, notes, status, entity_id, template_id, wp_modified_at, last_synced_at, created_at, updated_at`
-	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, slug = ?, parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
+	pageColumns       = `id, site_id, path, planned_path, planned_trail, row_key, slug, parent_page_id, parent_reason, parent_method, parent_source, page_type_id, page_type_source, page_type_reason, technical_reason, read_only_reason, wp_type, wp_id, title, h1, meta_title, meta_description, keywords, notes, status, entity_id, template_id, wp_modified_at, last_synced_at, created_at, updated_at`
+	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, planned_trail = ?, row_key = ?, slug = ?, parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
+	setParentSource   = `UPDATE pages SET parent_source = ?, updated_at = ? WHERE id = ?`
 	updateDerived     = `UPDATE pages SET parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, status = ?, updated_at = ? WHERE id = ?`
 	updatePublished   = `UPDATE pages SET wp_id = ?, status = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
 	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE id = ?`
@@ -44,24 +45,57 @@ func pageConflict(path string) *errors.Error {
 	return errors.New(errors.Conflict, "a page with this path already exists in the site").WithDetail("path", path)
 }
 
-func encodePlan(p pagemap.Page) (keywords, notes string, err error) {
-	if keywords, err = encodeJSON(keyword.New(p.Keywords)); err != nil {
-		return "", "", err
+type encodedPlan struct {
+	keywords, notes, trail string
+}
+
+func encodePlan(p pagemap.Page) (encodedPlan, error) {
+	var (
+		out encodedPlan
+		err error
+	)
+	if out.keywords, err = encodeJSON(keyword.New(p.Keywords)); err != nil {
+		return encodedPlan{}, err
 	}
-	if notes, err = encodeJSON(note.Clean(p.Notes)); err != nil {
-		return "", "", err
+	if out.notes, err = encodeJSON(note.Clean(p.Notes)); err != nil {
+		return encodedPlan{}, err
 	}
-	return keywords, notes, nil
+	trail := p.PlannedTrail
+	if trail == nil {
+		trail = []string{}
+	}
+	if out.trail, err = encodeJSON(trail); err != nil {
+		return encodedPlan{}, err
+	}
+	return out, nil
+}
+
+func storedParentSource(source pagemap.ParentSource) string {
+	if source == pagemap.ParentFromSite {
+		return "site"
+	}
+	return string(source)
+}
+
+func (r *PageRepo) SetParentSource(ctx context.Context, pageID string, source pagemap.ParentSource, at time.Time) error {
+	if !source.Valid() {
+		return errors.New(errors.Invalid, "the parent source is not recognized").WithDetail("parentSource", string(source))
+	}
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), setParentSource, []any{storedParentSource(source), formatTime(at), pageID},
+		nil, "set the page's parent source")
+	return requireAffected(affected, err, pageNotFound(pageID))
 }
 
 func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
-	keywords, notes, err := encodePlan(p)
+	plan, err := encodePlan(p)
 	if err != nil {
 		return err
 	}
+	keywords, notes := plan.keywords, plan.notes
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertPage, []any{
-		p.ID, p.SiteID, p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID),
-		storedParentReason(p.ParentReason), string(p.ParentMethod), nullString(p.PageTypeID), string(p.TypeSource), string(p.TypeReason),
+		p.ID, p.SiteID, p.Path, p.PlannedPath, plan.trail, p.RowKey, p.Slug, nullString(p.ParentPageID),
+		storedParentReason(p.ParentReason), string(p.ParentMethod), storedParentSource(p.ParentSource),
+		nullString(p.PageTypeID), string(p.TypeSource), string(p.TypeReason),
 		string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, keywords, notes, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
@@ -70,12 +104,13 @@ func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
 }
 
 func (r *PageRepo) Update(ctx context.Context, p pagemap.Page) error {
-	keywords, notes, err := encodePlan(p)
+	plan, err := encodePlan(p)
 	if err != nil {
 		return err
 	}
+	keywords, notes := plan.keywords, plan.notes
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updatePage, []any{
-		p.Path, p.PlannedPath, p.Slug, nullString(p.ParentPageID),
+		p.Path, p.PlannedPath, plan.trail, p.RowKey, p.Slug, nullString(p.ParentPageID),
 		storedParentReason(p.ParentReason), string(p.ParentMethod), string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, keywords, notes, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), formatTime(p.UpdatedAt), p.ID,
@@ -173,6 +208,7 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		pageTypeID                     sql.NullString
 		typeSource, typeReason         string
 		parentReason, parentMethod     string
+		parentSource, trail            string
 		technicalReason                string
 		readOnlyReason                 string
 		wpType, status                 string
@@ -181,7 +217,8 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		createdAt, updatedAt           string
 		keywords, notes                string
 	)
-	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.PlannedPath, &p.Slug, &parentID, &parentReason, &parentMethod, &pageTypeID, &typeSource, &typeReason, &technicalReason, &readOnlyReason,
+	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.PlannedPath, &trail, &p.RowKey, &p.Slug, &parentID, &parentReason, &parentMethod, &parentSource,
+		&pageTypeID, &typeSource, &typeReason, &technicalReason, &readOnlyReason,
 		&wpType, &wpID, &p.Title, &p.H1, &p.MetaTitle, &p.MetaDescription,
 		&keywords, &notes, &status, &entityID, &templateID, &wpModifiedAt, &lastSyncedAt, &createdAt, &updatedAt); err != nil {
 		return pagemap.Page{}, err
@@ -190,10 +227,19 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 	if err := decodeJSON(notes, &stored, "decode the page notes"); err != nil {
 		return pagemap.Page{}, err
 	}
+	if err := decodeJSON(trail, &p.PlannedTrail, "decode the page's planned trail"); err != nil {
+		return pagemap.Page{}, err
+	}
+	if len(p.PlannedTrail) == 0 {
+		p.PlannedTrail = nil
+	}
 	p.Notes = note.Clean(stored)
 	p.ParentPageID = optString(parentID)
 	p.ParentReason = pagemap.ParentReason(parentReason)
 	p.ParentMethod = pagemap.ParentMethod(parentMethod)
+	if parentSource != "site" {
+		p.ParentSource = pagemap.ParentSource(parentSource)
+	}
 	p.PageTypeID = optString(pageTypeID)
 	p.TypeSource = pagemap.TypeSource(typeSource)
 	p.TypeReason = pagemap.TypeReason(typeReason)

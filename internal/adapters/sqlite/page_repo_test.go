@@ -125,6 +125,9 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	want.ParentPageID = &parent.ID
 	want.EntityID = &entity.ID
 	want.PlannedPath = "/sneakers/running/"
+	want.PlannedTrail = []string{"Shop", "Footwear"}
+	want.RowKey = "row:Groups:running shoes"
+	want.ParentSource = pagemap.ParentFromWorkbook
 	if err := repo.Insert(t.Context(), want); err != nil {
 		t.Fatalf("Insert: %v", err)
 	}
@@ -149,6 +152,9 @@ func TestPageRepoRoundTrip(t *testing.T) {
 		t.Errorf("unknown entity code = %q, want INVALID", errors.CodeOf(err))
 	}
 
+	pinned := want.ParentSource
+	want.ParentSource = pagemap.ParentFromSite
+	want.PlannedTrail = nil
 	want.Title = "Renamed"
 	want.Status = pagemap.StatusPublished
 	want.WPID = nil
@@ -165,9 +171,20 @@ func TestPageRepoRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get after update: %v", err)
 	}
+	want.ParentSource = pinned
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Get after update = %+v\nwant %+v", got, want)
+		t.Errorf("Get after update = %+v\nwant %+v, the parent source a person set kept by a whole-row update", got, want)
 	}
+	if err = repo.SetParentSource(t.Context(), want.ID, pagemap.ParentFromSite, sqlitetest.Stamp.Add(2*time.Minute)); err != nil {
+		t.Fatalf("SetParentSource: %v", err)
+	}
+	if got, err = repo.Get(t.Context(), want.ID); err != nil || got.ParentSource != pagemap.ParentFromSite {
+		t.Errorf("parent source after SetParentSource = %q, %v; want the site's", got.ParentSource, err)
+	}
+	if err = repo.SetParentSource(t.Context(), want.ID, "elsewhere", sqlitetest.Stamp); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an unknown parent source code = %q, want INVALID", errors.CodeOf(err))
+	}
+	want.ParentSource = pagemap.ParentFromSite
 
 	if err = repo.Delete(t.Context(), parent.ID); err != nil {
 		t.Fatalf("Delete parent: %v", err)

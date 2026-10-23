@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 71
+const latestMigration = 72
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -92,6 +92,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0069_page_links_origin_dropped.sql",
 		"0070_page_links_block_hash.sql",
 		"0071_page_renders_theme_h1.sql",
+		"0072_pages_workbook_hierarchy.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -2055,6 +2056,48 @@ func TestARenderSaysWhetherTheThemePrintsTheH1AndADownDropsIt(t *testing.T) {
 	}
 	if got := rowsOf(t, store, `SELECT page_id FROM page_renders ORDER BY page_id`); !slices.Equal(got, []string{"pg1", "pg2"}) {
 		t.Fatalf("the down lost renders: %v", got)
+	}
+}
+
+func TestAPageKeepsTheWorkbooksHierarchyAndADownDropsIt(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 71)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-23T09:00:00Z"
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('pg1', 's1', '/a/', 'a', 'page', 'exists', ?, ?)`, at, at)
+
+	if _, err = provider.UpTo(t.Context(), 72); err != nil {
+		t.Fatalf("up to 72: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT planned_trail, row_key, parent_source FROM pages`); !slices.Equal(got, []string{"[] |  | site"}) {
+		t.Fatalf("an earlier page reads %v, want no trail, no mapping and the site's parent", got)
+	}
+	must(`UPDATE pages SET planned_trail = '["Peptides"]', row_key = 'row:Groups:bpc-157', parent_source = 'workbook' WHERE id = 'pg1'`)
+	if _, execErr := store.writer.ExecContext(t.Context(), `UPDATE pages SET parent_source = 'theirs' WHERE id = 'pg1'`); execErr == nil {
+		t.Fatal("a parent source the model does not name was stored")
+	}
+
+	if _, err = provider.DownTo(t.Context(), 71); err != nil {
+		t.Fatalf("down to 71: %v", err)
+	}
+	for _, column := range []string{"planned_trail", "row_key", "parent_source"} {
+		if got := columnOf(t, store, "pages", column); got != "" {
+			t.Fatalf("pages still carries %s (%s) after the down migration", column, got)
+		}
+	}
+	if got := rowsOf(t, store, `SELECT id FROM pages`); !slices.Equal(got, []string{"pg1"}) {
+		t.Fatalf("the down lost pages: %v", got)
 	}
 }
 
