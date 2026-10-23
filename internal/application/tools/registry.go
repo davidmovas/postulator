@@ -83,28 +83,31 @@ func (r *Registry) Build(b Binding) []Tool {
 	built := make([]Tool, 0, len(r.order))
 	for _, name := range r.order {
 		tool := r.byName[name](r.deps)
-		if b.Mode == agent.ModeConfirm && tool.Def.Risk.NeedsConfirmation() {
-			tool.Run = r.proposal(tool.Def, tool.Check, "")
-		}
-		tool.Run = asTheAgent(r.confirmed(tool))
+		tool.Run = asTheAgent(r.gated(tool))
 		built = append(built, tool)
 	}
 	return built
 }
 
-func (r *Registry) confirmed(tool Tool) func(context.Context, Binding, json.RawMessage) (any, error) {
-	if tool.Confirm == nil {
-		return tool.Run
-	}
+func (r *Registry) gated(tool Tool) func(context.Context, Binding, json.RawMessage) (any, error) {
 	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
-		if b.Approved {
+		risk := tool.risk(args)
+		if b.Approved || !risk.NeedsConfirmation() {
 			return tool.Run(ctx, b, args)
 		}
-		summary, err := tool.Confirm(ctx, b, args)
-		if err != nil || summary == "" {
-			return tool.Run(ctx, b, args)
+		if tool.Confirm != nil {
+			summary, err := tool.Confirm(ctx, b, args)
+			if err != nil {
+				return nil, err
+			}
+			if summary != "" {
+				return r.proposal(tool.Def, risk, tool.Check, summary)(ctx, b, args)
+			}
 		}
-		return r.proposal(tool.Def, tool.Check, summary)(ctx, b, args)
+		if b.Mode == agent.ModeConfirm {
+			return r.proposal(tool.Def, risk, tool.Check, "")(ctx, b, args)
+		}
+		return tool.Run(ctx, b, args)
 	}
 }
 
@@ -121,16 +124,13 @@ func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.R
 	}
 
 	tool := build(r.deps)
-	if b.Mode == agent.ModeConfirm && !b.Approved && tool.Def.Risk.NeedsConfirmation() {
-		tool.Run = r.proposal(tool.Def, tool.Check, "")
-	}
 	ctx = kctx.WithActor(ctx, kctx.ActorAgent)
 	if tool.Authorize != nil {
 		if err := tool.Authorize(ctx, b); err != nil {
 			return nil, err
 		}
 	}
-	return r.confirmed(tool)(ctx, b, args)
+	return r.gated(tool)(ctx, b, args)
 }
 
 func (r *Registry) Lookup(name string) (Def, bool) {
@@ -141,7 +141,7 @@ func (r *Registry) Lookup(name string) (Def, bool) {
 	return build(r.deps).Def, true
 }
 
-func (r *Registry) proposal(def Def, check func(json.RawMessage) error, said string) func(
+func (r *Registry) proposal(def Def, risk Risk, check func(json.RawMessage) error, said string) func(
 	context.Context, Binding, json.RawMessage) (any, error) {
 	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
 		if b.ConversationID == "" {
@@ -172,7 +172,7 @@ func (r *Registry) proposal(def Def, check func(json.RawMessage) error, said str
 		if publishErr := r.deps.Publisher.Publish(events.AgentConfirmRequested,
 			events.AgentConfirmRequestedPayload{
 				ConversationID: b.ConversationID, ConfirmationID: action.ID, Tool: def.Name,
-				Args: Redact(action.Args), Risk: string(def.Risk), Summary: action.Summary,
+				Args: Redact(action.Args), Risk: string(risk), Summary: action.Summary,
 			}); publishErr != nil {
 			return nil, publishErr
 		}

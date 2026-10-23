@@ -293,7 +293,11 @@ func TestEveryWriteToolProposesInsteadOfWriting(t *testing.T) {
 
 		out, err := tool.Run(t.Context(), binding, argumentsFor(tool.Def.Name))
 		if err != nil {
-			t.Fatalf("%s proposed with %v", tool.Def.Name, err)
+			if errors.IsCode(err, errors.Internal) {
+				t.Fatalf("%s failed with an internal error: %v", tool.Def.Name, err)
+			}
+			t.Logf("%s refused before it proposed: %v", tool.Def.Name, err)
+			continue
 		}
 		confirmation, ok := out.(tools.Confirmation)
 		if !ok || confirmation.ActionID == "" {

@@ -55,7 +55,30 @@ type Tool struct {
 	Check     func(args json.RawMessage) error
 	Run       func(ctx context.Context, b Binding, args json.RawMessage) (any, error)
 	Confirm   func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
+	RiskOf    func(args json.RawMessage) Risk
 	Def       Def
+}
+
+func (t Tool) risk(args json.RawMessage) Risk {
+	if t.RiskOf == nil {
+		return t.Def.Risk
+	}
+	return t.RiskOf(args)
+}
+
+type opOnly struct {
+	Op string `json:"op"`
+}
+
+func readsOn(tool Tool, ops ...string) Tool {
+	tool.RiskOf = func(args json.RawMessage) Risk {
+		var in opOnly
+		if err := json.Unmarshal(args, &in); err == nil && slices.Contains(ops, in.Op) {
+			return RiskRead
+		}
+		return tool.Def.Risk
+	}
+	return tool
 }
 
 func confirming[In any](tool Tool, ask func(ctx context.Context, b Binding, in In) (string, error)) Tool {
