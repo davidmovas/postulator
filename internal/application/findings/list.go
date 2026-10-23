@@ -13,6 +13,28 @@ func invalid(message, field string) error {
 	return errors.New(errors.Invalid, message).WithDetail("field", field)
 }
 
+func (s *Service) Get(ctx context.Context, req GetRequest) (Finding, error) {
+	held, err := s.held(ctx, req.SiteID, req.FindingID)
+	if err != nil {
+		return Finding{}, err
+	}
+	return view(held), nil
+}
+
+func (s *Service) held(ctx context.Context, siteID, findingID string) (finding.Finding, error) {
+	if findingID == "" {
+		return finding.Finding{}, invalid("name the finding", "findingId")
+	}
+	held, err := s.deps.Findings.Get(ctx, findingID)
+	if err != nil {
+		return finding.Finding{}, err
+	}
+	if siteID != "" && held.SiteID != siteID {
+		return finding.Finding{}, errors.New(errors.NotFound, "the site holds no such finding").WithDetail("findingId", findingID)
+	}
+	return held, nil
+}
+
 func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Finding], error) {
 	if req.SiteID == "" {
 		return paging.List[Finding]{}, invalid("name the site whose findings to list", "siteId")

@@ -215,6 +215,7 @@ export const agent = {
         sync: "Sync",
         reports: "Reports",
         imports: "Import",
+        findings: "Findings",
         models: "Models",
         content: "Content",
         schedules: "Schedules",

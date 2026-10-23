@@ -16,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/content"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
@@ -92,6 +93,7 @@ func (stubPacker) Package() ([]byte, error) {
 }
 
 type fixture struct {
+	store    *sqlite.Store
 	types    *pagetypes.Service
 	pages    *pages.Service
 	site     string
@@ -164,27 +166,34 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Types: sqlite.NewPageTypeRepo(store),
 		Bodies: sqlite.NewPageBodyRepo(store), UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
-	seeded.types, seeded.pages = types, pagesService
+	seeded.store, seeded.types, seeded.pages = store, types, pagesService
+	graphService := graph.New(graph.Deps{
+		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store),
+		Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
+	})
+	importsService := imports.New(imports.Deps{
+		Tables:   importer.New(),
+		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Types: sqlite.NewPageTypeRepo(store),
+		Fields:   sqlite.NewPageFieldRepo(store),
+		Mappings: sqlite.NewImportMappingRepo(store), Sites: siteRepo, UnitOfWork: store,
+		Findings: sqlite.NewFindingRepo(store), Terms: sqlite.NewPageIdentityRepo(store),
+		Publisher: bus, Clock: now,
+	})
 	return tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
-		Graph: graph.New(graph.Deps{
-			Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store),
-			Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
-			Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
-		}),
+		Sites:     sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
+		Graph:     graphService,
 		Pages:     pagesService,
 		PageTypes: types,
 		Templates: templateService,
 		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry(), pagesService),
 		Sync:      sync.New(stubEngine{}, siteRepo, stubProbe{}, stubPacker{}, now),
 		Reports:   reportsService,
-		Imports: imports.New(imports.Deps{
-			Tables:   importer.New(),
-			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Types: sqlite.NewPageTypeRepo(store),
-			Fields:   sqlite.NewPageFieldRepo(store),
-			Mappings: sqlite.NewImportMappingRepo(store), Sites: siteRepo, UnitOfWork: store,
-			Findings: sqlite.NewFindingRepo(store), Terms: sqlite.NewPageIdentityRepo(store),
-			Publisher: bus, Clock: now,
+		Imports:   importsService,
+		Findings: findings.New(findings.Deps{
+			Findings: sqlite.NewFindingRepo(store), Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
+			Parents: pageRepo, Pages: pagesService, Cards: graphService, Rows: importsService,
+			UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Models: models.New(built, modelRepo, modelProfiles, book,
 			secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), book, bus, now),
@@ -475,6 +484,8 @@ func argumentsFor(name string) json.RawMessage {
 		return json.RawMessage(`{"id":"t1","spec":` + minimalSpec + `}`)
 	case "sites_explore":
 		return json.RawMessage(`{"view":"gaps"}`)
+	case "findings":
+		return json.RawMessage(`{"op":"resolve","findingId":"f1","option":"ignore"}`)
 	default:
 		return json.RawMessage(`{}`)
 	}

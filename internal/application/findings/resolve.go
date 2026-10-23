@@ -35,7 +35,7 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 		return ResolveResponse{}, invalid("the option is not recognized", "option")
 	}
 	if option.Kind() == finding.Run {
-		held, err := s.open(ctx, req.FindingID, option)
+		held, err := s.open(ctx, req.SiteID, req.FindingID, option)
 		if err != nil {
 			return ResolveResponse{}, err
 		}
@@ -45,7 +45,7 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	var held finding.Finding
 	err := s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
 		var openErr error
-		if held, openErr = s.open(c, req.FindingID, option); openErr != nil {
+		if held, openErr = s.open(c, req.SiteID, req.FindingID, option); openErr != nil {
 			return openErr
 		}
 		return s.change(c, held, option, req, by)
@@ -63,11 +63,8 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	return ResolveResponse{Finding: view(settled)}, nil
 }
 
-func (s *Service) open(ctx context.Context, findingID string, option finding.Option) (finding.Finding, error) {
-	if findingID == "" {
-		return finding.Finding{}, invalid("name the finding to resolve", "findingId")
-	}
-	held, err := s.deps.Findings.Get(ctx, findingID)
+func (s *Service) open(ctx context.Context, siteID, findingID string, option finding.Option) (finding.Finding, error) {
+	held, err := s.held(ctx, siteID, findingID)
 	if err != nil {
 		return finding.Finding{}, err
 	}

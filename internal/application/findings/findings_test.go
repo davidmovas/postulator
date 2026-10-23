@@ -321,3 +321,25 @@ func TestFindingsAreListedByCursor(t *testing.T) {
 		t.Errorf("an unknown code = %v, want Invalid", err)
 	}
 }
+
+func TestAFindingOfAnotherSiteIsNeitherReadNorResolved(t *testing.T) {
+	t.Parallel()
+
+	service, s := newService(t, raised(finding.TechnicalDetected, `{"reason":"shortcode"}`))
+	held, err := service.Get(t.Context(), findings.GetRequest{SiteID: siteID, FindingID: "f-technical_detected"})
+	if err != nil || held.Code != "technical_detected" || len(held.Options) != 2 {
+		t.Fatalf("Get on its own site = %+v, %v", held, err)
+	}
+	if _, err := service.Get(t.Context(), findings.GetRequest{SiteID: "site-2", FindingID: "f-technical_detected"}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("Get from another site = %v, want NotFound", err)
+	}
+	_, err = service.Resolve(t.Context(), findings.ResolveRequest{
+		SiteID: "site-2", FindingID: "f-technical_detected", Option: "ignore", By: finding.ResolvedByAgent,
+	})
+	if !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("Resolve from another site = %v, want NotFound", err)
+	}
+	if s.held["f-technical_detected"].Status != finding.Open || len(s.calls) != 0 {
+		t.Errorf("a resolution from another site changed %+v, %v", s.held["f-technical_detected"], s.calls)
+	}
+}

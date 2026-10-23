@@ -24,7 +24,7 @@ func TestEveryToolBelongsToADeclaredGroupAndEveryGroupHoldsOne(t *testing.T) {
 			t.Errorf("%s belongs to no declared group, so deferred loading could not offer it", def.Name)
 			continue
 		}
-		if !strings.HasPrefix(def.Name, group.Name+"_") {
+		if def.Name != group.Name && !strings.HasPrefix(def.Name, group.Name+"_") {
 			t.Errorf("%s was put in the group %s", def.Name, group.Name)
 		}
 		held[group.Name]++
@@ -75,7 +75,8 @@ func TestOnDemandNamesTheGroupOfEveryToolButTheOrientingReads(t *testing.T) {
 		{name: "a write loads on demand", tool: "pages_create", group: "pages", found: true},
 		{name: "a read outside the orienting set loads on demand", tool: "reports_link_audit", group: "reports", found: true},
 		{name: "a name of an unknown group", tool: "weather_today"},
-		{name: "a name without a group", tool: "pages"},
+		{name: "a tool named after its group alone", tool: "findings", group: "findings", found: true},
+		{name: "a bare name of no group", tool: "weather"},
 	}
 
 	for _, tc := range cases {

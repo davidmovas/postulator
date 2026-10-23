@@ -2,6 +2,7 @@ package finding
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"time"
 
@@ -132,6 +133,16 @@ var rules = map[Code]rule{
 func (c Code) Valid() bool {
 	_, known := rules[c]
 	return known
+}
+
+func Codes() []Code {
+	return slices.Sorted(maps.Keys(rules))
+}
+
+func Options() []Option {
+	return slices.Sorted(slices.Values([]Option{
+		Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType, RewriteField, RelinkPage, Rescan,
+	}))
 }
 
 func SeverityOf(code Code) Severity {

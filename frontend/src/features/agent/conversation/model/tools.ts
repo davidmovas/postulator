@@ -11,6 +11,7 @@ export const families = [
     "sync",
     "reports",
     "imports",
+    "findings",
     "models",
     "content",
     "schedules",

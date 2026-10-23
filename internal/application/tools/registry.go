@@ -11,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
@@ -46,6 +47,7 @@ type Deps struct {
 	Sync        *sync.Service
 	Reports     *reports.Service
 	Imports     *imports.Service
+	Findings    *findings.Service
 	Models      *models.Service
 	Content     *content.Service
 	Schedules   *schedules.Service

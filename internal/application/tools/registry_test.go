@@ -94,6 +94,7 @@ func registered() []string {
 		"imports_save_mapping",
 		"imports_list_mappings",
 		"imports_delete_mapping",
+		"findings",
 		"models_list",
 		"models_upsert",
 		"models_disable",
@@ -163,7 +164,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 61374
+	schemaCeilingBytes = 63151
 	charactersPerToken = 4
 	widestLogged       = 8
 )

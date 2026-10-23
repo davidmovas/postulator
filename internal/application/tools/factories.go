@@ -75,6 +75,7 @@ func factories() []factory {
 		importsSaveMapping,
 		importsListMappings,
 		importsDeleteMapping,
+		findingsTool,
 		modelsList,
 		modelsUpsert,
 		modelsDisable,

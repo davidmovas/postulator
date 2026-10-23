@@ -230,6 +230,24 @@ func sortedBy(tool Tool, fields ...string) Tool {
 	return tool
 }
 
+func enumOn(tool Tool, property string, values []string) Tool {
+	schema := tool.Def.Schema
+	if schema == nil || schema.Properties == nil {
+		return tool
+	}
+	held, ok := schema.Properties[property]
+	if !ok {
+		return tool
+	}
+	closed := *held
+	closed.Enum = slices.Clone(values)
+	widened := *schema
+	widened.Properties = maps.Clone(schema.Properties)
+	widened.Properties[property] = &closed
+	tool.Def.Schema = &widened
+	return tool
+}
+
 func orderedOnly(tool Tool) Tool {
 	schema := tool.Def.Schema
 	if schema == nil || schema.Properties == nil {

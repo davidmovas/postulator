@@ -40,7 +40,13 @@ type ListRequest struct {
 	Limit  int    `json:"limit,omitempty"`
 }
 
+type GetRequest struct {
+	SiteID    string `json:"siteId,omitempty"`
+	FindingID string `json:"findingId"`
+}
+
 type ResolveRequest struct {
+	SiteID       string `json:"siteId,omitempty"`
 	FindingID    string `json:"findingId"`
 	Option       string `json:"option"`
 	PageID       string `json:"pageId,omitempty"`

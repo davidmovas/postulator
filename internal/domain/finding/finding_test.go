@@ -78,6 +78,31 @@ func TestAnOptionIsAModelChangeOrARun(t *testing.T) {
 	if kind := finding.Option("made_up").Kind(); kind != "" {
 		t.Errorf("an unknown option is a %q, want none", kind)
 	}
+	if listed := finding.Options(); len(listed) != len(cases) || !slices.IsSorted(listed) {
+		t.Errorf("Options() = %v, want every option once, sorted", listed)
+	}
+}
+
+func TestEveryCodeIsListedOnceAndOffersOnlyListedOptions(t *testing.T) {
+	t.Parallel()
+
+	codes := finding.Codes()
+	if !slices.IsSorted(codes) || len(slices.Compact(slices.Clone(codes))) != len(codes) {
+		t.Fatalf("Codes() = %v, want each code once, sorted", codes)
+	}
+	for _, code := range codes {
+		if !code.Valid() {
+			t.Errorf("%s is listed and not valid", code)
+		}
+		for _, option := range finding.OptionsOf(code) {
+			if !slices.Contains(finding.Options(), option) {
+				t.Errorf("%s offers %s, which Options() does not list", code, option)
+			}
+		}
+	}
+	if !slices.Contains(codes, finding.RowWithoutPage) || slices.Contains(codes, finding.Code("made_up")) {
+		t.Errorf("Codes() = %v", codes)
+	}
 }
 
 func TestAnUnknownCodeIsRefused(t *testing.T) {
