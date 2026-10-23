@@ -842,7 +842,10 @@ The owner chose per-field acceptance of a draft run's review, built in Go before
   - `8acd0ec`: our H1 was written into an existing page with no client text (the replica's main hub);
   - `958cefe`: the product proof's wire log hid a request per route;
   - `6441006`: the client loop cancelled on the plan's wait, before any write.
-- [~] **G, the gate.** Green: the static legs, `task build` at `11f095c`, the race groups for kernel, domain and application, the migrations to 0070, the plugin on 7.4, and on the replica the contract and exit tests. Stopped by the memory guard: the runtime race group, and the replica's `e2e:full` from a fresh reset. Not started: the adapters and transport race groups, covergate, the final `task build`, the frontend legs, `ui:lint`, and every vanilla leg. The exact commands are under The gate in `STATUS.md`.
+- [x] **G, the gate: green on both stands (2026-10-23).**
+  - The first run was stopped twice by the memory guard.
+  - The second run, after the memory freed, ran every leg: the five race groups, covergate (88.84% / 88.14%), `task build` with no drift, the frontend legs, `ui:lint`, `e2e:full` on both stands from fresh resets, vanilla's contract and exit tests, and `e2e:full:noplugin`.
+  - It found two things: the restricted-user proof's cleanup (`a7e5d68`), and a revert without the plugin claiming the body back.
 - [x] **Docs:** CONTRACTS (`6aa1c1b`), the spec's part 16 (`8621635`, `6aa1c1b`), ARCHITECTURE and CLAUDE.md's stage 3 ruling (`a9e41e6`), STATUS and this plan.
 
 **Deviations in session 4:**

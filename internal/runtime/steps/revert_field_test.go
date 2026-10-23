@@ -269,6 +269,29 @@ func TestACreatedPageTheClientEditedIsHandedBack(t *testing.T) {
 	}
 }
 
+func TestARevertWithoutThePluginNeverClaimsTheBodyBack(t *testing.T) {
+	t.Parallel()
+
+	deps, server, sc, id := existingPage(t, []wptest.Option{wptest.WithoutPlugin()}, wptest.Item{Title: "Espresso", Content: hisIntro})
+	published := runPublish(t, deps, sc)
+	written, _ := server.Lookup(id)
+	if written.Content == hisIntro || published.PreviousContentHash != "" {
+		t.Fatalf("the publish left %q with %q kept, want our body written through core and no copy of the client's", written.Content, published.PreviousContentHash)
+	}
+	recordedFor(t, &deps, sc.Page, published)
+
+	reverted, result := revertOf(t, deps, sc.Page.ID)
+	if result.Next != run.TransitionPause || reverted.Outcome == steps.OutcomeRestored {
+		t.Fatalf("the revert answered %+v / %s, want it handed to a person: the body it would put back was never kept", reverted, result.Message)
+	}
+	if !strings.Contains(result.Message, steps.ReasonRevertNoBody) {
+		t.Errorf("the revert says %q, want it to name the body it never kept", result.Message)
+	}
+	if after, _ := server.Lookup(id); after.Content != written.Content {
+		t.Errorf("the revert changed the body to %q, want it left as the run left it", after.Content)
+	}
+}
+
 func TestAFieldRevertOfAPageTheRunCreatedLeavesItOnTheSite(t *testing.T) {
 	t.Parallel()
 

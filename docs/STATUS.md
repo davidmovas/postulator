@@ -13,8 +13,8 @@ closed and the screens) on 2026-10-18, which closes stage 1**; **stage 2 (2a, pa
 their scopes, and 2b, the read layer with the writer's pack and the agent's view) on 2026-10-19,
 its stand legs green on both stands on 2026-10-20**; **stage 3, the field writers and the editable
 body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1, then the stored
-diff, per-field acceptance and the screens; its gate is partly run, the machine's memory having
-stopped two legs, and the legs owed are listed under The gate. Stage 4 is next.**
+diff, per-field acceptance and the screens; its gate is green on both stands (2026-10-23). Stage 4
+is next.**
 
 ## Where we are
 
@@ -402,8 +402,27 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
-**2026-10-23, on Windows, stage 3's gate. Partial: the memory guard stopped the runtime race group
-and the replica's fresh `e2e:full`, with another workload holding about 5 GB.**
+**2026-10-23, on Windows, stage 3's gate, completed after the memory freed. Green on the final
+code.**
+- **Second run, every owed leg, one at a time:**
+  - `go test -race` green over runtime (3 packages), adapters with `-p 1` (30) and app, transport,
+    cmd and frontend (9);
+  - `go run ./cmd/covergate`: domain+application 88.84% of 15,168 (gate 80%), total 88.14% of
+    31,508 (gate 70%);
+  - `task build` green with no generated drift; `npm run typecheck` clean; `npm run test:run` 1,790
+    tests in 170 files; `task ui:lint` 0 issues, the harness suite in 226 s;
+  - the replica: `e2e:full` from a fresh reset (566 s);
+  - vanilla after `task plugin:deploy`: the six contract tests, the four exit tests (the
+    restricted-user test skips there), `e2e:full` from a fresh reset (247 s), and
+    `e2e:full:noplugin` (42 s).
+- **What the second run found, each closed with a test that failed first:**
+  - `a7e5d68`: the restricted-user proof left its kept page with our text, which failed the
+    writer's proof later in the same suite;
+  - the no-plugin revert answered `restored` while our body stood.
+- Both stands were taken down.
+
+The first run's record follows. It was partial: the memory guard stopped the runtime race group
+and the replica's fresh `e2e:full` while another workload held about 5 GB.
 - **Run and green:**
   - `gofmt -l .` silent; the comment check; `go vet` plain, `-tags uiharness` and `-tags e2e`
     clean; `golangci-lint run` plain and `--build-tags uiharness` 0 issues; `task lint:e2e` alone
@@ -427,7 +446,7 @@ and the replica's fresh `e2e:full`, with another workload holding about 5 GB.**
   client loop's sync point, fixed in `6441006`, and the writer's picture, which refuses an edited
   stand. Its rerun from a fresh reset was stopped by the memory guard while provisioning; the stand
   was taken down.
-- **Owed, one at a time on an idle machine** (close the Rust builds and browsers first):
+- **The commands the second run used, one at a time on an idle machine:**
   ```
   go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
   go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
@@ -680,7 +699,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 3 done (stage 3 on 2026-10-20 to 23, part of its gate owed), stage 4 next |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 3 done (stage 3 on 2026-10-20 to 23, its gate green on both stands), stage 4 next |
 
 ## Known gaps
 
@@ -776,8 +795,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Stage 3's gate legs owed** (the commands under **The gate**, 2026-10-23), then **stage 4 of
-   the site model**: reconciliation with the workbook, the findings inbox and its resolution, the
+1. **Stage 4 of the site model**: reconciliation with the workbook, the findings inbox and its resolution, the
    site map and the agent's tools over the model, re-planned in its own session. What stage 3
    hands it is under "Stage 4 must know" in the phase plan's session-4 checkpoint.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex

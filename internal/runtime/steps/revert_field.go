@@ -89,17 +89,22 @@ func revertByField(ctx context.Context, deps Deps, sc *run.StepContext, result *
 		work.published.PreviousProduct.ImageID != 0 {
 		result.Fields = append(result.Fields, revertImage(ctx, work))
 	}
+	nothing := ReasonRevertNothing
 	switch {
-	case !wantedField(wanted, body) || work.published.PreviousContentHash == "":
+	case !wantedField(wanted, body):
+	case work.published.PreviousContentHash == "" && work.published.ContentHash != "":
+		result.Fields = append(result.Fields, RevertedField{Key: body, Outcome: OutcomeKept, Detail: ReasonRevertNoBody})
+		nothing = ReasonRevertNoBody
+	case work.published.PreviousContentHash == "":
 	case work.published.ContentHash == "":
 		result.Fields = append(result.Fields, RevertedField{Key: body, Outcome: OutcomeKept, Detail: ReasonRevertBodyUnproven})
 	default:
 		result.Fields = append(result.Fields, revertBody(ctx, deps, sc, work, body))
 	}
-	return settleReverted(result)
+	return settleReverted(result, nothing)
 }
 
-func settleReverted(result *RevertResult) (string, bool) {
+func settleReverted(result *RevertResult, nothing string) (string, bool) {
 	restored := 0
 	for _, reverted := range result.Fields {
 		switch reverted.Outcome {
@@ -114,7 +119,7 @@ func settleReverted(result *RevertResult) (string, bool) {
 		}
 	}
 	if restored == 0 && len(result.Fields) > 0 {
-		return ReasonRevertNothing, false
+		return nothing, false
 	}
 	result.Outcome = OutcomeRestored
 	result.Detail = "each field the run wrote that the site still holds as it wrote it was put back"

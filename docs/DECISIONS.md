@@ -4231,6 +4231,14 @@ each is folded into the entries below.
   `TestTheSiteFiltersAreRespectedUnderARestrictedUser`, which runs before it in the same suite (A.7),
   restored the framed page it edited and left its kept page with our text; it now restores both, and
   the two pass in order from a fresh reset.
+- **A revert without the plugin never claims the body back** (found by the gate's
+  `e2e:full:noplugin` on vanilla). Without the plugin, `publish` writes the body through core and
+  keeps no copy of what it replaced, since it cannot read the raw body. The per-field revert of
+  such a result skipped the body without a word and, with nothing else to put back, answered
+  `restored`, while the client's page still held our rewrite. The body is now handed back with
+  `ReasonRevertNoBody`, and a revert that puts nothing back pauses naming that reason, as the
+  revert before stage 3 did (`TestARevertWithoutThePluginNeverClaimsTheBodyBack`, failing first with
+  the false `restored`).
 - **The screens (D.1 to D.4).** The run report's publish pane shows each field before and after and
   the body's blocks as the site stored them, marked ours, the client's or the site's and kept, added
   or removed, with the regions the site injects read from the page model (whether inside the content
