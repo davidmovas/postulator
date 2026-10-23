@@ -50,6 +50,43 @@ type metaPrompt struct {
 	Pattern     string
 	Picture     string
 	Description []string
+	Standing    bool
+}
+
+func metaRequires(scope []field.Key) []run.ArtifactKind {
+	if run.WritesBody(scope) {
+		return []run.ArtifactKind{run.ArtifactDraft}
+	}
+	return nil
+}
+
+func keepsBody(sc *run.StepContext) bool {
+	scope := sc.Fields()
+	return len(scope) > 0 && !run.WritesBody(scope)
+}
+
+func asItStands(facts contextpack.Facts, page pagemap.Page) content.ContentDraft {
+	standing := content.ContentDraft{Title: page.Title, H1: facts.H1, Summary: facts.Page.Summary.Text}
+	if title, held := facts.Field(field.Title); held && strings.TrimSpace(title.Current) != "" {
+		standing.Title = strings.TrimSpace(title.Current)
+	}
+	body, held := facts.Field(field.Body)
+	if !held {
+		body, held = facts.Field(field.ProductDescription)
+	}
+	if !held {
+		return standing
+	}
+	doc, err := content.Parse(body.Current)
+	if err != nil {
+		return standing
+	}
+	for _, heading := range doc.Headings() {
+		if text := strings.TrimSpace(content.TextOf(heading)); heading.Data != "h1" && text != "" {
+			standing.Sections = append(standing.Sections, content.DraftSection{Heading: text})
+		}
+	}
+	return standing
 }
 
 func GenerateMeta(deps Deps) run.StepDef {
@@ -57,15 +94,21 @@ func GenerateMeta(deps Deps) run.StepDef {
 		Name:      NameGenerateMeta,
 		Role:      domainllm.RoleEditor,
 		Requires:  []run.ArtifactKind{run.ArtifactDraft},
+		Scoped:    metaRequires,
 		Produces:  []run.ArtifactKind{run.ArtifactMeta},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   editorTimeout,
 		Price:     run.Price{OutputTokens: metaTokens, Input: packInput(deps, domainllm.RoleEditor, seoTitleKey)},
 		Preflight: inputPreflight(deps, domainllm.RoleEditor, seoTitleKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
-			draft, err := draftOf(sc)
-			if err != nil {
-				return run.Result{}, err
+			standing := keepsBody(sc)
+			var draft content.ContentDraft
+			if !standing {
+				read, err := draftOf(sc)
+				if err != nil {
+					return run.Result{}, err
+				}
+				draft = read
 			}
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {
@@ -82,7 +125,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 
 			keywords := pagemap.Keywords(sc.Page, entity)
 			prompt := metaPrompt{
-				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
+				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft, Standing: standing,
 				SiteName: owner.Name,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
 					PrimaryKeyword: keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
@@ -95,6 +138,10 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 			prompt.Picture = picture(seen.Fitted, contextpack.SectionTargets)
+			if standing {
+				draft = asItStands(seen.Facts, sc.Page)
+				prompt.Draft = draft
+			}
 			if description, held := seen.Facts.Field(field.SEODescription); held {
 				prompt.Description = contextpack.FieldRules(seen.Facts, description.Scope)
 				if current := strings.TrimSpace(description.Current); current != "" {

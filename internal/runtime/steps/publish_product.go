@@ -338,13 +338,16 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	if err != nil {
 		return nil, err
 	}
-	if refusesDrift(sc, drifted) {
+	bodyKept := keepsBody(sc)
+	if !bodyKept && refusesDrift(sc, drifted) {
 		refused := driftRefused(sc.Page, "in the store since it was last read or written")
 		return &refused, nil
 	}
-	description, err := descriptionOf(body)
-	if err != nil {
-		return nil, err
+	var description string
+	if !bodyKept {
+		if description, err = descriptionOf(body); err != nil {
+			return nil, err
+		}
 	}
 	raw, err := client.GetRaw(ctx, wp.TypeProduct, held.ID)
 	switch {
@@ -359,9 +362,14 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		return nil, err
 	}
 	previous := raw.Content
-	keeping, err := deps.keepingOf(ctx, sc, draft, true)
-	if err != nil {
-		return nil, err
+	if bodyKept {
+		description = raw.Content
+	}
+	var keeping *content.KeptBody
+	if !bodyKept {
+		if keeping, err = deps.keepingOf(ctx, sc, draft, true); err != nil {
+			return nil, err
+		}
 	}
 	onSite := liveBody{raw: raw.Content, hash: raw.ContentHash, plugin: true, stable: raw.SaveStable}
 	if stop, guardErr := guardedPlugin(ctx, client, sc, onSite); guardErr != nil || stop != nil {
@@ -434,6 +442,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		Custom: custom,
 	}
 	plan.Store.Lists = lists
+	plan.Request.KeepBody = bodyKept
 	plan.Writes = append(plan.Writes, unitCheck)
 	if (hasFields(update) || len(lists) > 0) && !plan.Unstable {
 		plan.Writes = append(plan.Writes, unitStore)
@@ -450,7 +459,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
 	}
-	if !plan.Unstable {
+	if !plan.Unstable && !bodyKept {
 		plan.Writes = append(plan.Writes, unitRaw)
 	}
 	state.Plan = plan

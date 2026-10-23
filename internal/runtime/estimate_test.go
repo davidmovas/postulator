@@ -3,7 +3,6 @@ package runtime_test
 import (
 	"context"
 	"math"
-	"slices"
 	"strings"
 	"testing"
 
@@ -187,47 +186,47 @@ func TestEstimateWarnsWhenAPageWantsImagesTheRecipeWillNotDraw(t *testing.T) {
 	}
 }
 
-func TestEstimateSaysARunScopedToFieldsPaysForWholeDrafts(t *testing.T) {
+func TestARunScopedToFieldsIsPricedOnTheStepsItKeeps(t *testing.T) {
 	t.Parallel()
 
-	scoped := recipeOf("generate_body", "publish")
-	scoped[1].Params = map[string]any{run.ParamFields: []string{"excerpt", "seo_title"}}
-	cases := []struct {
-		name   string
-		recipe []template.StepSpec
-		said   bool
-	}{
-		{name: "a run scoped to two fields", recipe: scoped, said: true},
-		{name: "a run that writes every field", recipe: recipeOf("generate_body", "publish")},
+	harness := newHarness(t, 2)
+	body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
+	meta := pricedStep("generate_meta", llm.RoleEditor, run.Price{OutputTokens: 512})
+	publish := run.StepDef{
+		Name:     "publish",
+		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
+		Scoped:   run.DraftsOf,
+		Produces: []run.ArtifactKind{run.ArtifactPublishResult},
+		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+	engine := harness.engine(t, mustRegister(t, body, meta, publish))
+	whole := recipeOf("generate_body", "generate_meta", "publish")
+	harness.specs.spec = template.TemplateSpec{
+		Sections: []template.Section{{Heading: "Intro", TargetWords: 1200}}, Recipe: whole,
+	}
+	scoped, err := run.ScopeRecipe(whole, []string{string(field.SEODescription)})
+	if err != nil {
+		t.Fatalf("ScopeRecipe: %v", err)
+	}
 
-			harness := newHarness(t, 1)
-			body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
-			publish := run.StepDef{
-				Name:     "publish",
-				Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
-				Produces: []run.ArtifactKind{run.ArtifactPublishResult},
-				Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
-			}
-			engine := harness.engine(t, mustRegister(t, body, publish))
-			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(tc.recipe), nil)
-			if err != nil {
-				t.Fatalf("EstimateRun: %v", err)
-			}
-			said := slices.IndexFunc(estimate.Findings, func(f run.EstimateFinding) bool { return f.Code == runtime.CodeFieldsScoped })
-			if (said >= 0) != tc.said {
-				t.Fatalf("findings = %+v, want the scope said %v", estimate.Findings, tc.said)
-			}
-			if said >= 0 {
-				f := estimate.Findings[said]
-				if f.Severity != content.SeverityInfo || !strings.Contains(f.Message, "2 fields") || strings.Contains(f.Message, "_") {
-					t.Errorf("finding = %+v, want a note that counts the fields in words", f)
-				}
-			}
-		})
+	full, err := engine.EstimateRun(t.Context(), harness.newRun(whole), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun of the whole recipe: %v", err)
+	}
+	swept, err := engine.EstimateRun(t.Context(), harness.newRun(scoped), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun of the scoped recipe: %v", err)
+	}
+	metaOnly, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_meta")), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun of the meta alone: %v", err)
+	}
+	if swept.Tokens != metaOnly.Tokens || swept.Tokens >= full.Tokens {
+		t.Fatalf("the scoped run is priced at %d tokens, the meta alone at %d and the whole recipe at %d; "+
+			"want the scoped run priced as its meta step alone", swept.Tokens, metaOnly.Tokens, full.Tokens)
+	}
+	if len(swept.Findings) != 0 {
+		t.Errorf("the scoped run's estimate says %+v, want nothing about a recipe it narrowed on purpose", swept.Findings)
 	}
 }
 

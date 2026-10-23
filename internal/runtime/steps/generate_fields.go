@@ -129,7 +129,7 @@ func GenerateFields(deps Deps) run.StepDef {
 					"asked for no other field of "+sc.Page.Path)
 			}
 			prompt.Picture = picture(seen.Fitted, contextpack.SectionTargets, contextpack.SectionRules)
-			prompt.Asked = askedFields(seen, asked, sc.Spec.Product)
+			prompt.Asked = askedFields(seen, asked, sc.Spec.Product, sc.Page.Title)
 
 			request, err := stepRequest(sc, call, prompt, room)
 			if err != nil {
@@ -243,12 +243,20 @@ func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]asked
 	kind := claimedType(set, sc)
 	asked := make([]askedScope, 0)
 	skipped := make([]FieldSkip, 0)
+	scoped := sc.Fields()
+	keys := otherTextFields(sc.Page)
+	if slices.Contains(scoped, field.Title) && run.Producer(field.Title, scoped) == run.StepGenerateFields {
+		keys = append([]field.Key{field.Title}, keys...)
+	}
 	candidates := make([]field.Scope, 0)
-	for _, key := range otherTextFields(sc.Page) {
+	for _, key := range keys {
 		scope, _ := set.Scope(kind.ID, key)
 		candidates = append(candidates, scope)
 	}
 	candidates = append(candidates, set.Custom(kind.ID)...)
+	if len(scoped) > 0 {
+		candidates = slices.DeleteFunc(candidates, func(scope field.Scope) bool { return !slices.Contains(scoped, scope.Key) })
+	}
 	for i := range candidates {
 		scope, key := candidates[i], candidates[i].Key
 		if !scope.Enabled || !scope.AIWrites {
@@ -276,6 +284,9 @@ func fieldsToWrite(ctx context.Context, deps Deps, sc *run.StepContext) ([]asked
 		instances, kept, err := instancesToWrite(ctx, deps, sc, set, kind)
 		if err != nil {
 			return nil, nil, err
+		}
+		if len(scoped) > 0 {
+			instances = slices.DeleteFunc(instances, func(wanted askedScope) bool { return !slices.Contains(scoped, wanted.Key) })
 		}
 		asked, skipped = append(asked, instances...), append(skipped, kept...)
 	}
@@ -338,6 +349,9 @@ func writerFor(ctx context.Context, deps Deps, sc *run.StepContext, scope field.
 	if listField(key) && sc.Page.WPType == pagemap.WPProduct {
 		return "", nil
 	}
+	if key == field.Title && sc.Page.WPType != pagemap.WPProduct {
+		return "", nil
+	}
 	if key != field.Excerpt || sc.Page.WPType == pagemap.WPProduct {
 		return reasonNoWriter, nil
 	}
@@ -357,22 +371,25 @@ func writerFor(ctx context.Context, deps Deps, sc *run.StepContext, scope field.
 	return reasonUnsupported, nil
 }
 
-func fieldsApply(deps Deps) func(context.Context, run.Target) (bool, error) {
+func fieldsApply(deps Deps) func(context.Context, run.Target, map[string]any) (bool, error) {
 	if deps.Types == nil || deps.WordPress == nil {
 		return nil
 	}
-	return func(ctx context.Context, target run.Target) (bool, error) {
-		sc := &run.StepContext{Run: run.Run{SiteID: target.Page.SiteID}, Page: target.Page, Spec: target.Spec}
+	return func(ctx context.Context, target run.Target, params map[string]any) (bool, error) {
+		sc := &run.StepContext{Run: run.Run{SiteID: target.Page.SiteID}, Page: target.Page, Spec: target.Spec, Params: params}
 		asked, _, err := fieldsToWrite(ctx, deps, sc)
 		return len(asked) > 0, err
 	}
 }
 
-func askedFields(seen sitemodel.Picture, asked []askedScope, product *template.Product) []askedField {
+func askedFields(seen sitemodel.Picture, asked []askedScope, product *template.Product, planned string) []askedField {
 	out := make([]askedField, 0, len(asked))
 	for i := range asked {
 		wanted := &asked[i]
 		rules := contextpack.FieldRules(seen.Facts, wanted.Scope)
+		if planned = strings.TrimSpace(planned); wanted.Key == field.Title && planned != "" {
+			rules = append(rules, "The owner's workbook plans the title as: "+planned+". Keep to it unless a rule above says otherwise.")
+		}
 		if wanted.Key == field.ProductShortDescription && product != nil {
 			rules = append(rules, content.ShortDescriptionRules(*product)...)
 		}

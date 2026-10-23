@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/runs"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -88,37 +89,56 @@ func TestARunSwitchesRewritesOnForChosenPages(t *testing.T) {
 	}
 }
 
-func TestARunScopedToFieldsHandsThemToPublishAlone(t *testing.T) {
+func onTheSite(fixture *fixture, pageIDs ...string) {
+	fixture.mapping.known = map[string]pagemap.Page{}
+	for i, pageID := range pageIDs {
+		wpID, entityID := int64(100+i), "entity-"+pageID
+		fixture.mapping.known[pageID] = pagemap.Page{ID: pageID, Path: "/" + pageID + "/", WPID: &wpID, EntityID: &entityID}
+	}
+}
+
+func TestARunScopedToFieldsKeepsOnlyTheStepsItsFieldsNeed(t *testing.T) {
 	t.Parallel()
 
 	recipe := []template.StepSpec{
-		{Name: "generate_body", Enabled: true}, {Name: "generate_meta", Enabled: true}, {Name: "publish", Enabled: true},
+		{Name: "generate_body", Enabled: true}, {Name: "generate_meta", Enabled: true},
+		{Name: "generate_fields", Enabled: true}, {Name: "publish", Enabled: true},
 	}
 	fixture := newFixture(t)
 	fixture.specs.siteID = fixture.siteID
 	fixture.specs.spec = template.TemplateSpec{Recipe: recipe}
+	onTheSite(fixture, fixture.pages...)
 	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
 		SiteID: fixture.siteID, PageIDs: []string{fixture.pages[0]}, Fields: []string{"seo_description", "excerpt", "excerpt"},
 	}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	queued := fixture.engine.queued.Recipe
-	if listed, held := run.ParamsFor(queued, "publish")[run.ParamFields].([]string); !held || !slices.Equal(listed, []string{"excerpt", "seo_description"}) {
-		t.Errorf("publish's params = %v, want the two fields, sorted once each", run.ParamsFor(queued, "publish"))
+	queued := fixture.engine.queued
+	if got := enabledNames(queued.Recipe); !slices.Equal(got, []string{"generate_meta", "generate_fields", "publish"}) {
+		t.Errorf("the scoped run keeps %v, want the meta, the fields and publish", got)
 	}
-	for _, step := range []string{"generate_body", "generate_meta"} {
-		if _, held := run.ParamsFor(queued, step)[run.ParamFields]; held {
-			t.Errorf("%s carries the field scope, want publish alone", step)
+	for _, step := range []string{"generate_meta", "generate_fields", "publish"} {
+		if listed, held := run.ParamsFor(queued.Recipe, step)[run.ParamFields].([]string); !held || !slices.Equal(listed, []string{"excerpt", "seo_description"}) {
+			t.Errorf("%s's params = %v, want the two fields, sorted once each", step, run.ParamsFor(queued.Recipe, step))
 		}
 	}
+	if !slices.Equal(queued.Targets, []string{fixture.pages[0]}) {
+		t.Errorf("the scoped run targets %v, want the page it was given and no ancestor", queued.Targets)
+	}
 
+	withoutMeta := slices.Clone(recipe)
+	withoutMeta[1].Enabled = false
 	cases := []struct {
-		name string
-		req  runs.StartRequest
+		name    string
+		req     runs.StartRequest
+		recipe  []template.StepSpec
+		planned bool
 	}{
 		{name: "a field nobody knows", req: runs.StartRequest{Fields: []string{"flavor"}}},
 		{name: "a field the store owns", req: runs.StartRequest{Fields: []string{"price"}}},
 		{name: "a run that publishes nothing", req: runs.StartRequest{Fields: []string{"excerpt"}, Kind: string(run.KindRelink)}},
+		{name: "a field no step of the recipe writes", req: runs.StartRequest{Fields: []string{"seo_description"}}, recipe: withoutMeta},
+		{name: "a page not on the site", req: runs.StartRequest{Fields: []string{"seo_description"}}, planned: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -127,6 +147,12 @@ func TestARunScopedToFieldsHandsThemToPublishAlone(t *testing.T) {
 			refused := newFixture(t)
 			refused.specs.siteID = refused.siteID
 			refused.specs.spec = template.TemplateSpec{Recipe: recipe}
+			if tc.recipe != nil {
+				refused.specs.spec.Recipe = tc.recipe
+			}
+			if !tc.planned {
+				onTheSite(refused, refused.pages...)
+			}
 			tc.req.SiteID, tc.req.PageIDs = refused.siteID, []string{refused.pages[0]}
 			_, err := refused.service.Start(t.Context(), tc.req)
 			if !errors.IsCode(err, errors.Invalid) {

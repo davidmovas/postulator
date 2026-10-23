@@ -60,26 +60,33 @@ func Publish(deps Deps) run.StepDef {
 		Name:      NamePublish,
 		Preflight: preflights(pluginPreflight(deps, NamePublish, "writes no SEO meta"), storePreflight(deps)),
 		Requires:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
+		Scoped:    run.DraftsOf,
 		Produces:  []run.ArtifactKind{run.ArtifactPublishResult},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   publishTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
-			body, err := sc.Artifact(run.ArtifactBodyHTML)
-			if err != nil {
-				return run.Result{}, err
-			}
-			draft, err := draftOf(sc)
-			if err != nil {
-				return run.Result{}, err
+			var (
+				body  []byte
+				draft content.ContentDraft
+			)
+			if !keepsBody(sc) {
+				held, err := sc.Artifact(run.ArtifactBodyHTML)
+				if err != nil {
+					return run.Result{}, err
+				}
+				if draft, err = draftOf(sc); err != nil {
+					return run.Result{}, err
+				}
+				body = held.Blob
 			}
 			state, err := publishStateOf(sc, deps.now())
 			if err != nil {
 				return run.Result{}, err
 			}
 			if sc.Page.WPType == pagemap.WPProduct {
-				return publishProduct(ctx, deps, sc, &state, body.Blob, draft)
+				return publishProduct(ctx, deps, sc, &state, body, draft)
 			}
-			return publishItem(ctx, deps, sc, &state, string(body.Blob), draft)
+			return publishItem(ctx, deps, sc, &state, string(body), draft)
 		},
 	}
 }
@@ -179,9 +186,9 @@ func (d Deps) planEdit(ctx context.Context, sc *run.StepContext, plan *publishPl
 	if err != nil {
 		return PageEdit{}, err
 	}
-	page := PageEdit{
-		PageID: sc.Page.ID, Path: sc.Page.Path, WPID: plan.WPID, Fields: plan.fieldChanges(),
-		Blocks: block.Diff(plan.Previous, plan.Final, written),
+	page := PageEdit{PageID: sc.Page.ID, Path: sc.Page.Path, WPID: plan.WPID, Fields: plan.fieldChanges()}
+	if !plan.Request.KeepBody {
+		page.Blocks = block.Diff(plan.Previous, plan.Final, written)
 	}
 	if slices.ContainsFunc(page.Blocks, func(c block.Change) bool { return c.Change != block.ChangeKept }) {
 		page.Body = plan.bodyKey()
@@ -266,11 +273,16 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	if err != nil {
 		return nil, err
 	}
+	bodyKept := keepsBody(sc)
+	if bodyKept && (!found || sc.Page.WPID == nil) {
+		off := needsHuman(sc.Page.Path + " " + ReasonScopedOffSite)
+		return &off, nil
+	}
 	drifted, err := deps.drifted(ctx, sc.Page)
 	if err != nil {
 		return nil, err
 	}
-	if refusesDrift(sc, drifted) {
+	if !bodyKept && refusesDrift(sc, drifted) {
 		refused := driftRefused(sc.Page, "on the site since it was last read or written")
 		return &refused, nil
 	}
@@ -283,47 +295,13 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 			return stop, guardErr
 		}
 	}
-	owed, err := deps.owesH1(ctx, sc.Page.ID)
-	if err != nil {
-		return nil, err
-	}
-	stripped, err := withoutHeadingOne(rendered)
-	if err != nil {
-		return nil, err
-	}
-	final, previous := stripped, site.raw
-	if owed {
-		final = rendered
-	}
-	if found && sc.Page.WPID == nil && !block.SameRender(site.raw, rendered) && !block.SameRender(site.raw, stripped) {
-		taken := needsHuman(sc.Page.Path + ": " + ReasonSlugTaken + " (" + existing.Link + ")")
-		return &taken, nil
-	}
-	keeping, err := deps.keepingOf(ctx, sc, draft, found)
-	if err != nil {
-		return nil, err
-	}
-	if keeping != nil {
-		held, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, site, rendered, owed)
-		if guardErr != nil {
-			return nil, guardErr
+	final, previous := site.raw, site.raw
+	if !bodyKept {
+		body, stop, bodyErr := deps.planBody(ctx, sc, site, existing, found, rendered, draft)
+		if bodyErr != nil || stop != nil {
+			return stop, bodyErr
 		}
-		if !same {
-			changed := needsHuman(sc.Page.Path + ": " + ReasonClientChanged)
-			return &changed, nil
-		}
-		if held.client && !site.plugin {
-			needsPlugin := needsHuman(sc.Page.Path + ": " + ReasonKeptNeedsPlugin)
-			return &needsPlugin, nil
-		}
-		final, previous = held.final, held.previous
-	}
-	if keeping == nil && found {
-		rewrote, stop, rewriteErr := deps.rewrite(ctx, sc, site, rendered, owed)
-		if rewriteErr != nil || stop != nil {
-			return stop, rewriteErr
-		}
-		final = rewrote
+		final, previous = body.final, body.previous
 	}
 	live := map[field.Key]string{}
 	if found {
@@ -343,7 +321,11 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	viaRaw := found && site.plugin
 	request := itemPlan{
 		Title: draft.Title, Slug: sc.Page.Slug, Status: string(sc.Run.PublishMode), Parent: placed.wpID,
-		ViaRaw: viaRaw, KeepTitle: kept[field.Title],
+		ViaRaw: viaRaw, KeepTitle: kept[field.Title], KeepBody: bodyKept,
+	}
+	if bodyKept {
+		title, written := answered.Value(field.Title)
+		request.Title, request.KeepTitle = title, kept[field.Title] || !written
 	}
 	if !found || existing.FeaturedMedia == 0 {
 		request.Featured = featured.FeaturedID
@@ -382,7 +364,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 	if seo.Send {
 		plan.Writes = append(plan.Writes, unitSEO)
 	}
-	if viaRaw && !plan.Unstable {
+	if viaRaw && !plan.Unstable && !request.KeepBody {
 		plan.Writes = append(plan.Writes, unitRaw)
 	}
 	state.Plan = plan
@@ -395,6 +377,58 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 		state.Result.took(seoWrite{applied: []string{}, skipped: seo.Skipped, findings: seo.Findings})
 	}
 	return nil, nil
+}
+
+type plannedBody struct {
+	final    string
+	previous string
+}
+
+func (d Deps) planBody(ctx context.Context, sc *run.StepContext, site liveBody, existing wp.Item, found bool,
+	rendered string, draft content.ContentDraft) (plannedBody, *run.Result, error) {
+	owed, err := d.owesH1(ctx, sc.Page.ID)
+	if err != nil {
+		return plannedBody{}, nil, err
+	}
+	stripped, err := withoutHeadingOne(rendered)
+	if err != nil {
+		return plannedBody{}, nil, err
+	}
+	planned := plannedBody{final: stripped, previous: site.raw}
+	if owed {
+		planned.final = rendered
+	}
+	if found && sc.Page.WPID == nil && !block.SameRender(site.raw, rendered) && !block.SameRender(site.raw, stripped) {
+		taken := needsHuman(sc.Page.Path + ": " + ReasonSlugTaken + " (" + existing.Link + ")")
+		return plannedBody{}, &taken, nil
+	}
+	keeping, err := d.keepingOf(ctx, sc, draft, found)
+	if err != nil {
+		return plannedBody{}, nil, err
+	}
+	if keeping != nil {
+		held, same, guardErr := d.guard(ctx, sc.Page.ID, keeping, site, rendered, owed)
+		if guardErr != nil {
+			return plannedBody{}, nil, guardErr
+		}
+		if !same {
+			changed := needsHuman(sc.Page.Path + ": " + ReasonClientChanged)
+			return plannedBody{}, &changed, nil
+		}
+		if held.client && !site.plugin {
+			needsPlugin := needsHuman(sc.Page.Path + ": " + ReasonKeptNeedsPlugin)
+			return plannedBody{}, &needsPlugin, nil
+		}
+		planned.final, planned.previous = held.final, held.previous
+	}
+	if keeping == nil && found {
+		rewrote, stop, rewriteErr := d.rewrite(ctx, sc, site, rendered, owed)
+		if rewriteErr != nil || stop != nil {
+			return plannedBody{}, stop, rewriteErr
+		}
+		planned.final = rewrote
+	}
+	return planned, nil, nil
 }
 
 func guardedPlugin(ctx context.Context, client *wp.Client, sc *run.StepContext, site liveBody) (*run.Result, error) {
@@ -767,7 +801,7 @@ func finishItem(ctx context.Context, deps Deps, sc *run.StepContext, state *publ
 	if err := recordCustom(ctx, deps, sc, state); err != nil {
 		return state.failed(err)
 	}
-	if plan.Unstable {
+	if plan.Unstable && (!plan.Request.KeepBody || plan.Request.carries()) {
 		state.Finished = true
 		return state.stopped(needsHuman(sc.Page.Path + ": " + ReasonSaveAltersClient))
 	}

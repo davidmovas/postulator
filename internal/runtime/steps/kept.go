@@ -18,6 +18,8 @@ const (
 		"so nothing was written; sync the site, then regenerate the page so the writer reads it again"
 	ReasonKeptNeedsPlugin = "the page holds its owner's own text, which is kept as it stands, and only the companion " +
 		"plugin's raw route can write beside it without changing it; install the plugin or let the run rewrite the page"
+	ReasonScopedOffSite = "is not on the site, and a run scoped to fields without the body writes only to pages on " +
+		"the site; publish the page first"
 	ReasonSlugTaken = "the site already holds a page under this page's slug that this run did not create; " +
 		"give the planned page another slug, or map that page to the entity in its place, then run it again"
 	ReasonSaveAltersClient = "a save of this page by the site's user would change its owner's content, because the user " +

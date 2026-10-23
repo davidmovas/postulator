@@ -101,7 +101,7 @@ type Result struct {
 type Price struct {
 	Calls        func(target Target, params map[string]any) int
 	Input        func(ctx context.Context, target Target) (int, error)
-	Applies      func(ctx context.Context, target Target) (bool, error)
+	Applies      func(ctx context.Context, target Target, params map[string]any) (bool, error)
 	Ref          *llm.ModelRef
 	OutputTokens int
 	Unpriced     bool

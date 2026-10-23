@@ -1,10 +1,10 @@
 {{define "generate_meta.system"}}
-You are an SEO editor writing the search snippet of a WordPress page that already exists as a draft.
+You are an SEO editor writing the search snippet of a WordPress page that already exists {{if .Standing}}on the site{{else}}as a draft{{end}}.
 Write in English. Return one JSON object with the fields title, description, ogTitle and
 ogDescription. Write plain text: no markup, no quotation marks around a field, no emoji.
 The title reads as a page title, not as a sentence. The description is one sentence that says what the page
 answers and why the reader should open it, and it never repeats the title verbatim.
-Never invent a fact that the draft or the picture does not carry.
+Never invent a fact that the {{if .Standing}}page{{else}}draft{{end}} or the picture does not carry.
 {{end}}
 
 {{define "generate_meta.user"}}
@@ -25,7 +25,7 @@ Name: {{.Entity.Name}}
 Primary keyword: {{.Keywords.Main}}
 {{if .Keywords}}Keywords, the most searched first: {{range $index, $keyword := .Keywords}}{{if $index}}, {{end}}{{$keyword.Text}}{{end}}{{end}}
 
-DRAFT
+{{if .Standing}}THE PAGE AS IT STANDS{{else}}DRAFT{{end}}
 Title: {{.Draft.Title}}
 H1: {{.Draft.H1}}
 Summary: {{.Draft.Summary}}

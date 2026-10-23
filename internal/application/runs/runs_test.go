@@ -223,7 +223,9 @@ func stepRegistry(t *testing.T) *run.Registry {
 		{Name: string(run.StepResolveContext), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactLinkContext}},
 		{Name: string(run.StepGenerateBody), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactLinkContext},
 			Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
-		{Name: string(run.StepPublish), Run: nothing,
+		{Name: string(run.StepGenerateMeta), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactMeta}},
+		{Name: string(run.StepGenerateFields), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactFields}},
+		{Name: string(run.StepPublish), Run: nothing, Scoped: run.DraftsOf,
 			Requires: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
 		{Name: string(run.StepSyncBack), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactPublishResult}},
 	}

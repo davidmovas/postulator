@@ -29,23 +29,10 @@ const (
 	CodeModelProviderRemoved = "model_provider_removed"
 	CodeProviderKeyMissing   = "provider_key_missing"
 	CodeImagesStepOff        = "images_step_off"
-	CodeFieldsScoped         = "fields_scoped"
 )
 
-func scopedFields(recipe []template.StepSpec) []string {
-	for _, step := range recipe {
-		if !step.Enabled || step.Name != string(run.StepPublish) {
-			continue
-		}
-		sc := run.StepContext{Params: step.Params}
-		keys := sc.Fields()
-		out := make([]string, 0, len(keys))
-		for _, key := range keys {
-			out = append(out, string(key))
-		}
-		return out
-	}
-	return nil
+func scoped(recipe []template.StepSpec) bool {
+	return len(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish)))) > 0
 }
 
 type pricing struct {
@@ -76,14 +63,6 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[s
 	if err != nil {
 		return run.Estimate{}, err
 	}
-	if scoped := scopedFields(record.Recipe); len(scoped) > 0 {
-		priced.add(run.EstimateFinding{
-			Severity: content.SeverityInfo, Code: CodeFieldsScoped,
-			Message: "this run drafts each page whole and writes only the " + strconv.Itoa(len(scoped)) +
-				" fields it names, so it is priced as whole drafts",
-		})
-	}
-
 	for i := range defs {
 		if defs[i].Preflight == nil {
 			continue
@@ -130,6 +109,7 @@ func (e *Engine) planTargets(ctx context.Context, record run.Run, assigned map[s
 	}
 
 	_, ownsRecipe := record.Kind.Recipe()
+	ownsRecipe = ownsRecipe || scoped(record.Recipe)
 	undrawn := writesWithoutImages(record.Recipe)
 	pages := e.targetPages(ctx, record.Targets)
 	types, err := e.deps.Types.Set(ctx, record.SiteID)
@@ -190,12 +170,13 @@ func pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
 }
 
 func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, target *run.Target, priced *pricing) error {
-	calls := callsOf(def, *target, run.ParamsFor(record.Recipe, def.Name))
+	params := run.ParamsFor(record.Recipe, def.Name)
+	calls := callsOf(def, *target, params)
 	if calls == 0 {
 		return nil
 	}
 	if def.Price.Applies != nil {
-		applies, appliesErr := def.Price.Applies(ctx, *target)
+		applies, appliesErr := def.Price.Applies(ctx, *target, params)
 		if appliesErr != nil {
 			return appliesErr
 		}

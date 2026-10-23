@@ -1,13 +1,13 @@
 package runs
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/templates"
-	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -135,11 +135,17 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	if recipe, err = withRewrite(recipe, req.Rewrite, chosen); err != nil {
 		return planned{}, err
 	}
-	if recipe, err = withFields(recipe, req.Fields); err != nil {
+	if recipe, err = run.ScopeRecipe(recipe, req.Fields); err != nil {
 		return planned{}, err
 	}
+	bodyKept := len(req.Fields) > 0 && !run.WritesBody(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish))))
+	if bodyKept {
+		if offSite := s.onTheSite(ctx, targets); offSite != nil {
+			return planned{}, offSite
+		}
+	}
 	added := make([]AddedPage, 0)
-	if kind.PageScoped() && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
+	if kind.PageScoped() && !bodyKept && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
 		if added, err = s.ancestors(ctx, siteID, targets); err != nil {
 			return planned{}, err
 		}
@@ -360,32 +366,23 @@ func withRewrite(recipe []template.StepSpec, rewrite, chosen []string) ([]templa
 	return out, nil
 }
 
-func withFields(recipe []template.StepSpec, fields []string) ([]template.StepSpec, error) {
-	if len(fields) == 0 {
-		return recipe, nil
-	}
-	for _, key := range fields {
-		spec, known := field.Lookup(field.Key(key))
-		if !known || spec.Denied || spec.Write == field.None {
-			return nil, invalid("a run can be scoped only to fields it may write", "fields").WithDetail("key", key)
+func (s *Service) onTheSite(ctx context.Context, targets []string) error {
+	planned := make([]string, 0)
+	for _, pageID := range targets {
+		page, err := s.pages.Get(ctx, pageID)
+		if err != nil {
+			return err
+		}
+		if page.WPID == nil {
+			planned = append(planned, cmp.Or(page.Path, pageID))
 		}
 	}
-	at := slices.IndexFunc(recipe, func(step template.StepSpec) bool {
-		return step.Enabled && step.Name == string(run.StepPublish)
-	})
-	if at < 0 {
-		return nil, invalid("the run publishes nothing, so it has no fields to scope", "fields")
+	if len(planned) == 0 {
+		return nil
 	}
-	listed := slices.Clone(fields)
-	slices.Sort(listed)
-	out := slices.Clone(recipe)
-	params := make(map[string]any, len(out[at].Params)+1)
-	for key, value := range out[at].Params {
-		params[key] = value
-	}
-	params[run.ParamFields] = slices.Compact(listed)
-	out[at].Params = params
-	return out, nil
+	return invalid("a run scoped to fields without the body writes only to pages on the site, and "+
+		strings.Join(planned, ", ")+" is not on it yet; publish it with a whole run first", "fields").
+		WithDetail("paths", planned)
 }
 
 func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]template.StepSpec, error) {
