@@ -4326,3 +4326,17 @@ rulings and what was decided while building.
   publish proof needed (`TestSameTextDecodesOnlyPlainFields`, `TestAnEscapedAmpersandIsNoChangeOnTheSite`,
   `TestAKsesEscapedTitleIsNoMismatch` and `TestATitleStoredWithItsEntitiesEscapedIsTakenAsWritten`,
   each failing first).
+
+### 4.1, decided while building
+
+- **`MatchRow` is one matcher over a `RowSite`** (`pagemap.NewRowSite(pages, fields, entities)`),
+  built once per sheet from the site's pages, their field rows and the graph, and asked per row.
+  Its rules run in the owner's order, with a person's mapping (`mapped`, `pages.row_key`) ahead
+  of them all, over the site's unarchived pages first and the map's planned rows only when no
+  page on the site answers, so a second import finds its own planned row and a page the client
+  publishes later wins. A product row sees products only; a page row sees every page but a
+  product, except by its address, which is an address whatever it holds. The H1 rule compares a
+  row's H1 with the page's own H1 and, on a page that carries none, with its title, because the
+  theme prints the title as the page's H1 (both stands and the client's site): that is what made
+  `ClaimProduct` find a product by the H1 the sheet gave it, and it now does so through
+  `MatchRow`.

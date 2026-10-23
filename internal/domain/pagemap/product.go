@@ -1,6 +1,10 @@
 package pagemap
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/davidmovas/postulator/internal/domain/field"
+)
 
 type MatchedBy string
 
@@ -65,14 +69,14 @@ func answersTo(page Page, known []string, wanted string) bool {
 	return false
 }
 
-func ClaimProduct(store Page, pages []Page, names map[string][]string) (Page, bool) {
+func ClaimProduct(store Page, pages []Page, fields map[string][]field.Value) (Page, bool) {
 	candidates := make([]Page, 0, len(pages)+1)
 	for i := range pages {
-		if pages[i].PlannedPath == "" {
+		if pages[i].PlannedPath == "" && pages[i].WPID != nil {
 			candidates = append(candidates, pages[i])
 		}
 	}
-	candidates = append(candidates, store)
+	site := NewRowSite(append(candidates, store), fields, nil)
 
 	var (
 		claimer Page
@@ -87,8 +91,8 @@ func ClaimProduct(store Page, pages []Page, names map[string][]string) (Page, bo
 		if row.PlannedPath != "" {
 			address = row.PlannedPath
 		}
-		match := MatchProduct(ProductRow{Path: address, H1: row.H1, Title: row.Title}, candidates, names)
-		if match.Found && match.Page.WPID != nil && store.WPID != nil && *match.Page.WPID == *store.WPID {
+		match := site.Match(Row{Path: address, H1: row.H1, Title: row.Title, Product: true})
+		if match.Found() && match.Page.WPID != nil && store.WPID != nil && *match.Page.WPID == *store.WPID {
 			claimer = row
 			count++
 		}

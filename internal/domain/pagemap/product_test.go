@@ -2,7 +2,9 @@ package pagemap_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -96,7 +98,11 @@ func TestANewStoreProductClaimsTheRowThatWaitedForIt(t *testing.T) {
 		storeProduct("powder", 20, "/product/powder/", "powder"),
 		{ID: "page", SiteID: "site", Path: "/mak/", WPType: pagemap.WPPage, H1: "Mak Liquid"},
 	}
-	names := map[string][]string{"powder": {"Old Powder"}, "page": {"Mak Capsule"}}
+	at := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+	fields := map[string][]field.Value{
+		"powder": {field.NewValue("powder", field.Title, "Old Powder", at)},
+		"page":   {field.NewValue("page", field.Title, "Mak Capsule", at)},
+	}
 
 	cases := []struct {
 		name  string
@@ -114,7 +120,7 @@ func TestANewStoreProductClaimsTheRowThatWaitedForIt(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, claimed := pagemap.ClaimProduct(tc.store, pages, names)
+			got, claimed := pagemap.ClaimProduct(tc.store, pages, fields)
 			if tc.want == "" {
 				if claimed {
 					t.Fatalf("claimed by %s, want no row", got.ID)

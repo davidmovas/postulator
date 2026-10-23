@@ -47,7 +47,7 @@ type absorber struct {
 	tracked  *findings
 	pending  map[string]struct{}
 	seen     map[string]lastSeen
-	names    map[string][]string
+	values   map[string][]field.Value
 	now      time.Time
 	findings []content.Finding
 }
@@ -140,16 +140,16 @@ func (a *absorber) lastSeen(ctx context.Context, items []item) (map[string]lastS
 	return seen, nil
 }
 
-func (a *absorber) siteNames(ctx context.Context) (map[string][]string, error) {
-	if a.names != nil {
-		return a.names, nil
+func (a *absorber) siteFields(ctx context.Context) (map[string][]field.Value, error) {
+	if a.values != nil {
+		return a.values, nil
 	}
 	stored, err := a.service.deps.Fields.ListBySite(ctx, a.state.SiteID)
 	if err != nil {
 		return nil, err
 	}
-	a.names = pagemap.Names(stored)
-	return a.names, nil
+	a.values = stored
+	return a.values, nil
 }
 
 type bodyRead struct {
@@ -171,11 +171,11 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 			continue
 		}
 		if !known && items[i].Type == pagemap.WPProduct && waiting > 0 {
-			names, err := a.siteNames(ctx)
+			stored, err := a.siteFields(ctx)
 			if err != nil {
 				return nil, err
 			}
-			current, known = pagemap.ClaimProduct(storeCandidate(items[i]), slices.Collect(maps.Values(a.rows.byPath)), names)
+			current, known = pagemap.ClaimProduct(storeCandidate(items[i]), slices.Collect(maps.Values(a.rows.byPath)), stored)
 			if known {
 				waiting--
 			}

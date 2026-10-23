@@ -63,6 +63,7 @@ type Page struct {
 	SiteID          string
 	Path            string
 	PlannedPath     string
+	RowKey          string
 	Slug            string
 	ParentPageID    *string
 	ParentReason    ParentReason
