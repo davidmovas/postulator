@@ -4252,3 +4252,28 @@ each is folded into the entries below.
   draft. A field's revert outcome (`restored`, `kept`) has no vocabulary in `vocab.ts`, and the
   publish result does not name its body key (the screens take `product_description` when a product
   snapshot is present); both are left as they are.
+
+## 2026-10-23 — stage 4: the workbook reconciled with the site through findings that last
+
+Stage 4 reconciles the client's workbooks with the observed site through persistent findings a
+person or the agent resolves, and gives the agent its tools over the model. The decisions taken at
+its first session's plan, with the owner's answers and a Fable critic's findings, are under "4.1
+tasks" in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`; this section holds the owner's
+rulings and what was decided while building.
+
+### Stage 4 in three sessions, and the agent's tools folded into three (the owner)
+
+- **Three sessions, each gated like stage 1's sub-stages.** 4.1 is the matcher and the findings:
+  `MatchRow`, the workbook reconciled into persistent findings, their lifecycle and the resolution
+  use case, with no agent tool and no screen. 4.2 is the agent working the loop: its tools over
+  findings, fields and blocks, `sites_update`, `pages_get` answering the model, and the agent
+  resolving findings end to end on the fake provider. 4.3 is the screens (the Findings inbox, the
+  Site map, the import preview naming each row's match rule), the full gate and phase 14's closing
+  report. Each writes its task list at its start and ends on a checkpoint.
+- **Nine planned tools become three.** The schemas stand at 61,343 of 61,356 bytes, and every byte
+  is resent on every round of every turn. `pages_fields_get/set`,
+  `pages_blocks_list/replace/insert_after/delete/place_link` and `findings_list/resolve` fold into
+  `pages_fields` (`get`, `set`), `pages_blocks` (`list`, `replace`, `insert_after`, `delete`,
+  `place_link`) and `findings` (`list`, `resolve`), each with an `op` enum, the way `sites_explore`
+  carries its views. Writes stay confirmable. `templates_resolve_for_page` folds into `pages_get`,
+  as the plan said. Deferred tool loading stays off until the owner has tried a funded key.
