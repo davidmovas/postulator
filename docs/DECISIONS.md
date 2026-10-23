@@ -4277,3 +4277,27 @@ rulings and what was decided while building.
   `place_link`) and `findings` (`list`, `resolve`), each with an `op` enum, the way `sites_explore`
   carries its views. Writes stay confirmable. `templates_resolve_for_page` folds into `pages_get`,
   as the plan said. Deferred tool loading stays off until the owner has tried a funded key.
+
+### The owner's answers to stage 3's open questions (Part 0)
+
+- **No second H1, adaptively.** A page we created still carried our H1 in its content, while the
+  theme printed the page's title as the H1 outside the content root on both stands and on the
+  client's first site, so every page we created had two. The extraction now records whether the
+  theme prints one (`render.Extraction.ThemeH1`, `page_renders.theme_h1`, migration 0071):
+  `printed` when an `<h1>` stands outside a located content root, or inside it with text the raw
+  does not hold (a classic theme whose title shares the content's wrapper); `absent` when there is
+  neither; unknown when the root was only assumed or the visit landed elsewhere. One rule decides
+  for created and existing pages alike (`render.OwesH1`, read through `sitemodel.OwesH1`). Over an
+  existing page, our H1 goes in only when its own render is `absent` and none of the client's
+  blocks that stay holds an H1; with `rewrites` on, his text blocks give way, so only the blocks
+  the rewrite keeps count. On a page we create, it goes in only when every observed render of its
+  WordPress type is `absent` and none is `printed`. With no observation, never. The guard still
+  recognises an earlier write of ours in either form, with or without its H1, and a creation
+  whose answer was lost is found in either form.
+  (`TestExtractSaysWhetherTheThemePrintsTheH1`, `TestOurH1IsOwedOnlyWhereTheThemePrintsNone`,
+  `TestTheReadLayerSaysWhetherOurH1IsOwed`, `TestACreatedPageCarriesNoH1WhereTheThemePrintsTheTitle`,
+  `TestACreationWithNoObservedRenderCarriesNoH1` and `TestOurH1OnlyWhereTheThemePrintsNone`, the
+  publish cases failing first with the H1 written; the full loop on the stands asserts that no
+  draft it created carries an H1 in its content.) Validation still reads the draft's own H1; the
+  page shows the title the theme prints. A render stored before 0071 reads unknown until the page
+  is rendered again, which a full walk with "Render every page again" does at once.

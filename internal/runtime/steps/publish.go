@@ -275,8 +275,19 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 			return stop, guardErr
 		}
 	}
-	final, previous := rendered, site.raw
-	if found && sc.Page.WPID == nil && !block.SameRender(site.raw, rendered) {
+	owed, err := deps.owesH1(ctx, sc.Page.ID)
+	if err != nil {
+		return nil, err
+	}
+	stripped, err := withoutHeadingOne(rendered)
+	if err != nil {
+		return nil, err
+	}
+	final, previous := stripped, site.raw
+	if owed {
+		final = rendered
+	}
+	if found && sc.Page.WPID == nil && !block.SameRender(site.raw, rendered) && !block.SameRender(site.raw, stripped) {
 		taken := needsHuman(sc.Page.Path + ": " + ReasonSlugTaken + " (" + existing.Link + ")")
 		return &taken, nil
 	}
@@ -285,7 +296,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 		return nil, err
 	}
 	if keeping != nil {
-		held, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, site, rendered)
+		held, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, site, rendered, owed)
 		if guardErr != nil {
 			return nil, guardErr
 		}
@@ -300,7 +311,7 @@ func planItem(ctx context.Context, deps Deps, sc *run.StepContext, client *wp.Cl
 		final, previous = held.final, held.previous
 	}
 	if keeping == nil && found {
-		rewrote, stop, rewriteErr := deps.rewrite(ctx, sc, site, rendered)
+		rewrote, stop, rewriteErr := deps.rewrite(ctx, sc, site, rendered, owed)
 		if rewriteErr != nil || stop != nil {
 			return stop, rewriteErr
 		}
@@ -394,21 +405,28 @@ func guardedPlugin(ctx context.Context, client *wp.Client, sc *run.StepContext, 
 	}
 }
 
-func (d Deps) rewrite(ctx context.Context, sc *run.StepContext, site liveBody, rendered string) (string, *run.Result, error) {
+func (d Deps) rewrite(ctx context.Context, sc *run.StepContext, site liveBody, rendered string, owed bool) (string, *run.Result, error) {
 	written, err := d.ourBlocks(ctx, sc.Page.ID)
 	if err != nil {
 		return "", nil, err
 	}
-	ours, err := withoutHeadingOne(rendered)
+	stripped, err := withoutHeadingOne(rendered)
 	if err != nil {
 		return "", nil, err
 	}
-	final, _, _, err := block.Rewrite(site.raw, written, ours)
+	final, theirs, _, err := block.Rewrite(site.raw, written, stripped)
 	switch {
 	case errors.IsCode(err, errors.Invalid):
 		refused := needsHuman(sc.Page.Path + ": " + ReasonRewriteRefused + ": " + err.Error())
 		return "", &refused, nil
 	case err != nil:
+		return "", nil, err
+	}
+	ours, err := headed(owed, theirs, stripped, rendered)
+	if err != nil || ours == stripped {
+		return final, nil, err
+	}
+	if final, _, _, err = block.Rewrite(site.raw, written, ours); err != nil {
 		return "", nil, err
 	}
 	return final, nil, nil

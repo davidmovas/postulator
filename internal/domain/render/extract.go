@@ -25,6 +25,7 @@ type page struct {
 	blocks    []rawBlock
 	positions map[string][]int
 	root      *html.Node
+	located   bool
 	state     RootState
 	content   []run
 	objects   []ldObject
@@ -70,6 +71,7 @@ func Extract(in Input) (Extraction, error) {
 	out.Links = p.typedLinks()
 	out.Regions, out.WordsContent, out.WordsGenerated = p.regions()
 	out.Headings = p.headings()
+	out.ThemeH1 = p.themeH1(out.Headings)
 	out.Builder = p.builder()
 	out.URLForm = p.urlForm()
 	out.Robots = p.robots()

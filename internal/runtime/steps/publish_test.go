@@ -134,8 +134,8 @@ func TestPublishCreatesThenUpdates(t *testing.T) {
 	}
 
 	stored, ok := server.Lookup(first.WPID)
-	if !ok || stored.Slug != "espresso" || stored.Content != publishBody {
-		t.Fatalf("the site holds %+v", stored)
+	if !ok || stored.Slug != "espresso" || stored.Content != publishedWithoutH1 {
+		t.Fatalf("the site holds %+v, want our body without the H1 no observation owes", stored)
 	}
 	if stored.Title != "Espresso guide" {
 		t.Errorf("title = %q, want the draft title", stored.Title)

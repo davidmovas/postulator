@@ -33,6 +33,7 @@ type modelInfo interface {
 type pictures interface {
 	Picture(ctx context.Context, req sitemodel.PackRequest) (sitemodel.Picture, error)
 	Absolute(ctx context.Context, siteID string) (bool, error)
+	OwesH1(ctx context.Context, pageID string) (bool, error)
 }
 
 func (d Deps) inputBudget(ctx context.Context, call modelCall, ceiling int, fixed ...string) int {

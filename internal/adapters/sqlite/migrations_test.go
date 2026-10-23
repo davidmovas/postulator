@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 70
+const latestMigration = 71
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -91,6 +91,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0068_pages_site_copies_dropped.sql",
 		"0069_page_links_origin_dropped.sql",
 		"0070_page_links_block_hash.sql",
+		"0071_page_renders_theme_h1.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -2011,6 +2012,49 @@ func TestALinkKeepsTheBlockItWasPlacedInAndADownDropsIt(t *testing.T) {
 	kept := []string{"l1 | 1", "l2 | 0"}
 	if got := rowsOf(t, store, `SELECT id, ours FROM page_links ORDER BY id`); !slices.Equal(got, kept) {
 		t.Fatalf("the down lost links:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(kept, "\n"))
+	}
+}
+
+func TestARenderSaysWhetherTheThemePrintsTheH1AndADownDropsIt(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 70)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-23T09:00:00Z"
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	page := `INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES (?, 's1', ?, ?, 'page', 'exists', ?, ?)`
+	must(page, "pg1", "/a/", "a", at, at)
+	must(page, "pg2", "/b/", "b", at, at)
+	must(`INSERT INTO page_renders (page_id, render_hash, content_root, extracted_at) VALUES ('pg1', 'h', 'found', ?)`, at)
+
+	if _, err = provider.UpTo(t.Context(), 71); err != nil {
+		t.Fatalf("up to 71: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT page_id, theme_h1 FROM page_renders ORDER BY page_id`); !slices.Equal(got, []string{"pg1 | "}) {
+		t.Fatalf("an earlier render reads %v, want it unknown until the page is rendered again", got)
+	}
+	must(`INSERT INTO page_renders (page_id, render_hash, content_root, theme_h1, extracted_at) VALUES ('pg2', 'h', 'found', 'printed', ?)`, at)
+	if _, execErr := store.writer.ExecContext(t.Context(), `UPDATE page_renders SET theme_h1 = 'maybe' WHERE page_id = 'pg1'`); execErr == nil {
+		t.Fatal("a theme heading the model does not name was stored")
+	}
+
+	if _, err = provider.DownTo(t.Context(), 70); err != nil {
+		t.Fatalf("down to 70: %v", err)
+	}
+	if got := columnOf(t, store, "page_renders", "theme_h1"); got != "" {
+		t.Fatalf("page_renders still carries theme_h1 (%s) after the down migration", got)
+	}
+	if got := rowsOf(t, store, `SELECT page_id FROM page_renders ORDER BY page_id`); !slices.Equal(got, []string{"pg1", "pg2"}) {
+		t.Fatalf("the down lost renders: %v", got)
 	}
 }
 

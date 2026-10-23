@@ -101,6 +101,7 @@ type Extraction struct {
 	Builder        string                       `json:"builder"`
 	URLForm        string                       `json:"urlForm"`
 	Robots         string                       `json:"robots"`
+	ThemeH1        ThemeH1                      `json:"themeH1"`
 }
 
 func (e Extraction) NoIndex() bool {

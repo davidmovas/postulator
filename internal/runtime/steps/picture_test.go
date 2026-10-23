@@ -68,6 +68,7 @@ type pictureStub struct {
 	links    []pagemap.PageLink
 	asked    []sitemodel.PackRequest
 	absolute bool
+	owesH1   map[string]bool
 }
 
 func (p *pictureStub) Picture(ctx context.Context, req sitemodel.PackRequest) (sitemodel.Picture, error) {
@@ -125,6 +126,10 @@ func (p *pictureStub) Picture(ctx context.Context, req sitemodel.PackRequest) (s
 
 func (p *pictureStub) Absolute(context.Context, string) (bool, error) {
 	return p.absolute, nil
+}
+
+func (p *pictureStub) OwesH1(_ context.Context, pageID string) (bool, error) {
+	return p.owesH1[pageID], nil
 }
 
 func (p *pictureStub) requests() []sitemodel.PackRequest {

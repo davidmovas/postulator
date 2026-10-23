@@ -368,7 +368,7 @@ func planProduct(ctx context.Context, deps Deps, sc *run.StepContext, client *wp
 		return stop, guardErr
 	}
 	if keeping != nil {
-		guarded, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, onSite, description)
+		guarded, same, guardErr := deps.guard(ctx, sc.Page.ID, keeping, onSite, description, false)
 		if guardErr != nil {
 			return nil, guardErr
 		}

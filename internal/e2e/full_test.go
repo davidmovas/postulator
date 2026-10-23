@@ -188,6 +188,9 @@ func TestTheWholeLoopReachesTheDockerSite(t *testing.T) {
 		if draft.Meta.Title == "" || draft.Meta.Description == "" {
 			t.Fatalf("the draft %s carries no seo meta: %+v", planned.path, draft.Meta)
 		}
+		if draft.H1 != "" {
+			t.Fatalf("the draft %s carries an H1 of ours (%q) in its content, while the stand's theme prints the page's title", planned.path, draft.H1)
+		}
 	}
 
 	stored = pagesByPath(t, core.Pages, siteID)

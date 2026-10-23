@@ -35,6 +35,7 @@ func renderOf(pageID string, root render.RootState, at time.Time) render.Record 
 				{Level: 2, Text: "Related products", Generated: true},
 			},
 			WordsContent: 120, WordsGenerated: 40, Builder: "elementor", URLForm: render.URLFormAbsolute, Robots: "index, follow",
+			ThemeH1: render.ThemeH1Printed,
 		},
 		FinalPath:   "/landed/",
 		ExtractedAt: at,
@@ -68,7 +69,7 @@ func TestPageRenderRepoRoundTrip(t *testing.T) {
 	}
 
 	rescanned := renderOf(product.ID, render.RootDynamicOnly, sqlitetest.Stamp.Add(time.Hour))
-	rescanned.Builder, rescanned.Robots = "", "noindex"
+	rescanned.Builder, rescanned.Robots, rescanned.ThemeH1 = "", "noindex", render.ThemeH1Absent
 	if err = repo.Put(t.Context(), rescanned); err != nil {
 		t.Fatalf("Put again: %v", err)
 	}
@@ -94,6 +95,11 @@ func TestPageRenderRepoRoundTrip(t *testing.T) {
 	unknownRoot := renderOf(product.ID, "partial", sqlitetest.Stamp)
 	if err = repo.Put(t.Context(), unknownRoot); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a root state the model does not name code = %q, want INVALID", errors.CodeOf(err))
+	}
+	unknownHeading := renderOf(product.ID, render.RootFound, sqlitetest.Stamp)
+	unknownHeading.ThemeH1 = "maybe"
+	if err = repo.Put(t.Context(), unknownHeading); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a theme heading the model does not name code = %q, want INVALID", errors.CodeOf(err))
 	}
 	if err = repo.Put(t.Context(), renderOf("no-such-page", render.RootFound, sqlitetest.Stamp)); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("the render of no page code = %q, want INVALID", errors.CodeOf(err))

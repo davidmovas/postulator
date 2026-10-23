@@ -139,29 +139,54 @@ func composed(raw string, written []string, ours, whole string) (final, part str
 	return final, block.Part(raw, written, ours), true
 }
 
-func earlierWrite(onSite string, kept *content.KeptBody, ours, rendered string) (string, bool) {
-	for _, whole := range []string{ours, rendered} {
-		earlier, part, _ := composed(kept.Raw, kept.Written, ours, whole)
-		if block.SameRender(onSite, earlier) {
-			return part, true
+func earlierWrite(onSite string, kept *content.KeptBody, forms ...string) (string, bool) {
+	for _, ours := range forms {
+		for _, whole := range forms {
+			earlier, part, _ := composed(kept.Raw, kept.Written, ours, whole)
+			if block.SameRender(onSite, earlier) {
+				return part, true
+			}
 		}
 	}
 	return "", false
 }
 
-func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, site liveBody, rendered string) (guarded, bool, error) {
+func (d Deps) owesH1(ctx context.Context, pageID string) (bool, error) {
+	if d.Pictures == nil {
+		return false, nil
+	}
+	return d.Pictures.OwesH1(ctx, pageID)
+}
+
+func headed(owed bool, theirs, stripped, rendered string) (string, error) {
+	if !owed {
+		return stripped, nil
+	}
+	doc, err := content.Parse(theirs)
+	if err != nil {
+		return "", err
+	}
+	for _, heading := range doc.Headings() {
+		if heading.Data == "h1" {
+			return stripped, nil
+		}
+	}
+	return rendered, nil
+}
+
+func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, site liveBody, rendered string, owed bool) (guarded, bool, error) {
 	written, err := d.writtenOf(ctx, pageID, kept)
 	if err != nil {
 		return guarded{}, false, err
 	}
-	ours, err := withoutHeadingOne(rendered)
+	stripped, err := withoutHeadingOne(rendered)
 	if err != nil {
 		return guarded{}, false, err
 	}
 	read := block.Client(kept.Raw, kept.Written)
 	theirs := block.Client(site.raw, written)
 	if block.Hash(read) != block.Hash(theirs) {
-		part, held := earlierWrite(site.raw, kept, ours, rendered)
+		part, held := earlierWrite(site.raw, kept, stripped, rendered)
 		if !held {
 			return guarded{}, false, nil
 		}
@@ -170,6 +195,10 @@ func (d Deps) guard(ctx context.Context, pageID string, kept *content.KeptBody, 
 		if block.Hash(read) != block.Hash(theirs) {
 			return guarded{}, false, nil
 		}
+	}
+	ours, err := headed(owed, theirs, stripped, rendered)
+	if err != nil {
+		return guarded{}, false, err
 	}
 	final, _, client := composed(site.raw, written, ours, ours)
 	previous := site.raw

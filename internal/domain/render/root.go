@@ -327,6 +327,7 @@ func wraps(node *html.Node) bool {
 
 func (p *page) setRoot(root *html.Node) {
 	p.root = root
+	p.located = true
 	p.state = stateOf(p.in.Archive, p.body, true)
 }
 
