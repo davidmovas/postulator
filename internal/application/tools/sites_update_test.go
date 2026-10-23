@@ -2,6 +2,7 @@ package tools_test
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/sites"
@@ -87,10 +88,27 @@ func TestSitesUpdateCarriesTheSettings(t *testing.T) {
 		t.Fatalf("the settings merge lost the defaults or the name: %+v", held.Site)
 	}
 
+	detected := updateSite(t, call, map[string]any{
+		"id": seeded.site, "technicalShortcodes": []string{"vc_row", "member_area"}, "technicalBlocks": []string{"acme/form"},
+		"builders": []map[string]any{{"name": "Acme Builder", "classPrefixes": []string{"acme-"}}},
+	}).Settings
+	if !slices.Equal(detected.TechnicalShortcodes, []string{"vc_row", "member_area"}) || !slices.Equal(detected.TechnicalBlocks, []string{"acme/form"}) ||
+		len(detected.Builders) != 1 || detected.Builders[0].Name != "Acme Builder" || !slices.Equal(detected.Builders[0].ClassPrefixes, []string{"acme-"}) {
+		t.Fatalf("the detection settings = %+v, want the shortcodes, blocks and builder the agent named", detected)
+	}
+	if detected.Observe.FullWalkEvery != 3 || string(detected.LinkURLForm) != "relative" {
+		t.Fatalf("setting the detection lost the rest: %+v", detected)
+	}
+	reset := updateSite(t, call, map[string]any{"id": seeded.site, "technicalShortcodes": []string{}}).Settings
+	if len(reset.TechnicalShortcodes) == 0 || slices.Contains(reset.TechnicalShortcodes, "member_area") {
+		t.Fatalf("an empty shortcode list = %v, want the defaults back", reset.TechnicalShortcodes)
+	}
+
 	refusals := []struct {
 		name string
 		args map[string]any
 	}{
+		{name: "a builder without a name", args: map[string]any{"builders": []map[string]any{{"classPrefixes": []string{"x-"}}}}},
 		{name: "a concurrency over the ceiling", args: map[string]any{"renderConcurrency": 17}},
 		{name: "a negative concurrency", args: map[string]any{"renderConcurrency": -1}},
 		{name: "a negative cadence", args: map[string]any{"fullWalkEvery": -1}},
