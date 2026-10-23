@@ -139,6 +139,14 @@ func reviewThePlan(ctx context.Context, deps Deps, sc *run.StepContext, state *p
 		return run.Result{}, err
 	}
 	state.Result.Fields, state.Result.Blocks = planned.Fields, planned.Blocks
+	if scope := sc.Fields(); len(scope) > 0 {
+		state.narrow(scope, planned.Body)
+		state.Result.Declined = nil
+		planned.Fields, planned.Blocks = state.Result.Fields, state.Result.Blocks
+		if state.Plan.Request.KeepBody {
+			planned.Body = ""
+		}
+	}
 	hash, err := hashOf(state.Plan, "publish plan")
 	if err != nil {
 		return run.Result{}, err

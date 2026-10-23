@@ -3,6 +3,7 @@ package runtime_test
 import (
 	"context"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 
@@ -181,6 +182,50 @@ func TestEstimateWarnsWhenAPageWantsImagesTheRecipeWillNotDraw(t *testing.T) {
 			}
 			if (warned == 1) != tc.warned || warned > 1 {
 				t.Fatalf("findings = %+v, want the image step named %v", estimate.Findings, tc.warned)
+			}
+		})
+	}
+}
+
+func TestEstimateSaysARunScopedToFieldsPaysForWholeDrafts(t *testing.T) {
+	t.Parallel()
+
+	scoped := recipeOf("generate_body", "publish")
+	scoped[1].Params = map[string]any{run.ParamFields: []string{"excerpt", "seo_title"}}
+	cases := []struct {
+		name   string
+		recipe []template.StepSpec
+		said   bool
+	}{
+		{name: "a run scoped to two fields", recipe: scoped, said: true},
+		{name: "a run that writes every field", recipe: recipeOf("generate_body", "publish")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			harness := newHarness(t, 1)
+			body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
+			publish := run.StepDef{
+				Name:     "publish",
+				Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
+				Produces: []run.ArtifactKind{run.ArtifactPublishResult},
+				Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
+			}
+			engine := harness.engine(t, mustRegister(t, body, publish))
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(tc.recipe), nil)
+			if err != nil {
+				t.Fatalf("EstimateRun: %v", err)
+			}
+			said := slices.IndexFunc(estimate.Findings, func(f run.EstimateFinding) bool { return f.Code == runtime.CodeFieldsScoped })
+			if (said >= 0) != tc.said {
+				t.Fatalf("findings = %+v, want the scope said %v", estimate.Findings, tc.said)
+			}
+			if said >= 0 {
+				f := estimate.Findings[said]
+				if f.Severity != content.SeverityInfo || !strings.Contains(f.Message, "2 fields") || strings.Contains(f.Message, "_") {
+					t.Errorf("finding = %+v, want a note that counts the fields in words", f)
+				}
 			}
 		})
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -132,6 +133,9 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 
 	chosen := slices.Clone(targets)
 	if recipe, err = withRewrite(recipe, req.Rewrite, chosen); err != nil {
+		return planned{}, err
+	}
+	if recipe, err = withFields(recipe, req.Fields); err != nil {
 		return planned{}, err
 	}
 	added := make([]AddedPage, 0)
@@ -353,6 +357,34 @@ func withRewrite(recipe []template.StepSpec, rewrite, chosen []string) ([]templa
 		params[run.ParamRewrite] = slices.Clone(listed)
 		out[at].Params = params
 	}
+	return out, nil
+}
+
+func withFields(recipe []template.StepSpec, fields []string) ([]template.StepSpec, error) {
+	if len(fields) == 0 {
+		return recipe, nil
+	}
+	for _, key := range fields {
+		spec, known := field.Lookup(field.Key(key))
+		if !known || spec.Denied || spec.Write == field.None {
+			return nil, invalid("a run can be scoped only to fields it may write", "fields").WithDetail("key", key)
+		}
+	}
+	at := slices.IndexFunc(recipe, func(step template.StepSpec) bool {
+		return step.Enabled && step.Name == string(run.StepPublish)
+	})
+	if at < 0 {
+		return nil, invalid("the run publishes nothing, so it has no fields to scope", "fields")
+	}
+	listed := slices.Clone(fields)
+	slices.Sort(listed)
+	out := slices.Clone(recipe)
+	params := make(map[string]any, len(out[at].Params)+1)
+	for key, value := range out[at].Params {
+		params[key] = value
+	}
+	params[run.ParamFields] = slices.Compact(listed)
+	out[at].Params = params
 	return out, nil
 }
 

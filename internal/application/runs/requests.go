@@ -15,6 +15,7 @@ type StartRequest struct {
 	Kind        string              `json:"kind,omitempty"`
 	Budget      run.Budget          `json:"budget"`
 	Rewrite     []string            `json:"rewrite,omitempty"`
+	Fields      []string            `json:"fields,omitempty"`
 }
 
 type StartResponse struct {

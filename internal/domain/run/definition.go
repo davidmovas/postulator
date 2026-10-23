@@ -251,7 +251,31 @@ func Plan(registry *Registry, kind Kind, recipe []template.StepSpec, deadline ti
 	return Definition{Kind: kind, Steps: steps, Deadline: deadline}, nil
 }
 
-const ParamRewrite = "rewrite"
+const (
+	ParamRewrite = "rewrite"
+	ParamFields  = "fields"
+)
+
+func (c *StepContext) Fields() []field.Key {
+	listed, held := c.Param(ParamFields)
+	if !held {
+		return nil
+	}
+	var out []field.Key
+	switch keys := listed.(type) {
+	case []string:
+		for _, key := range keys {
+			out = append(out, field.Key(key))
+		}
+	case []any:
+		for _, key := range keys {
+			if text, ok := key.(string); ok {
+				out = append(out, field.Key(text))
+			}
+		}
+	}
+	return out
+}
 
 func (c *StepContext) Rewrites(pageID string) bool {
 	listed, held := c.Param(ParamRewrite)

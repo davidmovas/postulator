@@ -29,7 +29,24 @@ const (
 	CodeModelProviderRemoved = "model_provider_removed"
 	CodeProviderKeyMissing   = "provider_key_missing"
 	CodeImagesStepOff        = "images_step_off"
+	CodeFieldsScoped         = "fields_scoped"
 )
+
+func scopedFields(recipe []template.StepSpec) []string {
+	for _, step := range recipe {
+		if !step.Enabled || step.Name != string(run.StepPublish) {
+			continue
+		}
+		sc := run.StepContext{Params: step.Params}
+		keys := sc.Fields()
+		out := make([]string, 0, len(keys))
+		for _, key := range keys {
+			out = append(out, string(key))
+		}
+		return out
+	}
+	return nil
+}
 
 type pricing struct {
 	findings []run.EstimateFinding
@@ -58,6 +75,13 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[s
 	targets, err := e.planTargets(ctx, record, assigned, priced)
 	if err != nil {
 		return run.Estimate{}, err
+	}
+	if scoped := scopedFields(record.Recipe); len(scoped) > 0 {
+		priced.add(run.EstimateFinding{
+			Severity: content.SeverityInfo, Code: CodeFieldsScoped,
+			Message: "this run drafts each page whole and writes only the " + strconv.Itoa(len(scoped)) +
+				" fields it names, so it is priced as whole drafts",
+		})
 	}
 
 	for i := range defs {

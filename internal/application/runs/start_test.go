@@ -88,6 +88,57 @@ func TestARunSwitchesRewritesOnForChosenPages(t *testing.T) {
 	}
 }
 
+func TestARunScopedToFieldsHandsThemToPublishAlone(t *testing.T) {
+	t.Parallel()
+
+	recipe := []template.StepSpec{
+		{Name: "generate_body", Enabled: true}, {Name: "generate_meta", Enabled: true}, {Name: "publish", Enabled: true},
+	}
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+	fixture.specs.spec = template.TemplateSpec{Recipe: recipe}
+	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{fixture.pages[0]}, Fields: []string{"seo_description", "excerpt", "excerpt"},
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	queued := fixture.engine.queued.Recipe
+	if listed, held := run.ParamsFor(queued, "publish")[run.ParamFields].([]string); !held || !slices.Equal(listed, []string{"excerpt", "seo_description"}) {
+		t.Errorf("publish's params = %v, want the two fields, sorted once each", run.ParamsFor(queued, "publish"))
+	}
+	for _, step := range []string{"generate_body", "generate_meta"} {
+		if _, held := run.ParamsFor(queued, step)[run.ParamFields]; held {
+			t.Errorf("%s carries the field scope, want publish alone", step)
+		}
+	}
+
+	cases := []struct {
+		name string
+		req  runs.StartRequest
+	}{
+		{name: "a field nobody knows", req: runs.StartRequest{Fields: []string{"flavor"}}},
+		{name: "a field the store owns", req: runs.StartRequest{Fields: []string{"price"}}},
+		{name: "a run that publishes nothing", req: runs.StartRequest{Fields: []string{"excerpt"}, Kind: string(run.KindRelink)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			refused := newFixture(t)
+			refused.specs.siteID = refused.siteID
+			refused.specs.spec = template.TemplateSpec{Recipe: recipe}
+			tc.req.SiteID, tc.req.PageIDs = refused.siteID, []string{refused.pages[0]}
+			_, err := refused.service.Start(t.Context(), tc.req)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Start(%+v) = %v, want Invalid", tc.req, err)
+			}
+			if kernel, typed := stderrors.AsType[*errors.Error](err); !typed || kernel.Details["field"] != "fields" {
+				t.Errorf("the refusal %v does not name the fields", err)
+			}
+		})
+	}
+}
+
 func TestAKindWithARecipeOfItsOwnNeverTakesTheTemplates(t *testing.T) {
 	t.Parallel()
 

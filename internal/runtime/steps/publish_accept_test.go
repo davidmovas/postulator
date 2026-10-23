@@ -179,6 +179,55 @@ func TestADeclinedBodyLeavesTheClientsBlocksAndOurRecordAlone(t *testing.T) {
 	}
 }
 
+func TestARunScopedToAFieldShowsAndWritesThatFieldAlone(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDepsWith(t)
+	bodies, fields := &bodyLog{}, &fieldLog{}
+	deps.Bodies, deps.Fields = bodies, fields
+	deps.Types = scopedTypes{keys: []field.Key{field.Excerpt}}
+	seeded := server.Seed(wptest.Item{
+		Type: "page", Title: "Espresso", Slug: "espresso", Status: "publish", Content: clientText, Excerpt: ownersExcerpt,
+	})
+	sc := rewritten(publishContext(t))
+	sc.Page.WPID = &seeded[0].ID
+	sc.Page.Status = pagemap.StatusPublished
+	sc.Run.PublishMode = run.PublishDraft
+	sc.Item.CurrentStep = steps.NamePublish
+	sc.Params[run.ParamFields] = []any{string(field.Excerpt)}
+	withFields(t, sc, steps.FieldValue{Key: string(field.Excerpt), Value: ourExcerpt})
+
+	result, err := drive(t, steps.Publish(deps), sc)
+	if err != nil || !awaitsReview(result) {
+		t.Fatalf("Publish = %+v, %v; want a review first", result, err)
+	}
+	plan, held := editPlanIn(t, result)
+	if !held || len(plan.Pages) != 1 || plan.Pages[0].Body != "" || !slices.Equal(changedKeys(plan.Pages[0].Fields), []field.Key{field.Excerpt}) {
+		t.Fatalf("the review shows %+v, want the excerpt alone", plan)
+	}
+
+	server.ResetRequests()
+	accept(t, sc)
+	result, err = drive(t, steps.Publish(deps), sc)
+	if err != nil || result.Next == run.TransitionPause {
+		t.Fatalf("Publish after the acceptance = %+v, %v", result, err)
+	}
+	published, _ := publishedIn(t, result)
+	stored, _ := server.Lookup(seeded[0].ID)
+	if stored.Content != clientText || stored.Excerpt != ourExcerpt {
+		t.Errorf("the site holds %q with %q, want the owner's body and our excerpt", stored.Content, stored.Excerpt)
+	}
+	if len(published.Declined) != 0 || published.WrittenMeta != nil {
+		t.Errorf("declined %v with SEO %+v, want nothing declined by a person and no SEO write", published.Declined, published.WrittenMeta)
+	}
+	if ours := bodies.ours(sc.Page.ID); len(ours) != 0 {
+		t.Errorf("our blocks = %v, want none: the run was scoped to the excerpt", ours)
+	}
+	if _, recorded := fields.recorded[field.SEOTitle]; recorded {
+		t.Error("the SEO title was recorded under a run scoped to the excerpt")
+	}
+}
+
 func TestAPlanThatMovedAfterAPartialAcceptanceIsAcceptedWhole(t *testing.T) {
 	t.Parallel()
 
