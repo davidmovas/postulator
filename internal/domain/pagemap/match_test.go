@@ -123,8 +123,10 @@ func TestARowKeyNamesTheRowByItsFirstIdentity(t *testing.T) {
 		{name: "its address first", row: pagemap.Row{Path: "/peptides/bpc-157/", Title: "BPC-157", Entity: "BPC 157"}, want: "row:Groups:/peptides/bpc-157/"},
 		{name: "its title without an address", row: pagemap.Row{Title: " Healing Peptides ", Entity: "Healing"}, want: "row:Groups:healing peptides"},
 		{name: "its entity without a title", row: pagemap.Row{Entity: "TB-500", H1: "TB-500 Peptide"}, want: "row:Groups:tb-500"},
-		{name: "its H1 alone", row: pagemap.Row{H1: "Caf&eacute; Guide"}, want: "row:Groups:café guide"},
-		{name: "nothing to name it by", row: pagemap.Row{SKU: "SKU-1"}},
+		{name: "its H1 before its SKU", row: pagemap.Row{H1: "Caf&eacute; Guide", SKU: "CAF-1"}, want: "row:Groups:café guide"},
+		{name: "its SKU alone, folded as a match folds it", row: pagemap.Row{SKU: " MAK-L-10 ", Product: true}, want: "row:Groups:sku:mak-l-10"},
+		{name: "its SKU on a page row", row: pagemap.Row{SKU: "Mak-L-10"}, want: "row:Groups:sku:mak-l-10"},
+		{name: "nothing to name it by", row: pagemap.Row{Parent: "Peptides", SKU: "  "}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

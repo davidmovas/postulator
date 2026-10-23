@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -319,6 +320,49 @@ func TestAFindingLivesOnce(t *testing.T) {
 		listed, err := sqlite.NewFindingRepo(h.store).ListBySite(t.Context(), h.siteID, "")
 		if err != nil || len(listed) != 0 {
 			t.Fatalf("findings after a preview = %+v (%v), want none", listed, err)
+		}
+	})
+
+	t.Run("a row named by its SKU alone", func(t *testing.T) {
+		t.Parallel()
+
+		h := newHarness(t)
+		fields := sqlite.NewPageFieldRepo(h.store)
+		skuOf := func(page pagemap.Page, sku string) {
+			if err := fields.Observe(t.Context(), page.ID, []field.Value{field.NewValue(page.ID, field.SKU, sku, observedAt)}); err != nil {
+				t.Fatalf("observe the SKU: %v", err)
+			}
+		}
+		liquid := h.storeProduct(t, "mak-liquid", "Mak Liquid", 501)
+		capsule := h.storeProduct(t, "mak-capsule", "Mak Capsule", 502)
+		skuOf(liquid, "MAK-L-10")
+		skuOf(capsule, "mak-l-10")
+		mapping := h.mapping(map[string]string{string(importmap.FieldSKU): "SKU", string(importmap.FieldKeywords): "keywords"})
+		mapping.Options.RowType = importmap.RowProducts
+		sheet := "SKU,keywords\nMAK-L-10,mak liquid\n"
+
+		steps := []struct {
+			name       string
+			before     func()
+			status     finding.Status
+			resolution string
+		}{
+			{name: "raised under its SKU", status: finding.Open},
+			{name: "cleared as matched once one product carries it", before: func() { skuOf(capsule, "MAK-C-20") },
+				status: finding.Resolved, resolution: finding.ResolutionRowMatched},
+		}
+		for _, step := range steps {
+			if step.before != nil {
+				step.before()
+			}
+			h.applyCSV(t, sheet, mapping)
+			held := h.one(t, finding.RowAmbiguous)
+			switch {
+			case held.SubjectKey != "row:rows.csv:sku:mak-l-10":
+				t.Fatalf("%s: the finding is keyed %q, want the row's SKU", step.name, held.SubjectKey)
+			case held.Status != step.status || held.Resolution != step.resolution:
+				t.Fatalf("%s: the finding is %s (%q), want %s (%q)", step.name, held.Status, held.Resolution, step.status, step.resolution)
+			}
 		}
 	})
 

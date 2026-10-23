@@ -41,6 +41,9 @@ func RowKey(sheet string, row Row) string {
 			identity = nameKey(name)
 		}
 	}
+	if sku := nameKey(row.SKU); identity == "" && sku != "" {
+		identity = "sku:" + sku
+	}
 	if identity == "" {
 		return ""
 	}
