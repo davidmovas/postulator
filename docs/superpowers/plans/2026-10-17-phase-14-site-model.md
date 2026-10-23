@@ -1051,12 +1051,73 @@ The owner chose per-field acceptance of a draft run's review, built in Go before
 - [x] **P0.3 — plain text compares with entities decoded** (`58e067d`). `field.SameText`; `observeFields`, `keptFieldsOf`, `checkBeforeWriting`, `movedSince`, `refuseMismatch`, `edit.checked`'s value arm. Tests: `TestSameTextDecodesOnlyPlainFields`, `TestAnEscapedAmpersandIsNoChangeOnTheSite`, `TestAKsesEscapedTitleIsNoMismatch`. Commit `fix(fields): plain text compares with its entities decoded`.
 - [x] **4.1.1 — `pagemap.MatchRow`.** Decision 3; `ClaimProduct` uses it; `MatchProduct` goes with its import callers in 4.1.2. Test: `TestMatchRow`. Commit `feat(pagemap): one matcher for every workbook row`.
 - [x] **4.1.2 — the import matches through `MatchRow`** (with storage `079f791`, the lifecycle rule `b3e4f27` and the option kinds `14e5cc2` landed beside it). A match pass before `pagesOf` gives every row an address (decision 2); `held` and `products.go`'s matcher go; the `sku` column; `PreviewPage.matchedBy` for every row with `candidates`; the copy. Tests: a URL-less row matched by title updates that page, an unmatched one is planned under its parent, a second import creates nothing. Commit `feat(imports): every row is matched by one rule, with or without a URL`.
-- [ ] **4.1.3 — the workbook's hierarchy.** Every level column bound as a hierarchy fact (Root alone makes groups); decision 4; 0072; `pagemap.TrailDiffers`; decision 7 in `derive`; the preview's `parent_differs`. Commit `feat(imports): the sheet's levels are the row's expected trail`.
-- [ ] **4.1.4 — findings that last.** `row_ambiguous`, `row_without_page`, option kinds; decision 5 in `FindingRepo` and the trackers; the import persists its row findings and `parent_differs`; the observation closes `row_without_page` and `parent_differs`. Test: `TestAFindingLivesOnce`. Commit `feat(findings): a finding lives once and closes when its cause goes`.
-- [ ] **4.1.5 — `application/findings`.** `List` (cursor) and `Resolve`, decision 6; `imports.MapRow`; publish's `params.fields`; `core.Findings`; `vocab.ts` with its copy. Test: `TestEachResolutionOptionPerCode`. Commit `feat(findings): one use case resolves a finding`.
+- [x] **4.1.3 — the workbook's hierarchy** (`2f1813f`). Every level column bound as a hierarchy fact (Root alone makes groups); decision 4; 0072; `pagemap.TrailDiffers`; decision 7 in `derive`; the preview's `parent_differs`. Commit `feat(imports): the sheet's levels are the row's expected trail`.
+- [ ] **4.1.4 — findings that last** (in part: the settled rule `b3e4f27` and the option kinds `14e5cc2` landed; the codes, the persistence and the closing are owed). `row_ambiguous`, `row_without_page`, option kinds; decision 5 in `FindingRepo` and the trackers; the import persists its row findings and `parent_differs`; the observation closes `row_without_page` and `parent_differs`. Test: `TestAFindingLivesOnce`. Commit `feat(findings): a finding lives once and closes when its cause goes`.
+- [ ] **4.1.5 — `application/findings`** (its writes landed: `PageFieldRepo.AcceptSite`, `PageBodyRepo.AcceptSite` in `7287d4e`, `PageRepo.SetParentSource` in `079f791`). `List` (cursor) and `Resolve`, decision 6; `imports.MapRow`; publish's `params.fields`; `core.Findings`; `vocab.ts` with its copy. Test: `TestEachResolutionOptionPerCode`. Commit `feat(findings): one use case resolves a finding`.
 - [ ] **4.1.6 — the samples.** URL-less rows in `samples/build/client.mjs` (by entity, by title, none, a hub and a store category sharing a name); the pins move. Commit `test(samples): the client's sheets carry rows without a URL`.
 - [ ] **4.1.7 — `TestTheWorkbookReconcilesWithTheSite`.** Commit `test(e2e): the workbook reconciles with the site`.
 - [ ] **4.1.8 — the docs and the checkpoint.** Commit `docs: stage 4.1, the matcher and the findings`.
+
+#### Checkpoint, 2026-10-23 (end of 4.1's first session; the next session resumes at 4.1.4)
+
+**Landed on `dev`, the tree clean at the checkpoint's commit:**
+- the plan `cb76bc3`;
+- Part 0:
+  - `8013230`: no second H1, adaptively (0071 `page_renders.theme_h1`);
+  - `5cfdee2`: the store's formatted variation description, recorded as the store answered it;
+  - `58e067d`: plain text compared with its entities decoded;
+- 4.1.1 `2e76024` (`MatchRow`);
+- the storage `079f791` (0072: `planned_trail`, `row_key`, `parent_source`);
+- 4.1.4's first half:
+  - `b3e4f27`: a settled finding stays settled while its facts stand;
+  - `14e5cc2`: each option is a model change or a run;
+- 4.1.2 `a1f62eb` (agent; the `sku` column moved the schemas to 61,361 bytes, ceiling 61,374);
+- 4.1.5's writes `7287d4e`;
+- 4.1.3 `2f1813f` (agent).
+
+Each has its entry under 2026-10-23 in `DECISIONS.md`; the spec's 16.1, 16.3, 16.4, 16.7 and 16.8 are amended.
+
+**Run and green at the checkpoint:**
+- `go build ./...`;
+- `go vet` of the `e2e` and `uiharness` builds;
+- `go test -count=1 ./internal/domain/... ./internal/application/... ./internal/transport/...` with no failure, plus the touched packages one by one (`sqlite`, `wp`, `wptest`, `runtime`, `runtime/steps`, `app`);
+- `go test -tags uiharness ./cmd/postulator/...` after P0.2 (169 s);
+- `golangci-lint` on every touched package (0 issues), `gofmt -l` silent;
+- `npm run typecheck`; vitest on `src/features/imports` (171 tests).
+
+**Not run this session:** no stand, no `-race`, no `covergate`, no `task build`, no `task lint:e2e`, no whole vitest or `ui:lint`.
+
+**Next, in order:**
+1. 4.1.4. Add the codes `row_ambiguous` and `row_without_page` to `domain/finding` with `task vocab` and their copy. The import's apply then persists `row_*` and `parent_differs` and clears the open `row_*` of its sheet it did not raise this time. The observation closes `row_without_page` once the planned page is on the site. Finally, `TestAFindingLivesOnce` through `observe` and `imports`.
+2. 4.1.5, then 4.1.6, 4.1.7 and 4.1.8.
+
+**4.1.4 and 4.1.5 must know:**
+- An ambiguous row has no draft. Its candidates live on the import's per-row match (`rowDraft.match`); persist from there, not from the message.
+- The preview's `imports.Finding.Subject` already holds `parent_differs`' persistent bytes. It does not carry the page id, which `compareTrail` in `pages.go` has to hand.
+- The import must not clear `parent_differs` for a row with no trail, nor for a product row, while the preview does not compare products.
+- To compare products in the preview, give `imports.Deps` a term reader (`ListTermsBySite`, wired as `stores.identities` in `build_services.go`).
+- `parent_ambiguous` raised under a workbook pin shares the crumb subject shape and key.
+- `MatchRow` scans every page per rule per row; build a lookup if the client's 2,000-page sites show it.
+- A URL-less row now plans a page wherever it names something and no page answers, an exported entity with no page included.
+- The resolution's writes exist: `PageFieldRepo.AcceptSite` clears the run behind a field, `PageBodyRepo.AcceptSite` and `PageRepo.SetParentSource`.
+
+**Commands owed before 4.1 closes** (one at a time, one stand at a time):
+```
+task build ; git status --short
+go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov1.out ./internal/kernel/... ./internal/domain/...
+go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov2.out ./internal/application/...
+go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
+go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+(merge the five profiles into coverage.out) ; go run ./cmd/covergate
+task lint:e2e
+cd frontend ; npm run test:run -- --maxWorkers=2 ; cd .. ; task ui:lint
+task e2e:up STAND=replica ; task plugin:deploy STAND=replica
+E2E_STAND=replica go test -tags e2e -count=1 -timeout 45m -run 'TestTheWholeLoopReachesTheDockerSite|TestTheWorkbookReconcilesWithTheSite' ./internal/e2e/
+task e2e:down STAND=replica
+(the same on STAND=vanilla)
+```
+The full loop asserts that no created draft carries an H1 in its content (P0.1); it has not run on a stand yet.
 
 ### 4.2 — the agent works the loop (planned at its start)
 

@@ -4366,3 +4366,28 @@ rulings and what was decided while building.
   column joins the import's fields (the header `SKU`), so the agent's mapping enum carries it in
   three tools and the schemas grow from 61,343 to 61,361 bytes (ceiling 61,374), the one schema
   move of 4.1.
+- **The sheet's levels are the row's expected trail, read and compared, never written** (4.1.3;
+  this amends the 2026-10-04 ruling that ignored every level column but Root, as the 2026-10-17
+  record foresaw). Category, Subcategory and Sub Subcategory, in any spacing, are detected and read
+  as the column use `trail` ("Expected parent"); only Root still makes groups. A row's trail is its
+  level cells in header order, placeholders dropped, the last dropped when the groups' own name or
+  slug evidence says it names the row, and it is stored as `pages.planned_trail` on a created page,
+  a matched page and a waiting product row. A trail column the file does not carry is refused,
+  like a missing root. `pagemap.TrailDiffers` compares it by name (the page's title and H1, as
+  plan and as fields, and a term page's title) with the chain of the page's model parents, the
+  front page and technical pages left out and a store-category twin folded into one node; a
+  product is compared with each chain of its `product_cat` terms, and the subject names the
+  closest. The preview raises a transient `parent_differs` and the observation the persistent one
+  from the stored trail, under the same marshalled `{sheet, site}`, cleared as `observed_clear`
+  when they agree or the trail is empty; the id-based raise of 2026-10-18 is gone. **Two
+  deviations, kept for 4.1.4**: the preview does not yet compare product rows (the import has no
+  term reader; one line in `build_services.go` and a consumer interface give it one), and entity
+  names are compared on neither side, because the observation reads no entities and a name only
+  the import compared would flip the persistent finding on every walk.
+- **The derived parent wins over a workbook parent unless a person set the parent source to the
+  workbook** (amending 2026-10-18; decision 7 of the 4.1 plan). Under `parent_source = workbook`
+  the derivation keeps as the model parent the page the trail's nearest level names, by the name
+  rule `DeriveParent` uses (now `Index.ParentNamed`), with the reason `workbook`; a tie keeps the
+  derived parent and raises `parent_ambiguous` naming the candidates. That parent shapes the tree
+  and the link plan and is never written to an existing page; a planned page's one creation call
+  still sends it, as the owner's answer 1 of 2026-10-17 allows.

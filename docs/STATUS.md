@@ -14,9 +14,41 @@ their scopes, and 2b, the read layer with the writer's pack and the agent's view
 its stand legs green on both stands on 2026-10-20**; **stage 3, the field writers and the editable
 body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1, then the stored
 diff, per-field acceptance and the screens; its gate is green on both stands (2026-10-23). Stage 4
-is next.**
+is re-planned as 4.1 (the matcher and the findings), 4.2 (the agent works the loop) and 4.3 (the
+screens, the gate and the report); 4.1 is half done (2026-10-23), and resumes at 4.1.4.**
 
 ## Where we are
+
+**2026-10-23, stage 4.1, first session: the owner's three answers, the matcher, the workbook's
+hierarchy.** The reasoning is under 2026-10-23 in `DECISIONS.md`. The task list, the checkpoint
+and the commands owed are under 4.1 in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **Part 0, the owner's answers to stage 3's open questions:**
+  - `8013230`: our H1 goes in only where the theme prints none, one rule for every page; the
+    extraction records `theme_h1` (0071), `printed` on both stands.
+  - `5cfdee2`: a reverted variation description is accepted in the store's form and recorded as
+    the store answered it.
+  - `58e067d`: the title, excerpt and SEO fields compare with their entities decoded, so kses's
+    `&amp;` is no change, no pause and no finding.
+- **The re-plan** (`cb76bc3`): three sessions. The nine planned agent tools fold into
+  `pages_fields`, `pages_blocks` and `findings`, each with an `op` enum.
+- **4.1 so far:**
+  - `2e76024`: `pagemap.MatchRow`, one matcher (mapped, URL, slug, entity, title, H1, SKU).
+  - `a1f62eb`: the import matches every row through it, with or without a URL. A URL-less row
+    with no page is planned under the page its sheet trail names. The rows are `row_ambiguous`
+    or `row_without_page` in the preview, and the preview names each row's rule.
+  - `2f1813f`: the sheet's Category and Subcategory columns are the row's expected trail,
+    compared with the site's into `parent_differs` (`{sheet, site}`), cleared when they agree. A
+    person may pin the model's parent to the workbook.
+  - `079f791`: migration 0072.
+  - `b3e4f27`, `14e5cc2`: a finding a person settled stays settled while its facts stand, and
+    each option is a model change or a run.
+  - `7287d4e`: the resolution's writes.
+- **Owed in 4.1:** the row codes persisted with their lifecycle, `application/findings`
+  (`List`, `Resolve`), the samples' URL-less rows, `TestTheWorkbookReconcilesWithTheSite` on both
+  stands, and the gate legs listed in the checkpoint.
+- Schemas 61,361 bytes (90 tools, ceiling 61,374, from the `sku` column); migrations to 0072;
+  bound methods 129; plugin 1.5.1.
 
 **2026-10-20/21, stage 3 of the site model: editing the client's pages field by field and block by
 block, Part 0 to C.** The reasoning is under **stage 3** in `DECISIONS.md`; the task list, both
@@ -699,7 +731,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 3 done (stage 3 on 2026-10-20 to 23, its gate green on both stands), stage 4 next |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 3 done (stage 3 on 2026-10-20 to 23, its gate green on both stands); stage 4 in three sessions, 4.1 half done (2026-10-23) |
 
 ## Known gaps
 
@@ -795,9 +827,9 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Stage 4 of the site model**: reconciliation with the workbook, the findings inbox and its resolution, the
-   site map and the agent's tools over the model, re-planned in its own session. What stage 3
-   hands it is under "Stage 4 must know" in the phase plan's session-4 checkpoint.
+1. **Stage 4.1 of the site model, resumed at 4.1.4**: the row findings persisted, the resolution
+   use case, the samples, `TestTheWorkbookReconcilesWithTheSite` on both stands, and the gate legs
+   the 4.1 checkpoint lists; then 4.2 and 4.3, each planned at its start.
 2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
