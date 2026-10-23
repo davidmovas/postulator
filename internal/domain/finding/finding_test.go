@@ -22,14 +22,14 @@ func TestANewFindingTakesItsCodesSeverityAndOptions(t *testing.T) {
 		finding.ParentNameTwin:     {finding.Info, []finding.Option{finding.Ignore}},
 		finding.RenderRedirected:   {finding.Info, []finding.Option{finding.Rescan, finding.Ignore}},
 		finding.ParentDiffers:      {finding.Warning, []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}},
-		finding.PluginOutdated:     {finding.Warning, []finding.Option{finding.UpdatePlugin, finding.Ignore}},
-		finding.FieldChangedOnSite: {finding.Warning, []finding.Option{finding.AcceptSite, finding.Ignore}},
-		finding.BodyChangedOnSite:  {finding.Warning, []finding.Option{finding.AcceptSite, finding.Ignore}},
+		finding.PluginOutdated:     {finding.Warning, []finding.Option{finding.Ignore}},
+		finding.FieldChangedOnSite: {finding.Warning, []finding.Option{finding.AcceptSite, finding.RewriteField, finding.Ignore}},
+		finding.BodyChangedOnSite:  {finding.Warning, []finding.Option{finding.AcceptSite, finding.RelinkPage, finding.Ignore}},
 		finding.RenderUnreachable:  {finding.Warning, []finding.Option{finding.Rescan, finding.Ignore}},
 		finding.BuilderDetected:    {finding.Info, []finding.Option{finding.Ignore}},
-		finding.TechnicalDetected:  {finding.Info, []finding.Option{finding.ClearTechnical, finding.Ignore}},
-		finding.PageTitleDiffers:   {finding.Warning, []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}},
-		finding.PageH1Differs:      {finding.Warning, []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}},
+		finding.TechnicalDetected:  {finding.Info, []finding.Option{finding.SetType, finding.Ignore}},
+		finding.PageTitleDiffers:   {finding.Warning, []finding.Option{finding.AcceptSite, finding.RewriteField, finding.Ignore}},
+		finding.PageH1Differs:      {finding.Warning, []finding.Option{finding.AcceptSite, finding.Ignore}},
 		finding.URLFormMixed:       {finding.Info, []finding.Option{finding.Ignore}},
 		finding.EntityCardProposed: {finding.Info, []finding.Option{finding.Accept, finding.Ignore}},
 	}
@@ -54,6 +54,30 @@ func TestANewFindingTakesItsCodesSeverityAndOptions(t *testing.T) {
 	}
 }
 
+func TestAnOptionIsAModelChangeOrARun(t *testing.T) {
+	t.Parallel()
+
+	cases := map[finding.Option]finding.OptionKind{
+		finding.Ignore:         finding.ModelChange,
+		finding.Accept:         finding.ModelChange,
+		finding.AcceptSite:     finding.ModelChange,
+		finding.AcceptWorkbook: finding.ModelChange,
+		finding.MapToPage:      finding.ModelChange,
+		finding.SetType:        finding.ModelChange,
+		finding.RewriteField:   finding.Run,
+		finding.RelinkPage:     finding.Run,
+		finding.Rescan:         finding.Run,
+	}
+	for option, want := range cases {
+		if got := option.Kind(); got != want {
+			t.Errorf("%s is a %s, want a %s", option, got, want)
+		}
+	}
+	if kind := finding.Option("made_up").Kind(); kind != "" {
+		t.Errorf("an unknown option is a %q, want none", kind)
+	}
+}
+
 func TestAnUnknownCodeIsRefused(t *testing.T) {
 	t.Parallel()
 
@@ -67,7 +91,7 @@ func TestAnUnknownCodeIsRefused(t *testing.T) {
 		"no site":             func(f *finding.Finding) { f.SiteID = "" },
 		"no id":               func(f *finding.Finding) { f.ID = "" },
 		"an unknown status":   func(f *finding.Finding) { f.Status = "parked" },
-		"a foreign option":    func(f *finding.Finding) { f.Options = []finding.Option{finding.ClearTechnical} },
+		"a foreign option":    func(f *finding.Finding) { f.Options = []finding.Option{finding.SetType} },
 		"a malformed subject": func(f *finding.Finding) { f.Subject = []byte("{") },
 	}
 	for name, mutate := range cases {

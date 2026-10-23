@@ -61,11 +61,30 @@ const (
 	Accept         Option = "accept"
 	AcceptSite     Option = "accept_site"
 	AcceptWorkbook Option = "accept_workbook"
-	KeepBoth       Option = "keep_both"
-	ClearTechnical Option = "clear_technical"
-	UpdatePlugin   Option = "update_plugin"
+	MapToPage      Option = "map_to_page"
+	SetType        Option = "set_type"
+	RewriteField   Option = "rewrite_field"
+	RelinkPage     Option = "relink_page"
 	Rescan         Option = "rescan"
 )
+
+type OptionKind string
+
+const (
+	ModelChange OptionKind = "model"
+	Run         OptionKind = "run"
+)
+
+func (o Option) Kind() OptionKind {
+	switch o {
+	case Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType:
+		return ModelChange
+	case RewriteField, RelinkPage, Rescan:
+		return Run
+	default:
+		return ""
+	}
+}
 
 const (
 	SubjectSite             = "site"
@@ -93,15 +112,15 @@ var rules = map[Code]rule{
 	ParentCycle:        {Warning, []Option{Ignore}},
 	ParentNameTwin:     {Info, []Option{Ignore}},
 	ParentDiffers:      {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
-	PluginOutdated:     {Warning, []Option{UpdatePlugin, Ignore}},
-	FieldChangedOnSite: {Warning, []Option{AcceptSite, Ignore}},
-	BodyChangedOnSite:  {Warning, []Option{AcceptSite, Ignore}},
+	PluginOutdated:     {Warning, []Option{Ignore}},
+	FieldChangedOnSite: {Warning, []Option{AcceptSite, RewriteField, Ignore}},
+	BodyChangedOnSite:  {Warning, []Option{AcceptSite, RelinkPage, Ignore}},
 	RenderUnreachable:  {Warning, []Option{Rescan, Ignore}},
 	RenderRedirected:   {Info, []Option{Rescan, Ignore}},
 	BuilderDetected:    {Info, []Option{Ignore}},
-	TechnicalDetected:  {Info, []Option{ClearTechnical, Ignore}},
-	PageTitleDiffers:   {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
-	PageH1Differs:      {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
+	TechnicalDetected:  {Info, []Option{SetType, Ignore}},
+	PageTitleDiffers:   {Warning, []Option{AcceptSite, RewriteField, Ignore}},
+	PageH1Differs:      {Warning, []Option{AcceptSite, Ignore}},
 	URLFormMixed:       {Info, []Option{Ignore}},
 	EntityCardProposed: {Info, []Option{Accept, Ignore}},
 }

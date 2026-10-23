@@ -559,7 +559,7 @@ func TestTechnicalPagesAreNamedWithTheirReason(t *testing.T) {
 		t.Errorf("technical_detected findings = %d, want one per reason the observation set", len(detected))
 	}
 	account := s.pageAt(t, "/account/")
-	if f, ok := s.finding(finding.TechnicalDetected, finding.SubjectPage(account.ID)); !ok || !slices.Contains(f.Options, finding.ClearTechnical) {
+	if f, ok := s.finding(finding.TechnicalDetected, finding.SubjectPage(account.ID)); !ok || !slices.Contains(f.Options, finding.SetType) {
 		t.Errorf("the account page's finding = %+v %t", f, ok)
 	}
 }
@@ -872,8 +872,8 @@ func TestAnOutdatedPluginIsAFindingThatClearsWhenUpdated(t *testing.T) {
 
 	s.run(t, observe.Options{})
 	f, ok := s.finding(finding.PluginOutdated, finding.SubjectSite)
-	if !ok || f.Status != finding.Open || !slices.Contains(f.Options, finding.UpdatePlugin) {
-		t.Fatalf("plugin_outdated = %+v %t", f, ok)
+	if !ok || f.Status != finding.Open || !slices.Equal(f.Options, []finding.Option{finding.Ignore}) {
+		t.Fatalf("plugin_outdated = %+v %t, want it open with ignore alone: uploading the plugin is a person's, and the finding closes itself once the manifest is current", f, ok)
 	}
 	var subject struct {
 		Version  string `json:"version"`
@@ -960,8 +960,8 @@ func TestAPlannedTitleThatDiffersIsAFindingAndThePlanIsKept(t *testing.T) {
 		t.Errorf("the plan was not kept: %+v", after)
 	}
 	f, ok := s.finding(finding.PageTitleDiffers, finding.SubjectPage(planned.ID))
-	if !ok || f.Status != finding.Open || !slices.Contains(f.Options, finding.AcceptWorkbook) {
-		t.Fatalf("page_title_differs = %+v %t", f, ok)
+	if !ok || f.Status != finding.Open || !slices.Contains(f.Options, finding.RewriteField) {
+		t.Fatalf("page_title_differs = %+v %t, want the workbook's title offered as a run that writes it", f, ok)
 	}
 	var subject struct {
 		Planned string `json:"planned"`
