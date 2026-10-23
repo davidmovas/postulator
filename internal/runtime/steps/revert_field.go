@@ -77,9 +77,9 @@ func revertByField(ctx context.Context, deps Deps, sc *run.StepContext, result *
 		if change.Key == body || !change.Moves() || !wantedField(wanted, change.Key) {
 			continue
 		}
-		reverted := revertField(ctx, editor, target, change, work.published)
+		reverted, stored := revertField(ctx, editor, target, change, work.published)
 		if reverted.Outcome == OutcomeRestored {
-			if err := recordField(ctx, deps, sc, work.page.ID, change.Key, change.Before); err != nil {
+			if err := recordField(ctx, deps, sc, work.page.ID, change.Key, stored); err != nil {
 				return err.Error(), false
 			}
 		}
@@ -126,7 +126,8 @@ func settleReverted(result *RevertResult, nothing string) (string, bool) {
 	return "", true
 }
 
-func revertField(ctx context.Context, editor edit.Service, target edit.Target, change field.Change, published PublishResult) RevertedField {
+func revertField(ctx context.Context, editor edit.Service, target edit.Target, change field.Change,
+	published PublishResult) (reverted RevertedField, stored string) {
 	before := change.Before
 	write := edit.Write{Key: change.Key, Value: &before, Expected: expectedOf(change.After), Provider: providerOf(change.Key, published)}
 	if change.Key.Kind() == field.Meta && before == "" && write.Provider != field.ProviderStore {
@@ -135,14 +136,18 @@ func revertField(ctx context.Context, editor edit.Service, target edit.Target, c
 	write.Social = socialBack(change.Key, published)
 	results, err := editor.Write(ctx, target, []edit.Write{write})
 	if err != nil {
-		return RevertedField{Key: change.Key, Outcome: OutcomeKept, Detail: err.Error()}
+		return RevertedField{Key: change.Key, Outcome: OutcomeKept, Detail: err.Error()}, ""
 	}
 	for _, held := range results {
 		if held.Key == change.Key && held.Outcome == edit.OutcomeWritten {
-			return RevertedField{Key: change.Key, Outcome: OutcomeRestored}
+			stored = before
+			if held.Value != nil {
+				stored = *held.Value
+			}
+			return RevertedField{Key: change.Key, Outcome: OutcomeRestored}, stored
 		}
 	}
-	return RevertedField{Key: change.Key, Outcome: OutcomeKept, Detail: ReasonRevertFieldMoved}
+	return RevertedField{Key: change.Key, Outcome: OutcomeKept, Detail: ReasonRevertFieldMoved}, ""
 }
 
 func providerOf(key field.Key, published PublishResult) field.Provider {

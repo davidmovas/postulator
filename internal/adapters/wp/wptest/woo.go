@@ -10,9 +10,10 @@ import (
 const wooNamespace = "/wp-json/wc/v3"
 
 var (
-	scriptPattern    = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script>`)
-	breakPattern     = regexp.MustCompile(`(?i)<br\s*/?>`)
-	ampersandPattern = regexp.MustCompile(`&([^a-zA-Z#]|$)`)
+	scriptPattern     = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script>`)
+	breakPattern      = regexp.MustCompile(`(?i)<br\s*/?>`)
+	ampersandPattern  = regexp.MustCompile(`&([^a-zA-Z#]|$)`)
+	apostrophePattern = regexp.MustCompile(`(\pL)'(\pL)`)
 )
 
 func (s *Server) routeWoo(mux *http.ServeMux) {
@@ -230,6 +231,10 @@ func rendered(value string, edit bool) string {
 		return value
 	}
 	return value + "\n"
+}
+
+func formatted(value string) string {
+	return rendered(apostrophePattern.ReplaceAllString(value, "$1&#8217;$2"), false)
 }
 
 func (s *Server) setMetaData(stored *Item, key string, value any) {

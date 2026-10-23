@@ -189,7 +189,7 @@ func (s *Server) variationPayload(stored, parent *Item) map[string]any {
 		"stock_status":      stockStatusOf(stored),
 		"manage_stock":      manageStock,
 		"stock_quantity":    stored.StockQuantity,
-		"description":       rendered(stored.Content, false),
+		"description":       formatted(stored.Content),
 		"permalink":         s.permalink(parent),
 		"status":            stored.Status,
 		"date_modified_gmt": stored.Modified.UTC().Format(wpTimeLayout),

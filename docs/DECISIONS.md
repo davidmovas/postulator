@@ -4301,3 +4301,13 @@ rulings and what was decided while building.
   draft it created carries an H1 in its content.) Validation still reads the draft's own H1; the
   page shows the title the theme prints. A render stored before 0071 reads unknown until the page
   is rendered again, which a full walk with "Render every page again" does at once.
+- **A reverted variation description in the store's formatted form is accepted.** WooCommerce
+  answers a variation's description through `wc_format_content` in every context and keeps no raw
+  form a client can read back, and the page renders the same, so a revert puts back the client's
+  text in that form (`Don't` comes back as `Don&#8217;t`). One defect sat under it: the revert
+  recorded the value it sent as the field's base, while the store answers that value formatted
+  again, so the next walk read the store's own formatting as the client's change and raised
+  `field_changed_on_site`. The revert now records what the store answered, as publish has since
+  `e2080f7`, and `wptest` formats a variation's description as the store does, apostrophes
+  included (`TestARevertedVariationDescriptionInTheStoresFormIsAccepted`, failing first on the
+  fake's formatting and then on the recorded value).

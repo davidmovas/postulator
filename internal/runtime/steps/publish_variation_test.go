@@ -22,13 +22,19 @@ type variedProduct struct {
 func publishVariations(t *testing.T) variedProduct {
 	t.Helper()
 
+	return publishVariationsOver(t, "<p>Old small.</p>")
+}
+
+func publishVariationsOver(t *testing.T, smallText string) variedProduct {
+	t.Helper()
+
 	item := storeProduct()
 	item.ProductType = "variable"
 	h := newProductHarness(t, item)
 	h.deps.Types = variationTypes{}
 	seeded := h.server.Seed(
 		wptest.Item{Type: wptest.TypeProductVariation, Parent: h.held.ID, SKU: "EM-1-S", RegularPrice: "120", Status: "publish",
-			Content: "<p>Old small.</p>", Choices: []wptest.Choice{{ID: 3, Name: "Size", Option: "Small"}}},
+			Content: smallText, Choices: []wptest.Choice{{ID: 3, Name: "Size", Option: "Small"}}},
 		wptest.Item{Type: wptest.TypeProductVariation, Parent: h.held.ID, SKU: "EM-1-L", RegularPrice: "150", Status: "publish",
 			Choices: []wptest.Choice{{ID: 3, Name: "Size", Option: "Large"}}},
 	)
@@ -104,6 +110,38 @@ func TestAVariationsDescriptionIsWrittenAloneAndPutBack(t *testing.T) {
 	large, _ = p.server.Lookup(p.large.ID)
 	if small.Content != "<p>Old small.</p>\n" || large.Content != "" {
 		t.Errorf("after the revert the variations hold %q and %q, want what they held before", small.Content, large.Content)
+	}
+}
+
+func TestARevertedVariationDescriptionInTheStoresFormIsAccepted(t *testing.T) {
+	t.Parallel()
+
+	p := publishVariationsOver(t, "<p>Don't shake the small one.</p>")
+	formatted := "<p>Don&#8217;t shake the small one.</p>\n"
+	if got := p.published.PreviousVariations[0].Before; got != formatted {
+		t.Fatalf("the publish kept %q as the client's, want the store's formatted answer %q", got, formatted)
+	}
+	fields := &fieldLog{}
+	p.deps.Fields = fields
+
+	reverted, result := runRevert(t, p.deps, "page-child")
+	if result.Next == run.TransitionPause || reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("the revert answered %+v / %s, want the client's text put back in the store's form", reverted, result.Message)
+	}
+	wordpress, ok := p.deps.WordPress.(oneClient)
+	if !ok {
+		t.Fatalf("the harness holds %T, want one client", p.deps.WordPress)
+	}
+	answered, err := wordpress.client.GetVariation(t.Context(), p.held.ID, p.small.ID)
+	if err != nil {
+		t.Fatalf("read the variation back: %v", err)
+	}
+	if !strings.Contains(answered.Description, "Don&#8217;t shake the small one.") {
+		t.Errorf("the store answers %q, want the client's text in its formatted form", answered.Description)
+	}
+	if recorded := fields.recordedValue(variationKey(p.small)); recorded != answered.Description {
+		t.Errorf("the revert recorded %q as the field's value, want what the store answers, %q, or the next walk reads the store's own formatting as the client's change",
+			recorded, answered.Description)
 	}
 }
 
