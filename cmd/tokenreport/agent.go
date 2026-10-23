@@ -211,23 +211,23 @@ func siteContextOf(model *sitemodeltest.Memory) agentapp.SiteContext {
 }
 
 func (a agentReport) write(out io.Writer) error {
-	s := newSheet(out)
-	s.heading("THE AGENT, PER ROUND", "bytes", "tokens")
-	for _, row := range a.Instructions {
-		s.measured("instructions, "+row.Name, row)
-	}
-	s.measured(a.AllSchemas.Name, a.AllSchemas)
-	s.measured(a.Deferred.Name, a.Deferred)
-	for i := range a.Stands {
-		stand := &a.Stands[i]
-		for _, row := range []measure{stand.Brief, stand.Context, stand.Instructions, stand.Round, stand.DeferredRound} {
-			s.measured(stand.Stand+": "+row.Name, row)
+	return tables(out, func(s *sheet) {
+		s.heading("THE AGENT, PER ROUND", "bytes", "tokens")
+		for _, row := range a.Instructions {
+			s.measured("instructions, "+row.Name, row)
 		}
-	}
-	s.blank()
-	s.heading("EVERY TOOL SCHEMA, THE WIDEST FIRST", "bytes", "tokens")
-	for _, row := range a.Schemas {
-		s.measured(row.Name, row)
-	}
-	return s.flush()
+		s.measured(a.AllSchemas.Name, a.AllSchemas)
+		s.measured(a.Deferred.Name, a.Deferred)
+		for i := range a.Stands {
+			stand := &a.Stands[i]
+			for _, row := range []measure{stand.Brief, stand.Context, stand.Instructions, stand.Round, stand.DeferredRound} {
+				s.measured(stand.Stand+": "+row.Name, row)
+			}
+		}
+	}, func(s *sheet) {
+		s.heading("EVERY TOOL SCHEMA, THE WIDEST FIRST", "bytes", "tokens")
+		for _, row := range a.Schemas {
+			s.measured(row.Name, row)
+		}
+	})
 }

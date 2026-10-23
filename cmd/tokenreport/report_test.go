@@ -11,8 +11,8 @@ func TestTheReportNamesEachModelsEncodingAndTheFallback(t *testing.T) {
 	t.Parallel()
 
 	var table bytes.Buffer
-	if err := run(t.Context(), &table, false); err != nil {
-		t.Fatalf("run: %v", err)
+	if err := execute(t.Context(), &table, false); err != nil {
+		t.Fatalf("execute: %v", err)
 	}
 	for _, want := range []string{"gpt-5.6-terra", "o200k_base", "gpt-image-2"} {
 		if !strings.Contains(table.String(), want) {
@@ -21,8 +21,8 @@ func TestTheReportNamesEachModelsEncodingAndTheFallback(t *testing.T) {
 	}
 
 	var encoded bytes.Buffer
-	if err := run(t.Context(), &encoded, true); err != nil {
-		t.Fatalf("run -json: %v", err)
+	if err := execute(t.Context(), &encoded, true); err != nil {
+		t.Fatalf("execute -json: %v", err)
 	}
 	var decoded struct {
 		Models []struct {

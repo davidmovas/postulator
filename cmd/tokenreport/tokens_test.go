@@ -6,6 +6,7 @@ import (
 
 	"github.com/tiktoken-go/tokenizer"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 )
 
@@ -81,7 +82,11 @@ func TestEveryModelHasAnEncodingAndAnUnknownOneSaysSo(t *testing.T) {
 func TestTheCatalogsModelsAreEachMapped(t *testing.T) {
 	t.Parallel()
 
-	mapped, err := catalogEncodings(t.Context())
+	models, err := catalog.New(noOverrides{})
+	if err != nil {
+		t.Fatalf("catalog: %v", err)
+	}
+	mapped, err := catalogEncodings(t.Context(), models)
 	if err != nil {
 		t.Fatalf("catalogEncodings: %v", err)
 	}

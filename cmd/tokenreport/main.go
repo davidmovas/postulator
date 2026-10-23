@@ -13,13 +13,13 @@ func main() {
 	asJSON := flag.Bool("json", false, "print the report as JSON instead of tables")
 	flag.Parse()
 
-	if err := run(context.Background(), os.Stdout, *asJSON); err != nil {
+	if err := execute(context.Background(), os.Stdout, *asJSON); err != nil {
 		fmt.Fprintln(os.Stderr, "tokenreport:", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, out io.Writer, asJSON bool) error {
+func execute(ctx context.Context, out io.Writer, asJSON bool) error {
 	built, err := build(ctx)
 	if err != nil {
 		return err

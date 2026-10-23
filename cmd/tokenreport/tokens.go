@@ -32,6 +32,27 @@ func (c counter) count(text string) (int, error) {
 	return c.codec.Count(text)
 }
 
+type counters struct {
+	held map[tokenizer.Encoding]counter
+}
+
+func newCounters() *counters {
+	return &counters{held: map[tokenizer.Encoding]counter{}}
+}
+
+func (cs *counters) of(ref llm.ModelRef) (counter, error) {
+	mapped := encodingFor(ref)
+	if held, ok := cs.held[mapped.encoding]; ok {
+		return held, nil
+	}
+	made, err := newCounter(mapped.encoding)
+	if err != nil {
+		return counter{}, err
+	}
+	cs.held[mapped.encoding] = made
+	return made, nil
+}
+
 type encoding struct {
 	encoding tokenizer.Encoding
 	fallback bool
@@ -55,11 +76,7 @@ func (noOverrides) List(context.Context) ([]llm.ModelOverride, error) {
 	return nil, nil
 }
 
-func catalogEncodings(ctx context.Context) ([]modelEncoding, error) {
-	models, err := catalog.New(noOverrides{})
-	if err != nil {
-		return nil, err
-	}
+func catalogEncodings(ctx context.Context, models *catalog.Catalog) ([]modelEncoding, error) {
 	listed, err := models.List(ctx)
 	if err != nil {
 		return nil, err

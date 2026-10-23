@@ -39,11 +39,23 @@ type Capture struct {
 }
 
 func Stand(name string) (*Memory, error) {
-	raw, err := captures.ReadFile(path.Join("testdata", name, "site.json"))
+	held, err := Read(name)
 	if err != nil {
 		return nil, err
 	}
-	return Decode(raw)
+	return held.Memory(), nil
+}
+
+func Read(name string) (Capture, error) {
+	raw, err := captures.ReadFile(path.Join("testdata", name, "site.json"))
+	if err != nil {
+		return Capture{}, err
+	}
+	var held Capture
+	if err := json.Unmarshal(raw, &held); err != nil {
+		return Capture{}, err
+	}
+	return held, nil
 }
 
 func Decode(raw []byte) (*Memory, error) {
@@ -51,9 +63,13 @@ func Decode(raw []byte) (*Memory, error) {
 	if err := json.Unmarshal(raw, &held); err != nil {
 		return nil, err
 	}
+	return held.Memory(), nil
+}
+
+func (c Capture) Memory() *Memory {
 	return &Memory{
-		Site: held.Site, Pages: held.Pages, Entities: held.Entities, Edges: held.Edges,
-		Types: pagetype.NewSet(held.Types, held.Scopes), Terms: held.Terms, Fields: held.Fields, Bodies: held.Bodies,
-		Written: held.Written, Renders: held.Renders, Links: held.Links, Findings: held.Findings,
-	}, nil
+		Site: c.Site, Pages: c.Pages, Entities: c.Entities, Edges: c.Edges,
+		Types: pagetype.NewSet(c.Types, c.Scopes), Terms: c.Terms, Fields: c.Fields, Bodies: c.Bodies,
+		Written: c.Written, Renders: c.Renders, Links: c.Links, Findings: c.Findings,
+	}
 }

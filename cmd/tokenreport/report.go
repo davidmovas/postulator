@@ -7,12 +7,14 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/tiktoken-go/tokenizer"
+	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
+	"github.com/davidmovas/postulator/internal/domain/llm"
 )
 
 type report struct {
 	Models []modelRow  `json:"models"`
 	Agent  agentReport `json:"agent"`
+	Pages  []pageRow   `json:"pages"`
 }
 
 type modelRow struct {
@@ -22,7 +24,11 @@ type modelRow struct {
 }
 
 func build(ctx context.Context) (report, error) {
-	mapped, err := catalogEncodings(ctx)
+	known, err := catalog.New(noOverrides{})
+	if err != nil {
+		return report{}, err
+	}
+	mapped, err := catalogEncodings(ctx, known)
 	if err != nil {
 		return report{}, err
 	}
@@ -31,7 +37,12 @@ func build(ctx context.Context) (report, error) {
 		models = append(models, modelRow{Model: row.model, Encoding: string(row.encoding), Fallback: row.fallback})
 	}
 
-	c, err := newCounter(tokenizer.O200kBase)
+	held := newCounters()
+	chat, err := known.Default(llm.RoleChat)
+	if err != nil {
+		return report{}, err
+	}
+	c, err := held.of(chat)
 	if err != nil {
 		return report{}, err
 	}
@@ -39,24 +50,45 @@ func build(ctx context.Context) (report, error) {
 	if err != nil {
 		return report{}, err
 	}
-	return report{Models: models, Agent: agent}, nil
+	pages, err := measurePages(ctx, held, known)
+	if err != nil {
+		return report{}, err
+	}
+	return report{Models: models, Agent: agent, Pages: pages}, nil
 }
 
 func (r report) write(out io.Writer) error {
-	s := newSheet(out)
-	s.heading("MODEL", "ENCODING", "")
-	for _, row := range r.Models {
-		said := ""
-		if row.Fallback {
-			said = "not mapped, counted as " + row.Encoding
+	err := tables(out, func(s *sheet) {
+		s.heading("MODEL", "ENCODING", "")
+		for _, row := range r.Models {
+			said := ""
+			if row.Fallback {
+				said = "not mapped, counted as " + row.Encoding
+			}
+			s.row(row.Model, row.Encoding, said)
 		}
-		s.row(row.Model, row.Encoding, said)
-	}
-	s.blank()
-	if err := s.flush(); err != nil {
+	})
+	if err != nil {
 		return err
 	}
-	return r.Agent.write(out)
+	if err := r.Agent.write(out); err != nil {
+		return err
+	}
+	return writePages(out, r.Pages)
+}
+
+func tables(out io.Writer, fills ...func(*sheet)) error {
+	for _, fill := range fills {
+		s := newSheet(out)
+		fill(s)
+		if err := s.flush(); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(out); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type sheet struct {
@@ -77,10 +109,6 @@ func (s *sheet) row(cells ...string) {
 
 func (s *sheet) heading(cells ...string) {
 	s.row(cells...)
-}
-
-func (s *sheet) blank() {
-	s.row("")
 }
 
 func (s *sheet) measured(name string, m measure) {
