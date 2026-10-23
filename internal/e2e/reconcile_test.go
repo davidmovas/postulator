@@ -357,6 +357,9 @@ func reconcileNestedURLsBySlug(t *testing.T, core *app.Core, siteID string) {
 	open := r.findings(t, finding.Open)
 	t.Logf("open findings after one import and one sync: %s", counted(byCode(open)))
 	stored := pagesByPath(t, core.Pages, siteID)
+	if gap, held := stored["/brewing/"]; held {
+		t.Errorf("the row matched at /guide/setup/ planned %+v, want no page at /brewing/", gap)
+	}
 	planned, found := stored["/cold-brew-at-home/"]
 	if !found {
 		t.Fatalf("the URL-less row was not planned at the slug of its title")

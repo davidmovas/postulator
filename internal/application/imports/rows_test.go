@@ -2,6 +2,7 @@ package imports_test
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -350,6 +351,105 @@ func TestAURLUnderOneParentNeverTakesAPageUnderAnotherByItsSlugOrName(t *testing
 			}
 			if ambiguous := findings(report.Warnings, imports.CodeRowAmbiguous); len(ambiguous) != 0 {
 				t.Fatalf("ambiguous rows = %+v, want the pages of other parents passed over", ambiguous)
+			}
+		})
+	}
+}
+
+func (h harness) plannedPage(t *testing.T, path, title string) pagemap.Page {
+	t.Helper()
+
+	page, err := pagemap.NewPage(pagemap.Page{
+		ID: id.New(), SiteID: h.siteID, Path: path, WPType: pagemap.WPPage, Title: title,
+		Status: pagemap.StatusPlanned, CreatedAt: observedAt, UpdatedAt: observedAt,
+	})
+	if err != nil {
+		t.Fatalf("NewPage: %v", err)
+	}
+	if err = sqlite.NewPageRepo(h.store).Insert(t.Context(), page); err != nil {
+		t.Fatalf("insert the planned page: %v", err)
+	}
+	return page
+}
+
+func TestOnlyAPlannedPageFillsTheGapsInItsPath(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		seed   func(*testing.T, harness)
+		sheet  string
+		gaps   []string
+		absent []string
+	}{
+		{
+			name: "a row matched by its slug at another address",
+			seed: func(t *testing.T, h harness) {
+				guide := h.sitePage(t, "/guide/", "Guide", 61, nil)
+				h.childPage(t, "/guide/setup/", "Setup", 62, guide)
+			},
+			sheet:  "URL,Title\n/guide/,Guide\n/brewing/setup/,Setting up your grinder\n",
+			absent: []string{"/brewing/"},
+		},
+		{
+			name:   "a row matched by its URL on the site",
+			seed:   func(t *testing.T, h harness) { h.sitePage(t, "/journal/hello/", "Hello", 63, nil) },
+			sheet:  "URL,Title\n/journal/hello/,Hello\n",
+			absent: []string{"/journal/"},
+		},
+		{
+			name:   "a row matched by its slug to a page planned at another address",
+			seed:   func(t *testing.T, h harness) { h.plannedPage(t, "/setup/", "Setup") },
+			sheet:  "URL,Title\n/brewing/setup/,Setting up your grinder\n",
+			absent: []string{"/brewing/"},
+		},
+		{
+			name:  "a row matched by its URL to a page still planned",
+			seed:  func(t *testing.T, h harness) { h.plannedPage(t, "/brewing/setup/", "Setup") },
+			sheet: "URL,Title\n/brewing/setup/,Setting up your grinder\n",
+			gaps:  []string{"/brewing/"},
+		},
+		{
+			name:  "a row no page answers",
+			seed:  func(*testing.T, harness) {},
+			sheet: "URL,Title\n/brewing/cold/,Cold brew\n",
+			gaps:  []string{"/brewing/"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			tc.seed(t, h)
+			path := h.file(t, "rows.csv", tc.sheet)
+			mapping := h.mapping(map[string]string{string(importmap.FieldPath): "URL", string(importmap.FieldTitle): "Title"})
+
+			report := h.preview(t, path, mapping)
+			generated := make([]string, 0)
+			for i := range report.Pages {
+				if report.Pages[i].Generated {
+					generated = append(generated, report.Pages[i].Path)
+				}
+			}
+			if !slices.Equal(generated, tc.gaps) {
+				t.Fatalf("the preview fills the gaps %v, want %v: %+v", generated, tc.gaps, report.Pages)
+			}
+			if filled := findings(report.Warnings, imports.CodeIntermediatePath); len(filled) != len(tc.gaps) {
+				t.Fatalf("intermediate findings = %+v, want %d", filled, len(tc.gaps))
+			}
+
+			h.apply(t, path, mapping)
+			for _, gap := range tc.gaps {
+				if stored, found := h.pageAt(t, gap); !found || stored.Status != pagemap.StatusPlanned {
+					t.Fatalf("the gap %s reads %+v (%t), want it planned", gap, stored, found)
+				}
+			}
+			for _, gap := range tc.absent {
+				if stored, found := h.pageAt(t, gap); found {
+					t.Fatalf("the import planned %+v, want no page at %s", stored, gap)
+				}
 			}
 		})
 	}

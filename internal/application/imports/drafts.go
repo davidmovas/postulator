@@ -56,6 +56,14 @@ func (p *pageDraft) page() (pagemap.Page, bool) {
 	return p.match.Page, p.match.Found()
 }
 
+func (p *pageDraft) plansAtItsURL() bool {
+	if p.url == "" || p.path != p.url {
+		return false
+	}
+	current, exists := p.page()
+	return !exists || (current.WPID == nil && current.Status != pagemap.StatusArchived)
+}
+
 func (p *pageDraft) sheetPath() string {
 	if p.url != "" {
 		return p.url
@@ -152,7 +160,7 @@ func fillGaps(sheet *drafts, state *siteState, p *plan) {
 	order := make([]string, 0)
 	for _, path := range sheet.sortedPaths() {
 		draft := sheet.pages[path]
-		if draft.url == "" {
+		if !draft.plansAtItsURL() {
 			continue
 		}
 		product := draft.product()
