@@ -118,6 +118,7 @@ type Preflight func(ctx context.Context, record Run, targets map[string]Target) 
 type StepDef struct {
 	Run       func(ctx context.Context, sc *StepContext) (Result, error)
 	Preflight Preflight
+	Scoped    func(scope []field.Key) []ArtifactKind
 	Name      string
 	Role      llm.Role
 	Requires  []ArtifactKind
@@ -222,7 +223,7 @@ func ValidateRecipe(registry StepCatalog, recipe []template.StepSpec) error {
 		}
 		seen[spec.Name] = struct{}{}
 
-		for _, required := range def.Requires {
+		for _, required := range def.RequiresFor(spec.Params) {
 			if _, ok := produced[required]; !ok {
 				return invalid("step "+spec.Name+" requires "+string(required)+", which no earlier step produces", "recipe")
 			}
@@ -257,24 +258,7 @@ const (
 )
 
 func (c *StepContext) Fields() []field.Key {
-	listed, held := c.Param(ParamFields)
-	if !held {
-		return nil
-	}
-	var out []field.Key
-	switch keys := listed.(type) {
-	case []string:
-		for _, key := range keys {
-			out = append(out, field.Key(key))
-		}
-	case []any:
-		for _, key := range keys {
-			if text, ok := key.(string); ok {
-				out = append(out, field.Key(text))
-			}
-		}
-	}
-	return out
+	return FieldsOf(c.Params)
 }
 
 func (c *StepContext) Rewrites(pageID string) bool {
