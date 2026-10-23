@@ -4391,3 +4391,20 @@ rulings and what was decided while building.
   derived parent and raises `parent_ambiguous` naming the candidates. That parent shapes the tree
   and the link plan and is never written to an existing page; a planned page's one creation call
   still sends it, as the owner's answer 1 of 2026-10-17 allows.
+
+### The owner's answers to 4.1's first session (2026-10-23)
+
+- **A field rewrite that pays for a whole draft is accepted for 4.1 only.** `rewrite_field` runs
+  the template's whole chain and `publish` writes only the named fields, so a meta description
+  costs a body draft. A run scoped to chosen fields is a real need, not a later nicety: the client
+  will ask for sweeps such as "rewrite the meta descriptions of 300 pages", and paying a body
+  draft for each is the spend he already complained about. **4.2 builds it**: a run can target
+  chosen fields, the steps for fields it does not touch are skipped, `publish` requires only the
+  drafts of the fields it writes, and the estimate prices only those.
+- **Re-importing an export plans no page for an entity that has none.** A row that carries only an
+  entity (no URL, no title, no H1) matches or updates the entity and plans no page. A row with a
+  URL, a title or an H1 that no page answers is `row_without_page`, which plans one, as before.
+  Group entities without a page exist on purpose (`no_page` in the link plan), and a re-import must
+  not fill the site plan with pages nobody asked for. This amends the plan-time answer of the same
+  day: a URL-less row with no page is planned at the slug of its title, else its H1, never of its
+  entity name.
