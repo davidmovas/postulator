@@ -497,7 +497,7 @@ func TestEveryKindRecipeIsRunnableByTheRealRegistry(t *testing.T) {
 		t.Fatalf("register the steps: %v", err)
 	}
 
-	for _, kind := range []run.Kind{run.KindRelink, run.KindSync, run.KindRevert} {
+	for _, kind := range []run.Kind{run.KindRelink, run.KindSync, run.KindRevert, run.KindEdit} {
 		recipe, owns := kind.Recipe()
 		if !owns {
 			t.Fatalf("%s owns no recipe", kind)

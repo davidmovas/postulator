@@ -93,6 +93,22 @@ export type FindingCode = (typeof findingCodes)[number];
 export const findingSeverities = ["info", "warning", "error"] as const;
 export type FindingSeverity = (typeof findingSeverities)[number];
 
+export const findingStatuses = ["open", "resolved", "dismissed"] as const;
+export type FindingStatus = (typeof findingStatuses)[number];
+
+export const findingOptions = [
+    "ignore",
+    "accept",
+    "accept_site",
+    "accept_workbook",
+    "map_to_page",
+    "set_type",
+    "rewrite_field",
+    "relink_page",
+    "rescan",
+] as const;
+export type FindingOption = (typeof findingOptions)[number];
+
 export const blockKinds = [
     "paragraph",
     "heading",
@@ -267,11 +283,12 @@ export const runKinds = [
     "import",
     "repair",
     "revert",
+    "edit",
     "custom",
 ] as const;
 export type RunKind = (typeof runKinds)[number];
 
-export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "revert"];
+export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "revert", "edit"];
 
 export const startableRunKinds: readonly RunKind[] = [
     "generate",
@@ -353,7 +370,7 @@ export const stepNames = [
 ] as const;
 export type StepName = (typeof stepNames)[number];
 
-export const perKindStepNames = ["sync_site", "relink_page", "revert"] as const;
+export const perKindStepNames = ["sync_site", "relink_page", "revert", "edit_page"] as const;
 export type PerKindStepName = (typeof perKindStepNames)[number];
 
 export const retryBlockedReasons = ["inputs_expired"] as const;

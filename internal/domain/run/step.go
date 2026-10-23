@@ -31,6 +31,7 @@ const (
 	StepSyncSite   PerKindStepName = "sync_site"
 	StepRelinkPage PerKindStepName = "relink_page"
 	StepRevert     PerKindStepName = "revert"
+	StepEditPage   PerKindStepName = "edit_page"
 )
 
 var stepNames = []StepName{
@@ -40,7 +41,7 @@ var stepNames = []StepName{
 }
 
 var perKindSteps = []PerKindStepName{
-	StepSyncSite, StepRelinkPage, StepRevert,
+	StepSyncSite, StepRelinkPage, StepRevert, StepEditPage,
 }
 
 func StepNames() []StepName {

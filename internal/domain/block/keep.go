@@ -14,9 +14,13 @@ const (
 func Part(current string, written []string, ours string) string {
 	body := Parse(current)
 	if len(clientBlocks(body, written)) > 0 && body.Kind == Blocks {
-		return htmlOpen + ours + htmlClose
+		return HTMLBlock(ours)
 	}
 	return ours
+}
+
+func HTMLBlock(raw string) string {
+	return htmlOpen + raw + htmlClose
 }
 
 func Keep(current string, written []string, ours string) (raw string, kept bool) {

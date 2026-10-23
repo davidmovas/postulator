@@ -47,7 +47,7 @@ type ListRequest struct {
 	dto.ListRequest
 	SiteID string `json:"siteId,omitempty"`
 	Status string `json:"status,omitempty" enum:"pending,running,waiting,paused,completed,failed,cancelled" description:"Only this state"`
-	Kind   string `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,repair,revert,custom" description:"Only this kind"`
+	Kind   string `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,repair,revert,edit,custom" description:"Only this kind"`
 }
 
 type ListItemsRequest struct {

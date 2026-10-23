@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 72
+const latestMigration = 73
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -93,6 +93,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0070_page_links_block_hash.sql",
 		"0071_page_renders_theme_h1.sql",
 		"0072_pages_workbook_hierarchy.sql",
+		"0073_runs_kind_edit.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1132,6 +1133,50 @@ func TestADownRestoresThePagesCheck(t *testing.T) {
 		t.Fatal("the restored check accepted a post type it never named")
 	}
 
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestAnEditRunIsStoredAndADownTakesItAwayAlone(t *testing.T) {
+	t.Parallel()
+
+	made := storeAt(t, 72)
+	want := schemaOf(t, made, "runs")
+
+	store := openStore(t, nil)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	exec := func(query string, args ...any) error {
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr
+	}
+	const at = "2026-10-23T09:00:00Z"
+	insert := `INSERT INTO runs (id, site_id, kind, status, targets, recipe, publish_mode, created_by, deadline_at, created_at)
+		VALUES (?, 's1', ?, 'completed', '[]', '[]', 'publish', 'agent', ?, ?)`
+	if err = exec(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at); err != nil {
+		t.Fatalf("site: %v", err)
+	}
+	for _, row := range [][2]string{{"r1", "edit"}, {"r2", "revert"}, {"r3", "generate"}} {
+		if err = exec(insert, row[0], row[1], at, at); err != nil {
+			t.Fatalf("a %s run: %v", row[1], err)
+		}
+	}
+	if err = exec(insert, "r4", "dance", at, at); err == nil {
+		t.Fatal("the check accepted a kind it never named")
+	}
+
+	if _, err = provider.DownTo(t.Context(), 72); err != nil {
+		t.Fatalf("down to 72: %v", err)
+	}
+	if got := schemaOf(t, store, "runs"); !slices.Equal(got, want) {
+		t.Fatalf("the down left runs as\n%s\nwant it as migration 72 left it\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if got := rowsOf(t, store, `SELECT id FROM runs ORDER BY id`); !slices.Equal(got, []string{"r2", "r3"}) {
+		t.Fatalf("the down kept the runs %v, want every run but the edit", got)
+	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)
 	}

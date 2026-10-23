@@ -10,6 +10,8 @@ func (k Kind) Recipe() ([]template.StepSpec, bool) {
 		return SyncRecipe(), true
 	case KindRevert:
 		return RevertRecipe(), true
+	case KindEdit:
+		return steps(string(StepEditPage)), true
 	case KindGenerate, KindAudit, KindImport, KindRepair, KindCustom:
 		return nil, false
 	default:

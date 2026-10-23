@@ -119,7 +119,7 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 			"scope_clash",
 		},
 		"offGraphLinkClasses":        {"self", "external", "unknown_internal"},
-		"runKindsWithTheirOwnRecipe": {"relink", "sync", "revert"},
+		"runKindsWithTheirOwnRecipe": {"relink", "sync", "revert", "edit"},
 		"startableRunKinds":          {"generate", "relink", "audit", "sync", "import", "custom"},
 		"scopableFieldKeys": {
 			"title", "excerpt", "body", "seo_title", "seo_description", "seo_canonical", "product_description",

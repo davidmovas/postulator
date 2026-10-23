@@ -24,6 +24,7 @@ export const runs = {
         sync_site: "Sync the site",
         relink_page: "Place the links",
         revert: "Put it back",
+        edit_page: "Make the confirmed change",
     },
     kinds: {
         generate: "Generate",
@@ -33,6 +34,7 @@ export const runs = {
         import: "Import",
         repair: "Repair",
         revert: "Revert",
+        edit: "Agent edit",
         custom: "Custom",
     },
     status: {
@@ -300,6 +302,7 @@ export const runs = {
             import: "Runs the page steps you choose without a recipe of its own.",
             repair: "No model is called. The hierarchy is read from the site and never written, so a repair can no longer be started; a relink fixes the links.",
             revert: "A revert is started from the run it undoes, on that run's page.",
+            edit: "An agent edit makes the one change to a field or a block that a person confirmed, and no model is called.",
             custom: "Runs exactly the steps of the template, whatever they are.",
         },
         estimate: "Price this run",

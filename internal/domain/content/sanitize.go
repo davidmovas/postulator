@@ -60,14 +60,36 @@ func (a *LinkAllowance) keep(node *html.Node) (string, bool) {
 	return a.context.Href(resolved.Target), true
 }
 
+type demotion struct {
+	from []string
+	to   atom.Atom
+}
+
+var (
+	sectionDemotion = demotion{from: demotedHeadings, to: atom.H3}
+	blockDemotion   = demotion{from: []string{"h1"}, to: atom.H2}
+)
+
 func Sanitize(fragment string, allowance *LinkAllowance) (string, Stripped) {
+	return sanitized(fragment, allowance, sectionDemotion)
+}
+
+func SanitizeBlock(fragment string, keepH1 bool) (string, Stripped) {
+	rule := blockDemotion
+	if keepH1 {
+		rule = demotion{}
+	}
+	return sanitized(fragment, nil, rule)
+}
+
+func sanitized(fragment string, allowance *LinkAllowance, rule demotion) (string, Stripped) {
 	doc, err := Parse(fragment)
 	if err != nil {
 		return "", Stripped{}
 	}
 
 	var stripped Stripped
-	scrub(doc.root, allowance, &stripped)
+	scrub(doc.root, allowance, rule, &stripped)
 
 	rendered, err := doc.Render()
 	if err != nil {
@@ -76,7 +98,7 @@ func Sanitize(fragment string, allowance *LinkAllowance) (string, Stripped) {
 	return rendered, stripped
 }
 
-func scrub(parent *html.Node, allowance *LinkAllowance, stripped *Stripped) {
+func scrub(parent *html.Node, allowance *LinkAllowance, rule demotion, stripped *Stripped) {
 	for child := parent.FirstChild; child != nil; {
 		next := child.NextSibling
 		if child.Type != html.ElementNode {
@@ -90,20 +112,20 @@ func scrub(parent *html.Node, allowance *LinkAllowance, stripped *Stripped) {
 		case child.Data == "a":
 			if href, kept := allowance.keep(child); kept {
 				child.Attr = []html.Attribute{{Key: "href", Val: href}}
-				scrub(child, nil, stripped)
+				scrub(child, nil, rule, stripped)
 				break
 			}
-			scrub(child, nil, stripped)
+			scrub(child, nil, rule, stripped)
 			unwrap(parent, child)
 			stripped.Links++
 		default:
-			if slices.Contains(demotedHeadings, child.Data) {
-				child.Data = "h3"
-				child.DataAtom = atom.H3
+			if slices.Contains(rule.from, child.Data) {
+				child.Data = rule.to.String()
+				child.DataAtom = rule.to
 				stripped.Demoted++
 			}
 			child.Attr = keptAttributes(child.Attr, stripped)
-			scrub(child, allowance, stripped)
+			scrub(child, allowance, rule, stripped)
 		}
 		child = next
 	}

@@ -389,6 +389,9 @@ func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]templ
 	if kind == run.KindRevert {
 		return nil, invalid("a revert is started from the run it undoes, not from a list of pages", "kind")
 	}
+	if kind == run.KindEdit {
+		return nil, invalid("an edit is started from the one change a person confirmed, not from a list of pages", "kind")
+	}
 	if kind == run.KindRepair {
 		return nil, invalid("a repair run can no longer be started: the hierarchy is read from the site and never written, "+
 			"so there is nothing to repair; start a relink run to fix the links", "kind")

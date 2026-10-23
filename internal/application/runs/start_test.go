@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -93,7 +94,55 @@ func onTheSite(fixture *fixture, pageIDs ...string) {
 	fixture.mapping.known = map[string]pagemap.Page{}
 	for i, pageID := range pageIDs {
 		wpID, entityID := int64(100+i), "entity-"+pageID
-		fixture.mapping.known[pageID] = pagemap.Page{ID: pageID, Path: "/" + pageID + "/", WPID: &wpID, EntityID: &entityID}
+		fixture.mapping.known[pageID] = pagemap.Page{
+			ID: pageID, SiteID: fixture.siteID, Path: "/" + pageID + "/", WPID: &wpID, EntityID: &entityID,
+		}
+	}
+}
+
+func TestAnEditRunStartsFromOneConfirmedChangeAndNeverFromStart(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	onTheSite(fixture, fixture.pages[0])
+	change := run.Edit{Op: run.EditSetField, Field: "excerpt", Value: "Pull a balanced shot."}
+	started, err := fixture.service.StartEdit(kctx.WithActor(t.Context(), kctx.ActorAgent), runs.EditRequest{
+		SiteID: fixture.siteID, PageID: fixture.pages[0], Edit: change,
+	})
+	if err != nil || started.RunID == "" {
+		t.Fatalf("StartEdit = %+v, %v", started, err)
+	}
+	queued := fixture.engine.queued
+	if queued.Kind != run.KindEdit || !slices.Equal(queued.Targets, []string{fixture.pages[0]}) ||
+		queued.PublishMode != run.PublishLive || queued.CreatedBy != kctx.ActorAgent {
+		t.Fatalf("the queued run = %+v, want one live edit of the page by the agent", queued)
+	}
+	if got, err := run.EditOf(run.ParamsFor(queued.Recipe, "edit_page")); err != nil || got != change {
+		t.Fatalf("the run carries %+v, %v, want the change it was given", got, err)
+	}
+
+	fixture.mapping.known[fixture.pages[1]] = pagemap.Page{ID: fixture.pages[1], SiteID: fixture.siteID, Path: "/planned/"}
+	refusals := []struct {
+		name string
+		req  runs.EditRequest
+		code errors.Code
+	}{
+		{name: "a field the run may not write", req: runs.EditRequest{PageID: fixture.pages[0], Edit: run.Edit{Op: run.EditSetField, Field: "sku", Value: "X"}}, code: errors.Invalid},
+		{name: "a page not on the site", req: runs.EditRequest{PageID: fixture.pages[1], Edit: change}, code: errors.Invalid},
+		{name: "another site's page", req: runs.EditRequest{SiteID: "elsewhere", PageID: fixture.pages[0], Edit: change}, code: errors.NotFound},
+	}
+	for _, tc := range refusals {
+		if tc.req.SiteID == "" {
+			tc.req.SiteID = fixture.siteID
+		}
+		if _, err := fixture.service.StartEdit(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
+			t.Errorf("%s: StartEdit = %v, want %s", tc.name, err, tc.code)
+		}
+	}
+	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{fixture.pages[0]}, Kind: string(run.KindEdit),
+	}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("Start of an edit run = %v, want it refused: an edit starts from the change a person confirmed", err)
 	}
 }
 

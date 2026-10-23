@@ -34,6 +34,7 @@ func all(deps Deps) []run.StepDef {
 		SyncSite(deps),
 		RelinkPage(deps),
 		Revert(deps),
+		EditPage(deps),
 	}
 }
 

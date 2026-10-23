@@ -27,10 +27,14 @@ func TestAKindAPersonMayStartIsNeitherARepairNorARevert(t *testing.T) {
 			t.Errorf("%s is not startable, yet a person may ask for it", kind)
 		}
 	}
-	for _, kind := range []run.Kind{run.KindRepair, run.KindRevert, run.Kind("teleport")} {
+	for _, kind := range []run.Kind{run.KindRepair, run.KindRevert, run.KindEdit, run.Kind("teleport")} {
 		if kind.Startable() {
-			t.Errorf("%s is startable: a repair writes nothing any more, a revert starts from the run it undoes", kind)
+			t.Errorf("%s is startable: a repair writes nothing any more, a revert starts from the run it undoes, "+
+				"an edit from the change a person confirmed", kind)
 		}
+	}
+	if run.KindEdit.PageScoped() {
+		t.Error("an edit run loads its page itself, so it needs no template resolved for it")
 	}
 }
 
@@ -50,6 +54,7 @@ func TestAKindThatOwnsARecipeHandsItOut(t *testing.T) {
 		{name: "repair", kind: run.KindRepair},
 		{name: "sync", kind: run.KindSync, owned: true, want: []string{"sync_site"}},
 		{name: "revert", kind: run.KindRevert, owned: true, want: []string{"revert"}},
+		{name: "edit", kind: run.KindEdit, owned: true, want: []string{"edit_page"}},
 		{name: "generate", kind: run.KindGenerate},
 		{name: "custom", kind: run.KindCustom},
 		{name: "audit", kind: run.KindAudit},
@@ -98,8 +103,8 @@ func TestAStepBelongsToATemplateRecipeOrToAKindNeverBoth(t *testing.T) {
 	t.Parallel()
 
 	perKind := run.PerKindStepNames()
-	if len(perKind) != 3 {
-		t.Fatalf("PerKindStepNames() = %v, want the three steps a kind recipe owns", perKind)
+	if len(perKind) != 4 {
+		t.Fatalf("PerKindStepNames() = %v, want the four steps a kind recipe owns", perKind)
 	}
 
 	for _, name := range perKind {
@@ -125,10 +130,10 @@ func TestEveryPerKindStepIsNamedByExactlyOneKind(t *testing.T) {
 
 	kinds := []run.Kind{
 		run.KindGenerate, run.KindRelink, run.KindAudit, run.KindSync, run.KindImport,
-		run.KindRepair, run.KindRevert, run.KindCustom,
+		run.KindRepair, run.KindRevert, run.KindEdit, run.KindCustom,
 	}
 
-	for _, step := range []string{"sync_site", "relink_page", "revert"} {
+	for _, step := range []string{"sync_site", "relink_page", "revert", "edit_page"} {
 		owners := make([]run.Kind, 0, 1)
 		for _, kind := range kinds {
 			recipe, owned := kind.Recipe()
