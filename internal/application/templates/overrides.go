@@ -111,19 +111,19 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 		return ResolveForPageResponse{}, err
 	}
 	picked := strings.TrimSpace(req.TemplateID)
-	templateID := page.TemplateID
+	templateID, source := page.TemplateID, SourcePage
 	if picked != "" {
-		templateID = &picked
+		templateID, source = &picked, SourceRun
 	}
 	if templateID == nil {
 		types, typesErr := s.types.ListBySite(ctx, page.SiteID)
 		if typesErr != nil {
 			return ResolveForPageResponse{}, typesErr
 		}
-		templateID = pagetype.NewSet(types, nil).TypeOf(page).TemplateID
+		templateID, source = pagetype.NewSet(types, nil).TypeOf(page).TemplateID, SourceType
 	}
 	if templateID == nil {
-		templateID = owner.Defaults.TemplateID
+		templateID, source = owner.Defaults.TemplateID, SourceSite
 	}
 	if templateID == nil {
 		return ResolveForPageResponse{}, errors.New(errors.NotFound, "page has no template and its site has no default template").WithDetail("pageId", page.ID)
@@ -154,7 +154,9 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	if err != nil {
 		return ResolveForPageResponse{}, err
 	}
-	return ResolveForPageResponse{TemplateID: base.ID, SiteID: page.SiteID, Version: base.Version, Spec: spec.Expanded(vars)}, nil
+	return ResolveForPageResponse{
+		TemplateID: base.ID, Name: base.Name, Source: source, SiteID: page.SiteID, Version: base.Version, Spec: spec.Expanded(vars),
+	}, nil
 }
 
 func (s *Service) varsFor(ctx context.Context, page pagemap.Page, owner site.Site) (template.Vars, error) {

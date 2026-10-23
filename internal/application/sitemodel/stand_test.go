@@ -137,30 +137,37 @@ func TestThePackOfEveryStandPage(t *testing.T) {
 
 const toolResultCap = 16384
 
-func TestEveryPageViewOfTheReplicaFitsATurnsToolResult(t *testing.T) {
+func TestEveryPageModelOfBothStandsFitsATurnsToolResult(t *testing.T) {
 	t.Parallel()
 
-	raw, err := os.ReadFile(filepath.Join("testdata", "replica", "site.json"))
-	if err != nil {
-		t.Fatalf("read the replica's capture: %v", err)
-	}
-	m := captured(t, raw)
-	for i := range m.pages {
-		page := &m.pages[i]
-		if page.Status == pagemap.StatusArchived {
-			continue
-		}
-		answered, err := m.service().Explore(t.Context(), sitemodel.ExploreRequest{SiteID: m.site.ID, View: sitemodel.ViewPage, PageID: page.ID})
+	for _, stand := range []string{"replica", "vanilla"} {
+		raw, err := os.ReadFile(filepath.Join("testdata", stand, "site.json"))
 		if err != nil {
-			t.Fatalf("the page view of %s: %v", page.Path, err)
+			t.Fatalf("read the %s's capture: %v", stand, err)
 		}
-		encoded, err := json.Marshal(answered)
-		if err != nil {
-			t.Fatalf("encode: %v", err)
+		m := captured(t, raw)
+		widest, at := 0, ""
+		for i := range m.pages {
+			page := &m.pages[i]
+			if page.Status == pagemap.StatusArchived {
+				continue
+			}
+			answered, err := m.service().Page(t.Context(), sitemodel.PageRequest{SiteID: m.site.ID, PageID: page.ID})
+			if err != nil {
+				t.Fatalf("the %s's page model of %s: %v", stand, page.Path, err)
+			}
+			encoded, err := json.Marshal(answered)
+			if err != nil {
+				t.Fatalf("encode: %v", err)
+			}
+			if len(encoded) > widest {
+				widest, at = len(encoded), page.Path
+			}
+			if len(encoded) > toolResultCap {
+				t.Errorf("the %s's page model of %s is %d bytes, over a turn's %d-byte tool result", stand, page.Path, len(encoded), toolResultCap)
+			}
 		}
-		if len(encoded) > toolResultCap {
-			t.Errorf("the page view of %s is %d bytes, over a turn's %d-byte tool result", page.Path, len(encoded), toolResultCap)
-		}
+		t.Logf("the %s's widest page model is %s at %d bytes", stand, at, widest)
 	}
 }
 

@@ -302,7 +302,8 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 		t.Fatalf("set the site default: %v", err)
 	}
 	viaDefault, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: orphan.ID})
-	if err != nil || viaDefault.TemplateID != hub.ID || viaDefault.Version != 1 || viaDefault.Spec.Tone != hub.Spec.Tone {
+	if err != nil || viaDefault.TemplateID != hub.ID || viaDefault.Version != 1 || viaDefault.Spec.Tone != hub.Spec.Tone ||
+		viaDefault.Source != templates.SourceSite || viaDefault.Name != hub.Name {
 		t.Errorf("ResolveForPage via the site default = %+v, %v", viaDefault, err)
 	}
 
@@ -331,6 +332,13 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	if resolved.Spec.Tone != "warm" || resolved.Spec.KeywordRules.MaxDensity != 0.05 || resolved.Spec.Length.Min != 100 ||
 		resolved.Spec.Images.Inline != 3 || resolved.Spec.Images.Source != template.ImagesAI || resolved.Spec.Images.Featured {
 		t.Errorf("ResolveForPage = %+v", resolved.Spec)
+	}
+	if resolved.Source != templates.SourcePage {
+		t.Errorf("a page's own template resolves from %q, want the page", resolved.Source)
+	}
+	picked, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID, TemplateID: hub.ID})
+	if err != nil || picked.Source != templates.SourceRun {
+		t.Errorf("a template picked for a run resolves as %+v, %v, want from the run", picked.Source, err)
 	}
 
 	replaced, err := h.service.SetOverride(t.Context(), templates.SetOverrideRequest{TemplateID: hub.ID, Scope: "site", TargetID: h.siteID, Patch: json.RawMessage(`{"tone":"cold"}`)})

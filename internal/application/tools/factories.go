@@ -51,7 +51,6 @@ func factories() []factory {
 		templatesDelete,
 		templatesSetOverride,
 		templatesDeleteOverride,
-		templatesResolveForPage,
 		runsStart,
 		runsGet,
 		runsList,

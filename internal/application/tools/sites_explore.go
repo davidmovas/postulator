@@ -15,8 +15,8 @@ const (
 )
 
 type sitesExploreArgs struct {
-	View    string `json:"view" enum:"page,tree,links,gaps,pack" description:"tree lists a page's children, the top level without a page"`
-	PageID  string `json:"pageId,omitempty" description:"Page id; page, links and pack need it or path"`
+	View    string `json:"view" enum:"tree,links,gaps,pack" description:"tree lists a page's children, the top level without a page"`
+	PageID  string `json:"pageId,omitempty" description:"Page id; links and pack need it or path"`
 	Path    string `json:"path,omitempty" description:"The page's path, used when pageId is empty"`
 	Field   string `json:"field,omitempty" enum:"title,excerpt,body,seo_title,seo_description,product_description,product_short_description,variation_description,image_alt,image_title" description:"pack: default the body"`
 	MetaKey string `json:"metaKey,omitempty" description:"pack: a custom field's meta key, in place of field"`
@@ -28,8 +28,8 @@ type sitesExploreArgs struct {
 func sitesExplore(deps Deps) Tool {
 	return newSiteTool(Def{
 		Name: sitesExploreName,
-		Description: "Read the site's model: a page's facts, the page tree, a page's owed links, the pages with gaps, " +
-			"or the pack the writer reads for a field.",
+		Description: "Read the site's model: the page tree, a page's owed links, the pages with gaps, or the pack the " +
+			"writer reads for a field.",
 		Risk: RiskRead,
 	}, func(ctx context.Context, b Binding, in sitesExploreArgs) (sitemodel.ExploreResponse, error) {
 		req := sitemodel.ExploreRequest{

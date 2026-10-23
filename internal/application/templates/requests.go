@@ -71,8 +71,17 @@ type ResolveForPageRequest struct {
 	TemplateID string `json:"templateId,omitempty" description:"Template id to resolve instead; default the page's own"`
 }
 
+const (
+	SourceRun  = "run"
+	SourcePage = "page"
+	SourceType = "type"
+	SourceSite = "site"
+)
+
 type ResolveForPageResponse struct {
 	TemplateID string                `json:"templateId"`
+	Name       string                `json:"name"`
+	Source     string                `json:"source"`
 	SiteID     string                `json:"siteId"`
 	Version    int                   `json:"version"`
 	Spec       template.TemplateSpec `json:"spec"`

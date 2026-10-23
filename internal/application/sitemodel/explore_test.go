@@ -64,10 +64,10 @@ func TestEveryViewAnswersFromTheModel(t *testing.T) {
 	t.Parallel()
 
 	m := audited()
-	page := explore(t, m, sitemodel.ExploreRequest{View: sitemodel.ViewPage, Path: "peptides"})
-	if page.Page == nil || page.Page.Page.PageID != "hub" || page.Page.Entity == nil || page.Page.Entity.Name != "Peptides" ||
-		len(page.Page.Products) != 1 || len(page.Page.Findings) != 1 || page.Page.Findings[0].Code != "parent_unresolved" {
-		t.Errorf("page = %+v, want the hub found by its path with its card, its product and its open finding", page.Page)
+	page, err := m.service().Page(t.Context(), sitemodel.PageRequest{SiteID: siteID, Path: "peptides"})
+	if err != nil || page.Page.PageID != "hub" || page.Entity == nil || page.Entity.Name != "Peptides" ||
+		len(page.Products) != 1 || len(page.Findings) != 1 || page.Findings[0].Code != "parent_unresolved" {
+		t.Errorf("page = %+v, %v, want the hub found by its path with its card, its product and its open finding", page, err)
 	}
 
 	top := explore(t, m, sitemodel.ExploreRequest{View: sitemodel.ViewTree})
@@ -129,10 +129,10 @@ func TestExploreRefusesWhatItCannotAnswer(t *testing.T) {
 		code errors.Code
 	}{
 		{name: "an unknown view", m: audited(), req: sitemodel.ExploreRequest{View: "everything"}, code: errors.Invalid},
-		{name: "a page view with no page", m: audited(), req: sitemodel.ExploreRequest{View: sitemodel.ViewPage}, code: errors.Invalid},
+		{name: "the page view pages_get took", m: audited(), req: sitemodel.ExploreRequest{View: "page", Path: "/peptides/"}, code: errors.Invalid},
 		{name: "a links view with no page", m: audited(), req: sitemodel.ExploreRequest{View: sitemodel.ViewLinks}, code: errors.Invalid},
-		{name: "a path no page has", m: audited(), req: sitemodel.ExploreRequest{View: sitemodel.ViewPage, Path: "/nowhere/"}, code: errors.NotFound},
-		{name: "a page of another site", m: other, req: sitemodel.ExploreRequest{View: sitemodel.ViewPage, PageID: "far"}, code: errors.NotFound},
+		{name: "a path no page has", m: audited(), req: sitemodel.ExploreRequest{View: sitemodel.ViewLinks, Path: "/nowhere/"}, code: errors.NotFound},
+		{name: "a page of another site", m: other, req: sitemodel.ExploreRequest{View: sitemodel.ViewLinks, PageID: "far"}, code: errors.NotFound},
 		{name: "an unknown gap", m: audited(), req: sitemodel.ExploreRequest{View: sitemodel.ViewGaps, Gap: "ugly"}, code: errors.Invalid},
 		{name: "a cursor of another order", m: audited(), req: sitemodel.ExploreRequest{View: sitemodel.ViewTree, Cursor: "bm90IGEgY3Vyc29y"}, code: errors.Invalid},
 		{name: "a field the writer never writes", m: audited(), req: sitemodel.ExploreRequest{View: sitemodel.ViewPack, PageID: "tb", Field: "price"}, code: errors.Invalid},

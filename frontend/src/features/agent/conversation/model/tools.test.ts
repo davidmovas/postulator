@@ -52,7 +52,7 @@ describe("resultSummary", () => {
 
     it("says which view of the site's model the agent read", () => {
         const page = { pageId: "p1", path: "/peptides/", title: "Peptides" };
-        expect(resultSummary("sites_explore", { view: "page", page: { page, trail: [] } })).toBe("the page /peptides/");
+        expect(resultSummary("pages_get", { page: { page, parent: { trail: [] } }, template: null })).toBe("the page /peptides/");
         expect(
             resultSummary("sites_explore", { view: "tree", tree: { parent: page, nodes: { items: [{}, {}], hasMore: true } } }),
         ).toBe("2 pages under /peptides/, more available");

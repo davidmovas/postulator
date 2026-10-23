@@ -17,6 +17,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -132,9 +133,12 @@ func assertTheBriefStays(t *testing.T, core *app.Core, script *fake.Scripted, co
 func assertEveryViewAnswersFromTheModel(t *testing.T, core *app.Core, conversation string) {
 	t.Helper()
 
-	page := explore(t, core, conversation, `{"view":"page","path":"`+agentHub+`"}`).Page
-	if page == nil || page.Page.Path != agentHub || len(page.Products) == 0 || (page.ListedFrom != "listing" && page.ListedFrom != "twin") {
-		t.Errorf("the page view of %s is %+v, want its products from its listing or its twin's term", agentHub, page)
+	var read tools.PagesGetResponse
+	if err := json.Unmarshal(callTool(t, core, conversation, "pages_get", `{"path":"`+agentHub+`"}`), &read); err != nil {
+		t.Fatalf("decode what pages_get answered for %s: %v", agentHub, err)
+	}
+	if page := read.Page; page.Page.Path != agentHub || len(page.Products) == 0 || (page.ListedFrom != "listing" && page.ListedFrom != "twin") {
+		t.Errorf("the page model of %s is %+v, want its products from its listing or its twin's term", agentHub, page)
 	}
 
 	top := explore(t, core, conversation, `{"view":"tree"}`).Tree

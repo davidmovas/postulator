@@ -231,7 +231,6 @@ func TestSitesExploreAnswersEveryViewOverTheStore(t *testing.T) {
 	registry, binding, seeded := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 	calls := map[string]string{
-		"page":  `{"view":"page","path":"/coffee/"}`,
 		"tree":  `{"view":"tree"}`,
 		"links": `{"view":"links","pageId":"` + seeded.page + `"}`,
 		"gaps":  `{"view":"gaps","limit":10}`,

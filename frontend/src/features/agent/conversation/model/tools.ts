@@ -156,8 +156,6 @@ function countAt(record: Record<string, unknown> | null, key: string): number {
 function exploreSummary(result: Record<string, unknown>): string | null {
     const said = copy.agent.transcript.tool.explore;
     switch (result["view"]) {
-        case "page":
-            return said.page(textAt(recordAt(recordAt(result, "page"), "page"), "path"));
         case "tree": {
             const tree = recordAt(result, "tree");
             const nodes = recordAt(tree, "nodes");
@@ -195,7 +193,13 @@ function cardsSummary(result: Record<string, unknown>): string | null {
     return skipped === 0 ? done : `${done}, ${said.skipped(skipped)}`;
 }
 
+function pageSummary(result: Record<string, unknown>): string | null {
+    const path = textAt(recordAt(recordAt(result, "page"), "page"), "path");
+    return path === "" ? null : copy.agent.transcript.tool.explore.page(path);
+}
+
 const summaries: Readonly<Record<string, (result: Record<string, unknown>) => string | null>> = {
+    pages_get: pageSummary,
     sites_explore: exploreSummary,
     graph_propose_cards: cardsSummary,
 };

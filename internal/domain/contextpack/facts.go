@@ -74,6 +74,8 @@ type LinkRef struct {
 type FieldFacts struct {
 	Key     field.Key   `json:"key"`
 	Current string      `json:"current"`
+	Base    string      `json:"base"`
+	Hash    string      `json:"hash"`
 	Ours    bool        `json:"ours"`
 	Scope   field.Scope `json:"scope"`
 	Stored  bool        `json:"stored"`
@@ -478,12 +480,13 @@ func (s Snapshot) fieldFacts(page pagemap.Page, key field.Key, scope field.Scope
 	if key == field.Body {
 		if body, found := s.body(page.ID); found {
 			row.Current = body.Serialize()
+			row.Hash = block.BodyHash(row.Current)
 			row.Ours = row.Current != "" && !block.HasClient(row.Current, s.Written[page.ID])
 		}
 		return row
 	}
 	if value, found := s.value(page.ID, key); found {
-		row.Current = value.Current
+		row.Current, row.Base, row.Hash = value.Current, value.Base, value.CurrentHash
 		row.Ours = value.WrittenRunID != nil && value.CurrentHash == value.BaseHash
 	}
 	return row

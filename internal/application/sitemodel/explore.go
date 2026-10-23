@@ -19,7 +19,6 @@ import (
 type View string
 
 const (
-	ViewPage  View = "page"
 	ViewTree  View = "tree"
 	ViewLinks View = "links"
 	ViewGaps  View = "gaps"
@@ -43,7 +42,6 @@ type ExploreRequest struct {
 
 type ExploreResponse struct {
 	View  View                             `json:"view"`
-	Page  *PageView                        `json:"page,omitempty"`
 	Tree  *TreeView                        `json:"tree,omitempty"`
 	Links *reports.LinkAuditPageResponse   `json:"links,omitempty"`
 	Gaps  *paging.List[contextpack.GapRow] `json:"gaps,omitempty"`
@@ -67,8 +65,6 @@ type PackText struct {
 
 func (s *Service) Explore(ctx context.Context, req ExploreRequest) (ExploreResponse, error) {
 	switch req.View {
-	case ViewPage:
-		return s.explorePage(ctx, req)
 	case ViewTree:
 		return s.exploreTree(ctx, req)
 	case ViewLinks:
@@ -78,26 +74,9 @@ func (s *Service) Explore(ctx context.Context, req ExploreRequest) (ExploreRespo
 	case ViewPack:
 		return s.explorePack(ctx, req)
 	default:
-		return ExploreResponse{}, errors.New(errors.Invalid, "the view must be page, tree, links, gaps or pack").
+		return ExploreResponse{}, errors.New(errors.Invalid, "the view must be tree, links, gaps or pack; a page is read by pages_get").
 			WithDetail("field", "view").WithDetail("value", string(req.View))
 	}
-}
-
-func (s *Service) explorePage(ctx context.Context, req ExploreRequest) (ExploreResponse, error) {
-	var view PageView
-	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
-		page, err := s.named(c, req, true)
-		if err != nil {
-			return err
-		}
-		facts, _, _, err := s.read(c, page.ID, "", nil)
-		if err != nil {
-			return err
-		}
-		view = pageView(facts)
-		return nil
-	})
-	return ExploreResponse{View: ViewPage, Page: &view}, err
 }
 
 func (s *Service) exploreLinks(ctx context.Context, req ExploreRequest) (ExploreResponse, error) {

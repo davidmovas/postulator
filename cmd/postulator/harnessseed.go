@@ -347,7 +347,7 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 	case strings.Contains(lowered, "open the page"):
 		return fake.Turn{
 			Tool: "pages_get",
-			Args: json.RawMessage(`{"id":"` + absentPageID + `"}`),
+			Args: json.RawMessage(`{"pageId":"` + absentPageID + `"}`),
 			Text: "There is no page with that id on this site. Give me the path instead and I will " +
 				"look it up in the map.",
 		}

@@ -230,7 +230,7 @@ export const packFieldKeys: readonly FieldKey[] = [
     "image_title",
 ];
 
-export const exploreViews = ["page", "tree", "links", "gaps", "pack"] as const;
+export const exploreViews = ["tree", "links", "gaps", "pack"] as const;
 export type ExploreView = (typeof exploreViews)[number];
 
 export const siteGaps = ["planned", "empty", "unmapped", "orphan", "missing_links", "findings"] as const;

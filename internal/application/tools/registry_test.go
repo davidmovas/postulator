@@ -70,7 +70,6 @@ func registered() []string {
 		"templates_delete",
 		"templates_set_override",
 		"templates_delete_override",
-		"templates_resolve_for_page",
 		"runs_start",
 		"runs_get",
 		"runs_list",
@@ -166,7 +165,7 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 65025
+	schemaCeilingBytes = 64963
 	charactersPerToken = 4
 	widestLogged       = 8
 )
