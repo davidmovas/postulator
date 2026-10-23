@@ -144,9 +144,9 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, itemType s
 	s.mu.Lock()
 	created := s.add(Item{
 		Type:          itemType,
-		Title:         stringField(body, "title"),
-		Content:       stringField(body, "content"),
-		Excerpt:       stringField(body, "excerpt"),
+		Title:         s.saved(stringField(body, "title")),
+		Content:       s.saved(stringField(body, "content")),
+		Excerpt:       s.saved(stringField(body, "excerpt")),
 		Slug:          stringField(body, "slug"),
 		Status:        stringField(body, "status"),
 		Template:      stringField(body, "template"),

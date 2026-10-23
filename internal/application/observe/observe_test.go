@@ -836,6 +836,34 @@ func TestAFieldChangedOnTheSiteIsAFindingUntilAccepted(t *testing.T) {
 	}
 }
 
+func TestAnEscapedAmpersandIsNoChangeOnTheSite(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	for i := range s.plugin.items {
+		if s.plugin.items[i].ID == tb500ID {
+			s.plugin.items[i].Title = "TB-500 & BPC-157"
+		}
+	}
+	s.run(t, observe.Options{})
+	tb := s.pageAt(t, "/tb-500/")
+
+	for i := range s.plugin.items {
+		if s.plugin.items[i].ID == tb500ID {
+			s.plugin.items[i].Title = "TB-500 &amp; BPC-157"
+		}
+	}
+	s.touch(tb500ID, start.Add(time.Minute))
+	s.clock.Set(start.Add(time.Hour))
+	s.run(t, observe.Options{})
+
+	if _, raised := s.finding(finding.FieldChangedOnSite, finding.SubjectPageField(tb.ID, string(field.Title))); raised {
+		t.Error("a title the site stored with its ampersand escaped raised field_changed_on_site, want no change: the text is the same")
+	}
+	if title := s.fieldOf(t, tb.ID, field.Title); title.Changed() || title.Base != "TB-500 &amp; BPC-157" {
+		t.Errorf("title = %+v, want the base agreed to what the site stores, so a write under its hash still holds", title)
+	}
+}
+
 func TestAnOutdatedPluginIsAFindingThatClearsWhenUpdated(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

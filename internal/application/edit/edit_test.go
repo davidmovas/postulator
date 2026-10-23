@@ -527,6 +527,22 @@ func TestAValueAlreadyStoredIsTakenAsWritten(t *testing.T) {
 	}
 }
 
+func TestATitleStoredWithItsEntitiesEscapedIsTakenAsWritten(t *testing.T) {
+	t.Parallel()
+
+	s := newSite()
+	s.core[field.Title] = "Tea &amp; coffee"
+	results, err := serviceOver(s).Write(t.Context(), page, []edit.Write{
+		{Key: field.Title, Value: new("Tea & coffee"), Expected: hashOf("Old title")},
+	})
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if len(results) != 1 || results[0].Outcome != edit.OutcomeWritten {
+		t.Errorf("results = %+v, want the title the site stored with its ampersand escaped taken as written, not as the client's", results)
+	}
+}
+
 func TestAnOutdatedPluginWritesNothing(t *testing.T) {
 	t.Parallel()
 

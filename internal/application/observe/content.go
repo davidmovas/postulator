@@ -333,7 +333,7 @@ func (a *absorber) observeFields(ctx context.Context, page pagemap.Page, values 
 		subject := finding.SubjectPageField(page.ID, string(value.Key))
 		switch {
 		case !value.Changed():
-		case known && spec.Denied:
+		case known && spec.Denied, field.SameText(value.Key, value.Base, value.Current):
 			if err := a.service.deps.Fields.Agree(ctx, page.ID, value.Key, a.now); err != nil {
 				return err
 			}

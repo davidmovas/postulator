@@ -125,11 +125,13 @@ func (p seoPlan) writes() []edit.Write {
 func (p seoPlan) movedSince(held wp.SEOMeta) []string {
 	before := p.before()
 	moved := make([]string, 0, 2)
-	if p.Meta.Title != "" && (held.Title != before.Title || (p.Meta.OGTitle != "" && held.OGTitle != before.OGTitle)) {
+	same := field.SameText
+	if p.Meta.Title != "" && (!same(field.SEOTitle, held.Title, before.Title) ||
+		(p.Meta.OGTitle != "" && !same(field.SEOTitle, held.OGTitle, before.OGTitle))) {
 		moved = append(moved, string(field.SEOTitle))
 	}
-	if p.Meta.Description != "" && (held.Description != before.Description ||
-		(p.Meta.OGDescription != "" && held.OGDescription != before.OGDescription)) {
+	if p.Meta.Description != "" && (!same(field.SEODescription, held.Description, before.Description) ||
+		(p.Meta.OGDescription != "" && !same(field.SEODescription, held.OGDescription, before.OGDescription))) {
 		moved = append(moved, string(field.SEODescription))
 	}
 	return moved

@@ -446,8 +446,8 @@ func checkBeforeWriting(ctx context.Context, sc *run.StepContext, client *wp.Cli
 			key   field.Key
 			moved bool
 		}{
-			{key: field.Title, moved: !request.KeepTitle && item.Title != plan.SiteTitle},
-			{key: field.Excerpt, moved: request.Excerpt != nil && item.Excerpt != plan.Excerpt},
+			{key: field.Title, moved: !request.KeepTitle && !field.SameText(field.Title, item.Title, plan.SiteTitle)},
+			{key: field.Excerpt, moved: request.Excerpt != nil && !field.SameText(field.Excerpt, item.Excerpt, plan.Excerpt)},
 			{key: field.FeaturedImage, moved: request.Featured != 0 && item.FeaturedMedia != plan.SiteFeatured},
 			{key: field.Body, moved: request.sendsBody() && wp.ContentHash(item.Content) != plan.SiteHash},
 		} {

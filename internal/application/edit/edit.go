@@ -261,7 +261,7 @@ func checked(ctx context.Context, target Target, group []Write, read reader, put
 		switch {
 		case holds(current, group[i].Expected):
 			values[group[i].Key] = text(group[i].Value)
-		case current == text(group[i].Value):
+		case field.SameText(group[i].Key, current, text(group[i].Value)):
 		default:
 			results = append(results, Result{Key: group[i].Key, Outcome: OutcomeMoved, Hash: new(block.BodyHash(current))})
 		}

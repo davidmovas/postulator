@@ -56,7 +56,7 @@ func (d Deps) keptFieldsOf(ctx context.Context, sc *run.StepContext, existing bo
 			kept[key] = existing || key != field.Title
 		case existing && !rewrites && strings.TrimSpace(value.Current) != "" && !ours:
 			kept[key] = true
-		case existing && !rewrites && read && strings.TrimSpace(onSite) != strings.TrimSpace(value.Current):
+		case existing && !rewrites && read && !field.SameText(key, strings.TrimSpace(onSite), strings.TrimSpace(value.Current)):
 			kept[key] = true
 		}
 	}

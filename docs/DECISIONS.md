@@ -4311,3 +4311,18 @@ rulings and what was decided while building.
   `e2080f7`, and `wptest` formats a variation's description as the store does, apostrophes
   included (`TestARevertedVariationDescriptionInTheStoresFormIsAccepted`, failing first on the
   fake's formatting and then on the recorded value).
+- **Plain-text fields compare with HTML entities decoded.** Under an editor without
+  `unfiltered_html`, kses stores a title's `&` as `&amp;`, so a title of ours read back as the
+  client's edit, a whole-post check paused, and the next walk raised `field_changed_on_site` on text
+  nobody had changed (the closing review's residue (4) of stage 3). `field.SameText` decodes the
+  entities and trims for the title, the excerpt, the SEO title and the SEO description; the Open
+  Graph twins compare under their SEO field's key, as their guard follows it. It decides at every
+  place that asks whether the site changed a value: the observation's field pass, which agrees the
+  base to the site's stored form, so a later write under its hash still holds, and keeps whose the
+  value is; `keptFieldsOf`; `checkBeforeWriting`; the SEO plan's `movedSince`; the title mismatch
+  after a write; and the registry's "already stored" arm of `edit.checked`, whose hash arm stays
+  raw because a hash cannot be decoded. What we write and every stored hash are unchanged. The
+  fake now runs its save filter on a creation as WordPress's `wp_insert_post` does, which the
+  publish proof needed (`TestSameTextDecodesOnlyPlainFields`, `TestAnEscapedAmpersandIsNoChangeOnTheSite`,
+  `TestAKsesEscapedTitleIsNoMismatch` and `TestATitleStoredWithItsEntitiesEscapedIsTakenAsWritten`,
+  each failing first).

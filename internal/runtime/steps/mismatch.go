@@ -1,6 +1,9 @@
 package steps
 
-import "github.com/davidmovas/postulator/internal/domain/pagemap"
+import (
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+)
 
 const (
 	FieldPath   = "path"
@@ -37,7 +40,7 @@ func mismatches(plan pagemap.Page, held answered) []Mismatch {
 		found = differ(found, FieldSlug, plan.Slug, held.slug)
 	}
 	found = statusMismatch(found, plan, held)
-	if plan.Title != "" && held.title != "" {
+	if plan.Title != "" && held.title != "" && !field.SameText(field.Title, plan.Title, held.title) {
 		found = differ(found, FieldTitle, plan.Title, held.title)
 	}
 	if plan.H1 != "" && held.h1 != "" {
@@ -62,9 +65,9 @@ func pathOf(link string) string {
 	return path
 }
 
-func differ(into []Mismatch, field, planned, actual string) []Mismatch {
+func differ(into []Mismatch, name, planned, actual string) []Mismatch {
 	if planned == actual {
 		return into
 	}
-	return append(into, Mismatch{Field: field, Planned: planned, Actual: actual})
+	return append(into, Mismatch{Field: name, Planned: planned, Actual: actual})
 }
