@@ -15,10 +15,35 @@ its stand legs green on both stands on 2026-10-20**; **stage 3, the field writer
 body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1, then the stored
 diff, per-field acceptance and the screens; its gate is green on both stands (2026-10-23). Stage 4
 is re-planned as 4.1 (the matcher and the findings), 4.2 (the agent works the loop) and 4.3 (the
-screens, the gate and the report); 4.1 is done (2026-10-23), green on both stands, with four gate
-legs owed; 4.2 is next.**
+screens, the gate and the report); 4.1 and 4.2 are done (2026-10-23), green on both stands, with the
+race and covergate legs owed; 4.3 is next.**
 
 ## Where we are
+
+**2026-10-23, stage 4.2: the agent works the loop.** The reasoning is under "The owner's answers at
+4.2's plan" and "4.2, decided while building" in `DECISIONS.md`; the task list, the checkpoint and the
+commands owed are under 4.2 in the phase plan.
+
+- **The owner's answers at the plan**: the agent's writes to a page's fields or blocks wait for the
+  person in either mode, resolving a finding and starting a run follow the mode; a title scoped
+  without the body is answered by one editor call.
+- **Part 0** (agent): gaps only from a row that plans its page (`8c6d75d`), a CSV's rows keyed by its
+  file (`c85378e`), a row named by its SKU has a key (`96a3874`), one `pagemap.TermParents`
+  (`71ea057`).
+- **The field-scoped run** (`112e73f`, `247124f`): the steps a scope does not need are disabled at the
+  start, publish requires only its fields' drafts and writes no body without it, `generate_meta`
+  writes from the page as it stands, the estimate prices the kept steps. A meta sweep over three
+  pages: 5,309 tokens against 55,941 for the whole recipe.
+- **The tools**: a call's risk from its arguments (`7dae806`); `findings` and `runs_start`'s `fields`,
+  `rewrite` and estimate card (`d1978f9`); every agent write a run of the kind `edit`, migration 0073
+  (`3c5e54e`, `85052a6`); `pages_fields` and `pages_blocks` (`57b5a91`); `pages_get` over
+  `sitemodel.Page`, `templates_resolve_for_page` and the explore `page` view gone (`d1691f4`);
+  `sites_update`'s detection settings (`111e9b2`).
+- **The instructions** (`20700b9`) and **the stands** (`1fa2d1e`): the agent's part of the reconcile
+  proof and `TestTheAgentEditsABlock` green on the replica, the block test and the reconcile proof on
+  vanilla, with `TestTheWholeLoopReachesTheDockerSite` and `TestTheAgentSeesTheSite`.
+- Schemas 65,722 bytes (92 tools, ceiling 65,735; 61,361 and 90 before); migrations to 0073; plugin
+  1.5.1.
 
 **2026-10-23, stage 4.1, second session: the findings last, and one use case resolves them.** The
 reasoning is under "The owner's answers to 4.1's first session" and "4.1, the second session" in

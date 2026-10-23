@@ -1200,22 +1200,59 @@ task e2e:down STAND=replica
 7. **`pages_get` is the agent's one page view**: the read layer's whole page view (type with source, card, children, siblings, products, twin, targets, links in and out) with the identity, the template and its source, fields with current, base and owner, a blocks summary, the parent's reason, method and crumbs, and open findings with ids and options; long lists cut with `more` and the paged op named. `sites_explore` loses its `page` view (spec 16.7 amended).
 8. **A CSV's row keys name its file, with no alias for the old ones**: no release carries a `row::` key.
 
-- [ ] **0.0 — the plan.** This list; the owner's answers in `DECISIONS.md`. Commit `docs(plan): stage 4.2's task list`.
-- [ ] **P0.1 — no gap page from a row matched elsewhere.** `fillGaps` reads only drafts that plan a new page. Test: a sheet's `/brewing/setup/` matched to `/guide/setup/` by slug plans no `/brewing/`; the vanilla reconcile e2e asserts it. Commit `fix(imports): only a planned page fills the gaps in its path`.
-- [ ] **P0.2 — a CSV's row keys name its file.** The row key, the seen keys and the row subjects take the file's base name for a CSV. Test: two CSVs imported in turn never close each other's row findings. Commit `fix(imports): a CSV's rows are keyed by its file`.
-- [ ] **P0.3 — a row named by its SKU alone has a key.** `pagemap.RowKey` falls to `sku:<key>`. Tests: `TestRowKey`, a SKU-only row's `row_without_page` persisted. Commit `fix(pagemap): a row named by its SKU has a key`.
-- [ ] **P0.4 — one term-parent helper.** `pagemap.TermParents`, called by the import and the observation. Test: `TestTermParents`. Commit `refactor(pagemap): one term-parent helper for the import and the sync`.
-- [ ] **4.2.1 — the scoped recipe.** `run.ScopeRecipe` (decision 3) and `run.Requires` in `ValidateRecipe`, the claim and the requeue; `withFields` goes. Tests: the step table per scope, the refusals, a scoped recipe validates without `generate_body`. Commit `feat(run): a run scoped to fields keeps only the steps they need`.
-- [ ] **4.2.2 — publish, meta and fields without the body.** Decision 4; `generate_meta` without a draft writes from the page as it stands; `generate_fields` asks only the scoped fields and answers the title when the body is out (decision 2); the estimate prices the kept steps, drops the whole-drafts note and raises no `recipe_differs` for a scope. Test: `TestAMetaSweepWritesOnlyTheMetaDescription` (no `generate_body` call, no body write, only the meta description, estimated below the full run). Commit `feat(runs): a scoped run pays only for the fields it writes`.
-- [ ] **4.2.3 — the risk of a call.** Decision 6 in the registry. Test: a table per op in both modes counting the proposals. Commit `feat(tools): a call's risk comes from its arguments`.
-- [ ] **4.2.4 — `findings` and `runs_start`.** `findings` (`list`, `resolve` by the agent, a run option answering its request); `runs_start` takes `fields` and `rewrite` and its card carries the estimate in confirm mode; the tool family. Commit `feat(tools): the agent lists and resolves findings`.
-- [ ] **4.2.5 — the `edit` kind.** 0073, `run.KindEdit`, `edit_page` (decision 5), `runs.StartEdit`, the copy. Tests: a field and a block written and reverted, a moved value and a client block refused, `runs.Start` refusing the kind, the migration's round trip. Commit `feat(runs): an agent's edit is a run of its own kind`.
-- [ ] **4.2.6 — `pages_fields` and `pages_blocks`.** The ops, their refusals and their summaries. Commit `feat(tools): the agent edits a page field by field and block by block`.
-- [ ] **4.2.7 — `pages_get` answers the model.** Decision 7; `templates_resolve_for_page` goes; `ResolveForPage` gains `source`; the page view's callers move. Test: under the cap on every captured stand page. Commit `feat(tools): pages_get answers the page's model`.
-- [ ] **4.2.8 — `sites_update` carries the per-site settings.** Commit `feat(tools): sites_update carries the detection settings`.
-- [ ] **4.2.9 — the instructions.** Findings, sweeps, block operations against a run, confirmation; the brief points at `findings`. Commit `feat(agent): the agent is taught the loop`.
-- [ ] **4.2.10 — the stands.** The agent part of `TestTheWorkbookReconcilesWithTheSite` and `TestTheAgentEditsABlock` on the replica, the block test on vanilla. Commit `test(e2e): the agent works the loop on the stands`.
-- [ ] **4.2.11 — the docs and the checkpoint.** Commit `docs: stage 4.2, the agent works the loop`.
+- [x] **0.0 — the plan** (`3cccef4`). This list; the owner's answers in `DECISIONS.md`. Commit `docs(plan): stage 4.2's task list`.
+- [x] **P0.1 — no gap page from a row matched elsewhere** (`8c6d75d`, agent). `fillGaps` reads only drafts that plan a new page. Test: a sheet's `/brewing/setup/` matched to `/guide/setup/` by slug plans no `/brewing/`; the vanilla reconcile e2e asserts it. Commit `fix(imports): only a planned page fills the gaps in its path`.
+- [x] **P0.2 — a CSV's row keys name its file** (`c85378e`, agent). The row key, the seen keys and the row subjects take the file's base name for a CSV. Test: two CSVs imported in turn never close each other's row findings. Commit `fix(imports): a CSV's rows are keyed by its file`.
+- [x] **P0.3 — a row named by its SKU alone has a key** (`96a3874`, agent). `pagemap.RowKey` falls to `sku:<key>`. Tests: `TestRowKey`, a SKU-only row's `row_without_page` persisted. Commit `fix(pagemap): a row named by its SKU has a key`.
+- [x] **P0.4 — one term-parent helper** (`71ea057`, agent). `pagemap.TermParents`, called by the import and the observation. Test: `TestTermParents`. Commit `refactor(pagemap): one term-parent helper for the import and the sync`.
+- [x] **4.2.1 — the scoped recipe** (`112e73f`; the requeue needed no change). `run.ScopeRecipe` (decision 3) and `run.Requires` in `ValidateRecipe`, the claim and the requeue; `withFields` goes. Tests: the step table per scope, the refusals, a scoped recipe validates without `generate_body`. Commit `feat(run): a run scoped to fields keeps only the steps they need`.
+- [x] **4.2.2 — publish, meta and fields without the body** (`247124f`). Decision 4; `generate_meta` without a draft writes from the page as it stands; `generate_fields` asks only the scoped fields and answers the title when the body is out (decision 2); the estimate prices the kept steps, drops the whole-drafts note and raises no `recipe_differs` for a scope. Test: `TestAMetaSweepWritesOnlyTheMetaDescription` (no `generate_body` call, no body write, only the meta description, estimated below the full run). Commit `feat(runs): a scoped run pays only for the fields it writes`.
+- [x] **4.2.3 — the risk of a call** (`7dae806`). Decision 6 in the registry. Test: a table per op in both modes counting the proposals. Commit `feat(tools): a call's risk comes from its arguments`.
+- [x] **4.2.4 — `findings` and `runs_start`** (`d1978f9`). `findings` (`list`, `resolve` by the agent, a run option answering its request); `runs_start` takes `fields` and `rewrite` and its card carries the estimate in confirm mode; the tool family. Commit `feat(tools): the agent lists and resolves findings`.
+- [x] **4.2.5 — the `edit` kind** (`3c5e54e`; its core registry pin followed late in `85052a6`). 0073, `run.KindEdit`, `edit_page` (decision 5), `runs.StartEdit`, the copy. Tests: a field and a block written and reverted, a moved value and a client block refused, `runs.Start` refusing the kind, the migration's round trip. Commit `feat(runs): an agent's edit is a run of its own kind`.
+- [x] **4.2.6 — `pages_fields` and `pages_blocks`** (`57b5a91`). The ops, their refusals and their summaries. Commit `feat(tools): the agent edits a page field by field and block by block`.
+- [x] **4.2.7 — `pages_get` answers the model** (`d1691f4`). Decision 7; `templates_resolve_for_page` goes; `ResolveForPage` gains `source`; the page view's callers move. Test: under the cap on every captured stand page. Commit `feat(tools): pages_get answers the page's model`.
+- [x] **4.2.8 — `sites_update` carries the per-site settings** (`111e9b2`). Commit `feat(tools): sites_update carries the detection settings`.
+- [x] **4.2.9 — the instructions** (`20700b9`). Findings, sweeps, block operations against a run, confirmation; the brief points at `findings`. Commit `feat(agent): the agent is taught the loop`.
+- [x] **4.2.10 — the stands** (`1fa2d1e`). The agent part of `TestTheWorkbookReconcilesWithTheSite` and `TestTheAgentEditsABlock` on the replica, the block test on vanilla. Commit `test(e2e): the agent works the loop on the stands`.
+- [x] **4.2.11 — the docs and the checkpoint.** Commit `docs: stage 4.2, the agent works the loop`.
+
+#### Checkpoint, 2026-10-23 (4.2 closed; 4.3 is next)
+
+**Landed on `dev`**, the tree clean at the checkpoint's commit; the reasoning is under "4.2, decided while building" in `DECISIONS.md`:
+- the plan `3cccef4`;
+- Part 0 (agent): `8c6d75d` gaps only from a row that plans its page, `c85378e` a CSV's rows keyed by its file, `96a3874` a row named by its SKU has a key, `71ea057` one `pagemap.TermParents`;
+- the field-scoped run: `112e73f` `run.ScopeRecipe` and `StepDef.Scoped`, `247124f` publish, meta and fields without the body, the estimate on the kept steps;
+- the tools: `7dae806` the risk of a call, `d1978f9` `findings` and `runs_start`'s `fields`, `rewrite` and estimate card, `3c5e54e` the `edit` kind (0073) with `85052a6`, `57b5a91` `pages_fields` and `pages_blocks`, `d1691f4` `pages_get` over `sitemodel.Page`, `111e9b2` `sites_update`'s detection settings;
+- `20700b9` the instructions; `1fa2d1e` the stands.
+
+**Schemas**: 61,361 bytes and 90 tools before; 65,722 bytes and 92 tools after (ceiling 65,735). Per commit: 63,138 (`findings`, `runs_start`), 63,127 (`findings`' `op` optional, `runs_list`'s kind), 65,012 (`pages_fields`, `pages_blocks`), 64,950 (`templates_resolve_for_page` gone, `pages_get` rewritten, the explore `page` view gone), 65,722 (`sites_update`).
+
+**The meta sweep**, three pages of the steps pipeline: estimated at 5,309 tokens ($0.0068) against 55,941 ($0.0770) for the whole recipe over the same pages; no body, fields, judge or repair call, one meta answer per page, no body write.
+
+**Run and green:**
+- `go build ./...`; `go vet -tags e2e ./internal/e2e/`; `go vet -tags uiharness ./cmd/postulator/`;
+- `go test -count=1` without race in five groups: kernel and domain, application, runtime (`-p 1`), adapters (`-p 1 -timeout 30m`), app, transport, cmd and frontend;
+- `golangci-lint run ./...` 0 issues; `task lint:e2e` 0 issues; `gofmt -l` silent; `task build` with no generated drift; `npm run typecheck` against the regenerated bindings; the whole vitest (`npm run test:run -- --maxWorkers=2`, 170 files, 1,800 tests); `task ui:lint` (the uiharness lint and its tests, 118 s);
+- the stands, one at a time after `task plugin:deploy`: on the replica `TestTheWorkbookReconcilesWithTheSite` (45.7 s, the agent part included), `TestTheAgentEditsABlock` (40.7 s), `TestTheAgentSeesTheSite` and `TestTheWholeLoopReachesTheDockerSite` (71 s together); on vanilla `TestTheAgentEditsABlock`, `TestTheWholeLoopReachesTheDockerSite` and `TestTheWorkbookReconcilesWithTheSite` (80.6 s together). Both stands were taken down.
+
+**Not run**: no `-race`, no `covergate`. The runtime package failed once while it ran beside `application/runs` under load (193 s against 118 s alone), and passed alone and beside `runs` twice after; the failing test was cut from the output and is not known.
+
+**What 4.3 starts with:**
+- The agent's cards for `pages_fields`, `pages_blocks` and `findings`: today the card shows the tool's own sentence (`Confirm`), which `ownSummary` lets through; a describer per op in `frontend/src/features/agent/cards/model` is 4.3's.
+- The Findings inbox can call `findings.Service` (`List`, `Get`, `Resolve`) through a bound service; `vocab.ts` now carries `findingStatuses` and `findingOptions`.
+- An agent edit is a run of the kind `edit` (`Agent edit` in the copy): the run screens list it, its review is the confirmation, and `runs_revert` (or the Pages drawer's per-field revert) undoes it.
+- A block edit on the replica's hubs meets no client block (the hubs' raw is ours after a run); vanilla's `/guide/setup/` proves the guard over the owner's blocks.
+
+**Commands owed** (one at a time, on an idle machine; the 4.1 legs included):
+```
+go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov1.out ./internal/kernel/... ./internal/domain/...
+go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov2.out ./internal/application/...
+go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
+go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+(merge cov1.out to cov5.out into coverage.out) ; go run ./cmd/covergate
+```
 
 ### 4.3 — the screens, the gate and the phase report (planned at its start)
 

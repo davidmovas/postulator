@@ -4491,3 +4491,101 @@ rulings and what was decided while building.
   row that matched an existing page at another address plans nothing, gaps included; a CSV's row
   keys name its file, so two CSVs never touch each other's findings; a row named by its SKU alone
   has a key. The import and the observation share one term-parent helper.
+
+### 4.2, decided while building (2026-10-23)
+
+- **Part 0.** Only a row that plans a page at its own URL fills the gaps in that path: a row
+  matched elsewhere, or to a page on the site, plans nothing, gaps included (`8c6d75d`). One
+  consequence: a product row matched to its store product at another address no longer creates the
+  entity-only level its sheet URL names (the "Mak" of `/mak/…`); only an unmatched row does. A
+  CSV's rows key under its file's base name (`row:pages.csv:…`) and its row subjects name the file,
+  while a workbook keeps its sheet names; no alias reads the old `row::` keys, which no release
+  carries, and renaming a CSV now drops a person's mapping (`c85378e`). A row named only by its SKU
+  keys as `row:<sheet>:sku:<folded SKU>`; such a row plans no page (it has no path), so the one
+  finding it can raise is `row_ambiguous`, when two products share the SKU (`96a3874`). The import
+  and the observation read a term's WordPress parent through one `pagemap.TermParents` (`71ea057`).
+- **A scoped run keeps only the steps its fields need** (`run.ScopeRecipe`, `112e73f`): the body's
+  steps (`resolve_context`, `generate_body`, the links, the images, `validate`, `judge`,
+  `relink_neighbors`) for the body, a product's description and the featured image; `generate_meta`
+  for the SEO title and description; `generate_fields` for everything else, a title without the
+  body included; publish, `sync_back` and `report` always. The scope is copied onto every kept
+  step. A step declares its requirements under a scope (`StepDef.Scoped`, read by `RequiresFor` in
+  the recipe check and the claim's input hash); publish requires only `run.DraftsOf` its fields and
+  `generate_meta` the draft only with the body in scope. The requeue needed no change: a scoped run
+  never produces the draft, so it can never purge it.
+- **Publish without the body** (`247124f`) reads no draft and no body, composes nothing, runs no
+  guard, rewrite or H1 rule, plans no raw write, records no body and refuses no drift; the title
+  comes from `generate_fields` when the scope names it. It stands down on a page not on the site,
+  and `runs.Start` refuses such a scope over a planned page before anything is spent and adds no
+  ancestor. An unstable page is held for a person only when the plan would save the post. Without a
+  draft, `generate_meta` describes the page as it stands (its title, H1, summary and the current
+  body's headings). The estimate prices the kept steps alone and raises no `recipe_differs` for a
+  scope; `Price.Applies` takes the step's params so `generate_fields` sees the scope.
+- **A call's risk comes from its arguments** (`Tool.RiskOf`, `readsOn`; `7dae806`), so a folded
+  tool's reads never wait and its writes propose as any write does, with that call's risk on the
+  card. A summary a tool cannot build now refuses the call: before, the registry ran the write in an
+  autonomous conversation when the lookup behind its summary failed.
+- **`findings`** (`d1978f9`) lists open findings by default and resolves one as the agent; a model
+  option proposes a plain sentence in confirm mode and runs at once in an autonomous conversation (the
+  owner's answer 1), a run option answers its request with no card, and another site's finding is
+  never read or resolved (`findings.Get`, the site on `ResolveRequest`). Its code and option enums
+  come from `finding.Codes()` and `finding.Options()`, and `vocab.ts` carries `findingStatuses` and
+  `findingOptions`. A tool named after its group alone belongs to it. `runs_start` takes `fields`
+  and `rewrite`, and in confirm mode its card names the pages, the scope and the estimate.
+- **An agent's write is a run of the kind `edit`** (migration 0073; `3c5e54e`). `runs.StartEdit`
+  enqueues it live, by the agent; its step `edit_page` loads its page itself, plans in one execution
+  and writes in the next. A block edit takes relink's path (the plugin, a save-stable page, the body
+  hash the agent listed, `PutRaw` under it, the landed blocks, `recordSpliced`, `adopt`); a field
+  goes through `application/edit` under the value the agent read, its before taken from the model
+  and checked against that hash. The agent's HTML is scrubbed by `content.SanitizeBlock` (classes,
+  ids, styles, data attributes and links go, an `h1` becomes an `h2` unless the page owes one) and
+  becomes one `core/html` block in a block-editor body; a link comes only through `place_link`, whose
+  href is the target's path, or its absolute URL when the site's setting says so. A replaced or
+  inserted block is ours, a deleted one leaves our record, and a block that takes a link keeps its
+  owner; the diff marks a changed client block as his. The result is a version-3 `publish_result`, so
+  `runs_revert` undoes it whole or per field, and the person's confirmation is its review.
+- **`pages_fields` and `pages_blocks`** (`57b5a91`) read through `sitemodel.Fields` and
+  `sitemodel.Blocks` and refuse before any card a denied, read-only or person's field, a page off
+  the site or of another site, a site without the plugin for a block, a moved hash, a block past
+  the end, and a replace or delete of the owner's block without rewrites; an empty `hash` on a
+  field means it was read empty, and a field that has gained a value since is then refused as
+  moved. Their writes wait for the person in either mode (the owner's answer 1).
+- **`pages_get` is the agent's one page view** (`d1691f4`): `sitemodel.Page` answers the page view's
+  whole neighborhood with the identity, the type and its source, the parent's reason, method and
+  trail, fields with current, base, hash and owner (each value cut at 300 runes), the body in sum
+  by owner (a long body is never repeated whole) and the open findings with their ids and options,
+  each long list naming the op that pages it; the tool adds the template a run would use with its
+  source (`ResolveForPage` answers `source` and `name`). `templates_resolve_for_page` and
+  `sites_explore`'s `page` view are gone.
+- **`sites_update`** sets the technical shortcodes and blocks and the page builders, each replacing
+  its list, an empty list giving the defaults back (`111e9b2`).
+
+### Deviations from the 4.2 request
+
+- **`pages_get` gives the parent's trail with its reason and method, not the render's crumbs**: the
+  derived chain is the model's answer and the crumbs stay on `parent_*` findings' subjects, which
+  `findings op list` shows.
+- **HTML refused before the card is an empty block only**: whether an operation fuses blocks or
+  turns the body's kind depends on the live body, so the step finds it and holds the item for a
+  person with the reason.
+- **A link the agent places takes the site setting's form**, not the majority of the site's own
+  links that a run reads from its link context.
+- **The core's step-registry pin moved one commit late** (`85052a6` after `3c5e54e`): the `app`
+  package was not run with the edit kind's commit.
+- **The cap test of `pages_get` runs in `sitemodel` over both stands' captures** (the widest model
+  6,418 bytes on the replica and 3,225 on vanilla), with the literal 16,384 the tool-result cap
+  defaults to, since `sitemodel` cannot import `application/agent`.
+
+### What the stands found at 4.2's close (2026-10-23)
+
+- **Replica**: the agent listed 13 open `row_without_page` findings, mapped the dosing guide's row
+  onto `/bpc-157/` (the planned guide went) and pinned Reconstitution's parent to the workbook, each
+  on a card a person confirmed; `rescan` on `render_redirected` answered a full sync with no card;
+  the meta sweep over `/peptides/` and `/reconstitution/` drew a card reading "estimated $0.00 for
+  6262 tokens" on the fake provider, drafted no body and wrote the meta description alone; a second
+  import created nothing and reopened neither the person's ignore nor the agent's mapping. The
+  agent's block edit on `/peptides/` replaced our last paragraph and two reverts gave back the run's
+  bytes and then the base; the hub carries no block of the owner's.
+- **Vanilla**: on the block-editor `/guide/setup/` the owner's heading and paragraph stood byte for
+  byte while the agent replaced our `core/html` block, the injected regions did not move, and the
+  reverts gave back the bytes. The nested sheet planned no `/brewing/`.
