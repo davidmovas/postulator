@@ -74,6 +74,13 @@ func TestNewMappingRejectsWhatCannotBeImported(t *testing.T) {
 			},
 		},
 		{
+			name: "a note column that is also a category level",
+			change: func(m *importmap.Mapping) {
+				m.Options.LevelColumns = []string{"Root Entity", "Subcategory"}
+				m.Options.NoteColumns = []string{"subcategory"}
+			},
+		},
+		{
 			name: "category columns alone",
 			change: func(m *importmap.Mapping) {
 				m.Columns = nil
@@ -142,13 +149,13 @@ func TestNewMappingTakesARootColumnInPlaceOfAPath(t *testing.T) {
 	ready, err := importmap.NewMapping(importmap.Mapping{
 		ID: "m1", SiteID: "s1", Name: "groups",
 		Columns: map[importmap.Field]string{importmap.FieldTitle: "Title"},
-		Options: importmap.Options{LevelColumns: []string{" Root Entity ", "Category"}, NoteColumns: []string{"Notes ", "category"}},
+		Options: importmap.Options{LevelColumns: []string{" Root Entity ", "Category", "Brand"}, NoteColumns: []string{"Notes ", "brand"}},
 	})
 	if err != nil {
 		t.Fatalf("NewMapping: %v", err)
 	}
-	if !slices.Equal(ready.Options.LevelColumns, []string{"Root Entity", "Category"}) ||
-		!slices.Equal(ready.Options.NoteColumns, []string{"Notes", "category"}) {
+	if !slices.Equal(ready.Options.LevelColumns, []string{"Root Entity", "Category", "Brand"}) ||
+		!slices.Equal(ready.Options.NoteColumns, []string{"Notes", "brand"}) {
 		t.Fatalf("options = %+v, want the columns trimmed and kept as given", ready.Options)
 	}
 
@@ -201,30 +208,35 @@ func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
 		name   string
 		row    []string
 		levels []string
+		trail  []string
 		notes  []note.Note
 	}{
 		{
 			name:   "every level and note filled",
 			row:    []string{"Peptides", "BPC-157", "Liquid", "/bpc-157/liquid/", "Commercial", "Sold as a 10 ml vial"},
 			levels: []string{"Peptides"},
+			trail:  []string{"Peptides", "BPC-157", "Liquid"},
 			notes:  []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
 		},
 		{
 			name:   "a level cell is trimmed",
 			row:    []string{" Peptides ", "", "", "/bpc-157/"},
 			levels: []string{"Peptides"},
+			trail:  []string{"Peptides"},
 			notes:  []note.Note{},
 		},
 		{
 			name:   "a placeholder is no level",
 			row:    []string{"—", "BPC-157", "Liquid", "/bpc-157/"},
 			levels: []string{},
+			trail:  []string{"BPC-157", "Liquid"},
 			notes:  []note.Note{},
 		},
 		{
 			name:   "every placeholder the sheets carry",
 			row:    []string{"-", "N/A", "none", "/about/", " ", ""},
 			levels: []string{},
+			trail:  []string{},
 			notes:  []note.Note{},
 		},
 	}
@@ -235,6 +247,9 @@ func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
 
 			if got := binding.Levels(tc.row); !slices.Equal(got, tc.levels) {
 				t.Errorf("Levels = %q, want %q", got, tc.levels)
+			}
+			if got := binding.Trail(tc.row); !slices.Equal(got, tc.trail) {
+				t.Errorf("Trail = %q, want %q", got, tc.trail)
 			}
 			if got := binding.Notes(tc.row); !reflect.DeepEqual(got, tc.notes) {
 				t.Errorf("Notes = %+v, want %+v", got, tc.notes)
@@ -249,23 +264,26 @@ func TestBindReadsTheLevelsAndTheNotesOfARow(t *testing.T) {
 	}
 }
 
-func TestOnlyARootColumnIsALevel(t *testing.T) {
+func TestEveryLevelColumnIsATrailAndOnlyARootGroups(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		header string
 		root   bool
+		trail  bool
 	}{
-		{header: "Root Entity", root: true},
-		{header: "root_entity", root: true},
-		{header: "Root", root: true},
+		{header: "Root Entity", root: true, trail: true},
+		{header: "root_entity", root: true, trail: true},
+		{header: "Root", root: true, trail: true},
 		{header: "Root?"},
 		{header: "Root Category"},
-		{header: "Category"},
+		{header: "Category", trail: true},
 		{header: "Main Category"},
-		{header: "Subcategory"},
-		{header: "Sub Category"},
-		{header: "Sub Subcategory"},
+		{header: "Subcategory", trail: true},
+		{header: "Sub Category", trail: true},
+		{header: "sub-category", trail: true},
+		{header: "Sub Subcategory", trail: true},
+		{header: "Category?"},
 		{header: "Brand"},
 	}
 
@@ -282,33 +300,42 @@ func TestOnlyARootColumnIsALevel(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Bind: %v", err)
 			}
-			want, use := []string{}, importmap.UseIgnored
-			if tc.root {
-				want, use = []string{"Peptides"}, importmap.UseLevel
+			levels, trail, use := []string{}, []string{}, importmap.UseIgnored
+			if tc.trail {
+				trail, use = []string{"Peptides"}, importmap.UseTrail
 			}
-			if got := binding.Levels([]string{"/a/", "Peptides"}); !slices.Equal(got, want) {
-				t.Errorf("Levels = %q, want %q", got, want)
+			if tc.root {
+				levels, use = []string{"Peptides"}, importmap.UseLevel
+			}
+			if got := binding.Levels([]string{"/a/", "Peptides"}); !slices.Equal(got, levels) {
+				t.Errorf("Levels = %q, want %q", got, levels)
+			}
+			if got := binding.Trail([]string{"/a/", "Peptides"}); !slices.Equal(got, trail) {
+				t.Errorf("Trail = %q, want %q", got, trail)
 			}
 			if got := m.Uses(headers)[1]; got.Use != use {
 				t.Errorf("Uses = %+v, want %s", got, use)
+			}
+			if detected := importmap.AutoDetect(headers).Options.LevelColumns; slices.Contains(detected, tc.header) != tc.trail {
+				t.Errorf("AutoDetect levels = %q, want the header detected %v", detected, tc.trail)
 			}
 		})
 	}
 }
 
-func TestBindPassesOverACategoryColumnTheFileDoesNotCarry(t *testing.T) {
+func TestTheTrailFollowsTheHeaderOrder(t *testing.T) {
 	t.Parallel()
 
 	m := importmap.Mapping{
 		Columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
-		Options: importmap.Options{LevelColumns: []string{"Root Entity", "Category", "Subcategory"}},
+		Options: importmap.Options{LevelColumns: []string{"Subcategory", "Category", "Root"}},
 	}
-	binding, err := m.Bind([]string{"URL", "Root Entity"})
+	binding, err := m.Bind([]string{"Root", "Category", "Subcategory", "URL"})
 	if err != nil {
-		t.Fatalf("Bind = %v, want the category columns passed over", err)
+		t.Fatalf("Bind: %v", err)
 	}
-	if got := binding.Levels([]string{"/a/", "Peptides"}); !slices.Equal(got, []string{"Peptides"}) {
-		t.Fatalf("Levels = %q, want the root alone", got)
+	if got := binding.Trail([]string{"Peptides", "BPC-157", "Liquid", "/a/"}); !slices.Equal(got, []string{"Peptides", "BPC-157", "Liquid"}) {
+		t.Fatalf("Trail = %q, want the levels as the header orders them", got)
 	}
 }
 
@@ -316,8 +343,9 @@ func TestBindRejectsALevelOrNoteColumnTheFileDoesNotCarry(t *testing.T) {
 	t.Parallel()
 
 	for name, options := range map[string]importmap.Options{
-		"a level": {LevelColumns: []string{"Root Entity"}},
-		"a note":  {NoteColumns: []string{"Notes"}},
+		"a level":          {LevelColumns: []string{"Root Entity"}},
+		"a category level": {LevelColumns: []string{"Category"}},
+		"a note":           {NoteColumns: []string{"Notes"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -344,8 +372,8 @@ func TestUsesSaysWhatEveryColumnOfTheFileBecomes(t *testing.T) {
 	want := []importmap.ColumnUse{
 		{Header: "URL", Use: importmap.UseField, Field: importmap.FieldPath},
 		{Header: "Root Entity", Use: importmap.UseLevel},
-		{Header: "Category", Use: importmap.UseIgnored},
-		{Header: "Subcategory", Use: importmap.UseIgnored},
+		{Header: "Category", Use: importmap.UseTrail},
+		{Header: "Subcategory", Use: importmap.UseTrail},
 		{Header: "Title", Use: importmap.UseField, Field: importmap.FieldTitle},
 		{Header: "Notes", Use: importmap.UseNote},
 		{Header: "Entity?", Use: importmap.UseIgnored},

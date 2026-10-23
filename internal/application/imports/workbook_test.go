@@ -62,7 +62,7 @@ func TestInspectDetectsEverySheetOnItsOwn(t *testing.T) {
 	if !slices.Equal(names, clientSheets) {
 		t.Fatalf("sheets = %v, want %v", names, clientSheets)
 	}
-	if groups := seen.Sheets[0].Detected.Options.LevelColumns; !slices.Equal(groups, []string{"Root Entity"}) {
+	if groups := seen.Sheets[0].Detected.Options.LevelColumns; !slices.Equal(groups, []string{"Root Entity", "Category", "Subcategory"}) {
 		t.Fatalf("the group sheet detects the levels %v", groups)
 	}
 }

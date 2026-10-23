@@ -301,6 +301,18 @@ func (i identityStore) ListTerms(_ context.Context, pageID string) ([]pagemap.Te
 	return i.s.terms[pageID], nil
 }
 
+func (i identityStore) ListTermsBySite(_ context.Context, siteID string) (map[string][]pagemap.Term, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	out := make(map[string][]pagemap.Term)
+	for pageID, terms := range i.s.terms {
+		if i.s.pages[pageID].SiteID == siteID && len(terms) > 0 {
+			out[pageID] = slices.Clone(terms)
+		}
+	}
+	return out, nil
+}
+
 type fieldStore struct{ s *stores }
 
 func (f fieldStore) Observe(_ context.Context, pageID string, values []field.Value) error {

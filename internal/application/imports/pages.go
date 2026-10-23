@@ -1,8 +1,10 @@
 package imports
 
 import (
+	"encoding/json"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
@@ -25,6 +27,7 @@ func sameRef(a, b *string) bool {
 
 func samePage(a, b pagemap.Page) bool {
 	return a.Title == b.Title && a.H1 == b.H1 && a.MetaTitle == b.MetaTitle && a.PlannedPath == b.PlannedPath &&
+		slices.Equal(a.PlannedTrail, b.PlannedTrail) &&
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
 		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID) &&
@@ -118,7 +121,7 @@ func (b *builder) createPage(draft *pageDraft, entityID *string) error {
 		technical = pagemap.TechnicalWorkbook
 	}
 	planned := pagemap.Page{
-		ID: id.New(), SiteID: b.state.siteID, Path: draft.path, WPType: wpType,
+		ID: id.New(), SiteID: b.state.siteID, Path: draft.path, PlannedTrail: draft.trail, WPType: wpType,
 		Title: title, H1: draft.h1, MetaTitle: draft.metaTitle, MetaDescription: draft.metaDesc,
 		Keywords: draft.keywords, Notes: draft.notes, Status: pagemap.StatusPlanned, EntityID: entityID,
 		TechnicalReason: technical, CreatedAt: b.now, UpdatedAt: b.now,
@@ -148,10 +151,43 @@ func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, entityID *s
 	if draft.url != "" && current.Path != draft.url {
 		next.PlannedPath = draft.url
 	}
+	if len(draft.trail) > 0 {
+		next.PlannedTrail = draft.trail
+	}
 	if entityID != nil {
 		next.EntityID = entityID
 	}
+	if err := b.compareTrail(current, draft); err != nil {
+		return err
+	}
 	return b.planUpdate(current, next, draft)
+}
+
+func (b *builder) compareTrail(current pagemap.Page, draft *pageDraft) error {
+	if current.WPID == nil || current.WPType == pagemap.WPProduct || current.Status == pagemap.StatusArchived {
+		return nil
+	}
+	expected := current
+	expected.PlannedTrail = draft.trail
+	diff, differs := pagemap.TrailDiffers(expected, b.state.trails)
+	if !differs {
+		return nil
+	}
+	subject, err := json.Marshal(diff)
+	if err != nil {
+		return err
+	}
+	b.p.noteAbout(draft.at, "", CodeParentDiffers, subject,
+		"the sheet places "+draft.path+" under "+strings.Join(diff.Sheet, " › ")+", where the site shows it "+placed(diff.Site)+
+			"; the import writes no parent to the site, so the difference stays a finding")
+	return nil
+}
+
+func placed(trail []string) string {
+	if len(trail) == 0 {
+		return "at the top of the site"
+	}
+	return "under " + strings.Join(trail, " › ")
 }
 
 func (b *builder) keptType(current pagemap.Page, draft *pageDraft) pagemap.WPType {

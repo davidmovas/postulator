@@ -40,6 +40,7 @@ type identityStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error)
 	ReplaceTerms(ctx context.Context, pageID string, terms []pagemap.Term) error
 	ListTerms(ctx context.Context, pageID string) ([]pagemap.Term, error)
+	ListTermsBySite(ctx context.Context, siteID string) (map[string][]pagemap.Term, error)
 }
 
 type fieldStore interface {

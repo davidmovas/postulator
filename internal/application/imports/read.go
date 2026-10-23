@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
@@ -36,6 +37,8 @@ type rowDraft struct {
 	related      []string
 	parent       string
 	levels       []string
+	trail        []string
+	expected     []string
 	match        pagemap.Match
 	unreadable   bool
 	wantsProduct bool
@@ -55,6 +58,17 @@ func (r *rowDraft) names() bool {
 
 func (r *rowDraft) asked(product bool) pagemap.Row {
 	return pagemap.Row{Path: r.url, Entity: r.name, Parent: r.parent, Title: r.title, H1: r.h1, SKU: r.sku, Product: product}
+}
+
+func (r *rowDraft) trailBelow(slug string) []string {
+	if len(r.trail) == 0 {
+		return nil
+	}
+	last := groupNode{name: r.trail[len(r.trail)-1]}
+	if last.namedBy(r) || sameSlug(slug, last.name) {
+		return slices.Clone(r.trail[:len(r.trail)-1])
+	}
+	return slices.Clone(r.trail)
 }
 
 func (r *rowDraft) cardNotes() []note.Note {
@@ -168,6 +182,7 @@ func cellsOf(binding importmap.Binding, row []string, at importmap.Origin) rowDr
 		related:   binding.List(row, importmap.FieldRelated),
 		parent:    binding.Text(row, importmap.FieldParentEntity),
 		levels:    binding.Levels(row),
+		trail:     binding.Trail(row),
 		notes:     binding.Notes(row),
 	}
 }

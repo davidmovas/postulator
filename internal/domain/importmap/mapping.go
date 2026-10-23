@@ -159,7 +159,7 @@ func NewMapping(m Mapping) (Mapping, error) {
 		return Mapping{}, err
 	}
 	roots := rootColumns(levels)
-	if apartErr := apart(columns, roots, notes); apartErr != nil {
+	if apartErr := apart(columns, levelColumns(levels), notes); apartErr != nil {
 		return Mapping{}, apartErr
 	}
 	m.Options.LevelColumns, m.Options.NoteColumns = levels, notes
@@ -232,6 +232,7 @@ type Binding struct {
 	index   map[Field]int
 	indent  []int
 	levels  []int
+	trail   []int
 	notes   []noteColumn
 	options Options
 }
@@ -299,11 +300,16 @@ func (m Mapping) Bind(headers []string) (Binding, error) {
 	if err != nil {
 		return Binding{}, err
 	}
+	trail, err := bindAll(positions, levelColumns(m.Options.LevelColumns), "levelColumns", "the level column is not in the file")
+	if err != nil {
+		return Binding{}, err
+	}
+	slices.Sort(trail)
 	notes, err := bindNotes(positions, m.Options.NoteColumns)
 	if err != nil {
 		return Binding{}, err
 	}
-	return Binding{index: index, indent: indent, levels: levels, notes: notes, options: m.Options.OrDefault()}, nil
+	return Binding{index: index, indent: indent, levels: levels, trail: slices.Compact(trail), notes: notes, options: m.Options.OrDefault()}, nil
 }
 
 func bindNotes(positions headerIndex, columns []string) ([]noteColumn, error) {
@@ -346,8 +352,16 @@ func levelCell(row []string, at int) string {
 }
 
 func (b Binding) Levels(row []string) []string {
-	out := make([]string, 0, len(b.levels))
-	for _, at := range b.levels {
+	return levelCells(row, b.levels)
+}
+
+func (b Binding) Trail(row []string) []string {
+	return levelCells(row, b.trail)
+}
+
+func levelCells(row []string, columns []int) []string {
+	out := make([]string, 0, len(columns))
+	for _, at := range columns {
 		if name := levelCell(row, at); name != "" {
 			out = append(out, name)
 		}

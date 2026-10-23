@@ -5,6 +5,7 @@ type Use string
 const (
 	UseField   Use = "field"
 	UseLevel   Use = "level"
+	UseTrail   Use = "trail"
 	UseNote    Use = "note"
 	UseIndent  Use = "indent"
 	UseIgnored Use = "ignored"
@@ -37,6 +38,9 @@ func (m Mapping) Uses(headers []string) []ColumnUse {
 	}
 	for _, column := range rootColumns(m.Options.LevelColumns) {
 		mark(column, UseLevel, "")
+	}
+	for _, column := range levelColumns(m.Options.LevelColumns) {
+		mark(column, UseTrail, "")
 	}
 	for _, column := range m.Options.NoteColumns {
 		mark(column, UseNote, "")

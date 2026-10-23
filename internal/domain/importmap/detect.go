@@ -36,7 +36,10 @@ func weak(field Field, header string) bool {
 	return slices.ContainsFunc(weakAliases[field], func(alias string) bool { return written == compact(alias) })
 }
 
-var levelAliases = []string{"root entity", "root"}
+var (
+	rootAliases  = []string{"root entity", "root"}
+	trailAliases = []string{"category", "subcategory", "sub subcategory"}
+)
 
 var noteAliases = []string{
 	"notes", "note", "intent owner", "reason", "detected form variation",
@@ -87,22 +90,38 @@ func compact(normalized string) string {
 	return strings.ReplaceAll(normalized, " ", "")
 }
 
-func rootLevel(header string) bool {
+func namedAs(header string, aliases []string) bool {
 	if asked(header) {
 		return false
 	}
 	written := compact(Words(header))
-	return slices.ContainsFunc(levelAliases, func(alias string) bool { return written == compact(alias) })
+	return slices.ContainsFunc(aliases, func(alias string) bool { return written == compact(alias) })
 }
 
-func rootColumns(columns []string) []string {
+func rootLevel(header string) bool {
+	return namedAs(header, rootAliases)
+}
+
+func level(header string) bool {
+	return rootLevel(header) || namedAs(header, trailAliases)
+}
+
+func columnsWhere(columns []string, keep func(string) bool) []string {
 	out := make([]string, 0, len(columns))
 	for _, column := range columns {
-		if rootLevel(column) {
+		if keep(column) {
 			out = append(out, column)
 		}
 	}
 	return out
+}
+
+func rootColumns(columns []string) []string {
+	return columnsWhere(columns, rootLevel)
+}
+
+func levelColumns(columns []string) []string {
+	return columnsWhere(columns, level)
 }
 
 func noteOf(header string) bool {
@@ -120,7 +139,7 @@ func AutoDetect(headers []string) Mapping {
 			}
 			continue
 		}
-		if rootLevel(header) {
+		if level(header) {
 			options.LevelColumns = append(options.LevelColumns, header)
 			continue
 		}

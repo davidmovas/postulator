@@ -15,7 +15,7 @@ const workbook: PreviewReport = {
     columns: [
         { sheet: "Catalog", header: "URL", use: "field", field: "path" },
         { sheet: "Catalog", header: "Root Entity", use: "level" },
-        { sheet: "Catalog", header: "Category", use: "ignored" },
+        { sheet: "Catalog", header: "Category", use: "trail" },
         { sheet: "Compounds", header: "Entity", use: "field", field: "entity" },
     ],
     pages: [
@@ -100,13 +100,13 @@ describe("the preview of a workbook", () => {
         expect(screen.queryByText(copy.imports.preview.columnSheet)).toBeNull();
     });
 
-    it("says what each column of each sheet became, a Category column ignored", () => {
+    it("says what each column of each sheet became, a Category column the expected parent", () => {
         show(workbook);
         const uses = screen.getByRole("region", { name: copy.imports.preview.columns });
         expect(within(uses).getByText("Catalog")).toBeDefined();
         expect(within(uses).getByText("Compounds")).toBeDefined();
         expect(within(uses).getByText("Root Entity").parentElement?.textContent).toContain(copy.imports.columnUses.level);
-        expect(within(uses).getByText("Category").parentElement?.textContent).toContain(copy.imports.columnUses.ignored);
+        expect(within(uses).getByText("Category").parentElement?.textContent).toContain(copy.imports.columnUses.trail);
     });
 
     it("lists the groups with their trail, the page each found, their rows and their sheet", () => {

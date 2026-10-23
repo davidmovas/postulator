@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"encoding/json"
 	"slices"
 
 	"github.com/davidmovas/postulator/internal/application"
@@ -43,6 +44,7 @@ const (
 	CodeAmbiguousEntity       FindingCode = "ambiguous_entity"
 	CodeRowAmbiguous          FindingCode = "row_ambiguous"
 	CodeRowWithoutPage        FindingCode = "row_without_page"
+	CodeParentDiffers         FindingCode = "parent_differs"
 	CodeProductRowLeft        FindingCode = "product_row_left"
 	CodeWPTypeKept            FindingCode = "wp_type_kept"
 	CodeIntermediateLevel     FindingCode = "intermediate_level"
@@ -64,7 +66,7 @@ type Options struct {
 	ListSeparator   string            `json:"listSeparator,omitempty" description:"Other list separator in a cell; default comma"`
 	Sheets          []string          `json:"sheets,omitempty" description:"Sheet names to read; default the first"`
 	IndentColumns   []string          `json:"indentColumns,omitempty" description:"Columns whose position nests the path, shallowest first"`
-	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Root Entity or Root group columns, outermost first"`
+	LevelColumns    []string          `json:"levelColumns,omitempty" description:"Root groups, then category levels, outermost first"`
 	NoteColumns     []string          `json:"noteColumns,omitempty" description:"Columns kept as notes for the writer"`
 	RowType         importmap.RowType `json:"rowType,omitempty" enum:"pages,products,type" description:"Default pages; a parent of products stays a page, a wp_type cell wins"`
 	NoHeader        bool              `json:"noHeader,omitempty" description:"No header row: columns go by letter, every row is data"`
@@ -88,11 +90,12 @@ type Mapping struct {
 }
 
 type Finding struct {
-	Row     int    `json:"row"`
-	Sheet   string `json:"sheet,omitempty"`
-	Field   string `json:"field,omitempty"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Row     int             `json:"row"`
+	Sheet   string          `json:"sheet,omitempty"`
+	Field   string          `json:"field,omitempty"`
+	Code    string          `json:"code"`
+	Message string          `json:"message"`
+	Subject json.RawMessage `json:"subject,omitempty"`
 }
 
 type PreviewPage struct {

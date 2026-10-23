@@ -37,6 +37,10 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	if err != nil {
 		return err
 	}
+	carried, err := s.deps.Identity.ListTermsBySite(ctx, state.SiteID)
+	if err != nil {
+		return err
+	}
 	now := s.now()
 
 	changed := make(map[string]pagemap.Page)
@@ -81,16 +85,21 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		if state.Full && archive(page, m.identities[page.ID], state, readers) {
 			page.Status = pagemap.StatusArchived
 			changed[page.ID] = page
+			m.pages[i] = page
 			state.Counts.Archived++
 		}
 		if page.Status != pagemap.StatusArchived {
 			continue
 		}
-		for _, code := range []finding.Code{finding.RenderUnreachable, finding.RenderRedirected, finding.ParentCycle} {
+		for _, code := range []finding.Code{finding.RenderUnreachable, finding.RenderRedirected, finding.ParentCycle, finding.ParentDiffers} {
 			if err := tracked.clear(ctx, code, finding.SubjectPage(page.ID)); err != nil {
 				return err
 			}
 		}
+	}
+	m.reindex()
+	if err := s.trails(ctx, tracked, m, carried); err != nil {
+		return err
 	}
 
 	set, err := s.deps.Types.Set(ctx, state.SiteID)
@@ -267,26 +276,6 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 		trails = record.Trails
 	}
 	derived := pagemap.DeriveParent(*page, pagemap.ParentSignals{Trails: trails, WPParentID: m.wpParentOf(page.ID), Landings: m.landed}, m.index)
-
-	if page.ParentReason == pagemap.ParentWorkbook && page.ParentPageID != nil && !sameRef(page.ParentPageID, derived.ParentID) {
-		workbook := *page.ParentPageID
-		derivedID, derivedPath, workbookPath := "", "", ""
-		if derived.ParentID != nil {
-			derivedID = *derived.ParentID
-			if found, ok := m.index.ByID(derivedID); ok {
-				derivedPath = found.Path
-			}
-		}
-		if found, ok := m.index.ByID(workbook); ok {
-			workbookPath = found.Path
-		}
-		if err := tracked.raise(ctx, finding.ParentDiffers, &page.ID, finding.SubjectPage(page.ID), map[string]string{
-			"workbook": workbook, "derived": derivedID, "reason": string(derived.Reason),
-			"workbookPath": workbookPath, "derivedPath": derivedPath,
-		}); err != nil {
-			return err
-		}
-	}
 	page.ParentPageID = derived.ParentID
 	page.ParentReason = derived.Reason
 	page.ParentMethod = derived.Method
@@ -313,6 +302,9 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 			return err
 		}
 	}
+	if err := pinToWorkbook(ctx, tracked, page, m, ambiguous); err != nil {
+		return err
+	}
 	twins := make(map[string]struct{}, len(derived.Twins))
 	for _, twin := range derived.Twins {
 		subject := finding.SubjectCrumb(page.ID, twin.Crumb.Key())
@@ -330,6 +322,77 @@ func (s *Service) parent(ctx context.Context, tracked *findings, page *pagemap.P
 		return err
 	}
 	return clearStale(ctx, tracked, finding.ParentAmbiguous, page.ID, ambiguous)
+}
+
+func pinToWorkbook(ctx context.Context, tracked *findings, page *pagemap.Page, m siteModel, ambiguous map[string]struct{}) error {
+	if page.ParentSource != pagemap.ParentFromWorkbook || page.WPType == pagemap.WPProduct || len(page.PlannedTrail) == 0 {
+		return nil
+	}
+	level := page.PlannedTrail[len(page.PlannedTrail)-1]
+	candidates := m.index.ParentNamed(*page, level)
+	switch len(candidates) {
+	case 0:
+		return nil
+	case 1:
+		parentID := candidates[0].ID
+		page.ParentPageID, page.ParentReason, page.ParentMethod = &parentID, pagemap.ParentWorkbook, pagemap.MethodName
+		return nil
+	}
+	subject := finding.SubjectCrumb(page.ID, level)
+	if _, raised := ambiguous[subject]; raised {
+		return nil
+	}
+	ambiguous[subject] = struct{}{}
+	paths := make([]string, 0, len(candidates))
+	for i := range candidates {
+		paths = append(paths, candidates[i].Path)
+	}
+	return tracked.raise(ctx, finding.ParentAmbiguous, &page.ID, subject, map[string]any{"name": level, "candidates": paths})
+}
+
+func (s *Service) trails(ctx context.Context, tracked *findings, m siteModel, carried map[string][]pagemap.Term) error {
+	shown := pagemap.NewTrailSite(m.index, carried, m.termParents())
+	for i := range m.pages {
+		page := m.pages[i]
+		if page.WPID == nil || page.Status == pagemap.StatusArchived {
+			continue
+		}
+		subject := finding.SubjectPage(page.ID)
+		diff, differs := pagemap.TrailDiffers(page, shown)
+		if !differs {
+			if err := tracked.clear(ctx, finding.ParentDiffers, subject); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := tracked.raise(ctx, finding.ParentDiffers, &page.ID, subject, diff, trailOptions(page.WPType)...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func trailOptions(wpType pagemap.WPType) []finding.Option {
+	if wpType == pagemap.WPProduct {
+		return []finding.Option{finding.AcceptSite, finding.Ignore}
+	}
+	return []finding.Option{finding.AcceptSite, finding.AcceptWorkbook, finding.Ignore}
+}
+
+func (m siteModel) termParents() map[int64]int64 {
+	out := make(map[int64]int64)
+	for i := range m.pages {
+		page := m.pages[i]
+		identity, observed := m.identities[page.ID]
+		if !page.WPType.Term() || page.WPID == nil || !observed {
+			continue
+		}
+		out[*page.WPID] = 0
+		if identity.WPParentID != nil {
+			out[*page.WPID] = *identity.WPParentID
+		}
+	}
+	return out
 }
 
 func (m siteModel) pathOf(pageID string) string {

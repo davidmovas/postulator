@@ -28,13 +28,27 @@ func (h harness) sheet(t *testing.T, path, name string) imports.Mapping {
 }
 
 func ignored(report imports.PreviewReport) []string {
+	return usedAs(report, "ignored")
+}
+
+func usedAs(report imports.PreviewReport, use string) []string {
 	out := make([]string, 0)
 	for _, column := range report.Columns {
-		if column.Use == "ignored" {
+		if column.Use == use {
 			out = append(out, column.Header)
 		}
 	}
 	return out
+}
+
+func (h harness) trailAt(t *testing.T, path string) []string {
+	t.Helper()
+
+	stored, found := h.pageAt(t, path)
+	if !found {
+		t.Fatalf("no page at %s", path)
+	}
+	return stored.PlannedTrail
 }
 
 func clean(t *testing.T, name string, applied imports.ApplyResponse) {
@@ -56,8 +70,19 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	if first.Counts.EntitiesCreated != 8 || first.Counts.PagesCreated != 8 || first.Counts.EdgesCreated != 7 {
 		t.Fatalf("the group sheet wrote %+v, want eight entities, eight pages and seven edges", first.Counts)
 	}
-	if left := ignored(first.Report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
-		t.Fatalf("the group sheet ignored %v, want the category columns", left)
+	if left := ignored(first.Report); len(left) != 0 {
+		t.Fatalf("the group sheet ignored %v, want every column read", left)
+	}
+	if read := usedAs(first.Report, "trail"); !slices.Equal(read, []string{"Category", "Subcategory"}) {
+		t.Fatalf("the group sheet reads %v as the trail, want the category columns", read)
+	}
+	for path, want := range map[string][]string{
+		"/peptides/": nil, "/peptides/bpc-157/": {"Peptides"}, "/peptides/bpc-157/liquid/": {"Peptides", "BPC-157"},
+		"/peptides/tb-500/capsules/": {"Peptides", "TB-500"}, "/peptides/storage/": {"Peptides"},
+	} {
+		if got := h.trailAt(t, path); !slices.Equal(got, want) {
+			t.Errorf("the trail of %s = %q, want %q", path, got, want)
+		}
 	}
 	if orphaned := findings(first.Report.Warnings, imports.CodeGroupWithoutPage); len(orphaned) != 0 {
 		t.Fatalf("a group of the group sheet found no page: %+v", orphaned)
@@ -82,11 +107,19 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	if catalog.Counts.EntitiesCreated != 5 || catalog.Counts.PagesCreated != 5 || catalog.Counts.EdgesCreated != 4 {
 		t.Fatalf("the catalog wrote %+v, want four products and the shop above them", catalog.Counts)
 	}
-	if left := ignored(catalog.Report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
-		t.Fatalf("the catalog ignored %v, want the category columns", left)
+	if left := ignored(catalog.Report); len(left) != 0 {
+		t.Fatalf("the catalog ignored %v, want every column read", left)
 	}
 	if len(catalog.Report.Groups) != 0 {
 		t.Fatalf("groups = %+v, want none: the catalog has no root column", catalog.Report.Groups)
+	}
+	for path, want := range map[string][]string{
+		"/shop/bpc-157-5mg/": {"Peptides", "BPC-157"}, "/shop/tb-500-5mg/": {"Peptides", "TB-500"},
+		"/shop/recovery-blend/": {"Blends", "Recovery"}, "/shop/": nil,
+	} {
+		if got := h.trailAt(t, path); !slices.Equal(got, want) {
+			t.Errorf("the trail of the waiting row %s = %q, want %q", path, got, want)
+		}
 	}
 	for _, product := range []string{"BPC-157 5 mg vial", "BPC-157 10 mg vial", "TB-500 5 mg vial", "BPC-157 and TB-500 blend"} {
 		if !hasEdge(catalog.Report, product, "Shop", string(graph.EdgeParent)) {
@@ -112,9 +145,15 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 	if canada, _ := page(wide.Report, "/peptides/canada/"); canada.PageType != "Entity" {
 		t.Fatalf("the preview shows Canada as %+v, want an Entity page", canada)
 	}
-	if left := ignored(wide.Report); !slices.Equal(left,
-		[]string{"Entity ID", "Primary Entity", "Entity Type", "Category", "Subcategory", "Page Template"}) {
+	if left := ignored(wide.Report); !slices.Equal(left, []string{"Entity ID", "Primary Entity", "Entity Type", "Page Template"}) {
 		t.Fatalf("the wide sheet ignored %v", left)
+	}
+	for path, want := range map[string][]string{
+		"/peptides/": nil, "/peptides/bpc-157/": {"Peptides"}, "/peptides/canada/": {"Peptides"},
+	} {
+		if got := h.trailAt(t, path); !slices.Equal(got, want) {
+			t.Errorf("after the wide sheet the trail of %s = %q, want %q", path, got, want)
+		}
 	}
 	if dropped := findings(wide.Report.Warnings, imports.CodePageTypeColumnDropped); len(dropped) != 1 ||
 		!strings.Contains(dropped[0].Message, "Entity Type") || dropped[0].Sheet != "Entities" {
@@ -275,8 +314,11 @@ func TestTheClientWorkbookImportsAsOneWorkbook(t *testing.T) {
 			t.Errorf("the finding %+v names no sheet of the workbook", finding)
 		}
 	}
-	if left := ignored(applied.Report); len(left) != 2+2+6+1 {
-		t.Errorf("ignored = %v, want the category columns of three sheets beside the columns no field reads", left)
+	if left := ignored(applied.Report); len(left) != 4+1 {
+		t.Errorf("ignored = %v, want only the columns no field and no level reads", left)
+	}
+	if read := usedAs(applied.Report, "trail"); len(read) != 2+2+2 {
+		t.Errorf("trail columns = %v, want the category columns of three sheets", read)
 	}
 
 	again, err := whole.service.Apply(t.Context(), imports.ApplyRequest{SiteID: whole.siteID, Path: clientWorkbook, Sheets: sheets})

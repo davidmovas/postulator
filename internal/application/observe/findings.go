@@ -31,7 +31,7 @@ func (s *Service) findings(ctx context.Context, siteID string, codes ...finding.
 	return f, nil
 }
 
-func (f *findings) raise(ctx context.Context, code finding.Code, pageID *string, subjectKey string, subject any) error {
+func (f *findings) raise(ctx context.Context, code finding.Code, pageID *string, subjectKey string, subject any, options ...finding.Option) error {
 	encoded, err := json.Marshal(subject)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func (f *findings) raise(ctx context.Context, code finding.Code, pageID *string,
 	}
 	record, err := finding.New(finding.Finding{
 		ID: id.New(), SiteID: f.siteID, PageID: pageID, Code: code, SubjectKey: subjectKey, Subject: encoded,
-		CreatedAt: f.now, UpdatedAt: f.now,
+		Options: options, CreatedAt: f.now, UpdatedAt: f.now,
 	})
 	if err != nil {
 		return err

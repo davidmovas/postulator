@@ -588,7 +588,10 @@ func TestTheDerivedParentWinsAndTheWorkbookParentIsAFinding(t *testing.T) {
 	s := newScenario(t)
 	shop := s.seedPage(t, pagemap.Page{ID: "shop", Path: "/shop/", WPType: pagemap.WPPage, WPID: new(shopID), Status: pagemap.StatusPublished})
 	pep := s.seedPage(t, pagemap.Page{ID: "pep", Path: "/peptides/", WPType: pagemap.WPPage, WPID: new(peptidesID), Status: pagemap.StatusPublished})
-	s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished, ParentPageID: &shop.ID, ParentReason: pagemap.ParentWorkbook})
+	s.seedPage(t, pagemap.Page{ID: "tb", Path: "/tb-500/", WPType: pagemap.WPPage, WPID: new(tb500ID), Status: pagemap.StatusPublished,
+		ParentPageID: &shop.ID, ParentReason: pagemap.ParentWorkbook, PlannedTrail: []string{"BPC-157"}})
+	s.seedPage(t, pagemap.Page{ID: "bpc", Path: "/bpc-157/", WPType: pagemap.WPPage, WPID: new(bpcID), Status: pagemap.StatusPublished,
+		ParentPageID: &shop.ID, ParentReason: pagemap.ParentWorkbook})
 	for i := range s.plugin.items {
 		if s.plugin.items[i].ID == tb500ID {
 			s.plugin.items[i].Parent = peptidesID
@@ -605,12 +608,15 @@ func TestTheDerivedParentWinsAndTheWorkbookParentIsAFinding(t *testing.T) {
 		t.Fatalf("parent_differs = %+v %t", f, ok)
 	}
 	var subject struct {
-		Workbook string `json:"workbook"`
-		Derived  string `json:"derived"`
-		Reason   string `json:"reason"`
+		Sheet []string `json:"sheet"`
+		Site  []string `json:"site"`
 	}
-	if err := json.Unmarshal(f.Subject, &subject); err != nil || subject.Workbook != shop.ID || subject.Derived != pep.ID || subject.Reason != "wp_parent" {
-		t.Errorf("subject = %s (%v)", f.Subject, err)
+	if err := json.Unmarshal(f.Subject, &subject); err != nil || !slices.Equal(subject.Sheet, []string{"BPC-157"}) ||
+		!slices.Equal(subject.Site, []string{"Peptides"}) {
+		t.Errorf("subject = %s (%v), want the sheet's trail beside the site's", f.Subject, err)
+	}
+	if bpc, raised := s.finding(finding.ParentDiffers, finding.SubjectPage("bpc")); raised {
+		t.Errorf("a workbook parent without a trail raised %s; the trail, not the parent id, is the sheet's word", bpc.Subject)
 	}
 }
 

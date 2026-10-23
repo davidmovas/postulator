@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
@@ -47,6 +46,9 @@ func matchRows(rows []rowDraft, rowType importmap.RowType, state *siteState, p *
 		if !rows[at].unreadable {
 			state.address(&rows[at], &sheet)
 		}
+	}
+	for i := range rows {
+		rows[i].expected = rows[i].trailBelow(pagemap.Slug(rows[i].sheetPath()))
 	}
 
 	kept := make([]rowDraft, 0, len(rows))
@@ -159,7 +161,7 @@ func (s *siteState) plannedAt(row *rowDraft) string {
 		if slug == "" {
 			continue
 		}
-		path, err := pagemap.NormalizePath(s.levelPath(row) + slug + "/")
+		path, err := pagemap.NormalizePath(s.levelPath(row.trailBelow(slug)) + slug + "/")
 		if err != nil {
 			return ""
 		}
@@ -168,17 +170,14 @@ func (s *siteState) plannedAt(row *rowDraft) string {
 	return ""
 }
 
-func (s *siteState) levelPath(row *rowDraft) string {
-	for i := len(row.levels) - 1; i >= 0; i-- {
-		level := row.levels[i]
-		if graph.Key(level) == graph.Key(row.named()) {
-			continue
-		}
-		found := s.site.Match(pagemap.Row{Entity: level, Title: level, H1: level})
-		if found.Found() && holdsPages(found.Page) {
-			return found.Page.Path
-		}
+func (s *siteState) levelPath(trail []string) string {
+	if len(trail) == 0 {
 		return pagemap.RootPath
+	}
+	level := trail[len(trail)-1]
+	found := s.site.Match(pagemap.Row{Entity: level, Title: level, H1: level})
+	if found.Found() && holdsPages(found.Page) {
+		return found.Page.Path
 	}
 	return pagemap.RootPath
 }

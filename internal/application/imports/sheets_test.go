@@ -180,7 +180,7 @@ func TestOnlyTheRootColumnMakesAGroupAndTheUrlPlacesTheRowsInIt(t *testing.T) {
 	h := newHarness(t)
 	path := h.file(t, "client.csv", clientSheet)
 	mapping := h.detected(t, path)
-	if !slices.Equal(mapping.Options.LevelColumns, []string{"Root Entity"}) {
+	if !slices.Equal(mapping.Options.LevelColumns, []string{"Root Entity", "Category", "Subcategory"}) {
 		t.Fatalf("levels = %v", mapping.Options.LevelColumns)
 	}
 
@@ -188,8 +188,11 @@ func TestOnlyTheRootColumnMakesAGroupAndTheUrlPlacesTheRowsInIt(t *testing.T) {
 	if len(report.Errors) != 0 {
 		t.Fatalf("errors = %+v", report.Errors)
 	}
-	if left := ignored(report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
-		t.Fatalf("ignored = %v, want the category columns", left)
+	if left := ignored(report); len(left) != 0 {
+		t.Fatalf("ignored = %v, want the category columns read as the trail", left)
+	}
+	if groupsBy := usedAs(report, "level"); !slices.Equal(groupsBy, []string{"Root Entity"}) {
+		t.Fatalf("group columns = %v, want the root alone", groupsBy)
 	}
 	owners := map[string]string{
 		"/peptides/":                "Peptides",
@@ -438,7 +441,7 @@ func TestAUrlParentWinsInsideTheRowsRootGroup(t *testing.T) {
 	}
 }
 
-func TestASavedCategoryLevelColumnIsIgnored(t *testing.T) {
+func TestASavedCategoryLevelColumnIsReadAsTheTrailAndMakesNoGroup(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
@@ -454,8 +457,11 @@ func TestASavedCategoryLevelColumnIsIgnored(t *testing.T) {
 	}
 
 	report := h.preview(t, path, imports.Mapping{ID: saved.Mapping.ID})
-	if left := ignored(report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
-		t.Fatalf("ignored = %v, want the category columns", left)
+	if left := ignored(report); len(left) != 0 {
+		t.Fatalf("ignored = %v, want every column read", left)
+	}
+	if read := usedAs(report, "trail"); !slices.Equal(read, []string{"Category", "Subcategory"}) {
+		t.Fatalf("trail columns = %v, want the category columns", read)
 	}
 	if groups := report.Groups; len(groups) != 1 || !slices.Equal(groups[0].Path, []string{"Peptides"}) {
 		t.Fatalf("groups = %+v, want the root alone", groups)

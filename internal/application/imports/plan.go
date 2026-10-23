@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"encoding/json"
 	"slices"
 	"time"
 
@@ -81,7 +82,11 @@ func (p *plan) sheetAt(at importmap.Origin) string {
 }
 
 func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, message string) {
-	finding := Finding{Row: at.Row, Sheet: at.Sheet, Field: field, Code: string(code), Message: message}
+	p.noteAbout(at, field, code, nil, message)
+}
+
+func (p *plan) noteAbout(at importmap.Origin, field string, code FindingCode, subject json.RawMessage, message string) {
+	finding := Finding{Row: at.Row, Sheet: at.Sheet, Field: field, Code: string(code), Message: message, Subject: subject}
 	if code.Blocking() {
 		p.report.Errors = append(p.report.Errors, finding)
 		return

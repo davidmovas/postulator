@@ -92,10 +92,10 @@ export const imports = {
         unnamed: (letter: string) => `Column ${letter}`,
         indentHint:
             "Tick the columns whose position carries the hierarchy, left to right. A row's path is its own cell prefixed by the columns to its left.",
-        levels: "Group columns",
+        levels: "Level columns",
         levelsHint:
-            "Tick the Root Entity or Root columns that name the groups a row sits in, outermost first; rows that repeat the same names belong to the same group, under a hub entity. No other column makes a group.",
-        noGroupColumns: "The sheet has no Root Entity or Root column left to group its rows by.",
+            "Tick the columns that name the levels a row sits under, outermost first. A Root Entity or Root column makes the groups: rows that repeat the same names belong to the same group, under a hub entity. A Category or Subcategory column names the parents the sheet expects, which are compared with the site and never written to it. No other column makes a group.",
+        noGroupColumns: "The sheet has no Root, Category or Subcategory column left to read levels from.",
         notes: "Notes for the writer",
         notesHint:
             "Tick the columns to keep on each page as notes, such as Notes or Intent Owner. The writer reads them as context and an export writes them back.",
@@ -249,6 +249,7 @@ export const imports = {
         ambiguous_entity: "Several entities carry this name, so the row needs a parent or a group to say which one",
         row_ambiguous: "Several pages answer to this row, so it writes nothing until it names one of them by its URL",
         row_without_page: "No page answers to this row, so it is planned; a product row waits until the store holds the product",
+        parent_differs: "The sheet places the row under other parents than the site shows; no parent is written to the site",
         product_row_left: "An earlier row waited for this product and is left beside it; delete it on the Pages screen",
         wp_type_kept: "The row is already on the site, so it keeps its WordPress type",
         intermediate_level: "The level above the products stays an entity without a page",
@@ -257,6 +258,7 @@ export const imports = {
     columnUses: {
         field: "A page field",
         level: "Group",
+        trail: "Expected parent",
         note: "Note for the writer",
         indent: "Hierarchy",
         ignored: "Ignored",

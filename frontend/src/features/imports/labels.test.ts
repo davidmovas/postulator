@@ -119,6 +119,7 @@ describe("what a column became", () => {
     it.each([
         [{ header: "URL", use: "field", field: "path" }, "Page path"],
         [{ header: "Root Entity", use: "level" }, "Group"],
+        [{ header: "Category", use: "trail" }, "Expected parent"],
         [{ header: "Notes", use: "note" }, "Note for the writer"],
         [{ header: "Entity?", use: "ignored" }, "Ignored"],
     ])("words %j as %s", (column, want) => {

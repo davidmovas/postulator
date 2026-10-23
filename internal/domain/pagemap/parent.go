@@ -223,18 +223,7 @@ func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, ind
 		return Page{}, MethodNone, false
 	}
 
-	named := index.ByName(crumb.Name)
-	pages := make([]Page, 0, len(named))
-	terms := make([]Page, 0, len(named))
-	for i := range named {
-		switch {
-		case named[i].ID == page.ID || descends(named[i].Path, page.Path):
-		case named[i].WPType.Term():
-			terms = append(terms, named[i])
-		default:
-			pages = append(pages, named[i])
-		}
-	}
+	pages, terms := index.parentsNamed(page, crumb.Name)
 	candidates := pages
 	if len(pages) == 0 {
 		candidates = terms
@@ -251,6 +240,30 @@ func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, ind
 		d.ambiguous(crumb, candidates)
 	}
 	return Page{}, MethodNone, false
+}
+
+func (i Index) ParentNamed(page Page, name string) []Page {
+	pages, terms := i.parentsNamed(page, name)
+	if len(pages) == 0 {
+		return terms
+	}
+	return pages
+}
+
+func (i Index) parentsNamed(page Page, name string) (pages, terms []Page) {
+	named := i.ByName(name)
+	pages = make([]Page, 0, len(named))
+	terms = make([]Page, 0, len(named))
+	for at := range named {
+		switch {
+		case named[at].ID == page.ID || descends(named[at].Path, page.Path):
+		case named[at].WPType.Term():
+			terms = append(terms, named[at])
+		default:
+			pages = append(pages, named[at])
+		}
+	}
+	return pages, terms
 }
 
 func (d *Derivation) twin(crumb Crumb, chosen Page, terms []Page) {

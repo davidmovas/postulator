@@ -142,7 +142,7 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 				importmap.FieldPath: "Recommended URL Layer", importmap.FieldTitle: "Title", importmap.FieldH1: "H1",
 				importmap.FieldKeywords: "Keywords",
 			},
-			levels: []string{"Root Entity"},
+			levels: []string{"Root Entity", "Category", "Subcategory"},
 		},
 		{
 			name:    "the category and subcategory sheet",
@@ -150,6 +150,7 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 			columns: map[importmap.Field]string{
 				importmap.FieldPath: "URL", importmap.FieldTitle: "Title", importmap.FieldH1: "H1", importmap.FieldKeywords: "Keywords",
 			},
+			levels: []string{"Category", "Subcategory"},
 		},
 		{
 			name: "the wide sheet an assistant wrote",
@@ -161,7 +162,8 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 				importmap.FieldPageType: "Entity Level", importmap.FieldEntity: "Entity Name", importmap.FieldPath: "Canonical URL",
 				importmap.FieldParentEntity: "Parent Entity", importmap.FieldTitle: "Title", importmap.FieldH1: "H1",
 			},
-			notes: []string{"Intent Owner", "Notes"},
+			levels: []string{"Category", "Subcategory"},
+			notes:  []string{"Intent Owner", "Notes"},
 		},
 		{
 			name:    "the variation sheet",
@@ -170,15 +172,16 @@ func TestAutoDetectReadsTheClientSheets(t *testing.T) {
 			notes:   []string{"Detected Form / Variation", "Reason"},
 		},
 		{
-			name:    "the root column is the level wherever it stands",
+			name:    "every level column is detected wherever it stands",
 			headers: []string{"Subcategory", "URL", "Category", "Root"},
 			columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
-			levels:  []string{"Root"},
+			levels:  []string{"Subcategory", "Category", "Root"},
 		},
 		{
-			name:    "a root category is no level",
+			name:    "a root or a main category is no level",
 			headers: []string{"Sub Subcategory", "Category", "URL", "Root Category", "Main Category", "Sub Category"},
 			columns: map[importmap.Field]string{importmap.FieldPath: "URL"},
+			levels:  []string{"Sub Subcategory", "Category", "Sub Category"},
 		},
 	}
 

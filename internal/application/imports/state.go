@@ -19,6 +19,7 @@ type siteState struct {
 	edges     []graph.Edge
 	pages     []pagemap.Page
 	site      pagemap.RowSite
+	trails    pagemap.TrailSite
 	byName    map[string][]graph.Entity
 	byPath    map[string]pagemap.Page
 	edgeKeys  map[string]struct{}
@@ -32,6 +33,7 @@ func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pa
 	state := siteState{
 		siteID: siteID, entities: entities, edges: edges, pages: pages, pageTypes: pageTypes, fields: fields,
 		site:     pagemap.NewRowSite(pages, fields, entities),
+		trails:   pagemap.NewTrailSite(pagemap.NewIndexNamed(pages, pagemap.Names(fields)), nil, nil),
 		byName:   make(map[string][]graph.Entity, len(entities)),
 		byPath:   make(map[string]pagemap.Page, len(pages)),
 		edgeKeys: make(map[string]struct{}, len(edges)),

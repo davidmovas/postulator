@@ -22,7 +22,11 @@ func (n *groupNode) namedBy(row *rowDraft) bool {
 }
 
 func (n *groupNode) sluggedBy(row *rowDraft) bool {
-	return strings.EqualFold(pagemap.Slug(row.sheetPath()), slugOf(n.name))
+	return sameSlug(pagemap.Slug(row.sheetPath()), n.name)
+}
+
+func sameSlug(slug, name string) bool {
+	return slug != "" && strings.EqualFold(slug, slugOf(name))
 }
 
 type groups struct {
