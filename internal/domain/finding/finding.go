@@ -70,8 +70,17 @@ const (
 const (
 	SubjectSite             = "site"
 	ResolvedByObservation   = "observation"
+	ResolvedByImport        = "import"
+	ResolvedByPerson        = "person"
+	ResolvedByAgent         = "agent"
 	ResolutionObservedClear = "observed_clear"
+	ResolutionRowMatched    = "row_matched"
+	ResolutionRowLeftSheet  = "row_left_sheet"
 )
+
+func Settled(status Status, resolvedBy string) bool {
+	return status == Dismissed || (status == Resolved && (resolvedBy == ResolvedByPerson || resolvedBy == ResolvedByAgent))
+}
 
 type rule struct {
 	severity Severity

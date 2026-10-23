@@ -121,6 +121,47 @@ func TestFindingRepoUpsertFollowsTheLifecycle(t *testing.T) {
 	}
 }
 
+func TestAFindingAPersonResolvedStaysResolvedWhileItsFactsStand(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		resolvedBy string
+		subject    string
+		want       finding.Status
+	}{
+		{name: "a person's resolution and the same facts", resolvedBy: finding.ResolvedByPerson, subject: `{"workbook":["Peptides"], "site":["Shop"]}`, want: finding.Resolved},
+		{name: "the agent's resolution and the same facts", resolvedBy: finding.ResolvedByAgent, subject: `{"workbook":["Peptides"],"site":["Shop"]}`, want: finding.Resolved},
+		{name: "a person's resolution and facts that changed", resolvedBy: finding.ResolvedByPerson, subject: `{"workbook":["Peptides"],"site":["Blends"]}`, want: finding.Open},
+		{name: "the observation's close and the cause back", resolvedBy: finding.ResolvedByObservation, subject: `{"workbook":["Peptides"],"site":["Shop"]}`, want: finding.Open},
+		{name: "an import's close and the cause back", resolvedBy: finding.ResolvedByImport, subject: `{"workbook":["Peptides"],"site":["Shop"]}`, want: finding.Open},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := findingStore(t)
+			repo := NewFindingRepo(store)
+			page := "pg1"
+			raised := newFinding(t, "s1", &page, finding.ParentDiffers, finding.SubjectPage(page), `{"workbook":["Peptides"],"site":["Shop"]}`, findingStamp)
+			if err := repo.Upsert(t.Context(), raised); err != nil {
+				t.Fatalf("Upsert: %v", err)
+			}
+			if err := repo.Settle(t.Context(), raised.ID, finding.Resolved, "accept_site", tc.resolvedBy, findingStamp.Add(time.Minute)); err != nil {
+				t.Fatalf("Settle: %v", err)
+			}
+			again := newFinding(t, "s1", &page, finding.ParentDiffers, finding.SubjectPage(page), tc.subject, findingStamp.Add(time.Hour))
+			if err := repo.Upsert(t.Context(), again); err != nil {
+				t.Fatalf("Upsert again: %v", err)
+			}
+			got, err := repo.Get(t.Context(), raised.ID)
+			if err != nil || got.Status != tc.want {
+				t.Fatalf("after it was raised again the finding is %+v, %v; want %s", got, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestAPersonSettlesAnOpenFindingOnce(t *testing.T) {
 	t.Parallel()
 

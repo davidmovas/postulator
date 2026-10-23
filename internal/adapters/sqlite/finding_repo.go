@@ -14,7 +14,7 @@ import (
 const (
 	findingColumns  = `id, site_id, page_id, entity_id, code, severity, subject_key, subject, options, status, resolution, resolved_by, created_at, updated_at`
 	insertFinding   = `INSERT INTO findings (` + findingColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	selectRaised    = `SELECT id, status, subject FROM findings WHERE site_id = ? AND code = ? AND subject_key = ?`
+	selectRaised    = `SELECT id, status, resolved_by, subject FROM findings WHERE site_id = ? AND code = ? AND subject_key = ?`
 	raiseAgain      = `UPDATE findings SET severity = ?, subject = ?, options = ?, status = ?, resolution = '', resolved_by = '', updated_at = ? WHERE id = ?`
 	clearFinding    = `UPDATE findings SET status = ?, resolution = ?, resolved_by = ?, updated_at = ? WHERE site_id = ? AND code = ? AND subject_key = ? AND status = ?`
 	settleFinding   = `UPDATE findings SET status = ?, resolution = ?, resolved_by = ?, updated_at = ? WHERE id = ? AND status = ?`
@@ -36,9 +36,10 @@ func NewFindingRepo(store *Store) *FindingRepo {
 }
 
 type raised struct {
-	id      string
-	status  finding.Status
-	subject string
+	id         string
+	status     finding.Status
+	resolvedBy string
+	subject    string
 }
 
 func (r *FindingRepo) Upsert(ctx context.Context, f finding.Finding) error {
@@ -67,7 +68,7 @@ func (r *FindingRepo) Upsert(ctx context.Context, f finding.Finding) error {
 			return insertErr
 		}
 		existing := rows[0]
-		if existing.status == finding.Dismissed && sameJSON(existing.subject, subject) {
+		if finding.Settled(existing.status, existing.resolvedBy) && sameJSON(existing.subject, subject) {
 			return nil
 		}
 		_, updateErr := execWrite(c, r.store.writeFrom(c), raiseAgain, []any{
@@ -145,7 +146,7 @@ func scanRaised(rows *sql.Rows) (raised, error) {
 		row    raised
 		status string
 	)
-	if err := rows.Scan(&row.id, &status, &row.subject); err != nil {
+	if err := rows.Scan(&row.id, &status, &row.resolvedBy, &row.subject); err != nil {
 		return raised{}, err
 	}
 	row.status = finding.Status(status)
