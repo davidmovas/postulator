@@ -6,14 +6,15 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
+	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-func audited() *memory {
+func audited() *sitemodeltest.Memory {
 	m := site1()
-	m.audit = reports.LinkAuditResponse{
+	m.Audit = reports.LinkAuditResponse{
 		SiteID: siteID,
 		Totals: reports.LinkTotals{Audited: 2, Targets: 3, Satisfied: 1, Missing: 1, MissingRequired: 1, Pending: 1, Orphans: 1, OffGraph: 2},
 		Pages: []reports.PageAudit{
@@ -28,12 +29,12 @@ func TestTheBriefReadsTheWholeSiteInOneRead(t *testing.T) {
 	t.Parallel()
 
 	m := audited()
-	brief, err := m.service().Brief(t.Context(), siteID)
+	brief, err := m.Service().Brief(t.Context(), siteID)
 	if err != nil {
 		t.Fatalf("Brief: %v", err)
 	}
-	if m.reads != 1 {
-		t.Errorf("the brief read in %d units, want one", m.reads)
+	if m.Reads() != 1 {
+		t.Errorf("the brief read in %d units, want one", m.Reads())
 	}
 	if brief.Name != "Shop" || brief.Overview.Pages != 5 || brief.Overview.Empty != 4 || brief.Overview.Unmapped != 3 {
 		t.Errorf("brief = %+v, want five pages, four holding no text and three with no entity", brief.Overview)
@@ -44,16 +45,16 @@ func TestTheBriefReadsTheWholeSiteInOneRead(t *testing.T) {
 	if len(brief.Overview.Findings) != 1 || brief.Overview.Findings[0].Code != "parent_unresolved" {
 		t.Errorf("findings = %+v, want the open one only", brief.Overview.Findings)
 	}
-	if _, err := m.service().Brief(t.Context(), "elsewhere"); !errors.IsCode(err, errors.NotFound) {
+	if _, err := m.Service().Brief(t.Context(), "elsewhere"); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("Brief of an unknown site = %v, want NotFound", err)
 	}
 }
 
-func explore(t *testing.T, m *memory, req sitemodel.ExploreRequest) sitemodel.ExploreResponse {
+func explore(t *testing.T, m *sitemodeltest.Memory, req sitemodel.ExploreRequest) sitemodel.ExploreResponse {
 	t.Helper()
 
 	req.SiteID = siteID
-	got, err := m.service().Explore(t.Context(), req)
+	got, err := m.Service().Explore(t.Context(), req)
 	if err != nil {
 		t.Fatalf("Explore(%+v): %v", req, err)
 	}
@@ -64,7 +65,7 @@ func TestEveryViewAnswersFromTheModel(t *testing.T) {
 	t.Parallel()
 
 	m := audited()
-	page, err := m.service().Page(t.Context(), sitemodel.PageRequest{SiteID: siteID, Path: "peptides"})
+	page, err := m.Service().Page(t.Context(), sitemodel.PageRequest{SiteID: siteID, Path: "peptides"})
 	if err != nil || page.Page.PageID != "hub" || page.Entity == nil || page.Entity.Name != "Peptides" ||
 		len(page.Products) != 1 || len(page.Findings) != 1 || page.Findings[0].Code != "parent_unresolved" {
 		t.Errorf("page = %+v, %v, want the hub found by its path with its card, its product and its open finding", page, err)
@@ -121,10 +122,10 @@ func TestExploreRefusesWhatItCannotAnswer(t *testing.T) {
 	t.Parallel()
 
 	other := site1()
-	other.pages[3].SiteID = "another-site"
+	other.Pages[3].SiteID = "another-site"
 	cases := []struct {
 		name string
-		m    *memory
+		m    *sitemodeltest.Memory
 		req  sitemodel.ExploreRequest
 		code errors.Code
 	}{
@@ -142,7 +143,7 @@ func TestExploreRefusesWhatItCannotAnswer(t *testing.T) {
 			t.Parallel()
 
 			tc.req.SiteID = siteID
-			if _, err := tc.m.service().Explore(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
+			if _, err := tc.m.Service().Explore(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
 				t.Errorf("Explore = %v, want %s", err, tc.code)
 			}
 		})

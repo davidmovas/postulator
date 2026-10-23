@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
+	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
@@ -70,40 +71,40 @@ func link(id, from, to, href string, kind pagemap.LinkType, source pagemap.LinkS
 	}
 }
 
-func site1() *memory {
+func site1() *sitemodeltest.Memory {
 	hub := sitePage("hub", "/peptides/", "Peptides", 2, pagemap.WPPage, pagetype.Hub, "home")
 	hub.EntityID = new("e-peptides")
 	child := sitePage("bpc", "/bpc-157/", "BPC-157", 3, pagemap.WPPage, pagetype.Entity, "hub")
 	child.EntityID = new("e-bpc")
-	return &memory{
-		site: site.Site{ID: siteID, Name: "Shop", BaseURL: "https://shop.example.com", Settings: site.DefaultSettings()},
-		pages: []pagemap.Page{
+	return &sitemodeltest.Memory{
+		Site: site.Site{ID: siteID, Name: "Shop", BaseURL: "https://shop.example.com", Settings: site.DefaultSettings()},
+		Pages: []pagemap.Page{
 			sitePage("home", "/", "Home", 1, pagemap.WPPage, pagetype.Entity, ""),
 			hub, child,
 			sitePage("far", "/far-away/", "Far Away", 9, pagemap.WPPage, pagetype.Entity, ""),
 			sitePage("tb", "/product/tb-500/", "TB-500", 30, pagemap.WPProduct, pagetype.Product, ""),
 		},
-		entities: []graph.Entity{
+		Entities: []graph.Entity{
 			{ID: "e-peptides", SiteID: siteID, Name: "Peptides", CanonicalPageID: new("hub"), Source: graph.SourceUser, Score: 1, Definition: "Peptides for research."},
 			{ID: "e-bpc", SiteID: siteID, Name: "BPC-157", CanonicalPageID: new("bpc"), Source: graph.SourceUser, Score: 0.5,
 				Anchors: []graph.Anchor{{Text: "BPC-157", Source: graph.AnchorUser, Weight: 1}}},
 		},
-		edges: []graph.Edge{edge("g1", "e-bpc", "e-peptides")},
-		types: presetSet(),
-		terms: map[string][]pagemap.Term{},
-		fields: map[string][]field.Value{
+		Edges: []graph.Edge{edge("g1", "e-bpc", "e-peptides")},
+		Types: presetSet(),
+		Terms: map[string][]pagemap.Term{},
+		Fields: map[string][]field.Value{
 			"tb":  {field.NewValue("tb", field.Price, "60.00", stamp), field.NewValue("tb", field.SKU, "TB-5", stamp)},
 			"far": {field.NewValue("far", field.SEODescription, "Far from the hub.", stamp)},
 		},
-		bodies: []block.Snapshot{
+		Bodies: []block.Snapshot{
 			{PageID: "bpc", Side: block.Current, Raw: "<p>BPC-157 is studied for repair.</p>", Kind: block.Classic},
 		},
-		links: []pagemap.PageLink{
+		Links: []pagemap.PageLink{
 			link("l1", "hub", "tb", "/product/tb-500/", pagemap.LinkListing, pagemap.SourceRender),
 			link("c1", "bpc", "hub", "https://shop.example.com/peptides/", pagemap.LinkContextual, pagemap.SourceRaw),
 			link("c2", "far", "bpc", "https://shop.example.com/bpc-157/", pagemap.LinkContextual, pagemap.SourceRaw),
 		},
-		findings: []finding.Finding{
+		Findings: []finding.Finding{
 			{ID: "f1", SiteID: siteID, PageID: new("hub"), Code: finding.ParentUnresolved, Status: finding.Open},
 			{ID: "f2", SiteID: siteID, PageID: new("hub"), Code: finding.RenderUnreachable, Status: finding.Dismissed},
 		},
@@ -114,15 +115,15 @@ func TestAPackReadsOnlyThePagesNeighborhood(t *testing.T) {
 	t.Parallel()
 
 	m := site1()
-	picture, err := m.service().Picture(t.Context(), sitemodel.PackRequest{PageID: "hub"})
+	picture, err := m.Service().Picture(t.Context(), sitemodel.PackRequest{PageID: "hub"})
 	if err != nil {
 		t.Fatalf("Picture: %v", err)
 	}
-	if m.reads != 1 {
-		t.Errorf("the pack read in %d units, want one read", m.reads)
+	if m.Reads() != 1 {
+		t.Errorf("the pack read in %d units, want one read", m.Reads())
 	}
-	if len(m.asked) != 1 || slices.Contains(m.asked[0], "far") || !slices.Contains(m.asked[0], "tb") {
-		t.Errorf("bodies were asked for %v, want the hub's neighborhood without the far page", m.asked)
+	if asked := m.Asked(); len(asked) != 1 || slices.Contains(asked[0], "far") || !slices.Contains(asked[0], "tb") {
+		t.Errorf("bodies were asked for %v, want the hub's neighborhood without the far page", asked)
 	}
 	if picture.Fitted.Field != field.Body {
 		t.Errorf("an unnamed field = %s, want the hub's link field", picture.Fitted.Field)
@@ -143,11 +144,11 @@ func TestAPackFollowsTheSitesLinkForm(t *testing.T) {
 
 	absolute := site1()
 	relative := site1()
-	relative.site.Settings.LinkURLForm = site.URLFormRelative
+	relative.Site.Settings.LinkURLForm = site.URLFormRelative
 
 	cases := []struct {
 		name string
-		m    *memory
+		m    *sitemodeltest.Memory
 		want string
 	}{
 		{name: "the client's links are absolute", m: absolute, want: "https://shop.example.com/bpc-157/"},
@@ -157,7 +158,7 @@ func TestAPackFollowsTheSitesLinkForm(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			picture, err := tc.m.service().Picture(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "body"})
+			picture, err := tc.m.Service().Picture(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "body"})
 			if err != nil {
 				t.Fatalf("Picture: %v", err)
 			}
@@ -171,16 +172,16 @@ func TestAPackFollowsTheSitesLinkForm(t *testing.T) {
 func TestTheSitesLinkFormIsReadForTheLinkPlans(t *testing.T) {
 	t.Parallel()
 
-	absolute, err := site1().service().Absolute(t.Context(), siteID)
+	absolute, err := site1().Service().Absolute(t.Context(), siteID)
 	if err != nil || !absolute {
 		t.Errorf("Absolute = %t, %v; want the client's absolute links followed", absolute, err)
 	}
 	relative := site1()
-	relative.site.Settings.LinkURLForm = site.URLFormRelative
-	if absolute, err = relative.service().Absolute(t.Context(), siteID); err != nil || absolute {
+	relative.Site.Settings.LinkURLForm = site.URLFormRelative
+	if absolute, err = relative.Service().Absolute(t.Context(), siteID); err != nil || absolute {
 		t.Errorf("Absolute = %t, %v; want the setting's relative form", absolute, err)
 	}
-	if _, err = site1().service().Absolute(t.Context(), "elsewhere"); !errors.IsCode(err, errors.NotFound) {
+	if _, err = site1().Service().Absolute(t.Context(), "elsewhere"); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("Absolute of an unknown site = %v, want NotFound", err)
 	}
 }
@@ -194,7 +195,7 @@ func TestAPackIsBuiltOverTheClaim(t *testing.T) {
 	}}
 	scope := field.Scope{Key: field.Body, Enabled: true, Instruction: "Written from the claim.", Links: field.NoLinks()}
 	claimedType := pagetype.Type{ID: "type-claimed", SiteID: siteID, Name: "Pillar", Preset: pagetype.Hub}
-	picture, err := m.service().Picture(t.Context(), sitemodel.PackRequest{
+	picture, err := m.Service().Picture(t.Context(), sitemodel.PackRequest{
 		PageID: "hub", Field: "body", Claim: &sitemodel.Claim{Type: &claimedType, Scope: scope, Links: &claimed},
 	})
 	if err != nil {
@@ -207,8 +208,8 @@ func TestAPackIsBuiltOverTheClaim(t *testing.T) {
 	if strings.Contains(text, "/bpc-157/ (") {
 		t.Errorf("the pack planned links of its own:\n%s", text)
 	}
-	if !slices.Contains(m.asked[0], "far") {
-		t.Errorf("the claimed target's page was not read: %v", m.asked)
+	if asked := m.Asked(); !slices.Contains(asked[0], "far") {
+		t.Errorf("the claimed target's page was not read: %v", asked)
 	}
 }
 
@@ -216,14 +217,14 @@ func TestAPackIsFittedToItsBudget(t *testing.T) {
 	t.Parallel()
 
 	m := site1()
-	whole, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
+	whole, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
 	if err != nil {
 		t.Fatalf("Pack: %v", err)
 	}
 	if len(whole.Dropped) != 0 || whole.Tokens != whole.Built || whole.Field != "body" || len(whole.Sections) == 0 {
 		t.Fatalf("whole pack = %+v", whole)
 	}
-	fitted, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Budget: whole.Tokens - 1})
+	fitted, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Budget: whole.Tokens - 1})
 	if err != nil {
 		t.Fatalf("Pack: %v", err)
 	}
@@ -236,33 +237,33 @@ func TestAPackOutOfARunTakesTheRolesBudget(t *testing.T) {
 	t.Parallel()
 
 	m := site1()
-	whole, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
+	whole, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
 	if err != nil {
 		t.Fatalf("Pack: %v", err)
 	}
-	m.budgets = map[domainllm.Role]int{domainllm.RoleWriter: whole.Tokens - 1, domainllm.RoleEditor: 4000}
-	fitted, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
+	m.Budgets = map[domainllm.Role]int{domainllm.RoleWriter: whole.Tokens - 1, domainllm.RoleEditor: 4000}
+	fitted, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub"})
 	if err != nil {
 		t.Fatalf("Pack: %v", err)
 	}
 	if fitted.Budget != whole.Tokens-1 || len(fitted.Dropped) == 0 {
 		t.Errorf("the body's pack = budget %d, %d drops; want the writer's budget and a drop", fitted.Budget, len(fitted.Dropped))
 	}
-	meta, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "seo_title"})
+	meta, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "seo_title"})
 	if err != nil {
 		t.Fatalf("Pack: %v", err)
 	}
 	if meta.Budget != 4000 {
 		t.Errorf("the SEO title's pack has budget %d, want the editor's 4000", meta.Budget)
 	}
-	excerpt, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "excerpt"})
+	excerpt, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Field: "excerpt"})
 	if err != nil {
 		t.Fatalf("Pack: %v", err)
 	}
 	if excerpt.Budget != 4000 {
 		t.Errorf("the excerpt's pack has budget %d, want the editor's 4000, as generate_fields writes it", excerpt.Budget)
 	}
-	asked, err := m.service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Budget: 100000})
+	asked, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "hub", Budget: 100000})
 	if err != nil || asked.Budget != 100000 {
 		t.Errorf("a budget asked for = %d, %v; want it kept", asked.Budget, err)
 	}
@@ -287,7 +288,7 @@ func TestAPackRefusesWhatTheWriterNeverWrites(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := m.service().Pack(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
+			if _, err := m.Service().Pack(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
 				t.Errorf("Pack(%+v) = %v, want %s", tc.req, err, tc.code)
 			}
 		})

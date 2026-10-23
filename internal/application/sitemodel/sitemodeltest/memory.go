@@ -1,4 +1,4 @@
-package sitemodel_test
+package sitemodeltest
 
 import (
 	"context"
@@ -19,27 +19,28 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-type memory struct {
-	mu       sync.Mutex
-	site     site.Site
-	pages    []pagemap.Page
-	entities []graph.Entity
-	edges    []graph.Edge
-	types    pagetype.Set
-	terms    map[string][]pagemap.Term
-	fields   map[string][]field.Value
-	bodies   []block.Snapshot
-	written  []block.Written
-	renders  []render.Record
-	links    []pagemap.PageLink
-	findings []finding.Finding
-	reads    int
-	asked    [][]string
-	budgets  map[domainllm.Role]int
-	audit    reports.LinkAuditResponse
+type Memory struct {
+	Site     site.Site
+	Pages    []pagemap.Page
+	Entities []graph.Entity
+	Edges    []graph.Edge
+	Types    pagetype.Set
+	Terms    map[string][]pagemap.Term
+	Fields   map[string][]field.Value
+	Bodies   []block.Snapshot
+	Written  []block.Written
+	Renders  []render.Record
+	Links    []pagemap.PageLink
+	Findings []finding.Finding
+	Budgets  map[domainllm.Role]int
+	Audit    reports.LinkAuditResponse
+
+	mu    sync.Mutex
+	reads int
+	asked [][]string
 }
 
-func (m *memory) service() *sitemodel.Service {
+func (m *Memory) Service() *sitemodel.Service {
 	return sitemodel.New(sitemodel.Deps{
 		Reader: m, Sites: siteReader{m}, Pages: pageReader{m}, Entities: entityReader{m}, Edges: edgeReader{m},
 		Types: typeReader{m}, Terms: termReader{m}, Fields: fieldReader{m}, Bodies: bodyReader{m},
@@ -48,163 +49,175 @@ func (m *memory) service() *sitemodel.Service {
 	})
 }
 
-type auditReader struct{ m *memory }
-
-func (r auditReader) LinkAudit(_ context.Context, req reports.LinkAuditRequest) (reports.LinkAuditResponse, error) {
-	if req.SiteID != r.m.site.ID {
-		return reports.LinkAuditResponse{}, errors.New(errors.NotFound, "no such site")
-	}
-	return r.m.audit, nil
+func (m *Memory) Reads() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.reads
 }
 
-func (r auditReader) LinkAuditPage(_ context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error) {
-	for i := range r.m.audit.Pages {
-		if r.m.audit.Pages[i].PageID == req.PageID {
-			return reports.LinkAuditPageResponse{Page: r.m.audit.Pages[i]}, nil
-		}
-	}
-	return reports.LinkAuditPageResponse{Page: reports.PageAudit{PageID: req.PageID}}, nil
+func (m *Memory) Asked() [][]string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.asked)
 }
 
-type budgetReader struct{ m *memory }
-
-func (r budgetReader) InputBudget(role domainllm.Role) int {
-	return r.m.budgets[role]
-}
-
-func (m *memory) Read(ctx context.Context, fn func(context.Context) error) error {
+func (m *Memory) Read(ctx context.Context, fn func(context.Context) error) error {
 	m.mu.Lock()
 	m.reads++
 	m.mu.Unlock()
 	return fn(ctx)
 }
 
-func (m *memory) ask(ids []string) {
+func (m *Memory) ask(ids []string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.asked = append(m.asked, slices.Clone(ids))
 }
 
-type siteReader struct{ m *memory }
+type auditReader struct{ m *Memory }
 
-func (r siteReader) Get(_ context.Context, id string) (site.Site, error) {
-	if id != r.m.site.ID {
-		return site.Site{}, errors.New(errors.NotFound, "no such site")
+func (r auditReader) LinkAudit(_ context.Context, req reports.LinkAuditRequest) (reports.LinkAuditResponse, error) {
+	if req.SiteID != r.m.Site.ID {
+		return reports.LinkAuditResponse{}, errors.New(errors.NotFound, "no such site")
 	}
-	return r.m.site, nil
+	return r.m.Audit, nil
 }
 
-type pageReader struct{ m *memory }
+func (r auditReader) LinkAuditPage(_ context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error) {
+	for i := range r.m.Audit.Pages {
+		if r.m.Audit.Pages[i].PageID == req.PageID {
+			return reports.LinkAuditPageResponse{Page: r.m.Audit.Pages[i]}, nil
+		}
+	}
+	return reports.LinkAuditPageResponse{Page: reports.PageAudit{PageID: req.PageID}}, nil
+}
+
+type budgetReader struct{ m *Memory }
+
+func (r budgetReader) InputBudget(role domainllm.Role) int {
+	return r.m.Budgets[role]
+}
+
+type siteReader struct{ m *Memory }
+
+func (r siteReader) Get(_ context.Context, id string) (site.Site, error) {
+	if id != r.m.Site.ID {
+		return site.Site{}, errors.New(errors.NotFound, "no such site")
+	}
+	return r.m.Site, nil
+}
+
+type pageReader struct{ m *Memory }
 
 func (r pageReader) Get(_ context.Context, id string) (pagemap.Page, error) {
-	for i := range r.m.pages {
-		if r.m.pages[i].ID == id {
-			return r.m.pages[i], nil
+	for i := range r.m.Pages {
+		if r.m.Pages[i].ID == id {
+			return r.m.Pages[i], nil
 		}
 	}
 	return pagemap.Page{}, errors.New(errors.NotFound, "no such page")
 }
 
 func (r pageReader) ListBySite(_ context.Context, siteID string) ([]pagemap.Page, error) {
-	out := make([]pagemap.Page, 0, len(r.m.pages))
-	for i := range r.m.pages {
-		if r.m.pages[i].SiteID == siteID {
-			out = append(out, r.m.pages[i])
+	out := make([]pagemap.Page, 0, len(r.m.Pages))
+	for i := range r.m.Pages {
+		if r.m.Pages[i].SiteID == siteID {
+			out = append(out, r.m.Pages[i])
 		}
 	}
 	return out, nil
 }
 
-type entityReader struct{ m *memory }
+type entityReader struct{ m *Memory }
 
 func (r entityReader) ListBySite(context.Context, string) ([]graph.Entity, error) {
-	return slices.Clone(r.m.entities), nil
+	return slices.Clone(r.m.Entities), nil
 }
 
-type edgeReader struct{ m *memory }
+type edgeReader struct{ m *Memory }
 
 func (r edgeReader) ListBySite(context.Context, string) ([]graph.Edge, error) {
-	return slices.Clone(r.m.edges), nil
+	return slices.Clone(r.m.Edges), nil
 }
 
-type typeReader struct{ m *memory }
+type typeReader struct{ m *Memory }
 
 func (r typeReader) Set(context.Context, string) (pagetype.Set, error) {
-	return r.m.types, nil
+	return r.m.Types, nil
 }
 
-type termReader struct{ m *memory }
+type termReader struct{ m *Memory }
 
 func (r termReader) ListTermsBySite(context.Context, string) (map[string][]pagemap.Term, error) {
-	return r.m.terms, nil
+	return r.m.Terms, nil
 }
 
-type fieldReader struct{ m *memory }
+type fieldReader struct{ m *Memory }
 
 func (r fieldReader) ListBySite(context.Context, string) (map[string][]field.Value, error) {
-	return r.m.fields, nil
+	return r.m.Fields, nil
 }
 
-type bodyReader struct{ m *memory }
+type bodyReader struct{ m *Memory }
 
 func (r bodyReader) ListCurrent(_ context.Context, ids []string) ([]block.Snapshot, error) {
 	r.m.ask(ids)
 	out := make([]block.Snapshot, 0)
-	for i := range r.m.bodies {
-		if slices.Contains(ids, r.m.bodies[i].PageID) {
-			out = append(out, r.m.bodies[i])
+	for i := range r.m.Bodies {
+		if slices.Contains(ids, r.m.Bodies[i].PageID) {
+			out = append(out, r.m.Bodies[i])
 		}
 	}
 	return out, nil
 }
 
 func (r bodyReader) ListBySite(context.Context, string) ([]block.Snapshot, error) {
-	return slices.Clone(r.m.bodies), nil
+	return slices.Clone(r.m.Bodies), nil
 }
 
 func (r bodyReader) ListWritten(_ context.Context, pageID string) ([]block.Written, error) {
 	out := make([]block.Written, 0)
-	for i := range r.m.written {
-		if r.m.written[i].PageID == pageID {
-			out = append(out, r.m.written[i])
+	for i := range r.m.Written {
+		if r.m.Written[i].PageID == pageID {
+			out = append(out, r.m.Written[i])
 		}
 	}
 	return out, nil
 }
 
-type renderReader struct{ m *memory }
+type renderReader struct{ m *Memory }
 
 func (r renderReader) ListForPages(_ context.Context, ids []string) ([]render.Record, error) {
 	out := make([]render.Record, 0)
-	for i := range r.m.renders {
-		if slices.Contains(ids, r.m.renders[i].PageID) {
-			out = append(out, r.m.renders[i])
+	for i := range r.m.Renders {
+		if slices.Contains(ids, r.m.Renders[i].PageID) {
+			out = append(out, r.m.Renders[i])
 		}
 	}
 	return out, nil
 }
 
 func (r renderReader) ListBySite(context.Context, string) ([]render.Record, error) {
-	return slices.Clone(r.m.renders), nil
+	return slices.Clone(r.m.Renders), nil
 }
 
 func (r renderReader) URLForms(context.Context, string) ([]string, error) {
 	out := make([]string, 0)
-	for i := range r.m.renders {
-		if r.m.renders[i].URLForm != "" {
-			out = append(out, r.m.renders[i].URLForm)
+	for i := range r.m.Renders {
+		if r.m.Renders[i].URLForm != "" {
+			out = append(out, r.m.Renders[i].URLForm)
 		}
 	}
 	return out, nil
 }
 
-type linkReader struct{ m *memory }
+type linkReader struct{ m *Memory }
 
 func (r linkReader) ListFromPages(_ context.Context, ids []string) ([]pagemap.PageLink, error) {
 	out := make([]pagemap.PageLink, 0)
-	for i := range r.m.links {
-		if slices.Contains(ids, r.m.links[i].FromPageID) {
-			out = append(out, r.m.links[i])
+	for i := range r.m.Links {
+		if slices.Contains(ids, r.m.Links[i].FromPageID) {
+			out = append(out, r.m.Links[i])
 		}
 	}
 	return out, nil
@@ -212,9 +225,9 @@ func (r linkReader) ListFromPages(_ context.Context, ids []string) ([]pagemap.Pa
 
 func (r linkReader) ListToPage(_ context.Context, pageID string) ([]pagemap.PageLink, error) {
 	out := make([]pagemap.PageLink, 0)
-	for i := range r.m.links {
-		if r.m.links[i].ToPageID != nil && *r.m.links[i].ToPageID == pageID {
-			out = append(out, r.m.links[i])
+	for i := range r.m.Links {
+		if r.m.Links[i].ToPageID != nil && *r.m.Links[i].ToPageID == pageID {
+			out = append(out, r.m.Links[i])
 		}
 	}
 	return out, nil
@@ -222,25 +235,25 @@ func (r linkReader) ListToPage(_ context.Context, pageID string) ([]pagemap.Page
 
 func (r linkReader) ListContextual(context.Context, string) ([]pagemap.PageLink, error) {
 	out := make([]pagemap.PageLink, 0)
-	for i := range r.m.links {
-		if r.m.links[i].Type == pagemap.LinkContextual && r.m.links[i].Source == pagemap.SourceRaw {
-			out = append(out, r.m.links[i])
+	for i := range r.m.Links {
+		if r.m.Links[i].Type == pagemap.LinkContextual && r.m.Links[i].Source == pagemap.SourceRaw {
+			out = append(out, r.m.Links[i])
 		}
 	}
 	return out, nil
 }
 
 func (r linkReader) ListBySite(context.Context, string) ([]pagemap.PageLink, error) {
-	return slices.Clone(r.m.links), nil
+	return slices.Clone(r.m.Links), nil
 }
 
-type findingReader struct{ m *memory }
+type findingReader struct{ m *Memory }
 
 func (r findingReader) ListForPage(_ context.Context, pageID string) ([]finding.Finding, error) {
 	out := make([]finding.Finding, 0)
-	for i := range r.m.findings {
-		if r.m.findings[i].PageID != nil && *r.m.findings[i].PageID == pageID {
-			out = append(out, r.m.findings[i])
+	for i := range r.m.Findings {
+		if r.m.Findings[i].PageID != nil && *r.m.Findings[i].PageID == pageID {
+			out = append(out, r.m.Findings[i])
 		}
 	}
 	return out, nil
@@ -248,9 +261,9 @@ func (r findingReader) ListForPage(_ context.Context, pageID string) ([]finding.
 
 func (r findingReader) ListBySite(_ context.Context, _ string, status finding.Status) ([]finding.Finding, error) {
 	out := make([]finding.Finding, 0)
-	for i := range r.m.findings {
-		if r.m.findings[i].Status == status {
-			out = append(out, r.m.findings[i])
+	for i := range r.m.Findings {
+		if r.m.Findings[i].Status == status {
+			out = append(out, r.m.Findings[i])
 		}
 	}
 	return out, nil

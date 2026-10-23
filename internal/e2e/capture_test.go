@@ -64,7 +64,7 @@ func TestTheStandModelIsCaptured(t *testing.T) {
 	ids := rows.settle()
 	encoded := rows.normalized(t, live.env, ids)
 
-	path := filepath.Join(repoRoot(t), "internal", "application", "sitemodel", "testdata", live.env.stand, "site.json")
+	path := filepath.Join(repoRoot(t), "internal", "application", "sitemodel", "sitemodeltest", "testdata", live.env.stand, "site.json")
 	if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatalf("make the directory of %s: %v", path, err)
 	}

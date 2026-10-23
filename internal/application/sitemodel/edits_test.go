@@ -20,12 +20,12 @@ func TestTheFieldsOfAPageAreReadWithTheirBaseAndOwner(t *testing.T) {
 	m := site1()
 	moved := written(field.NewValue("bpc", field.SEOTitle, "Older title", stamp), "run-1")
 	moved.Current, moved.CurrentHash = "The owner's title", field.Hash("The owner's title")
-	m.fields["bpc"] = []field.Value{
+	m.Fields["bpc"] = []field.Value{
 		written(field.NewValue("bpc", field.Excerpt, "Our excerpt.", stamp), "run-1"),
 		moved,
 		field.NewValue("bpc", field.Title, "BPC-157", stamp),
 	}
-	got, err := m.service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: siteID, PageID: "bpc"})
+	got, err := m.Service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: siteID, PageID: "bpc"})
 	if err != nil {
 		t.Fatalf("Fields: %v", err)
 	}
@@ -43,15 +43,15 @@ func TestTheFieldsOfAPageAreReadWithTheirBaseAndOwner(t *testing.T) {
 		}
 	}
 
-	store, err := m.service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: siteID, PageID: "tb", Keys: []string{"price"}})
+	store, err := m.Service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: siteID, PageID: "tb", Keys: []string{"price"}})
 	if err != nil || len(store.Fields.Items) != 1 || store.Fields.Items[0].Owner != "store" || store.Fields.Items[0].Writable {
 		t.Errorf("the product's price = %+v, %v, want the store's, never written", store.Fields.Items, err)
 	}
-	first, err := m.service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: siteID, PageID: "bpc", Limit: 1})
+	first, err := m.Service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: siteID, PageID: "bpc", Limit: 1})
 	if err != nil || len(first.Fields.Items) != 1 || !first.Fields.HasMore {
 		t.Errorf("a page of one = %+v, %v, want a cursor to the rest", first.Fields, err)
 	}
-	if _, err := m.service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: "elsewhere", PageID: "bpc"}); !errors.IsCode(err, errors.NotFound) {
+	if _, err := m.Service().Fields(t.Context(), sitemodel.FieldsRequest{SiteID: "elsewhere", PageID: "bpc"}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("another site's page = %v, want NotFound", err)
 	}
 }
@@ -62,10 +62,10 @@ func TestTheBlocksOfAPageAreListedWithTheirOwnersAndTheBodysHash(t *testing.T) {
 	m := site1()
 	theirs, ours := "<p>The owner's own opening.</p>", "<p>Our paragraph on storage.</p>"
 	raw := theirs + "\n\n" + ours
-	m.bodies[0].Raw, m.bodies[0].Hash = raw, block.BodyHash(raw)
-	m.written = []block.Written{{PageID: "bpc", BlockHash: block.Parse(raw).Blocks[1].Hash, RunID: "run-1"}}
+	m.Bodies[0].Raw, m.Bodies[0].Hash = raw, block.BodyHash(raw)
+	m.Written = []block.Written{{PageID: "bpc", BlockHash: block.Parse(raw).Blocks[1].Hash, RunID: "run-1"}}
 
-	got, err := m.service().Blocks(t.Context(), sitemodel.BlocksRequest{SiteID: siteID, Path: "/bpc-157/"})
+	got, err := m.Service().Blocks(t.Context(), sitemodel.BlocksRequest{SiteID: siteID, Path: "/bpc-157/"})
 	if err != nil {
 		t.Fatalf("Blocks: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestTheBlocksOfAPageAreListedWithTheirOwnersAndTheBodysHash(t *testing.T) {
 		rows[0].Excerpt != "The owner's own opening." {
 		t.Fatalf("the blocks = %+v, want the owner's then ours, with hashes and excerpts", rows)
 	}
-	first, err := m.service().Blocks(t.Context(), sitemodel.BlocksRequest{SiteID: siteID, PageID: "bpc", Limit: 1})
+	first, err := m.Service().Blocks(t.Context(), sitemodel.BlocksRequest{SiteID: siteID, PageID: "bpc", Limit: 1})
 	if err != nil || len(first.Blocks.Items) != 1 || !first.Blocks.HasMore {
 		t.Errorf("a page of one block = %+v, %v, want a cursor to the rest", first.Blocks, err)
 	}

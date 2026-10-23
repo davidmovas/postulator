@@ -3,9 +3,7 @@ package sitemodel_test
 import (
 	"cmp"
 	"encoding/json"
-	stderrors "errors"
 	"flag"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,59 +12,35 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
+	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
 	"github.com/davidmovas/postulator/internal/domain/block"
-	"github.com/davidmovas/postulator/internal/domain/field"
-	"github.com/davidmovas/postulator/internal/domain/finding"
-	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
-	"github.com/davidmovas/postulator/internal/domain/site"
 )
 
 var updatePacks = flag.Bool("update-packs", false, "rewrite the stand pack goldens from the captured models")
 
 const tightBudget = 3000
 
-type capture struct {
-	Site     site.Site                 `json:"site"`
-	Pages    []pagemap.Page            `json:"pages"`
-	Entities []graph.Entity            `json:"entities"`
-	Edges    []graph.Edge              `json:"edges"`
-	Types    []pagetype.Type           `json:"types"`
-	Scopes   []field.Scope             `json:"scopes"`
-	Terms    map[string][]pagemap.Term `json:"terms"`
-	Fields   map[string][]field.Value  `json:"fields"`
-	Bodies   []block.Snapshot          `json:"bodies"`
-	Written  []block.Written           `json:"written"`
-	Renders  []render.Record           `json:"renders"`
-	Links    []pagemap.PageLink        `json:"links"`
-	Findings []finding.Finding         `json:"findings"`
-}
-
-func captured(t *testing.T, raw []byte) *memory {
+func stand(t *testing.T, name string) *sitemodeltest.Memory {
 	t.Helper()
 
-	var held capture
-	if err := json.Unmarshal(raw, &held); err != nil {
-		t.Fatalf("decode the capture: %v", err)
+	m, err := sitemodeltest.Stand(name)
+	if err != nil {
+		t.Fatalf("load the %s capture: %v", name, err)
 	}
-	return &memory{
-		site: held.Site, pages: held.Pages, entities: held.Entities, edges: held.Edges,
-		types: pagetype.NewSet(held.Types, held.Scopes), terms: held.Terms, fields: held.Fields, bodies: held.Bodies,
-		written: held.Written, renders: held.Renders, links: held.Links, findings: held.Findings,
-	}
+	return m
 }
 
-func packsOf(t *testing.T, m *memory) string {
+func packsOf(t *testing.T, m *sitemodeltest.Memory) string {
 	t.Helper()
 
-	pages := slices.Clone(m.pages)
+	pages := slices.Clone(m.Pages)
 	pages = slices.DeleteFunc(pages, func(page pagemap.Page) bool { return page.Status == pagemap.StatusArchived })
 	slices.SortFunc(pages, func(a, b pagemap.Page) int { return cmp.Compare(a.Path, b.Path) })
 	var out strings.Builder
 	for i := range pages {
-		whole, err := m.service().Picture(t.Context(), sitemodel.PackRequest{PageID: pages[i].ID})
+		whole, err := m.Service().Picture(t.Context(), sitemodel.PackRequest{PageID: pages[i].ID})
 		if err != nil {
 			t.Fatalf("the pack of %s: %v", pages[i].Path, err)
 		}
@@ -79,13 +53,13 @@ func packsOf(t *testing.T, m *memory) string {
 	return out.String()
 }
 
-func dropsAt(t *testing.T, m *memory, pageID string, built int) string {
+func dropsAt(t *testing.T, m *sitemodeltest.Memory, pageID string, built int) string {
 	t.Helper()
 
 	if built <= tightBudget {
 		return "--- fits in " + strconv.Itoa(tightBudget) + " tokens\n"
 	}
-	tight, err := m.service().Picture(t.Context(), sitemodel.PackRequest{PageID: pageID, Budget: tightBudget})
+	tight, err := m.Service().Picture(t.Context(), sitemodel.PackRequest{PageID: pageID, Budget: tightBudget})
 	if err != nil {
 		return "--- " + strconv.Itoa(tightBudget) + " tokens are too few: " + err.Error() + "\n"
 	}
@@ -103,23 +77,14 @@ func dropsAt(t *testing.T, m *memory, pageID string, built int) string {
 func TestThePackOfEveryStandPage(t *testing.T) {
 	t.Parallel()
 
-	for _, stand := range []string{"vanilla", "replica"} {
-		t.Run(stand, func(t *testing.T) {
+	for _, name := range sitemodeltest.Stands() {
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			dir := filepath.Join("testdata", stand)
-			raw, err := os.ReadFile(filepath.Join(dir, "site.json"))
-			if stderrors.Is(err, fs.ErrNotExist) {
-				t.Skipf("the %s stand is not captured: on a fresh stand run E2E_CAPTURE=1 task e2e:full STAND=%s -- -run "+
-					"TestTheStandModelIsCaptured, then this test with -update-packs", stand, stand)
-			}
-			if err != nil {
-				t.Fatalf("read the capture: %v", err)
-			}
-			got := packsOf(t, captured(t, raw))
-			golden := filepath.Join(dir, "packs.golden")
+			got := packsOf(t, stand(t, name))
+			golden := filepath.Join("testdata", name, "packs.golden")
 			if *updatePacks {
-				if err = os.WriteFile(golden, []byte(got), 0o644); err != nil {
+				if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
 					t.Fatalf("write %s: %v", golden, err)
 				}
 				return
@@ -129,7 +94,7 @@ func TestThePackOfEveryStandPage(t *testing.T) {
 				t.Fatalf("read %s: %v; run this test with -update-packs once the capture is reviewed", golden, err)
 			}
 			if got != string(want) {
-				t.Errorf("the %s packs moved from %s; review the difference and rerun with -update-packs", stand, golden)
+				t.Errorf("the %s packs moved from %s; review the difference and rerun with -update-packs", name, golden)
 			}
 		})
 	}
@@ -140,21 +105,17 @@ const toolResultCap = 16384
 func TestEveryPageModelOfBothStandsFitsATurnsToolResult(t *testing.T) {
 	t.Parallel()
 
-	for _, stand := range []string{"replica", "vanilla"} {
-		raw, err := os.ReadFile(filepath.Join("testdata", stand, "site.json"))
-		if err != nil {
-			t.Fatalf("read the %s's capture: %v", stand, err)
-		}
-		m := captured(t, raw)
+	for _, name := range sitemodeltest.Stands() {
+		m := stand(t, name)
 		widest, at := 0, ""
-		for i := range m.pages {
-			page := &m.pages[i]
+		for i := range m.Pages {
+			page := &m.Pages[i]
 			if page.Status == pagemap.StatusArchived {
 				continue
 			}
-			answered, err := m.service().Page(t.Context(), sitemodel.PageRequest{SiteID: m.site.ID, PageID: page.ID})
+			answered, err := m.Service().Page(t.Context(), sitemodel.PageRequest{SiteID: m.Site.ID, PageID: page.ID})
 			if err != nil {
-				t.Fatalf("the %s's page model of %s: %v", stand, page.Path, err)
+				t.Fatalf("the %s's page model of %s: %v", name, page.Path, err)
 			}
 			encoded, err := json.Marshal(answered)
 			if err != nil {
@@ -164,10 +125,10 @@ func TestEveryPageModelOfBothStandsFitsATurnsToolResult(t *testing.T) {
 				widest, at = len(encoded), page.Path
 			}
 			if len(encoded) > toolResultCap {
-				t.Errorf("the %s's page model of %s is %d bytes, over a turn's %d-byte tool result", stand, page.Path, len(encoded), toolResultCap)
+				t.Errorf("the %s's page model of %s is %d bytes, over a turn's %d-byte tool result", name, page.Path, len(encoded), toolResultCap)
 			}
 		}
-		t.Logf("the %s's widest page model is %s at %d bytes", stand, at, widest)
+		t.Logf("the %s's widest page model is %s at %d bytes", name, at, widest)
 	}
 }
 
@@ -175,20 +136,24 @@ func TestAStandCaptureLoadsBackIntoTheModel(t *testing.T) {
 	t.Parallel()
 
 	m := site1()
-	m.renders = []render.Record{{PageID: "hub", ExtractedAt: stamp, Extraction: render.Extraction{
+	m.Renders = []render.Record{{PageID: "hub", ExtractedAt: stamp, Extraction: render.Extraction{
 		Root: render.RootEmptyRaw, WordsGenerated: 48,
 		Regions: []render.Region{{Kind: render.RegionListing, Inside: true, Links: 1, Signal: render.SignalJSONLD}},
 	}}}
-	m.written = []block.Written{{PageID: "bpc", BlockHash: "h1", RunID: "run-1", WrittenAt: stamp}}
-	raw, err := json.Marshal(capture{
-		Site: m.site, Pages: m.pages, Entities: m.entities, Edges: m.edges, Types: presetTypes(), Scopes: presetScopes(),
-		Terms: m.terms, Fields: m.fields, Bodies: m.bodies, Written: m.written, Renders: m.renders, Links: m.links,
-		Findings: m.findings,
+	m.Written = []block.Written{{PageID: "bpc", BlockHash: "h1", RunID: "run-1", WrittenAt: stamp}}
+	raw, err := json.Marshal(sitemodeltest.Capture{
+		Site: m.Site, Pages: m.Pages, Entities: m.Entities, Edges: m.Edges, Types: presetTypes(), Scopes: presetScopes(),
+		Terms: m.Terms, Fields: m.Fields, Bodies: m.Bodies, Written: m.Written, Renders: m.Renders, Links: m.Links,
+		Findings: m.Findings,
 	})
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	if want, got := packsOf(t, m), packsOf(t, captured(t, raw)); got != want {
+	loaded, err := sitemodeltest.Decode(raw)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if want, got := packsOf(t, m), packsOf(t, loaded); got != want {
 		t.Errorf("the packs of a loaded capture =\n%s\nwant\n%s", got, want)
 	}
 }

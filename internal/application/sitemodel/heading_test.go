@@ -41,9 +41,9 @@ func TestTheReadLayerSaysWhetherOurH1IsOwed(t *testing.T) {
 			t.Parallel()
 
 			m := site1()
-			m.pages = append(m.pages, planned, archived)
-			m.renders = tc.renders
-			owed, err := m.service().OwesH1(t.Context(), tc.pageID)
+			m.Pages = append(m.Pages, planned, archived)
+			m.Renders = tc.renders
+			owed, err := m.Service().OwesH1(t.Context(), tc.pageID)
 			if err != nil || owed != tc.want {
 				t.Errorf("OwesH1 = %t, %v; want %t", owed, err, tc.want)
 			}

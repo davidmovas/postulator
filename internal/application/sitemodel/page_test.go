@@ -19,17 +19,17 @@ func TestThePageModelAnswersWhatTheAgentAsksOfAPage(t *testing.T) {
 	m := site1()
 	theirs, ours := "<p>The owner's own opening.</p>", "<p>"+strings.Repeat("Our long paragraph on storage. ", 40)+"</p>"
 	raw := theirs + "\n\n" + ours
-	m.bodies[0].Raw, m.bodies[0].Hash = raw, block.BodyHash(raw)
-	m.written = []block.Written{{PageID: "bpc", BlockHash: block.Parse(raw).Blocks[1].Hash, RunID: "run-1"}}
-	m.fields["bpc"] = []field.Value{written(field.NewValue("bpc", field.Excerpt, "Our excerpt.", stamp), "run-1")}
-	m.pages[2].ParentMethod = pagemap.MethodHref
-	m.pages[2].TypeSource, m.pages[2].TypeReason = pagemap.TypeSourceAuto, pagemap.TypeByDefault
-	m.findings = append(m.findings, finding.Finding{
+	m.Bodies[0].Raw, m.Bodies[0].Hash = raw, block.BodyHash(raw)
+	m.Written = []block.Written{{PageID: "bpc", BlockHash: block.Parse(raw).Blocks[1].Hash, RunID: "run-1"}}
+	m.Fields["bpc"] = []field.Value{written(field.NewValue("bpc", field.Excerpt, "Our excerpt.", stamp), "run-1")}
+	m.Pages[2].ParentMethod = pagemap.MethodHref
+	m.Pages[2].TypeSource, m.Pages[2].TypeReason = pagemap.TypeSourceAuto, pagemap.TypeByDefault
+	m.Findings = append(m.Findings, finding.Finding{
 		ID: "f3", SiteID: siteID, PageID: new("bpc"), Code: finding.FieldChangedOnSite, Severity: finding.Warning,
 		Options: finding.OptionsOf(finding.FieldChangedOnSite), Status: finding.Open,
 	})
 
-	got, err := m.service().Page(t.Context(), sitemodel.PageRequest{SiteID: siteID, Path: "/bpc-157/"})
+	got, err := m.Service().Page(t.Context(), sitemodel.PageRequest{SiteID: siteID, Path: "/bpc-157/"})
 	if err != nil {
 		t.Fatalf("Page: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestThePageModelAnswersWhatTheAgentAsksOfAPage(t *testing.T) {
 	if len(got.Siblings)+len(got.Children) == 0 && got.Entity == nil {
 		t.Errorf("the page model lost the neighborhood the page view carried: %+v", got)
 	}
-	if _, err := m.service().Page(t.Context(), sitemodel.PageRequest{SiteID: "elsewhere", PageID: "bpc"}); !errors.IsCode(err, errors.NotFound) {
+	if _, err := m.Service().Page(t.Context(), sitemodel.PageRequest{SiteID: "elsewhere", PageID: "bpc"}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("another site's page = %v, want NotFound", err)
 	}
 }
