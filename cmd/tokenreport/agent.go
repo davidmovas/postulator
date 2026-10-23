@@ -18,9 +18,12 @@ import (
 )
 
 type measure struct {
-	Name   string `json:"name"`
-	Bytes  int    `json:"bytes"`
-	Tokens int    `json:"tokens"`
+	Name      string `json:"name"`
+	Bytes     int    `json:"bytes"`
+	Tokens    int    `json:"tokens"`
+	Estimated int    `json:"estimated,omitempty"`
+	Words     int    `json:"words,omitempty"`
+	Runes     int    `json:"runes,omitempty"`
 }
 
 func (c counter) measure(name, text string) (measure, error) {

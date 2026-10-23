@@ -12,9 +12,10 @@ import (
 )
 
 type report struct {
-	Models []modelRow  `json:"models"`
-	Agent  agentReport `json:"agent"`
-	Pages  []pageRow   `json:"pages"`
+	Models   []modelRow     `json:"models"`
+	Agent    agentReport    `json:"agent"`
+	Pages    []pageRow      `json:"pages"`
+	Estimate estimateReport `json:"estimate"`
 }
 
 type modelRow struct {
@@ -54,7 +55,11 @@ func build(ctx context.Context) (report, error) {
 	if err != nil {
 		return report{}, err
 	}
-	return report{Models: models, Agent: agent, Pages: pages}, nil
+	estimate, err := measureEstimate(ctx, held, known, pages)
+	if err != nil {
+		return report{}, err
+	}
+	return report{Models: models, Agent: agent, Pages: pages, Estimate: estimate}, nil
 }
 
 func (r report) write(out io.Writer) error {
@@ -74,7 +79,10 @@ func (r report) write(out io.Writer) error {
 	if err := r.Agent.write(out); err != nil {
 		return err
 	}
-	return writePages(out, r.Pages)
+	if err := writePages(out, r.Pages); err != nil {
+		return err
+	}
+	return writeEstimate(out, r.Estimate)
 }
 
 func tables(out io.Writer, fills ...func(*sheet)) error {

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/davidmovas/postulator/internal/adapters/llm/catalog"
 	"github.com/davidmovas/postulator/internal/adapters/llm/tuning"
@@ -25,6 +26,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/settings"
+	"github.com/davidmovas/postulator/internal/runtime"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
 
@@ -32,6 +34,7 @@ const reportRun = "token-report"
 
 type prompt struct {
 	Model        string    `json:"model"`
+	Estimated    int       `json:"estimated"`
 	Instructions measure   `json:"instructions"`
 	Pack         measure   `json:"pack"`
 	Sections     []measure `json:"sections"`
@@ -166,7 +169,19 @@ func (h *harness) asked(ctx context.Context, c *counters, def run.StepDef, sc *r
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", def.Name, err)
 	}
+	if measured.Estimated, err = h.estimated(ctx, def, sc); err != nil {
+		return nil, err
+	}
 	return &measured, nil
+}
+
+func (h *harness) estimated(ctx context.Context, def run.StepDef, sc *run.StepContext) (int, error) {
+	estimated, err := runtime.EstimatedInput(ctx, def, run.Target{Page: sc.Page, Spec: sc.Spec, Links: sc.Links})
+	h.pictures.take()
+	if err != nil {
+		return 0, fmt.Errorf("the estimate of %s: %w", def.Name, err)
+	}
+	return estimated, nil
 }
 
 func (h *harness) linker(ctx context.Context, c *counters, sc *run.StepContext) (*linkerRow, error) {
@@ -189,6 +204,9 @@ func (h *harness) linker(ctx context.Context, c *counters, sc *run.StepContext) 
 	call, err := c.promptOf(asked[0], nil)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", def.Name, err)
+	}
+	if call.Estimated, err = h.estimated(ctx, def, sc); err != nil {
+		return nil, err
 	}
 	row.Call = &call
 	return row, nil
@@ -273,11 +291,14 @@ func (c counter) packOf(measured *prompt, seen sitemodel.Picture, user string, l
 	if measured.Pack, err = c.measure("pack", text); err != nil {
 		return err
 	}
+	measured.Pack.Words, measured.Pack.Runes = len(strings.Fields(text)), utf8.RuneCountInString(text)
 	for i := range kept.Sections {
 		section, err := c.measure(string(kept.Sections[i].Name), contextpack.Fitted{Sections: kept.Sections[i : i+1]}.Text())
 		if err != nil {
 			return err
 		}
+		section.Estimated = kept.Sections[i].Tokens
+		measured.Pack.Estimated += section.Estimated
 		measured.Sections = append(measured.Sections, section)
 	}
 	return nil
