@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/imports"
@@ -28,12 +29,13 @@ type reconciled struct {
 	sheets []imports.SheetMapping
 }
 
-func reconcileSite(t *testing.T) (*site, *app.Core, string) {
+func reconcileSite(t *testing.T) (*site, *app.Core, *fake.Scripted, string) {
 	t.Helper()
 
 	live := newSite(t)
 	requirePlugin(t, live.env, true)
-	core := openCore(t)
+	script := sweepScript()
+	core := openCoreWith(t, script)
 	owner, err := core.Sites.Create(t.Context(), sites.CreateRequest{
 		Name: "Reconciled Shop", BaseURL: live.env.baseURL, Username: live.env.user, Password: live.env.pass, AllowInsecure: true,
 	})
@@ -41,7 +43,7 @@ func reconcileSite(t *testing.T) (*site, *app.Core, string) {
 		t.Fatalf("create the site: %v", err)
 	}
 	runSync(t, core, owner.Site.ID)
-	return live, core, owner.Site.ID
+	return live, core, script, owner.Site.ID
 }
 
 func (r reconciled) preview(t *testing.T) imports.PreviewReport {
@@ -162,10 +164,10 @@ func subjectText(held findings.Finding, key string) string {
 }
 
 func TestTheWorkbookReconcilesWithTheSite(t *testing.T) {
-	live, core, siteID := reconcileSite(t)
+	live, core, script, siteID := reconcileSite(t)
 	switch live.env.stand {
 	case "replica":
-		reconcileTheClientsWorkbook(t, core, siteID)
+		reconcileTheClientsWorkbook(t, core, script, siteID)
 	case "vanilla":
 		reconcileNestedURLsBySlug(t, core, siteID)
 	default:
@@ -173,7 +175,7 @@ func TestTheWorkbookReconcilesWithTheSite(t *testing.T) {
 	}
 }
 
-func reconcileTheClientsWorkbook(t *testing.T, core *app.Core, siteID string) {
+func reconcileTheClientsWorkbook(t *testing.T, core *app.Core, script *fake.Scripted, siteID string) {
 	sheets := make([]imports.SheetMapping, 0, len(clientWorkbookSheets))
 	for _, sheet := range clientWorkbookSheets {
 		sheets = append(sheets, imports.SheetMapping{Sheet: sheet})
@@ -269,17 +271,18 @@ func reconcileTheClientsWorkbook(t *testing.T, core *app.Core, siteID string) {
 		t.Errorf("parent_differs went from %d after the import to %d after the sync, want the import and the observation to raise one row", byCode(afterImport)[string(finding.ParentDiffers)], same)
 	}
 
-	ignored, err := core.Findings.Resolve(t.Context(), findings.ResolveRequest{FindingID: rowless.ID, Option: string(finding.Ignore)})
-	if err != nil || ignored.Finding.Status != string(finding.Dismissed) || ignored.Finding.ResolvedBy != finding.ResolvedByPerson {
-		t.Errorf("ignoring the dosing guide's row = %+v, %v", ignored.Finding, err)
-	}
-	pinned, err := core.Findings.Resolve(t.Context(), findings.ResolveRequest{
-		FindingID: differs.ID, Option: string(finding.AcceptWorkbook), By: finding.ResolvedByAgent,
+	other := slices.IndexFunc(afterSync, func(f findings.Finding) bool {
+		return f.Code == string(finding.RowWithoutPage) && f.PageID != guide.ID
 	})
-	if err != nil || pinned.Finding.Status != string(finding.Resolved) || pinned.Finding.ResolvedBy != finding.ResolvedByAgent {
-		t.Errorf("pinning Reconstitution to the workbook = %+v, %v", pinned.Finding, err)
+	if other < 0 {
+		t.Fatalf("the replica holds no other row waiting for a page: %+v", afterSync)
 	}
-	resolveARunOption(t, core, afterSync)
+	waiting := afterSync[other]
+	ignored, err := core.Findings.Resolve(t.Context(), findings.ResolveRequest{FindingID: waiting.ID, Option: string(finding.Ignore)})
+	if err != nil || ignored.Finding.Status != string(finding.Dismissed) || ignored.Finding.ResolvedBy != finding.ResolvedByPerson {
+		t.Errorf("a person ignoring %s = %+v, %v", waiting.SubjectKey, ignored.Finding, err)
+	}
+	theAgentWorksTheFindings(t, core, script, siteID, afterSync, stored)
 
 	runSync(t, core, siteID)
 	moved := pagesByPath(t, core.Pages, siteID)["/reconstitution/"]
@@ -292,7 +295,7 @@ func reconcileTheClientsWorkbook(t *testing.T, core *app.Core, siteID string) {
 		t.Errorf("the second import = %+v, want nothing created", again.Counts)
 	}
 	settled := r.findings(t, "")
-	for _, id := range []string{rowless.ID, differs.ID} {
+	for _, id := range []string{waiting.ID, rowless.ID, differs.ID} {
 		idx := slices.IndexFunc(settled, func(f findings.Finding) bool { return f.ID == id })
 		if idx < 0 {
 			t.Errorf("finding %s is gone after a second import, want it kept and settled", id)
@@ -304,33 +307,13 @@ func reconcileTheClientsWorkbook(t *testing.T, core *app.Core, siteID string) {
 	}
 	runSync(t, core, siteID)
 	final := r.findings(t, finding.Open)
-	if _, reopened := onPage(final, string(finding.RowWithoutPage), guide.ID); reopened {
-		t.Error("the dosing guide's row reopened after a sync, want the person's dismissal kept while its subject stands")
+	if slices.ContainsFunc(final, func(f findings.Finding) bool { return f.ID == waiting.ID || f.ID == rowless.ID }) {
+		t.Error("a row the person ignored or the agent mapped reopened after a sync, want both kept while their subjects stand")
+	}
+	if _, planned := pagesByPath(t, core.Pages, siteID)["/bpc-157/bpc-157-dosing-guide/"]; planned {
+		t.Error("the second import planned the dosing guide again, want its row found on /bpc-157/ by the agent's mapping")
 	}
 	t.Logf("open findings after the resolutions, a second import and a sync: %s", counted(byCode(final)))
-}
-
-func resolveARunOption(t *testing.T, core *app.Core, open []findings.Finding) {
-	t.Helper()
-
-	for i := range open {
-		for _, option := range open[i].Options {
-			if option.Kind != string(finding.Run) {
-				continue
-			}
-			prepared, err := core.Findings.Resolve(t.Context(), findings.ResolveRequest{FindingID: open[i].ID, Option: option.Name})
-			if err != nil {
-				t.Errorf("%s on %s: %v", option.Name, open[i].Code, err)
-				return
-			}
-			if prepared.Finding.Status != string(finding.Open) || (prepared.Start == nil && prepared.Sync == nil) {
-				t.Errorf("%s on %s = %+v, want the finding open and a request for the normal start", option.Name, open[i].Code, prepared)
-			}
-			t.Logf("%s on %s prepared start %+v sync %+v", option.Name, open[i].Code, prepared.Start, prepared.Sync)
-			return
-		}
-	}
-	t.Log("no open finding offers a run option on this stand")
 }
 
 func reconcileNestedURLsBySlug(t *testing.T, core *app.Core, siteID string) {
