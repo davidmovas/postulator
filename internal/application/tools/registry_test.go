@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tiktoken-go/tokenizer"
+
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/tools"
@@ -165,9 +167,9 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 65735
-	charactersPerToken = 4
-	widestLogged       = 8
+	schemaCeilingBytes  = 65735
+	schemaCeilingTokens = 14626
+	widestLogged        = 8
 )
 
 type sentTool struct {
@@ -177,11 +179,12 @@ type sentTool struct {
 }
 
 type measuredTool struct {
-	name  string
-	bytes int
+	name   string
+	bytes  int
+	tokens int
 }
 
-func schemaBytes(t *testing.T, tool tools.Tool) int {
+func wireSchema(t *testing.T, tool tools.Tool) []byte {
 	t.Helper()
 
 	encoded, err := json.Marshal(sentTool{
@@ -190,16 +193,36 @@ func schemaBytes(t *testing.T, tool tools.Tool) int {
 	if err != nil {
 		t.Fatalf("encode the schema of %s: %v", tool.Def.Name, err)
 	}
-	return len(encoded)
+	return encoded
+}
+
+func o200k(t *testing.T) tokenizer.Codec {
+	t.Helper()
+
+	codec, err := tokenizer.Get(tokenizer.O200kBase)
+	if err != nil {
+		t.Fatalf("the o200k_base encoding: %v", err)
+	}
+	return codec
+}
+
+func tokensOf(t *testing.T, codec tokenizer.Codec, text []byte) int {
+	t.Helper()
+
+	count, err := codec.Count(string(text))
+	if err != nil {
+		t.Fatalf("count the tokens of %q: %v", text, err)
+	}
+	return count
 }
 
 func widestOf(measured []measuredTool) string {
 	sorted := slices.Clone(measured)
-	slices.SortStableFunc(sorted, func(a, b measuredTool) int { return b.bytes - a.bytes })
+	slices.SortStableFunc(sorted, func(a, b measuredTool) int { return b.tokens - a.tokens })
 
 	named := make([]string, 0, widestLogged)
 	for _, tool := range sorted[:min(widestLogged, len(sorted))] {
-		named = append(named, tool.name+" "+strconv.Itoa(tool.bytes))
+		named = append(named, tool.name+" "+strconv.Itoa(tool.tokens)+" tokens ("+strconv.Itoa(tool.bytes)+" bytes)")
 	}
 	return strings.Join(named, ", ")
 }
@@ -207,23 +230,30 @@ func widestOf(measured []measuredTool) string {
 func TestTheToolSchemasFitTheirCeiling(t *testing.T) {
 	t.Parallel()
 
+	codec := o200k(t)
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
 
-	total := 0
+	bytes, tokens := 0, 0
 	measured := make([]measuredTool, 0, len(built))
 	for _, tool := range built {
-		size := schemaBytes(t, tool)
-		total += size
-		measured = append(measured, measuredTool{name: tool.Def.Name, bytes: size})
+		encoded := wireSchema(t, tool)
+		counted := tokensOf(t, codec, encoded)
+		bytes += len(encoded)
+		tokens += counted
+		measured = append(measured, measuredTool{name: tool.Def.Name, bytes: len(encoded), tokens: counted})
 	}
 
-	t.Logf("%d tools, %d bytes of schema, about %d tokens; the widest: %s",
-		len(built), total, total/charactersPerToken, widestOf(measured))
+	t.Logf("%d tools, %d bytes and %d o200k_base tokens of wire JSON schema; the widest: %s",
+		len(built), bytes, tokens, widestOf(measured))
 
-	if total > schemaCeilingBytes {
-		t.Fatalf("the tool schemas grew to %d bytes, over the %d this build allows; "+
-			"every round of every turn resends all of it", total, schemaCeilingBytes)
+	if bytes > schemaCeilingBytes {
+		t.Errorf("the tool schemas grew to %d bytes, over the %d this build allows; "+
+			"every round of every turn resends all of it", bytes, schemaCeilingBytes)
+	}
+	if tokens > schemaCeilingTokens {
+		t.Errorf("the tool schemas grew to %d o200k_base tokens of wire JSON, over the %d this build allows; "+
+			"every round of every turn resends all of it", tokens, schemaCeilingTokens)
 	}
 }
 
@@ -236,18 +266,22 @@ type sentGroup struct {
 func TestADeferredRoundSendsTheOrientingToolsWholeAndOnlyTheNamesOfTheGroups(t *testing.T) {
 	t.Parallel()
 
+	codec := o200k(t)
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
 
-	every, eager, whole := 0, 0, 0
+	every, eager, whole, everyTokens, eagerTokens := 0, 0, 0, 0, 0
 	named := map[string]bool{}
 	headers := []sentGroup{{Type: "tool_search"}}
 	for _, tool := range built {
-		size := schemaBytes(t, tool)
-		every += size
+		schema := wireSchema(t, tool)
+		counted := tokensOf(t, codec, schema)
+		every += len(schema)
+		everyTokens += counted
 		group, deferred := tools.OnDemand(tool.Def.Name)
 		if !deferred {
-			eager += size
+			eager += len(schema)
+			eagerTokens += counted
 			whole++
 			continue
 		}
@@ -262,8 +296,9 @@ func TestADeferredRoundSendsTheOrientingToolsWholeAndOnlyTheNamesOfTheGroups(t *
 	}
 
 	payload := eager + len(encoded)
-	t.Logf("loading tools on demand sends %d tools whole and %d groups, %d bytes, about %d tokens, before any "+
-		"search; every tool at once is %d bytes", whole, len(named), payload, payload/charactersPerToken, every)
+	payloadTokens := eagerTokens + tokensOf(t, codec, encoded)
+	t.Logf("loading tools on demand sends %d tools whole and %d groups, %d bytes and %d o200k_base tokens, before any "+
+		"search; every tool at once is %d bytes and %d tokens", whole, len(named), payload, payloadTokens, every, everyTokens)
 
 	if whole == 0 || len(named) == 0 || payload >= every {
 		t.Fatalf("a deferred round sends %d tools whole in %d groups for %d bytes of %d, want fewer bytes than every tool",
