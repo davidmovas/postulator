@@ -681,3 +681,57 @@ func TestEstimatePricesImagesOnTheModelThatDrawsThem(t *testing.T) {
 		t.Fatalf("findings = %+v, want the missing key of the image model", unkeyed.Findings)
 	}
 }
+
+func TestEstimatedInputIsTheInputTheEstimatePrices(t *testing.T) {
+	t.Parallel()
+
+	const words = 300
+	cases := []struct {
+		name   string
+		price  run.Price
+		output int
+	}{
+		{name: "a step priced on its spec's words", output: llm.WordTokens(words)},
+		{name: "a step priced at its own ceiling", price: run.Price{OutputTokens: 512}, output: 512},
+		{name: "a step that reads a pack", output: llm.WordTokens(words), price: run.Price{
+			Input: func(context.Context, run.Target) (int, error) { return 1234, nil },
+		}},
+		{name: "a pack the read layer refuses", output: llm.WordTokens(words), price: run.Price{
+			Input: func(context.Context, run.Target) (int, error) { return 0, errors.New(errors.Invalid, "no page") },
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			harness := newHarness(t, 1)
+			harness.specs.spec = template.TemplateSpec{Sections: []template.Section{{Heading: "Intro", TargetWords: words}}}
+			def := pricedStep("generate_body", llm.RoleWriter, tc.price)
+			engine := harness.engine(t, mustRegister(t, def))
+
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
+			if err != nil {
+				t.Fatalf("EstimateRun: %v", err)
+			}
+			input, err := runtime.EstimatedInput(t.Context(), def, run.Target{Spec: harness.specs.spec})
+			if err != nil {
+				t.Fatalf("EstimatedInput: %v", err)
+			}
+			if estimate.Tokens != input+tc.output {
+				t.Errorf("the estimate prices %d tokens, want the input %d and the output %d", estimate.Tokens, input, tc.output)
+			}
+		})
+	}
+}
+
+func TestEstimatedInputPassesOnAReadLayersFailure(t *testing.T) {
+	t.Parallel()
+
+	busy := errors.New(errors.External, "the database is busy")
+	def := pricedStep("generate_body", llm.RoleWriter, run.Price{
+		Input: func(context.Context, run.Target) (int, error) { return 0, busy },
+	})
+	if _, err := runtime.EstimatedInput(t.Context(), def, run.Target{}); !errors.IsCode(err, errors.External) {
+		t.Errorf("EstimatedInput = %v, want the read layer's failure", err)
+	}
+}

@@ -221,18 +221,11 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 		return nil
 	}
 
-	usage := usageOf(
-		outputOf(def, llm.WordTokens(targetWords(target.Spec))),
-		reasoningOf(info, e.deps.Tuning.Effort(def.Role)),
-	)
-	if def.Price.Input != nil {
-		pack, packErr := def.Price.Input(ctx, *target)
-		if packErr != nil && !errors.IsCode(packErr, errors.Invalid) {
-			return packErr
-		}
-		usage.Input += pack
-		usage.Total += pack
+	input, err := EstimatedInput(ctx, def, *target)
+	if err != nil {
+		return err
 	}
+	usage := usageOf(input, outputOf(def, *target), reasoningOf(info, e.deps.Tuning.Effort(def.Role)))
 	priced.tokens += usage.Total * calls
 	priced.usd += llm.Cost(usage, info, e.deps.Tuning.Tier(def.Role)) * float64(calls)
 	return nil
@@ -284,8 +277,19 @@ func stepNames(recipe []template.StepSpec) []string {
 	return out
 }
 
-func usageOf(output, reasoning int) llm.Usage {
-	input := promptOverhead + int(float64(output)*inputShareOfOutput)
+func EstimatedInput(ctx context.Context, def run.StepDef, target run.Target) (int, error) {
+	input := promptOverhead + int(float64(outputOf(def, target))*inputShareOfOutput)
+	if def.Price.Input == nil {
+		return input, nil
+	}
+	pack, err := def.Price.Input(ctx, target)
+	if err != nil && !errors.IsCode(err, errors.Invalid) {
+		return 0, err
+	}
+	return input + pack, nil
+}
+
+func usageOf(input, output, reasoning int) llm.Usage {
 	return llm.Usage{Input: input, Output: output + reasoning, Reasoning: reasoning, Total: input + output + reasoning}
 }
 
@@ -296,11 +300,11 @@ func reasoningOf(info llm.ModelInfo, effort llm.ReasoningEffort) int {
 	return int(float64(llm.Allowance(effort)) * reasoningShareOfAllowance)
 }
 
-func outputOf(def run.StepDef, body int) int {
+func outputOf(def run.StepDef, target run.Target) int {
 	if def.Price.OutputTokens > 0 {
 		return def.Price.OutputTokens
 	}
-	return body
+	return llm.WordTokens(targetWords(target.Spec))
 }
 
 func callsOf(def run.StepDef, target run.Target, params map[string]any) int {
