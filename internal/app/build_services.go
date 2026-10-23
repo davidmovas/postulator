@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
 	"github.com/davidmovas/postulator/internal/application/browser"
 	"github.com/davidmovas/postulator/internal/application/content"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
@@ -36,6 +37,7 @@ type useCases struct {
 	graph     *graph.Service
 	pages     *pages.Service
 	imports   *imports.Service
+	findings  *findings.Service
 	models    *models.Service
 	runs      *runs.Service
 	sync      *sync.Service
@@ -86,28 +88,37 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	})
 	runsService := runs.New(running.engine, stores.runs, stores.items, stores.artifacts, stores.runEvents,
 		writing.templates, stores.pages, running.steps, pagesService)
+	graphService := graph.New(graph.Deps{
+		Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
+		Identities: stores.identities, Fields: stores.fields, Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,
+		Publisher: c.Events, Clock: stores.now,
+	})
+	importsService := imports.New(imports.Deps{
+		Tables:     importer.New(),
+		Entities:   stores.entities,
+		Edges:      stores.edges,
+		Pages:      stores.pages,
+		Types:      stores.pageTypes,
+		Fields:     stores.fields,
+		Mappings:   stores.mappings,
+		Sites:      stores.sites,
+		Findings:   stores.findings,
+		Terms:      stores.identities,
+		Items:      stores.items,
+		UnitOfWork: stores.store,
+		Publisher:  c.Events,
+		Clock:      stores.now,
+		MaxRows:    imports.MaxRows(values),
+	})
 
 	return useCases{
-		sites: sites.New(stores.sites, stores.secrets, stores.store, writing.pageTypes, writing.wordpress, c.Events, stores.now),
-		graph: graph.New(graph.Deps{
-			Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
-			Identities: stores.identities, Fields: stores.fields, Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,
-			Publisher: c.Events, Clock: stores.now,
-		}),
-		pages: pagesService,
-		imports: imports.New(imports.Deps{
-			Tables:     importer.New(),
-			Entities:   stores.entities,
-			Edges:      stores.edges,
-			Pages:      stores.pages,
-			Types:      stores.pageTypes,
-			Fields:     stores.fields,
-			Mappings:   stores.mappings,
-			Sites:      stores.sites,
-			UnitOfWork: stores.store,
-			Publisher:  c.Events,
-			Clock:      stores.now,
-			MaxRows:    imports.MaxRows(values),
+		sites:   sites.New(stores.sites, stores.secrets, stores.store, writing.pageTypes, writing.wordpress, c.Events, stores.now),
+		graph:   graphService,
+		pages:   pagesService,
+		imports: importsService,
+		findings: findings.New(findings.Deps{
+			Findings: stores.findings, Fields: stores.fields, Bodies: stores.bodies, Parents: stores.pages, Pages: pagesService,
+			Cards: graphService, Rows: importsService, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 		}),
 		models: models.New(llm.catalog, stores.overrides, llm.profiles, llm.ledger, stores.secrets, llm.client,
 			c.Events, stores.now),

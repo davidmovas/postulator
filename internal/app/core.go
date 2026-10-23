@@ -23,6 +23,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/browser"
 	"github.com/davidmovas/postulator/internal/application/content"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
@@ -120,6 +121,7 @@ type kit struct {
 	Graph           *graph.Service
 	Pages           *pages.Service
 	Imports         *imports.Service
+	Findings        *findings.Service
 	Templates       *templates.Service
 	PageTypes       *pagetypes.Service
 	SiteModel       *sitemodel.Service
@@ -228,6 +230,7 @@ func (c *Core) assemble(ctx context.Context, store *sqlite.Store, key []byte) (k
 		Graph:           services.graph,
 		Pages:           services.pages,
 		Imports:         services.imports,
+		Findings:        services.findings,
 		Templates:       writing.templates,
 		PageTypes:       writing.pageTypes,
 		SiteModel:       writing.siteModel,
