@@ -21,68 +21,6 @@ func inTheStore(wpID int64, path, slug, name string) pagemap.Page {
 	return product
 }
 
-func TestMatchProductFindsTheStoreProductAFileRowMeans(t *testing.T) {
-	t.Parallel()
-
-	liquid := storeProduct("liquid", 11, "/product/bpc-157-liquid/", "bpc-157-liquid")
-	liquid.Title = "Buy Liquid BPC"
-	capsules := storeProduct("capsules", 12, "/product/capsules/", "capsules")
-	tbLiquid := storeProduct("tb-liquid", 13, "/product/tb-500-liquid/", "tb-500-liquid")
-	sameSlugA := storeProduct("powder-a", 14, "/product/powder/", "powder")
-	sameSlugB := storeProduct("powder-b", 15, "/product/powder-2/", "powder")
-	unread := storeProduct("unread", 16, "/product/gel-caps/", "gel-caps")
-	unread.Title = "Gel Caps"
-	page := pagemap.Page{ID: "page", SiteID: "site", Path: "/bpc-157/", WPType: pagemap.WPPage}
-	unsynced := pagemap.Page{ID: "planned", SiteID: "site", Path: "/x/", WPType: pagemap.WPProduct}
-	products := []pagemap.Page{liquid, capsules, tbLiquid, sameSlugA, sameSlugB, unread, page, unsynced}
-	names := map[string][]string{
-		"liquid": {"BPC-157 Liquid"}, "capsules": {"BPC-157 Capsules"}, "tb-liquid": {"TB-500 Liquid", "TB-500 in Liquid Form"},
-		"powder-a": {"Powder"}, "powder-b": {"Powder"}, "page": {"BPC-157"}, "planned": {"BPC-157 Liquid"},
-	}
-
-	cases := []struct {
-		name      string
-		row       pagemap.ProductRow
-		want      string
-		by        pagemap.MatchedBy
-		ambiguous bool
-	}{
-		{name: "the exact address", row: pagemap.ProductRow{Path: "/product/bpc-157-liquid/"}, want: "liquid", by: pagemap.MatchedByPath},
-		{name: "the address without a trailing slash", row: pagemap.ProductRow{Path: "/product/capsules"}, want: "capsules", by: pagemap.MatchedByPath},
-		{name: "the slug the URL ends in", row: pagemap.ProductRow{Path: "/bpc-157/capsules/"}, want: "capsules", by: pagemap.MatchedBySlug},
-		{name: "the store name the H1 names", row: pagemap.ProductRow{Path: "/bpc-157/liquid/", H1: "bpc-157 liquid"}, want: "liquid", by: pagemap.MatchedByName},
-		{name: "the store name the title names", row: pagemap.ProductRow{Path: "/tb-500/liquid/", Title: "TB-500 Liquid"}, want: "tb-liquid", by: pagemap.MatchedByName},
-		{name: "a slug two products share", row: pagemap.ProductRow{Path: "/forms/powder/"}, ambiguous: true},
-		{name: "a name two products share", row: pagemap.ProductRow{Path: "/forms/x/", H1: "Powder"}, ambiguous: true},
-		{name: "nothing alike", row: pagemap.ProductRow{Path: "/forms/gel/", H1: "Gel"}},
-		{name: "a page is never a product", row: pagemap.ProductRow{Path: "/bpc-157/", H1: "BPC-157"}},
-		{name: "a product the store does not hold yet", row: pagemap.ProductRow{Path: "/elsewhere/", H1: "BPC-157 Liquid"}, want: "liquid", by: pagemap.MatchedByName},
-		{name: "the H1 the store's page shows", row: pagemap.ProductRow{Path: "/tb-500/form/", H1: "TB-500 in liquid form"}, want: "tb-liquid", by: pagemap.MatchedByName},
-		{name: "a plan's title the site does not show", row: pagemap.ProductRow{Path: "/bpc/liquid/", Title: "Buy Liquid BPC"}},
-		{name: "the plan's title of a product whose name was never read", row: pagemap.ProductRow{Path: "/gels/", Title: "Gel Caps"}, want: "unread", by: pagemap.MatchedByName},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := pagemap.MatchProduct(tc.row, products, names)
-			if got.Ambiguous != tc.ambiguous {
-				t.Fatalf("ambiguous = %t, want %t (%+v)", got.Ambiguous, tc.ambiguous, got)
-			}
-			if tc.want == "" {
-				if got.Found {
-					t.Fatalf("found %s, want none", got.Page.ID)
-				}
-				return
-			}
-			if !got.Found || got.Page.ID != tc.want || got.By != tc.by {
-				t.Fatalf("match = %s by %s (found %t), want %s by %s", got.Page.ID, got.By, got.Found, tc.want, tc.by)
-			}
-		})
-	}
-}
-
 func TestANewStoreProductClaimsTheRowThatWaitedForIt(t *testing.T) {
 	t.Parallel()
 

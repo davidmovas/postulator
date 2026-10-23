@@ -184,6 +184,16 @@ func findings(list []imports.Finding, code imports.FindingCode) []imports.Findin
 	return out
 }
 
+func besidesPlanned(list []imports.Finding) []imports.Finding {
+	out := make([]imports.Finding, 0, len(list))
+	for i := range list {
+		if list[i].Code != string(imports.CodeRowWithoutPage) {
+			out = append(out, list[i])
+		}
+	}
+	return out
+}
+
 func page(report imports.PreviewReport, path string) (imports.PreviewPage, bool) {
 	for i := range report.Pages {
 		if report.Pages[i].Path == path {

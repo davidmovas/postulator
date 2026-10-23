@@ -367,10 +367,19 @@ func TestPreviewFallsBackOnUnknownVocabulary(t *testing.T) {
 			string(importmap.FieldPageType): "page type",
 		}))
 
-	for _, code := range []imports.FindingCode{imports.CodeUnknownWPType, imports.CodeUnknownPageType} {
-		if got := findings(report.Warnings, code); len(got) != 1 || got[0].Row != 2 {
-			t.Fatalf("%s findings = %+v, want one on the row with a page", code, report.Warnings)
+	for code, rows := range map[imports.FindingCode][]int{imports.CodeUnknownWPType: {2}, imports.CodeUnknownPageType: {2, 3}} {
+		got := findings(report.Warnings, code)
+		at := make([]int, 0, len(got))
+		for i := range got {
+			at = append(at, got[i].Row)
 		}
+		slices.Sort(at)
+		if !slices.Equal(at, rows) {
+			t.Fatalf("%s findings = %+v, want one on each of the rows %v", code, report.Warnings, rows)
+		}
+	}
+	if beta, found := page(report, "/beta/"); !found || beta.PageType != "" {
+		t.Fatalf("the row without a URL = %+v, want an untyped page at the slug of its entity", beta)
 	}
 	if found, _ := page(report, "/a/"); found.WPType != "page" || found.PageType != "" {
 		t.Fatalf("the page = %+v, want an untyped page", found)
@@ -535,8 +544,8 @@ func TestATemplateColumnIsReadAsNothing(t *testing.T) {
 	if found, _ := page(report, "/a/"); found.PageType != "" {
 		t.Fatalf("the page reads as %+v, want it untyped", found)
 	}
-	if len(report.Warnings) != 0 {
-		t.Fatalf("warnings = %+v", report.Warnings)
+	if left := besidesPlanned(report.Warnings); len(left) != 0 {
+		t.Fatalf("warnings = %+v", left)
 	}
 }
 
@@ -599,9 +608,9 @@ func TestEveryFindingNamesItsSheet(t *testing.T) {
 	})
 	mapping := h.detected(t, products)
 	mapping.Options.RowType = importmap.RowProducts
-	waiting := findings(h.preview(t, products, mapping).Warnings, imports.CodeProductNotInStore)
+	waiting := findings(h.preview(t, products, mapping).Warnings, imports.CodeRowWithoutPage)
 	if len(waiting) != 1 || waiting[0].Sheet != "Sheet1" || waiting[0].Row != 2 {
-		t.Errorf("not-in-store findings = %+v, want row 2 of Sheet1", waiting)
+		t.Errorf("rows without a product = %+v, want row 2 of Sheet1", waiting)
 	}
 }
 

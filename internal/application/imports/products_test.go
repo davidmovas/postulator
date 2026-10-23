@@ -76,8 +76,8 @@ func TestASheetOfProductsFindsThemInTheStore(t *testing.T) {
 		by      string
 		store   string
 	}{
-		{path: liquid.Path, planned: "/mak/mak-liquid/", by: string(pagemap.MatchedBySlug), store: "Mak Liquid"},
-		{path: capsule.Path, planned: "/mak/capsule/", by: string(pagemap.MatchedByName), store: "Mak Capsule"},
+		{path: liquid.Path, planned: "/mak/mak-liquid/", by: string(pagemap.RuleSlug), store: "Mak Liquid"},
+		{path: capsule.Path, planned: "/mak/capsule/", by: string(pagemap.RuleH1), store: "Mak Capsule"},
 	}
 	for _, tc := range cases {
 		view, found := page(report, tc.path)
@@ -90,8 +90,8 @@ func TestASheetOfProductsFindsThemInTheStore(t *testing.T) {
 	if !found || waiting.WPType != string(pagemap.WPProduct) || waiting.Action != string(imports.ActionCreate) || waiting.Title != "" {
 		t.Errorf("the preview shows the row without a product as %+v", waiting)
 	}
-	if missing := findings(report.Warnings, imports.CodeProductNotInStore); len(missing) != 1 || missing[0].Row != 4 {
-		t.Errorf("not-in-store findings = %+v, want the powder row", missing)
+	if missing := findings(report.Warnings, imports.CodeRowWithoutPage); len(missing) != 1 || missing[0].Row != 4 {
+		t.Errorf("rows without a product = %+v, want the powder row", missing)
 	}
 	if _, generated := page(report, "/mak/"); generated {
 		t.Error("the preview plans a page for the level above the products")

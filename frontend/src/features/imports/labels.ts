@@ -85,7 +85,7 @@ export function productNote(page: ProductRow): string | null {
     if (name === "") {
         return copy.imports.preview.waitingProduct;
     }
-    const by = matchedBy[page.matchedBy ?? ""] ?? matchedBy["path"] ?? "";
+    const by = matchedBy[page.matchedBy ?? ""] ?? matchedBy["url"] ?? "";
     return copy.imports.preview.storeProduct(name, by, page.plannedPath ?? "");
 }
 

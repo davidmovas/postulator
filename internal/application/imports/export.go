@@ -93,7 +93,7 @@ func exportFormat(req ExportRequest) (importmap.Format, error) {
 func exportedFields() []importmap.Field {
 	out := make([]importmap.Field, 0, len(importmap.Fields()))
 	for _, field := range importmap.Fields() {
-		if field != importmap.FieldPrimaryKeyword && field != importmap.FieldOwnEntity {
+		if field != importmap.FieldPrimaryKeyword && field != importmap.FieldOwnEntity && field != importmap.FieldSKU {
 			out = append(out, field)
 		}
 	}

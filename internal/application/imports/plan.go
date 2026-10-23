@@ -1,7 +1,6 @@
 package imports
 
 import (
-	"maps"
 	"slices"
 	"time"
 
@@ -111,12 +110,9 @@ func (p *plan) counts() Counts {
 
 func planSheet(state siteState, read *sheetRead, now time.Time) (plan, error) {
 	p := newPlan(state.siteID, read.mapping, read.table)
-	rows := readRows(read.binding, read.table, &p)
+	rows := matchRows(readRows(read.binding, read.table, &p), read.mapping.Options.RowType, &state, &p)
 	sheet := pagesOf(rows, &p)
-	state.byPlanned = maps.Clone(state.byPlanned)
 	resolveTypes(sheet, &state)
-	typeRows(sheet, read.mapping.Options.RowType, &state)
-	matchProducts(sheet, &state, &p)
 	fillGaps(sheet, &state, &p)
 
 	if err := newBuilder(state, &p, rows, sheet, now).run(); err != nil {

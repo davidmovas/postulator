@@ -413,6 +413,7 @@ export const importFields = [
     "meta_description",
     "wp_type",
     "own_entity",
+    "sku",
 ] as const;
 export type ImportField = (typeof importFields)[number];
 
@@ -443,7 +444,8 @@ export const importFindingCodes = [
     "group_without_page",
     "ambiguous_parent",
     "ambiguous_entity",
-    "product_not_in_store",
+    "row_ambiguous",
+    "row_without_page",
     "product_row_left",
     "wp_type_kept",
     "intermediate_level",

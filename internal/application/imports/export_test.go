@@ -112,7 +112,7 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 
 	source := newHarness(t)
 	source.apply(t, source.file(t, "rich.csv", richSheet), richMapping(source))
-	if typed := source.typeNames(t); !maps.Equal(typed, map[string]string{"/hosting/": "Hub", "/domains/": "Entity"}) {
+	if typed := source.typeNames(t); !maps.Equal(typed, map[string]string{"/hosting/": "Hub", "/domains/": "Entity", "/support/": "Entity"}) {
 		t.Fatalf("the source typed its pages %v", typed)
 	}
 
@@ -121,7 +121,7 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
-	if got.Pages != 2 || got.Entities != 4 {
+	if got.Pages != 3 || got.Entities != 4 {
 		t.Fatalf("export = %+v", got)
 	}
 
@@ -141,8 +141,8 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if len(applied.Report.Errors) != 0 {
 		t.Fatalf("errors = %+v", applied.Report.Errors)
 	}
-	if len(applied.Report.Warnings) != 0 {
-		t.Fatalf("warnings = %+v", applied.Report.Warnings)
+	if left := besidesPlanned(applied.Report.Warnings); len(left) != 0 {
+		t.Fatalf("warnings = %+v", left)
 	}
 
 	before, after := snapshot(t, source), snapshot(t, target)
@@ -152,8 +152,10 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if !slices.Equal(before.edges, after.edges) {
 		t.Fatalf("edges\n before %v\n after  %v", before.edges, after.edges)
 	}
-	if !slices.Equal(before.pages, after.pages) {
-		t.Fatalf("pages\n before %v\n after  %v", before.pages, after.pages)
+	pageless := "/shop/|Shop||||page|planned|Shop|Shop|"
+	if !slices.Equal(slices.Sorted(slices.Values(append(slices.Clone(before.pages), pageless))), after.pages) {
+		t.Fatalf("pages\n before %v\n after  %v\n want the site's pages and one planned for the entity the root left without a page",
+			before.pages, after.pages)
 	}
 }
 
@@ -278,8 +280,8 @@ func TestTheExportWritesThePageTypeByName(t *testing.T) {
 		string(importmap.FieldPath): "path", string(importmap.FieldEntity): "entity", string(importmap.FieldPageType): "page type",
 	})
 	got := h.apply(t, h.file(t, "types.csv", "path,entity,page type\n/hub/,Hub,Pillar\n/plain/,Plain,\n,Loose,Hub\n"), mapping)
-	if len(got.Report.Warnings) != 0 || len(got.Report.Errors) != 0 {
-		t.Fatalf("findings = %+v %+v", got.Report.Warnings, got.Report.Errors)
+	if left := besidesPlanned(got.Report.Warnings); len(left) != 0 || len(got.Report.Errors) != 0 {
+		t.Fatalf("findings = %+v %+v", left, got.Report.Errors)
 	}
 	for _, held := range h.pages(t) {
 		if held.TemplateID != nil {
@@ -311,7 +313,7 @@ func TestTheExportWritesThePageTypeByName(t *testing.T) {
 	for _, row := range table.Rows {
 		cells[binding.Text(row, importmap.FieldPath)+"#"+binding.Text(row, importmap.FieldEntity)] = binding.Text(row, importmap.FieldPageType)
 	}
-	want := map[string]string{"/hub/#Hub": "Collection", "/plain/#Plain": "", "#Loose": ""}
+	want := map[string]string{"/hub/#Hub": "Collection", "/plain/#Plain": "", "/loose/#Loose": "Collection"}
 	if !maps.Equal(cells, want) {
 		t.Fatalf("the exported page types = %v, want %v", cells, want)
 	}

@@ -6,7 +6,7 @@ import (
 )
 
 type columnArgs struct {
-	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,page_type,parent_entity,related,meta_title,meta_description,wp_type,own_entity" description:"Page field"`
+	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,page_type,parent_entity,related,meta_title,meta_description,wp_type,own_entity,sku" description:"Page field"`
 	Column string `json:"column" description:"Source header"`
 }
 

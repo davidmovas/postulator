@@ -24,6 +24,7 @@ var aliases = map[Field][]string{
 	FieldMetaDescription: {"meta description", "seo description", "description"},
 	FieldWPType:          {"post type", "wp type", "wordpress type", "content type"},
 	FieldOwnEntity:       {"own entity", "is entity", "has entity"},
+	FieldSKU:             {"sku"},
 }
 
 var weakAliases = map[Field][]string{

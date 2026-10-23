@@ -49,7 +49,7 @@ func (b *builder) planPage(draft *pageDraft) error {
 	}
 	entityID := b.ownerOf(draft)
 
-	current, exists := b.state.held(draft.path)
+	current, exists := draft.page()
 	switch {
 	case exists:
 		return b.updatePage(current, draft, entityID)
@@ -58,6 +58,9 @@ func (b *builder) planPage(draft *pageDraft) error {
 			"the root of the site already exists on WordPress, so the import does not plan it; sync the site first to map it")
 		return nil
 	default:
+		if !draft.generated {
+			b.p.noteAt(draft.at, string(importmap.FieldPath), CodeRowWithoutPage, withoutPage(draft))
+		}
 		return b.createPage(draft, entityID)
 	}
 }
@@ -142,8 +145,8 @@ func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, entityID *s
 	next.Notes = note.Merge(current.Notes, draft.notes)
 	next.WPType = b.keptType(current, draft)
 	b.retype(&next, current, draft)
-	if current.Path != draft.path {
-		next.PlannedPath = draft.path
+	if draft.url != "" && current.Path != draft.url {
+		next.PlannedPath = draft.url
 	}
 	if entityID != nil {
 		next.EntityID = entityID

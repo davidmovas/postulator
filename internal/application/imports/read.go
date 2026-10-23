@@ -18,22 +18,43 @@ const (
 )
 
 type rowDraft struct {
-	at        importmap.Origin
-	path      string
-	title     string
-	h1        string
-	metaTitle string
-	metaDesc  string
-	wpType    string
-	pageType  string
-	keywords  keyword.List
-	notes     []note.Note
-	name      string
-	own       ownership
-	anchors   []string
-	related   []string
-	parent    string
-	levels    []string
+	at           importmap.Origin
+	path         string
+	url          string
+	title        string
+	h1           string
+	sku          string
+	metaTitle    string
+	metaDesc     string
+	wpType       string
+	pageType     string
+	keywords     keyword.List
+	notes        []note.Note
+	name         string
+	own          ownership
+	anchors      []string
+	related      []string
+	parent       string
+	levels       []string
+	match        pagemap.Match
+	unreadable   bool
+	wantsProduct bool
+	modeProduct  bool
+}
+
+func (r *rowDraft) sheetPath() string {
+	if r.url != "" {
+		return r.url
+	}
+	return r.path
+}
+
+func (r *rowDraft) names() bool {
+	return r.name != "" || r.title != "" || r.h1 != "" || r.sku != "" || len(r.levels) > 0
+}
+
+func (r *rowDraft) asked(product bool) pagemap.Row {
+	return pagemap.Row{Path: r.url, Entity: r.name, Parent: r.parent, Title: r.title, H1: r.h1, SKU: r.sku, Product: product}
 }
 
 func (r *rowDraft) cardNotes() []note.Note {
@@ -68,7 +89,7 @@ func (r *rowDraft) named() string {
 	case r.title != "":
 		return r.title
 	default:
-		return titleFrom(r.path)
+		return titleFrom(r.sheetPath())
 	}
 }
 
@@ -118,14 +139,18 @@ func readRow(binding importmap.Binding, row []string, raw string, at importmap.O
 		return rowDraft{}, false
 	}
 	draft := cellsOf(binding, row, at)
-	if draft.name == "" && raw == "" && len(draft.levels) == 0 {
-		p.noteAt(at, "", CodeNoTarget, "the row names neither a path, an entity nor a group")
+	if raw == "" && !draft.names() {
+		noTarget(at, p)
 		return rowDraft{}, false
 	}
 	draft.own = rowOwnership(binding, row, at, p)
 	draft.keywords = rowKeywords(binding, row, at, p)
-	draft.path = rowPath(raw, at, p)
+	draft.url, draft.unreadable = rowURL(raw, at, p)
 	return draft, true
+}
+
+func noTarget(at importmap.Origin, p *plan) {
+	p.noteAt(at, "", CodeNoTarget, "the row names no page, no entity and no group")
 }
 
 func cellsOf(binding importmap.Binding, row []string, at importmap.Origin) rowDraft {
@@ -133,6 +158,7 @@ func cellsOf(binding importmap.Binding, row []string, at importmap.Origin) rowDr
 		at:        at,
 		title:     binding.Text(row, importmap.FieldTitle),
 		h1:        binding.Text(row, importmap.FieldH1),
+		sku:       binding.Text(row, importmap.FieldSKU),
 		metaTitle: binding.Text(row, importmap.FieldMetaTitle),
 		metaDesc:  binding.Text(row, importmap.FieldMetaDescription),
 		wpType:    binding.Text(row, importmap.FieldWPType),
@@ -156,14 +182,14 @@ func rowOwnership(binding importmap.Binding, row []string, at importmap.Origin, 
 	return own
 }
 
-func rowPath(raw string, at importmap.Origin, p *plan) string {
+func rowURL(raw string, at importmap.Origin, p *plan) (url string, unreadable bool) {
 	if raw == "" {
-		return ""
+		return "", false
 	}
 	normalized, err := pagemap.NormalizePath(raw)
 	if err != nil {
 		p.noteAt(at, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+raw)
-		return ""
+		return "", true
 	}
-	return normalized
+	return normalized, false
 }

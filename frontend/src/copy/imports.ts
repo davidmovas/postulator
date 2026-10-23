@@ -143,9 +143,13 @@ export const imports = {
         storeProduct: (name: string, by: string, planned: string) =>
             planned === "" ? `The store's ${name}, found by ${by}` : `The store's ${name}, found by ${by}, from ${planned}`,
         matchedBy: {
-            path: "its address",
+            mapped: "a person's mapping",
+            url: "its address",
             slug: "its slug",
-            name: "its name",
+            entity: "its entity",
+            title: "its title",
+            h1: "its heading",
+            sku: "its SKU",
         } as Readonly<Record<string, string>>,
     },
     rowTypes: {
@@ -157,7 +161,7 @@ export const imports = {
         title: "Rows become",
         hint: "What a new row of the sheet becomes. A row with product rows under it stays a page, a wp_type column wins over this choice, and a row already on the site keeps its type.",
         products:
-            "A product row is matched to the product you created in WooCommerce by its address, its slug, then its name; Postulator never creates a product.",
+            "A product row is matched to the product you created in WooCommerce by its address, its slug, its entity, its title, its heading, then its SKU; Postulator never creates a product.",
     },
     apply: {
         title: "Apply the sheet",
@@ -220,6 +224,7 @@ export const imports = {
         meta_description: "Meta description",
         wp_type: "WordPress type",
         own_entity: "Is an entity (yes or no)",
+        sku: "SKU",
     },
     findings: {
         bad_path: "The path cannot be used",
@@ -242,7 +247,8 @@ export const imports = {
         group_without_page: "A group has no page of its own; it stays an entity and the links pass over it",
         ambiguous_parent: "Several entities carry the parent's name, so the row has to say which one it means",
         ambiguous_entity: "Several entities carry this name, so the row needs a parent or a group to say which one",
-        product_not_in_store: "The store holds no product for this row yet; create it in WooCommerce and sync the site",
+        row_ambiguous: "Several pages answer to this row, so it writes nothing until it names one of them by its URL",
+        row_without_page: "No page answers to this row, so it is planned; a product row waits until the store holds the product",
         product_row_left: "An earlier row waited for this product and is left beside it; delete it on the Pages screen",
         wp_type_kept: "The row is already on the site, so it keeps its WordPress type",
         intermediate_level: "The level above the products stays an entity without a page",

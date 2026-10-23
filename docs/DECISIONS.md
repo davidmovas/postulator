@@ -4340,3 +4340,29 @@ rulings and what was decided while building.
   theme prints the title as the page's H1 (both stands and the client's site): that is what made
   `ClaimProduct` find a product by the H1 the sheet gave it, and it now does so through
   `MatchRow`.
+- **The import matches every row once, before it drafts pages** (4.1.2). A match pass gives each
+  row an address: the page it matched, else its URL, else the slug of its title, entity name or
+  H1 under the page its nearest level names (a level that names the row itself is passed over),
+  else the root. Drafts are keyed by that address, while the hierarchy work that reads a row's
+  URL (`fillGaps`, `urlParent`, the groups, the products under a hub) still reads the URL, so
+  WooCommerce's `/product/` base never becomes an entity. `held`, `MatchProduct` and the
+  product matcher are gone. An address an archived page or a slug collision already holds is taken
+  as a `url` match, which keeps `UNIQUE(site_id, path)`. A product row of a sheet read as products
+  only by its mode, which finds no product, falls back to a page at its address. One candidate
+  updates that page; several are `row_ambiguous`, naming each path, and the row is left out before
+  drafts and groups, so it writes no entity and no page; none is `row_without_page`, a planned
+  page, or a product row waiting as before (the import no longer raises `product_not_in_store`,
+  which stays the run's refusal). `PreviewPage.matchedBy` names the rule for every matched row.
+- **A slug, title or H1 never crosses branches.** A sheet nests its forms under each compound
+  (`/peptides/bpc-157/capsules/`, `/peptides/tb-500/capsules/`), so the slug rule alone merged one
+  compound's capsules into the other's. When a row's URL parent and a candidate's URL parent are
+  both known (a page, or a row of the same sheet) and differ, that candidate is dropped and the
+  next rule asked. A flat page's parent is the root, never known, so the client's flat pages still
+  match a nested sheet URL by slug. The rule lives in the import (`matchAs`), beside the sheet's
+  own rows it reads; `RowSite.Match` stays the site's matcher.
+- **A row without a URL now plans a page** wherever it names something and no page answers it,
+  as the owner ruled at the plan: an exported entity with no page, a level row of products, a
+  group. An export that is edited and imported again therefore plans pages for them. The `sku`
+  column joins the import's fields (the header `SKU`), so the agent's mapping enum carries it in
+  three tools and the schemas grow from 61,343 to 61,361 bytes (ceiling 61,374), the one schema
+  move of 4.1.

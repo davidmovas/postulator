@@ -576,13 +576,23 @@ func TestTheVariationSheetPutsEachFormUnderItsProduct(t *testing.T) {
 func TestAParentOrANameTwoEntitiesShareIsAnErrorNotAGuess(t *testing.T) {
 	t.Parallel()
 
+	const twoPagelessLiquids = "Root Entity,Root\nBPC-157,Liquid\nTB-500,Liquid\n"
 	cases := []struct {
-		name  string
-		sheet string
-		code  imports.FindingCode
+		name    string
+		before  string
+		sheet   string
+		code    imports.FindingCode
+		warning bool
 	}{
-		{name: "a parent named Liquid", sheet: "url,entity,parent\n/drops/,Drops,Liquid\n", code: imports.CodeAmbiguousParent},
-		{name: "an entity named Liquid with nothing above it", sheet: "url,entity\n/liquid/,Liquid\n", code: imports.CodeAmbiguousEntity},
+		{name: "a parent named Liquid", before: twoLiquids, sheet: "url,entity,parent\n/drops/,Drops,Liquid\n", code: imports.CodeAmbiguousParent},
+		{
+			name: "an entity named Liquid with nothing above it, which two pages carry", before: twoLiquids,
+			sheet: "url,entity\n/liquids/,Liquid\n", code: imports.CodeRowAmbiguous, warning: true,
+		},
+		{
+			name: "an entity named Liquid with nothing above it, which no page carries", before: twoPagelessLiquids,
+			sheet: "url,entity\n/liquids/,Liquid\n", code: imports.CodeAmbiguousEntity,
+		},
 	}
 
 	for _, tc := range cases {
@@ -590,13 +600,17 @@ func TestAParentOrANameTwoEntitiesShareIsAnErrorNotAGuess(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
-			liquids := h.file(t, "liquids.csv", twoLiquids)
+			liquids := h.file(t, "liquids.csv", tc.before)
 			h.apply(t, liquids, h.detected(t, liquids))
 
 			path := h.file(t, "ambiguous.csv", tc.sheet)
 			report := h.preview(t, path, h.detected(t, path))
-			if len(findings(report.Errors, tc.code)) != 1 {
-				t.Fatalf("errors = %+v, want one %s", report.Errors, tc.code)
+			list := report.Errors
+			if tc.warning {
+				list = report.Warnings
+			}
+			if len(findings(list, tc.code)) != 1 {
+				t.Fatalf("findings = %+v %+v, want one %s", report.Errors, report.Warnings, tc.code)
 			}
 		})
 	}
@@ -727,8 +741,11 @@ func TestANoteThatDescribesTheEntityGoesToItsCard(t *testing.T) {
 		if got := cardNotesOf(t, h, "BPC-157"); !slices.Equal(got, []note.Note{{Label: "Entity notes", Text: "A pentadecapeptide"}}) {
 			t.Fatalf("%s: BPC-157's card = %+v, want the note that names the entity", when, got)
 		}
-		if got := cardNotesOf(t, h, "Healing"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Peptides that repair tissue"}}) {
-			t.Fatalf("%s: Healing's card = %+v, want the note of a row with no page", when, got)
+		if got := notesAt(t, h, "/healing/"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Peptides that repair tissue"}}) {
+			t.Fatalf("%s: the notes of the page a row without a URL plans = %+v, want the note about the page", when, got)
+		}
+		if got := cardNotesOf(t, h, "Healing"); len(got) != 0 {
+			t.Fatalf("%s: Healing's card = %+v, want no note: the row's one note is about its page", when, got)
 		}
 	}
 	check(h, "after the import")

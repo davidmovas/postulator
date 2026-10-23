@@ -43,7 +43,17 @@ describe("what a product row of the preview says", () => {
         },
         {
             name: "a product found at its own address",
-            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "path" },
+            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "url" },
+            want: "The store's Mak Liquid, found by its address",
+        },
+        {
+            name: "a product found by its SKU",
+            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "sku" },
+            want: "The store's Mak Liquid, found by its SKU",
+        },
+        {
+            name: "a product found by a rule the screen does not know yet",
+            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "something_new" },
             want: "The store's Mak Liquid, found by its address",
         },
     ])("$name", ({ page, want }) => {

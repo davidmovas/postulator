@@ -65,6 +65,7 @@ func TestAutoDetectReadsTheAliasTable(t *testing.T) {
 		{name: "parent product entity", header: "Parent Product Entity", want: importmap.FieldParentEntity},
 		{name: "own entity", header: "Own entity", want: importmap.FieldOwnEntity},
 		{name: "is entity", header: "is_entity", want: importmap.FieldOwnEntity},
+		{name: "sku", header: "SKU", want: importmap.FieldSKU},
 	}
 
 	for _, tc := range cases {
@@ -285,7 +286,7 @@ func TestFieldsAreTheCanonicalColumnOrder(t *testing.T) {
 		importmap.FieldPath, importmap.FieldTitle, importmap.FieldH1, importmap.FieldPrimaryKeyword,
 		importmap.FieldKeywords, importmap.FieldAnchors, importmap.FieldEntity, importmap.FieldPageType,
 		importmap.FieldParentEntity, importmap.FieldRelated, importmap.FieldMetaTitle,
-		importmap.FieldMetaDescription, importmap.FieldWPType, importmap.FieldOwnEntity,
+		importmap.FieldMetaDescription, importmap.FieldWPType, importmap.FieldOwnEntity, importmap.FieldSKU,
 	}
 	if !slices.Equal(fields, want) {
 		t.Fatalf("Fields() = %v, want %v", fields, want)

@@ -41,7 +41,8 @@ const (
 	CodeGroupWithoutPage      FindingCode = "group_without_page"
 	CodeAmbiguousParent       FindingCode = "ambiguous_parent"
 	CodeAmbiguousEntity       FindingCode = "ambiguous_entity"
-	CodeProductNotInStore     FindingCode = "product_not_in_store"
+	CodeRowAmbiguous          FindingCode = "row_ambiguous"
+	CodeRowWithoutPage        FindingCode = "row_without_page"
 	CodeProductRowLeft        FindingCode = "product_row_left"
 	CodeWPTypeKept            FindingCode = "wp_type_kept"
 	CodeIntermediateLevel     FindingCode = "intermediate_level"
@@ -272,7 +273,7 @@ func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action, pag
 		Sheet:           sheet,
 		Path:            p.Path,
 		PlannedPath:     p.PlannedPath,
-		MatchedBy:       string(draft.matchedBy),
+		MatchedBy:       draft.matchedBy(),
 		Title:           p.Title,
 		H1:              p.H1,
 		MetaTitle:       p.MetaTitle,

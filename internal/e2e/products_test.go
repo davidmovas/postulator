@@ -243,7 +243,7 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	}
 	waiting := 0
 	for _, finding := range applied.Report.Warnings {
-		if finding.Code == string(imports.CodeProductNotInStore) {
+		if finding.Code == string(imports.CodeRowWithoutPage) {
 			waiting++
 		}
 	}

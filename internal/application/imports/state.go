@@ -18,25 +18,23 @@ type siteState struct {
 	entities  []graph.Entity
 	edges     []graph.Edge
 	pages     []pagemap.Page
+	site      pagemap.RowSite
 	byName    map[string][]graph.Entity
 	byPath    map[string]pagemap.Page
-	byPlanned map[string]pagemap.Page
 	edgeKeys  map[string]struct{}
 	types     map[pagemap.WPType]struct{}
 	pageTypes []pagetype.Type
 	fields    map[string][]field.Value
-	names     map[string][]string
 }
 
 func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, pageTypes []pagetype.Type,
 	fields map[string][]field.Value) siteState {
 	state := siteState{
-		siteID: siteID, entities: entities, edges: edges, pages: pages, pageTypes: pageTypes,
-		fields: fields, names: pagemap.Names(fields),
-		byName:    make(map[string][]graph.Entity, len(entities)),
-		byPath:    make(map[string]pagemap.Page, len(pages)),
-		byPlanned: make(map[string]pagemap.Page),
-		edgeKeys:  make(map[string]struct{}, len(edges)),
+		siteID: siteID, entities: entities, edges: edges, pages: pages, pageTypes: pageTypes, fields: fields,
+		site:     pagemap.NewRowSite(pages, fields, entities),
+		byName:   make(map[string][]graph.Entity, len(entities)),
+		byPath:   make(map[string]pagemap.Page, len(pages)),
+		edgeKeys: make(map[string]struct{}, len(edges)),
 		types: map[pagemap.WPType]struct{}{
 			pagemap.WPPage: {}, pagemap.WPPost: {}, pagemap.WPProduct: {}, pagemap.WPProductCategory: {},
 		},
@@ -47,9 +45,6 @@ func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pa
 	for i := range pages {
 		state.byPath[pages[i].Path] = pages[i]
 		state.types[pages[i].WPType] = struct{}{}
-		if pages[i].PlannedPath != "" {
-			state.byPlanned[pages[i].PlannedPath] = pages[i]
-		}
 	}
 	for i := range edges {
 		state.edgeKeys[edgeKey(edges[i])] = struct{}{}
@@ -132,17 +127,6 @@ func sortStored(entities []graph.Entity, edges []graph.Edge, pages []pagemap.Pag
 	})
 }
 
-func (s *siteState) held(path string) (pagemap.Page, bool) {
-	if page, ok := s.byPath[path]; ok && page.WPID != nil {
-		return page, true
-	}
-	if page, ok := s.byPlanned[path]; ok {
-		return page, true
-	}
-	page, ok := s.byPath[path]
-	return page, ok
-}
-
 func inTheStore(page pagemap.Page) bool {
 	return page.WPType == pagemap.WPProduct && page.WPID != nil
 }
@@ -151,23 +135,26 @@ func (s *siteState) sells() bool {
 	return slices.ContainsFunc(s.pages, inTheStore)
 }
 
-func (s *siteState) storeHolds(row pagemap.ProductRow) bool {
-	if page, held := s.held(row.Path); held && inTheStore(page) {
-		return true
-	}
-	return pagemap.MatchProduct(row, s.pages, s.names).Found
+func (s *siteState) storeHolds(row *rowDraft) bool {
+	found := s.site.Match(row.asked(true))
+	return found.Found() && inTheStore(found.Page)
 }
 
 func (s *siteState) rowTypeOf(binding importmap.Binding, rows [][]string) importmap.RowType {
 	found := 0
-	for _, row := range rows {
-		raw := binding.Path(row)
-		if raw == "" {
+	for _, cells := range rows {
+		row := cellsOf(binding, cells, importmap.Origin{})
+		if raw := binding.Path(cells); raw != "" {
+			url, err := pagemap.NormalizePath(raw)
+			if err != nil {
+				return importmap.RowPages
+			}
+			row.url = url
+		}
+		if row.url == "" && row.name == "" && row.title == "" && row.h1 == "" && row.sku == "" {
 			continue
 		}
-		path, pathErr := pagemap.NormalizePath(raw)
-		product := pagemap.ProductRow{Path: path, H1: binding.Text(row, importmap.FieldH1), Title: binding.Text(row, importmap.FieldTitle)}
-		if pathErr != nil || !s.storeHolds(product) {
+		if !s.storeHolds(&row) {
 			return importmap.RowPages
 		}
 		found++
