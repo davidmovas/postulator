@@ -41,6 +41,10 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	if err != nil {
 		return err
 	}
+	set, err := s.deps.Types.Set(ctx, state.SiteID)
+	if err != nil {
+		return err
+	}
 	now := s.now()
 
 	changed := make(map[string]pagemap.Page)
@@ -50,7 +54,7 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 			continue
 		}
 		before := page
-		if err := s.classify(ctx, tracked, &page, m, settings, state.Technical); err != nil {
+		if err := s.classify(ctx, tracked, &page, m, set, settings, state.Technical); err != nil {
 			return err
 		}
 		if before.TechnicalReason != page.TechnicalReason || before.ReadOnlyReason != page.ReadOnlyReason {
@@ -102,10 +106,6 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		return err
 	}
 
-	set, err := s.deps.Types.Set(ctx, state.SiteID)
-	if err != nil {
-		return err
-	}
 	typed := untyped(m, changed, set)
 	state.Counts.Typed += len(typed)
 
@@ -150,10 +150,21 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	return nil
 }
 
-func (s *Service) classify(ctx context.Context, tracked *findings, page *pagemap.Page, m siteModel, settings site.Settings, technical site.TechnicalPages) error {
+func typedRegular(page pagemap.Page, set pagetype.Set) bool {
+	if page.TypeSource != pagemap.TypeSourceManual || page.PageTypeID == nil {
+		return false
+	}
+	kind, found := set.ByID(*page.PageTypeID)
+	return found && kind.Preset != pagetype.Technical
+}
+
+func (s *Service) classify(ctx context.Context, tracked *findings, page *pagemap.Page, m siteModel, set pagetype.Set, settings site.Settings, technical site.TechnicalPages) error {
 	record, rendered := m.renders[page.ID]
 	if page.TechnicalReason == pagemap.TechnicalNone || page.TechnicalReason.Observed() {
 		reason := technicalReason(*page, m.bodies[page.ID], record, rendered, settings, technical)
+		if typedRegular(*page, set) {
+			reason = pagemap.TechnicalNone
+		}
 		subject := finding.SubjectPage(page.ID)
 		switch {
 		case reason != pagemap.TechnicalNone && page.TechnicalReason == pagemap.TechnicalNone:

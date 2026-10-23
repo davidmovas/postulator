@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
@@ -102,6 +103,33 @@ func TestATypedPageIsNeverRetypedByTheObservation(t *testing.T) {
 	}
 	if tb500.PageTypeID == nil {
 		t.Fatal("tb-500 was not typed by the first walk")
+	}
+}
+
+func TestAPageAPersonTypedAsRegularIsNeverDetectedTechnicalAgain(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	s.run(t, observe.Options{})
+
+	account := s.pageAt(t, "/account/")
+	if account.TechnicalReason != pagemap.TechnicalShortcode {
+		t.Fatalf("the account page = %q, want it detected technical first", account.TechnicalReason)
+	}
+	shop := s.pageAt(t, "/shop/")
+	s.stores.setType(account.ID, siteID+"-entity", pagemap.TypeByUser)
+	s.stores.setType(shop.ID, siteID+"-technical", pagemap.TypeByUser)
+
+	s.clock.Set(start.Add(time.Hour))
+	s.run(t, observe.Options{Full: true, RenderRescan: true})
+	if after := s.pageAt(t, "/account/"); after.TechnicalReason != pagemap.TechnicalNone {
+		t.Errorf("the account page a person typed Entity = %q, want no technical reason", after.TechnicalReason)
+	}
+	if held, _ := s.finding(finding.TechnicalDetected, finding.SubjectPage(account.ID)); held.Status == finding.Open {
+		t.Errorf("technical_detected on the page a person typed = %+v, want it closed", held)
+	}
+	if after := s.pageAt(t, "/shop/"); after.TechnicalReason != pagemap.TechnicalShop {
+		t.Errorf("the shop a person typed Technical = %q, want its detection kept", after.TechnicalReason)
 	}
 }
 
