@@ -981,6 +981,31 @@ func TestAPlannedTitleThatDiffersIsAFindingAndThePlanIsKept(t *testing.T) {
 	}
 }
 
+func TestARowWithoutAPageClosesWhenItsPageReachesTheSite(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	landed := s.seedPage(t, pagemap.Page{ID: "planned-tb", Path: "/tb-500/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, Title: "TB-500"})
+	waiting := s.seedPage(t, pagemap.Page{ID: "planned-kpv", Path: "/kpv/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, Title: "KPV"})
+	for _, row := range []struct{ key, pageID string }{{"row:Groups:tb-500", landed.ID}, {"row:Groups:kpv", waiting.ID}} {
+		pageID := row.pageID
+		if err := (findingStore{s.stores}).Upsert(t.Context(), finding.Finding{
+			ID: "f-" + pageID, SiteID: siteID, PageID: &pageID, Code: finding.RowWithoutPage, SubjectKey: row.key,
+			Subject: json.RawMessage(`{"sheet":"Groups"}`), CreatedAt: earlier, UpdatedAt: earlier,
+		}); err != nil {
+			t.Fatalf("seed the finding: %v", err)
+		}
+	}
+
+	s.run(t, observe.Options{})
+	closed, _ := s.finding(finding.RowWithoutPage, "row:Groups:tb-500")
+	if closed.Status != finding.Resolved || closed.ResolvedBy != finding.ResolvedByObservation || closed.Resolution != finding.ResolutionRowMatched {
+		t.Errorf("the row whose page reached the site = %+v, want resolved as row_matched by the observation", closed)
+	}
+	if open, _ := s.finding(finding.RowWithoutPage, "row:Groups:kpv"); open.Status != finding.Open {
+		t.Errorf("the row whose page is still planned = %+v, want open", open)
+	}
+}
+
 func TestTheSummaryCountsTheModel(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

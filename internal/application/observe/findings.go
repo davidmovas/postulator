@@ -62,6 +62,19 @@ func (f *findings) clear(ctx context.Context, code finding.Code, subjectKey stri
 	return f.store.Clear(ctx, f.siteID, code, subjectKey, finding.ResolvedByObservation, finding.ResolutionObservedClear, f.now)
 }
 
+func (f *findings) closeFor(ctx context.Context, code finding.Code, pageID, resolution string) error {
+	for key, open := range f.open {
+		if open.Code != code || open.PageID == nil || *open.PageID != pageID {
+			continue
+		}
+		delete(f.open, key)
+		if err := f.store.Clear(ctx, f.siteID, code, open.SubjectKey, finding.ResolvedByObservation, resolution, f.now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (f *findings) openFor(code finding.Code, prefix string) []finding.Finding {
 	out := make([]finding.Finding, 0)
 	for key := range f.open {

@@ -17,7 +17,7 @@ import (
 )
 
 var modelCodes = []finding.Code{
-	finding.FieldChangedOnSite, finding.BodyChangedOnSite, finding.PageTitleDiffers, finding.PageH1Differs,
+	finding.FieldChangedOnSite, finding.BodyChangedOnSite, finding.PageTitleDiffers, finding.PageH1Differs, finding.RowWithoutPage,
 }
 
 func (s *Service) content(ctx context.Context, state *State, readers Readers, batch int) (bool, error) {
@@ -226,6 +226,9 @@ func (a *absorber) keep(ctx context.Context, p prepared) error {
 		a.state.Counts.Created++
 	}
 
+	if err := a.tracked.closeFor(ctx, finding.RowWithoutPage, p.next.ID, finding.ResolutionRowMatched); err != nil {
+		return err
+	}
 	if err := a.identity(ctx, p.next, p.it); err != nil {
 		return err
 	}
