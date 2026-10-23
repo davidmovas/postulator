@@ -63,12 +63,13 @@ func (f *findings) clear(ctx context.Context, code finding.Code, subjectKey stri
 }
 
 func (f *findings) closeFor(ctx context.Context, code finding.Code, pageID, resolution string) error {
-	for key, open := range f.open {
-		if open.Code != code || open.PageID == nil || *open.PageID != pageID {
+	for key := range f.open {
+		held := f.open[key]
+		if held.Code != code || held.PageID == nil || *held.PageID != pageID {
 			continue
 		}
 		delete(f.open, key)
-		if err := f.store.Clear(ctx, f.siteID, code, open.SubjectKey, finding.ResolvedByObservation, resolution, f.now); err != nil {
+		if err := f.store.Clear(ctx, f.siteID, code, held.SubjectKey, finding.ResolvedByObservation, resolution, f.now); err != nil {
 			return err
 		}
 	}
