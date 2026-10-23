@@ -4227,9 +4227,10 @@ each is folded into the entries below.
   own work never having run the whole suite). `TestTheClientLoopFromTheSamples` cancelled its second
   run on the first publish `step.done`, which since the durable record (0.2) is also the plan's wait
   before any write, so the revert rightly found nothing written: the test now waits until an item
-  holds a `publish_result`. `TestTheWriterSeesTheFullPicture` refused a stand the exit tests had
-  edited (the restricted-user test leaves its kept page with our text), as its message says: the
-  whole suite runs from a fresh reset, after the exit tests.
+  holds a `publish_result`. `TestTheWriterSeesTheFullPicture` refused its page because
+  `TestTheSiteFiltersAreRespectedUnderARestrictedUser`, which runs before it in the same suite (A.7),
+  restored the framed page it edited and left its kept page with our text; it now restores both, and
+  the two pass in order from a fresh reset.
 - **The screens (D.1 to D.4).** The run report's publish pane shows each field before and after and
   the body's blocks as the site stored them, marked ours, the client's or the site's and kept, added
   or removed, with the regions the site injects read from the page model (whether inside the content

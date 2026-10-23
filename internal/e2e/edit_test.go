@@ -61,8 +61,11 @@ func TestTheSiteFiltersAreRespectedUnderARestrictedUser(t *testing.T) {
 	original := wpCLI(t, live.env, "post", "get", framedID, "--field=post_content")
 	withFrame := original + "\n\n" + clientFrame
 	wpCLI(t, live.env, "post", "update", framedID, "--post_content="+withFrame, "--user="+live.env.user)
+	plainID := strconv.FormatInt(*plain.WPID, 10)
+	kept := wpCLI(t, live.env, "post", "get", plainID, "--field=post_content")
 	t.Cleanup(func() {
 		wpCLI(t, live.env, "post", "update", framedID, "--post_content="+original, "--user="+live.env.user)
+		wpCLI(t, live.env, "post", "update", plainID, "--post_content="+kept, "--user="+live.env.user)
 	})
 	runSync(t, core, siteID)
 
