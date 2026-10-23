@@ -4,11 +4,57 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tiktoken-go/tokenizer"
+
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
+	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
+	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
+
+const instructionsCeilingTokens = 1924
+
+func TestTheInstructionsAndTheReplicasBriefFitTheirCeiling(t *testing.T) {
+	t.Parallel()
+
+	replica, err := sitemodeltest.Stand("replica")
+	if err != nil {
+		t.Fatalf("load the replica's capture: %v", err)
+	}
+	brief, err := replica.Service().Brief(t.Context(), replica.Site.ID)
+	if err != nil {
+		t.Fatalf("the replica's brief: %v", err)
+	}
+	codec, err := tokenizer.Get(tokenizer.O200kBase)
+	if err != nil {
+		t.Fatalf("the o200k_base encoding: %v", err)
+	}
+
+	widest, at := 0, ""
+	for _, mode := range []domainagent.Mode{domainagent.ModeConfirm, domainagent.ModeAutonomous} {
+		instructions, err := agent.Instructions(agent.SiteContext{
+			SiteID: replica.Site.ID, SiteName: replica.Site.Name, Mode: string(mode), Brief: brief.Text(),
+		})
+		if err != nil {
+			t.Fatalf("render the %s instructions: %v", mode, err)
+		}
+		tokens, err := codec.Count(instructions)
+		if err != nil {
+			t.Fatalf("count the %s instructions: %v", mode, err)
+		}
+		t.Logf("the %s instructions with the replica's brief: %d bytes, %d o200k_base tokens; the brief alone %d bytes, "+
+			"without link totals, which a capture holds no audit for", mode, len(instructions), tokens, len(brief.Text()))
+		if tokens > widest {
+			widest, at = tokens, string(mode)
+		}
+	}
+	if widest > instructionsCeilingTokens {
+		t.Errorf("the %s instructions with the replica's brief grew to %d o200k_base tokens, over the %d this build allows; "+
+			"every round of every turn resends them", at, widest, instructionsCeilingTokens)
+	}
+}
 
 func TestTheInstructionsTeachTheModelsVocabulary(t *testing.T) {
 	t.Parallel()
