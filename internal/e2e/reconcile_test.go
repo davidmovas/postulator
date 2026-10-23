@@ -155,8 +155,10 @@ func subjectText(held findings.Finding, key string) string {
 	if json.Unmarshal(held.Subject, &subject) != nil {
 		return ""
 	}
-	text, _ := subject[key].(string)
-	return text
+	if text, ok := subject[key].(string); ok {
+		return text
+	}
+	return ""
 }
 
 func TestTheWorkbookReconcilesWithTheSite(t *testing.T) {
@@ -240,8 +242,8 @@ func reconcileTheClientsWorkbook(t *testing.T, core *app.Core, siteID string) {
 	t.Logf("open findings after one import and one sync: %s", counted(byCode(afterSync)))
 	stored := pagesByPath(t, core.Pages, siteID)
 	pathOf := make(map[string]string, len(stored))
-	for path, page := range stored {
-		pathOf[page.ID] = path
+	for path := range stored {
+		pathOf[stored[path].ID] = path
 	}
 	for i := range afterSync {
 		if afterSync[i].Code == string(finding.ParentDiffers) {
