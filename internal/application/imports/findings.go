@@ -77,7 +77,7 @@ func (p *plan) keepAmbiguous(row *rowDraft) {
 		return cmp.Or(strings.Compare(a.Path, b.Path), strings.Compare(a.ID, b.ID))
 	})
 	subject := ambiguousRow{
-		Sheet: p.sheetAt(row.at), Rule: string(row.match.Rule), Candidates: make([]string, 0, len(candidates)),
+		Sheet: p.rowSheet(row.at), Rule: string(row.match.Rule), Candidates: make([]string, 0, len(candidates)),
 		PageIDs: make([]string, 0, len(candidates)), Product: row.wantsProduct,
 	}
 	for i := range candidates {
@@ -95,7 +95,7 @@ func (p *plan) keepPlanned(row *rowDraft, page *pagemap.Page) {
 	pageID := page.ID
 	p.lasting = append(p.lasting, lasting{
 		code: finding.RowWithoutPage, key: row.key, pageID: &pageID,
-		subject: plannedRow{Sheet: p.sheetAt(row.at), PlannedPath: page.Path, Product: page.WPType == pagemap.WPProduct},
+		subject: plannedRow{Sheet: p.rowSheet(row.at), PlannedPath: page.Path, Product: page.WPType == pagemap.WPProduct},
 	})
 }
 

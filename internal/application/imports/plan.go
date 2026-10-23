@@ -29,6 +29,7 @@ type canonical struct {
 type plan struct {
 	siteID    string
 	sheet     string
+	file      string
 	read      []string
 	mapping   importmap.Mapping
 	report    PreviewReport
@@ -42,14 +43,18 @@ type plan struct {
 	keys      map[string]map[string]struct{}
 }
 
-func newPlan(siteID string, mapping importmap.Mapping, table importmap.Table) plan {
-	p := plan{siteID: siteID, read: sheetsRead(mapping, table), mapping: mapping, rows: len(table.Rows)}
+func newPlan(siteID string, read *sheetRead) plan {
+	mapping, table := read.mapping, read.table
+	p := plan{siteID: siteID, file: read.file, read: sheetsRead(mapping, table), mapping: mapping, rows: len(table.Rows)}
 	if len(p.read) == 1 {
 		p.sheet = p.read[0]
 	}
-	p.keys = make(map[string]map[string]struct{}, len(p.read))
+	p.keys = make(map[string]map[string]struct{}, len(p.read)+1)
 	for _, sheet := range p.read {
 		p.sawRow(sheet, "")
+	}
+	if len(p.read) == 0 {
+		p.sawRow(p.file, "")
 	}
 	p.report.Columns = columnViews(p.sheet, mapping.Uses(table.Headers))
 	p.noteDropped(mapping, table.Headers)
@@ -88,6 +93,13 @@ func (p *plan) sheetAt(at importmap.Origin) string {
 	return p.sheet
 }
 
+func (p *plan) rowSheet(at importmap.Origin) string {
+	if at.Sheet != "" {
+		return at.Sheet
+	}
+	return p.file
+}
+
 func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, message string) {
 	p.noteAbout(at, field, code, nil, message)
 }
@@ -121,7 +133,7 @@ func (p *plan) counts() Counts {
 }
 
 func planSheet(state siteState, read *sheetRead, now time.Time) (plan, error) {
-	p := newPlan(state.siteID, read.mapping, read.table)
+	p := newPlan(state.siteID, read)
 	rows := matchRows(readRows(read.binding, read.table, &p), read.mapping.Options.RowType, &state, &p)
 	sheet := pagesOf(rows, &p)
 	resolveTypes(sheet, &state)

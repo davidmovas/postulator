@@ -161,8 +161,8 @@ func readRow(binding importmap.Binding, row []string, raw string, at importmap.O
 	draft.own = rowOwnership(binding, row, at, p)
 	draft.keywords = rowKeywords(binding, row, at, p)
 	draft.url, draft.unreadable = rowURL(raw, at, p)
-	draft.key = pagemap.RowKey(p.sheetAt(at), draft.asked(false))
-	p.sawRow(p.sheetAt(at), draft.key)
+	draft.key = pagemap.RowKey(p.rowSheet(at), draft.asked(false))
+	p.sawRow(p.rowSheet(at), draft.key)
 	return draft, true
 }
 

@@ -85,7 +85,7 @@ func TestAFindingLivesOnce(t *testing.T) {
 		second := h.sitePage(t, "/b/guide/", "Guide", 32, nil)
 		mapping := h.mapping(map[string]string{string(importmap.FieldTitle): "title", string(importmap.FieldKeywords): "keywords"})
 		guide, other := "title,keywords\nGuide,guide\n", "title,keywords\nOther,other\n"
-		key := pagemap.RowKey("", pagemap.Row{Title: "Guide"})
+		key := pagemap.RowKey("rows.csv", pagemap.Row{Title: "Guide"})
 		repo := sqlite.NewFindingRepo(h.store)
 
 		steps := []struct {
@@ -99,7 +99,7 @@ func TestAFindingLivesOnce(t *testing.T) {
 		}{
 			{
 				name: "raised with its candidates", sheet: guide, status: finding.Open,
-				subject: `{"sheet":"","rule":"title","candidates":["/a/guide/","/b/guide/"],"pageIds":["` + first.ID + `","` + second.ID + `"],"product":false}`,
+				subject: `{"sheet":"rows.csv","rule":"title","candidates":["/a/guide/","/b/guide/"],"pageIds":["` + first.ID + `","` + second.ID + `"],"product":false}`,
 			},
 			{name: "one row on a second import", sheet: guide, status: finding.Open},
 			{
@@ -184,9 +184,9 @@ func TestAFindingLivesOnce(t *testing.T) {
 
 				h := newHarness(t)
 				mapping := tc.mapping(h)
-				subject := `{"sheet":"","plannedPath":"` + tc.planned + `","product":false}`
+				subject := `{"sheet":"rows.csv","plannedPath":"` + tc.planned + `","product":false}`
 				if tc.product {
-					subject = `{"sheet":"","plannedPath":"` + tc.planned + `","product":true}`
+					subject = `{"sheet":"rows.csv","plannedPath":"` + tc.planned + `","product":true}`
 				}
 				for range 2 {
 					h.applyCSV(t, tc.sheet, mapping)
@@ -197,8 +197,8 @@ func TestAFindingLivesOnce(t *testing.T) {
 						t.Fatalf("pages = %+v, want %s planned", h.pages(t), tc.planned)
 					case held.PageID == nil || *held.PageID != planned.ID || held.Status != finding.Open:
 						t.Fatalf("the finding = %+v, want it open on the planned page %s", held, planned.ID)
-					case held.SubjectKey != pagemap.RowKey("", tc.key) || string(held.Subject) != subject:
-						t.Fatalf("the finding reads %s %s, want %s %s", held.SubjectKey, held.Subject, pagemap.RowKey("", tc.key), subject)
+					case held.SubjectKey != pagemap.RowKey("rows.csv", tc.key) || string(held.Subject) != subject:
+						t.Fatalf("the finding reads %s %s, want %s %s", held.SubjectKey, held.Subject, pagemap.RowKey("rows.csv", tc.key), subject)
 					case !slices.Equal(held.Options, []finding.Option{finding.MapToPage, finding.Ignore}):
 						t.Fatalf("options = %v", held.Options)
 					}
@@ -319,6 +319,51 @@ func TestAFindingLivesOnce(t *testing.T) {
 		listed, err := sqlite.NewFindingRepo(h.store).ListBySite(t.Context(), h.siteID, "")
 		if err != nil || len(listed) != 0 {
 			t.Fatalf("findings after a preview = %+v (%v), want none", listed, err)
+		}
+	})
+
+	t.Run("two files never touch each other's rows", func(t *testing.T) {
+		t.Parallel()
+
+		h := newHarness(t)
+		mapping := h.mapping(map[string]string{string(importmap.FieldTitle): "title", string(importmap.FieldKeywords): "keywords"})
+		guides := h.file(t, "guides.csv", "title,keywords\nLoose guide,loose\n")
+		notes := h.file(t, "notes.csv", "title,keywords\nField notes,notes\n")
+		shelf := h.workbook(t, "shelf.xlsx", importmap.Table{Headers: []string{"title", "keywords"}, Rows: [][]string{{"Shelf guide", "shelf"}}})
+		subjects := map[string]string{
+			pagemap.RowKey("guides.csv", pagemap.Row{Title: "Loose guide"}): `{"sheet":"guides.csv","plannedPath":"/loose-guide/","product":false}`,
+			pagemap.RowKey("notes.csv", pagemap.Row{Title: "Field notes"}):  `{"sheet":"notes.csv","plannedPath":"/field-notes/","product":false}`,
+			pagemap.RowKey("Sheet1", pagemap.Row{Title: "Shelf guide"}):     `{"sheet":"Sheet1","plannedPath":"/shelf-guide/","product":false}`,
+		}
+
+		steps := []struct {
+			name string
+			path string
+			open int
+		}{
+			{name: "the first file", path: guides, open: 1},
+			{name: "a second file", path: notes, open: 2},
+			{name: "a workbook", path: shelf, open: 3},
+			{name: "the first file again", path: guides, open: 3},
+			{name: "the second file again", path: notes, open: 3},
+		}
+		for _, step := range steps {
+			h.apply(t, step.path, mapping)
+			held := h.lasting(t, finding.RowWithoutPage)
+			if len(held) != step.open {
+				t.Fatalf("%s: row findings = %+v, want %d", step.name, held, step.open)
+			}
+			for i := range held {
+				subject, known := subjects[held[i].SubjectKey]
+				switch {
+				case !known:
+					t.Fatalf("%s: the finding is keyed %s, want its file or its sheet named", step.name, held[i].SubjectKey)
+				case held[i].Status != finding.Open:
+					t.Fatalf("%s: %s is %s (%s), want it open", step.name, held[i].SubjectKey, held[i].Status, held[i].Resolution)
+				case string(held[i].Subject) != subject:
+					t.Fatalf("%s: the subject = %s, want %s", step.name, held[i].Subject, subject)
+				}
+			}
 		}
 	})
 

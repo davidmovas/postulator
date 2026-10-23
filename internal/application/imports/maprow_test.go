@@ -90,7 +90,7 @@ func TestAMappedRowIsFoundByItsMappingOnTheNextImport(t *testing.T) {
 			t.Fatalf("the chosen page's row key = %q, want %q", mapped.RowKey, ambiguous.SubjectKey)
 		}
 
-		report := h.preview(t, h.file(t, "again.csv", sheet), mapping)
+		report := h.preview(t, h.file(t, "rows.csv", sheet), mapping)
 		if view, found := page(report, "/b/guide/"); !found || view.MatchedBy != string(pagemap.RuleMapped) || view.Action != string(imports.ActionUpdate) {
 			t.Fatalf("pages = %+v, want the chosen page updated by the mapping", report.Pages)
 		}
@@ -173,7 +173,7 @@ func TestMapRowRefusesWhatItCannotMap(t *testing.T) {
 		}))
 	ambiguous := h.one(t, finding.RowAmbiguous)
 	waiting := h.one(t, finding.RowWithoutPage)
-	if string(waiting.Subject) != `{"sheet":"","plannedPath":"/product/mak-liquid/","product":true}` {
+	if string(waiting.Subject) != `{"sheet":"rows.csv","plannedPath":"/product/mak-liquid/","product":true}` {
 		t.Fatalf("the waiting row's subject = %s, want a product row", waiting.Subject)
 	}
 

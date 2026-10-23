@@ -3,6 +3,7 @@ package imports
 import (
 	"cmp"
 	"context"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -16,6 +17,7 @@ type sheetRead struct {
 	mapping importmap.Mapping
 	table   importmap.Table
 	binding importmap.Binding
+	file    string
 }
 
 type workbook struct {
@@ -113,7 +115,7 @@ func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, e
 		if err != nil {
 			return nil, err
 		}
-		read, err := bound(mapping, table)
+		read, err := bound(req.Path, mapping, table)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +143,7 @@ func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, e
 			return nil, errors.New(errors.Invalid, "the sheets carry more rows together than the import.maxRows setting allows").
 				WithDetail("maxRows", s.deps.MaxRows).WithDetail("sheet", ordered[i].Sheet)
 		}
-		read, bindErr := bound(mapping, table)
+		read, bindErr := bound(req.Path, mapping, table)
 		if bindErr != nil {
 			return nil, bindErr
 		}
@@ -150,12 +152,12 @@ func (s *Service) reads(ctx context.Context, req PreviewRequest) ([]sheetRead, e
 	return reads, nil
 }
 
-func bound(mapping importmap.Mapping, table importmap.Table) (sheetRead, error) {
+func bound(path string, mapping importmap.Mapping, table importmap.Table) (sheetRead, error) {
 	binding, err := mapping.Bind(table.Headers)
 	if err != nil {
 		return sheetRead{}, err
 	}
-	return sheetRead{mapping: mapping, table: table, binding: binding}, nil
+	return sheetRead{mapping: mapping, table: table, binding: binding, file: filepath.Base(path)}, nil
 }
 
 func (s *Service) inWorkbookOrder(path string, asked []SheetMapping) ([]SheetMapping, error) {
