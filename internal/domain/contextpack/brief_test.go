@@ -86,7 +86,7 @@ The top two levels of the hub tree, with the pages under each hub:
 LINKS
 Of 4 audited pages the graph owes 6 links: 2 placed, 2 missing (1 of them required), 2 waiting on a page. 3 pages are orphans; 1 link points off the graph.
 
-OPEN FINDINGS
+OPEN FINDINGS (findings op list reads each with its options)
 - parent_differs: 2
 - render_unreachable: 1
 `

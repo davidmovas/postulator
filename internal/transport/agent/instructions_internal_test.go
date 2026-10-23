@@ -18,7 +18,9 @@ func TestTheInstructionsTeachTheModelsVocabulary(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	words := make([]string, 0, 32)
-	words = append(words, "page type", "field", "scope", "rewrites", "trail", "twin", "orphan", "card", "finding", "pack", "pages_get")
+	words = append(words, "page type", "field", "scope", "rewrites", "trail", "twin", "orphan", "card", "finding", "pack", "pages_get",
+		"FINDINGS", "op list", "op resolve", "option", "explain", "SWEEPS", "fields", "runs_start", "EDITING A PAGE", "pages_fields",
+		"pages_blocks", "place_link", "bodyHash", "CONFIRMATION", "confirms", "runs_get", "runs_revert")
 	for _, view := range []sitemodel.View{sitemodel.ViewTree, sitemodel.ViewLinks, sitemodel.ViewGaps, sitemodel.ViewPack} {
 		words = append(words, "view "+string(view))
 	}

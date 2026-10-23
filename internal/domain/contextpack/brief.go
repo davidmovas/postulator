@@ -89,7 +89,7 @@ func (b Brief) render(fit shape) string {
 	out.WriteString("\nLINKS\n")
 	out.WriteString(b.Links.text())
 
-	out.WriteString("\nOPEN FINDINGS\n")
+	out.WriteString("\nOPEN FINDINGS (findings op list reads each with its options)\n")
 	if len(o.Findings) == 0 {
 		out.WriteString("none\n")
 	}
