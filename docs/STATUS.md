@@ -15,9 +15,28 @@ its stand legs green on both stands on 2026-10-20**; **stage 3, the field writer
 body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1, then the stored
 diff, per-field acceptance and the screens; its gate is green on both stands (2026-10-23). Stage 4
 is re-planned as 4.1 (the matcher and the findings), 4.2 (the agent works the loop) and 4.3 (the
-screens, the gate and the report); 4.1 is half done (2026-10-23), and resumes at 4.1.4.**
+screens, the gate and the report); 4.1's code is done to 4.1.6 (2026-10-23), and it resumes at
+4.1.7, the reconcile proof and the stands.**
 
 ## Where we are
+
+**2026-10-23, stage 4.1, second session: the findings last, and one use case resolves them.** The
+reasoning is under "The owner's answers to 4.1's first session" and "4.1, the second session" in
+`DECISIONS.md`; the checkpoint and the commands owed are under 4.1 in the phase plan.
+
+- **The owner's answers** (`92eb616`): a run scoped to chosen fields is 4.2's; a row that names only
+  an entity plans no page (`a480bbb`, failing first).
+- **4.1.4**: the row codes, `pagemap.RowKey` and their words (`f34a492`); the import persists
+  `row_ambiguous`, `row_without_page` and `parent_differs` and closes what it no longer raises
+  (`0c5a6e0`); the observation closes a row's finding once its page is on the site (`a64f5da`).
+- **4.1.5**: `application/findings` (`04caaf5`, `core.Findings`), `imports.MapRow` (`6e341ea`), a
+  page a person typed as regular is never detected technical again (`5a0fbd2`), a run scoped to the
+  fields publish writes (`9bc1f59`), a card accepted by the agent recorded as the agent's
+  (`8aac371`).
+- **4.1.6**: the client's sheets carry URL-less rows the replica answers (`4f4f62d`).
+- **Owed in 4.1:** `TestTheWorkbookReconcilesWithTheSite` and both stands, then the docs.
+- Schemas unchanged (61,361 bytes, 90 tools); migrations to 0072; bound methods 129 (`StartRequest`
+  gains `fields`); plugin 1.5.1.
 
 **2026-10-23, stage 4.1, first session: the owner's three answers, the matcher, the workbook's
 hierarchy.** The reasoning is under 2026-10-23 in `DECISIONS.md`. The task list, the checkpoint

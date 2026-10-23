@@ -4408,3 +4408,44 @@ rulings and what was decided while building.
   not fill the site plan with pages nobody asked for. This amends the plan-time answer of the same
   day: a URL-less row with no page is planned at the slug of its title, else its H1, never of its
   entity name.
+
+### 4.1, the second session (2026-10-23)
+
+- **A row has a key** (`pagemap.RowKey`): `row:<sheet>:<identity>`, the identity being the row's
+  path, else the `graph.Key` of its title, entity name or H1. The import sets it on every row, so
+  a person's mapping (`pages.row_key`) is found by `mapped`, and it is the subject key of the row's
+  findings. A row named only by its SKU has none, and every CSV shares the sheet name `""`; neither
+  touches the client's workbooks, and both are named in the checkpoint.
+- **A persisted subject carries no physical row number.** The lifecycle compares subjects, so a row
+  moved down the sheet would reopen a finding a person settled. `row_ambiguous` holds
+  `{sheet, rule, candidates, pageIds, product}` and no page; `row_without_page` holds
+  `{sheet, plannedPath, product}` on the planned page or the waiting product row. Both offer
+  `map_to_page` and `ignore`; the first is a warning, the second a note.
+- **Apply persists what the preview shows, inside its unit of work**: the row findings, and
+  `parent_differs` under the observation's subject and options (`pagemap.TrailOptions`, one rule
+  for both sides), cleared by the import when the trail agrees. A product's trail is compared
+  through its `product_cat` terms in the preview too. The open row findings of each sheet the import
+  read and did not raise again close as `row_matched` (the row is still there) or
+  `row_left_sheet`. The observation closes `row_without_page` as `row_matched` once its page has a
+  WordPress id. The preview writes nothing.
+- **`map_to_page` is `imports.MapRow`**: the row key moves onto the chosen page (with the planned
+  trail when the page has none), the finding moves there and settles as `mapped`, and only then is
+  the planned page deleted, when it is still planned and no run item names it. A product row maps
+  only to a product.
+- **`set_type` needs no new column**: the observation leaves a page alone whose type a person (or
+  the agent) set to a non-technical preset, so its technical reason stays empty and
+  `technical_detected` closes; a page typed Technical keeps its detection.
+- **`findings.Resolve` records who chose**: `By` is the person or the agent, and the agent's
+  acceptance of a card is recorded as the agent's (`graph.AcceptCard` takes it). A model change and
+  its settling are one unit of work; a run option settles nothing and answers the request:
+  `rewrite_field` a start on the page with `fields` and `rewrite` (a field the client changed is
+  his until the run rewrites it, which the start dialog confirms), `relink_page` a relink start,
+  `rescan` a full sync that renders every page again. `accept_site` on a title or an H1 makes the
+  plan take the site's value.
+- **A run scoped to fields** (`StartRequest.fields`, publish's `params.fields`): only writable
+  keys, only with an enabled publish step. Publish narrows its plan to them before the review gate
+  with the same narrowing a person's partial acceptance uses, the body only when named, and records
+  nothing as declined. The estimate says, as a note, that the run still drafts each page whole: the
+  owner accepted that for 4.1 only, and 4.2 skips what the scope does not need.
+- **The drawer's `parent_differs` sentence read the subject from before `2f1813f`** (`reason`,
+  `workbookPath`) and said only "a different parent"; it now reads `{sheet, site}`, failing first.
