@@ -112,6 +112,20 @@ func TestAWritersPromptIsSplitIntoItsParts(t *testing.T) {
 	}
 }
 
+func TestTheLinkerCountsEachOwedPhraseOnce(t *testing.T) {
+	t.Parallel()
+
+	for _, row := range measuredPages(t) {
+		if row.Linker == nil || row.Linker.Call == nil {
+			continue
+		}
+		if row.Linker.Phrases <= 0 || row.Linker.Phrases >= row.Linker.Calls {
+			t.Errorf("%s %s owes %d phrases in %d refused calls, want each phrase tried more than once and counted once",
+				row.Stand, row.Path, row.Linker.Phrases, row.Linker.Calls)
+		}
+	}
+}
+
 func hasSection(sections []measure, name string) bool {
 	for _, section := range sections {
 		if section.Name == name {

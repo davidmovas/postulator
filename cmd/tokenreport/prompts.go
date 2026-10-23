@@ -44,10 +44,10 @@ type prompt struct {
 }
 
 type linkerRow struct {
-	Call   *prompt `json:"call,omitempty"`
-	Calls  int     `json:"calls"`
-	Tries  int     `json:"tries"`
-	Priced int     `json:"priced"`
+	Call    *prompt `json:"call,omitempty"`
+	Calls   int     `json:"calls"`
+	Phrases int     `json:"phrases"`
+	Priced  int     `json:"priced"`
 }
 
 type pageRow struct {
@@ -192,7 +192,7 @@ func (h *harness) linker(ctx context.Context, c *counters, sc *run.StepContext) 
 	asked := h.client.take()
 	h.pictures.take()
 	row := &linkerRow{
-		Calls: len(asked), Tries: tries(sc.Params),
+		Calls: len(asked), Phrases: distinct(asked),
 		Priced: def.Price.Calls(run.Target{Page: sc.Page, Spec: sc.Spec, Links: sc.Links}, sc.Params),
 	}
 	if stepErr != nil {
@@ -212,14 +212,15 @@ func (h *harness) linker(ctx context.Context, c *counters, sc *run.StepContext) 
 	return row, nil
 }
 
-func tries(params map[string]any) int {
-	if count, ok := params[steps.ParamIterations].(float64); ok {
-		return int(count)
+func distinct(asked []llm.Request) int {
+	prompts := map[string]bool{}
+	for i := range asked {
+		for _, message := range asked[i].Messages {
+			prompts[asked[i].System+"\x00"+message.Text] = true
+		}
 	}
-	return defaultTries
+	return len(prompts)
 }
-
-const defaultTries = 2
 
 func hold(sc *run.StepContext, artifacts ...run.Artifact) {
 	for i := range artifacts {
@@ -317,7 +318,7 @@ func writePages(out io.Writer, rows []pageRow) error {
 				name += ", no body"
 			}
 			s.prompt(name, "writer", row.Writer, "1")
-			owed := strconv.Itoa(row.Linker.Calls/max(row.Linker.Tries, 1)) + " owed, " + strconv.Itoa(row.Linker.Priced) + " priced"
+			owed := strconv.Itoa(row.Linker.Phrases) + " owed, " + strconv.Itoa(row.Linker.Priced) + " priced"
 			if row.Linker.Call == nil {
 				s.row("", "linker", "", "", "", "", "", "", owed)
 			} else {
