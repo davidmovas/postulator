@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"strings"
 
@@ -16,15 +15,8 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-//go:embed prompts/*.tmpl
-var promptFS embed.FS
-
-var prompts = llm.MustPrompts(promptFS, "prompts/*.tmpl")
-
 const (
-	instructionsPrompt = "chat.instructions"
-	contextPrompt      = "chat.context"
-	cacheFamily        = "chat:"
+	cacheFamily = "chat:"
 
 	ChatStep = domainllm.StepChat
 )
@@ -80,11 +72,11 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 		return agentapp.RunResult{}, errors.New(errors.Invalid, "an agent turn needs a model")
 	}
 
-	instructions, err := prompts.One(instructionsPrompt, spec.Context)
+	instructions, err := agentapp.Instructions(spec.Context)
 	if err != nil {
 		return agentapp.RunResult{}, err
 	}
-	situation, err := prompts.One(contextPrompt, spec.Context)
+	situation, err := agentapp.Situation(spec.Context)
 	if err != nil {
 		return agentapp.RunResult{}, err
 	}

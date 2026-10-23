@@ -1,10 +1,10 @@
-package agent
+package agent_test
 
 import (
 	"strings"
 	"testing"
 
-	agentapp "github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -13,7 +13,7 @@ import (
 func TestTheInstructionsTeachTheModelsVocabulary(t *testing.T) {
 	t.Parallel()
 
-	instructions, err := prompts.One(instructionsPrompt, agentapp.SiteContext{Mode: "confirm"})
+	instructions, err := agent.Instructions(agent.SiteContext{Mode: "confirm"})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
