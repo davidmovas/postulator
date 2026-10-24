@@ -4,6 +4,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -49,8 +50,10 @@ func (p *pipeline) runOver(t *testing.T, record run.Run) []run.Item {
 		t.Fatalf("Enqueue: %v", err)
 	}
 	deadline := time.Now().Add(pollTimeout)
+	var items []run.Item
 	for time.Now().Before(deadline) {
-		items, listErr := p.items.ByRun(t.Context(), queued.ID)
+		var listErr error
+		items, listErr = p.items.ByRun(t.Context(), queued.ID)
 		if listErr == nil && len(items) == len(record.Targets) && !slices.ContainsFunc(items, func(item run.Item) bool {
 			return !item.Status.Terminal()
 		}) {
@@ -69,8 +72,17 @@ func (p *pipeline) runOver(t *testing.T, record run.Run) []run.Item {
 		}
 		time.Sleep(pollInterval)
 	}
-	t.Fatal("timed out waiting for the run to finish")
+	t.Fatalf("timed out waiting for the run to finish; its items stand at %s", itemStates(items))
 	return nil
+}
+
+func itemStates(items []run.Item) string {
+	said := make([]string, 0, len(items))
+	for i := range items {
+		said = append(said, items[i].TargetID+" "+string(items[i].Status)+" at "+items[i].CurrentStep+
+			" after "+strconv.Itoa(items[i].Attempts)+" attempts "+items[i].Error)
+	}
+	return strings.Join(said, "; ")
 }
 
 func (p *pipeline) writesTheTitle(t *testing.T) {
