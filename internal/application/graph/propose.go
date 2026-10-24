@@ -111,7 +111,15 @@ func (s *Service) ProposeFromPages(ctx context.Context, req ProposeFromPagesRequ
 }
 
 func (s *Service) PreviewFromPages(ctx context.Context, req PreviewFromPagesRequest) (PreviewFromPagesResponse, error) {
-	return s.previewFromPages(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+	switch {
+	case !req.Source.valid():
+		return PreviewFromPagesResponse{}, errors.New(errors.Invalid, "a proposal comes from the model or from the site").
+			WithDetail("field", "source")
+	case req.Source == SourceSite:
+		return s.previewFromSite(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+	default:
+		return s.previewFromPages(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+	}
 }
 
 func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageIDs []string, pathPrefix string) (PreviewFromPagesResponse, error) {

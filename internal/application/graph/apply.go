@@ -39,6 +39,15 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 		if _, keywordsErr := application.KeywordList(req.Entities[i].Keywords, field+".keywords"); keywordsErr != nil {
 			return ApplyProposalsResponse{}, keywordsErr
 		}
+		for j, fact := range req.Entities[i].Facts {
+			at := field + ".facts[" + strconv.Itoa(j) + "]"
+			if strings.TrimSpace(fact.Label) == "" {
+				return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a fact needs a label").WithDetail("field", at+".label")
+			}
+			if strings.TrimSpace(fact.Value) == "" {
+				return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a fact needs a value").WithDetail("field", at+".value")
+			}
+		}
 	}
 
 	state, err := s.snapshot(ctx, siteID)

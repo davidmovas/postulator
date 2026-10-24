@@ -90,7 +90,8 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		writing.templates, stores.pages, running.steps, pagesService)
 	graphService := graph.New(graph.Deps{
 		Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
-		Identities: stores.identities, Fields: stores.fields, Work: stores.items, Profiles: llm.profiles, LLM: llm.client, UnitOfWork: stores.store,
+		Maps: writing.siteModel, Identities: stores.identities, Fields: stores.fields, Work: stores.items, Profiles: llm.profiles,
+		LLM: llm.client, UnitOfWork: stores.store,
 		Publisher: c.Events, Clock: stores.now,
 	})
 	importsService := imports.New(imports.Deps{

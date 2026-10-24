@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
@@ -73,7 +74,12 @@ type findingStore interface {
 	Upsert(ctx context.Context, f finding.Finding) error
 	Get(ctx context.Context, id string) (finding.Finding, error)
 	Settle(ctx context.Context, id string, status finding.Status, resolution, resolvedBy string, at time.Time) error
+	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
 	OpenBySite(ctx context.Context, siteID string, code finding.Code) ([]finding.Finding, error)
+}
+
+type siteMap interface {
+	Map(ctx context.Context, siteID string) (contextpack.Map, error)
 }
 
 type Deps struct {
@@ -84,6 +90,7 @@ type Deps struct {
 	Identities identityReader
 	Fields     fieldReader
 	Findings   findingStore
+	Maps       siteMap
 	Work       workReader
 	Profiles   profileResolver
 	LLM        llm.Client
@@ -101,6 +108,7 @@ type Service struct {
 	fields     fieldReader
 	work       workReader
 	findings   findingStore
+	maps       siteMap
 	profiles   profileResolver
 	llm        llm.Client
 	uow        unitOfWork
@@ -111,7 +119,7 @@ type Service struct {
 func New(deps Deps) *Service {
 	return &Service{
 		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, identities: deps.Identities, fields: deps.Fields,
-		work: deps.Work, findings: deps.Findings,
+		work: deps.Work, findings: deps.Findings, maps: deps.Maps,
 		profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
 		clock: deps.Clock,
 	}
