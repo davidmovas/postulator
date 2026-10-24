@@ -356,3 +356,40 @@ func TestTheSetResolvesEveryPageToATypeAndAPolicy(t *testing.T) {
 		t.Errorf("a meta key took a scope it does not have: %+v %t", scope, found)
 	}
 }
+
+func TestAWritablePageOnTheSiteNoEntityCarriesNeedsOne(t *testing.T) {
+	t.Parallel()
+
+	pillar := pagetype.Type{ID: "s1-pillar", SiteID: "s1", Name: "Pillar", Preset: pagetype.Hub, CreatedAt: stamp, UpdatedAt: stamp}
+	set := pagetype.NewSet(append(seeded("s1"), pillar), nil)
+	onSite := func(path string, wpType pagemap.WPType, change func(*pagemap.Page)) pagemap.Page {
+		page := pagemap.Page{ID: "p" + path, SiteID: "s1", Path: path, WPType: wpType, WPID: new(int64(7)), Status: pagemap.StatusPublished}
+		if change != nil {
+			change(&page)
+		}
+		return page
+	}
+	typed := func(id string) func(*pagemap.Page) { return func(p *pagemap.Page) { p.PageTypeID = &id } }
+	cases := map[string]struct {
+		page pagemap.Page
+		want bool
+	}{
+		"an untyped page":     {onSite("/peptides/", pagemap.WPPage, nil), true},
+		"a product":           {onSite("/product/bpc/", pagemap.WPProduct, nil), true},
+		"a client's own type": {onSite("/pillar/", pagemap.WPPage, typed("s1-pillar")), true},
+		"a mapped page":       {onSite("/bpc/", pagemap.WPPage, func(p *pagemap.Page) { p.EntityID = new("e1") }), false},
+		"the root":            {onSite(pagemap.RootPath, pagemap.WPPage, nil), false},
+		"a store category":    {onSite("/product-category/peptides/", pagemap.WPProductCategory, nil), false},
+		"a catalog":           {onSite("/shop/", pagemap.WPPage, typed("s1-catalog")), false},
+		"a technical page":    {onSite("/cart/", pagemap.WPPage, func(p *pagemap.Page) { p.TechnicalReason = pagemap.TechnicalCart }), false},
+		"an archived page":    {onSite("/old/", pagemap.WPPage, func(p *pagemap.Page) { p.Status = pagemap.StatusArchived }), false},
+		"a planned page": {onSite("/planned/", pagemap.WPPage, func(p *pagemap.Page) {
+			p.WPID, p.Status = nil, pagemap.StatusPlanned
+		}), false},
+	}
+	for name, tc := range cases {
+		if got := set.NeedsEntity(tc.page); got != tc.want {
+			t.Errorf("%s needs an entity = %v, want %v", name, got, tc.want)
+		}
+	}
+}

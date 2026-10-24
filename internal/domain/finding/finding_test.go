@@ -34,6 +34,7 @@ func TestANewFindingTakesItsCodesSeverityAndOptions(t *testing.T) {
 		finding.EntityCardProposed: {finding.Info, []finding.Option{finding.Accept, finding.Ignore}},
 		finding.RowAmbiguous:       {finding.Warning, []finding.Option{finding.MapToPage, finding.Ignore}},
 		finding.RowWithoutPage:     {finding.Info, []finding.Option{finding.MapToPage, finding.Ignore}},
+		finding.PageWithoutEntity:  {finding.Warning, []finding.Option{finding.ProposeEntity, finding.Ignore}},
 	}
 	at := time.Date(2026, time.October, 17, 12, 0, 0, 0, time.UTC)
 	page := "page-1"
@@ -69,6 +70,7 @@ func TestAnOptionIsAModelChangeOrARun(t *testing.T) {
 		finding.RewriteField:   finding.Run,
 		finding.RelinkPage:     finding.Run,
 		finding.Rescan:         finding.Run,
+		finding.ProposeEntity:  finding.Proposal,
 	}
 	for option, want := range cases {
 		if got := option.Kind(); got != want {
@@ -83,16 +85,17 @@ func TestAnOptionIsAModelChangeOrARun(t *testing.T) {
 	}
 }
 
-func TestOnlyAModelChangeWithoutAChoicePerFindingIsTakenInBulk(t *testing.T) {
+func TestOnlyAModelChangeOrAProposalWithoutAChoicePerFindingIsTakenInBulk(t *testing.T) {
 	t.Parallel()
 
+	bulk := []finding.Option{finding.Ignore, finding.AcceptSite, finding.AcceptWorkbook, finding.SetType, finding.ProposeEntity}
 	for _, option := range finding.Options() {
-		want := slices.Contains([]finding.Option{finding.Ignore, finding.AcceptSite, finding.AcceptWorkbook, finding.SetType}, option)
+		want := slices.Contains(bulk, option)
 		if option.Bulk() != want {
 			t.Errorf("%s in bulk = %v, want %v", option, option.Bulk(), want)
 		}
-		if option.Bulk() && option.Kind() != finding.ModelChange {
-			t.Errorf("%s is taken in bulk but is a %s", option, option.Kind())
+		if option.Bulk() && option.Kind() == finding.Run {
+			t.Errorf("%s is taken in bulk but is a run", option)
 		}
 	}
 }

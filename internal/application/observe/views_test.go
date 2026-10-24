@@ -1,6 +1,8 @@
 package observe_test
 
 import (
+	"fmt"
+	"maps"
 	"slices"
 	"testing"
 	"time"
@@ -62,8 +64,13 @@ func TestThePageModelViewShowsAPageAsTheModel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Model of bpc-157: %v", err)
 	}
-	if len(hub.Findings) != 1 || hub.Findings[0].Code != string(finding.ParentUnresolved) || hub.Findings[0].Subject["path"] != "/healing-peptides/" {
-		t.Errorf("bpc-157's findings = %+v, want the unresolved crumb with its path", hub.Findings)
+	subjects := make(map[string]string, len(hub.Findings))
+	for _, held := range hub.Findings {
+		subjects[held.Code] = fmt.Sprint(held.Subject["path"])
+	}
+	expected := map[string]string{string(finding.ParentUnresolved): "/healing-peptides/", string(finding.PageWithoutEntity): "/bpc-157/"}
+	if !maps.Equal(subjects, expected) {
+		t.Errorf("bpc-157's findings = %+v, want the unresolved crumb and the missing entity, each with its path", hub.Findings)
 	}
 
 	if _, err := s.service.Model(t.Context(), observe.ModelRequest{PageID: " "}); !errors.IsCode(err, errors.Invalid) {

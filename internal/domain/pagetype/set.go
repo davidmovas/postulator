@@ -54,6 +54,11 @@ func (s Set) TypeOf(page pagemap.Page) Type {
 	return kind
 }
 
+func (s Set) NeedsEntity(page pagemap.Page) bool {
+	return page.EntityID == nil && page.WPID != nil && page.Status != pagemap.StatusArchived && page.Path != pagemap.RootPath &&
+		!page.WPType.Term() && page.TechnicalReason == pagemap.TechnicalNone && s.TypeOf(page).Preset.Writable()
+}
+
 func (s Set) Scope(typeID string, key field.Key) (field.Scope, bool) {
 	if key.Kind() != field.Meta && key.Instance() != "" {
 		key = key.Kind()

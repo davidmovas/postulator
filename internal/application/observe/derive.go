@@ -18,6 +18,7 @@ type timeStamp = time.Time
 var deriveCodes = []finding.Code{
 	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentAmbiguous, finding.ParentCycle,
 	finding.ParentNameTwin, finding.ParentDiffers, finding.URLFormMixed, finding.RenderUnreachable, finding.RenderRedirected,
+	finding.PageWithoutEntity,
 }
 
 func (s *Service) derive(ctx context.Context, state *State, readers Readers) error {
@@ -108,6 +109,9 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 
 	typed := untyped(m, changed, set)
 	state.Counts.Typed += len(typed)
+	if err := s.entityless(ctx, tracked, m, changed, typed, set); err != nil {
+		return err
+	}
 
 	err = s.inUnit(ctx, func(c context.Context) error {
 		for id := range changed {
@@ -256,6 +260,33 @@ func untyped(m siteModel, changed map[string]pagemap.Page, set pagetype.Set) []t
 		}
 	}
 	return out
+}
+
+func (s *Service) entityless(ctx context.Context, tracked *findings, m siteModel, changed map[string]pagemap.Page, typed []typing, set pagetype.Set) error {
+	assigned := make(map[string]string, len(typed))
+	for _, t := range typed {
+		assigned[t.pageID] = t.typeID
+	}
+	for i := range m.pages {
+		page := m.pages[i]
+		if moved, held := changed[page.ID]; held {
+			page = moved
+		}
+		if typeID, held := assigned[page.ID]; held {
+			page.PageTypeID = &typeID
+		}
+		subject := finding.SubjectPage(page.ID)
+		if !set.NeedsEntity(page) {
+			if err := tracked.clear(ctx, finding.PageWithoutEntity, subject); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := tracked.raise(ctx, finding.PageWithoutEntity, &page.ID, subject, map[string]string{"path": page.Path}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func derivedMoved(before, after pagemap.Page) bool {

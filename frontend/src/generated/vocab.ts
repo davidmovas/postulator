@@ -87,6 +87,7 @@ export const findingCodes = [
     "entity_card_proposed",
     "row_ambiguous",
     "row_without_page",
+    "page_without_entity",
 ] as const;
 export type FindingCode = (typeof findingCodes)[number];
 
@@ -106,6 +107,7 @@ export const findingOptions = [
     "rewrite_field",
     "relink_page",
     "rescan",
+    "propose_entity",
 ] as const;
 export type FindingOption = (typeof findingOptions)[number];
 
@@ -114,9 +116,10 @@ export const findingBulkOptions: readonly FindingOption[] = [
     "accept_site",
     "accept_workbook",
     "set_type",
+    "propose_entity",
 ];
 
-export const findingOptionKinds = ["model", "run"] as const;
+export const findingOptionKinds = ["model", "run", "proposal"] as const;
 export type FindingOptionKind = (typeof findingOptionKinds)[number];
 
 export const matchRules = ["mapped", "url", "slug", "entity", "title", "h1", "sku"] as const;

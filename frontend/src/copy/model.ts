@@ -222,6 +222,7 @@ export const model = {
         entity_card_proposed: "Card proposed",
         row_ambiguous: "Workbook row matches several pages",
         row_without_page: "Workbook row without a page",
+        page_without_entity: "Page without an entity",
     },
     severities: {
         info: "Note",

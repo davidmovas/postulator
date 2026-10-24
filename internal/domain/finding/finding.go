@@ -30,6 +30,7 @@ const (
 	EntityCardProposed Code = "entity_card_proposed"
 	RowAmbiguous       Code = "row_ambiguous"
 	RowWithoutPage     Code = "row_without_page"
+	PageWithoutEntity  Code = "page_without_entity"
 )
 
 type Severity string
@@ -69,6 +70,7 @@ const (
 	RewriteField   Option = "rewrite_field"
 	RelinkPage     Option = "relink_page"
 	Rescan         Option = "rescan"
+	ProposeEntity  Option = "propose_entity"
 )
 
 type OptionKind string
@@ -76,10 +78,11 @@ type OptionKind string
 const (
 	ModelChange OptionKind = "model"
 	Run         OptionKind = "run"
+	Proposal    OptionKind = "proposal"
 )
 
 func BulkOptions() []Option {
-	return []Option{Ignore, AcceptSite, AcceptWorkbook, SetType}
+	return []Option{Ignore, AcceptSite, AcceptWorkbook, SetType, ProposeEntity}
 }
 
 func (o Option) Bulk() bool {
@@ -92,6 +95,8 @@ func (o Option) Kind() OptionKind {
 		return ModelChange
 	case RewriteField, RelinkPage, Rescan:
 		return Run
+	case ProposeEntity:
+		return Proposal
 	default:
 		return ""
 	}
@@ -136,6 +141,7 @@ var rules = map[Code]rule{
 	EntityCardProposed: {Info, []Option{Accept, Ignore}},
 	RowAmbiguous:       {Warning, []Option{MapToPage, Ignore}},
 	RowWithoutPage:     {Info, []Option{MapToPage, Ignore}},
+	PageWithoutEntity:  {Warning, []Option{ProposeEntity, Ignore}},
 }
 
 func (c Code) Valid() bool {
@@ -149,7 +155,7 @@ func Codes() []Code {
 
 func Options() []Option {
 	return slices.Sorted(slices.Values([]Option{
-		Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType, RewriteField, RelinkPage, Rescan,
+		Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType, RewriteField, RelinkPage, Rescan, ProposeEntity,
 	}))
 }
 

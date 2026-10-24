@@ -49,6 +49,7 @@ export const findings = {
         rewrite_field: "the field was written again",
         relink_page: "the page was relinked",
         rescan: "the page was fetched again",
+        propose_entity: "an entity now carries the page",
         observed_clear: "the site no longer shows it",
         row_matched: "the row found its page",
         row_left_sheet: "the row left the workbook",
@@ -93,6 +94,7 @@ export const findings = {
         rewrite_field: "Rewrite it",
         relink_page: "Relink the page",
         rescan: "Fetch again",
+        propose_entity: "Propose an entity",
     },
     optionDoes: {
         ignore: "Dismisses the finding, so the model keeps what it holds; nothing is written to the site.",
@@ -104,6 +106,8 @@ export const findings = {
         rewrite_field: "Opens a run start that writes the field again over the client's value.",
         relink_page: "Opens a run start that places the page's owed links again.",
         rescan: "Opens a sync that walks every page and fetches each render again.",
+        propose_entity:
+            "Opens entity proposals named from the site, which the model takes only once you accept them; nothing is written to the site.",
     },
     subjects: {
         unresolved: (name: string, path: string) => {
@@ -174,6 +178,10 @@ export const findings = {
             name === ""
                 ? "The agent proposed a card for an entity; accept or dismiss it on the Graph screen."
                 : `The agent proposed a card for ${name}; accept or dismiss it on the Graph screen.`,
+        withoutEntity: (path: string) =>
+            path === ""
+                ? "No entity carries this page, so no run can write it."
+                : `No entity carries ${path}, so no run can write it.`,
         generic: "The observation flagged something here.",
     },
 };

@@ -118,7 +118,7 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 			"bad_path", "unknown_parent", "unknown_related", "self_edge", "cycle", "ambiguous_parent", "ambiguous_entity",
 			"scope_clash",
 		},
-		"findingBulkOptions":         {"ignore", "accept_site", "accept_workbook", "set_type"},
+		"findingBulkOptions":         {"ignore", "accept_site", "accept_workbook", "set_type", "propose_entity"},
 		"offGraphLinkClasses":        {"self", "external", "unknown_internal"},
 		"runKindsWithTheirOwnRecipe": {"relink", "sync", "revert", "edit"},
 		"startableRunKinds":          {"generate", "relink", "audit", "sync", "import", "custom"},

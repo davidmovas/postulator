@@ -64,6 +64,8 @@ export function findingSentence(code: string, subject: Subject): string {
             return said.urlForms(count(subject, "absolute"), count(subject, "relative"));
         case "entity_card_proposed":
             return said.cardProposed(subjectText(subject, "name"));
+        case "page_without_entity":
+            return said.withoutEntity(subjectText(subject, "path"));
         default:
             return said.generic;
     }
