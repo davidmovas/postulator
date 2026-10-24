@@ -108,7 +108,9 @@ const (
 	ResolvedByImport        = "import"
 	ResolvedByPerson        = "person"
 	ResolvedByAgent         = "agent"
+	ResolvedByModel         = "model"
 	ResolutionObservedClear = "observed_clear"
+	ResolutionPageMapped    = "page_mapped"
 	ResolutionRowMatched    = "row_matched"
 	ResolutionRowLeftSheet  = "row_left_sheet"
 )

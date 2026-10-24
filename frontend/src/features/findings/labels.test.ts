@@ -33,13 +33,14 @@ describe("who settled a finding and how", () => {
         ["agent", "the agent"],
         ["observation", "the observation"],
         ["import", "an import"],
+        ["model", "the model"],
         ["", copy.findings.someone],
     ])("names %s", (by, said) => {
         expect(resolvedByLabel(by)).toBe(said);
     });
 
     it("words every option and every settlement the site records on its own", () => {
-        for (const resolution of [...findingOptions, "observed_clear", "row_matched", "row_left_sheet"]) {
+        for (const resolution of [...findingOptions, "observed_clear", "row_matched", "row_left_sheet", "page_mapped"]) {
             expect(resolutionLabel(resolution)).not.toBe(copy.findings.unknownResolution);
             expect(resolutionLabel(resolution)).not.toContain("_");
         }

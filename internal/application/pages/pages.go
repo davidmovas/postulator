@@ -434,7 +434,7 @@ func (s *Service) MapToEntity(ctx context.Context, req MapToEntityRequest) (MapT
 			return updateErr
 		}
 		updated = page
-		return nil
+		return s.carried(c, page)
 	})
 	if err != nil {
 		return MapToEntityResponse{}, err
@@ -521,6 +521,9 @@ func (s *Service) SetCanonical(ctx context.Context, req SetCanonicalRequest) (Se
 			page.UpdatedAt = now
 			if updateErr := s.pages.Update(c, page); updateErr != nil {
 				return updateErr
+			}
+			if clearErr := s.carried(c, page); clearErr != nil {
+				return clearErr
 			}
 		case *page.EntityID != entity.ID:
 			return errors.New(errors.Invalid, "page is mapped to another entity").WithDetail("pageId", page.ID).WithDetail("entityId", *page.EntityID)

@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/note"
@@ -51,7 +52,7 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 		service: pages.New(pages.Deps{
 			Pages: sqlite.NewPageRepo(store), Types: sqlite.NewPageTypeRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
 			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
-			UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
+			Findings: sqlite.NewFindingRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
 		}),
 		store:    store,
 		recorder: recorder,
@@ -431,6 +432,49 @@ func TestAssignTemplateMovesTheNamedPagesOnly(t *testing.T) {
 		t.Fatalf("AssignTemplate again = %+v, %v, want nothing to change", again, err)
 	}
 	h.wantEvents(t)
+}
+
+func TestMappingAPageClearsItsMissingEntityFinding(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	shoes := h.entity(t, "Shoes")
+	boots := h.entity(t, "Boots")
+	first := h.page(t, "/shoes/", nil)
+	second := h.page(t, "/boots/", nil)
+	repo := sqlite.NewFindingRepo(h.store)
+	for _, page := range []string{first.ID, second.ID} {
+		raised, err := finding.New(finding.Finding{
+			ID: id.New(), SiteID: h.siteID, PageID: &page, Code: finding.PageWithoutEntity, SubjectKey: finding.SubjectPage(page),
+			CreatedAt: h.clock.Now(), UpdatedAt: h.clock.Now(),
+		})
+		if err != nil {
+			t.Fatalf("build the finding: %v", err)
+		}
+		if err = repo.Upsert(t.Context(), raised); err != nil {
+			t.Fatalf("raise the finding: %v", err)
+		}
+	}
+
+	if _, err := h.service.MapToEntity(t.Context(), pages.MapToEntityRequest{PageID: first.ID, EntityID: shoes.ID}); err != nil {
+		t.Fatalf("MapToEntity: %v", err)
+	}
+	if _, err := h.service.SetCanonical(t.Context(), pages.SetCanonicalRequest{EntityID: boots.ID, PageID: second.ID}); err != nil {
+		t.Fatalf("SetCanonical: %v", err)
+	}
+	open, err := repo.OpenBySite(t.Context(), h.siteID, finding.PageWithoutEntity)
+	if err != nil || len(open) != 0 {
+		t.Fatalf("open findings after mapping both pages = %d %v, want none", len(open), err)
+	}
+	all, err := repo.ListBySite(t.Context(), h.siteID, finding.Resolved)
+	if err != nil || len(all) != 2 {
+		t.Fatalf("resolved findings = %d %v, want both", len(all), err)
+	}
+	for i := range all {
+		if all[i].ResolvedBy != finding.ResolvedByModel || all[i].Resolution != finding.ResolutionPageMapped {
+			t.Errorf("a mapped page's finding = %s by %s, want page_mapped by the model, so an unmap opens it again", all[i].Resolution, all[i].ResolvedBy)
+		}
+	}
 }
 
 func TestMapUnmapAndCanonical(t *testing.T) {

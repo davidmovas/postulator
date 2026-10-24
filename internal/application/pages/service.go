@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -55,6 +56,10 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type findingClearer interface {
+	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
+}
+
 type Deps struct {
 	Pages      pageStore
 	Types      typeReader
@@ -63,6 +68,7 @@ type Deps struct {
 	Edges      edgeReader
 	Sites      siteReader
 	Bodies     bodyReader
+	Findings   findingClearer
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock
@@ -77,6 +83,7 @@ type Service struct {
 	edges     edgeReader
 	sites     siteReader
 	bodies    bodyReader
+	findings  findingClearer
 	uow       unitOfWork
 	publisher application.Publisher
 	clock     clock.Clock
@@ -86,8 +93,16 @@ type Service struct {
 func New(deps Deps) *Service {
 	return &Service{
 		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
-		bodies: deps.Bodies, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
+		bodies: deps.Bodies, findings: deps.Findings, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
 	}
+}
+
+func (s *Service) carried(ctx context.Context, page pagemap.Page) error {
+	if s.findings == nil {
+		return nil
+	}
+	return s.findings.Clear(ctx, page.SiteID, finding.PageWithoutEntity, finding.SubjectPage(page.ID),
+		finding.ResolvedByModel, finding.ResolutionPageMapped, s.now())
 }
 
 func (s *Service) drifted(ctx context.Context, siteID string) (map[string]bool, error) {

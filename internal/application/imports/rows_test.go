@@ -125,6 +125,34 @@ func TestARowWithoutAURLUpdatesThePageItNames(t *testing.T) {
 	}
 }
 
+func TestARowThatGivesAPageAnEntityClearsItsMissingEntityFinding(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	about := h.sitePage(t, "/about/", "About us", 11, nil)
+	repo := sqlite.NewFindingRepo(h.store)
+	raised, err := finding.New(finding.Finding{
+		ID: id.New(), SiteID: h.siteID, PageID: &about.ID, Code: finding.PageWithoutEntity, SubjectKey: finding.SubjectPage(about.ID),
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("build the finding: %v", err)
+	}
+	if err = repo.Upsert(t.Context(), raised); err != nil {
+		t.Fatalf("raise the finding: %v", err)
+	}
+
+	path := h.file(t, "rows.csv", "title,keywords\nAbout us,about us\n")
+	h.apply(t, path, h.mapping(map[string]string{string(importmap.FieldTitle): "title", string(importmap.FieldKeywords): "keywords"}))
+	if stored, _ := h.pageAt(t, "/about/"); stored.EntityID == nil {
+		t.Fatalf("the row's page carries no entity after the apply")
+	}
+	settled, err := repo.Get(t.Context(), raised.ID)
+	if err != nil || settled.Status != finding.Resolved || settled.ResolvedBy != finding.ResolvedByModel || settled.Resolution != finding.ResolutionPageMapped {
+		t.Errorf("the finding after the import = %s by %s (%s) %v, want page_mapped by the model", settled.Status, settled.ResolvedBy, settled.Resolution, err)
+	}
+}
+
 func TestARowWithoutAURLOrAPageIsPlannedUnderTheLevelItNames(t *testing.T) {
 	t.Parallel()
 

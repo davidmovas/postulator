@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -97,6 +98,12 @@ func (s *Service) writePage(ctx context.Context, planned *plannedPage, now time.
 	}
 	if err := s.deps.Pages.Update(ctx, planned.page); err != nil {
 		return err
+	}
+	if planned.page.EntityID != nil {
+		if err := s.deps.Findings.Clear(ctx, planned.page.SiteID, finding.PageWithoutEntity, finding.SubjectPage(planned.page.ID),
+			finding.ResolvedByModel, finding.ResolutionPageMapped, now); err != nil {
+			return err
+		}
 	}
 	if !planned.retyped {
 		return nil

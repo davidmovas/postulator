@@ -37,6 +37,7 @@ export const findings = {
         agent: "the agent",
         observation: "the observation",
         import: "an import",
+        model: "the model",
     } as Readonly<Record<string, string>>,
     someone: "someone",
     resolutions: {
@@ -49,7 +50,8 @@ export const findings = {
         rewrite_field: "the field was written again",
         relink_page: "the page was relinked",
         rescan: "the page was fetched again",
-        propose_entity: "an entity now carries the page",
+        propose_entity: "an entity was proposed for the page",
+        page_mapped: "an entity now carries the page",
         observed_clear: "the site no longer shows it",
         row_matched: "the row found its page",
         row_left_sheet: "the row left the workbook",

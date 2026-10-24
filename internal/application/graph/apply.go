@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -25,6 +26,10 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	}
 	if _, err := s.sites.Get(ctx, siteID); err != nil {
 		return ApplyProposalsResponse{}, err
+	}
+	if !req.Source.valid() {
+		return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a proposal comes from the model or from the site").
+			WithDetail("field", "source")
 	}
 	if len(req.Entities) == 0 {
 		return ApplyProposalsResponse{}, errors.New(errors.Invalid, "there is no proposal to write").
@@ -58,6 +63,12 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	response := ApplyProposalsResponse{Entities: []Entity{}, Edges: []Edge{}}
 	now := s.now()
 	err = s.uow.Do(ctx, func(c context.Context) error {
+		if req.Source == SourceSite {
+			if siteErr := s.applyFromSite(c, siteID, req.Entities, &state, &response, now); siteErr != nil {
+				return siteErr
+			}
+			return s.settleScopes(c, siteID)
+		}
 		for i := range req.Entities {
 			if adoptErr := s.adopt(c, siteID, &req.Entities[i], &state, &response, now); adoptErr != nil {
 				return adoptErr
@@ -159,7 +170,15 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 			return canonicalErr
 		}
 	}
-	return nil
+	return s.carried(ctx, siteID, page.ID, now)
+}
+
+func (s *Service) carried(ctx context.Context, siteID, pageID string, now time.Time) error {
+	if s.findings == nil {
+		return nil
+	}
+	return s.findings.Clear(ctx, siteID, finding.PageWithoutEntity, finding.SubjectPage(pageID),
+		finding.ResolvedByModel, finding.ResolutionPageMapped, now)
 }
 
 func (s *Service) mappable(state *siteGraph, page pagemap.Page, entityID string) bool {
