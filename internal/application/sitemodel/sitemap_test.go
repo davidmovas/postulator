@@ -151,6 +151,30 @@ func TestTheSiteMapSearchesWithEachMatchsTrail(t *testing.T) {
 	}
 }
 
+func TestAMapNodeCarriesWhatTheRunStartPicksBy(t *testing.T) {
+	t.Parallel()
+
+	m := wide()
+	for i := range m.Pages {
+		switch m.Pages[i].ID {
+		case "page-07-00":
+			m.Pages[i].EntityID = new("e-07-00")
+		case "page-07-01":
+			m.Pages[i].Status, m.Pages[i].WPID = pagemap.StatusPlanned, nil
+		}
+	}
+	nodes := siteMap(t, m, sitemodel.MapRequest{ParentID: "hub-07", Limit: 2}).Nodes.Items
+	if len(nodes) != 2 {
+		t.Fatalf("the hub's first two children = %v", nodePaths(nodes))
+	}
+	if mapped := nodes[0]; mapped.EntityID != "e-07-00" || mapped.Status != pagemap.StatusPublished || !mapped.Page.OnSite {
+		t.Errorf("a mapped page on the site = %+v", mapped)
+	}
+	if planned := nodes[1]; planned.EntityID != "" || planned.Status != pagemap.StatusPlanned || planned.Page.OnSite {
+		t.Errorf("a planned page = %+v", planned)
+	}
+}
+
 func TestTheMapPlacesPagesAndScopesTheirSubtrees(t *testing.T) {
 	t.Parallel()
 

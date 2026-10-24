@@ -13,6 +13,7 @@ import (
 type RunsUseCase interface {
 	Start(ctx context.Context, req runs.StartRequest) (runs.StartResponse, error)
 	Estimate(ctx context.Context, req runs.StartRequest) (runs.EstimateResponse, error)
+	Parents(ctx context.Context, req runs.ParentsRequest) (runs.ParentsResponse, error)
 	Get(ctx context.Context, req runs.GetRequest) (runs.GetResponse, error)
 	List(ctx context.Context, req runs.ListRequest) (paging.List[runs.Run], error)
 	ListItems(ctx context.Context, req runs.ListItemsRequest) (paging.List[runs.Item], error)
@@ -30,6 +31,7 @@ type RunsUseCase interface {
 type RunsService struct {
 	start         middleware.Handler[runs.StartRequest, runs.StartResponse]
 	estimate      middleware.Handler[runs.StartRequest, runs.EstimateResponse]
+	parents       middleware.Handler[runs.ParentsRequest, runs.ParentsResponse]
 	get           middleware.Handler[runs.GetRequest, runs.GetResponse]
 	list          middleware.Handler[runs.ListRequest, paging.List[runs.Run]]
 	listItems     middleware.Handler[runs.ListItemsRequest, paging.List[runs.Item]]
@@ -48,6 +50,7 @@ func NewRunsService(logger *zap.Logger, useCase Source[RunsUseCase]) *RunsServic
 	return &RunsService{
 		start:         Wrap(logger, "runs.start", call(useCase, RunsUseCase.Start)),
 		estimate:      Wrap(logger, "runs.estimate", call(useCase, RunsUseCase.Estimate)),
+		parents:       Wrap(logger, "runs.parents", call(useCase, RunsUseCase.Parents)),
 		get:           Wrap(logger, "runs.get", call(useCase, RunsUseCase.Get)),
 		list:          Wrap(logger, "runs.list", call(useCase, RunsUseCase.List)),
 		listItems:     Wrap(logger, "runs.listItems", call(useCase, RunsUseCase.ListItems)),
@@ -69,6 +72,10 @@ func (s *RunsService) Start(c context.Context, req runs.StartRequest) (runs.Star
 
 func (s *RunsService) Estimate(c context.Context, req runs.StartRequest) (runs.EstimateResponse, error) {
 	return s.estimate(c, req)
+}
+
+func (s *RunsService) Parents(c context.Context, req runs.ParentsRequest) (runs.ParentsResponse, error) {
+	return s.parents(c, req)
 }
 
 func (s *RunsService) Get(c context.Context, req runs.GetRequest) (runs.GetResponse, error) {

@@ -111,6 +111,15 @@ func TestAMapNodeSaysWhatThePageIs(t *testing.T) {
 	if _, found := m.Node("gone"); found {
 		t.Error("an archived page has no node")
 	}
+	if bpc.EntityID != "e-bpc" || bpc.Status != pagemap.StatusPublished {
+		t.Errorf("BPC-157 carries entity %q and status %q, want what the run start's picker reads", bpc.EntityID, bpc.Status)
+	}
+	if planned.Status != pagemap.StatusPlanned {
+		t.Errorf("the planned page carries status %q", planned.Status)
+	}
+	if hub, _ := m.Node("guides"); hub.EntityID != "" {
+		t.Errorf("an unmapped page carries entity %q", hub.EntityID)
+	}
 }
 
 func TestTheMapFindsPagesByTextTypeAndSubtree(t *testing.T) {

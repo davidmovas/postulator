@@ -239,7 +239,10 @@ func (r mapRead) node(row contextpack.MapRow) contextpack.MapNode {
 	node := contextpack.MapNode{
 		Page: r.ref(row.PageID), ParentReason: page.ParentReason, ParentMethod: page.ParentMethod, Technical: page.TechnicalReason,
 		ReadOnly: page.ReadOnlyReason, Body: contextpack.BodyEmpty, LinksIn: r.inbound[row.PageID], LinksOut: r.outbound[row.PageID],
-		Findings: r.findings[row.PageID], Children: row.Children, Descendants: row.Descendants,
+		Findings: r.findings[row.PageID], Children: row.Children, Descendants: row.Descendants, Status: page.Status,
+	}
+	if page.EntityID != nil {
+		node.EntityID = *page.EntityID
 	}
 	if row.TwinID != "" {
 		twin := r.ref(row.TwinID)

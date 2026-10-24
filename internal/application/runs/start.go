@@ -227,6 +227,32 @@ func (s *Service) resolve(ctx context.Context, siteID, pageID, templateID string
 	return resolved, nil
 }
 
+func (s *Service) Parents(ctx context.Context, req ParentsRequest) (ParentsResponse, error) {
+	siteID := strings.TrimSpace(req.SiteID)
+	if siteID == "" {
+		return ParentsResponse{}, invalid("name the site of the selection", "siteId")
+	}
+	targets, err := uniqueTargets(req.PageIDs)
+	if err != nil {
+		return ParentsResponse{}, err
+	}
+	for _, pageID := range targets {
+		page, getErr := s.pages.Get(ctx, pageID)
+		if getErr != nil {
+			return ParentsResponse{}, getErr
+		}
+		if page.SiteID != siteID {
+			return ParentsResponse{}, invalid("a selected page belongs to another site", "pageIds").
+				WithDetail("pageId", pageID).WithDetail("siteId", page.SiteID)
+		}
+	}
+	added, err := s.ancestors(ctx, siteID, targets)
+	if err != nil {
+		return ParentsResponse{}, err
+	}
+	return ParentsResponse{Added: added}, nil
+}
+
 func (s *Service) ancestors(ctx context.Context, siteID string, targets []string) ([]AddedPage, error) {
 	chosen := make(map[string]struct{}, len(targets))
 	for _, pageID := range targets {

@@ -27,6 +27,8 @@ func BodyStates() []BodyState {
 
 type MapNode struct {
 	Page         Ref                     `json:"page"`
+	EntityID     string                  `json:"entityId,omitempty"`
+	Status       pagemap.Status          `json:"status"`
 	Twin         *Ref                    `json:"twin,omitempty"`
 	ParentReason pagemap.ParentReason    `json:"parentReason"`
 	ParentMethod pagemap.ParentMethod    `json:"parentMethod"`
@@ -256,7 +258,10 @@ func (m Map) node(pageID string) MapNode {
 		Page: m.snapshot.ref(page, false), ParentReason: page.ParentReason, ParentMethod: page.ParentMethod,
 		Technical: page.TechnicalReason, ReadOnly: page.ReadOnlyReason, Body: BodyEmpty,
 		LinksIn: linked.Inbound, LinksOut: linked.Outbound, Findings: m.open[pageID],
-		Children: len(m.children[pageID]), Descendants: m.descendants(pageID),
+		Children: len(m.children[pageID]), Descendants: m.descendants(pageID), Status: page.Status,
+	}
+	if page.EntityID != nil {
+		node.EntityID = *page.EntityID
 	}
 	if termID, paired := m.twin[pageID]; paired {
 		term, _ := m.snapshot.Index.ByID(termID)

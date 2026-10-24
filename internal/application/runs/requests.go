@@ -29,6 +29,15 @@ type EstimateResponse struct {
 	Added    []AddedPage  `json:"added"`
 }
 
+type ParentsRequest struct {
+	SiteID  string   `json:"siteId"`
+	PageIDs []string `json:"pageIds"`
+}
+
+type ParentsResponse struct {
+	Added []AddedPage `json:"added"`
+}
+
 type AddedPage struct {
 	PageID   string `json:"pageId"`
 	Path     string `json:"path"`

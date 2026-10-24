@@ -30,7 +30,7 @@ func (f *fixture) chain(links ...chain) {
 	}}
 	f.mapping.known = make(map[string]pagemap.Page, len(links))
 	for _, link := range links {
-		page := pagemap.Page{ID: link.id, Path: link.path, WPType: link.wpType, WPID: link.wpID}
+		page := pagemap.Page{ID: link.id, SiteID: f.siteID, Path: link.path, WPType: link.wpType, WPID: link.wpID}
 		if link.parent != "" {
 			parent := link.parent
 			page.ParentPageID = &parent
@@ -77,6 +77,35 @@ func TestStartAddsTheAncestorsThatAreNotOnTheSite(t *testing.T) {
 	estimated, err := fixture.service.Estimate(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"max"}})
 	if err != nil || !slices.Equal(estimated.Added, want) {
 		t.Fatalf("Estimate = %+v, %v; want the same parents named before the run starts", estimated.Added, err)
+	}
+}
+
+func TestTheParentsASelectionWritesFirstAreAnsweredBeforeTheStart(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "bikes", path: "/bikes/", mapped: true},
+		chain{id: "cargo", path: "/bikes/cargo/", parent: "bikes", mapped: true},
+		chain{id: "max", path: "/bikes/cargo/max/", parent: "cargo", mapped: true},
+		chain{id: "road", path: "/road/", wpID: onSite(), mapped: true},
+	)
+
+	got, err := fixture.service.Parents(t.Context(), runs.ParentsRequest{SiteID: fixture.siteID, PageIDs: []string{"max", "cargo", "road"}})
+	if err != nil {
+		t.Fatalf("Parents: %v", err)
+	}
+	want := []runs.AddedPage{{PageID: "bikes", Path: "/bikes/", NeededBy: "/bikes/cargo/max/"}}
+	if !slices.Equal(got.Added, want) {
+		t.Errorf("Added = %+v, want the one parent the selection lacks", got.Added)
+	}
+	if fixture.engine.queued.ID != "" {
+		t.Errorf("answering the parents queued the run %+v", fixture.engine.queued)
+	}
+	for _, req := range []runs.ParentsRequest{{PageIDs: []string{"max"}}, {SiteID: fixture.siteID}, {SiteID: "another-site", PageIDs: []string{"max"}}} {
+		if _, err = fixture.service.Parents(t.Context(), req); !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("Parents(%+v) = %v, want Invalid", req, err)
+		}
 	}
 }
 

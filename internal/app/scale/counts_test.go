@@ -100,6 +100,19 @@ func operations() []operation {
 			req.Cursor = first.Nodes.Next
 			return req
 		}),
+		siteMap("the picker's level", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			return sitemodel.MapRequest{ParentID: s.id(t, "/c010/s0/")}
+		}),
+		{name: "picker: the parents written first", rows: true, call: func(t *testing.T, s *scaled) func() error {
+			selected := []string{
+				s.id(t, "/c010/s0/t0/new-0/"), s.id(t, "/c010/s0/t0/p0/"), s.id(t, "/c011/s1/t1/p1/"), s.id(t, "/c012/s0/"),
+				s.id(t, "/product/item-013-1-4/"),
+			}
+			return func() error {
+				_, err := s.core.Runs.Parents(t.Context(), runs.ParentsRequest{SiteID: s.siteID, PageIDs: selected})
+				return err
+			}
+		}},
 		findingsList("by code", func(*testing.T, *scaled) findings.ListRequest {
 			return findings.ListRequest{Code: string(finding.PageWithoutEntity), Limit: listLimit}
 		}),
