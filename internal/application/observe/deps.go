@@ -83,6 +83,10 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type mapRefresher interface {
+	Refresh(ctx context.Context, siteID string) error
+}
+
 type Deps struct {
 	Sites      siteStore
 	Pages      pageStore
@@ -93,6 +97,7 @@ type Deps struct {
 	Links      linkStore
 	Findings   findingStore
 	Types      typeSet
+	Maps       mapRefresher
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

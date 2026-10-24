@@ -52,6 +52,8 @@ type spec struct {
 	written  bool
 	drifted  bool
 	edited   bool
+	touchedA bool
+	touchedB bool
 }
 
 func (s *spec) key() string {
@@ -171,6 +173,7 @@ func (b *blueprint) block(at int, home crumb) {
 					parent: topicPath, crumbs: []crumb{home, {name: name, path: hubPath}, {name: subName, path: subPath}, {name: topicName, path: topicPath}},
 					links:   []string{fmt.Sprintf("%sp%d/", topicPath, (k+1)%3), fmt.Sprintf("/product/item-%03d-%d-%d/", at, i, k)},
 					written: i == 0 && j == 1, drifted: i == 1 && j == 1 && k == 0, edited: i == 0 && j == 0 && k == 0,
+					touchedA: i == 1 && j == 0 && k == 0, touchedB: i == 1 && k == 1,
 				}
 				if k < 2 {
 					article.entity, article.scope = articleName, topicName
@@ -190,6 +193,7 @@ func (b *blueprint) block(at int, home crumb) {
 				crumbs: []crumb{home, {name: name, path: termPath}, {name: subName, path: subTermPath}},
 				links:  []string{fmt.Sprintf("/product/item-%03d-%d-%d/", at, i, (k+1)%productsPerCategory)},
 				terms:  []pagemap.Term{category}, entity: itemName, scope: subName,
+				touchedA: i == 1 && k == 0, touchedB: i == 1 && (k == 2 || k == 3),
 			})
 			subTerm.listing = append(subTerm.listing, itemPath)
 		}
@@ -210,6 +214,16 @@ func (b *blueprint) block(at int, home crumb) {
 		kind: kindArchived, block: at, wpType: pagemap.WPPage, path: fmt.Sprintf("%sold/", hubPath), title: fmt.Sprintf("Old %03d", at),
 		status: "archived", parent: hubPath,
 	})
+}
+
+func (b *blueprint) touched(second bool) []string {
+	out := make([]string, 0)
+	for _, s := range b.specs {
+		if (second && s.touchedB) || (!second && s.touchedA) {
+			out = append(out, s.path)
+		}
+	}
+	return out
 }
 
 const sentinel = "/cart/"

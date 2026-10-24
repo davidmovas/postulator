@@ -21,7 +21,7 @@ type runtimeParts struct {
 func (c *Core) buildObserver(stores repos, writing authoring) *observe.Service {
 	return observe.New(observe.Deps{
 		Sites: stores.sites, Pages: stores.pages, Identity: stores.identities, Fields: stores.fields, Bodies: stores.bodies,
-		Renders: stores.renders, Links: stores.links, Findings: stores.findings, Types: writing.pageTypes,
+		Renders: stores.renders, Links: stores.links, Findings: stores.findings, Types: writing.pageTypes, Maps: writing.siteModel,
 		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 	})
 }

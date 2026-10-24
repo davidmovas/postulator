@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -42,11 +43,48 @@ type Memory struct {
 
 func (m *Memory) Service() *sitemodel.Service {
 	return sitemodel.New(sitemodel.Deps{
-		Reader: m, Sites: siteReader{m}, Pages: pageReader{m}, Entities: entityReader{m}, Edges: edgeReader{m},
-		Types: typeReader{m}, Terms: termReader{m}, Fields: fieldReader{m}, Bodies: bodyReader{m},
+		Reader: m, UnitOfWork: m, Maps: mapReader{m}, Sites: siteReader{m}, Pages: pageReader{m}, Entities: entityReader{m},
+		Edges: edgeReader{m}, Types: typeReader{m}, Terms: termReader{m}, Fields: fieldReader{m}, Bodies: bodyReader{m},
 		Renders: renderReader{m}, Links: linkReader{m}, Findings: findingReader{m}, Budgets: budgetReader{m},
 		Audits: auditReader{m},
 	})
+}
+
+func (m *Memory) Do(ctx context.Context, fn func(context.Context) error) error {
+	return fn(ctx)
+}
+
+func (m *Memory) names() map[string][]field.Value {
+	out := make(map[string][]field.Value, len(m.Fields))
+	for pageID, values := range m.Fields {
+		for i := range values {
+			if values[i].Key == field.Title || values[i].Key == field.H1 {
+				out[pageID] = append(out[pageID], values[i])
+			}
+		}
+	}
+	return out
+}
+
+func (m *Memory) rows() []contextpack.MapRow {
+	names := m.names()
+	snapshot := contextpack.Snapshot{Index: pagemap.NewIndexNamed(m.Pages, pagemap.Names(names)), Types: m.Types, Fields: names}
+	return snapshot.Map(nil).Rows()
+}
+
+type mapReader struct{ m *Memory }
+
+func (mapReader) State(context.Context, string) (generation, built int64, err error) {
+	return 1, 1, nil
+}
+
+func (r mapReader) ListBySite(_ context.Context, siteID string) ([]contextpack.MapRow, error) {
+	rows := r.m.rows()
+	return slices.DeleteFunc(rows, func(row contextpack.MapRow) bool { return row.SiteID != siteID }), nil
+}
+
+func (mapReader) Write(context.Context, string, []contextpack.MapRow, []string, int64) error {
+	return nil
 }
 
 func (m *Memory) Reads() int {
@@ -156,6 +194,10 @@ type fieldReader struct{ m *Memory }
 
 func (r fieldReader) ListBySite(context.Context, string) (map[string][]field.Value, error) {
 	return r.m.Fields, nil
+}
+
+func (r fieldReader) ListNamesBySite(context.Context, string) (map[string][]field.Value, error) {
+	return r.m.names(), nil
 }
 
 type bodyReader struct{ m *Memory }

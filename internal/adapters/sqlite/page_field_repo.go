@@ -22,6 +22,8 @@ const (
 	selectFieldsForPage = `SELECT ` + fieldColumns + ` FROM page_fields WHERE page_id = ? ORDER BY field_key`
 	selectFieldsBySite  = `SELECT f.page_id, f.field_key, f.current_value, f.current_hash, f.base_value, f.base_hash, f.observed_at, f.written_at, f.written_run_id
 		FROM page_fields AS f JOIN pages AS p ON p.id = f.page_id WHERE p.site_id = ? ORDER BY f.page_id, f.field_key`
+	selectNamesBySite = `SELECT f.page_id, f.field_key, f.current_value, f.current_hash, f.base_value, f.base_hash, f.observed_at, f.written_at, f.written_run_id
+		FROM page_fields AS f JOIN pages AS p ON p.id = f.page_id WHERE p.site_id = ? AND f.field_key IN ('title', 'h1') ORDER BY f.page_id, f.field_key`
 	selectFieldsForPages = `SELECT ` + fieldColumns + ` FROM page_fields WHERE page_id IN `
 	orderFields          = ` ORDER BY page_id, field_key`
 )
@@ -84,6 +86,14 @@ func (r *PageFieldRepo) ListForPage(ctx context.Context, pageID string) ([]field
 
 func (r *PageFieldRepo) ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error) {
 	values, err := selectAll(ctx, r.store.execFrom(ctx), selectFieldsBySite, []any{siteID}, scanFieldValue, "list the site fields")
+	if err != nil {
+		return nil, err
+	}
+	return fieldsByPage(values), nil
+}
+
+func (r *PageFieldRepo) ListNamesBySite(ctx context.Context, siteID string) (map[string][]field.Value, error) {
+	values, err := selectAll(ctx, r.store.execFrom(ctx), selectNamesBySite, []any{siteID}, scanFieldValue, "list the site's page names")
 	if err != nil {
 		return nil, err
 	}

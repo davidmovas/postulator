@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -46,6 +47,17 @@ type termStore interface {
 
 type fieldStore interface {
 	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+	ListNamesBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+}
+
+type mapStore interface {
+	State(ctx context.Context, siteID string) (generation, built int64, err error)
+	ListBySite(ctx context.Context, siteID string) ([]contextpack.MapRow, error)
+	Write(ctx context.Context, siteID string, moved []contextpack.MapRow, gone []string, generation int64) error
+}
+
+type unitOfWork interface {
+	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
 type bodyStore interface {
@@ -83,20 +95,22 @@ type audits interface {
 }
 
 type Deps struct {
-	Budgets  budgets
-	Audits   audits
-	Reader   reader
-	Sites    siteStore
-	Pages    pageStore
-	Entities entityStore
-	Edges    edgeStore
-	Types    typeSets
-	Terms    termStore
-	Fields   fieldStore
-	Bodies   bodyStore
-	Renders  renderStore
-	Links    linkStore
-	Findings findingStore
+	Budgets    budgets
+	Audits     audits
+	Reader     reader
+	UnitOfWork unitOfWork
+	Maps       mapStore
+	Sites      siteStore
+	Pages      pageStore
+	Entities   entityStore
+	Edges      edgeStore
+	Types      typeSets
+	Terms      termStore
+	Fields     fieldStore
+	Bodies     bodyStore
+	Renders    renderStore
+	Links      linkStore
+	Findings   findingStore
 }
 
 type Service struct {

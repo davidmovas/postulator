@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 73
+const latestMigration = 74
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -94,6 +94,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0071_page_renders_theme_h1.sql",
 		"0072_pages_workbook_hierarchy.sql",
 		"0073_runs_kind_edit.sql",
+		"0074_page_map.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -138,7 +139,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders", "findings", "page_types", "field_scopes", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders", "findings", "page_types", "field_scopes", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules", "page_map", "page_map_sites"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)

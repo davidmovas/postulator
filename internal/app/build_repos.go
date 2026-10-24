@@ -26,6 +26,7 @@ type repos struct {
 	bodies        *sqlite.PageBodyRepo
 	fields        *sqlite.PageFieldRepo
 	renders       *sqlite.PageRenderRepo
+	pageMaps      *sqlite.PageMapRepo
 	findings      *sqlite.FindingRepo
 	pageTypes     *sqlite.PageTypeRepo
 	scopes        *sqlite.FieldScopeRepo
@@ -81,6 +82,7 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		bodies:        sqlite.NewPageBodyRepo(store),
 		fields:        sqlite.NewPageFieldRepo(store),
 		renders:       sqlite.NewPageRenderRepo(store),
+		pageMaps:      sqlite.NewPageMapRepo(store),
 		findings:      sqlite.NewFindingRepo(store),
 		pageTypes:     sqlite.NewPageTypeRepo(store),
 		scopes:        sqlite.NewFieldScopeRepo(store),

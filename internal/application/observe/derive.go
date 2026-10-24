@@ -148,6 +148,11 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	if err := s.deps.Sites.UpdateObservation(ctx, owner.ID, state.Technical, observation, now); err != nil {
 		return err
 	}
+	if s.deps.Maps != nil {
+		if err := s.deps.Maps.Refresh(ctx, state.SiteID); err != nil {
+			return err
+		}
+	}
 	if s.deps.Publisher != nil {
 		return s.deps.Publisher.Publish(events.PagesChanged, events.PagesChangedPayload{SiteID: state.SiteID})
 	}

@@ -78,6 +78,7 @@ type stores struct {
 	bodyLists  int
 	interleave func()
 	types      *typesFake
+	maps       mapRefresher
 }
 
 func (s *stores) interleaved() {
@@ -97,8 +98,10 @@ func (s *stores) bodyListings() int {
 }
 
 func newStores(owner site.Site) *stores {
+	guard := &unitGuard{}
 	return &stores{
-		guard:      &unitGuard{},
+		maps:       mapRefresher{guard: guard},
+		guard:      guard,
 		sites:      map[string]site.Site{owner.ID: owner},
 		pages:      map[string]pagemap.Page{},
 		identities: map[string]pagemap.Identity{},
@@ -607,7 +610,33 @@ func (s *stores) deps(clk clock.Clock) observe.Deps {
 	return observe.Deps{
 		Sites: s, Pages: pageStore{s}, Identity: identityStore{s}, Fields: fieldStore{s}, Bodies: bodyStore{s},
 		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, Types: s.types, UnitOfWork: unit{s.guard}, Publisher: bus{s}, Clock: clk,
+		Maps: &s.maps,
 	}
+}
+
+type mapRefresher struct {
+	mu     sync.Mutex
+	guard  *unitGuard
+	sites  []string
+	inUnit int
+}
+
+func (r *mapRefresher) Refresh(_ context.Context, siteID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sites = append(r.sites, siteID)
+	r.guard.mu.Lock()
+	defer r.guard.mu.Unlock()
+	if r.guard.open {
+		r.inUnit++
+	}
+	return nil
+}
+
+func (r *mapRefresher) refreshed() (sites []string, inUnit int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.sites), r.inUnit
 }
 
 type pluginFake struct {

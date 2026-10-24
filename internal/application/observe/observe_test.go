@@ -469,6 +469,24 @@ func TestTheObservationReadsTheSiteOutsideItsWriteUnit(t *testing.T) {
 	}
 }
 
+func TestAWalkRebuildsTheSiteMapOnceItHasWritten(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+
+	s.run(t, observe.Options{})
+	s.clock.Set(start.Add(time.Hour))
+	s.run(t, observe.Options{})
+
+	sites, inUnit := s.stores.maps.refreshed()
+	if !slices.Equal(sites, []string{siteID, siteID}) {
+		t.Errorf("two walks refreshed the map for %v, want once each", sites)
+	}
+	if inUnit != 0 {
+		t.Errorf("%d refreshes ran inside the walk's write unit, want each after it", inUnit)
+	}
+}
+
 func TestEveryNthObservationWalksFully(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
