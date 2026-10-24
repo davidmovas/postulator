@@ -237,6 +237,14 @@ func (m Map) Place(pageID string) (Place, bool) {
 	return Place{Ref: m.snapshot.ref(page, false), TypeID: m.snapshot.typeOf(page).ID}, true
 }
 
+func (m Map) Trail(pageID string) []Ref {
+	id, isRow := m.row(pageID)
+	if !isRow {
+		return []Ref{}
+	}
+	return m.trail(id)
+}
+
 func (m Map) Type(typeID string) (pagetype.Type, bool) {
 	return m.snapshot.Types.ByID(typeID)
 }

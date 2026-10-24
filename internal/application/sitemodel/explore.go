@@ -242,6 +242,10 @@ func (s *Service) namedOutside(ctx context.Context, req ExploreRequest) (pagemap
 }
 
 func rows[T any](all []T, ref func(T) contextpack.Ref, req ExploreRequest) (paging.List[T], error) {
+	return byPath(all, ref, req.Cursor, clamped(req.Limit, exploreDefaultLimit, exploreMaxLimit))
+}
+
+func byPath[T any](all []T, ref func(T) contextpack.Ref, cursor paging.Cursor, limit int) (paging.List[T], error) {
 	keyset := paging.Keyset[T]{
 		IDColumn: "id",
 		ID:       func(row T) string { return ref(row).PageID },
@@ -249,12 +253,16 @@ func rows[T any](all []T, ref func(T) contextpack.Ref, req ExploreRequest) (pagi
 			paging.TextKey[T]("path", "path", func(row T) any { return ref(row).Path }),
 		},
 	}
-	limit := req.Limit
+	return keyset.Page(all, paging.Request{After: cursor, Limit: limit})
+}
+
+func clamped(limit, fallback, ceiling int) int {
 	switch {
 	case limit <= 0:
-		limit = exploreDefaultLimit
-	case limit > exploreMaxLimit:
-		limit = exploreMaxLimit
+		return fallback
+	case limit > ceiling:
+		return ceiling
+	default:
+		return limit
 	}
-	return keyset.Page(all, paging.Request{After: req.Cursor, Limit: limit})
 }

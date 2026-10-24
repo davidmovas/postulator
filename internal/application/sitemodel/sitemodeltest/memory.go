@@ -185,6 +185,16 @@ func (r bodyReader) ListWritten(_ context.Context, pageID string) ([]block.Writt
 	return out, nil
 }
 
+func (r bodyReader) ListWrittenFor(_ context.Context, ids []string) ([]block.Written, error) {
+	out := make([]block.Written, 0)
+	for i := range r.m.Written {
+		if slices.Contains(ids, r.m.Written[i].PageID) {
+			out = append(out, r.m.Written[i])
+		}
+	}
+	return out, nil
+}
+
 type renderReader struct{ m *Memory }
 
 func (r renderReader) ListForPages(_ context.Context, ids []string) ([]render.Record, error) {

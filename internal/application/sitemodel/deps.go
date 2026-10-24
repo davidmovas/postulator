@@ -52,6 +52,7 @@ type bodyStore interface {
 	ListCurrent(ctx context.Context, pageIDs []string) ([]block.Snapshot, error)
 	ListBySite(ctx context.Context, siteID string) ([]block.Snapshot, error)
 	ListWritten(ctx context.Context, pageID string) ([]block.Written, error)
+	ListWrittenFor(ctx context.Context, pageIDs []string) ([]block.Written, error)
 }
 
 type renderStore interface {
