@@ -1327,10 +1327,59 @@ go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/
 
 **What 4.3b starts with:** the Findings inbox, the Site map, the import preview's match rule, the agent's cards for the 4.2 tools, the harness, the full gate and phase 14's report.
 
-### 4.3b — the screens, the gate and the phase report (planned at its start)
+### 4.3b — the screens, the gate and the phase report (2026-10-24)
 
-- The Findings inbox with each code's options; the Site map (hierarchy by reason, types, technical and read-only pages, link counts by type); the import preview naming each row's match rule; the agent's cards for the 4.2 tools; the harness.
-- The full gate on both stands, then phase 14's closing report.
+- **Touches.** `internal/application/{findings,sitemodel,imports,tools}`, `internal/domain/{finding,pagemap,contextpack}`, `internal/transport/wails` (a `FindingsService`, `PagesService.SiteMap`), `internal/app/wiring.go`, `internal/transport/wails/vocabgen`, the `runtime`, `runtime/steps` and `sync` test harnesses, `cmd/postulator/harness*.go`, `internal/e2e/observe_test.go`, `frontend/src` (`features/{findings,map}` new, `features/{imports,runs,agent,pages}`, `app/{router,nav}`, `data`, `copy`), `frontend/scripts/routes.json`, the docs.
+- **Migrations, tools.** None; no schema moves (92 tools, 65,722 bytes, 14,623 tokens). **Bound methods.** A `FindingsService` with six, and `PagesService.SiteMap`.
+- **Exit.** Unit: each findings filter and count, `Explain` per option, every `ResolveMany` refusal and its one event, the map's node table, paging, twins and trails over both captures and a 3,000-page store, the import pick from preview to a second import, a describer per write op. Harness: the inbox's list by code and a bulk ignore, the map's paging, shots of the three screens. The full gate below on the final code, both stands one at a time.
+
+#### 4.3b tasks
+
+**Decided at the plan** (the owner's two answers first; a Fable critic read the plan before the owner saw it, no blocking, five serious and six minor findings folded in):
+1. **The Site map is its own screen** (the owner): a rail entry; the Pages screen's Tree toggle goes, and `Pages.Tree` stays only for the run start's picker. **The flake is fixed** (the owner) with a wait bounded by the test's own deadline, checked once at `-count=3 -cpu 1`.
+2. **One confirmation, two callers.** The agent's sentence (`tools.resolution`) moves into `findings.Explain`, which the agent's card and the inbox's dialog both show; `DescribeContext` gains the finding, so the `findings` describer writes the same title and lines in both. The list's per-option sentence is copy keyed by option and kind; `Explain` runs only at confirmation.
+3. **Bulk by code is `findings.ResolveMany`** (`code`, `option`, `findingIds`, `pageTypeId`) in one unit of work: only `ignore`, `accept_site`, `accept_workbook` and `set_type`, each finding checked against its own options; a run option, `map_to_page` and `accept` are refused, and so is the whole call when any id is not open or not of that code and site. `change` writes through the stores, so `Resolve` and `ResolveMany` publish `pages.changed` once, after the commit. No agent tool.
+4. **One walk for both screens.** `findings.ListRequest` gains `pageTypeId` (the effective type) and `under` (a page and its descendants); the view gains `pagePath` and `pageTitle`; `Counts` answers the open counts per code under the same filters. The facts come from `sitemodel` through a reader `findings` declares, so the inbox's subtree is the map's.
+5. **The Site map is `sitemodel.Map`**, bound as `PagesService.SiteMap`: the children of a node by derived parent, keyset on path, 100 a page (at most 200), planned pages marked, archived pages left out. A node carries its path, title, type name and preset, parent reason and method, technical and read-only reasons, content state (`empty`, `client`, `ours`, `mixed`, `dynamic`), contextual links in and out from the audit, open findings, children and descendants. A twin is one node: the hub is the row and carries its store category, the term leaves its own parent's children and its children join the hub's, before paging and counting. A search by title or path, or a type filter, answers flat matches with each one's ancestor trail; a subtree is the tree rooted there. Bodies and written hashes load for the returned nodes only.
+6. **An ambiguous row is picked in the preview**: it becomes a `PreviewPage` with the action `ambiguous`, its `rowKey`, rule and `candidates`; preview and apply take `choices` (`rowKey`, `pageId`), refused outside the row's candidates; a choice matches as `mapped`, and apply sets the page's row key before its write. `pagemap.MatchRule` joins `vocab.ts`. The import tools keep their argument structs.
+7. **A run option opens the normal start**: `StartRunDrawer` takes the answered `StartRequest`, shows its `fields` scope and, for `rewrite_field`, a line the person confirms; `relink_page` seeds a relink; `rescan` opens a dialog with the sync panel's two options ticked.
+8. **One Opus agent builds the frontend** (T7 to T11) once T6 has landed; one writer per Go package.
+
+- [ ] **0.0 — the plan.** This list. Commit `docs(plan): stage 4.3b's task list`.
+- [ ] **T0 — the flake.** The `runtime/steps`, `runtime` and `sync` harnesses wait until the test's deadline less a margin; `go test -race -count=3 -cpu 1 -v ./internal/runtime/steps/` once. Commit `test(runtime): a harness waits as long as its test may run`.
+- [ ] **T1 — findings by page type and subtree.** Decision 4. Tests: a grandchild in, a path neighbour under another parent out, the effective type, the counts. Commit `feat(findings): list and count findings by page type and subtree`.
+- [ ] **T2 — `findings.Explain`.** Decision 2; the tool's `Confirm` calls it; run options and a bulk set have sentences. Commit `refactor(findings): one sentence explains a resolution`.
+- [ ] **T3 — `findings.ResolveMany`.** Decision 3, each refusal failing first, a publisher counting one event for three findings. Commit `feat(findings): resolve every finding of a code in one confirmed action`.
+- [ ] **T4 — `sitemodel.Map`.** Decision 5. Tests: the node table, cursor pages, search and type with trails, a twin as one row with stable paging, a 3,000-page store reading bodies for its page of nodes only, each capture's root and a hub. Commit `feat(sitemodel): the site map, a node at a time`.
+- [ ] **T5 — the import's choices.** Decision 6: a two-candidate row listed, picked, previewed `mapped`, applied, matched `mapped` by a second import; an earlier apply's `row_ambiguous` closes as `row_matched`. Commit `feat(imports): a person picks an ambiguous row's page in the preview`.
+- [ ] **T6 — the bindings.** `FindingsService` (`List`, `Get`, `Counts`, `Explain`, `Resolve`, `ResolveMany`) before Settings and `PagesService.SiteMap`; the contract, service, wiring and harness pins; `task build`; the frontend's api, endpoints, hooks, keys and `pages.changed` invalidation. Commit `feat(wails): bind the findings and the site map`.
+- [ ] **T7 — the Findings inbox.** Codes with counts, filters in the URL, rows in words, options with their sentence and kind, who resolved, the confirmation, the bulk bar. Commit `feat(findings): the findings inbox`.
+- [ ] **T8 — the seeded run start and the rescan dialog.** Decision 7. Commit `feat(runs): a finding's run option opens the run start it answers`.
+- [ ] **T9 — the Site map.** Lazy rows, "show more" per cursor, the filters, the marks, the twins, the drawer; the Pages screen's Tree toggle and the files only it uses go. Commit `feat(map): the site map by derived parent`.
+- [ ] **T10 — the import preview.** The rule per row, the ambiguous rows' pick. Commit `feat(imports): the preview names each row's rule and lets a person pick`.
+- [ ] **T11 — the cards.** `pages_fields set`, each `pages_blocks` write, `findings resolve` over the finding; the card body shared with the inbox; `confirmableArgs`. Commit `feat(agent): a card per op says exactly what changes`.
+- [ ] **T12 — the harness.** A small CSV import seeds an ambiguous row, a row without a page and a differing trail; tests for the inbox's list, a bulk ignore and the map's paging; shots of the three screens. Commit `test(harness): the findings, the map and the preview's pick`.
+- [ ] **T13 — the census.** The observe e2e logs pages by type, trails by method and links by type. Commit `test(e2e): the observation logs the site's census`.
+- [ ] **G — the gate**, one leg at a time on the final code:
+  ```
+  task build ; git status --short
+  gofmt -l . ; task check:go:comments ; go vet ./... ; go vet -tags e2e ./... ; go vet -tags uiharness ./cmd/postulator/...
+  golangci-lint run ./... ; golangci-lint run --build-tags uiharness ./cmd/postulator/... ; task lint:e2e
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov1.out ./internal/kernel/... ./internal/domain/...
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov2.out ./internal/application/...
+  go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  (merge the five into coverage.out) ; go run ./cmd/covergate
+  task plugin:lint ; task plugin:test
+  cd frontend ; npm run typecheck ; npm run test:run -- --maxWorkers=2 ; cd .. ; task ui:lint
+  go run ./cmd/tokenreport
+  task e2e:reset STAND=replica ; task plugin:deploy STAND=replica
+  E2E_STAND=replica go test -tags e2e -count=1 -timeout 45m -v -run 'TestTheWorkbookReconcilesWithTheSite|TestTheAgentEditsABlock|TestTheAgentSeesTheSite|TestTheWholeLoopReachesTheDockerSite' ./internal/e2e/
+  task e2e:reset STAND=replica ; task e2e:full STAND=replica -- -v ; task e2e:down STAND=replica
+  (the same on STAND=vanilla) ; task e2e:full:noplugin STAND=vanilla ; task e2e:up STAND=vanilla ; task e2e:down STAND=vanilla
+  ```
+- [ ] **D — the docs and the checkpoint.** `STATUS.md`, `VISION.md`, spec 16, `CLAUDE.md`, `DECISIONS.md`, this plan closed. Commit `docs: stage 4.3b and phase 14 closed`.
 
 ## Out of scope
 
