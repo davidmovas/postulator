@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/runs"
 	syncsite "github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -18,6 +19,8 @@ type Finding struct {
 	ID         string          `json:"id"`
 	SiteID     string          `json:"siteId"`
 	PageID     string          `json:"pageId,omitempty"`
+	PagePath   string          `json:"pagePath,omitempty"`
+	PageTitle  string          `json:"pageTitle,omitempty"`
 	EntityID   string          `json:"entityId,omitempty"`
 	Code       string          `json:"code"`
 	Severity   string          `json:"severity"`
@@ -32,12 +35,32 @@ type Finding struct {
 }
 
 type ListRequest struct {
-	SiteID string `json:"siteId"`
-	Status string `json:"status,omitempty"`
-	Code   string `json:"code,omitempty"`
-	PageID string `json:"pageId,omitempty"`
-	Cursor string `json:"cursor,omitempty"`
-	Limit  int    `json:"limit,omitempty"`
+	SiteID     string `json:"siteId"`
+	Status     string `json:"status,omitempty"`
+	Code       string `json:"code,omitempty"`
+	PageID     string `json:"pageId,omitempty"`
+	PageTypeID string `json:"pageTypeId,omitempty"`
+	Under      string `json:"under,omitempty"`
+	Cursor     string `json:"cursor,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
+}
+
+type CountsRequest struct {
+	SiteID     string `json:"siteId"`
+	Status     string `json:"status,omitempty"`
+	PageTypeID string `json:"pageTypeId,omitempty"`
+	Under      string `json:"under,omitempty"`
+}
+
+type CodeCount struct {
+	Code     string `json:"code"`
+	Severity string `json:"severity"`
+	Count    int    `json:"count"`
+}
+
+type CountsResponse struct {
+	Codes []CodeCount `json:"codes"`
+	Total int         `json:"total"`
 }
 
 type GetRequest struct {
@@ -59,6 +82,17 @@ type ResolveResponse struct {
 	Finding Finding                   `json:"finding"`
 	Start   *runs.StartRequest        `json:"start,omitempty"`
 	Sync    *syncsite.SyncSiteRequest `json:"sync,omitempty"`
+}
+
+func placed(f finding.Finding, places contextpack.Map) Finding {
+	shown := view(f)
+	if f.PageID == nil {
+		return shown
+	}
+	if place, found := places.Place(*f.PageID); found {
+		shown.PagePath, shown.PageTitle = place.Ref.Path, place.Ref.Title
+	}
+	return shown
 }
 
 func view(f finding.Finding) Finding {

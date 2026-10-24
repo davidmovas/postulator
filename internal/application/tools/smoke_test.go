@@ -180,6 +180,12 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Findings: sqlite.NewFindingRepo(store), Terms: sqlite.NewPageIdentityRepo(store),
 		Publisher: bus, Clock: now,
 	})
+	siteModel := sitemodel.New(sitemodel.Deps{
+		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, Sites: siteRepo, Pages: pageRepo,
+		Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
+		Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
+		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
+	})
 	return tools.New(tools.Deps{
 		Sites:     sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
 		Graph:     graphService,
@@ -192,7 +198,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Imports:   importsService,
 		Findings: findings.New(findings.Deps{
 			Findings: sqlite.NewFindingRepo(store), Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
-			Parents: pageRepo, Pages: pagesService, Cards: graphService, Rows: importsService,
+			Parents: pageRepo, Pages: pagesService, Cards: graphService, Rows: importsService, Places: siteModel,
 			UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Models: models.New(built, modelRepo, modelProfiles, book,
@@ -206,12 +212,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 			Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry(), pagesService),
 			RunReader: runRepo, Publisher: bus, Clock: now,
 		}),
-		SiteModel: sitemodel.New(sitemodel.Deps{
-			Budgets: wholeWindow{}, Audits: reportsService, Reader: store, Sites: siteRepo, Pages: pageRepo,
-			Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
-			Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
-			Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
-		}),
+		SiteModel:   siteModel,
 		ResultBytes: func() int { return 16384 },
 		Actions:     sqlite.NewPendingActionRepo(store),
 		Publisher:   bus,

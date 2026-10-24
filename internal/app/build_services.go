@@ -118,7 +118,8 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		imports: importsService,
 		findings: findings.New(findings.Deps{
 			Findings: stores.findings, Fields: stores.fields, Bodies: stores.bodies, Parents: stores.pages, Pages: pagesService,
-			Cards: graphService, Rows: importsService, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
+			Cards: graphService, Rows: importsService, Places: writing.siteModel, UnitOfWork: stores.store, Publisher: c.Events,
+			Clock: stores.now,
 		}),
 		models: models.New(llm.catalog, stores.overrides, llm.profiles, llm.ledger, stores.secrets, llm.client,
 			c.Events, stores.now),

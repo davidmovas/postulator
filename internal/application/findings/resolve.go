@@ -39,7 +39,12 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 		if err != nil {
 			return ResolveResponse{}, err
 		}
-		return prepared(held, option)
+		answer, err := prepared(held, option)
+		if err != nil {
+			return ResolveResponse{}, err
+		}
+		answer.Finding, err = s.shown(ctx, held)
+		return answer, err
 	}
 
 	var held finding.Finding
@@ -60,7 +65,8 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	if err := s.changed(held.SiteID); err != nil {
 		return ResolveResponse{}, err
 	}
-	return ResolveResponse{Finding: view(settled)}, nil
+	shown, err := s.shown(ctx, settled)
+	return ResolveResponse{Finding: shown}, err
 }
 
 func (s *Service) open(ctx context.Context, siteID, findingID string, option finding.Option) (finding.Finding, error) {
@@ -160,7 +166,7 @@ func (s *Service) setType(ctx context.Context, pageID, pageTypeID, by string) er
 }
 
 func prepared(held finding.Finding, option finding.Option) (ResolveResponse, error) {
-	shown := ResolveResponse{Finding: view(held)}
+	var shown ResolveResponse
 	if option == finding.Rescan {
 		shown.Sync = &syncsite.SyncSiteRequest{SiteID: held.SiteID, Full: true, RenderRescan: true}
 		return shown, nil

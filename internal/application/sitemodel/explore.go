@@ -193,7 +193,9 @@ func linkFacts(audit reports.LinkAuditResponse) map[string]contextpack.LinkFacts
 	out := make(map[string]contextpack.LinkFacts, len(audit.Pages))
 	for i := range audit.Pages {
 		row := &audit.Pages[i]
-		out[row.PageID] = contextpack.LinkFacts{Orphan: row.Orphan, MissingRequired: row.MissingRequired}
+		out[row.PageID] = contextpack.LinkFacts{
+			Orphan: row.Orphan, MissingRequired: row.MissingRequired, Inbound: row.Inbound, Outbound: row.ByType.Contextual,
+		}
 	}
 	return out
 }

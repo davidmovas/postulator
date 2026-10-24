@@ -11,9 +11,11 @@ import (
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -108,6 +110,41 @@ func (unit) Do(ctx context.Context, fn func(context.Context) error) error {
 	return fn(ctx)
 }
 
+type places struct{}
+
+func sitePage(id, path, title, parent, typeID string) pagemap.Page {
+	page := pagemap.Page{
+		ID: id, SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage, WPID: new(int64(len(path))),
+		Status: pagemap.StatusPublished, Title: title, CreatedAt: at, UpdatedAt: at,
+	}
+	if parent != "" {
+		page.ParentPageID, page.ParentReason = new(parent), pagemap.ParentJSONLD
+	}
+	if typeID != "" {
+		page.PageTypeID = new(typeID)
+	}
+	return page
+}
+
+func (places) Map(_ context.Context, site string) (contextpack.Map, error) {
+	if site != siteID {
+		return contextpack.Map{}, errors.New(errors.NotFound, "site not found")
+	}
+	kinds := []pagetype.Type{
+		{ID: "type-hub", SiteID: siteID, Name: "Hub", Preset: pagetype.Hub},
+		{ID: "type-entity", SiteID: siteID, Name: "Guide", Preset: pagetype.Entity},
+	}
+	held := []pagemap.Page{
+		sitePage("page-root", "/", "Home", "", ""),
+		sitePage(pageID, "/a/", "Coffee", "page-root", "type-hub"),
+		sitePage("page-2", "/a/b/", "Beans", pageID, "type-entity"),
+		sitePage("page-3", "/a/b/c/", "Roasts", "page-2", "type-entity"),
+		sitePage("page-4", "/a/x/", "Kettles", "page-5", "type-entity"),
+		sitePage("page-5", "/z/", "Tools", "page-root", "type-hub"),
+	}
+	return contextpack.Snapshot{Index: pagemap.NewIndex(held), Types: pagetype.NewSet(kinds, nil)}.Map(nil), nil
+}
+
 func newService(t *testing.T, held ...finding.Finding) (*findings.Service, *store) {
 	t.Helper()
 	s := &store{held: make(map[string]finding.Finding)}
@@ -119,7 +156,7 @@ func newService(t *testing.T, held ...finding.Finding) (*findings.Service, *stor
 		s.held[record.ID] = record
 	}
 	return findings.New(findings.Deps{
-		Findings: s, Fields: s, Bodies: bodies{s}, Parents: s, Pages: s, Cards: s, Rows: s,
+		Findings: s, Fields: s, Bodies: bodies{s}, Parents: s, Pages: s, Cards: s, Rows: s, Places: places{},
 		UnitOfWork: unit{}, Clock: clock.NewFake(at),
 	}), s
 }
@@ -319,6 +356,119 @@ func TestFindingsAreListedByCursor(t *testing.T) {
 	}
 	if _, err := service.List(t.Context(), findings.ListRequest{SiteID: siteID, Code: "made_up"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("an unknown code = %v, want Invalid", err)
+	}
+}
+
+func onPage(code finding.Code, page string) finding.Finding {
+	f := raised(code, `{}`)
+	f.ID, f.PageID, f.SubjectKey = "f-"+string(code)+"-"+page, new(page), finding.SubjectPage(page)
+	return f
+}
+
+func spread() []finding.Finding {
+	loose := raised(finding.PluginOutdated, `{}`)
+	loose.PageID, loose.SubjectKey = nil, finding.SubjectSite
+	return []finding.Finding{
+		onPage(finding.FieldChangedOnSite, pageID), onPage(finding.ParentDiffers, "page-2"),
+		onPage(finding.BodyChangedOnSite, "page-3"), onPage(finding.TechnicalDetected, "page-4"), loose,
+	}
+}
+
+func idsOf(listed []findings.Finding) []string {
+	out := make([]string, 0, len(listed))
+	for i := range listed {
+		out = append(out, listed[i].ID)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestFindingsAreListedByPageTypeAndSubtree(t *testing.T) {
+	t.Parallel()
+
+	service, _ := newService(t, spread()...)
+	cases := []struct {
+		name string
+		req  findings.ListRequest
+		want []string
+	}{
+		{
+			name: "a page and its descendants by derived parent", req: findings.ListRequest{Under: pageID},
+			want: []string{"f-body_changed_on_site-page-3", "f-field_changed_on_site-page-1", "f-parent_differs-page-2"},
+		},
+		{name: "a deeper subtree", req: findings.ListRequest{Under: "page-2"}, want: []string{"f-body_changed_on_site-page-3", "f-parent_differs-page-2"}},
+		{name: "a path neighbor under another parent", req: findings.ListRequest{Under: "page-5"}, want: []string{"f-technical_detected-page-4"}},
+		{name: "the page's type", req: findings.ListRequest{PageTypeID: "type-hub"}, want: []string{"f-field_changed_on_site-page-1"}},
+		{name: "type and subtree", req: findings.ListRequest{Under: pageID, PageTypeID: "type-entity"}, want: []string{"f-body_changed_on_site-page-3", "f-parent_differs-page-2"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tc.req.SiteID = siteID
+			listed, err := service.List(t.Context(), tc.req)
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			if got := idsOf(listed.Items); !slices.Equal(got, tc.want) {
+				t.Errorf("List(%+v) = %v, want %v", tc.req, got, tc.want)
+			}
+		})
+	}
+
+	if _, err := service.List(t.Context(), findings.ListRequest{SiteID: siteID, Under: "page-nobody"}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("a subtree under no page = %v, want NotFound", err)
+	}
+}
+
+func TestAFindingNamesItsPageInWords(t *testing.T) {
+	t.Parallel()
+
+	service, _ := newService(t, spread()...)
+	listed, err := service.List(t.Context(), findings.ListRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, held := range listed.Items {
+		switch held.ID {
+		case "f-body_changed_on_site-page-3":
+			if held.PagePath != "/a/b/c/" || held.PageTitle != "Roasts" {
+				t.Errorf("the body finding names %q %q, want /a/b/c/ Roasts", held.PagePath, held.PageTitle)
+			}
+		case "f-plugin_outdated":
+			if held.PagePath != "" || held.PageTitle != "" {
+				t.Errorf("a site's finding names a page: %q %q", held.PagePath, held.PageTitle)
+			}
+		}
+	}
+	got, err := service.Get(t.Context(), findings.GetRequest{SiteID: siteID, FindingID: "f-parent_differs-page-2"})
+	if err != nil || got.PagePath != "/a/b/" || got.PageTitle != "Beans" {
+		t.Errorf("Get = %+v, %v; want it to name /a/b/ Beans", got, err)
+	}
+}
+
+func TestFindingsAreCountedByCodeUnderTheListsFilters(t *testing.T) {
+	t.Parallel()
+
+	service, _ := newService(t, spread()...)
+	all, err := service.Counts(t.Context(), findings.CountsRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("Counts: %v", err)
+	}
+	if all.Total != 5 || len(all.Codes) != 5 {
+		t.Errorf("counts = %+v, want five codes of one", all)
+	}
+	for i := 1; i < len(all.Codes); i++ {
+		if all.Codes[i-1].Severity == string(finding.Info) && all.Codes[i].Severity == string(finding.Warning) {
+			t.Errorf("counts = %+v, want warnings before notes", all.Codes)
+		}
+	}
+	under, err := service.Counts(t.Context(), findings.CountsRequest{SiteID: siteID, Under: pageID, PageTypeID: "type-entity"})
+	if err != nil || under.Total != 2 {
+		t.Errorf("counts under /a/ typed Guide = %+v, %v; want 2", under, err)
+	}
+	if _, err := service.Counts(t.Context(), findings.CountsRequest{SiteID: siteID, Status: "lost"}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an unknown status = %v, want Invalid", err)
 	}
 }
 

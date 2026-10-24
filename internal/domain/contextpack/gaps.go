@@ -26,6 +26,8 @@ func Gaps() []Gap {
 type LinkFacts struct {
 	Orphan          bool
 	MissingRequired int
+	Inbound         int
+	Outbound        int
 }
 
 type GapRow struct {

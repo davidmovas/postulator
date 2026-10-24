@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -50,6 +51,10 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type siteMaps interface {
+	Map(ctx context.Context, siteID string) (contextpack.Map, error)
+}
+
 type Deps struct {
 	Findings   findingStore
 	Fields     fieldAcceptor
@@ -58,6 +63,7 @@ type Deps struct {
 	Pages      pageEditor
 	Cards      cardAcceptor
 	Rows       rowMapper
+	Places     siteMaps
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock
