@@ -321,8 +321,23 @@
     ]
   },
   {
-    "name": "pages-tree",
-    "route": "#/s/:siteId/pages?view=tree",
+    "name": "site-map",
+    "route": "#/s/:siteId/map",
+    "wait": 1600
+  },
+  {
+    "name": "site-map-search",
+    "route": "#/s/:siteId/map?q=espresso",
+    "wait": 1600
+  },
+  {
+    "name": "findings-inbox",
+    "route": "#/s/:siteId/findings",
+    "wait": 1600
+  },
+  {
+    "name": "findings-settled",
+    "route": "#/s/:siteId/findings?status=dismissed",
     "wait": 1600
   },
   {
