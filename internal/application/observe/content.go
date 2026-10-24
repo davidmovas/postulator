@@ -434,30 +434,7 @@ func (a *absorber) rawLinks(ctx context.Context, page pagemap.Page, raw, last st
 	if err != nil {
 		return err
 	}
-
-	links := make([]pagemap.PageLink, 0)
-	for _, found := range block.LinksOf(raw, written) {
-		path, kind := a.install.ResolveAt(page.Path, found.Href)
-		if kind != pagemap.LinkPath || path == "" {
-			continue
-		}
-		position := found.Position
-		link := pagemap.PageLink{
-			ID: id.New(), SiteID: page.SiteID, FromPageID: page.ID, ToURL: path, AnchorText: found.Anchor,
-			Type: pagemap.LinkContextual, Region: string(regionContent),
-			Source: pagemap.SourceRaw, Position: &position, Ours: found.Ours(path, held),
-			Absolute: pagemap.AbsoluteHref(found.Href), ObservedAt: a.now,
-		}
-		if link.Ours {
-			link.BlockHash = found.BlockHash
-		}
-		if target, ok := a.stored(path); ok {
-			link.ToPageID = &target.ID
-		}
-		if built, buildErr := pagemap.NewPageLink(link); buildErr == nil {
-			links = append(links, built)
-		}
-	}
+	links := ContentLinks(page, a.install, block.LinksOf(raw, written), held, a.stored, a.now)
 	return a.service.deps.Links.ReplaceForPage(ctx, page.ID, pagemap.SourceRaw, links)
 }
 
@@ -500,11 +477,7 @@ func (a *absorber) heldOurs(ctx context.Context, page pagemap.Page, last string,
 	if err != nil {
 		return nil, err
 	}
-	resolve := func(href string) (string, bool) {
-		path, kind := a.install.ResolveAt(page.Path, href)
-		return path, kind == pagemap.LinkPath && path != ""
-	}
-	return block.HeldOurs(stored, block.LinksOf(last, written), resolve, nil), nil
+	return block.HeldOurs(stored, block.LinksOf(last, written), Resolver(a.install, page), nil), nil
 }
 
 func (a *absorber) plan(ctx context.Context, current pagemap.Page, planned bool, next pagemap.Page, it item) error {

@@ -150,13 +150,13 @@ func TestSyncBackResolvesALinkAgainstTheFolderTheSiteLivesIn(t *testing.T) {
 			Status: pagemap.StatusPublished, EntityID: pointer("parent"),
 		},
 		{
-			ID: "page-child", SiteID: "site", Path: "/blog/coffee/espresso/", Slug: "espresso",
+			ID: "page-child", SiteID: "site", Path: "/blog/", Slug: "espresso",
 			WPType: pagemap.WPPage, Status: pagemap.StatusExists, EntityID: pointer("child"), WPID: &wpID,
 		},
 	}}
 
 	sc := syncBackContext(t, wpID)
-	sc.Page.Path = "/blog/coffee/espresso/"
+	sc.Page.Path = "/blog/"
 
 	synced := runSyncBack(t, deps, sc)
 	if synced.Links != 1 {

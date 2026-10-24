@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/finding"
@@ -143,8 +144,8 @@ func SyncBack(deps Deps) run.StepDef {
 			now := deps.now()
 			index := pagemap.NewIndex(pages)
 			site := pagemap.NewSite(owner.BaseURL)
-			links := observedOn(sc.Page, index, site, block.LinksOf(body, written),
-				block.HeldOurs(stored, block.LinksOf(last, written), resolver(site), nil), now)
+			links := observe.ContentLinks(sc.Page, site, block.LinksOf(body, written),
+				block.HeldOurs(stored, block.LinksOf(last, written), observe.Resolver(site, sc.Page), nil), index.ByPath, now)
 			moved, err := observeReadBack(ctx, deps, sc.Page, body, now)
 			if err != nil {
 				return run.Result{}, err

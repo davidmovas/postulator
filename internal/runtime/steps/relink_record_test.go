@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -223,6 +224,32 @@ func TestAdoptMarksTheLinksOfOurBlocksAsOurs(t *testing.T) {
 	}
 	if his := byTarget["/coffee/filter/"]; his.Ours || his.BlockHash != "" {
 		t.Errorf("the client's own link was recorded as ours: %+v", his)
+	}
+}
+
+func TestTheLinksARelinkRecordsStandInTheContentWhereThePageResolvesThem(t *testing.T) {
+	t.Parallel()
+
+	theirs := `<p>We roast every espresso blend we sell, beside our <a href="filter/">filter</a> range.</p>`
+	deps, _, recorder, _ := relinkDeps(t, theirs)
+	deps.Bodies = &bodyLog{}
+	if _, err := drive(t, steps.RelinkNeighbors(deps), relinkContext(t, deps)); err != nil {
+		t.Fatalf("RelinkNeighbors: %v", err)
+	}
+
+	recorded := recorder.byPage["page-parent"]
+	if len(recorded) == 0 {
+		t.Fatal("the relink recorded no link of the parent")
+	}
+	found := false
+	for _, link := range recorded {
+		if link.Region != string(render.RegionContent) {
+			t.Errorf("the link to %s is recorded in the region %q, want the content, as the observation records it", link.ToURL, link.Region)
+		}
+		found = found || link.ToURL == "/coffee/filter/"
+	}
+	if !found {
+		t.Errorf("the client's relative link was recorded as %+v, want /coffee/filter/, resolved against the page", recorded)
 	}
 }
 
