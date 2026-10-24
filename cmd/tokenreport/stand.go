@@ -36,8 +36,13 @@ func typedStand(name string) (*sitemodeltest.Memory, error) {
 	seeds := seededTemplates()
 	for i := range held.Types {
 		named := held.Types[i].Preset.DefaultTemplate()
-		if held.Types[i].TemplateID != nil || named == "" {
+		if named == "" {
 			continue
+		}
+		if id := held.Types[i].TemplateID; id != nil {
+			if _, known := seeds[*id]; known {
+				continue
+			}
 		}
 		if _, seeded := seeds[seedPrefix+named]; seeded {
 			held.Types[i].TemplateID = new(seedPrefix + named)

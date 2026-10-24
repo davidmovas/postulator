@@ -14,7 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
-const instructionsCeilingTokens = 1924
+const instructionsCeilingTokens = 1932
 
 func TestTheInstructionsAndTheReplicasBriefFitTheirCeiling(t *testing.T) {
 	t.Parallel()

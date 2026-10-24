@@ -69,11 +69,14 @@ func TestEveryStandPageIsARowMeasuredOrSaidWhyNot(t *testing.T) {
 			measured++
 		}
 	}
-	if measured != 8 {
-		t.Errorf("%d pages measured, want the eight mapped pages with a template (six on the replica, two on vanilla)", measured)
+	if measured != 9 {
+		t.Errorf("%d pages measured, want the nine mapped pages with a template (six hubs and entities and a product on the replica, two on vanilla)", measured)
 	}
-	if product := rowAt(t, rows, "replica", "/product/bpc-157-peptide/"); !strings.Contains(product.Skipped, "unmapped") {
-		t.Errorf("an unmapped product is skipped for %q, want the reason it has no entity", product.Skipped)
+	if product := rowAt(t, rows, "replica", "/product/bpc-157-peptide/"); product.Skipped != "" || product.Writer == nil {
+		t.Errorf("the product the capture gave an entity through its proposal is skipped for %q, want it measured", product.Skipped)
+	}
+	if unmapped := rowAt(t, rows, "replica", "/product/tb-500-peptide/"); !strings.Contains(unmapped.Skipped, "unmapped") {
+		t.Errorf("a product no entity carries is skipped for %q, want the reason it has no entity", unmapped.Skipped)
 	}
 	if cart := rowAt(t, rows, "replica", "/cart/"); cart.Skipped == "" {
 		t.Error("a technical page is measured, want it skipped")

@@ -48,7 +48,7 @@ func TestEveryMeasuredCallStandsBesideItsEstimate(t *testing.T) {
 		}
 	}
 	for _, step := range []string{stepWriter, stepWriterPack, stepLinker, stepJudge, stepJudgePack, stepMeta} {
-		if steps[step] != 8 {
+		if steps[step] != 9 {
 			t.Errorf("%d %s rows, want one per measured page", steps[step], step)
 		}
 	}

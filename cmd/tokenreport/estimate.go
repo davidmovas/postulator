@@ -473,7 +473,8 @@ func notes() []string {
 		"the judge reads a stand-in body, the captured prose cut to the template's target words, because a run judges the body its writer has just written, " +
 			"not the page's current one; its estimate prices that body at llm.ReadTokens, and the meta writer reads a stand-in draft of the template's headings",
 		"a linker call over a page with no body is listed and left out of its spread; the writer, the judge and the meta writer are always counted",
-		"no product is measured: every product in both captures is unmapped, and the steps refuse a page with no entity",
+		"one product is measured, the replica's /product/bpc-157-peptide/, which its capture gave an entity through the site's proposal; " +
+			"the other products are unmapped, and the steps refuse a page with no entity",
 		"the briefs carry no link totals, because a capture holds no link audit",
 		"bodies under " + strconv.Itoa(minProseWords) + " words are left out of the tokens-per-word sample, and a body both stands carry is counted once; " +
 			"their HTML is counted without the block editor's comments, as a writer answers it, and as a JSON string with only what JSON must escape",

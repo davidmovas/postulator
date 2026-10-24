@@ -28,7 +28,7 @@ const (
 	defaultIterations  = 2
 	maxIterations      = 4
 	repairTokens       = 256
-	linkerPromptTokens = 260
+	linkerPromptTokens = 290
 
 	leadWhy = "The template asks the first paragraph of the page to carry the primary keyword, and it does not yet."
 )
