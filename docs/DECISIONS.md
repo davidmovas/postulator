@@ -5091,5 +5091,9 @@ folded in). Agent P built Part 1, agent F the screens, agent S Part 4.
 - **"Select the whole branch" left the run start's picker.**
 - **Only the two proposal writers wait in either mode**, not every tool that maps a page.
 - **The judge is measured over a stand-in body.**
-- **The gate is partial**: the memory guard stopped the application race group and both stands'
-  `e2e:full`; `STATUS.md` lists the commands.
+- **The gate ran in two sittings**: the memory guard stopped the application race group and both
+  stands' `e2e:full`, which then ran green on the owner's word, in foreground chunks.
+- **The gate found one red**, in the replica's full suite: the proposal proof's run had relinked
+  the client's hub `/healing-peptides/` to its planted product. That sentence outlived the deleted
+  product and failed the writer's picture. The proof now reverts its run and asserts the hub is back
+  byte for byte (`feaf2d6`).

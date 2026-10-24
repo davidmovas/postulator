@@ -19,8 +19,8 @@ session 1 is done, session 2 (polish, docs, the build and the PR) is next. None 
 ## Next, in order
 
 1. **Phase 15, session 2**: polish, the docs, `task build` and `task package`, and the PR from `dev`
-   to `master` when the owner asks. It plans itself from session 1's checkpoint in the phase plan,
-   and starts with the commands session 1 left owed (under **The gate**).
+   to `master` when the owner asks. It plans itself from session 1's checkpoint in the phase plan;
+   session 1's gate is green, every leg.
 2. **Plugin 1.5.2 on the client's sites**, uploaded over 1.2.0 ("Replace current with uploaded"); it
    installs on PHP 7.2 and WordPress 5.7, and a released app refuses to write through one below 1.5.1.
 3. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
@@ -602,8 +602,26 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
 
-**2026-10-24, on Windows, at the close of phase 15 session 1 (`8f215d8` and the docs after it).
-Partial: the memory guard stopped two legs, which are owed.**
+**2026-10-24, on Windows, at the close of phase 15 session 1. Green on the final code, every leg:
+the record below, then the owed legs run on the owner's word the same evening.**
+
+- **The owed legs, run green.** Every other race profile came from the record below, on the same Go
+  code.
+  - **The application race group**, in three foreground chunks, each with its own profile:
+    `imports` (193 s); `graph` and `tools`; the other 21 packages at `-p 2`.
+  - **`covergate`** over all eight profiles, merged one line per block: domain and application
+    88.05% of 17,800 statements (gate 80%), total 87.66% of 35,629 (gate 70%).
+  - **The replica, from a fresh reset after `task plugin:deploy`**: `internal/e2e` in its own order,
+    in three chunks; 14 passed and 2 skipped by design.
+    - **The first run found one red**: `TestTheWriterSeesTheFullPicture` read the client's hub
+      `/healing-peptides/` with a link sentence that the proposal proof's run had relinked into it.
+      The planted product had been deleted, but the sentence stayed. The proof now reverts its run
+      and asserts the hub is back byte for byte (`feaf2d6`); a second run from a fresh reset was
+      green throughout.
+  - **Vanilla, from a fresh reset**: the same three chunks, 12 passed and 4 skipped by design. Then
+    `task e2e:full:noplugin`, the plugin restored with `e2e:up`, and the stand taken down.
+
+The first record, from before the owner's word:
 
 - **Run and green on the final code:**
   - `task build` with no generated drift;
@@ -1129,9 +1147,9 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Phase 15, session 2**, planned at its start from session 1's checkpoint: the commands session 1
-   left owed, polish (the whole-tree reads above, the picker's whole-branch pick if the owner wants
-   it back), the docs, the build and the PR.
+1. **Phase 15, session 2**, planned at its start from session 1's checkpoint: polish (the whole-tree
+   reads above, the picker's whole-branch pick if the owner wants it back), the docs, the build and
+   the PR.
 2. **The pre-release smoke with a funded OpenAI key**, whenever there is one: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the

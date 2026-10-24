@@ -54,7 +54,7 @@
 - [x] **X1 — the replica proof and the recapture** (`958d677`).
 - [x] **W1 — the report over the new capture** (`347a04e`). The linker's overhead became 290 once the product was measured.
 - [x] **W2 — the prompts** (`16553bd`).
-- [~] **G — the gate.** Every leg green except two the memory guard stopped: the application race group (with `covergate`) and both stands' `e2e:full`. The record and the commands owed are under "The gate" in `STATUS.md`.
+- [x] **G — the gate.** The memory guard first stopped the application race group (with `covergate`) and both stands' `e2e:full`; the owner had them run the same evening, all green, after one fix the replica found (`feaf2d6`: the proposal proof reverts its run). The record is under "The gate" in `STATUS.md`.
 - [x] **D — the docs and the checkpoint** (`15f3e22` and this commit).
 
 #### Decided while building
@@ -66,14 +66,13 @@
 - **The scale tests skip under `-race`**, and the gate runs them without it.
 - **Agent S took Part 4 whole** rather than the orchestrator, so that its packages had one writer while the orchestrator ran the replica proof and the report.
 
-#### Checkpoint, 2026-10-24 (session 1 closed but for two gate legs)
+#### Checkpoint, 2026-10-24 (session 1 closed, the whole gate green)
 
 **Landed on `dev`**, the reasoning under "phase 15, session 1" in `DECISIONS.md`: the plugin's floors and 1.5.2 with the legacy stand; `page_without_entity` and the site proposals with the inbox and the replica proof; the input side of the estimate; `page_map` and the reads over it; the run start's picker over the map; the prompt files.
 
-**Owed**: the application race group, `covergate`, and `e2e:full` on both stands with `e2e:full:noplugin` on vanilla. The commands are under "The gate" in `STATUS.md`.
+**Owed**: nothing. The legs the memory guard stopped ran green on the owner's word, the replica after `feaf2d6`.
 
 **What session 2 starts with**:
-- the owed legs;
 - the Overview's and the Reports' whole-tree reads, the last callers of `Pages.Tree`;
 - the picker's whole-branch pick, if the owner wants it back;
 - the docs, `task package` and the PR when the owner asks.
