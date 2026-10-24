@@ -5097,3 +5097,38 @@ folded in). Agent P built Part 1, agent F the screens, agent S Part 4.
   the client's hub `/healing-peptides/` to its planted product. That sentence outlived the deleted
   product and failed the writer's picture. The proof now reverts its run and asserts the hub is back
   byte for byte (`feaf2d6`).
+
+## 2026-10-24 — phase 15, session 2: the polish, the docs, the build and the pull request
+
+The owner asks for the release. This session polishes three things the client would meet, brings
+the docs to the release, builds 2.5.0 and opens the pull request from `dev` to `master`, which the
+owner merges and tags. The task list is under session 2 in the phase plan.
+
+### Bulk resolution: batches of 1,000, and a partial result said in plain words
+
+The brief allowed either one transaction per confirmed action or a partial result reported to the
+person, chosen by what SQLite allows at that size. It is the partial result (`b550336`).
+
+- **Measured** on the 5,003-page generated store (`internal/app/scale`, a probe not kept), with a
+  second writer timing its own wait:
+  - dismissing findings holds SQLite's one writer about 0.23 ms a finding: 248 ms for 1,000 and
+    941 ms for 4,131;
+  - accepting the site's value holds it about 0.8 ms a finding: 97 ms for 125.
+- **Why not one transaction**:
+  - a code of 10,000 findings in one unit would hold the writer for 2.3 to 8 s;
+  - that is past the 5 s `busy_timeout` every other writer waits: the observation, the engine and
+    every screen's write would fail busy;
+  - a unit also refuses whole on one finding it cannot settle, so one stale finding would settle
+    none of thousands. The probe met exactly that: an `accept_site` over 5,000 was refused by one
+    page with no observed value.
+- **What a batch is**: `ResolveMany` keeps its limit of 1,000, each call one unit, and the inbox sends
+  the batches in turn (`settleInBatches`).
+- **What a refusal does**:
+  - the first refused batch stops the action, and the later batches are never sent;
+  - the dialog stays open and says how many were settled, how many were not, and the refusal's own
+    words: "1000 of 2500 findings were settled; the other 1500 were not: the finding is no longer
+    open. Confirm again to settle the ones still open.";
+  - an internal failure is said in the app's own sentence, never in a driver's words;
+  - a refusal before anything was settled is shown as before.
+- **What it amends**: 4.3b's "A bulk over 1,000 findings is not one transaction" stands, and the
+  person is now told what it left.
