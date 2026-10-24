@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
-func policy(rules template.LinkRules) template.LinkPolicy {
-	return template.LinkPolicy{Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: template.AnchorPreferUser}
+func policy(rules field.LinkRules) field.LinkPolicy {
+	return field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 }
 
 func target(url string, anchors []string, relation content.Relation, required bool) content.LinkTarget {
@@ -31,7 +31,7 @@ func TestInsertLinksGolden(t *testing.T) {
 		name     string
 		body     string
 		context  content.LinkContext
-		rules    template.LinkRules
+		rules    field.LinkRules
 		want     string
 		placed   int
 		missing  int
@@ -93,7 +93,7 @@ func TestInsertLinksGolden(t *testing.T) {
 				target("/coffee/", []string{"coffee"}, content.RelationDown, false),
 				target("/tea/", []string{"tea"}, content.RelationDown, true),
 			),
-			rules:  template.LinkRules{MaxLinks: 1},
+			rules:  field.LinkRules{MaxLinks: 1},
 			want:   `<p>We sell <a href="/coffee/">coffee</a> and tea.</p>`,
 			placed: 1, missing: 1,
 			outcomes: []content.Outcome{content.OutcomeInserted, content.OutcomeCapReached},
@@ -102,7 +102,7 @@ func TestInsertLinksGolden(t *testing.T) {
 			name:    "max per target places the anchor twice",
 			body:    "<p>Coffee here, coffee there, coffee everywhere.</p>",
 			context: contextOf(target("/coffee/", []string{"coffee"}, content.RelationDown, false)),
-			rules:   template.LinkRules{MaxPerTarget: 2},
+			rules:   field.LinkRules{MaxPerTarget: 2},
 			want: `<p><a href="/coffee/">Coffee</a> here, <a href="/coffee/">coffee</a> there, ` +
 				`coffee everywhere.</p>`,
 			placed: 2, outcomes: []content.Outcome{content.OutcomeInserted, content.OutcomeInserted},
@@ -113,7 +113,7 @@ func TestInsertLinksGolden(t *testing.T) {
 			context: contextOf(
 				target("/coffee/", []string{"coffee"}, content.RelationUp, true),
 			),
-			rules:  template.LinkRules{ParentLinkWithinParagraphs: 2},
+			rules:  field.LinkRules{ParentLinkWithinParagraphs: 2},
 			want:   "<p>Nothing here.</p><p>Nothing either.</p><p>All about coffee.</p>",
 			placed: 0, missing: 1,
 			outcomes: []content.Outcome{content.OutcomePositionRule},
@@ -124,7 +124,7 @@ func TestInsertLinksGolden(t *testing.T) {
 			context: contextOf(
 				target("/coffee/", []string{"coffee"}, content.RelationUp, true),
 			),
-			rules:  template.LinkRules{ParentLinkWithinParagraphs: 2},
+			rules:  field.LinkRules{ParentLinkWithinParagraphs: 2},
 			want:   `<p>All about <a href="/coffee/">coffee</a>.</p><p>Nothing here.</p>`,
 			placed: 1, outcomes: []content.Outcome{content.OutcomeInserted},
 		},
@@ -203,15 +203,15 @@ func TestInsertLinksFollowsTheAnchorStrategy(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		strategy template.AnchorStrategy
+		strategy field.AnchorStrategy
 		want     string
 	}{
 		{
-			name: "prefer_user keeps the order the user wrote", strategy: template.AnchorPreferUser,
+			name: "prefer_user keeps the order the user wrote", strategy: field.AnchorPreferUser,
 			want: `<p><a href="/beans/">Beans</a> and coffee <a href="/beans/">beans</a>.</p>`,
 		},
 		{
-			name: "rotate takes the next anchor for the next placement", strategy: template.AnchorRotate,
+			name: "rotate takes the next anchor for the next placement", strategy: field.AnchorRotate,
 			want: `<p><a href="/beans/">Beans</a> and <a href="/beans/">coffee</a> beans.</p>`,
 		},
 	}
@@ -223,8 +223,8 @@ func TestInsertLinksFollowsTheAnchorStrategy(t *testing.T) {
 			doc := mustParse(t, "<p>Beans and coffee beans.</p>")
 			result := content.InsertLinks(doc,
 				contextOf(target("/beans/", []string{"beans", "coffee"}, content.RelationDown, false)),
-				template.LinkPolicy{
-					Rules:          template.LinkRules{MaxPerTarget: 2},
+				field.LinkPolicy{
+					Rules:          field.LinkRules{MaxPerTarget: 2},
 					ForbidExternal: true, ForbidSelf: true, AnchorStrategy: tc.strategy,
 				})
 
@@ -247,7 +247,7 @@ func TestInsertLinksIsIdempotent(t *testing.T) {
 	for run := range 200 {
 		body := randomBody(source, words)
 		targets := randomTargets(source, words)
-		rules := template.LinkRules{
+		rules := field.LinkRules{
 			MaxLinks:                   source.IntN(4),
 			MaxPerTarget:               1 + source.IntN(2),
 			ParentLinkWithinParagraphs: source.IntN(3),
@@ -313,7 +313,7 @@ func TestInsertLinksLeavesADocumentWithNoTargetsAlone(t *testing.T) {
 	t.Parallel()
 
 	doc := mustParse(t, "<p>Nothing to link.</p>")
-	result := content.InsertLinks(doc, contextOf(), policy(template.LinkRules{}))
+	result := content.InsertLinks(doc, contextOf(), policy(field.LinkRules{}))
 
 	if body := bodyOf(t, doc); body != "<p>Nothing to link.</p>" {
 		t.Fatalf("Render = %q", body)
@@ -356,6 +356,21 @@ func TestInsertLinksLeavesNonProseZonesAlone(t *testing.T) {
 			body: `<script>var label = "coffee";</script><p>We roast coffee.</p>`,
 			want: `<script>var label = "coffee";</script><p>We roast <a href="/coffee/">coffee</a>.</p>`,
 		},
+		{
+			name: "a shortcode's attributes are never spliced",
+			body: `<p>[products category="coffee" limit="4"] and more coffee.</p>`,
+			want: `<p>[products category=&#34;coffee&#34; limit=&#34;4&#34;] and more <a href="/coffee/">coffee</a>.</p>`,
+		},
+		{
+			name: "an enclosing shortcode's content is never spliced",
+			body: `<p>[note]Fresh coffee[/note] beside our coffee.</p>`,
+			want: `<p>[note]Fresh coffee[/note] beside our <a href="/coffee/">coffee</a>.</p>`,
+		},
+		{
+			name: "a shortcode alone leaves the anchor unplaced",
+			body: `<p>[products category="coffee"]</p>`,
+			want: `<p>[products category=&#34;coffee&#34;]</p>`,
+		},
 	}
 
 	for _, tc := range cases {
@@ -364,7 +379,7 @@ func TestInsertLinksLeavesNonProseZonesAlone(t *testing.T) {
 
 			doc := mustParse(t, tc.body)
 			content.InsertLinks(doc, contextOf(target("/coffee/", []string{"coffee"}, content.RelationDown, false)),
-				policy(template.LinkRules{MaxLinks: 5, MaxPerTarget: 1}))
+				policy(field.LinkRules{MaxLinks: 5, MaxPerTarget: 1}))
 
 			if got := bodyOf(t, doc); got != tc.want {
 				t.Fatalf("Render =\n%s\nwant\n%s", got, tc.want)

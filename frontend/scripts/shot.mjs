@@ -9,7 +9,7 @@ const usage = `postulator ui screenshots
   node scripts/shot.mjs --port 9222 --route "#/sites" --out shots/sites.png
       [--width 1280] [--height 820] [--wait 800] [--site <id>]
       [--clip "<x>,<y>,<w>,<h>"]
-      [--click "<css>"] [--type "<css>=<text>"] [--key "<Key>"]
+      [--click "<css>"] [--type "<css>=<text>"] [--key "<Key>"] [--fits "<css>"]
 
   node scripts/shot.mjs --port 9222 --routes scripts/routes.json --out-dir shots
 
@@ -27,10 +27,14 @@ so the seeded site does not have to be known in advance.
 --clip writes the named rectangle of the viewport at 1:1 instead of the whole
 window, which is how a strip is judged at pixel scale.
 
+--fits fails the shot when the named element, or anything inside it that
+scrolls, holds content wider than itself: the proof that a screen fits its
+panel rather than scrolling sideways.
+
 routes.json is an array of
   { "name", "route", "width", "height", "wait", "site", "clip",
     "steps": [ {"click": "<css>"}, {"type": "<css>=<text>"},
-               {"key": "Control+K"}, {"wait": 500} ] }
+               {"key": "Control+K"}, {"wait": 500}, {"fits": "<css>"} ] }
 and each name becomes <out-dir>/<name>.png.`;
 
 const flags = new Set([
@@ -47,6 +51,7 @@ const flags = new Set([
     "--click",
     "--type",
     "--key",
+    "--fits",
 ]);
 
 function parse(argv) {
@@ -103,6 +108,9 @@ function parse(argv) {
                 break;
             case "--key":
                 options.steps.push({ key: value });
+                break;
+            case "--fits":
+                options.steps.push({ fits: value });
                 break;
             default:
                 throw new Error(`unhandled flag ${flag}`);
@@ -173,6 +181,29 @@ async function resolveSite(page, wait) {
     return id;
 }
 
+async function fits(page, css) {
+    const sideways = await page.evaluate((selector) => {
+        const root = document.querySelector(selector);
+        if (root === null) {
+            return `nothing matches ${selector}`;
+        }
+        if (root.getBoundingClientRect().right > document.documentElement.clientWidth + 1) {
+            return `${selector} reaches past the window's right edge`;
+        }
+        for (const held of [root, ...root.querySelectorAll("*")]) {
+            const overflow = window.getComputedStyle(held).overflowX;
+            const scrolls = overflow === "auto" || overflow === "scroll";
+            if (scrolls && held.clientWidth > 0 && held.scrollWidth > held.clientWidth + 1) {
+                return `a ${held.tagName.toLowerCase()} inside ${selector} scrolls sideways: ${held.scrollWidth}px of content in ${held.clientWidth}px`;
+            }
+        }
+        return null;
+    }, css);
+    if (sideways !== null) {
+        throw new Error(sideways);
+    }
+}
+
 async function apply(page, steps) {
     for (const step of steps) {
         if (step.click !== undefined) {
@@ -196,7 +227,11 @@ async function apply(page, steps) {
             await page.waitForTimeout(step.wait);
             continue;
         }
-        throw new Error(`a step names none of click, type, key or wait: ${JSON.stringify(step)}`);
+        if (step.fits !== undefined) {
+            await fits(page, step.fits);
+            continue;
+        }
+        throw new Error(`a step names none of click, type, key, wait or fits: ${JSON.stringify(step)}`);
     }
 }
 

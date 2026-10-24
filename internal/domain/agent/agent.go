@@ -49,6 +49,7 @@ type Conversation struct {
 	Title        string
 	Mode         Mode
 	TitleSettled bool
+	Brief        string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

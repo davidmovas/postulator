@@ -12,24 +12,25 @@ func requireWoo(t *testing.T, env environment) {
 	t.Helper()
 
 	if !env.woo {
-		t.Fatalf("this suite needs WooCommerce; run `task e2e:reset` with E2E_WOO=1")
+		t.Fatalf("this suite needs WooCommerce; run `task e2e:reset STAND=%s` with E2E_WOO=1", env.stand)
 	}
 }
 
 func TestProductCategoryIsListed(t *testing.T) {
 	c, env := newClient(t)
 	requireWoo(t, env)
+	facts := standOf(t, env)
 
-	item := findBySlug(t, c, "product_cat", "postulator-koffein")
+	item := findBySlug(t, c, "product_cat", facts.category)
 
 	if item.Type != "product_cat" {
 		t.Errorf("type = %q, want product_cat", item.Type)
 	}
-	if item.Title != "Koffein" {
-		t.Errorf("title = %q, want Koffein", item.Title)
+	if item.Title != facts.categoryTitle {
+		t.Errorf("title = %q, want %s", item.Title, facts.categoryTitle)
 	}
-	if item.Path != "/product-category/postulator-koffein/" {
-		t.Errorf("path = %q, want /product-category/postulator-koffein/", item.Path)
+	if want := "/product-category/" + facts.category + "/"; item.Path != want {
+		t.Errorf("path = %q, want %s", item.Path, want)
 	}
 	if item.Parent != 0 {
 		t.Errorf("parent = %d, want 0", item.Parent)
@@ -43,7 +44,7 @@ func TestProductCategoryIsListed(t *testing.T) {
 	if len(item.Links) != 0 {
 		t.Errorf("links = %v, want none for a term", item.Links)
 	}
-	if item.ContentHash != hashOf("Caffeine products.") {
+	if item.ContentHash != hashOf(facts.categoryDescription) {
 		t.Errorf("contentHash = %q, want the hash of the term description", item.ContentHash)
 	}
 	if _, err := time.Parse(time.RFC3339, item.Modified); err != nil {
@@ -54,18 +55,18 @@ func TestProductCategoryIsListed(t *testing.T) {
 func TestProductIsListedWithItsLinks(t *testing.T) {
 	c, env := newClient(t)
 	requireWoo(t, env)
+	facts := standOf(t, env)
 
-	item := findBySlug(t, c, "product", "postulator-powder")
+	item := findBySlug(t, c, "product", facts.simpleProduct)
 
 	if item.Type != "product" {
 		t.Errorf("type = %q, want product", item.Type)
 	}
-	if item.Title != "Powder" {
-		t.Errorf("title = %q, want Powder", item.Title)
+	if item.Title != facts.simpleProductTitle {
+		t.Errorf("title = %q, want %s", item.Title, facts.simpleProductTitle)
 	}
-	want := link{Href: "/product-category/postulator-koffein/", Anchor: "Koffein"}
-	if len(item.Links) != 1 || item.Links[0] != want {
-		t.Fatalf("links = %v, want exactly [%v]", item.Links, want)
+	if len(item.Links) != 1 || item.Links[0] != facts.simpleProductLink {
+		t.Fatalf("links = %v, want exactly [%v]", item.Links, facts.simpleProductLink)
 	}
 }
 

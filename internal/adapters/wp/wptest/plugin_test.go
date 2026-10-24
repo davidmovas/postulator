@@ -33,8 +33,11 @@ func TestTheManifestReportsTheFrozenCapabilities(t *testing.T) {
 	}
 	decode(t, payload, &manifest)
 
-	want := []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"}
-	if manifest.Version != "1.2.0" || len(manifest.Capabilities) != len(want) {
+	want := []string{
+		"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms", "settings",
+		"meta_write", "guarded_write",
+	}
+	if manifest.Version != "1.5.2" || len(manifest.Capabilities) != len(want) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	for index, capability := range want {
@@ -96,7 +99,7 @@ func TestContentCarriesPathsHashesHeadingsAndInternalLinks(t *testing.T) {
 		Type:    wptest.TypePage,
 		Title:   "Powder",
 		Parent:  parent.ID,
-		Content: `<h1>Powder</h1><p>Koffein ist ein Alkaloid.</p><p><a href="/Koffein//">Koffein</a> and <a href="https://example.com/x">away</a> and <a href="mailto:a@b.c">mail</a></p>`,
+		Content: `<h1>Powder</h1><p>Koffein ist ein Alkaloid.</p><p><a href="/Koffein//">Koffein</a> and <a href="https://example.com/x">away</a> and <a href="mailto:a@b.c">mail</a> and <a href="dosage/">Dosage</a></p>`,
 	})
 
 	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content?types=page", nil, true)
@@ -134,11 +137,14 @@ func TestContentCarriesPathsHashesHeadingsAndInternalLinks(t *testing.T) {
 	if len(child.Modified) < 20 || child.Modified[len(child.Modified)-1] != 'Z' {
 		t.Errorf("modified = %q, want RFC3339 with a UTC offset", child.Modified)
 	}
-	if len(child.Links) != 1 {
-		t.Fatalf("links = %+v, want only the internal one", child.Links)
+	if len(child.Links) != 2 {
+		t.Fatalf("links = %+v, want only the two internal ones", child.Links)
 	}
 	if child.Links[0].Href != "/koffein/" || child.Links[0].Anchor != "Koffein" {
 		t.Errorf("link = %+v, want a collapsed and slash-wrapped path", child.Links[0])
+	}
+	if child.Links[1].Href != "/koffein/powder/dosage/" || child.Links[1].Anchor != "Dosage" {
+		t.Errorf("link = %+v, want the relative href resolved under the page as a browser does", child.Links[1])
 	}
 }
 
@@ -179,6 +185,27 @@ func TestContentPagesWithAnOpaqueCursorAndAnExclusiveSince(t *testing.T) {
 	decode(t, payload, &first)
 	if len(first.Items) != 1 {
 		t.Errorf("since returned %d items, want 1; the bound is exclusive", len(first.Items))
+	}
+}
+
+func TestTheContentListingLeavesOutTrashAndAutoDrafts(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	server.Seed(
+		wptest.Item{Type: wptest.TypePage, Title: "Kept"},
+		wptest.Item{Type: wptest.TypePage, Title: "Thrown", Status: "trash"},
+		wptest.Item{Type: wptest.TypePost, Title: "Unsaved", Status: "auto-draft"},
+	)
+
+	var listed struct {
+		Items []map[string]any `json:"items"`
+	}
+	_, payload := call(t, server, http.MethodGet, "/wp-json/postulator/v1/content", nil, true)
+	decode(t, payload, &listed)
+
+	if len(listed.Items) != 1 || listed.Items[0]["title"] != "Kept" {
+		t.Errorf("content listed %+v, want only the kept page", listed.Items)
 	}
 }
 
@@ -544,6 +571,28 @@ func TestAnEditJustBeforeARawWriteIsAConflict(t *testing.T) {
 	}
 }
 
+func TestTheNextItemUpdateFailsAndLeavesTheItemAsItWas(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Content: "<p>One.</p>"})
+	path := "/wp-json/wp/v2/pages/" + itoa(seeded[0].ID)
+
+	server.FailNextItemUpdate(http.StatusBadRequest)
+	if response, _ := call(t, server, http.MethodGet, path, nil, true); response.StatusCode != http.StatusOK {
+		t.Fatalf("a read was failed with %d, want only the next update failed", response.StatusCode)
+	}
+	if response, _ := call(t, server, http.MethodPost, path, []byte(`{"title":"Tea"}`), true); response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("the update answered %d, want the injected 400", response.StatusCode)
+	}
+	if stored, _ := server.Lookup(seeded[0].ID); stored.Title != "Coffee" {
+		t.Fatalf("the failed update landed: %q", stored.Title)
+	}
+	if response, _ := call(t, server, http.MethodPost, path, []byte(`{"title":"Tea"}`), true); response.StatusCode != http.StatusOK {
+		t.Fatalf("the update after it answered %d, want it through", response.StatusCode)
+	}
+}
+
 func TestRewriteReplacesTheStoredContent(t *testing.T) {
 	t.Parallel()
 
@@ -587,7 +636,7 @@ func tokenIn(t *testing.T, link string) (token string, query url.Values) {
 	if err != nil {
 		t.Fatalf("parse %s: %v", link, err)
 	}
-	return parsed.Query().Get("postulator_preview"), parsed.Query()
+	return parsed.Query().Get("preview_token"), parsed.Query()
 }
 
 func TestTheManifestCanNameFewerCapabilities(t *testing.T) {

@@ -118,8 +118,18 @@ func TestTheDerivedGroupingsReadTheirGoPredicates(t *testing.T) {
 			"bad_path", "unknown_parent", "unknown_related", "self_edge", "cycle", "ambiguous_parent", "ambiguous_entity",
 			"scope_clash",
 		},
+		"findingBulkOptions":         {"ignore", "accept_site", "accept_workbook", "set_type", "propose_entity"},
 		"offGraphLinkClasses":        {"self", "external", "unknown_internal"},
-		"runKindsWithTheirOwnRecipe": {"relink", "sync", "repair", "revert"},
+		"runKindsWithTheirOwnRecipe": {"relink", "sync", "revert", "edit"},
+		"startableRunKinds":          {"generate", "relink", "audit", "sync", "import", "custom"},
+		"scopableFieldKeys": {
+			"title", "excerpt", "body", "seo_title", "seo_description", "seo_canonical", "product_description",
+			"product_short_description", "variation_description", "image_alt", "image_title", "upsells", "cross_sells",
+		},
+		"packFieldKeys": {
+			"title", "excerpt", "body", "seo_title", "seo_description", "product_description",
+			"product_short_description", "variation_description", "image_alt", "image_title",
+		},
 	}
 
 	seen := make(map[string][]string)

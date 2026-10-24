@@ -9,6 +9,7 @@ import { copy } from "../../copy/index.js";
 import type { SelectOption } from "../../ui/index.js";
 import {
     Button,
+    HubIcon,
     LinkOffIcon,
     Panel,
     PanelHeader,
@@ -19,7 +20,7 @@ import {
 } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
 import type { EntityIndex } from "./entities.js";
-import { entityIcon, formatScore, entityKindLabel } from "../graph/labels.js";
+import { formatScore } from "../graph/labels.js";
 
 const noEntity = "none";
 
@@ -43,7 +44,6 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
     }, [page.id, page.entityId]);
 
     const entity = entityQuery.data?.entity;
-    const Icon = entityIcon(entity?.kind ?? "");
     const isCanonical = entity !== undefined && entity.canonicalPageId === page.id;
     const canonicalElsewhere =
         entity !== undefined && entity.canonicalPageId !== null && entity.canonicalPageId !== page.id;
@@ -76,11 +76,11 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                     <p className="text-xs text-ink-dim">{copy.pages.detail.entityMissing}</p>
                 ) : (
                     <div className="flex items-center gap-2">
-                        <Icon size={18} className="shrink-0 text-accent" />
+                        <HubIcon size={18} className="shrink-0 text-accent" />
                         <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm font-semibold text-ink">{entity.name}</span>
                             <span className="font-mono text-2xs text-ink-faint">
-                                {copy.pages.detail.entityMeta(entityKindLabel(entity.kind), formatScore(entity.score))}
+                                {copy.pages.detail.entityMeta(formatScore(entity.score))}
                             </span>
                         </div>
                     </div>

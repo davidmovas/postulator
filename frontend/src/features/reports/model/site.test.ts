@@ -17,15 +17,14 @@ function page(overrides: Partial<Page> = {}): Page {
         h1: "A",
         metaTitle: "",
         metaDescription: "",
-        canonical: "",
         keywords: [],
         notes: [],
         status: "published",
         entityId: "e-1",
         templateId: null,
-        contentHash: "",
-        observed: { link: "", slug: "", status: "", title: "", h1: "" },
-        mismatches: [],
+        pageTypeId: null,
+        typeSource: "",
+        typeReason: "",
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,
@@ -40,8 +39,10 @@ function entity(overrides: Partial<Entity> = {}): Entity {
         id: "e-1",
         siteId: "site-1",
         name: "Alpha",
-        kind: "topic",
         intent: "",
+        definition: "",
+        facts: null,
+        notes: null,
         keywords: null,
         anchors: null,
         scopeEntityId: null,
@@ -74,6 +75,7 @@ function audit(overrides: Partial<PageAudit> = {}): PageAudit {
         unpublished: 0,
         inbound: 1,
         orphan: false,
+        byType: { breadcrumb: 0, listing: 0, navigation: 0, contextual: 2, unknown: 0 },
         ...overrides,
     };
 }
@@ -177,6 +179,14 @@ describe("coverageRows", () => {
         expect(rows[0]).toMatchObject({ reason: noPage, links: 0, path: "" });
         expect(rows[1]).toMatchObject({ reason: "planned", links: 1, path: "/b/" });
         expect(rows[2]).toMatchObject({ reason: "published", links: 4 });
+    });
+
+    it("names the type of each canonical page and leaves an untyped one blank", () => {
+        const typed = [page({ id: "p-1", path: "/a/", status: "published", pageTypeId: "t-hub" }), pages[1]];
+        const rows = coverageRows(entities, typed, audits, new Map([["t-hub", "Category"]]));
+        expect(rows.find((row) => row.name === "Alpha")?.type).toBe("Category");
+        expect(rows.find((row) => row.name === "Beta")?.type).toBe("");
+        expect(rows.find((row) => row.name === "Gamma")?.type).toBe("");
     });
 
     it("breaks a tie on the weaker linking", () => {

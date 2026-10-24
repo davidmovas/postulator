@@ -1,15 +1,17 @@
 import { copy } from "../../../../copy/index.js";
+import { tokens as formatTokens } from "../../../../domain/format.js";
 
 export const families = [
     "sites",
     "graph",
     "pages",
+    "pagetypes",
     "templates",
-    "policies",
     "runs",
     "sync",
     "reports",
     "imports",
+    "findings",
     "models",
     "content",
     "schedules",
@@ -21,8 +23,8 @@ const nouns: Readonly<Record<string, [string, string]>> = {
     sites: ["site", "sites"],
     graph: ["entity", "entities"],
     pages: ["page", "pages"],
+    pagetypes: ["page type", "page types"],
     templates: ["template", "templates"],
-    policies: ["policy", "policies"],
     runs: ["run", "runs"],
     imports: ["mapping", "mappings"],
     models: ["model", "models"],
@@ -136,6 +138,72 @@ function labelOf(record: Record<string, unknown>): string | null {
     return null;
 }
 
+function textAt(record: Record<string, unknown> | null, key: string): string {
+    const held = record?.[key];
+    return typeof held === "string" ? held : "";
+}
+
+function recordAt(record: Record<string, unknown> | null, key: string): Record<string, unknown> | null {
+    const held = record?.[key];
+    return isRecord(held) ? held : null;
+}
+
+function countAt(record: Record<string, unknown> | null, key: string): number {
+    const held = record?.[key];
+    return Array.isArray(held) ? held.length : 0;
+}
+
+function exploreSummary(result: Record<string, unknown>): string | null {
+    const said = copy.agent.transcript.tool.explore;
+    switch (result["view"]) {
+        case "tree": {
+            const tree = recordAt(result, "tree");
+            const nodes = recordAt(tree, "nodes");
+            return said.tree(countAt(nodes, "items"), textAt(recordAt(tree, "parent"), "path"), nodes?.["hasMore"] === true);
+        }
+        case "links": {
+            const links = recordAt(result, "links");
+            return said.links(textAt(recordAt(links, "page"), "path"), countAt(links, "required"));
+        }
+        case "gaps": {
+            const gaps = recordAt(result, "gaps");
+            return said.gaps(countAt(gaps, "items"), gaps?.["hasMore"] === true);
+        }
+        case "pack": {
+            const pack = recordAt(result, "pack");
+            const size = pack?.["tokens"];
+            return said.pack(textAt(pack, "path"), formatTokens(typeof size === "number" ? size : 0));
+        }
+        default:
+            return null;
+    }
+}
+
+function cardsSummary(result: Record<string, unknown>): string | null {
+    const said = copy.agent.transcript.tool.cards;
+    const skipped = countAt(result, "skipped");
+    const done = Array.isArray(result["entities"])
+        ? said.written(countAt(result, "entities"))
+        : Array.isArray(result["proposals"])
+          ? said.proposed(countAt(result, "proposals"))
+          : null;
+    if (done === null) {
+        return null;
+    }
+    return skipped === 0 ? done : `${done}, ${said.skipped(skipped)}`;
+}
+
+function pageSummary(result: Record<string, unknown>): string | null {
+    const path = textAt(recordAt(recordAt(result, "page"), "page"), "path");
+    return path === "" ? null : copy.agent.transcript.tool.explore.page(path);
+}
+
+const summaries: Readonly<Record<string, (result: Record<string, unknown>) => string | null>> = {
+    pages_get: pageSummary,
+    sites_explore: exploreSummary,
+    graph_propose_cards: cardsSummary,
+};
+
 export function resultSummary(tool: string, result: unknown): string {
     if (Array.isArray(result)) {
         return listSummary(tool, result, false);
@@ -155,6 +223,10 @@ export function resultSummary(tool: string, result: unknown): string {
     const cut = truncationOf(result);
     if (cut !== null) {
         return copy.agent.transcript.tool.cutSummary(kilobytes(cut.totalBytes));
+    }
+    const special = summaries[tool]?.(result) ?? null;
+    if (special !== null) {
+        return special;
     }
     if (Array.isArray(result["items"])) {
         return listSummary(tool, result["items"], result["hasMore"] === true);

@@ -12,6 +12,7 @@ export interface NumberInputProps {
     min?: number;
     max?: number;
     step?: number;
+    disabled?: boolean;
     className?: string;
 }
 
@@ -24,6 +25,7 @@ export function NumberInput({
     min,
     max,
     step,
+    disabled = false,
     className,
 }: NumberInputProps): ReactElement {
     const [text, setText] = useState(() => String(value));
@@ -42,6 +44,7 @@ export function NumberInput({
             min={min}
             max={max}
             step={step}
+            disabled={disabled}
             className={className}
             value={text}
             onChange={(event) => {

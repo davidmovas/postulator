@@ -3,6 +3,7 @@ package pages_test
 import (
 	"encoding/json"
 	stderrors "errors"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -13,9 +14,13 @@ import (
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -45,9 +50,9 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	return harness{
 		service: pages.New(pages.Deps{
-			Pages: sqlite.NewPageRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
-			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store),
-			UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
+			Pages: sqlite.NewPageRepo(store), Types: sqlite.NewPageTypeRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
+			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
+			Findings: sqlite.NewFindingRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
 		}),
 		store:    store,
 		recorder: recorder,
@@ -294,6 +299,53 @@ func TestCreateRefusesCannibalization(t *testing.T) {
 	}
 }
 
+func TestAPageTypeIsSetByAPersonOrTheAgent(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+
+	types := sqlite.NewPageTypeRepo(h.store)
+	other := sqlitetest.Site(t, h.store, "other")
+	kinds := map[string]pagetype.Type{}
+	for _, kind := range []pagetype.Type{
+		{ID: id.New(), SiteID: h.siteID, Name: "Hub", Preset: pagetype.Hub},
+		{ID: id.New(), SiteID: h.siteID, Name: "Pillar", Preset: pagetype.Hub},
+		{ID: id.New(), SiteID: other.ID, Name: "Hub", Preset: pagetype.Hub},
+	} {
+		kind.CreatedAt, kind.UpdatedAt = sqlitetest.Stamp, sqlitetest.Stamp
+		if err := types.Insert(t.Context(), kind); err != nil {
+			t.Fatalf("Insert %s: %v", kind.Name, err)
+		}
+		kinds[kind.SiteID+kind.Name] = kind
+	}
+	page := h.page(t, "/peptides/", nil)
+	h.recorder.Reset()
+
+	set, err := h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[h.siteID+"Pillar"].ID})
+	if err != nil {
+		t.Fatalf("SetType: %v", err)
+	}
+	if set.Page.PageTypeID == nil || *set.Page.PageTypeID != kinds[h.siteID+"Pillar"].ID || set.Page.TypeSource != "manual" || set.Page.TypeReason != "user" {
+		t.Errorf("the page = type %v %s %s, want Pillar set by a person", set.Page.PageTypeID, set.Page.TypeSource, set.Page.TypeReason)
+	}
+	if seen := h.recorder.Events(); len(seen) != 1 || seen[0].Type != events.PagesChanged {
+		t.Errorf("events = %+v, want pages.changed", seen)
+	}
+
+	set, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[h.siteID+"Hub"].ID, By: pagemap.TypeByAI})
+	if err != nil || set.Page.TypeReason != "ai" {
+		t.Errorf("the agent's type = %+v %v, want the reason ai", set.Page, err)
+	}
+	if _, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[other.ID+"Hub"].ID}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("another site's type = %q, want INVALID", errors.CodeOf(err))
+	}
+	if _, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: "no-such-type"}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("an unknown type = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+	if _, err = h.service.SetType(t.Context(), pages.SetTypeRequest{PageID: page.ID, PageTypeID: kinds[h.siteID+"Hub"].ID, By: pagemap.TypeByListing}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an automatic reason through SetType = %q, want INVALID", errors.CodeOf(err))
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -326,7 +378,7 @@ func TestUpdate(t *testing.T) {
 	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: child.ID, Path: ptr("/blog/")}); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("moving onto a taken path code = %q, want CONFLICT", errors.CodeOf(err))
 	}
-	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: child.ID, WPType: ptr("widget")}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: child.ID, WPType: ptr("not a type")}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("bad wp type code = %q, want INVALID", errors.CodeOf(err))
 	}
 	if _, err = h.service.Update(t.Context(), pages.UpdateRequest{ID: "missing", Title: ptr("x")}); !errors.IsCode(err, errors.NotFound) {
@@ -380,6 +432,49 @@ func TestAssignTemplateMovesTheNamedPagesOnly(t *testing.T) {
 		t.Fatalf("AssignTemplate again = %+v, %v, want nothing to change", again, err)
 	}
 	h.wantEvents(t)
+}
+
+func TestMappingAPageClearsItsMissingEntityFinding(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	shoes := h.entity(t, "Shoes")
+	boots := h.entity(t, "Boots")
+	first := h.page(t, "/shoes/", nil)
+	second := h.page(t, "/boots/", nil)
+	repo := sqlite.NewFindingRepo(h.store)
+	for _, page := range []string{first.ID, second.ID} {
+		raised, err := finding.New(finding.Finding{
+			ID: id.New(), SiteID: h.siteID, PageID: &page, Code: finding.PageWithoutEntity, SubjectKey: finding.SubjectPage(page),
+			CreatedAt: h.clock.Now(), UpdatedAt: h.clock.Now(),
+		})
+		if err != nil {
+			t.Fatalf("build the finding: %v", err)
+		}
+		if err = repo.Upsert(t.Context(), raised); err != nil {
+			t.Fatalf("raise the finding: %v", err)
+		}
+	}
+
+	if _, err := h.service.MapToEntity(t.Context(), pages.MapToEntityRequest{PageID: first.ID, EntityID: shoes.ID}); err != nil {
+		t.Fatalf("MapToEntity: %v", err)
+	}
+	if _, err := h.service.SetCanonical(t.Context(), pages.SetCanonicalRequest{EntityID: boots.ID, PageID: second.ID}); err != nil {
+		t.Fatalf("SetCanonical: %v", err)
+	}
+	open, err := repo.OpenBySite(t.Context(), h.siteID, finding.PageWithoutEntity)
+	if err != nil || len(open) != 0 {
+		t.Fatalf("open findings after mapping both pages = %d %v, want none", len(open), err)
+	}
+	all, err := repo.ListBySite(t.Context(), h.siteID, finding.Resolved)
+	if err != nil || len(all) != 2 {
+		t.Fatalf("resolved findings = %d %v, want both", len(all), err)
+	}
+	for i := range all {
+		if all[i].ResolvedBy != finding.ResolvedByModel || all[i].Resolution != finding.ResolutionPageMapped {
+			t.Errorf("a mapped page's finding = %s by %s, want page_mapped by the model, so an unmap opens it again", all[i].Resolution, all[i].ResolvedBy)
+		}
+	}
 }
 
 func TestMapUnmapAndCanonical(t *testing.T) {
@@ -503,6 +598,55 @@ func TestListAndTree(t *testing.T) {
 	}
 	if _, err = h.service.Tree(t.Context(), pages.TreeRequest{}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("missing site code = %q, want INVALID", errors.CodeOf(err))
+	}
+}
+
+func TestAPageDriftedWhenItsBodyMovedFromItsBase(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	edited := h.page(t, "/edited/", nil)
+	ours := h.page(t, "/ours/", nil)
+	h.page(t, "/planned/", nil)
+	bodies := sqlite.NewPageBodyRepo(h.store)
+	later := sqlitetest.Stamp.Add(time.Hour)
+	for _, step := range []func() error{
+		func() error { return bodies.Record(t.Context(), ours.ID, "<p>Ours.</p>", sqlitetest.Stamp) },
+		func() error { return bodies.Record(t.Context(), edited.ID, "<p>Ours.</p>", sqlitetest.Stamp) },
+		func() error {
+			return bodies.Observe(t.Context(), block.Snapshot{
+				PageID: edited.ID, Raw: "<p>Edited by the client.</p>", Hash: block.BodyHash("<p>Edited by the client.</p>"),
+				Kind: block.Classic, ObservedAt: later,
+			})
+		},
+	} {
+		if err := step(); err != nil {
+			t.Fatalf("store a body: %v", err)
+		}
+	}
+
+	listed, err := h.service.List(t.Context(), pages.ListRequest{SiteID: h.siteID, ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: "path"}}})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	drifted := map[string]bool{}
+	for _, page := range listed.Items {
+		drifted[page.Path] = page.Drift
+	}
+	if want := map[string]bool{"/edited/": true, "/ours/": false, "/planned/": false}; !maps.Equal(drifted, want) {
+		t.Errorf("drift = %v, want %v", drifted, want)
+	}
+	tree, err := h.service.Tree(t.Context(), pages.TreeRequest{SiteID: h.siteID})
+	if err != nil || len(tree.Roots) != 3 || !tree.Roots[0].Page.Drift || tree.Roots[1].Page.Drift {
+		t.Errorf("Tree = %+v, %v; want the edited page alone drifted", tree, err)
+	}
+	got, err := h.service.Get(t.Context(), pages.GetRequest{ID: edited.ID})
+	if err != nil || !got.Page.Drift {
+		t.Errorf("Get = %+v, %v; want the edited page drifted", got.Page, err)
+	}
+	updated, err := h.service.Update(t.Context(), pages.UpdateRequest{ID: edited.ID, Title: ptr("Edited, renamed")})
+	if err != nil || !updated.Page.Drift {
+		t.Errorf("Update = %+v, %v; want the page still drifted", updated.Page, err)
 	}
 }
 
@@ -753,7 +897,7 @@ func TestAPageShowsTheNotesItCarries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the page: %v", err)
 	}
-	stored.Notes = []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}}
+	stored.Notes = []note.Note{{Label: "Intent Owner", Text: "Commercial"}}
 	if err = repo.Update(t.Context(), stored); err != nil {
 		t.Fatalf("store the notes: %v", err)
 	}

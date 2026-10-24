@@ -13,11 +13,15 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -28,8 +32,9 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Millisecond
-	pollTimeout  = 20 * time.Second
+	pollInterval   = 5 * time.Millisecond
+	pollFallback   = 10 * time.Minute
+	deadlineMargin = 30 * time.Second
 
 	goodDraft = `{"title":"Espresso guide","h1":"Espresso guide","sections":[` +
 		`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"},` +
@@ -72,6 +77,20 @@ func (stubTuning) Tier(domainllm.Role) domainllm.ServiceTier {
 	return domainllm.TierDefault
 }
 
+func (stubTuning) InputBudget(domainllm.Role) int {
+	return 0
+}
+
+func siteModelOf(store *sqlite.Store, types *pagetypes.Service) *sitemodel.Service {
+	return sitemodel.New(sitemodel.Deps{
+		Budgets: stubTuning{}, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
+		Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store), Entities: sqlite.NewEntityRepo(store),
+		Edges: sqlite.NewEdgeRepo(store), Types: types, Terms: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: sqlite.NewPageLinkRepo(store),
+		Findings: sqlite.NewFindingRepo(store),
+	})
+}
+
 type recorder struct {
 	types []events.Type
 	mu    sync.Mutex
@@ -92,8 +111,38 @@ type factory struct {
 	log    *sqlite.RunEventRepo
 	llm    *fake.Scripted
 	bus    *recorder
+	types  *pagetypes.Service
 	siteID string
 	pageID string
+}
+
+func typedSite(t *testing.T, store *sqlite.Store, siteID string, rules field.LinkRules) *pagetypes.Service {
+	t.Helper()
+
+	service := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: silentPublisher{}, Clock: clock.System{},
+	})
+	if err := service.Seed(t.Context(), siteID); err != nil {
+		t.Fatalf("seed the page types: %v", err)
+	}
+	listed, err := service.List(t.Context(), pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("list the page types: %v", err)
+	}
+	for i := range listed.Types {
+		preset := pagetype.Preset(listed.Types[i].Preset)
+		if !preset.Writable() {
+			continue
+		}
+		links := field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+		if _, err = service.SetScope(t.Context(), pagetypes.SetScopeRequest{
+			PageTypeID: listed.Types[i].ID, Field: string(pagetype.LinkField(preset)), Enabled: true, AIWrites: true, Links: links,
+		}); err != nil {
+			t.Fatalf("give the %s type the fixture's rules: %v", preset, err)
+		}
+	}
+	return service
 }
 
 func recipe() []template.StepSpec {
@@ -112,42 +161,32 @@ func spec() template.TemplateSpec {
 			{Heading: "About", Intent: "Explain the topic", TargetWords: 120, Required: true},
 			{Heading: "Brewing", Intent: "Give practical advice", TargetWords: 120},
 		},
-		Tone:         "practical",
-		KeywordRules: template.KeywordRules{PrimaryInH1: true, PrimaryInFirstParagraph: true},
-		LinkRules: template.LinkRules{
-			UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 5, MaxPerTarget: 1,
-		},
+		Tone:          "practical",
+		KeywordRules:  template.KeywordRules{PrimaryInH1: true, PrimaryInFirstParagraph: true},
 		ModelProfiles: map[domainllm.Role]domainllm.ModelRef{},
 		Recipe:        recipe(),
 	}
 }
 
-func newFactory(t *testing.T, draft string) *factory {
-	t.Helper()
-	return newFactoryWithSpec(t, draft, spec())
+func linkRules() field.LinkRules {
+	return field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 5, MaxPerTarget: 1}
 }
 
-func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec) *factory {
+func newFactory(t *testing.T, draft string) *factory {
+	t.Helper()
+	return newFactoryWithRules(t, draft, linkRules())
+}
+
+func newFactoryWithRules(t *testing.T, draft string, rules field.LinkRules) *factory {
 	t.Helper()
 
 	store := sqlitetest.Open(t)
 	at := sqlitetest.Stamp
 
-	policyRepo := sqlite.NewLinkPolicyRepo(store)
-	policy := template.LinkPolicy{
-		ID: id.New(), Scope: template.ScopeGlobal, Name: templates.DefaultPolicyName,
-		Rules:          chosen.LinkRules,
-		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: template.AnchorPreferUser,
-		CreatedAt: at, UpdatedAt: at,
-	}
-	if err := policyRepo.Insert(t.Context(), policy); err != nil {
-		t.Fatalf("insert the link policy: %v", err)
-	}
-
 	templateRepo := sqlite.NewTemplateRepo(store)
 	base := template.Template{
-		ID: id.New(), Scope: template.ScopeGlobal, Name: "Guide", PageKind: "guide", Version: 1,
-		Spec: chosen, CreatedAt: at, UpdatedAt: at,
+		ID: id.New(), Scope: template.ScopeGlobal, Name: "Guide", Version: 1,
+		Spec: spec(), CreatedAt: at, UpdatedAt: at,
 	}
 	if err := templateRepo.Insert(t.Context(), base); err != nil {
 		t.Fatalf("insert the template: %v", err)
@@ -158,7 +197,7 @@ func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec
 		ID: id.New(), Name: "Shop", BaseURL: "https://shop.example.com", Username: "editor",
 		Status: site.StatusActive, Plugin: site.PluginState{Capabilities: []string{}},
 		Defaults: site.Defaults{
-			TemplateID: &base.ID, LinkPolicyID: &policy.ID,
+			TemplateID:    &base.ID,
 			ModelProfiles: map[domainllm.Role]domainllm.ModelRef{},
 		},
 		CreatedAt: at, UpdatedAt: at,
@@ -206,6 +245,7 @@ func newFactoryWithSpec(t *testing.T, draft string, chosen template.TemplateSpec
 
 	return &factory{
 		store: store,
+		types: typedSite(t, store, owner.ID, rules),
 		runs:  sqlite.NewRunRepo(store),
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
@@ -224,7 +264,7 @@ func seedEntity(t *testing.T, repo *sqlite.EntityRepo, siteID, name, anchor stri
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(anchor),
+		ID: id.New(), SiteID: siteID, Name: name, Keywords: keyword.Of(anchor),
 		Anchors: []graph.Anchor{{Text: anchor, Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
@@ -259,8 +299,8 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 	t.Helper()
 
 	specs := templates.New(
-		sqlite.NewTemplateRepo(f.store), sqlite.NewLinkPolicyRepo(f.store), sqlite.NewPageRepo(f.store),
-		sqlite.NewEntityRepo(f.store), sqlite.NewSiteRepo(f.store), f.store, silentPublisher{}, clock.System{},
+		sqlite.NewTemplateRepo(f.store), sqlite.NewPageRepo(f.store), sqlite.NewEntityRepo(f.store),
+		sqlite.NewSiteRepo(f.store), sqlite.NewPageTypeRepo(f.store), f.store, silentPublisher{}, clock.System{},
 	)
 
 	registry := run.NewRegistry()
@@ -269,8 +309,11 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 		Edges:    sqlite.NewEdgeRepo(f.store),
 		Pages:    sqlite.NewPageRepo(f.store),
 		Sites:    sqlite.NewSiteRepo(f.store),
-		Policies: specs,
+		Types:    f.types,
 		Profiles: stubProfiles{},
+		Tuning:   stubTuning{},
+		Models:   stubCatalog{},
+		Pictures: siteModelOf(f.store, f.types),
 		LLM:      f.llm,
 	}); err != nil {
 		t.Fatalf("register the steps: %v", err)
@@ -278,7 +321,7 @@ func (f *factory) engine(t *testing.T) *runtime.Engine {
 
 	engine := runtime.New(runtime.Deps{
 		Runs: f.runs, Items: f.items, Artifacts: f.blobs, Execs: sqlite.NewStepExecRepo(f.store),
-		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs, Keys: stubKeys{},
+		Events: f.log, Pages: sqlite.NewPageRepo(f.store), Specs: specs, Types: f.types, Keys: stubKeys{},
 		Spend: sqlite.NewLLMCallRepo(f.store), Catalog: stubCatalog{}, Profiles: stubProfiles{}, Tuning: stubTuning{},
 		UnitOfWork: f.store, Publisher: f.bus,
 	}, registry, runtime.Config{
@@ -299,10 +342,20 @@ func (silentPublisher) Publish(events.Type, any) error {
 	return nil
 }
 
+func waitDeadline(t *testing.T) time.Time {
+	t.Helper()
+
+	held, bounded := t.Deadline()
+	if !bounded {
+		return time.Now().Add(pollFallback)
+	}
+	return held.Add(-deadlineMargin)
+}
+
 func (f *factory) waitForRun(t *testing.T, runID string, want run.Status) run.Run {
 	t.Helper()
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		record, err := f.runs.Get(t.Context(), runID)
 		if err == nil && record.Status == want {
@@ -354,7 +407,7 @@ func sqlitePages(f *factory) *sqlite.PageRepo {
 func waitForItem(t *testing.T, f *factory, runID string, want run.Status) {
 	t.Helper()
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		items, err := f.items.ByRun(t.Context(), runID)
 		if err == nil && len(items) == 1 && items[0].Status == want {

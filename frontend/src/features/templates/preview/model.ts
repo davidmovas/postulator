@@ -22,11 +22,6 @@ export interface Skeleton {
     featured: boolean;
     inlineImages: number;
     sections: SkeletonSection[];
-    parentLinkWithin: number;
-    upDepth: number;
-    downLinks: boolean;
-    childrenSection: boolean;
-    maxLinks: number;
     totalWords: number;
     lengthMin: number;
     lengthMax: number;
@@ -102,11 +97,6 @@ export function skeletonOf(draft: SpecDraft): Skeleton {
             keywordInHeading: section.primaryInHeading,
             imageAfter: slots.has(index),
         })),
-        parentLinkWithin: draft.parentLinkWithinParagraphs,
-        upDepth: draft.upDepth,
-        downLinks: draft.downLinks,
-        childrenSection: draft.childrenSection,
-        maxLinks: draft.maxLinks,
         totalWords,
         lengthMin: draft.lengthMin,
         lengthMax: draft.lengthMax,

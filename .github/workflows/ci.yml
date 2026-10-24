@@ -111,8 +111,12 @@ jobs:
           path: bin/postulator.exe
 
   plugin:
-    name: Companion plugin
+    name: Companion plugin on PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.2', '7.4', '8.5']
     steps:
       - uses: actions/checkout@v7
 
@@ -125,11 +129,36 @@ jobs:
       - name: Install Task
         run: go install github.com/go-task/task/v3/cmd/task@${{ env.TASK_VERSION }}
 
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
       - name: Show the PHP version
         run: php -v
 
       - name: Lint the plugin
-        run: task plugin:lint
+        run: task plugin:lint PHP_MATRIX=0
+
+      - name: Test the plugin
+        run: task plugin:test PHP_MATRIX=0
+
+  plugin-package:
+    name: Companion plugin package
+    needs: plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install Task
+        run: go install github.com/go-task/task/v3/cmd/task@${{ env.TASK_VERSION }}
 
       - name: Package the plugin
         run: task plugin:zip

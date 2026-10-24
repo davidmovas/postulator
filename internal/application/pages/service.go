@@ -6,8 +6,10 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -21,10 +23,14 @@ type pageStore interface {
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	List(ctx context.Context, q pagemap.Query, page paging.Request) (paging.List[pagemap.Page], error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
 }
 
-type linkStore interface {
-	ReplaceForPage(ctx context.Context, pageID string, links []pagemap.PageLink) error
+type typeReader interface {
+	Get(ctx context.Context, id string) (pagetype.Type, error)
+}
+
+type linkReader interface {
 	ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 }
 
@@ -42,16 +48,27 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
+type bodyReader interface {
+	Drifted(ctx context.Context, siteID string) ([]string, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type findingClearer interface {
+	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
+}
+
 type Deps struct {
 	Pages      pageStore
-	Links      linkStore
+	Types      typeReader
+	Links      linkReader
 	Entities   entityStore
 	Edges      edgeReader
 	Sites      siteReader
+	Bodies     bodyReader
+	Findings   findingClearer
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock
@@ -60,10 +77,13 @@ type Deps struct {
 
 type Service struct {
 	pages     pageStore
-	links     linkStore
+	types     typeReader
+	links     linkReader
 	entities  entityStore
 	edges     edgeReader
 	sites     siteReader
+	bodies    bodyReader
+	findings  findingClearer
 	uow       unitOfWork
 	publisher application.Publisher
 	clock     clock.Clock
@@ -72,9 +92,37 @@ type Service struct {
 
 func New(deps Deps) *Service {
 	return &Service{
-		pages: deps.Pages, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
-		uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
+		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
+		bodies: deps.Bodies, findings: deps.Findings, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
 	}
+}
+
+func (s *Service) carried(ctx context.Context, page pagemap.Page) error {
+	if s.findings == nil {
+		return nil
+	}
+	return s.findings.Clear(ctx, page.SiteID, finding.PageWithoutEntity, finding.SubjectPage(page.ID),
+		finding.ResolvedByModel, finding.ResolutionPageMapped, s.now())
+}
+
+func (s *Service) drifted(ctx context.Context, siteID string) (map[string]bool, error) {
+	ids, err := s.bodies.Drifted(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	drifted := make(map[string]bool, len(ids))
+	for _, pageID := range ids {
+		drifted[pageID] = true
+	}
+	return drifted, nil
+}
+
+func (s *Service) viewOf(ctx context.Context, page pagemap.Page) (Page, error) {
+	drifted, err := s.drifted(ctx, page.SiteID)
+	if err != nil {
+		return Page{}, err
+	}
+	return view(page, drifted[page.ID]), nil
 }
 
 func (s *Service) now() time.Time {

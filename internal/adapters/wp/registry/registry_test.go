@@ -75,6 +75,83 @@ func TestClientIsBuiltOnceAndRebuiltOnChange(t *testing.T) {
 	}
 }
 
+func assertAgent(t *testing.T, held *registry.Registry, server *wptest.Server, want string) *wp.Client {
+	t.Helper()
+
+	client, err := held.Client(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("Client: %v", err)
+	}
+	server.ResetRequests()
+	if _, err = client.Probe(t.Context()); err != nil {
+		t.Fatalf("Probe: %v", err)
+	}
+	requests := server.Requests()
+	if len(requests) == 0 {
+		t.Fatal("no request reached the site")
+	}
+	for _, recorded := range requests {
+		if got := recorded.Header.Get("User-Agent"); got != want {
+			t.Errorf("%s %s User-Agent = %q, want %q", recorded.Method, recorded.Path, got, want)
+		}
+	}
+	return client
+}
+
+func TestASiteUserAgentOverrideReachesItsClient(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		agent string
+		want  string
+	}{
+		{name: "a site that names its agent", agent: "Agent/1", want: "Agent/1"},
+		{name: "a site that names none", want: wp.DefaultUserAgent},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			store := newSites(server)
+			store.record.Settings.UserAgent = tc.agent
+			held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+
+			assertAgent(t, held, server, tc.want)
+		})
+	}
+
+	changes := []struct {
+		name  string
+		stamp bool
+	}{
+		{name: "a changed agent under a new stamp rebuilds the client", stamp: true},
+		{name: "a changed agent under the same stamp rebuilds the client"},
+	}
+
+	for _, tc := range changes {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			store := newSites(server)
+			store.record.Settings.UserAgent = "Agent/1"
+			held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+
+			first := assertAgent(t, held, server, "Agent/1")
+			store.record.Settings.UserAgent = "Agent/2"
+			if tc.stamp {
+				store.record.UpdatedAt = store.record.UpdatedAt.Add(1)
+			}
+			if second := assertAgent(t, held, server, "Agent/2"); second == first {
+				t.Fatal("the registry kept a client whose agent changed")
+			}
+		})
+	}
+}
+
 func TestClientReportsWhatItCannotDo(t *testing.T) {
 	t.Parallel()
 
@@ -135,10 +212,15 @@ func TestProbeReadsTheManifest(t *testing.T) {
 		name      string
 		opts      []wptest.Option
 		installed bool
+		outdated  bool
 		seo       string
 		commerce  site.Commerce
 	}{
 		{name: "the plugin answers", installed: true, seo: "yoast", commerce: site.CommerceReady},
+		{
+			name: "an older plugin", opts: []wptest.Option{wptest.WithPluginVersion("0.9.0")},
+			installed: true, outdated: true, seo: "yoast", commerce: site.CommerceReady,
+		},
 		{name: "the plugin is absent", opts: []wptest.Option{wptest.WithoutPlugin()}, commerce: site.CommerceReady},
 		{
 			name: "a site without a store", opts: []wptest.Option{wptest.WithoutCommerce()},
@@ -164,6 +246,9 @@ func TestProbeReadsTheManifest(t *testing.T) {
 			}
 			if found.Commerce != tc.commerce {
 				t.Errorf("commerce = %q, want %q", found.Commerce, tc.commerce)
+			}
+			if found.PluginOutdated != tc.outdated || found.PluginRequired != wp.PluginVersion {
+				t.Errorf("outdated = %t, required = %q, want %t and %q", found.PluginOutdated, found.PluginRequired, tc.outdated, wp.PluginVersion)
 			}
 			state := found.Plugin
 			if state.Installed != tc.installed || state.SEOPlugin != tc.seo {
@@ -270,6 +355,54 @@ func TestTestConnectionFallsBackToTheStoredPassword(t *testing.T) {
 	}
 	if reached.Reach != site.ReachOK || reached.SiteName == "" {
 		t.Fatalf("reachability = %+v", reached)
+	}
+}
+
+func TestTestConnectionSendsTheSavedSitesUserAgent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		saved bool
+		want  string
+	}{
+		{name: "a saved site sends its own agent", saved: true, want: "Agent/1"},
+		{name: "a site not yet saved sends the default", want: wp.DefaultUserAgent},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := wptest.New(t)
+			store := newSites(server)
+			store.record.Settings.UserAgent = "Agent/1"
+			held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
+
+			candidate := site.Candidate{
+				BaseURL: store.record.BaseURL, Username: store.record.Username, Password: wptest.DefaultPassword, AllowInsecure: true,
+			}
+			if tc.saved {
+				candidate.SiteID = siteID
+			}
+			server.ResetRequests()
+			reached, err := held.TestConnection(t.Context(), candidate)
+			if err != nil {
+				t.Fatalf("TestConnection: %v", err)
+			}
+			if reached.Reach != site.ReachOK {
+				t.Fatalf("reachability = %+v", reached)
+			}
+			requests := server.Requests()
+			if len(requests) == 0 {
+				t.Fatal("no request reached the site")
+			}
+			for _, recorded := range requests {
+				if got := recorded.Header.Get("User-Agent"); got != tc.want {
+					t.Errorf("%s %s User-Agent = %q, want %q", recorded.Method, recorded.Path, got, tc.want)
+				}
+			}
+		})
 	}
 }
 

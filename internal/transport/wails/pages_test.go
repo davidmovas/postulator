@@ -6,7 +6,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 	"github.com/davidmovas/postulator/internal/transport/wails"
 )
@@ -53,16 +55,42 @@ func (f pagesFake) PreviewLink(context.Context, pages.PreviewLinkRequest) (pages
 	return answer[pages.PreviewLinkResponse](f.mode)
 }
 
-func (f pagesFake) ReplaceLinks(context.Context, pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error) {
-	return answer[pages.ReplaceLinksResponse](f.mode)
+func (f pagesFake) SetType(context.Context, pages.SetTypeRequest) (pages.SetTypeResponse, error) {
+	return answer[pages.SetTypeResponse](f.mode)
+}
+
+type pageModelsFake struct{ mode failure }
+
+func (f pageModelsFake) Model(context.Context, observe.ModelRequest) (observe.ModelView, error) {
+	return answer[observe.ModelView](f.mode)
+}
+
+func (f pageModelsFake) SummaryOf(context.Context, observe.SummaryRequest) (observe.Summary, error) {
+	return answer[observe.Summary](f.mode)
+}
+
+type siteModelFake struct{ mode failure }
+
+func (f siteModelFake) Pack(context.Context, sitemodel.PackRequest) (sitemodel.PackView, error) {
+	return answer[sitemodel.PackView](f.mode)
+}
+
+func (f siteModelFake) SiteMap(context.Context, sitemodel.MapRequest) (sitemodel.MapView, error) {
+	return answer[sitemodel.MapView](f.mode)
+}
+
+func pagesService(mode failure) *wails.PagesService {
+	return wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: mode}),
+		ready[wails.ModelUseCase](pageModelsFake{mode: mode}), ready[wails.SiteModelUseCase](siteModelFake{mode: mode}))
 }
 
 func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{})), []string{
-		"Create", "Delete", "Get", "List", "MapToEntity", "PreviewLink", "ReplaceLinks", "SetCanonical", "Tree", "Unmap", "Update",
+	assertMethodNames(t, pagesService(missing), []string{
+		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "SetCanonical",
+		"SetType", "SiteMap", "Tree", "Unmap", "Update", "WriterPack",
 	})
-	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: missing})), missingBody)
-	assertEveryMethodConverts(t, wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: panicking})), panicBody)
+	assertEveryMethodConverts(t, pagesService(missing), missingBody)
+	assertEveryMethodConverts(t, pagesService(panicking), panicBody)
 }

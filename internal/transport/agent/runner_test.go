@@ -70,7 +70,7 @@ func TestAToolCallIsFencedAuditedAndKept(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: the tree is empty")
+	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: the tree is empty")
 
 	seen := h.seen()
 	started := slices.Index(seen, events.AgentToolStarted)
@@ -81,17 +81,17 @@ func TestAToolCallIsFencedAuditedAndKept(t *testing.T) {
 	}
 
 	outcome, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
-	if !ok || outcome.Tool != "pages_tree" || outcome.Status != string(domainagent.CallOK) {
+	if !ok || outcome.Tool != "pages_list" || outcome.Status != string(domainagent.CallOK) {
 		t.Fatalf("the finished payload is %+v", h.payload(events.AgentToolFinished))
 	}
 
 	recorded, err := sqlite.NewToolCallRepo(h.store).ByConversation(t.Context(), conversation)
-	if err != nil || len(recorded) != 1 || recorded[0].Tool != "pages_tree" {
+	if err != nil || len(recorded) != 1 || recorded[0].Tool != "pages_list" {
 		t.Fatalf("the tool call ledger holds %+v, %v", recorded, err)
 	}
 
 	stored := h.messages(t, conversation)
-	if len(stored) != 3 || stored[1].Role != "tool" || stored[1].Tool != "pages_tree" {
+	if len(stored) != 3 || stored[1].Role != "tool" || stored[1].Tool != "pages_list" {
 		t.Fatalf("the transcript is %+v", stored)
 	}
 
@@ -238,7 +238,7 @@ func TestEveryModelCallOfATurnIsItsOwnLedgerRow(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_tree{}\nTOOL:pages_list{}\nFAKE: two reads and an answer")
+	h.send(t, conversation, "TOOL:pages_list{}\nTOOL:pages_list{}\nFAKE: two reads and an answer")
 
 	listed, err := h.calls.List(t.Context(), domainllm.CallQuery{ConversationID: conversation},
 		paging.Request{Limit: 50})
@@ -394,7 +394,7 @@ func TestAStoppedTurnKeepsTheRoundsItFinished(t *testing.T) {
 
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
 	if _, err := h.service.Send(t.Context(), agentapp.SendRequest{
-		ConversationID: conversation, Text: "TOOL:pages_tree{}\nFAKE: never said",
+		ConversationID: conversation, Text: "TOOL:pages_list{}\nFAKE: never said",
 	}); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestEveryRoundOfATurnAnnouncesWhatItSpent(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: one read and an answer")
+	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: one read and an answer")
 
 	rounds := make([]events.AgentUsagePayload, 0, 2)
 	for _, event := range h.bus.Events() {
@@ -486,7 +486,7 @@ func TestTheConversationHistoryIsReplayedOnTheNextTurn(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: first")
+	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: first")
 
 	held, body := loadHistory(t, h.store, conversation)
 	roles := make([]llmport.Role, 0, len(held.Items))
@@ -508,7 +508,7 @@ func TestTheConversationHistoryIsReplayedOnTheNextTurn(t *testing.T) {
 	if len(replayed) != len(held.Items)+2 {
 		t.Fatalf("the second turn sent %d messages, want the %d stored and its own two", len(replayed), len(held.Items))
 	}
-	if replayed[1].Text != "TOOL:pages_tree{}\nFAKE: first" || replayed[3].Result == nil {
+	if replayed[1].Text != "TOOL:pages_list{}\nFAKE: first" || replayed[3].Result == nil {
 		t.Fatalf("the second turn did not replay the first: %+v", replayed)
 	}
 	if replayed[len(replayed)-2].Role != llmport.RoleDeveloper || replayed[len(replayed)-1].Text != "FAKE: second" {
@@ -551,7 +551,7 @@ func TestAStoredCallNeverCarriesACredential(t *testing.T) {
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
 	model := fake.New(fake.WithScript(func(string) fake.Turn {
-		return fake.Turn{Tool: "pages_tree", Args: json.RawMessage(`{"token":"` + secret + `"}`), Text: "refused"}
+		return fake.Turn{Tool: "pages_list", Args: json.RawMessage(`{"token":"` + secret + `"}`), Text: "refused"}
 	}))
 	h := build(t, store, model, &applicationtest.Recorder{})
 	h.siteID = owner.ID
@@ -650,7 +650,8 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeConfirm)
-	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: the tree")
+	sqlitetest.Page(t, h.store, h.siteID, "/coffee/")
+	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: the tree")
 
 	sqlitetest.Page(t, h.store, h.siteID, "/coffee/fresh/")
 	h.bus.Reset()
@@ -661,12 +662,21 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 		t.Fatalf("the model was asked %d times, want three rounds", len(asked))
 	}
 
+	if !strings.Contains(asked[0].System, "THE SITE WHEN THIS CONVERSATION BEGAN") ||
+		!strings.Contains(asked[0].System, ": 1 page, all planned;") {
+		t.Fatalf("the instructions carry no brief of the site as the conversation found it: %q", asked[0].System)
+	}
+	stored, err := sqlite.NewConversationRepo(h.store).Get(t.Context(), conversation)
+	if err != nil || stored.Brief == "" || !strings.Contains(asked[0].System, strings.TrimSpace(stored.Brief)) {
+		t.Fatalf("the conversation keeps the brief %q, %v; want the one the instructions carry", stored.Brief, err)
+	}
+
 	names := h.registry.Names()
 	for index, req := range asked {
 		if req.System != asked[0].System || strings.Contains(req.System, " entities, ") {
 			t.Fatalf("round %d carries other instructions or the site in them: %q", index+1, req.System)
 		}
-		if req.CacheKey != "chat:confirm" || req.Effort != domainllm.EffortNone || req.Tier != domainllm.TierDefault {
+		if req.CacheKey != "chat:confirm:"+h.siteID || req.Effort != domainllm.EffortNone || req.Tier != domainllm.TierDefault {
 			t.Fatalf("round %d asks with %q, %q and %q", index+1, req.CacheKey, req.Effort, req.Tier)
 		}
 		if req.Meta.Step != agentrunner.ChatStep || req.Meta.Role != domainllm.RoleChat || req.Meta.ConversationID != conversation {
@@ -690,7 +700,7 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 	if opening.Role != llmport.RoleDeveloper || latest.Role != llmport.RoleDeveloper {
 		t.Fatalf("the turns open with %+v and %+v, want the site context as a developer message", opening, latest)
 	}
-	if !strings.Contains(opening.Text, "0 pages") || !strings.Contains(latest.Text, "1 pages") {
+	if !strings.Contains(opening.Text, "1 pages") || !strings.Contains(latest.Text, "2 pages") {
 		t.Fatalf("the contexts read %q and %q, want the page counts of their own turns", opening.Text, latest.Text)
 	}
 	if opening.Text == latest.Text {
@@ -713,7 +723,7 @@ func TestASavedToolRowCarriesTheStatusTheLedgerRecorded(t *testing.T) {
 	}
 	conversation := created.Conversation.ID
 
-	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: no site here")
+	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: no site here")
 
 	live, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
 	if !ok || live.Status != string(domainagent.CallDenied) {
@@ -742,7 +752,7 @@ func TestASavedToolRowThatSucceededReadsAsDone(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_tree{}\nFAKE: the tree is empty")
+	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: the tree is empty")
 
 	for _, message := range h.messages(t, conversation) {
 		if message.Role == "tool" && message.ToolStatus != string(domainagent.CallOK) {
@@ -827,11 +837,16 @@ func TestAConversationWithoutASiteStillAnswers(t *testing.T) {
 		t.Fatalf("CreateConversation: %v", err)
 	}
 
-	h.send(t, created.Conversation.ID, "TOOL:pages_tree{}\nFAKE: no site here")
+	h.send(t, created.Conversation.ID, "TOOL:pages_list{}\nFAKE: no site here")
 
 	outcome, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
 	if !ok || outcome.Status != string(domainagent.CallDenied) {
 		t.Fatalf("a site scoped tool in a siteless conversation = %+v", h.payload(events.AgentToolFinished))
+	}
+	for _, req := range h.model.Requests() {
+		if req.CacheKey != "chat:autonomous" || strings.Contains(req.System, "THE SITE WHEN THIS CONVERSATION BEGAN") {
+			t.Fatalf("a siteless round asks with %q and a brief: %q", req.CacheKey, req.System)
+		}
 	}
 }
 

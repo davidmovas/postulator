@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
 import type { TransportError } from "../../data/errors.js";
-import { blockingFindings, kindDoes, startableKinds, startRefusal, takesATemplate, tokenCapOf } from "./start.js";
+import { blockingFindings, kindDoes, startableKinds, startRefusal, takesATemplate, tokenCapOf } from "./start-model.js";
 
 function refused(cause: TransportError): Error {
     return Object.assign(new Error(cause.message), { cause });
@@ -21,9 +21,11 @@ describe("what the drawer says a kind does", () => {
         expect(kindDoes("teleport")).toBe("");
     });
 
-    it("offers every kind but a revert, which starts from the run it undoes", () => {
+    it("offers every kind but a revert, a repair and an agent's edit, which start elsewhere or no longer", () => {
         expect(startableKinds).not.toContain("revert");
-        expect(startableKinds).toHaveLength(runKinds.length - 1);
+        expect(startableKinds).not.toContain("repair");
+        expect(startableKinds).not.toContain("edit");
+        expect(startableKinds).toHaveLength(runKinds.length - 3);
     });
 
     it("tells a relink apart from a generate", () => {

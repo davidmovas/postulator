@@ -12,8 +12,10 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -51,8 +53,12 @@ func newHarness(t *testing.T) harness {
 	vault := secrets.NewStore(sqlite.NewSecretsRepo(store, clk), sqlitetest.Key())
 	recorder := &applicationtest.Recorder{}
 	reach := &probeStub{reached: site.Reachability{Reach: site.ReachOK, Message: "the site answered", HasPlugin: true}}
+	types := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk,
+	})
 	return harness{
-		service: sites.New(sqlite.NewSiteRepo(store), vault, store, reach, recorder, clk),
+		service: sites.New(sqlite.NewSiteRepo(store), vault, store, types, reach, recorder, clk),
 		store:   store,
 		secrets: vault,
 		clock:   clk,
@@ -290,6 +296,10 @@ func TestCreateStoresTheSiteAndItsPassword(t *testing.T) {
 	if err != nil || password != "abcd efgh" {
 		t.Errorf("stored password = %q, %v", password, err)
 	}
+	types, err := sqlite.NewPageTypeRepo(h.store).ListBySite(t.Context(), got.ID)
+	if err != nil || len(types) != len(pagetype.Presets()) {
+		t.Errorf("the new site's page types = %d %v, want the %d presets seeded", len(types), err, len(pagetype.Presets()))
+	}
 
 	encoded, err := json.Marshal(got)
 	if err != nil {
@@ -387,6 +397,88 @@ func TestUpdateAppliesOnlyTheGivenFields(t *testing.T) {
 	}
 	if _, err = h.service.Update(t.Context(), sites.UpdateRequest{ID: created.Site.ID, Defaults: &sites.Defaults{TemplateID: ptr("no-such-template")}}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("unknown default template code = %q, want INVALID", errors.CodeOf(err))
+	}
+}
+
+func TestSettingsRoundTripThroughTheSitesService(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	created, err := h.service.Create(t.Context(), sites.CreateRequest{Name: "Shop", BaseURL: "https://shop.example.com"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if fresh := created.Site.Settings; fresh.LinkURLForm != site.URLFormAuto || fresh.Observe.RenderConcurrency != 4 ||
+		fresh.Observe.FullWalkEvery != 10 || len(fresh.Builders) == 0 {
+		t.Fatalf("a new site's settings = %+v, want the defaults", fresh)
+	}
+
+	repo := sqlite.NewSiteRepo(h.store)
+	stored, err := repo.Get(t.Context(), created.Site.ID)
+	if err != nil {
+		t.Fatalf("Get the stored site: %v", err)
+	}
+	observedAt := time.Date(2026, time.October, 17, 8, 0, 0, 0, time.UTC)
+	stored.Settings.Observation = site.ObservationState{LastStartedAt: &observedAt, SinceFullWalk: 3}
+	stored.Settings.Technical = site.TechnicalPages{Front: 7}
+	if err = repo.Update(t.Context(), stored); err != nil {
+		t.Fatalf("record an observation: %v", err)
+	}
+
+	if _, err = h.service.Update(t.Context(), sites.UpdateRequest{ID: created.Site.ID, Settings: &site.Settings{
+		UserAgent:   " Agent/1 ",
+		Observe:     site.ObserveSettings{RenderConcurrency: 2},
+		Technical:   site.TechnicalPages{Front: 1},
+		Observation: site.ObservationState{SinceFullWalk: 99},
+	}}); err != nil {
+		t.Fatalf("Update the settings: %v", err)
+	}
+
+	read, err := h.service.Get(t.Context(), sites.GetRequest{ID: created.Site.ID})
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	got := read.Site.Settings
+	if got.UserAgent != "Agent/1" || got.Observe.RenderConcurrency != 2 || got.Observe.FullWalkEvery != 10 ||
+		got.LinkURLForm != site.URLFormAuto || len(got.Builders) == 0 || len(got.TechnicalShortcodes) == 0 {
+		t.Errorf("settings read back = %+v", got)
+	}
+	if got.Observation.SinceFullWalk != 3 || got.Observation.LastStartedAt == nil ||
+		!got.Observation.LastStartedAt.Equal(observedAt) || got.Technical.Front != 7 {
+		t.Errorf("an update replaced the observation's bookkeeping: %+v, %+v", got.Observation, got.Technical)
+	}
+
+	encoded, err := json.Marshal(read)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	for _, key := range []string{`"settings":{"linkUrlForm":"auto","userAgent":"Agent/1"`, `"renderConcurrency":2`, `"fullWalkEvery":10`} {
+		if !strings.Contains(string(encoded), key) {
+			t.Errorf("view lacks %s: %s", key, encoded)
+		}
+	}
+
+	refusals := []struct {
+		name     string
+		settings site.Settings
+	}{
+		{name: "a link form it does not know", settings: site.Settings{LinkURLForm: "sometimes"}},
+		{name: "a concurrency over the ceiling", settings: site.Settings{Observe: site.ObserveSettings{RenderConcurrency: 17}}},
+		{name: "a negative concurrency", settings: site.Settings{Observe: site.ObserveSettings{RenderConcurrency: -1}}},
+		{name: "a negative cadence", settings: site.Settings{Observe: site.ObserveSettings{FullWalkEvery: -1}}},
+	}
+
+	for _, tc := range refusals {
+		t.Run(tc.name, func(t *testing.T) {
+			_, updateErr := h.service.Update(t.Context(), sites.UpdateRequest{ID: created.Site.ID, Settings: &tc.settings})
+			if !errors.IsCode(updateErr, errors.Invalid) {
+				t.Fatalf("code = %q, want INVALID (err %v)", errors.CodeOf(updateErr), updateErr)
+			}
+			after, getErr := h.service.Get(t.Context(), sites.GetRequest{ID: created.Site.ID})
+			if getErr != nil || after.Site.Settings.UserAgent != "Agent/1" || after.Site.Settings.Observe.RenderConcurrency != 2 {
+				t.Fatalf("a refused update changed the settings: %+v, %v", after.Site.Settings, getErr)
+			}
+		})
 	}
 }
 

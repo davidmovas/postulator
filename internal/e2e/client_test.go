@@ -39,7 +39,6 @@ const (
 	planHubs = 5
 
 	relinkTarget = "/electric-bikes/commuter/volt-commuter-500/"
-	repairTarget = "/electric-bikes/cargo/hauler-cargo-max/"
 	deleteTarget = "/components/batteries/powercell-500wh/"
 )
 
@@ -103,7 +102,7 @@ func planMapping(t *testing.T, core *app.Core, siteID string) imports.Mapping {
 	if seen.Rows != planRows {
 		t.Fatalf("the plan carries %d rows, want %d", seen.Rows, planRows)
 	}
-	for _, field := range []string{"entity", "parent_entity", "path", "title", "primary_keyword", "keywords", "page_kind"} {
+	for _, field := range []string{"entity", "parent_entity", "path", "title", "primary_keyword", "keywords", "page_type"} {
 		if seen.Detected.Columns[field] == "" {
 			t.Fatalf("%s is not detected in %v", field, seen.Headers)
 		}
@@ -289,6 +288,7 @@ func TestTheClientLoopFromTheSamples(t *testing.T) {
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
+	assertTheTypesCarryTheShippedTemplates(t, core, siteID)
 
 	assertEverySheetIsNamed(t, core, siteID)
 	assertTheIndentTreeIsRead(t, core, siteID)
@@ -370,7 +370,6 @@ func TestTheClientLoopFromTheSamples(t *testing.T) {
 	assertTheSiteCarriesTheSameLinks(t, core, live, siteID, clientTargets)
 
 	relinkPutsOneStrippedLinkBack(t, core, siteID, relinkTarget, "/electric-bikes/commuter/")
-	repairPutsOneFlattenedPageBack(t, core, live, siteID, repairTarget)
 	assertTheAuditIsGreen(t, core, siteID, clientTargets)
 
 	aCancelledRunIsPutBack(t, core, live, siteID)
@@ -555,7 +554,7 @@ func waitForPublish(t *testing.T, core *app.Core, runID string) {
 	t.Helper()
 
 	var seq int64
-	published := ""
+	publishing := make([]string, 0)
 	waitFor(t, "the first item of run "+runID+" to reach the site", func() bool {
 		listed, err := core.Runs.ListEvents(t.Context(), runs.ListEventsRequest{
 			RunID: runID, SinceSeq: seq, Limit: 200,
@@ -573,11 +572,23 @@ func waitForPublish(t *testing.T, core *app.Core, runID string) {
 			if decodeErr := json.Unmarshal(event.Payload, &said); decodeErr != nil {
 				t.Fatalf("decode a step.done payload: %v", decodeErr)
 			}
-			if said.Step == steps.NamePublish {
-				published = said.ItemID
+			if said.Step == steps.NamePublish && !slices.Contains(publishing, said.ItemID) {
+				publishing = append(publishing, said.ItemID)
 			}
 		}
-		return published != ""
+		return slices.ContainsFunc(publishing, func(itemID string) bool { return holdsAPublishResult(t, core, itemID) })
+	})
+}
+
+func holdsAPublishResult(t *testing.T, core *app.Core, itemID string) bool {
+	t.Helper()
+
+	held, err := core.Runs.ListArtifacts(t.Context(), runs.ListArtifactsRequest{ItemID: itemID})
+	if err != nil {
+		t.Fatalf("list the artifacts of %s: %v", itemID, err)
+	}
+	return slices.ContainsFunc(held.Artifacts, func(artifact runs.ArtifactSummary) bool {
+		return artifact.Kind == string(run.ArtifactPublishResult)
 	})
 }
 
@@ -709,45 +720,6 @@ func relinkPutsOneStrippedLinkBack(t *testing.T, core *app.Core, siteID, path, r
 	if anchorsGone(after.Content) != anchorsGone(before.Content) {
 		t.Fatalf("the relink of %s rewrote the prose as well as the link.\nbefore: %q\nafter:  %q",
 			path, anchorsGone(before.Content), anchorsGone(after.Content))
-	}
-}
-
-func repairPutsOneFlattenedPageBack(t *testing.T, core *app.Core, live *site, siteID, path string) {
-	t.Helper()
-
-	page := pageAt(t, core, siteID, path)
-	parent, ok := live.byPath(t, parentOf(path))
-	if !ok {
-		t.Fatalf("the site serves no %s to be the parent of %s", parentOf(path), path)
-	}
-	before := live.storedContent(t, "pages", int(*page.WPID))
-
-	live.call(t, http.MethodPost, "/wp-json/wp/v2/pages/"+strconv.FormatInt(*page.WPID, 10),
-		map[string]any{"parent": 0}, http.StatusOK, nil)
-
-	flattened, served := live.byPath(t, path)
-	if served && flattened.Parent != 0 {
-		t.Fatalf("the hand edit left %s under the parent %d", path, flattened.Parent)
-	}
-
-	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
-		SiteID: siteID, PageIDs: []string{page.ID}, Kind: string(run.KindRepair),
-	})
-	if err != nil {
-		t.Fatalf("start the repair of %s: %v", path, err)
-	}
-	awaitRun(t, core.Runs, started.RunID)
-
-	repaired, ok := live.byPath(t, path)
-	if !ok {
-		t.Fatalf("the site lost %s during the repair", path)
-	}
-	if repaired.Parent != parent.ID {
-		t.Fatalf("the repair left %s under the parent %d, want %d (%s)",
-			path, repaired.Parent, parent.ID, parentOf(path))
-	}
-	if after := live.storedContent(t, "pages", int(*page.WPID)); after != before {
-		t.Fatalf("the repair of %s rewrote the body.\nbefore: %q\nafter:  %q", path, before, after)
 	}
 }
 

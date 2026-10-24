@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -27,6 +28,7 @@ func Site(t testing.TB, store *sqlite.Store, name string) site.Site {
 		Status:    site.StatusActive,
 		Plugin:    site.PluginState{Capabilities: []string{}},
 		Defaults:  site.Defaults{ModelProfiles: map[llm.Role]llm.ModelRef{}},
+		Settings:  site.DefaultSettings(),
 		CreatedAt: Stamp,
 		UpdatedAt: Stamp,
 	}
@@ -41,7 +43,8 @@ func Entity(t testing.TB, store *sqlite.Store, siteID, name string) graph.Entity
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		ID: id.New(), SiteID: siteID, Name: name, Keywords: keyword.Of(name),
+		Facts: []graph.Fact{}, Notes: []note.Note{},
 		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}
@@ -55,8 +58,8 @@ func Page(t testing.TB, store *sqlite.Store, siteID, path string) pagemap.Page {
 	t.Helper()
 
 	record := pagemap.Page{
-		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
-		Title: path, H1: path, Keywords: keyword.Of(), Notes: []pagemap.Note{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
+		ID: id.New(), SiteID: siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage, ParentReason: pagemap.ParentNone,
+		Title: path, H1: path, Keywords: keyword.Of(), Notes: []note.Note{}, Status: pagemap.StatusPlanned, CreatedAt: Stamp, UpdatedAt: Stamp,
 	}
 	if err := sqlite.NewPageRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the page fixture: %v", err)
@@ -68,7 +71,7 @@ func Template(t testing.TB, store *sqlite.Store, name string) template.Template 
 	t.Helper()
 
 	seed := template.Seed()[3]
-	record := template.Template{ID: id.New(), Scope: template.ScopeGlobal, Name: name, PageKind: seed.PageKind, Version: 1, Spec: seed.Spec, CreatedAt: Stamp, UpdatedAt: Stamp}
+	record := template.Template{ID: id.New(), Scope: template.ScopeGlobal, Name: name, Version: 1, Spec: seed.Spec, CreatedAt: Stamp, UpdatedAt: Stamp}
 	if err := sqlite.NewTemplateRepo(store).Insert(t.Context(), record); err != nil {
 		t.Fatalf("insert the template fixture: %v", err)
 	}

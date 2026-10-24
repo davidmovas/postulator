@@ -77,7 +77,7 @@ func TestResolveLayersOverrides(t *testing.T) {
 	t.Parallel()
 
 	base := validSpec()
-	site := json.RawMessage(`{"linkRules":{"maxLinks":5},"tone":"warm"}`)
+	site := json.RawMessage(`{"keywordRules":{"maxDensity":0.05},"tone":"warm"}`)
 	page := json.RawMessage(`{"sections":[{"heading":"Only","intent":"one","targetWords":100,"required":true,"keywordRules":{"include":["x"],"primaryInHeading":false}}],"images":{"inline":0},"modelProfiles":{"writer":null,"editor":{"provider":"openai","model":"gpt-5.6-luna"}}}`)
 
 	resolved, err := template.Resolve(base, site, page)
@@ -87,8 +87,11 @@ func TestResolveLayersOverrides(t *testing.T) {
 	if resolved.Tone != "warm" {
 		t.Errorf("tone = %q, want the site override", resolved.Tone)
 	}
-	if resolved.LinkRules.MaxLinks != 5 || resolved.LinkRules.UpDepth != 2 {
-		t.Errorf("link rules = %+v, want maxLinks patched and upDepth kept", resolved.LinkRules)
+	if resolved.KeywordRules.MaxDensity != 0.05 || resolved.KeywordRules.PrimaryInH1 != base.KeywordRules.PrimaryInH1 {
+		t.Errorf("keyword rules = %+v, want maxDensity patched and the rest kept", resolved.KeywordRules)
+	}
+	if _, err = template.Resolve(base, json.RawMessage(`{"linkRules":{"maxLinks":5}}`), nil); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an override still carrying link rules = %v, want INVALID: link rules live in the page types' scopes", err)
 	}
 	if len(resolved.Sections) != 1 || resolved.Sections[0].Heading != "Only" || len(resolved.Sections[0].KeywordRules.Include) != 1 {
 		t.Errorf("sections = %+v, want the page override to replace the list wholesale", resolved.Sections)

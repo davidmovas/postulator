@@ -70,11 +70,12 @@ const (
 	PauseNeedsHuman           PauseReason = "needs_human"
 	PauseUser                 PauseReason = "user"
 	PauseAwaitingParent       PauseReason = "awaiting_parent"
+	PauseAwaitingReview       PauseReason = "awaiting_review"
 )
 
 func (r PauseReason) Valid() bool {
 	switch r {
-	case PauseBudgetExceeded, PauseAwaitingConfirmation, PauseNeedsHuman, PauseUser, PauseAwaitingParent:
+	case PauseBudgetExceeded, PauseAwaitingConfirmation, PauseNeedsHuman, PauseUser, PauseAwaitingParent, PauseAwaitingReview:
 		return true
 	default:
 		return false
@@ -84,6 +85,6 @@ func (r PauseReason) Valid() bool {
 func PauseReasons() []string {
 	return []string{
 		string(PauseBudgetExceeded), string(PauseAwaitingConfirmation),
-		string(PauseNeedsHuman), string(PauseUser), string(PauseAwaitingParent),
+		string(PauseNeedsHuman), string(PauseUser), string(PauseAwaitingParent), string(PauseAwaitingReview),
 	}
 }

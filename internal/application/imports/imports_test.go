@@ -11,9 +11,11 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 )
 
@@ -36,6 +38,14 @@ func newHarnessWithRows(t *testing.T, maxRows int) harness {
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
 	recorder := &applicationtest.Recorder{}
+	seeder := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: &applicationtest.Recorder{},
+		Clock: clock.NewFake(sqlitetest.Stamp),
+	})
+	if err := seeder.Seed(t.Context(), owner.ID); err != nil {
+		t.Fatalf("seed the page types: %v", err)
+	}
 
 	return harness{
 		service: imports.New(imports.Deps{
@@ -43,9 +53,13 @@ func newHarnessWithRows(t *testing.T, maxRows int) harness {
 			Entities:   sqlite.NewEntityRepo(store),
 			Edges:      sqlite.NewEdgeRepo(store),
 			Pages:      sqlite.NewPageRepo(store),
-			Templates:  sqlite.NewTemplateRepo(store),
+			Types:      sqlite.NewPageTypeRepo(store),
+			Fields:     sqlite.NewPageFieldRepo(store),
 			Mappings:   sqlite.NewImportMappingRepo(store),
 			Sites:      sqlite.NewSiteRepo(store),
+			Findings:   sqlite.NewFindingRepo(store),
+			Terms:      sqlite.NewPageIdentityRepo(store),
+			Items:      sqlite.NewRunItemRepo(store),
 			UnitOfWork: store,
 			Publisher:  recorder,
 			Clock:      clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)),
@@ -122,10 +136,61 @@ func (h harness) pages(t *testing.T) []pagemap.Page {
 	return listed
 }
 
+func (h harness) types(t *testing.T) map[pagetype.Preset]pagetype.Type {
+	t.Helper()
+
+	listed, err := sqlite.NewPageTypeRepo(h.store).ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the page types: %v", err)
+	}
+	out := make(map[pagetype.Preset]pagetype.Type, len(listed))
+	for i := range listed {
+		out[listed[i].Preset] = listed[i]
+	}
+	return out
+}
+
+func (h harness) rename(t *testing.T, preset pagetype.Preset, name string) {
+	t.Helper()
+
+	kind := h.types(t)[preset]
+	kind.Name = name
+	if err := sqlite.NewPageTypeRepo(h.store).Update(t.Context(), kind); err != nil {
+		t.Fatalf("rename the %s type: %v", preset, err)
+	}
+}
+
+func (h harness) typeNames(t *testing.T) map[string]string {
+	t.Helper()
+
+	byID := make(map[string]string)
+	for _, kind := range h.types(t) {
+		byID[kind.ID] = kind.Name
+	}
+	out := make(map[string]string)
+	held := h.pages(t)
+	for i := range held {
+		if held[i].PageTypeID != nil {
+			out[held[i].Path] = byID[*held[i].PageTypeID]
+		}
+	}
+	return out
+}
+
 func findings(list []imports.Finding, code imports.FindingCode) []imports.Finding {
 	out := make([]imports.Finding, 0, len(list))
 	for i := range list {
 		if list[i].Code == string(code) {
+			out = append(out, list[i])
+		}
+	}
+	return out
+}
+
+func besidesPlanned(list []imports.Finding) []imports.Finding {
+	out := make([]imports.Finding, 0, len(list))
+	for i := range list {
+		if list[i].Code != string(imports.CodeRowWithoutPage) {
 			out = append(out, list[i])
 		}
 	}

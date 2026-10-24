@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Postulator companion plugin
-  version: 1.2.0
+  version: 1.5.2
   summary: The REST namespace the Postulator companion plugin adds to a WordPress site.
   description: >-
     Every route lives under the WordPress REST namespace postulator/v1 and is
@@ -18,6 +18,32 @@ servers:
         description: Host and optional subdirectory of the WordPress installation.
 security:
   - applicationPassword: []
+x-denied-meta:
+  description: >-
+    The post meta keys no client reads or writes through the meta route, from
+    plugin version 1.5.0, beside every key is_protected_meta protects: the
+    store's own keys behind a product's prices, stock, SKU, attributes and
+    sales counter, a variation's attribute keys, and the SEO plugins' keys,
+    which are written through the SEO route alone. A key is compared after
+    ASCII case folding, because the meta_key column's collation ignores case
+    and trailing spaces, and a key that is not ASCII letters, digits,
+    underscores and hyphens, or longer than 255 bytes, is refused whole. The
+    client refuses the same keys before a request leaves; testdata/meta_deny.json
+    is the one table both sides test.
+  keys:
+    - _price
+    - _regular_price
+    - _sale_price
+    - _sku
+    - _stock_status
+    - _stock
+    - _manage_stock
+    - _product_attributes
+    - total_sales
+  prefixes:
+    - _
+    - attribute_
+    - rank_math_
 paths:
   /manifest:
     get:
@@ -62,7 +88,12 @@ paths:
         - name: types
           in: query
           required: false
-          description: Comma separated content types; all four are listed when absent.
+          description: >-
+            Comma separated content types: any name in the manifest's postTypes
+            or taxonomies, besides page, post, product and product_cat, which
+            are always accepted. Those four are listed when absent, as before
+            1.4.0, so a client that asks for nothing sees no new type. Any
+            other name answers 400 with the code invalid_type.
           schema:
             type: string
             default: page,post,product,product_cat
@@ -121,7 +152,15 @@ paths:
     put:
       operationId: setSeoMeta
       summary: Write SEO meta through whichever SEO plugin the site runs.
-      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. From
+        plugin version 1.5.0 (the capability guarded_write) a field named in
+        expected is written only while its stored value still hashes to the
+        hash given, the empty string standing for a field the post does not
+        carry; when any named field moved, the request answers 409 with the
+        code hash_mismatch and moved naming each such field with its current
+        hash, and nothing is written. A field left out of expected is written
+        unconditionally, as before 1.5.0.
       parameters:
         - $ref: "#/components/parameters/PostID"
       requestBody:
@@ -145,11 +184,21 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Moved"
   /content/{id}/raw:
     get:
       operationId: getRawContent
       summary: Read the stored post_content together with its hash.
-      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. From
+        plugin version 1.5.0 saveStable says whether the stored content passes
+        the current user's pre_post_content and content_save_pre filters
+        unchanged, kses and balanceTags among them, and from 1.5.1 whether the
+        stored title and excerpt pass their own pre_post_* and *_save_pre
+        filters unchanged too, which is whether any save of the whole post (a
+        title, an excerpt, the raw write, a store save) would leave the post as
+        it stands.
       parameters:
         - $ref: "#/components/parameters/PostID"
       responses:
@@ -168,7 +217,11 @@ paths:
     put:
       operationId: putRawContent
       summary: Replace post_content under optimistic concurrency control.
-      description: Post-only; a taxonomy term id answers 404 with the code not_found.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. From
+        plugin version 1.5.0 the answer carries the content WordPress stored
+        beside its hash, which the user's own save filters may have changed
+        from the content sent.
       parameters:
         - $ref: "#/components/parameters/PostID"
       requestBody:
@@ -194,6 +247,172 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /content/{id}/rendered:
+    get:
+      operationId: getRenderedContent
+      summary: Read a post's content as the front end filters it, without the theme.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. The
+        stored post_content runs through the_content inside a singular main
+        query for the post, after the_post(), so whatever a shortcode, a block
+        or a snippet adds to the content area on the front end is here, the
+        snippets that check is_singular, in_the_loop or is_main_query
+        included, while the theme's header, footer and sidebars are not. The
+        hash is the sha256 of the answered content. Advertised as the
+        capability rendered from plugin version 1.4.0; an older plugin answers
+        404 with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: The filtered content and its hash.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RenderedContent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /meta/{id}:
+    get:
+      operationId: getMeta
+      summary: Read the post meta values of the keys asked, and nothing else.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found, and
+        the user must be allowed edit_post on the post. Only the keys named in
+        keys are read, at most 50 of them. A key is never read when
+        is_protected_meta says it is protected, which covers every key that
+        starts with an underscore, the store's own keys and the SEO plugins'
+        underscored keys among them: such a request answers 400 with the code
+        meta_key_denied and data.keys naming the refused keys, and reads
+        nothing; from plugin version 1.5.0 a key on x-denied-meta is refused
+        the same way. A key the post does not carry answers null. Advertised as
+        the capability meta from plugin version 1.4.0; an older plugin answers
+        404 with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+        - name: keys
+          in: query
+          required: true
+          description: >-
+            Comma-separated meta keys, at most 50 once trimmed and
+            deduplicated. More answer 400 too_many_keys, none answers 400
+            invalid_param.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The value of every key asked, null for a key the post does not carry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaValues"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: putMeta
+      summary: Write post meta values, each under the hash it was read with.
+      description: >-
+        Post-only, as the read is. Every key written names in expected the hash
+        of the value it was read with, or null for a key the post did not
+        carry; a key without one answers 400 missing_expected. A key on
+        x-denied-meta, one is_protected_meta protects, one the user may not
+        edit_post_meta, a value that is neither a string nor null, and a key
+        whose stored value is not one plain text (an array, an object or more
+        than one row) all answer 400 meta_key_denied with data.keys naming
+        them, and nothing is written. When any key's stored value no longer
+        hashes to its expectation, the request answers 409 hash_mismatch with
+        moved naming each such key with its current hash or null, and nothing
+        is written. A null value deletes the key; a string is stored with
+        wp_slash. At most 50 keys. Which keys a person's scopes name is the
+        client's to decide. Advertised as the capability meta_write from plugin
+        version 1.5.0; an older plugin answers 404 with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetaWriteRequest"
+      responses:
+        "200":
+          description: Every key written, with the value now stored and its hash, both null for a deleted key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaWriteResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Moved"
+  /settings:
+    get:
+      operationId: getSettings
+      summary: Name the technical pages WordPress and WooCommerce keep.
+      description: >-
+        The reading setting and the page ids WordPress and the store name: the
+        static front page and the posts page when show_on_front is page, 0
+        otherwise; the privacy policy page; the store's shop, cart, checkout,
+        account and terms pages when WooCommerce is loaded, 0 otherwise or
+        when the store names none. One call answers what core REST spreads
+        over the settings routes and what it does not expose at all, the
+        privacy page among it. Advertised as the capability settings from
+        plugin version 1.4.0; an older plugin answers 404 with the code
+        rest_no_route.
+      responses:
+        "200":
+          description: The technical pages.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TechnicalPages"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /terms/{id}:
+    get:
+      operationId: getTerms
+      summary: List every term of every taxonomy the post's type carries.
+      description: >-
+        Post-only; a taxonomy term id answers 404 with the code not_found. The
+        taxonomies are every one registered for the post's type, the custom
+        ones a site adds and the store's internal ones (product_type,
+        product_visibility) included, whether or not they show in core REST.
+        The terms are ordered by taxonomy, then by term id. Advertised as the
+        capability terms from plugin version 1.4.0; an older plugin answers
+        404 with the code rest_no_route.
+      parameters:
+        - $ref: "#/components/parameters/PostID"
+      responses:
+        "200":
+          description: The post's terms, an empty list when it carries none.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostTerms"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /content/{id}/preview:
     post:
       operationId: createPreviewLink
@@ -203,11 +422,13 @@ paths:
         call mints a new random token, stores its sha256 under the post meta
         key _postulator_preview_hash beside _postulator_preview_expires, and
         answers the permalink with preview=true and the token in the
-        postulator_preview query argument. The previous link of the same post
+        preview_token query argument, a name that does not identify the
+        program a visitor might see it in. The previous link of the same post
         stops working at that instant. A front-end request whose token matches
         and has not expired renders a draft, pending, future or private post
         as published for that one request, with nocache headers,
-        DONOTCACHEPAGE and a noindex robots directive; a wrong, missing or
+        DONOTCACHEPAGE and a noindex robots directive, Rank Math's and Yoast's
+        robots output included; a wrong, missing or
         expired token renders the 404 page. A post that is already public
         renders as usual, whatever the token says. Issuing a link changes
         neither post_modified_gmt nor post_content.
@@ -239,7 +460,12 @@ components:
       name: id
       in: path
       required: true
-      description: WordPress post, page, product or product category id.
+      description: >-
+        The id of a content post, a post of a public post type other than an
+        attachment, or a product category id where a route says so. On the
+        post routes any other post (a variation, a reusable block, a
+        navigation menu, a template, an attachment) answers 404 with the code
+        not_found, as a term id does.
       schema:
         type: integer
         format: int64
@@ -288,6 +514,14 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/HashConflict"
+    Moved:
+      description: >-
+        A value named in expected no longer hashes to its expectation, so the
+        write was refused and nothing changed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/MovedConflict"
   schemas:
     Error:
       type: object
@@ -322,6 +556,28 @@ components:
           type: string
           pattern: "^[0-9a-f]{64}$"
           description: The hash the stored content has right now.
+    MovedConflict:
+      type: object
+      required:
+        - code
+        - message
+        - moved
+      properties:
+        code:
+          type: string
+          const: hash_mismatch
+        message:
+          type: string
+        moved:
+          type: object
+          description: >-
+            Each field or meta key whose stored value moved, with the hash it has
+            right now, or null for a meta key the post no longer carries.
+          additionalProperties:
+            type:
+              - string
+              - "null"
+            pattern: "^[0-9a-f]{64}$"
     Manifest:
       type: object
       required:
@@ -338,10 +594,16 @@ components:
         capabilities:
           type: array
           description: >-
-            For version 1.2.0 this is exactly bulk, seo_meta, seo_meta_read,
-            content_hash, raw and preview, in that order. A 1.1.0 plugin lists
-            the same list without seo_meta_read and serves no read of the SEO
-            meta; a 1.0.0 plugin lists neither that nor preview.
+            For version 1.5.0 this is exactly bulk, seo_meta, seo_meta_read,
+            content_hash, raw, preview, rendered, meta, terms, settings,
+            meta_write and guarded_write, in that order; 1.4.0 and 1.4.1 listed
+            the first ten, 1.2.0 listed the first six and 1.3.0 was never
+            released. A 1.1.0 plugin lists the same list without seo_meta_read
+            and serves no read of the SEO meta; a 1.0.0 plugin lists neither
+            that nor preview. guarded_write says the SEO route takes expected
+            hashes, the raw write answers the content it stored and the raw
+            read answers saveStable; a client writes nothing through a plugin
+            without it.
           items:
             type: string
             enum:
@@ -351,6 +613,18 @@ components:
               - content_hash
               - raw
               - preview
+              - rendered
+              - meta
+              - terms
+              - settings
+              - meta_write
+              - guarded_write
+        unfilteredHtml:
+          type: boolean
+          description: >-
+            Whether the user the request runs as holds unfiltered_html, absent
+            before 1.5.0. Without it every save of the whole post runs kses over
+            the stored content again.
         seoPlugin:
           type: string
           enum:
@@ -361,6 +635,21 @@ components:
           type: string
           examples:
             - 6.9.1
+        postTypes:
+          type: array
+          description: >-
+            The content post types, every public post type but attachment,
+            sorted; absent before 1.4.0. The post routes answer a post of
+            these types only.
+          items:
+            type: string
+        taxonomies:
+          type: array
+          description: >-
+            Every public taxonomy whose name no content post type also uses,
+            sorted; absent before 1.4.0. Each is a term family /content lists.
+          items:
+            type: string
         site:
           type: string
           format: uri
@@ -399,13 +688,21 @@ components:
           format: int64
         type:
           type: string
-          enum:
-            - page
-            - post
-            - product
-            - product_cat
+          description: >-
+            The post type of a content post, or the taxonomy of a term: page,
+            post, product, product_cat or any other name the manifest lists.
         slug:
           type: string
+        excerpt:
+          type: string
+          description: The raw post_excerpt; the empty string for a term.
+        terms:
+          type: array
+          description: >-
+            Every term of every taxonomy the post's type carries, as GET
+            /terms/{id} answers them; an empty list for a term.
+          items:
+            $ref: "#/components/schemas/Term"
         path:
           type: string
           description: >-
@@ -469,11 +766,17 @@ components:
         href:
           type: string
           description: >-
-            Site relative path of an internal anchor, normalised by the same
-            rules as path, including the ASCII lowercasing. A link counts as
-            internal when its host equals the site host exactly, compared in
-            lowercase, with no www stripping and with the scheme ignored; a
-            relative href is always internal. External links are not listed.
+            Site relative path of an internal anchor, classified as
+            pagemap.Site.Resolve classifies it. A link counts as internal
+            when its host and port equal the site's host and port as
+            written, compared in lowercase, with no www stripping and with
+            the scheme ignored; a relative href is internal and resolves
+            against the page's URL as a browser does: its path up to the
+            last slash. The path is escaped as Go's url.EscapedPath escapes
+            it, then lowercased in ASCII, with repeated slashes collapsed
+            and a trailing slash. An href with an invalid escape, a dot
+            segment or a control character is not listed, and neither are
+            external links.
           examples:
             - /koffein/
         anchor:
@@ -503,6 +806,15 @@ components:
           type: string
         ogDescription:
           type: string
+        expected:
+          type: object
+          description: >-
+            From 1.5.0, the hash of the value each field was read with, keyed by
+            the field's name; the empty string's hash stands for a field the
+            post does not carry.
+          additionalProperties:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
     SeoMetaState:
       type: object
       description: >-
@@ -553,6 +865,14 @@ components:
               - canonical
               - ogTitle
               - ogDescription
+        hashes:
+          type: object
+          description: >-
+            From 1.5.0, the hash of the value each applied field now stores,
+            after the SEO plugin's own filters.
+          additionalProperties:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
         seoPlugin:
           type: string
           enum:
@@ -573,14 +893,135 @@ components:
         type:
           type: string
           description: >-
-            A taxonomy term never appears here; the raw routes are post-only.
-          enum:
-            - page
-            - post
-            - product
+            The post type of the content post; a taxonomy term never appears
+            here, the raw routes being post-only.
         content:
           type: string
           description: The stored post_content, unmodified.
+        contentHash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        saveStable:
+          type: boolean
+          description: >-
+            From 1.5.0, whether a save of the whole post by the current user
+            would store the content unchanged, and from 1.5.1 the title and
+            the excerpt too.
+    TechnicalPages:
+      type: object
+      required:
+        - showOnFront
+        - pages
+      properties:
+        showOnFront:
+          type: string
+          enum:
+            - page
+            - posts
+        pages:
+          type: object
+          required:
+            - front
+            - posts
+            - privacy
+            - shop
+            - cart
+            - checkout
+            - account
+            - terms
+          properties:
+            front:
+              type: integer
+              format: int64
+            posts:
+              type: integer
+              format: int64
+            privacy:
+              type: integer
+              format: int64
+            shop:
+              type: integer
+              format: int64
+            cart:
+              type: integer
+              format: int64
+            checkout:
+              type: integer
+              format: int64
+            account:
+              type: integer
+              format: int64
+            terms:
+              type: integer
+              format: int64
+    Term:
+      type: object
+      required:
+        - taxonomy
+        - id
+        - name
+        - slug
+        - parent
+      properties:
+        taxonomy:
+          type: string
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        slug:
+          type: string
+        parent:
+          type: integer
+          format: int64
+          description: The parent term's id, 0 at the top of a hierarchical taxonomy or in a flat one.
+    PostTerms:
+      type: object
+      required:
+        - id
+        - terms
+      properties:
+        id:
+          type: integer
+          format: int64
+        terms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Term"
+    MetaValues:
+      type: object
+      required:
+        - id
+        - meta
+      properties:
+        id:
+          type: integer
+          format: int64
+        meta:
+          type: object
+          description: >-
+            Each key asked, with the value get_post_meta answers for it as a
+            single value, a string or the unserialized structure, or null when
+            the post carries no such key.
+          additionalProperties: true
+    RenderedContent:
+      type: object
+      required:
+        - id
+        - type
+        - content
+        - contentHash
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          description: The post type of the content post.
+        content:
+          type: string
+          description: The post_content after the_content, theme-free.
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"
@@ -603,10 +1044,63 @@ components:
       required:
         - contentHash
       properties:
+        content:
+          type: string
+          description: From 1.5.0, the post_content now stored, after the user's save filters.
         contentHash:
           type: string
           pattern: "^[0-9a-f]{64}$"
           description: The hash of the content that is now stored.
+    MetaWriteRequest:
+      type: object
+      required:
+        - meta
+        - expected
+      properties:
+        meta:
+          type: object
+          description: Each key to write with its new value, null to delete it.
+          additionalProperties:
+            type:
+              - string
+              - "null"
+        expected:
+          type: object
+          description: >-
+            Each key written with the hash of the value it was read with, null
+            for a key the post did not carry.
+          additionalProperties:
+            type:
+              - string
+              - "null"
+            pattern: "^[0-9a-f]{64}$"
+    MetaWriteResult:
+      type: object
+      required:
+        - id
+        - meta
+      properties:
+        id:
+          type: integer
+          format: int64
+        meta:
+          type: object
+          description: Each key written, with what is now stored.
+          additionalProperties:
+            type: object
+            required:
+              - value
+              - hash
+            properties:
+              value:
+                type:
+                  - string
+                  - "null"
+              hash:
+                type:
+                  - string
+                  - "null"
+                pattern: "^[0-9a-f]{64}$"
     PreviewLink:
       type: object
       required:
@@ -617,7 +1111,7 @@ components:
           type: string
           format: uri
           description: >-
-            The permalink with preview=true and postulator_preview=<token>
+            The permalink with preview=true and preview_token=<token>
             appended. The token is 32 lowercase hex characters and is stored
             only as its sha256.
         expiresAt:

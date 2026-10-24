@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -31,7 +32,7 @@ func (r *linkRecorder) ListForPage(_ context.Context, pageID string) ([]pagemap.
 	return r.byPage[pageID], nil
 }
 
-func (r *linkRecorder) ReplaceForPage(_ context.Context, pageID string, links []pagemap.PageLink) error {
+func (r *linkRecorder) ReplaceForPage(_ context.Context, pageID string, _ pagemap.LinkSource, links []pagemap.PageLink) error {
 	if r.err != nil {
 		return r.err
 	}
@@ -60,6 +61,7 @@ func relinkPages(wpID int64) []pagemap.Page {
 		{
 			ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
 			Status: pagemap.StatusPublished, EntityID: pointer("parent"), WPID: &wpID,
+			PageTypeID: pointer("type-page-parent"), TypeSource: pagemap.TypeSourceAuto, TypeReason: pagemap.TypeByKind,
 		},
 		{
 			ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", Slug: "espresso",
@@ -73,14 +75,14 @@ func relinkContext(t *testing.T, deps steps.Deps) *run.StepContext {
 
 	return unitContext(t, map[run.ArtifactKind][]byte{
 		run.ArtifactLinkContext:   linkContextBlob(t, deps),
-		run.ArtifactPublishResult: []byte(`{"wpId":99,"url":"https://shop.example.com/coffee/espresso/"}`),
+		run.ArtifactPublishResult: []byte(`{"wpId":99,"url":"https://shop.example.com/coffee/espresso/","status":"publish"}`),
 	})
 }
 
 func runRelink(t *testing.T, deps steps.Deps) steps.RelinkResult {
 	t.Helper()
 
-	result, err := steps.RelinkNeighbors(deps).Run(t.Context(), relinkContext(t, deps))
+	result, err := drive(t, steps.RelinkNeighbors(deps), relinkContext(t, deps))
 	if err != nil {
 		t.Fatalf("RelinkNeighbors: %v", err)
 	}
@@ -118,18 +120,40 @@ func TestRelinkAddsTheMissingEdgeToANeighbor(t *testing.T) {
 	}
 }
 
-func TestANeighborWithoutRulesOfItsOwnFollowsTheSitePolicy(t *testing.T) {
+func TestARelinkChangesOnlyTheBlockItLinksAndKeepsOurBlocksOurs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		theirs = "<p>Fresh &amp; roasted&nbsp;daily, <em class='x'>always</em>.</p>"
+		ours   = "<p>We roast every espresso blend we sell.</p>"
+	)
+	deps, server, _, wpID := relinkDeps(t, theirs+"\n\n"+ours)
+	log := &bodyLog{written: map[string][]string{"page-parent": {block.Hash(ours)}}}
+	deps.Bodies = log
+	runRelink(t, deps)
+
+	stored, _ := server.Lookup(wpID)
+	linked := `<p>We roast every <a href="/coffee/espresso/">espresso</a> blend we sell.</p>`
+	if stored.Content != theirs+"\n\n"+linked {
+		t.Fatalf("the parent holds %q, want the client's block byte for byte and only ours linked", stored.Content)
+	}
+	if written := log.ours("page-parent"); len(written) != 1 || written[0] != block.Hash(linked) {
+		t.Errorf("ours = %v, want the linked block recorded as ours in place of the one it replaced", written)
+	}
+}
+
+func TestANeighborFollowsTheRulesOfItsOwnType(t *testing.T) {
 	t.Parallel()
 
 	deps, server, _, wpID := relinkDeps(t, parentBody)
-	deps.Policies = policyStub{
-		rules: template.LinkRules{UpDepth: 1, DownLinks: true, MaxPerTarget: 1},
-		specs: map[string]template.LinkRules{"page-parent": {}},
+	deps.Types = typesStub{
+		rules:   field.LinkRules{UpDepth: 1, DownLinks: true, MaxPerTarget: 1},
+		perPage: map[string]field.LinkRules{"page-parent": {}},
 	}
 	sc := relinkContext(t, deps)
-	sc.Spec.LinkRules = template.LinkRules{UpDepth: 1, MaxPerTarget: 1}
+	sc.Links = linksOf(field.LinkRules{UpDepth: 1, MaxPerTarget: 1})
 
-	result, err := steps.RelinkNeighbors(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.RelinkNeighbors(deps), sc)
 	if err != nil {
 		t.Fatalf("RelinkNeighbors: %v", err)
 	}
@@ -168,10 +192,9 @@ func TestRelinkWritesAPlainSentenceWhereTheNeighborHasNoAnchor(t *testing.T) {
 		t.Fatalf("neighbor = %+v, want a written sentence and the body it replaced", neighbor)
 	}
 	stored, _ := server.Lookup(wpID)
-	want := `<h1>Coffee</h1><p>We roast beans every week.</p>` +
-		`<p>Visit the shop. Read more about <a href="/coffee/espresso/">espresso</a>.</p>`
+	want := bare + "\n\n" + `<p>Read more about <a href="/coffee/espresso/">espresso</a>.</p>`
 	if stored.Content != want {
-		t.Fatalf("the parent holds\n%s\nwant\n%s", stored.Content, want)
+		t.Fatalf("the parent holds\n%s\nwant\n%s: the client's paragraphs untouched and ours a block of its own", stored.Content, want)
 	}
 	if codes := findingCodes(relinked.Findings); len(codes) != 1 || codes[0] != steps.CodeRelinkPhraseTemplated {
 		t.Fatalf("findings = %+v, want the plain sentence named", relinked.Findings)
@@ -190,7 +213,7 @@ func TestRelinkNamesALinkItCouldNotPlace(t *testing.T) {
 	deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
 		ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 		Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
-		Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
+		Source:  graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 	})}
 	deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
 		ID: "e2", SiteID: "site", FromEntityID: "parent", ToEntityID: "filter",
@@ -200,7 +223,7 @@ func TestRelinkNamesALinkItCouldNotPlace(t *testing.T) {
 		ID: "page-filter", SiteID: "site", Path: "/coffee/filter/", Slug: "filter",
 		WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("filter"),
 	})}
-	deps.Policies = policyStub{specs: map[string]template.LinkRules{
+	deps.Types = typesStub{perPage: map[string]field.LinkRules{
 		"page-parent": {UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 1, MaxPerTarget: 1},
 	}}
 
@@ -221,11 +244,11 @@ func TestRelinkReachesANeighborThatOwesThePageALink(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		rules   template.LinkRules
+		rules   field.LinkRules
 		visited bool
 	}{
-		{name: "a parent whose rules link down", rules: template.LinkRules{UpDepth: 1, DownLinks: true, MaxPerTarget: 1}, visited: true},
-		{name: "a parent whose rules do not", rules: template.LinkRules{UpDepth: 1, MaxPerTarget: 1}},
+		{name: "a parent whose rules link down", rules: field.LinkRules{UpDepth: 1, DownLinks: true, MaxPerTarget: 1}, visited: true},
+		{name: "a parent whose rules do not", rules: field.LinkRules{UpDepth: 1, MaxPerTarget: 1}},
 	}
 
 	for _, tc := range cases {
@@ -233,7 +256,7 @@ func TestRelinkReachesANeighborThatOwesThePageALink(t *testing.T) {
 			t.Parallel()
 
 			deps, server, _, wpID := relinkDeps(t, parentBody)
-			deps.Policies = policyStub{specs: map[string]template.LinkRules{"page-parent": tc.rules}}
+			deps.Types = typesStub{perPage: map[string]field.LinkRules{"page-parent": tc.rules}}
 			sc := relinkContext(t, deps)
 			alone, err := json.Marshal(content.LinkContext{
 				PageID: "page-child", PageURL: "/coffee/espresso/", EntityID: "child", Targets: []content.LinkTarget{},
@@ -243,7 +266,7 @@ func TestRelinkReachesANeighborThatOwesThePageALink(t *testing.T) {
 			}
 			sc.Artifacts[run.ArtifactLinkContext] = run.Artifact{Kind: run.ArtifactLinkContext, Blob: alone}
 
-			result, err := steps.RelinkNeighbors(deps).Run(t.Context(), sc)
+			result, err := drive(t, steps.RelinkNeighbors(deps), sc)
 			if err != nil {
 				t.Fatalf("RelinkNeighbors: %v", err)
 			}
@@ -401,18 +424,18 @@ func TestRelinkAsksWhatTheNeighborsOwnRulesAllow(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		rules   template.LinkRules
+		rules   field.LinkRules
 		outcome string
 		detail  string
 	}{
 		{
 			name:    "a neighbor that links down owes the backlink",
-			rules:   template.LinkRules{UpDepth: 2, DownLinks: true, MaxPerTarget: 1},
+			rules:   field.LinkRules{UpDepth: 2, DownLinks: true, MaxPerTarget: 1},
 			outcome: steps.OutcomeLinked,
 		},
 		{
 			name:    "a neighbor whose template does not link down owes nothing",
-			rules:   template.LinkRules{UpDepth: 2, MaxPerTarget: 1},
+			rules:   field.LinkRules{UpDepth: 2, MaxPerTarget: 1},
 			outcome: steps.OutcomeSkipped,
 			detail:  steps.ReasonNeighborOwesNothing,
 		},
@@ -423,7 +446,7 @@ func TestRelinkAsksWhatTheNeighborsOwnRulesAllow(t *testing.T) {
 			t.Parallel()
 
 			deps, server, _, wpID := relinkDeps(t, parentBody)
-			deps.Policies = policyStub{specs: map[string]template.LinkRules{"page-parent": tc.rules}}
+			deps.Types = typesStub{perPage: map[string]field.LinkRules{"page-parent": tc.rules}}
 
 			relinked := runRelink(t, deps)
 			if len(relinked.Neighbors) != 1 || relinked.Neighbors[0].Outcome != tc.outcome {
@@ -472,7 +495,7 @@ func TestRelinkSpendsTheNeighborsOwnBudget(t *testing.T) {
 			deps.Entities = entityList{items: append(unitEntities(), graph.Entity{
 				ID: "filter", SiteID: "site", Name: "Filter", Keywords: keyword.Of("filter"),
 				Anchors: []graph.Anchor{{Text: "filter", Source: graph.AnchorUser, Weight: 1}},
-				Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-filter"),
+				Source:  graph.SourceUser, CanonicalPageID: pointer("page-filter"),
 			})}
 			deps.Edges = edgeList{items: append(unitEdges(), graph.Edge{
 				ID: "e2", SiteID: "site", FromEntityID: "parent", ToEntityID: "filter",
@@ -482,7 +505,7 @@ func TestRelinkSpendsTheNeighborsOwnBudget(t *testing.T) {
 				ID: "page-filter", SiteID: "site", Path: "/coffee/filter/", Slug: "filter",
 				WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("filter"),
 			})}
-			deps.Policies = policyStub{specs: map[string]template.LinkRules{
+			deps.Types = typesStub{perPage: map[string]field.LinkRules{
 				"page-parent": {UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: tc.maxLinks, MaxPerTarget: 1},
 			}}
 

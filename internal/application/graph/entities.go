@@ -2,11 +2,13 @@ package graph
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -49,7 +51,6 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 		ID:        id.New(),
 		SiteID:    req.SiteID,
 		Name:      req.Name,
-		Kind:      graphdomain.Kind(req.Kind),
 		Intent:    req.Intent,
 		Keywords:  keywords,
 		Anchors:   requestedAnchors(ctx, req.Anchors),
@@ -88,7 +89,30 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 	return CreateEntityResponse{Entity: entityView(entity)}, nil
 }
 
+func cardRefusal(req UpdateEntityRequest) error {
+	if req.Facts != nil {
+		for i, fact := range *req.Facts {
+			if strings.TrimSpace(fact.Label) == "" || strings.TrimSpace(fact.Value) == "" {
+				return errors.New(errors.Invalid, "a fact needs both what it is about and the fact").
+					WithDetail("field", "facts["+strconv.Itoa(i)+"]")
+			}
+		}
+	}
+	if req.Notes != nil {
+		for i, n := range *req.Notes {
+			if strings.TrimSpace(n.Label) == "" || strings.TrimSpace(n.Text) == "" {
+				return errors.New(errors.Invalid, "a note needs both a heading and a text").
+					WithDetail("field", "notes["+strconv.Itoa(i)+"]")
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (UpdateEntityResponse, error) {
+	if err := cardRefusal(req); err != nil {
+		return UpdateEntityResponse{}, err
+	}
 	var keywords keyword.List
 	if req.Keywords != nil {
 		listed, err := application.KeywordList(*req.Keywords, "keywords")
@@ -101,14 +125,26 @@ func (s *Service) UpdateEntity(ctx context.Context, req UpdateEntityRequest) (Up
 		if req.Name != nil {
 			next.Name = *req.Name
 		}
-		if req.Kind != nil {
-			next.Kind = graphdomain.Kind(*req.Kind)
-		}
 		if req.Intent != nil {
 			next.Intent = *req.Intent
 		}
 		if req.Keywords != nil {
 			next.Keywords = keywords
+		}
+		if req.Definition != nil {
+			next.Definition = *req.Definition
+		}
+		if req.Facts != nil {
+			next.Facts = make([]graphdomain.Fact, 0, len(*req.Facts))
+			for _, fact := range *req.Facts {
+				next.Facts = append(next.Facts, graphdomain.Fact(fact))
+			}
+		}
+		if req.Notes != nil {
+			next.Notes = make([]note.Note, 0, len(*req.Notes))
+			for _, n := range *req.Notes {
+				next.Notes = append(next.Notes, note.Note(n))
+			}
 		}
 	})
 	if err != nil {
@@ -194,13 +230,6 @@ func (s *Service) ListEntities(ctx context.Context, req ListEntitiesRequest) (pa
 		return paging.List[Entity]{}, err
 	}
 	q := graphdomain.EntityQuery{SiteID: req.SiteID, HasCanonicalPage: req.HasCanonicalPage, NamePrefix: req.NamePrefix}
-	if req.Kind != "" {
-		kind := graphdomain.Kind(req.Kind)
-		if !kind.Valid() {
-			return paging.List[Entity]{}, errors.New(errors.Invalid, "entity kind is not recognized").WithDetail("field", "kind")
-		}
-		q.Kind = &kind
-	}
 	key, desc, err := entitySort(req.Sort)
 	if err != nil {
 		return paging.List[Entity]{}, err

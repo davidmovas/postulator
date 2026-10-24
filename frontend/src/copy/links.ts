@@ -1,12 +1,8 @@
 export const links = {
     title: "Linking",
     loading: "Auditing the links",
-    policy: (name: string) => `Policy ${name}`,
-    forbidExternal: "no external links",
-    allowExternal: "external links allowed",
-    forbidSelf: "no self links",
-    allowSelf: "self links allowed",
     meters: {
+        rulesFromTypes: "Each page owes the links its page type's scope asks for. Change them in Settings, Page types.",
         required: "Links the graph asks for",
         targets: (count: number) => (count === 1 ? "1 target" : `${count} targets`),
         satisfied: "in place",
@@ -19,6 +15,8 @@ export const links = {
         ofPages: (audited: number, pages: number) => `${audited} of ${pages}`,
         orphans: "Orphan pages",
         offGraph: "Links outside the graph",
+        byType: "On the site, by type",
+        contextualOnly: "Only contextual links count toward the links the graph asks for, orphans and links outside the graph.",
     },
     relink: {
         start: (count: number) => (count === 1 ? "Relink 1 page" : `Relink ${count} pages`),

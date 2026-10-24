@@ -10,6 +10,7 @@ import (
 	"github.com/ncruces/go-sqlite3"
 	"github.com/ncruces/go-sqlite3/driver"
 	_ "github.com/ncruces/go-sqlite3/embed"
+	"github.com/ncruces/go-sqlite3/ext/hash"
 	_ "github.com/ncruces/go-sqlite3/vfs/adiantum"
 	"github.com/pressly/goose/v3"
 
@@ -22,10 +23,43 @@ const (
 	directoryMode = 0o700
 )
 
+type tracer interface {
+	Statement(sql string)
+	Row()
+}
+
 type Config struct {
 	Path     string
 	Key      []byte
 	Recovery string
+	Trace    tracer
+}
+
+func traced(trace tracer, then ...func(*sqlite3.Conn) error) func(*sqlite3.Conn) error {
+	if trace == nil && len(then) == 0 {
+		return nil
+	}
+	return func(conn *sqlite3.Conn) error {
+		for _, fn := range then {
+			if err := fn(conn); err != nil {
+				return err
+			}
+		}
+		if trace == nil {
+			return nil
+		}
+		return conn.Trace(sqlite3.TRACE_STMT|sqlite3.TRACE_ROW, func(event sqlite3.TraceEvent, _, sql any) error {
+			switch event {
+			case sqlite3.TRACE_STMT:
+				if text, ok := sql.(string); ok {
+					trace.Statement(text)
+				}
+			case sqlite3.TRACE_ROW:
+				trace.Row()
+			}
+			return nil
+		})
+	}
 }
 
 type Store struct {
@@ -44,7 +78,7 @@ func Open(cfg Config) (*Store, error) {
 		return nil, errors.Wrap(err, errors.Internal, "create the database directory")
 	}
 
-	writer, err := driver.Open(dsn(cfg.Path, cfg.Key, false))
+	writer, err := driver.Open(dsn(cfg.Path, cfg.Key, false), traced(cfg.Trace, hash.Register))
 	if err != nil {
 		return nil, dbx.Convert(err, "open the database for writing")
 	}
@@ -60,7 +94,7 @@ func Open(cfg Config) (*Store, error) {
 		)
 	}
 
-	reader, err := driver.Open(dsn(cfg.Path, cfg.Key, true))
+	reader, err := driver.Open(dsn(cfg.Path, cfg.Key, true), traced(cfg.Trace))
 	if err != nil {
 		converted := dbx.Convert(err, "open the database for reading")
 		return nil, stderrors.Join(converted, closeDB(writer, "close the writer after a failed reader open"))

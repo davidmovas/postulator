@@ -233,7 +233,6 @@ export function TemplateEditorScreen(): ReactElement {
                     <GroupView
                         group={group}
                         layer={layer}
-                        siteId={siteId}
                         draft={draft}
                         below={below}
                         siteOverride={siteOverride}
@@ -245,14 +244,13 @@ export function TemplateEditorScreen(): ReactElement {
             </div>
             <EditorDialogs
                 name={template.name}
-                pageKind={template.pageKind}
                 renaming={renaming}
                 renameBusy={update.isPending}
                 renameError={update.error}
                 onRenameOpenChange={setRenaming}
-                onRename={(identity) => {
+                onRename={(name) => {
                     update.mutate(
-                        { id: template.id, name: identity.name, pageKind: identity.pageKind },
+                        { id: template.id, name },
                         {
                             onSuccess: () => {
                                 setRenaming(false);

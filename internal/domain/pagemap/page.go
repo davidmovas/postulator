@@ -1,10 +1,12 @@
 package pagemap
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -17,13 +19,10 @@ const (
 	WPProductCategory WPType = "product_cat"
 )
 
+var wpTypePattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
+
 func (t WPType) Valid() bool {
-	switch t {
-	case WPPage, WPPost, WPProduct, WPProductCategory:
-		return true
-	default:
-		return false
-	}
+	return wpTypePattern.MatchString(string(t))
 }
 
 func (t WPType) Term() bool {
@@ -38,7 +37,7 @@ func (t WPType) SameFamily(other WPType) bool {
 }
 
 func (t WPType) core() bool {
-	return t == WPPage || t == WPPost
+	return !t.Term() && t != WPProduct
 }
 
 type Status string
@@ -59,48 +58,72 @@ func (s Status) Valid() bool {
 	}
 }
 
-type LinkOrigin string
-
-const (
-	OriginGenerated LinkOrigin = "generated"
-	OriginObserved  LinkOrigin = "observed"
-)
-
-func (o LinkOrigin) valid() bool {
-	switch o {
-	case OriginGenerated, OriginObserved:
-		return true
-	default:
-		return false
-	}
-}
-
 type Page struct {
 	ID              string
 	SiteID          string
 	Path            string
 	PlannedPath     string
+	PlannedTrail    []string
+	RowKey          string
 	Slug            string
 	ParentPageID    *string
+	ParentReason    ParentReason
+	ParentSource    ParentSource
+	ParentMethod    ParentMethod
+	PageTypeID      *string
+	TypeSource      TypeSource
+	TypeReason      TypeReason
+	TechnicalReason TechnicalReason
+	ReadOnlyReason  ReadOnlyReason
 	WPType          WPType
 	WPID            *int64
 	Title           string
 	H1              string
 	MetaTitle       string
 	MetaDescription string
-	Canonical       string
 	Keywords        keyword.List
-	Notes           []Note
+	Notes           []note.Note
 	Status          Status
 	EntityID        *string
 	TemplateID      *string
-	ContentHash     string
-	Observed        Observed
 	WPModifiedAt    *time.Time
 	LastSyncedAt    *time.Time
-	Drift           bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+func (p Page) Live() bool {
+	return p.WPID != nil && p.Status == StatusPublished
+}
+
+type LinkType string
+
+const (
+	LinkBreadcrumb LinkType = "breadcrumb"
+	LinkListing    LinkType = "listing"
+	LinkNavigation LinkType = "navigation"
+	LinkContextual LinkType = "contextual"
+	LinkUnknown    LinkType = "unknown"
+)
+
+func (t LinkType) Valid() bool {
+	switch t {
+	case LinkBreadcrumb, LinkListing, LinkNavigation, LinkContextual, LinkUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+type LinkSource string
+
+const (
+	SourceRaw    LinkSource = "raw"
+	SourceRender LinkSource = "render"
+)
+
+func (s LinkSource) Valid() bool {
+	return s == SourceRaw || s == SourceRender
 }
 
 type PageLink struct {
@@ -110,7 +133,13 @@ type PageLink struct {
 	ToPageID   *string
 	ToURL      string
 	AnchorText string
-	Origin     LinkOrigin
+	Type       LinkType
+	Region     string
+	Source     LinkSource
+	Position   *int
+	Ours       bool
+	BlockHash  string
+	Absolute   bool
 	ObservedAt time.Time
 }
 
@@ -140,6 +169,21 @@ func NewPage(p Page) (Page, error) {
 		return Page{}, invalid("entity id must not be empty when set", "entityId")
 	case emptyRef(p.TemplateID):
 		return Page{}, invalid("template id must not be empty when set", "templateId")
+	case emptyRef(p.PageTypeID):
+		return Page{}, invalid("page type id must not be empty when set", "pageTypeId")
+	case !p.TypeSource.Valid() || !p.TypeReason.Valid():
+		return Page{}, invalid("page type source or reason is not recognized", "typeReason")
+	case (p.PageTypeID == nil) != (p.TypeSource == TypeSourceNone):
+		return Page{}, invalid("a page type comes with its source", "typeSource")
+	case p.ParentReason != "" && !p.ParentReason.Valid():
+		return Page{}, invalid("parent reason is not recognized", "parentReason")
+	case !p.TechnicalReason.Valid():
+		return Page{}, invalid("technical reason is not recognized", "technicalReason")
+	case !p.ReadOnlyReason.Valid():
+		return Page{}, invalid("read-only reason is not recognized", "readOnlyReason")
+	}
+	if p.ParentReason == "" {
+		p.ParentReason = ParentNone
 	}
 
 	path, err := NormalizePath(p.Path)
@@ -147,7 +191,10 @@ func NewPage(p Page) (Page, error) {
 		return Page{}, err
 	}
 	p.Path = path
-	p.Slug = Slug(path)
+	p.Slug = strings.TrimSpace(p.Slug)
+	if p.Slug == "" {
+		p.Slug = Slug(path)
+	}
 	if p.PlannedPath, err = plannedPath(p.PlannedPath, path); err != nil {
 		return Page{}, err
 	}
@@ -155,9 +202,8 @@ func NewPage(p Page) (Page, error) {
 	p.H1 = strings.TrimSpace(p.H1)
 	p.MetaTitle = strings.TrimSpace(p.MetaTitle)
 	p.MetaDescription = strings.TrimSpace(p.MetaDescription)
-	p.Canonical = strings.TrimSpace(p.Canonical)
 	p.Keywords = keyword.New(p.Keywords)
-	p.Notes = NewNotes(p.Notes)
+	p.Notes = note.Clean(p.Notes)
 	return p, nil
 }
 
@@ -189,8 +235,10 @@ func NewPageLink(l PageLink) (PageLink, error) {
 		return PageLink{}, invalid("target page id must not be empty when set", "toPageId")
 	case l.ToURL == "":
 		return PageLink{}, invalid("link needs a target url, whether or not it names a target page", "toUrl")
-	case !l.Origin.valid():
-		return PageLink{}, invalid("link origin is not recognized", "origin")
+	case !l.Type.Valid():
+		return PageLink{}, invalid("link type is not recognized", "type")
+	case !l.Source.Valid():
+		return PageLink{}, invalid("link source is not recognized", "source")
 	}
 	return l, nil
 }

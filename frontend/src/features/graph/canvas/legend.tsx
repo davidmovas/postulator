@@ -1,9 +1,8 @@
 import type { ReactElement, ReactNode } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { entityKinds } from "../../../generated/vocab.js";
 import { CallSplitIcon, cx, IconButton, LinkOffIcon, toneClasses, UnfoldLessIcon, UnfoldMoreIcon } from "../../../ui/index.js";
-import { entityIcon, kindTone } from "../labels.js";
+import { presetIcon, presetLabel, presetRoles, presetTone } from "../../settings/types/labels.js";
 
 interface RowProps {
     swatch: ReactNode;
@@ -80,14 +79,14 @@ export function Legend({ open, proof, onToggle }: LegendProps): ReactElement {
                             <Row swatch={<Pill className="border-hairline bg-muted-soft" />} label={said.proofMuted} />
                         </Group>
                     ) : null}
-                    <Group title={said.kinds}>
-                        {entityKinds.map((kind) => {
-                            const Icon = entityIcon(kind);
+                    <Group title={said.types}>
+                        {presetRoles.map((preset) => {
+                            const Icon = presetIcon(preset);
                             return (
                                 <Row
-                                    key={kind}
-                                    swatch={<Icon size={14} className={toneClasses[kindTone(kind)].ink} />}
-                                    label={said.kind(kind)}
+                                    key={preset}
+                                    swatch={<Icon size={14} className={toneClasses[presetTone(preset)].ink} />}
+                                    label={presetLabel(preset)}
                                 />
                             );
                         })}

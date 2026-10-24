@@ -6,6 +6,11 @@ import (
 	"unicode"
 )
 
+func AbsoluteHref(href string) bool {
+	lower := strings.ToLower(strings.TrimSpace(href))
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "//")
+}
+
 func NormalizePath(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -104,6 +109,10 @@ func (s Site) URL(path string) string {
 }
 
 func (s Site) Resolve(href string) (path string, kind LinkKind) {
+	return s.ResolveAt(s.basePath(), href)
+}
+
+func (s Site) ResolveAt(document, href string) (path string, kind LinkKind) {
 	trimmed := strings.TrimSpace(href)
 	if trimmed == "" || trimmed[0] == '#' || trimmed[0] == '?' {
 		return "", LinkSameDocument
@@ -129,7 +138,7 @@ func (s Site) Resolve(href string) (path string, kind LinkKind) {
 	case escaped[0] != '/' && parsed.Host != "":
 		return "", LinkExternal
 	case escaped[0] != '/':
-		escaped = s.basePath() + escaped
+		escaped = s.hrefBase(document) + escaped
 	}
 
 	normalized, err := NormalizePath(escaped)
@@ -137,6 +146,14 @@ func (s Site) Resolve(href string) (path string, kind LinkKind) {
 		return "", LinkUnresolved
 	}
 	return normalized, LinkPath
+}
+
+func (s Site) hrefBase(document string) string {
+	trimmed := strings.TrimSpace(document)
+	if trimmed == "" || trimmed[0] != '/' {
+		return s.basePath()
+	}
+	return trimmed[:strings.LastIndex(trimmed, "/")+1]
 }
 
 const RootPath = "/"

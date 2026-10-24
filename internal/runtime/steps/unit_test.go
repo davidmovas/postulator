@@ -10,12 +10,14 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	port "github.com/davidmovas/postulator/internal/application/llm"
-	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -71,6 +73,10 @@ func (p pageList) Update(_ context.Context, page pagemap.Page) error {
 	return p.err
 }
 
+func (p pageList) UpdatePublished(ctx context.Context, page pagemap.Page) error {
+	return p.Update(ctx, page)
+}
+
 func (p pageList) Insert(context.Context, pagemap.Page) error {
 	return p.err
 }
@@ -90,6 +96,10 @@ func (p *pageRecorder) Get(_ context.Context, id string) (pagemap.Page, error) {
 func (p *pageRecorder) Update(_ context.Context, page pagemap.Page) error {
 	p.last = page
 	return nil
+}
+
+func (p *pageRecorder) UpdatePublished(ctx context.Context, page pagemap.Page) error {
+	return p.Update(ctx, page)
 }
 
 func (p *pageRecorder) Insert(_ context.Context, page pagemap.Page) error {
@@ -115,36 +125,58 @@ func (s siteStub) Get(context.Context, string) (site.Site, error) {
 	return s.record, nil
 }
 
-type policyStub struct {
-	rules      template.LinkRules
-	specs      map[string]template.LinkRules
-	err        error
-	resolveErr error
+type typesStub struct {
+	rules     field.LinkRules
+	perPage   map[string]field.LinkRules
+	err       error
+	canonical bool
 }
 
-func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error) {
-	if p.err != nil {
-		return templates.GetEffectivePolicyResponse{}, p.err
-	}
-	return templates.GetEffectivePolicyResponse{
-		Policy: templates.LinkPolicy{
-			Rules: p.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user",
-		},
-	}, nil
+func linksOf(rules field.LinkRules) field.LinkPolicy {
+	return field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 }
 
-func (p policyStub) ResolveForPage(_ context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
-	if p.resolveErr != nil {
-		return templates.ResolveForPageResponse{}, p.resolveErr
+func unitLinks() field.LinkPolicy {
+	return linksOf(field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 5, MaxPerTarget: 1})
+}
+
+func (s typesStub) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	if s.err != nil {
+		return pagetype.Set{}, s.err
 	}
-	rules, ok := p.specs[req.PageID]
-	if !ok {
-		rules = template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxPerTarget: 1}
+	fallback := field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxPerTarget: 1}
+	types := []pagetype.Type{
+		{ID: "type-entity", SiteID: siteID, Name: "Entity", Preset: pagetype.Entity},
+		{ID: "type-product", SiteID: siteID, Name: "Product", Preset: pagetype.Product},
 	}
-	return templates.ResolveForPageResponse{
-		TemplateID: "template", SiteID: "site", Version: 1,
-		Spec: template.TemplateSpec{LinkRules: rules},
-	}, nil
+	product := pagetype.DefaultScope(pagetype.Product, field.ProductDescription, "type-product")
+	product.Links = linksOf(fallback)
+	scopes := []field.Scope{scopeWith("type-entity", fallback), product}
+	for _, key := range []field.Key{field.SEOTitle, field.SEODescription} {
+		scopes = append(scopes, pagetype.DefaultScope(pagetype.Entity, key, "type-entity"), pagetype.DefaultScope(pagetype.Product, key, "type-product"))
+	}
+	scopes = append(scopes, pagetype.DefaultScope(pagetype.Product, field.ProductShortDescription, "type-product"))
+	if s.canonical {
+		canonical := pagetype.DefaultScope(pagetype.Entity, field.SEOCanonical, "type-entity")
+		canonical.Enabled, canonical.AIWrites = true, false
+		scopes = append(scopes, canonical)
+	}
+	for pageID, rules := range s.perPage {
+		if rules == (field.LinkRules{}) {
+			rules = s.rules
+		}
+		kind := pagetype.Type{ID: "type-" + pageID, SiteID: siteID, Name: pageID, Preset: pagetype.Entity, CreatedAt: time.Unix(1, 0)}
+		types = append(types, kind)
+		scopes = append(scopes, scopeWith(kind.ID, rules),
+			pagetype.DefaultScope(pagetype.Entity, field.SEOTitle, kind.ID), pagetype.DefaultScope(pagetype.Entity, field.SEODescription, kind.ID))
+	}
+	return pagetype.NewSet(types, scopes), nil
+}
+
+func scopeWith(typeID string, rules field.LinkRules) field.Scope {
+	scope := pagetype.DefaultScope(pagetype.Entity, field.Body, typeID)
+	scope.Links = linksOf(rules)
+	return scope
 }
 
 type profileStub struct {
@@ -186,12 +218,12 @@ func unitEntities() []graph.Entity {
 		{
 			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
-			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
+			Source:  graph.SourceUser, CanonicalPageID: pointer("page-parent"),
 		},
 		{
 			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
-			Kind:    graph.KindTopic, Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
+			Source:  graph.SourceUser, CanonicalPageID: pointer("page-child"),
 		},
 	}
 }
@@ -204,19 +236,19 @@ func unitEdges() []graph.Edge {
 }
 
 func unitDeps() steps.Deps {
-	return steps.Deps{
+	return pictured(steps.Deps{
 		Entities: entityList{items: unitEntities()},
 		Edges:    edgeList{items: unitEdges()},
 		Pages: pageList{items: []pagemap.Page{
-			{ID: "page-parent", SiteID: "site", Path: "/coffee/", WPType: pagemap.WPPage, Status: pagemap.StatusPublished},
-			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned},
+			{ID: "page-parent", SiteID: "site", Path: "/coffee/", Title: "Coffee", WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("parent")},
+			{ID: "page-child", SiteID: "site", Path: "/coffee/espresso/", Title: "Espresso", WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child")},
 		}},
 		Sites:    siteStub{},
-		Policies: policyStub{},
+		Types:    typesStub{},
 		Profiles: profileStub{},
 		LLM:      llmStub{reply: goodDraft},
 		Clock:    clock.NewFake(sqlitetest.Stamp),
-	}
+	})
 }
 
 func pointer(value string) *string {
@@ -239,6 +271,7 @@ func unitContext(t *testing.T, artifacts map[run.ArtifactKind][]byte) *run.StepC
 			WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: pointer("child"),
 		},
 		Spec:      spec(),
+		Links:     unitLinks(),
 		Params:    map[string]any{},
 		Artifacts: stored,
 		Check:     run.NewCheckpoint(),
@@ -290,11 +323,6 @@ func TestResolveContextReportsWhatItCannotRead(t *testing.T) {
 		{
 			name: "the pages cannot be listed",
 			deps: func(d steps.Deps) steps.Deps { d.Pages = pageList{err: boom}; return d },
-			want: errors.External,
-		},
-		{
-			name: "the policy cannot be read",
-			deps: func(d steps.Deps) steps.Deps { d.Policies = policyStub{err: boom}; return d },
 			want: errors.External,
 		},
 		{
@@ -463,18 +491,12 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 	}
 
 	cases := []struct {
-		name   string
-		rules  template.LinkRules
-		policy template.LinkRules
-		want   bool
+		name  string
+		rules field.LinkRules
+		want  bool
 	}{
-		{name: "the rules ask for a children section", rules: template.LinkRules{UpDepth: 1, ChildrenSection: true}, want: true},
-		{name: "the rules do not", rules: template.LinkRules{UpDepth: 1}},
-		{
-			name:   "the template inherits a site policy that asks for one",
-			policy: template.LinkRules{UpDepth: 1, DownLinks: true, ChildrenSection: true},
-			want:   true,
-		},
+		{name: "the page type's rules ask for a children section", rules: field.LinkRules{UpDepth: 1, ChildrenSection: true}, want: true},
+		{name: "the rules do not", rules: field.LinkRules{UpDepth: 1}},
 	}
 
 	for _, tc := range cases {
@@ -484,9 +506,8 @@ func TestGenerateBodyNamesTheChildrenWhenTheRulesAskFor(t *testing.T) {
 			deps := unitDeps()
 			recorder := &promptRecorder{reply: goodDraft}
 			deps.LLM = recorder
-			deps.Policies = policyStub{rules: tc.policy}
 			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: down})
-			sc.Spec.LinkRules = tc.rules
+			sc.Links = linksOf(tc.rules)
 
 			if _, runErr := steps.GenerateBody(deps).Run(t.Context(), sc); runErr != nil {
 				t.Fatalf("GenerateBody: %v", runErr)
@@ -617,12 +638,14 @@ func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name  string
-		short string
-		held  bool
+		name    string
+		short   string
+		written bool
+		held    bool
 	}{
-		{name: "a short description with the keyword", short: "<p>An espresso machine.</p>"},
-		{name: "a short description without it", short: "<p>A machine.</p>", held: true},
+		{name: "a short description with the keyword", short: "<p>An espresso machine.</p>", written: true},
+		{name: "a short description without it", short: "<p>A machine.</p>", written: true, held: true},
+		{name: "no short description written this run", short: "<p>A machine.</p>"},
 	}
 
 	for _, tc := range cases {
@@ -634,14 +657,16 @@ func TestValidateGradesAProductOnItsShortDescriptionNotOnItsName(t *testing.T) {
 			draft, err := json.Marshal(content.ContentDraft{
 				Title: "Machine", H1: "Machine",
 				Sections: []content.DraftSection{{Heading: "About", HTML: "<p>Espresso.</p>"}},
-				Product:  &content.ProductDraft{ShortDescription: tc.short},
 			})
 			if err != nil {
 				t.Fatalf("encode the draft: %v", err)
 			}
-			sc := productContext(t, deps)
+			sc := productContext(t, &deps)
 			sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: body}
 			sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: draft}
+			if tc.written {
+				withFields(t, sc, steps.FieldValue{Key: string(field.ProductShortDescription), Value: tc.short})
+			}
 			sc.Spec.KeywordRules.PrimaryInH1 = true
 
 			result, err := steps.Validate(deps).Run(t.Context(), sc)
@@ -951,7 +976,7 @@ func TestRepairLinksLeavesALinkTheBudgetCannotHold(t *testing.T) {
 		run.ArtifactLinkContext: owingContext(t),
 		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>Our espresso starts with the coffee we roast.</p>"),
 	})
-	sc.Spec.LinkRules.MaxLinks = 1
+	sc.Links.Rules.MaxLinks = 1
 
 	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
 	if err != nil {
@@ -978,7 +1003,7 @@ func TestRepairLinksPutsTheKeywordInTheLeadAndTheAnchorWhereTheParentLinkMayGo(t
 		run.ArtifactLinkContext: blob,
 		run.ArtifactBodyHTML:    []byte("<h1>Espresso</h1><p>A shot of the good stuff.</p><p>Second thoughts.</p>"),
 	})
-	sc.Spec.LinkRules.ParentLinkWithinParagraphs = 1
+	sc.Links.Rules.ParentLinkWithinParagraphs = 1
 
 	result, err := steps.RepairLinks(deps).Run(t.Context(), sc)
 	if err != nil {
@@ -1160,7 +1185,7 @@ func TestRepairLinksHonoursTheIterationParameter(t *testing.T) {
 			if tc.param != nil {
 				sc.Params = map[string]any{steps.ParamIterations: tc.param}
 			}
-			sc.Spec.LinkRules.ParentLinkWithinParagraphs = 1
+			sc.Links.Rules.ParentLinkWithinParagraphs = 1
 
 			result, err := steps.RepairLinks(local).Run(t.Context(), sc)
 			if err != nil {
@@ -1200,7 +1225,7 @@ func TestWriterCeilingGrowsWithTheTemplateAndTheAttempt(t *testing.T) {
 
 	long := spec()
 	long.Sections = []template.Section{{Heading: "Overview", TargetWords: 1800, Required: true}}
-	short := template.TemplateSpec{Length: template.Length{Max: 200}, LinkRules: spec().LinkRules}
+	short := template.TemplateSpec{Length: template.Length{Max: 200}}
 
 	for _, tc := range []struct {
 		name     string
@@ -1346,9 +1371,9 @@ func TestMaxTokensFallsBackToTheTemplateLength(t *testing.T) {
 		{name: "sections carry the target", spec: spec()},
 		{
 			name: "only a length ceiling",
-			spec: template.TemplateSpec{Length: template.Length{Max: 400}, LinkRules: spec().LinkRules},
+			spec: template.TemplateSpec{Length: template.Length{Max: 400}},
 		},
-		{name: "nothing at all", spec: template.TemplateSpec{LinkRules: spec().LinkRules}},
+		{name: "nothing at all", spec: template.TemplateSpec{}},
 	}
 
 	for _, tc := range cases {
@@ -1391,7 +1416,7 @@ func TestTheWriterPromptCarriesTheBrief(t *testing.T) {
 	blob := linkContextBlob(t, deps)
 
 	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
-	sc.Spec.LinkRules.ParentLinkWithinParagraphs = 2
+	sc.Links.Rules.ParentLinkWithinParagraphs = 2
 	sc.Spec.Sections[0].KeywordRules.PrimaryInHeading = true
 
 	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
@@ -1411,6 +1436,42 @@ func TestTheWriterPromptCarriesTheBrief(t *testing.T) {
 		if !strings.Contains(recorder.last, want) {
 			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
 		}
+	}
+}
+
+func TestTheWriterPromptNamesThePageTypeAndNoKind(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name, typeName, want string
+		absent               []string
+	}{
+		{name: "a typed page", typeName: "Category", want: "Page type: Category\n", absent: []string{"Kind:"}},
+		{name: "an untyped claim names the model's type", want: "Page type: Entity, an article", absent: []string{"Kind:"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			deps := unitDeps()
+			recorder := &promptRecorder{reply: goodDraft}
+			deps.LLM = recorder
+			blob := linkContextBlob(t, deps)
+			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: blob})
+			sc.Type.Name = tc.typeName
+
+			if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
+				t.Fatalf("GenerateBody: %v", err)
+			}
+			if tc.want != "" && !strings.Contains(recorder.last, tc.want) {
+				t.Fatalf("the prompt lacks %q:\n%s", tc.want, recorder.last)
+			}
+			for _, absent := range tc.absent {
+				if strings.Contains(recorder.last, absent) {
+					t.Fatalf("the prompt carries %q:\n%s", absent, recorder.last)
+				}
+			}
+		})
 	}
 }
 
@@ -1477,21 +1538,16 @@ func TestTheWriterPromptSaysWhenAPageHasNoKeywords(t *testing.T) {
 const productDraftReply = `{"title":"Espresso guide","h1":"Espresso guide","sections":[` +
 	`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"},` +
 	`{"heading":"Brewing","html":"<p>Use fresh water and a fine grind for a sweeter cup at home.</p>"}` +
-	`],"summary":"A short guide to espresso.",` +
-	`"shortDescription":"<p>An espresso machine for the home.</p>",` +
-	`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Size","value":""}]}`
+	`],"summary":"A short guide to espresso."}`
 
-func productContext(t *testing.T, deps steps.Deps) *run.StepContext {
+func productContext(t *testing.T, deps *steps.Deps) *run.StepContext {
 	t.Helper()
 
-	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
+	sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, *deps)})
 	sc.Page.WPType = pagemap.WPProduct
-	sc.Page.Observed.Title = "Espresso Machine &amp; Grinder"
+	deps.Fields = &fieldLog{values: []field.Value{field.NewValue(sc.Page.ID, field.Title, "Espresso Machine &amp; Grinder", time.Time{})}}
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is", TargetWords: 30, PrimaryKeyword: true},
-		Specifications: []template.ProductSpecification{
-			{Name: "Form", Intent: "The form the notes state"}, {Name: "Size", Intent: "The size the notes state"},
-		},
 	}
 	return sc
 }
@@ -1502,7 +1558,7 @@ func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
 	deps := unitDeps()
 	recorder := &promptRecorder{reply: productDraftReply}
 	deps.LLM = recorder
-	sc := productContext(t, deps)
+	sc := productContext(t, &deps)
 
 	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
 	if err != nil {
@@ -1510,14 +1566,17 @@ func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
 	}
 	for _, want := range []string{
 		"writing body copy for a WooCommerce product",
-		"shortDescription and specifications",
+		"title, h1, sections and summary",
 		"H1: Espresso Machine & Grinder (the product's name in the store",
 		"never state a price, a stock level or an SKU",
-		"Short description: write it in shortDescription as HTML paragraphs, about 30 words: Say what it is; it carries the primary keyword",
-		"- Form: The form the notes state\n",
 	} {
 		if !strings.Contains(recorder.last, want) {
 			t.Fatalf("the prompt lacks %q:\n%s", want, recorder.last)
+		}
+	}
+	for _, gone := range []string{"pecification", "shortDescription", "Short description"} {
+		if strings.Contains(recorder.last, gone) {
+			t.Errorf("the writer is still asked %q, which generate_fields writes or the store owns:\n%s", gone, recorder.last)
 		}
 	}
 
@@ -1525,12 +1584,8 @@ func TestTheWriterAnswersAProductUnderItsStoreName(t *testing.T) {
 	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil {
 		t.Fatalf("decode the draft: %v", err)
 	}
-	if draft.H1 != "Espresso Machine & Grinder" || draft.Product == nil {
+	if draft.H1 != "Espresso Machine & Grinder" {
 		t.Fatalf("draft = %+v", draft)
-	}
-	if draft.Product.ShortDescription != "<p>An espresso machine for the home.</p>" ||
-		len(draft.Product.Specifications) != 1 || draft.Product.Specifications[0].Value != "Countertop" {
-		t.Errorf("product draft = %+v", draft.Product)
 	}
 }
 
@@ -1540,7 +1595,7 @@ func TestTheWriterOfAPageIsAskedNothingAboutProducts(t *testing.T) {
 	deps := unitDeps()
 	recorder := &promptRecorder{reply: goodDraft}
 	deps.LLM = recorder
-	sc := productContext(t, deps)
+	sc := productContext(t, &deps)
 	sc.Page.WPType = pagemap.WPPage
 
 	result, err := steps.GenerateBody(deps).Run(t.Context(), sc)
@@ -1553,25 +1608,25 @@ func TestTheWriterOfAPageIsAskedNothingAboutProducts(t *testing.T) {
 		}
 	}
 	var draft content.ContentDraft
-	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil || draft.Product != nil {
-		t.Fatalf("a page's draft = %+v, %v", draft.Product, err)
+	if err := json.Unmarshal(result.Artifacts[0].Blob, &draft); err != nil {
+		t.Fatalf("a page's draft: %v", err)
 	}
 }
 
-func TestTheWriterCeilingMakesRoomForAProductsShortDescription(t *testing.T) {
+func TestTheWriterCeilingIsTheBodysAlone(t *testing.T) {
 	t.Parallel()
 
 	deps := unitDeps()
 	recorder := &ceilingRecorder{reply: productDraftReply}
 	deps.LLM = recorder
 
-	sc := productContext(t, deps)
+	sc := productContext(t, &deps)
 	sc.Spec.Sections = []template.Section{{Heading: "About", TargetWords: 1800, Required: true}, {Heading: "Brewing"}}
 	if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
 		t.Fatalf("GenerateBody: %v", err)
 	}
-	if got, want := recorder.ceilings[len(recorder.ceilings)-1], (1800+30)*3+1024; got != want {
-		t.Errorf("ceiling = %d, want %d", got, want)
+	if got, want := recorder.ceilings[len(recorder.ceilings)-1], 1800*3+1024; got != want {
+		t.Errorf("ceiling = %d, want %d: the short description is generate_fields' to write", got, want)
 	}
 }
 
@@ -1580,13 +1635,13 @@ func TestTheWriterReadsTheNotesOfThePageAsContext(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		notes []pagemap.Note
+		notes []note.Note
 		want  []string
 		gone  []string
 	}{
 		{
 			name:  "a page with notes",
-			notes: []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
+			notes: []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}},
 			want:  []string{"NOTES\n", "- Intent Owner: Commercial\n", "- Notes: Sold as a 10 ml vial\n", "never copy"},
 		},
 		{name: "a page without notes", gone: []string{"NOTES\n"}},
@@ -1601,6 +1656,11 @@ func TestTheWriterReadsTheNotesOfThePageAsContext(t *testing.T) {
 			deps.LLM = recorder
 			sc := unitContext(t, map[run.ArtifactKind][]byte{run.ArtifactLinkContext: linkContextBlob(t, deps)})
 			sc.Page.Notes = tc.notes
+			deps.Pages = pageList{items: []pagemap.Page{
+				{ID: "page-parent", SiteID: "site", Path: "/coffee/", Title: "Coffee", WPType: pagemap.WPPage, Status: pagemap.StatusPublished, EntityID: pointer("parent")},
+				sc.Page,
+			}}
+			deps = pictured(deps)
 
 			if _, err := steps.GenerateBody(deps).Run(t.Context(), sc); err != nil {
 				t.Fatalf("GenerateBody: %v", err)
@@ -1623,9 +1683,9 @@ func sharedNameEntities() []graph.Entity {
 	entities := unitEntities()
 	entities[1].ScopeID = pointer("parent")
 	return append(entities,
-		graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+		graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Source: graph.SourceUser},
 		graph.Entity{
-			ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+			ID: "tea-espresso", SiteID: "site", Name: "Espresso", Source: graph.SourceUser,
 			ScopeID: pointer("tea"),
 		},
 	)
@@ -1646,7 +1706,7 @@ func TestAPromptNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 				_, err := steps.GenerateBody(deps).Run(t.Context(), sc)
 				return err
 			},
-			want: []string{"Name: Coffee Espresso\n"},
+			want: []string{"Entity: Coffee Espresso\n"},
 		},
 		{
 			name: "the meta writer and its title pattern",
@@ -1666,6 +1726,7 @@ func TestAPromptNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 
 			deps := unitDeps()
 			deps.Entities = entityList{items: sharedNameEntities()}
+			deps = pictured(deps)
 			recorder := &promptRecorder{reply: goodDraft}
 			deps.LLM = recorder
 

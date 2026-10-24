@@ -6,43 +6,71 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
-type siteState struct {
-	siteID    string
-	entities  []graph.Entity
-	edges     []graph.Edge
-	pages     []pagemap.Page
-	byName    map[string][]graph.Entity
-	byPath    map[string]pagemap.Page
-	byPlanned map[string]pagemap.Page
-	edgeKeys  map[string]struct{}
+type siteFacts struct {
+	pageTypes   []pagetype.Type
+	fields      map[string][]field.Value
+	terms       map[string][]pagemap.Term
+	termParents map[int64]int64
+	chosen      *choices
 }
 
-func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page) siteState {
+type siteState struct {
+	siteFacts
+	siteID   string
+	entities []graph.Entity
+	edges    []graph.Edge
+	pages    []pagemap.Page
+	site     pagemap.RowSite
+	trails   pagemap.TrailSite
+	byName   map[string][]graph.Entity
+	byPath   map[string]pagemap.Page
+	edgeKeys map[string]struct{}
+	types    map[pagemap.WPType]struct{}
+}
+
+func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page, facts siteFacts) siteState {
 	state := siteState{
-		siteID: siteID, entities: entities, edges: edges, pages: pages,
-		byName:    make(map[string][]graph.Entity, len(entities)),
-		byPath:    make(map[string]pagemap.Page, len(pages)),
-		byPlanned: make(map[string]pagemap.Page),
-		edgeKeys:  make(map[string]struct{}, len(edges)),
+		siteFacts: facts, siteID: siteID, entities: entities, edges: edges, pages: pages,
+		site:     pagemap.NewRowSite(pages, facts.fields, entities),
+		trails:   pagemap.NewTrailSite(pagemap.NewIndexNamed(pages, pagemap.Names(facts.fields)), facts.terms, facts.termParents),
+		byName:   make(map[string][]graph.Entity, len(entities)),
+		byPath:   make(map[string]pagemap.Page, len(pages)),
+		edgeKeys: make(map[string]struct{}, len(edges)),
+		types: map[pagemap.WPType]struct{}{
+			pagemap.WPPage: {}, pagemap.WPPost: {}, pagemap.WPProduct: {}, pagemap.WPProductCategory: {},
+		},
 	}
 	for i := range entities {
 		state.byName[graph.Key(entities[i].Name)] = append(state.byName[graph.Key(entities[i].Name)], entities[i])
 	}
 	for i := range pages {
 		state.byPath[pages[i].Path] = pages[i]
-		if pages[i].PlannedPath != "" {
-			state.byPlanned[pages[i].PlannedPath] = pages[i]
-		}
+		state.types[pages[i].WPType] = struct{}{}
 	}
 	for i := range edges {
 		state.edgeKeys[edgeKey(edges[i])] = struct{}{}
 	}
 	return state
+}
+
+func (s *siteState) knows(wpType pagemap.WPType) bool {
+	_, known := s.types[wpType]
+	return known
+}
+
+func resolveTypes(sheet *drafts, state *siteState) {
+	for _, draft := range sheet.pages {
+		if cell := draft.cellType(); cell != "" && !state.knows(cell) {
+			draft.typeUnknown = true
+		}
+	}
 }
 
 func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
@@ -58,7 +86,54 @@ func (s *Service) state(ctx context.Context, siteID string) (siteState, error) {
 	if err != nil {
 		return siteState{}, err
 	}
-	return newSiteState(siteID, entities, edges, pages), nil
+	pageTypes, err := s.deps.Types.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	fields, err := s.deps.Fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	identities, err := s.deps.Terms.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	terms, err := s.deps.Terms.ListTermsBySite(ctx, siteID)
+	if err != nil {
+		return siteState{}, err
+	}
+	observed := make(map[string]pagemap.Identity, len(identities))
+	for i := range identities {
+		observed[identities[i].PageID] = identities[i]
+	}
+	facts := siteFacts{pageTypes: pageTypes, fields: fields, terms: terms, termParents: pagemap.TermParents(pages, observed)}
+	return newSiteState(siteID, entities, edges, pages, facts), nil
+}
+
+func (s *siteState) storeName(pageID string) string {
+	values := s.fields[pageID]
+	for i := range values {
+		if values[i].Key == field.Title {
+			return values[i].Current
+		}
+	}
+	return ""
+}
+
+func (s *siteState) typeName(typeID *string) string {
+	if typeID == nil {
+		return ""
+	}
+	for i := range s.pageTypes {
+		if s.pageTypes[i].ID == *typeID {
+			return s.pageTypes[i].Name
+		}
+	}
+	return ""
+}
+
+func (s *siteState) pageType(cell string, wpType pagemap.WPType) (pagetype.Type, bool) {
+	return pagetype.Match(cell, s.pageTypes, wpType)
 }
 
 func sortStored(entities []graph.Entity, edges []graph.Edge, pages []pagemap.Page) {
@@ -73,17 +148,6 @@ func sortStored(entities []graph.Entity, edges []graph.Edge, pages []pagemap.Pag
 	})
 }
 
-func (s *siteState) held(path string) (pagemap.Page, bool) {
-	if page, ok := s.byPath[path]; ok && page.WPID != nil {
-		return page, true
-	}
-	if page, ok := s.byPlanned[path]; ok {
-		return page, true
-	}
-	page, ok := s.byPath[path]
-	return page, ok
-}
-
 func inTheStore(page pagemap.Page) bool {
 	return page.WPType == pagemap.WPProduct && page.WPID != nil
 }
@@ -92,23 +156,26 @@ func (s *siteState) sells() bool {
 	return slices.ContainsFunc(s.pages, inTheStore)
 }
 
-func (s *siteState) storeHolds(row pagemap.ProductRow) bool {
-	if page, held := s.held(row.Path); held && inTheStore(page) {
-		return true
-	}
-	return pagemap.MatchProduct(row, s.pages).Found
+func (s *siteState) storeHolds(row *rowDraft) bool {
+	found := s.site.Match(row.asked(true))
+	return found.Found() && inTheStore(found.Page)
 }
 
 func (s *siteState) rowTypeOf(binding importmap.Binding, rows [][]string) importmap.RowType {
 	found := 0
-	for _, row := range rows {
-		raw := binding.Path(row)
-		if raw == "" {
+	for _, cells := range rows {
+		row := cellsOf(binding, cells, importmap.Origin{})
+		if raw := binding.Path(cells); raw != "" {
+			url, err := pagemap.NormalizePath(raw)
+			if err != nil {
+				return importmap.RowPages
+			}
+			row.url = url
+		}
+		if row.url == "" && row.name == "" && row.title == "" && row.h1 == "" && row.sku == "" {
 			continue
 		}
-		path, pathErr := pagemap.NormalizePath(raw)
-		product := pagemap.ProductRow{Path: path, H1: binding.Text(row, importmap.FieldH1), Title: binding.Text(row, importmap.FieldTitle)}
-		if pathErr != nil || !s.storeHolds(product) {
+		if !s.storeHolds(&row) {
 			return importmap.RowPages
 		}
 		found++

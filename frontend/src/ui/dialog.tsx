@@ -17,6 +17,7 @@ export interface DialogProps {
     destructive?: boolean;
     icon?: IconComponent;
     busy?: boolean;
+    refusal?: string | null;
     status?: ReactNode;
     onCancel?: () => void;
     children?: ReactNode;
@@ -33,10 +34,12 @@ export function Dialog({
     destructive = false,
     icon: Icon,
     busy = false,
+    refusal = null,
     status,
     onCancel,
     children,
 }: DialogProps): ReactElement {
+    const refused = refusal !== null && refusal !== "";
     return (
         <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
             <RadixDialog.Portal>
@@ -71,7 +74,13 @@ export function Dialog({
                                 {cancelLabel}
                             </Button>
                         )}
-                        <Button variant={destructive ? "danger" : "primary"} busy={busy} onClick={onConfirm}>
+                        <Button
+                            variant={destructive ? "danger" : "primary"}
+                            busy={busy}
+                            disabled={refused}
+                            title={refusal === null || refusal === "" ? undefined : refusal}
+                            onClick={onConfirm}
+                        >
                             {confirmLabel}
                         </Button>
                     </div>

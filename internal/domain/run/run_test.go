@@ -92,6 +92,7 @@ func TestKindsAndPublishModesAreClosedSets(t *testing.T) {
 		{name: "import", valid: run.KindImport.Valid(), want: true},
 		{name: "repair", valid: run.KindRepair.Valid(), want: true},
 		{name: "revert", valid: run.KindRevert.Valid(), want: true},
+		{name: "edit", valid: run.KindEdit.Valid(), want: true},
 		{name: "custom", valid: run.KindCustom.Valid(), want: true},
 		{name: "an unknown kind", valid: run.Kind("dance").Valid()},
 		{name: "draft", valid: run.PublishDraft.Valid(), want: true},

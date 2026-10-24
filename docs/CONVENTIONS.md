@@ -14,6 +14,7 @@
 | ncruces/go-sqlite3 | `v0.30.1` | `go.mod` |
 | goose | `v3.28.0` | `go.mod` |
 | golang.org/x/sys | `v0.47.0` | `go.mod` |
+| tiktoken-go/tokenizer | `v0.8.1`, tests and `cmd/tokenreport` only | `go.mod` |
 
 `wails3 doctor` must pass before any Wails work. It verified WebView2 `153.0.4234.32`
 and NSIS `v3.12` on the development machine. golangci-lint has to be built by the same
@@ -172,13 +173,47 @@ closure test is what catches that transitive case.
   in a `MemoryRouter` for the components that carry links. `npm run test:run` runs both.
 - **The tool schema ceiling is a tripwire, not a wall.** Everything in the tool registry
   is resent to the model on every round of every turn, so
-  `TestTheToolSchemasFitTheirCeiling` measures the wire bytes and fails over
-  `schemaCeilingBytes` in `internal/application/tools/registry_test.go`. A new tool raises
-  that constant deliberately, in the same commit, and a change that shrinks the schemas
-  lowers it again. The test logs the eight widest schemas, and a second test logs what a
-  round sends with `agent.toolLoading` set to `deferred`, without a ceiling. A field's
-  description says what it takes, its default, its limits and the tool an id comes from;
-  what every field would repeat belongs once in the chat instructions.
+  `TestTheToolSchemasFitTheirCeiling` measures the wire JSON in bytes and in `o200k_base`
+  tokens and fails over `schemaCeilingBytes` or `schemaCeilingTokens` in
+  `internal/application/tools/registry_test.go`. A new tool raises both constants
+  deliberately, in the same commit, and a change that shrinks the schemas lowers them again.
+  The test logs the eight widest schemas by tokens, and a second test logs what a round
+  sends with `agent.toolLoading` set to `deferred`, in bytes and tokens, without a ceiling.
+  `TestTheInstructionsAndTheReplicasBriefFitTheirCeiling` in `internal/application/agent`
+  does the same for the instructions over the replica's captured brief, the wider of the two
+  modes, under `instructionsCeilingTokens`. A field's description says what it takes, its
+  default, its limits and the tool an id comes from; what every field would repeat belongs
+  once in the chat instructions.
+
+## Sizes in bytes and tokens
+
+- **A size is measured in bytes and in tokens.** Bytes are what the wire and SQLite hold;
+  tokens, in the `o200k_base` encoding of the catalog's models, are what a call costs. The
+  application's own estimates stay word-based and run without a tokenizer: `llm.Tokens` for a
+  pack and `Fit`, `llm.WordTokens` and `runtime.EstimatedInput` for the run estimate,
+  `steps.tokensPerWord` for the writer's ceiling.
+- **The tokenizer never reaches the binary.** `github.com/tiktoken-go/tokenizer` carries
+  `o200k_base` compiled in and fetches nothing. It is imported only from `_test.go` files and
+  from `cmd/tokenreport`. `TestTheTokenizerStaysOutOfTheBinary` in `internal/app/deps_test.go`
+  proves that `cmd/postulator`'s build, plain and `uiharness`, holds none of it, and that no
+  other non-test package imports it. Its vocabulary is about 16 MB of generated Go: a cold
+  build takes about a minute, the compiler peaks near 400 MB, and a test binary that loads it
+  stays under 30 MB.
+- **`go run ./cmd/tokenreport` is a report, not a gate** (`-json` prints every row as JSON). It
+  runs the code as it is over the stand captures, with no stand and no model call, and
+  measures:
+  - the agent's round: the instructions, every tool schema, the deferred round, each stand's
+    brief and the turn's context message;
+  - the writer's, linker's and judge's prompts per captured page, the pack section by section,
+    each prompt counted in the encoding of the model its role resolves to;
+  - the run estimate, `llm.Tokens` and `Fit` against the real count, and the captured prose's
+    tokens per word against the constants, with the spread and a proposal. The proposal moves
+    no constant: the owner decides.
+
+  The tripwires are the gate.
+- **The stand captures** live in `internal/application/sitemodel/sitemodeltest/testdata/<stand>/site.json`,
+  embedded and loaded by `sitemodeltest.Stand`; `E2E_CAPTURE=1` writes them there, and the
+  `packs.golden` files stay in `internal/application/sitemodel/testdata`.
 
 ## Commits
 
@@ -186,7 +221,11 @@ Conventional commits: `<type>(<scope>): <subject>` with
 `type ∈ feat|fix|perf|refactor|docs|test|style|chore|ci|build|revert`. The scope names
 the package or the phase task (`feat(kernel): cursor pagination`). The commit-msg hook
 in `lefthook.yml` rejects anything else. Every commit ends with the attribution line
-the session was given. Commit on `dev`; never amend, rebase or force-push.
+the session was given. Commit on `dev`; never amend, rebase or force-push. When several
+writers share one tree, each commits with `git commit -m "…" -- <paths>`, which commits the
+named paths only, and never stages anything ahead of its own commit: a plain `git commit`
+takes the whole index, and on 2026-10-18 one writer's commit swept another's staged
+deletions in.
 
 **`lefthook` is still not installed on the development machine**
 (`go install github.com/evilmartians/lefthook@latest && lefthook install`), so nothing
@@ -210,27 +249,53 @@ in the same commit.
 ## Docker end-to-end
 
 `docker/e2e/compose.yaml` pins WordPress 7.0.1 (PHP 8.3), MariaDB 11.4.12 and WP-CLI 2.12.0,
-and one file serves two stacks. `task e2e:*` is the suites' own, compose project
-`postulator-test` on `127.0.0.1:8088`, with WooCommerce on unless `E2E_WOO=0`; `task sandbox:*`
-is the one people test the application against, project `postulator-e2e` on 8089, bare unless
-`E2E_PLUGIN=1` and without a store unless `E2E_WOO=1`. The suites force-delete what they wrote, so
-both harnesses refuse 8089. `task e2e:up` provisions the site, installs the plugin from
-`bin/postulator-companion.zip` and writes `.env.generated`.
+`bootstrap.sh` pins WooCommerce 11.1.2, Rank Math 1.0.280 and Yoast 28.7, and one file serves
+three compose projects:
+
+- **vanilla**, `task e2e:* STAND=vanilla` (the default), project `postulator-test-vanilla` on
+  `127.0.0.1:8088`: Twenty Twenty-Five 1.5 and the block editor, WooCommerce's own breadcrumbs, no
+  SEO plugin unless `E2E_SEO` names one, pages nested under `/guide/` and a front page of posts;
+- **replica**, `STAND=replica`, project `postulator-test-replica` on 8087, a replica of the
+  client's first site: Classic Editor 1.7.0, Blocksy 2.1.60 and Rank Math with its breadcrumbs on,
+  flat pages under a static front page, and the mu-plugin `stands/replica/site-behaviour.php`,
+  copied into `mu-plugins`, which registers an `entity` product taxonomy without `show_in_rest`
+  and gives every page whose slug is a product category or an entity a breadcrumb `nav` before
+  its content, a product grid after it and BreadcrumbList, ItemList and CollectionPage JSON-LD;
+  one hub's raw is empty, one is a lone shortcode, one is text, and one crumb names a path no
+  page answers;
+- **the sandbox**, `task sandbox:*`, project `postulator-e2e` on 8089, the one people test the
+  application against: `sandbox:up` brings it up bare unless `E2E_PLUGIN=1` and without a store
+  unless `E2E_WOO=1`, `sandbox:provision STAND=` makes it that stand on that command only, adding
+  what is missing and keeping what it holds, and only `sandbox:reset` throws it away.
+
+Both stands import their `products.csv` through WooCommerce's CSV importer
+(`docker/e2e/import-products.php`), so each carries a simple product and a variable one with SKU'd
+variations. `task e2e:up STAND=` provisions the stand, installs the plugin from
+`bin/postulator-companion.zip` and writes `docker/e2e/.env.<stand>` with `E2E_STAND`,
+`E2E_PROJECT`, `E2E_WP_URL`, `E2E_WP_USER`, `E2E_WP_APP_PASSWORD`, `E2E_SEO`, `E2E_WOO` and
+`E2E_PLUGIN`. A stand's title, admin user and seeds name nothing of the program, and its term ids
+start at 100000, so a term id is never a post id. The suites force-delete what they wrote, so
+both harnesses refuse 8089 and the sandbox's project; they read `POSTULATOR_E2E_ENV`, else
+`.env.$E2E_STAND`, else `.env.vanilla`, and take what differs between the stands from `standOf`
+in `internal/adapters/wp/e2e/stands_test.go`, never from a stand's name.
 
 ```
-task e2e:up                E2E_SEO=none|yoast|rankmath, E2E_WOO=0|1, E2E_PLUGIN=0|1
-task e2e:test              the plugin contract, ./internal/adapters/wp/e2e/...
-task e2e:full              the whole loop, ./internal/e2e/...
+task e2e:up STAND=         E2E_SEO=none|yoast|rankmath (vanilla), E2E_WOO=0|1, E2E_PLUGIN=0|1
+task e2e:test STAND=       the plugin contract, ./internal/adapters/wp/e2e/...; -- <args> reach go test
+task e2e:full STAND=       the whole loop, ./internal/e2e/...; -- <args> reach go test
 task e2e:full:noplugin     e2e:up with E2E_PLUGIN=0, then the degraded loop
-task e2e:down              e2e:reset does both
+task e2e:both              e2e:up and e2e:test on vanilla, then on the replica, never at once
+task e2e:down STAND=       e2e:reset does both
+task plugin:deploy STAND=  the zip installed over the plugin of a running stand
+task sandbox:provision     STAND=vanilla|replica on 8089; never -v, the plugin only with E2E_PLUGIN=1
 ```
 
 `E2E_PLUGIN=0` leaves the companion plugin installed but deactivated: the client who refuses
-to install it. `e2e:test` then skips, being that plugin's contract, and the loop tests in
-`internal/e2e` each skip the stack they cannot use, so both targets stay green either way; the
-product loop skips a site that answers no WooCommerce store. `e2e:full:noplugin` runs
-`-run TestTheWholeLoopDegradesWithoutThePlugin` and does not pass `-v`: to read what it proved,
-run its `go test` line from `Taskfile.yml` with `-v`.
+to install it. `e2e:test` then skips, being that plugin's contract, and fails instead when the env
+file says the plugin is on and the site answers no manifest; the loop tests in `internal/e2e` each
+skip the stack they cannot use, so both targets stay green either way; the product loop skips a
+site that answers no WooCommerce store. `e2e:full:noplugin` runs
+`-run TestTheWholeLoopDegradesWithoutThePlugin`; to read what it proved, pass `-- -v`.
 
 `internal/e2e` composes the real application over `adapters/llm/fake` and syncs the docker site,
 and every loop removes what it wrote before it starts and after it passes, so it can be run again
@@ -243,14 +308,19 @@ without resetting the stack:
   the sections it writes;
 - the product loop writes its CSV in the test.
 
-A test that needs WordPress state no route can set, such as an expired preview token, runs
-`wp` through the compose `bootstrap` service with `--no-deps --entrypoint wp`, which carries
-the database variables and the site volume; it skips when the environment names another site.
+A test that needs WordPress state no route can set, such as an expired preview token, calls
+`wpCLI`, which runs `wp` in the stand's compose project through the `bootstrap` service with
+`--no-deps --entrypoint wp`, carrying the database variables and the site volume.
 
 Both suites are `_test.go` behind `//go:build e2e`: it adds nothing to the coverage
 profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l .`.
 `task lint:e2e` refuses to start while another golangci-lint runs ("parallel golangci-lint is
 running"): run it alone, or run its line from `Taskfile.yml` by hand with
 `--allow-parallel-runners`.
-`task plugin:lint` uses the pinned image's `php` on Windows and a local `php` on CI,
-which also packages the plugin and never starts the stack.
+`task plugin:lint` runs `php -l` and `task plugin:test` runs every script under `wp-plugin/tests`
+(the href table, the meta deny list and the function scan) under `E_ALL`, on PHP 7.2, the plugin's
+floor, on 7.4 and on 8.5: the compose services `php72`, `php74` and `php85` on Windows, the local
+`php` plus that matrix elsewhere, and a `setup-php` matrix on CI, whose separate job packages the
+plugin and never starts a stand. A function or hook the plugin newly calls joins
+`wp-plugin/testdata/wordpress.json` with its `@since`, and the header's `Requires at least` follows
+the newest.

@@ -40,7 +40,6 @@ func validSpec() template.TemplateSpec {
 		Tone:          "plain",
 		Length:        template.Length{Min: 500, Max: 900},
 		KeywordRules:  template.KeywordRules{PrimaryInTitle: true, PrimaryInH1: true, PrimaryInFirstParagraph: true, MaxDensity: 0.02},
-		LinkRules:     template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 10, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2, ChildrenSection: true},
 		MetaRules:     template.MetaRules{TitlePattern: "{primaryKeyword} | {siteName}", DescriptionMax: 155},
 		Images:        template.Images{Featured: true, Inline: 1, Source: template.ImagesAI},
 		ModelProfiles: map[llm.Role]llm.ModelRef{llm.RoleWriter: {Provider: "openai", Model: "gpt"}},
@@ -52,10 +51,6 @@ func validProduct() *template.Product {
 	return &template.Product{
 		ShortDescription: template.ProductShortDescription{
 			Enabled: true, Intent: "Say what {entityName} is for", TargetWords: 40, PrimaryKeyword: true,
-		},
-		Specifications: []template.ProductSpecification{
-			{Name: "Form", Intent: "The form the name and the notes state"},
-			{Name: "Size", Intent: "The pack size the notes state"},
 		},
 	}
 }
@@ -98,11 +93,6 @@ func TestValidateSpec(t *testing.T) {
 		{name: "max below min", mutate: func(s *template.TemplateSpec) { s.Length.Max = 100 }, field: "length.max"},
 		{name: "density above one", mutate: func(s *template.TemplateSpec) { s.KeywordRules.MaxDensity = 1.5 }, field: "keywordRules.maxDensity"},
 		{name: "negative required keywords", mutate: func(s *template.TemplateSpec) { s.KeywordRules.RequiredKeywords = new(-1) }, field: "keywordRules.requiredKeywords"},
-		{name: "negative up depth", mutate: func(s *template.TemplateSpec) { s.LinkRules.UpDepth = -1 }, field: "linkRules.upDepth"},
-		{name: "sibling weight", mutate: func(s *template.TemplateSpec) { s.LinkRules.SiblingMinWeight = 2 }, field: "linkRules.siblingMinWeight"},
-		{name: "max links", mutate: func(s *template.TemplateSpec) { s.LinkRules.MaxLinks = -1 }, field: "linkRules.maxLinks"},
-		{name: "max per target", mutate: func(s *template.TemplateSpec) { s.LinkRules.MaxPerTarget = -1 }, field: "linkRules.maxPerTarget"},
-		{name: "paragraph window", mutate: func(s *template.TemplateSpec) { s.LinkRules.ParentLinkWithinParagraphs = -1 }, field: "linkRules.parentLinkWithinParagraphs"},
 		{name: "description max", mutate: func(s *template.TemplateSpec) { s.MetaRules.DescriptionMax = -1 }, field: "metaRules.descriptionMax"},
 		{name: "inline images", mutate: func(s *template.TemplateSpec) { s.Images.Inline = -1 }, field: "images.inline"},
 		{name: "unknown image source", mutate: func(s *template.TemplateSpec) { s.Images.Source = "camera" }, field: "images.source"},
@@ -118,18 +108,6 @@ func TestValidateSpec(t *testing.T) {
 			s.Product = validProduct()
 			s.Product.ShortDescription.Intent = "Sell the {price}"
 		}, field: "product.shortDescription.intent"},
-		{name: "blank specification name", mutate: func(s *template.TemplateSpec) {
-			s.Product = validProduct()
-			s.Product.Specifications[1].Name = "  "
-		}, field: "product.specifications[1].name"},
-		{name: "a specification named twice", mutate: func(s *template.TemplateSpec) {
-			s.Product = validProduct()
-			s.Product.Specifications[1].Name = "FORM"
-		}, field: "product.specifications[1].name"},
-		{name: "unknown specification placeholder", mutate: func(s *template.TemplateSpec) {
-			s.Product = validProduct()
-			s.Product.Specifications[0].Intent = "Read {notes}"
-		}, field: "product.specifications[0].intent"},
 		{name: "unknown role", mutate: func(s *template.TemplateSpec) {
 			s.ModelProfiles = map[llm.Role]llm.ModelRef{"painter": {Provider: "a", Model: "b"}}
 		}, field: "modelProfiles.painter"},
@@ -170,7 +148,7 @@ func TestValidateSpec(t *testing.T) {
 func TestTemplateValidate(t *testing.T) {
 	t.Parallel()
 
-	base := template.Template{ID: "t1", Scope: template.ScopeGlobal, Name: "Hub", PageKind: "hub", Version: 1, Spec: validSpec(), CreatedAt: stamp, UpdatedAt: stamp}
+	base := template.Template{ID: "t1", Scope: template.ScopeGlobal, Name: "Hub", Version: 1, Spec: validSpec(), CreatedAt: stamp, UpdatedAt: stamp}
 
 	cases := []struct {
 		name   string
@@ -184,7 +162,6 @@ func TestTemplateValidate(t *testing.T) {
 		{name: "global with site", mutate: func(x *template.Template) { x.SiteID = ptr("s1") }, field: "siteId"},
 		{name: "site without site", mutate: func(x *template.Template) { x.Scope = template.ScopeSite }, field: "siteId"},
 		{name: "blank name", mutate: func(x *template.Template) { x.Name = " " }, field: "name"},
-		{name: "blank kind", mutate: func(x *template.Template) { x.PageKind = "" }, field: "pageKind"},
 		{name: "zero version", mutate: func(x *template.Template) { x.Version = 0 }, field: "version"},
 		{name: "bad spec", mutate: func(x *template.Template) { x.Spec.Sections = nil }, field: "sections"},
 	}
@@ -195,44 +172,6 @@ func TestTemplateValidate(t *testing.T) {
 			x := base
 			tc.mutate(&x)
 			err := x.Validate()
-			if tc.field == "" {
-				if err != nil {
-					t.Fatalf("Validate: %v", err)
-				}
-				return
-			}
-			if got := fieldOf(t, err); got != tc.field {
-				t.Errorf("field = %q, want %q (err %v)", got, tc.field, err)
-			}
-		})
-	}
-}
-
-func TestLinkPolicyValidate(t *testing.T) {
-	t.Parallel()
-
-	base := template.LinkPolicy{ID: "p1", Scope: template.ScopeSite, SiteID: ptr("s1"), Name: "Strict", Rules: validSpec().LinkRules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: template.AnchorPreferUser, CreatedAt: stamp, UpdatedAt: stamp}
-
-	cases := []struct {
-		name   string
-		mutate func(*template.LinkPolicy)
-		field  string
-	}{
-		{name: "valid", mutate: func(*template.LinkPolicy) {}},
-		{name: "no id", mutate: func(p *template.LinkPolicy) { p.ID = "" }, field: "id"},
-		{name: "site without site", mutate: func(p *template.LinkPolicy) { p.SiteID = nil }, field: "siteId"},
-		{name: "global with site", mutate: func(p *template.LinkPolicy) { p.Scope = template.ScopeGlobal }, field: "siteId"},
-		{name: "blank name", mutate: func(p *template.LinkPolicy) { p.Name = "" }, field: "name"},
-		{name: "bad rules", mutate: func(p *template.LinkPolicy) { p.Rules.MaxLinks = -3 }, field: "linkRules.maxLinks"},
-		{name: "unknown strategy", mutate: func(p *template.LinkPolicy) { p.AnchorStrategy = "random" }, field: "anchorStrategy"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			p := base
-			tc.mutate(&p)
-			err := p.Validate()
 			if tc.field == "" {
 				if err != nil {
 					t.Fatalf("Validate: %v", err)
@@ -294,9 +233,6 @@ func TestEnums(t *testing.T) {
 	if !template.ImagesAI.Valid() || !template.ImagesWPMedia.Valid() || !template.ImagesLocal.Valid() || template.ImageSource("x").Valid() {
 		t.Error("image source validity is wrong")
 	}
-	if !template.AnchorPreferUser.Valid() || !template.AnchorRotate.Valid() || template.AnchorStrategy("x").Valid() {
-		t.Error("anchor strategy validity is wrong")
-	}
 	if !template.OverrideSite.Valid() || !template.OverridePage.Valid() || template.OverrideScope("x").Valid() {
 		t.Error("override scope validity is wrong")
 	}
@@ -312,7 +248,7 @@ func TestSpecJSONIsCamelCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	for _, key := range []string{`"sections"`, `"targetWords"`, `"keywordRules"`, `"primaryInHeading"`, `"linkRules"`, `"siblingMinWeight"`, `"metaRules"`, `"descriptionMax"`, `"modelProfiles"`, `"recipe"`} {
+	for _, key := range []string{`"sections"`, `"targetWords"`, `"keywordRules"`, `"primaryInHeading"`, `"metaRules"`, `"descriptionMax"`, `"modelProfiles"`, `"recipe"`} {
 		if !strings.Contains(string(encoded), key) {
 			t.Errorf("encoded spec lacks %s: %s", key, encoded)
 		}

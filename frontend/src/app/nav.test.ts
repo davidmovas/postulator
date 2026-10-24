@@ -19,7 +19,9 @@ describe("railSections", () => {
             "overview",
             "graph",
             "pages",
+            "map",
             "links",
+            "findings",
             "runs",
         ]);
         expect(sections[2].entries.map((entry) => entry.to)).toEqual([
@@ -46,7 +48,9 @@ describe("goToEntries", () => {
             "overview",
             "graph",
             "pages",
+            "map",
             "links",
+            "findings",
             "runs",
             "templates",
             "schedules",

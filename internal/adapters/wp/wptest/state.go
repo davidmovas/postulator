@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	TypePage            = "page"
-	TypePost            = "post"
-	TypeProduct         = "product"
-	TypeProductCategory = "product_cat"
+	TypePage             = "page"
+	TypePost             = "post"
+	TypeProduct          = "product"
+	TypeProductCategory  = "product_cat"
+	TypeProductVariation = "product_variation"
 
 	maxPathDepth = 10
 )
@@ -38,21 +39,38 @@ type Item struct {
 	Title          string
 	H1             string
 	Content        string
+	Filtered       string
 	Excerpt        string
 	Slug           string
 	Status         string
 	Template       string
 	ProductType    string
 	RegularPrice   string
+	SalePrice      string
 	SKU            string
+	StockStatus    string
+	StockQuantity  *int64
 	Categories     []int64
 	Tags           []int64
 	Attributes     []Attribute
+	Choices        []Choice
+	MetaData       []MetaEntry
+	Terms          []Term
+	Crumbs         []Crumb
 	Images         []int64
+	Upsells        []int64
+	CrossSells     []int64
 	ID             int64
 	Parent         int64
 	MenuOrder      int
 	FeaturedMedia  int64
+	ManageStock    bool
+	Closed         bool
+}
+
+type Crumb struct {
+	Name string
+	Path string
 }
 
 type Category struct {
@@ -71,6 +89,7 @@ type upload struct {
 	Title    string
 	Bytes    []byte
 	ID       int64
+	Parent   int64
 }
 
 func contentHash(raw string) string {
@@ -104,12 +123,15 @@ func hierarchical(itemType string) bool {
 	return itemType == TypePage || itemType == TypeProductCategory
 }
 
-func term(itemType string) bool {
-	return itemType == TypeProductCategory
+func (s *Server) term(itemType string) bool {
+	if itemType == TypeProductCategory {
+		return true
+	}
+	return slices.ContainsFunc(s.taxonomies, func(taxonomy Taxonomy) bool { return taxonomy.Name == itemType })
 }
 
 func (s *Server) storeOf(itemType string) (store map[int64]*Item, order []int64) {
-	if term(itemType) {
+	if s.term(itemType) {
 		return s.terms, s.termOrder
 	}
 	return s.items, s.order
@@ -187,7 +209,7 @@ func (s *Server) add(item Item) Item {
 	if item.Type == "" {
 		item.Type = TypePage
 	}
-	if !hierarchical(item.Type) {
+	if !hierarchical(item.Type) && item.Type != TypeProductVariation {
 		item.Parent = 0
 	}
 	if item.Status == "" {
@@ -201,7 +223,7 @@ func (s *Server) add(item Item) Item {
 	}
 
 	sequence := &s.nextID
-	if term(item.Type) {
+	if s.term(item.Type) {
 		sequence = &s.nextTermID
 	}
 	if item.ID <= 0 {
@@ -221,7 +243,7 @@ func (s *Server) add(item Item) Item {
 	}
 
 	stored := item
-	if term(item.Type) {
+	if s.term(item.Type) {
 		s.terms[item.ID] = &stored
 		s.termOrder = append(s.termOrder, item.ID)
 		return stored

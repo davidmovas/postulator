@@ -40,4 +40,11 @@ var (
 
 	flexPatienceSetting = settings.Duration("llm.flexPatience", defaultFlexPatience,
 		settings.DurationRange(leastFlexPatience, mostFlexPatience))
+
+	inputBudgetSettings = map[llm.Role]*settings.Setting[int]{
+		llm.RoleWriter: settings.Int("llm.inputBudget.writer", 0, settings.IntMin(0)),
+		llm.RoleEditor: settings.Int("llm.inputBudget.editor", 0, settings.IntMin(0)),
+		llm.RoleLinker: settings.Int("llm.inputBudget.linker", 0, settings.IntMin(0)),
+		llm.RoleJudge:  settings.Int("llm.inputBudget.judge", 0, settings.IntMin(0)),
+	}
 )

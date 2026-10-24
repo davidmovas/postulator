@@ -134,9 +134,6 @@ func TestExpandedSpecFillsTheProductOutputsOnACopy(t *testing.T) {
 	spec := validSpec()
 	spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say why {entityName} sells"},
-		Specifications: []template.ProductSpecification{
-			{Name: "Form", Intent: "The form {entityName} comes in"},
-		},
 	}
 
 	expanded := spec.Expanded(template.Vars{EntityName: "BPC-157 Liquid"})
@@ -144,12 +141,10 @@ func TestExpandedSpecFillsTheProductOutputsOnACopy(t *testing.T) {
 	if expanded.Product == spec.Product {
 		t.Fatal("the expanded spec shares the product block with its source")
 	}
-	if expanded.Product.ShortDescription.Intent != "Say why BPC-157 Liquid sells" ||
-		expanded.Product.Specifications[0].Intent != "The form BPC-157 Liquid comes in" {
+	if expanded.Product.ShortDescription.Intent != "Say why BPC-157 Liquid sells" {
 		t.Fatalf("product = %+v", expanded.Product)
 	}
-	if spec.Product.ShortDescription.Intent != "Say why {entityName} sells" ||
-		spec.Product.Specifications[0].Intent != "The form {entityName} comes in" {
+	if spec.Product.ShortDescription.Intent != "Say why {entityName} sells" {
 		t.Fatalf("the source product block was changed in place: %+v", spec.Product)
 	}
 

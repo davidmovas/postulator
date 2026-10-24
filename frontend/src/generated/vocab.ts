@@ -7,14 +7,153 @@ export type SiteReach = (typeof siteReaches)[number];
 export const siteCommerces = ["", "absent", "forbidden", "ready"] as const;
 export type SiteCommerce = (typeof siteCommerces)[number];
 
+export const urlForms = ["auto", "absolute", "relative"] as const;
+export type UrlForm = (typeof urlForms)[number];
+
 export const pageStatuses = ["planned", "exists", "published", "archived"] as const;
 export type PageStatus = (typeof pageStatuses)[number];
 
 export const pageWpTypes = ["page", "post", "product", "product_cat"] as const;
 export type PageWpType = (typeof pageWpTypes)[number];
 
-export const linkOrigins = ["generated", "observed"] as const;
-export type LinkOrigin = (typeof linkOrigins)[number];
+export const linkTypes = ["breadcrumb", "listing", "navigation", "contextual", "unknown"] as const;
+export type LinkType = (typeof linkTypes)[number];
+
+export const linkSources = ["raw", "render"] as const;
+export type LinkSource = (typeof linkSources)[number];
+
+export const parentReasons = [
+    "jsonld_breadcrumb",
+    "aria_breadcrumb",
+    "wp_parent",
+    "url",
+    "workbook",
+    "none",
+] as const;
+export type ParentReason = (typeof parentReasons)[number];
+
+export const parentMethods = ["href", "redirect", "name", ""] as const;
+export type ParentMethod = (typeof parentMethods)[number];
+
+export const trailSources = ["jsonld", "nav"] as const;
+export type TrailSource = (typeof trailSources)[number];
+
+export const technicalReasons = [
+    "posts_page",
+    "privacy",
+    "shop",
+    "cart",
+    "checkout",
+    "account",
+    "terms",
+    "shortcode",
+    "noindex",
+    "workbook",
+    "manual",
+    "",
+] as const;
+export type TechnicalReason = (typeof technicalReasons)[number];
+
+export const contentRootStates = ["found", "empty_raw", "dynamic_only", "not_found", "archive"] as const;
+export type ContentRootState = (typeof contentRootStates)[number];
+
+export const regionKinds = [
+    "breadcrumb",
+    "listing",
+    "navigation",
+    "content",
+    "content_dynamic",
+    "generated",
+    "unknown",
+] as const;
+export type RegionKind = (typeof regionKinds)[number];
+
+export const findingCodes = [
+    "parent_unresolved",
+    "parent_ambiguous",
+    "parent_cycle",
+    "parent_name_twin",
+    "parent_differs",
+    "plugin_outdated",
+    "field_changed_on_site",
+    "body_changed_on_site",
+    "render_unreachable",
+    "render_redirected",
+    "builder_detected",
+    "technical_detected",
+    "page_title_differs",
+    "page_h1_differs",
+    "url_form_mixed",
+    "entity_card_proposed",
+    "row_ambiguous",
+    "row_without_page",
+    "page_without_entity",
+] as const;
+export type FindingCode = (typeof findingCodes)[number];
+
+export const findingSeverities = ["info", "warning", "error"] as const;
+export type FindingSeverity = (typeof findingSeverities)[number];
+
+export const findingStatuses = ["open", "resolved", "dismissed"] as const;
+export type FindingStatus = (typeof findingStatuses)[number];
+
+export const findingOptions = [
+    "ignore",
+    "accept",
+    "accept_site",
+    "accept_workbook",
+    "map_to_page",
+    "set_type",
+    "rewrite_field",
+    "relink_page",
+    "rescan",
+    "propose_entity",
+] as const;
+export type FindingOption = (typeof findingOptions)[number];
+
+export const findingBulkOptions: readonly FindingOption[] = [
+    "ignore",
+    "accept_site",
+    "accept_workbook",
+    "set_type",
+    "propose_entity",
+];
+
+export const findingOptionKinds = ["model", "run", "proposal"] as const;
+export type FindingOptionKind = (typeof findingOptionKinds)[number];
+
+export const matchRules = ["mapped", "url", "slug", "entity", "title", "h1", "sku"] as const;
+export type MatchRule = (typeof matchRules)[number];
+
+export const bodyStates = ["empty", "client", "ours", "mixed", "dynamic"] as const;
+export type BodyState = (typeof bodyStates)[number];
+
+export const proposalClashes = ["", "no_name", "name_in_batch", "name_carried"] as const;
+export type ProposalClash = (typeof proposalClashes)[number];
+
+export const proposalSources = ["model", "site"] as const;
+export type ProposalSource = (typeof proposalSources)[number];
+
+export const blockKinds = [
+    "paragraph",
+    "heading",
+    "list",
+    "quote",
+    "html",
+    "shortcode",
+    "wp",
+    "foreign",
+] as const;
+export type BlockKind = (typeof blockKinds)[number];
+
+export const bodyKinds = ["classic", "blocks"] as const;
+export type BodyKind = (typeof bodyKinds)[number];
+
+export const blockOwners = ["ours", "client", "site"] as const;
+export type BlockOwner = (typeof blockOwners)[number];
+
+export const blockChanges = ["kept", "added", "removed"] as const;
+export type BlockChange = (typeof blockChanges)[number];
 
 export const previewKinds = ["public", "preview"] as const;
 export type PreviewKind = (typeof previewKinds)[number];
@@ -26,8 +165,104 @@ export const cannibalizationReasons = [
 ] as const;
 export type CannibalizationReason = (typeof cannibalizationReasons)[number];
 
-export const entityKinds = ["hub", "product", "topic", "category", "custom"] as const;
-export type EntityKind = (typeof entityKinds)[number];
+export const pageTypePresets = [
+    "hub",
+    "entity",
+    "product",
+    "store_category",
+    "catalog",
+    "technical",
+] as const;
+export type PageTypePreset = (typeof pageTypePresets)[number];
+
+export const pageTypeSources = ["", "auto", "manual"] as const;
+export type PageTypeSource = (typeof pageTypeSources)[number];
+
+export const pageTypeReasons = [
+    "",
+    "product",
+    "store_category",
+    "shop",
+    "technical",
+    "listing",
+    "default",
+    "kind",
+    "user",
+    "ai",
+    "import",
+] as const;
+export type PageTypeReason = (typeof pageTypeReasons)[number];
+
+export const fieldKeys = [
+    "title",
+    "h1",
+    "excerpt",
+    "body",
+    "seo_title",
+    "seo_description",
+    "seo_canonical",
+    "product_description",
+    "product_short_description",
+    "variation_description",
+    "featured_image",
+    "image_alt",
+    "image_title",
+    "upsells",
+    "cross_sells",
+    "meta",
+    "slug",
+    "status",
+    "parent",
+    "price",
+    "regular_price",
+    "sale_price",
+    "sku",
+    "stock_status",
+    "stock_quantity",
+    "manage_stock",
+    "attributes",
+    "variation",
+    "terms",
+] as const;
+export type FieldKey = (typeof fieldKeys)[number];
+
+export const scopableFieldKeys: readonly FieldKey[] = [
+    "title",
+    "excerpt",
+    "body",
+    "seo_title",
+    "seo_description",
+    "seo_canonical",
+    "product_description",
+    "product_short_description",
+    "variation_description",
+    "image_alt",
+    "image_title",
+    "upsells",
+    "cross_sells",
+];
+
+export const packFieldKeys: readonly FieldKey[] = [
+    "title",
+    "excerpt",
+    "body",
+    "seo_title",
+    "seo_description",
+    "product_description",
+    "product_short_description",
+    "variation_description",
+    "image_alt",
+    "image_title",
+];
+
+export const exploreViews = ["tree", "links", "gaps", "pack"] as const;
+export type ExploreView = (typeof exploreViews)[number];
+
+export const siteGaps = ["planned", "empty", "unmapped", "orphan", "missing_links", "findings"] as const;
+export type SiteGap = (typeof siteGaps)[number];
+
+export const fieldProviders = ["", "plugin", "store"] as const;
+export type FieldProvider = (typeof fieldProviders)[number];
 
 export const edgeKinds = ["parent", "related"] as const;
 export type EdgeKind = (typeof edgeKinds)[number];
@@ -52,7 +287,7 @@ export const offGraphLinkClasses: readonly LinkClass[] = ["self", "external", "u
 export const linkBlockedReasons = ["no_canonical_page", "no_page"] as const;
 export type LinkBlockedReason = (typeof linkBlockedReasons)[number];
 
-export const linkAuditSkipReasons = ["unmapped", "no_template"] as const;
+export const linkAuditSkipReasons = ["unmapped"] as const;
 export type LinkAuditSkipReason = (typeof linkAuditSkipReasons)[number];
 
 export const linkStates = [
@@ -73,11 +308,21 @@ export const runKinds = [
     "import",
     "repair",
     "revert",
+    "edit",
     "custom",
 ] as const;
 export type RunKind = (typeof runKinds)[number];
 
-export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "repair", "revert"];
+export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "revert", "edit"];
+
+export const startableRunKinds: readonly RunKind[] = [
+    "generate",
+    "relink",
+    "audit",
+    "sync",
+    "import",
+    "custom",
+];
 
 export const runStatuses = [
     "pending",
@@ -103,6 +348,7 @@ export const pauseReasons = [
     "needs_human",
     "user",
     "awaiting_parent",
+    "awaiting_review",
 ] as const;
 export type PauseReason = (typeof pauseReasons)[number];
 
@@ -117,6 +363,7 @@ export const artifactKinds = [
     "draft",
     "body_html",
     "meta",
+    "fields",
     "images",
     "validation_report",
     "judge_report",
@@ -125,6 +372,7 @@ export const artifactKinds = [
     "sync_result",
     "final_report",
     "revert_result",
+    "edit_plan",
 ] as const;
 export type ArtifactKind = (typeof artifactKinds)[number];
 
@@ -134,6 +382,7 @@ export const stepNames = [
     "resolve_context",
     "generate_body",
     "generate_meta",
+    "generate_fields",
     "insert_links",
     "repair_links",
     "generate_images",
@@ -146,7 +395,7 @@ export const stepNames = [
 ] as const;
 export type StepName = (typeof stepNames)[number];
 
-export const perKindStepNames = ["repair_hierarchy", "sync_site", "relink_page", "revert"] as const;
+export const perKindStepNames = ["sync_site", "relink_page", "revert", "edit_page"] as const;
 export type PerKindStepName = (typeof perKindStepNames)[number];
 
 export const retryBlockedReasons = ["inputs_expired"] as const;
@@ -201,21 +450,21 @@ export const importFields = [
     "keywords",
     "anchors",
     "entity",
-    "entity_kind",
+    "page_type",
     "parent_entity",
     "related",
-    "page_kind",
     "meta_title",
     "meta_description",
     "wp_type",
     "own_entity",
+    "sku",
 ] as const;
 export type ImportField = (typeof importFields)[number];
 
-export const importColumnUses = ["field", "level", "note", "indent", "ignored"] as const;
+export const importColumnUses = ["field", "level", "trail", "note", "indent", "ignored"] as const;
 export type ImportColumnUse = (typeof importColumnUses)[number];
 
-export const importRowTypes = ["pages", "products", "kind"] as const;
+export const importRowTypes = ["pages", "products", "type"] as const;
 export type ImportRowType = (typeof importRowTypes)[number];
 
 export const importFindingCodes = [
@@ -228,8 +477,9 @@ export const importFindingCodes = [
     "self_edge",
     "cycle",
     "cannibalization",
-    "unknown_entity_kind",
-    "unknown_page_kind",
+    "unknown_page_type",
+    "page_type_kept",
+    "page_type_column_dropped",
     "unknown_wp_type",
     "root_page_skipped",
     "bad_volume",
@@ -238,7 +488,9 @@ export const importFindingCodes = [
     "group_without_page",
     "ambiguous_parent",
     "ambiguous_entity",
-    "product_not_in_store",
+    "row_ambiguous",
+    "row_without_page",
+    "parent_differs",
     "product_row_left",
     "wp_type_kept",
     "intermediate_level",
@@ -257,7 +509,7 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
     "scope_clash",
 ];
 
-export const importActions = ["create", "update", "skip"] as const;
+export const importActions = ["create", "update", "skip", "ambiguous"] as const;
 export type ImportAction = (typeof importActions)[number];
 
 export const exportFormats = ["xlsx", "csv"] as const;

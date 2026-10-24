@@ -7,6 +7,7 @@ import {
     importFields,
     importFindingCodes,
     importRowTypes,
+    matchRules,
 } from "../../generated/vocab.js";
 import {
     actionLabel,
@@ -17,6 +18,7 @@ import {
     fieldLabel,
     findingLabel,
     findingPlace,
+    matchRuleLabel,
     noField,
     productNote,
     reasonLabel,
@@ -30,7 +32,14 @@ const vocabularies: readonly [string, readonly string[], (value: string) => stri
     ["import action", importActions, actionLabel],
     ["cannibalisation reason", cannibalizationReasons, reasonLabel],
     ["row type", importRowTypes, rowTypeLabel],
+    ["match rule", matchRules, matchRuleLabel],
 ];
+
+describe("the rule a row found its page by", () => {
+    it("says nothing for a row that found no page", () => {
+        expect(matchRuleLabel("")).toBe("");
+    });
+});
 
 describe("what a product row of the preview says", () => {
     it.each([
@@ -43,7 +52,17 @@ describe("what a product row of the preview says", () => {
         },
         {
             name: "a product found at its own address",
-            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "path" },
+            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "url" },
+            want: "The store's Mak Liquid, found by its address",
+        },
+        {
+            name: "a product found by its SKU",
+            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "sku" },
+            want: "The store's Mak Liquid, found by its SKU",
+        },
+        {
+            name: "a product found by a rule the screen does not know yet",
+            page: { wpType: "product", storeName: "Mak Liquid", matchedBy: "something_new" },
             want: "The store's Mak Liquid, found by its address",
         },
     ])("$name", ({ page, want }) => {
@@ -109,6 +128,7 @@ describe("what a column became", () => {
     it.each([
         [{ header: "URL", use: "field", field: "path" }, "Page path"],
         [{ header: "Root Entity", use: "level" }, "Group"],
+        [{ header: "Category", use: "trail" }, "Expected parent"],
         [{ header: "Notes", use: "note" }, "Note for the writer"],
         [{ header: "Entity?", use: "ignored" }, "Ignored"],
     ])("words %j as %s", (column, want) => {

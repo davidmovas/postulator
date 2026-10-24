@@ -14,6 +14,8 @@ type StartRequest struct {
 	PublishMode string              `json:"publishMode,omitempty"`
 	Kind        string              `json:"kind,omitempty"`
 	Budget      run.Budget          `json:"budget"`
+	Rewrite     []string            `json:"rewrite,omitempty"`
+	Fields      []string            `json:"fields,omitempty"`
 }
 
 type StartResponse struct {
@@ -25,6 +27,15 @@ type StartResponse struct {
 type EstimateResponse struct {
 	Estimate run.Estimate `json:"estimate"`
 	Added    []AddedPage  `json:"added"`
+}
+
+type ParentsRequest struct {
+	SiteID  string   `json:"siteId"`
+	PageIDs []string `json:"pageIds"`
+}
+
+type ParentsResponse struct {
+	Added []AddedPage `json:"added"`
 }
 
 type AddedPage struct {
@@ -45,7 +56,7 @@ type ListRequest struct {
 	dto.ListRequest
 	SiteID string `json:"siteId,omitempty"`
 	Status string `json:"status,omitempty" enum:"pending,running,waiting,paused,completed,failed,cancelled" description:"Only this state"`
-	Kind   string `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,repair,revert,custom" description:"Only this kind"`
+	Kind   string `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,repair,revert,edit,custom" description:"Only this kind"`
 }
 
 type ListItemsRequest struct {
@@ -66,7 +77,7 @@ type ListEventsResponse struct {
 
 type GetArtifactRequest struct {
 	ItemID string `json:"itemId" description:"Item id from runs_list_items"`
-	Kind   string `json:"kind" enum:"link_context,draft,body_html,meta,images,validation_report,judge_report,publish_result,relink_result,sync_result,final_report,revert_result" description:"Artifact to read"`
+	Kind   string `json:"kind" enum:"link_context,draft,body_html,meta,fields,images,validation_report,judge_report,publish_result,relink_result,sync_result,final_report,revert_result" description:"Artifact to read"`
 }
 
 type GetArtifactResponse struct {
@@ -101,7 +112,9 @@ type CancelRequest struct {
 type CancelResponse struct{}
 
 type RevertRequest struct {
-	RunID string `json:"runId" description:"Finished run id"`
+	RunID  string   `json:"runId" description:"Finished run id"`
+	PageID string   `json:"pageId,omitempty" description:"One page of the run to put back; every page it wrote when empty"`
+	Fields []string `json:"fields,omitempty" description:"Field keys to put back; every field it wrote when empty"`
 }
 
 type RevertResponse struct {
@@ -109,8 +122,9 @@ type RevertResponse struct {
 }
 
 type RetryStepRequest struct {
-	ItemID         string `json:"itemId" description:"Stopped item id from runs_list_items"`
-	AcceptFindings bool   `json:"acceptFindings,omitempty" description:"Let a page held at validate go on as it is"`
+	ItemID         string   `json:"itemId" description:"Stopped item id from runs_list_items"`
+	AcceptFindings bool     `json:"acceptFindings,omitempty" description:"Let a page held at validate go on as it is"`
+	Fields         []string `json:"fields,omitempty"`
 }
 
 type RetryStepResponse struct{}

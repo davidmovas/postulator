@@ -38,6 +38,7 @@ func stepRequest(sc *run.StepContext, call modelCall, prompt any, maxTokens int)
 		System:    system,
 		Messages:  []llm.Message{{Role: llm.RoleUser, Text: user}},
 		MaxTokens: maxTokens,
+		CacheKey:  cacheKey(call.step, sc.Run.SiteID, system),
 		Meta:      callMeta(sc, call.step, call.role),
 	}, nil
 }

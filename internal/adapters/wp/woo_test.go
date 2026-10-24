@@ -97,13 +97,35 @@ func TestGetProductTreatsTheTrashAndTheMissingAsNotFound(t *testing.T) {
 	}
 }
 
-func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
+func TestRestoreAttributesSendsTheWholeListAlone(t *testing.T) {
 	t.Parallel()
 
+	server := wptest.New(t)
+	seeded := seedProduct(server)
 	attributes := []wp.ProductAttribute{
 		{ID: 7, Name: "Color", Options: []string{"Blue"}, Visible: true},
 		{Name: "Form", Options: []string{"Liquid"}, Position: 1, Visible: true},
 	}
+	product, err := newClient(t, server).RestoreAttributes(t.Context(), seeded.ID, attributes)
+	if err != nil {
+		t.Fatalf("RestoreAttributes: %v", err)
+	}
+	if len(product.Attributes) != 2 || product.Attributes[1].Name != "Form" || !slices.Equal(product.Attributes[1].Options, []string{"Liquid"}) {
+		t.Errorf("product = %+v", product)
+	}
+	recorded, _ := server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	if _, sent := body["attributes"]; !sent || len(body) != 1 {
+		t.Errorf("the restore sent %v, want the attribute list alone", body)
+	}
+}
+
+func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
+	t.Parallel()
+
 	images := []int64{55}
 
 	cases := []struct {
@@ -119,18 +141,6 @@ func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
 			check: func(t *testing.T, product wp.Product) {
 				t.Helper()
 				if product.ShortDescription != "<p>new short</p>" || len(product.Attributes) != 2 {
-					t.Errorf("product = %+v", product)
-				}
-			},
-		},
-		{
-			name:   "the whole attribute list",
-			update: wp.UpdateProduct{Attributes: &attributes},
-			sent:   []string{"attributes"},
-			check: func(t *testing.T, product wp.Product) {
-				t.Helper()
-				if len(product.Attributes) != 2 || product.Attributes[1].Name != "Form" ||
-					!slices.Equal(product.Attributes[1].Options, []string{"Liquid"}) || product.ShortDescription != "<p>short</p>" {
 					t.Errorf("product = %+v", product)
 				}
 			},
@@ -183,6 +193,77 @@ func TestUpdateProductWritesOnlyWhatItCarries(t *testing.T) {
 				t.Errorf("price %q and SKU %q changed", stored.RegularPrice, stored.SKU)
 			}
 		})
+	}
+}
+
+func TestUpdateProductWritesACustomFieldByKeyAndRefusesTheStoresOwn(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := seedProduct(server)
+	client := newClient(t, server)
+
+	product, err := client.UpdateProduct(t.Context(), seeded.ID, wp.UpdateProduct{MetaData: map[string]string{"dosage_note": "Once a day"}})
+	if err != nil {
+		t.Fatalf("UpdateProduct: %v", err)
+	}
+	found := false
+	for _, entry := range product.MetaData {
+		found = found || entry.Key == "dosage_note" && string(entry.Value) == `"Once a day"`
+	}
+	if !found {
+		t.Errorf("meta = %+v, want the custom field written", product.MetaData)
+	}
+	recorded, _ := server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	if _, sent := body["meta_data"]; !sent || len(body) != 1 {
+		t.Errorf("the update sent %v, want the meta data alone", body)
+	}
+
+	sent := len(server.Requests())
+	for _, key := range []string{"_price", "_sku", "total_sales", "TOTAL_SALES", "attribute_pa_size", "rank_math_title", "a key"} {
+		if _, err = client.UpdateProduct(t.Context(), seeded.ID, wp.UpdateProduct{MetaData: map[string]string{key: "x"}}); !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("%q: %v, want refused before it leaves", key, err)
+		}
+	}
+	if len(server.Requests()) != sent {
+		t.Errorf("a refused key still reached the store")
+	}
+}
+
+func TestUpdateProductWritesTheUpsellsAndCrossSellsAsIDs(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	seeded := seedProduct(server)
+	others := server.Seed(
+		wptest.Item{Type: wptest.TypeProduct, Title: "Grinder", Status: "publish"},
+		wptest.Item{Type: wptest.TypeProduct, Title: "Scale", Status: "publish"},
+	)
+	client := newClient(t, server)
+
+	upsells, crossSells := []int64{others[1].ID, others[0].ID}, []int64{others[0].ID}
+	product, err := client.UpdateProduct(t.Context(), seeded.ID, wp.UpdateProduct{UpsellIDs: &upsells, CrossSellIDs: &crossSells})
+	if err != nil {
+		t.Fatalf("UpdateProduct: %v", err)
+	}
+	if !slices.Equal(product.UpsellIDs, upsells) || !slices.Equal(product.CrossSellIDs, crossSells) {
+		t.Errorf("product = %v / %v, want the lists as sent, in their order", product.UpsellIDs, product.CrossSellIDs)
+	}
+	recorded, _ := server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	if _, sent := body["upsell_ids"]; !sent || len(body) != 2 {
+		t.Errorf("the update sent %v, want the two lists alone", body)
+	}
+	read, err := client.GetProduct(t.Context(), seeded.ID)
+	if err != nil || !slices.Equal(read.UpsellIDs, upsells) || !slices.Equal(read.CrossSellIDs, crossSells) {
+		t.Errorf("read back = %v / %v (%v)", read.UpsellIDs, read.CrossSellIDs, err)
 	}
 }
 

@@ -1,8 +1,7 @@
 package imports
 
 import (
-	"context"
-	"maps"
+	"encoding/json"
 	"slices"
 	"time"
 
@@ -19,6 +18,7 @@ type plannedEntity struct {
 type plannedPage struct {
 	page    pagemap.Page
 	created bool
+	retyped bool
 }
 
 type canonical struct {
@@ -29,6 +29,7 @@ type canonical struct {
 type plan struct {
 	siteID    string
 	sheet     string
+	file      string
 	read      []string
 	mapping   importmap.Mapping
 	report    PreviewReport
@@ -37,15 +38,36 @@ type plan struct {
 	pages     []plannedPage
 	canonical []canonical
 	rows      int
+	lasting   []lasting
+	agreed    []string
+	chosen    []chosenRow
+	keys      map[string]map[string]struct{}
 }
 
-func newPlan(siteID string, mapping importmap.Mapping, table importmap.Table) plan {
-	p := plan{siteID: siteID, read: sheetsRead(mapping, table), mapping: mapping, rows: len(table.Rows)}
+func newPlan(siteID string, read *sheetRead) plan {
+	mapping, table := read.mapping, read.table
+	p := plan{siteID: siteID, file: read.file, read: sheetsRead(mapping, table), mapping: mapping, rows: len(table.Rows)}
 	if len(p.read) == 1 {
 		p.sheet = p.read[0]
 	}
+	p.keys = make(map[string]map[string]struct{}, len(p.read)+1)
+	for _, sheet := range p.read {
+		p.sawRow(sheet, "")
+	}
+	if len(p.read) == 0 {
+		p.sawRow(p.file, "")
+	}
 	p.report.Columns = columnViews(p.sheet, mapping.Uses(table.Headers))
+	p.noteDropped(mapping, table.Headers)
 	return p
+}
+
+func (p *plan) noteDropped(mapping importmap.Mapping, headers []string) {
+	read := mapping.Columns[importmap.FieldPageType]
+	for _, column := range mapping.Dropped(headers, importmap.FieldPageType) {
+		p.noteAt(p.whole(), string(importmap.FieldPageType), CodePageTypeColumnDropped,
+			"the column "+column+" also names a page type and was not read; the page type is read from "+read)
+	}
 }
 
 func sheetsRead(mapping importmap.Mapping, table importmap.Table) []string {
@@ -72,8 +94,19 @@ func (p *plan) sheetAt(at importmap.Origin) string {
 	return p.sheet
 }
 
+func (p *plan) rowSheet(at importmap.Origin) string {
+	if at.Sheet != "" {
+		return at.Sheet
+	}
+	return p.file
+}
+
 func (p *plan) noteAt(at importmap.Origin, field string, code FindingCode, message string) {
-	finding := Finding{Row: at.Row, Sheet: at.Sheet, Field: field, Code: string(code), Message: message}
+	p.noteAbout(at, field, code, nil, message)
+}
+
+func (p *plan) noteAbout(at importmap.Origin, field string, code FindingCode, subject json.RawMessage, message string) {
+	finding := Finding{Row: at.Row, Sheet: at.Sheet, Field: field, Code: string(code), Message: message, Subject: subject}
 	if code.Blocking() {
 		p.report.Errors = append(p.report.Errors, finding)
 		return
@@ -100,27 +133,21 @@ func (p *plan) counts() Counts {
 	return tally
 }
 
-func (s *Service) plan(ctx context.Context, state siteState, read *sheetRead, now time.Time) (plan, error) {
-	p := newPlan(state.siteID, read.mapping, read.table)
-	rows := readRows(read.binding, read.table, &p)
+func planSheet(state siteState, read *sheetRead, now time.Time) (plan, error) {
+	p := newPlan(state.siteID, read)
+	rows := matchRows(readRows(read.binding, read.table, &p), read.mapping.Options.RowType, &state, &p)
 	sheet := pagesOf(rows, &p)
-	state.byPlanned = maps.Clone(state.byPlanned)
-	typeRows(sheet, rows, read.mapping.Options.RowType, &state)
-	matchProducts(sheet, &state, &p)
+	resolveTypes(sheet, &state)
 	fillGaps(sheet, &state, &p)
-	templates, err := s.kindTemplates(ctx, state.siteID, sheet)
-	if err != nil {
-		return plan{}, err
-	}
 
-	if err := newBuilder(state, &p, rows, sheet, now).run(templates); err != nil {
+	if err := newBuilder(state, &p, rows, sheet, now).run(); err != nil {
 		return plan{}, err
 	}
 	p.report.settle()
 	return p, nil
 }
 
-func (b *builder) run(templates *kindTemplates) error {
+func (b *builder) run() error {
 	b.build()
 	if err := b.planEntities(); err != nil {
 		return err
@@ -131,7 +158,7 @@ func (b *builder) run(templates *kindTemplates) error {
 	if err := b.checkAcyclic(); err != nil {
 		return err
 	}
-	if err := b.planPages(templates); err != nil {
+	if err := b.planPages(); err != nil {
 		return err
 	}
 	if err := b.checkCannibalization(); err != nil {

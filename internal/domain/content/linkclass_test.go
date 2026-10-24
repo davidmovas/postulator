@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 func storedLink(toPageID, toURL string) pagemap.PageLink {
@@ -21,7 +21,7 @@ func TestClassifyLink(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
-	rules := template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5}
+	rules := field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5}
 	lc := plannedFor(fixture, "coffee", rules)
 	lc.Site = pagemap.NewSite("https://shop.example.com")
 
@@ -169,7 +169,7 @@ func TestEveryClassifierResolvesAnHrefAlike(t *testing.T) {
 					tc.href, resolution.Class, resolution.SameDocument, tc.want, tc.sameDoc)
 			}
 
-			report := content.Compliance(mustParse(t, body), lc, policy(template.LinkRules{}), lc.PageID)
+			report := content.Compliance(mustParse(t, body), lc, policy(field.LinkRules{}), lc.PageID)
 			wantCompliance := tc.want
 			if tc.sameDoc {
 				wantCompliance = content.ClassGraph
@@ -178,7 +178,7 @@ func TestEveryClassifierResolvesAnHrefAlike(t *testing.T) {
 				t.Errorf("Compliance(%q) reads as %s, want %s (%v)", tc.href, got, wantCompliance, codesOf(report))
 			}
 
-			linked := alreadyLinked(content.InsertLinks(mustParse(t, body), lc, policy(template.LinkRules{})))
+			linked := alreadyLinked(content.InsertLinks(mustParse(t, body), lc, policy(field.LinkRules{})))
 			want := []string{}
 			if tc.satisfies != "" {
 				want = []string{tc.satisfies}

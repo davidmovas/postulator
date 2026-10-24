@@ -5,7 +5,10 @@ package main
 import (
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -41,14 +44,21 @@ const (
 
 type seedEntity struct {
 	Name    string
-	Kind    string
 	Intent  string
 	Keyword string
 	Anchor  string
 	Parent  string
 	Path    string
 	Title   string
+	H1      string
 	Status  string
+}
+
+func (e *seedEntity) heading() string {
+	if e.H1 != "" {
+		return e.H1
+	}
+	return e.Title
 }
 
 type seedEdge struct {
@@ -74,55 +84,55 @@ const (
 
 func seedEntities() []seedEntity {
 	return []seedEntity{
-		{Name: "Espresso machines", Kind: "hub", Intent: "commercial", Keyword: "espresso machines", Anchor: "espresso machines", Path: "/espresso-machines/", Title: "Espresso machines: every type explained", Status: statusPublished},
-		{Name: "Espresso machines under $500", Kind: "topic", Intent: "commercial", Keyword: "best espresso machine under 500", Anchor: "espresso machines under $500", Parent: "Espresso machines", Path: "/espresso-machines/under-500/", Title: "The best espresso machines under $500", Status: statusPublished},
-		{Name: "Semi-automatic espresso machines", Kind: "topic", Intent: "commercial", Keyword: "semi automatic espresso machine", Anchor: "semi-automatic machines", Parent: "Espresso machines", Path: "/espresso-machines/semi-automatic/", Title: "Semi-automatic espresso machines, and who they suit", Status: statusPublished},
-		{Name: "Super-automatic espresso machines", Kind: "topic", Intent: "commercial", Keyword: "super automatic espresso machine", Anchor: "super-automatic machines", Parent: "Espresso machines", Path: "/espresso-machines/super-automatic/", Title: "Super-automatic espresso machines: bean to cup at home", Status: statusPublished},
-		{Name: "Manual lever machines", Kind: "topic", Intent: "informational", Keyword: "manual lever espresso machine", Anchor: "lever machines", Parent: "Espresso machines", Path: "/espresso-machines/manual-lever/", Title: "Manual lever machines and the shots they pull", Status: statusExists},
-		{Name: "Dual boiler machines", Kind: "topic", Intent: "commercial", Keyword: "dual boiler espresso machine", Anchor: "dual boiler machines", Parent: "Espresso machines", Path: "/espresso-machines/dual-boiler/", Title: "Dual boiler machines: steam and brew at once", Status: statusPublished},
-		{Name: "Espresso machine maintenance", Kind: "topic", Intent: "informational", Keyword: "espresso machine maintenance", Anchor: "machine maintenance", Parent: "Espresso machines", Path: "/espresso-machines/maintenance/", Title: "Espresso machine maintenance, week by week", Status: statusPublished},
-		{Name: "Descaling an espresso machine", Kind: "topic", Intent: "informational", Keyword: "how to descale an espresso machine", Anchor: "descaling", Parent: "Espresso machine maintenance", Path: "/espresso-machines/maintenance/descaling/", Title: "How to descale an espresso machine without ruining it", Status: statusExists},
+		{Name: "Espresso machines", Intent: "commercial", Keyword: "espresso machines", Anchor: "espresso machines", Path: hubPath, Title: "Espresso machines: every type explained", H1: storeCategoryName, Status: statusPublished},
+		{Name: "Espresso machines under $500", Intent: "commercial", Keyword: "best espresso machine under 500", Anchor: "espresso machines under $500", Parent: "Espresso machines", Path: "/espresso-machines/under-500/", Title: "The best espresso machines under $500", Status: statusPublished},
+		{Name: "Semi-automatic espresso machines", Intent: "commercial", Keyword: "semi automatic espresso machine", Anchor: "semi-automatic machines", Parent: "Espresso machines", Path: "/espresso-machines/semi-automatic/", Title: "Semi-automatic espresso machines, and who they suit", Status: statusPublished},
+		{Name: "Super-automatic espresso machines", Intent: "commercial", Keyword: "super automatic espresso machine", Anchor: "super-automatic machines", Parent: "Espresso machines", Path: "/espresso-machines/super-automatic/", Title: "Super-automatic espresso machines: bean to cup at home", Status: statusPublished},
+		{Name: "Manual lever machines", Intent: "informational", Keyword: "manual lever espresso machine", Anchor: "lever machines", Parent: "Espresso machines", Path: "/espresso-machines/manual-lever/", Title: "Manual lever machines and the shots they pull", Status: statusExists},
+		{Name: "Dual boiler machines", Intent: "commercial", Keyword: "dual boiler espresso machine", Anchor: "dual boiler machines", Parent: "Espresso machines", Path: "/espresso-machines/dual-boiler/", Title: "Dual boiler machines: steam and brew at once", Status: statusPublished},
+		{Name: "Espresso machine maintenance", Intent: "informational", Keyword: "espresso machine maintenance", Anchor: "machine maintenance", Parent: "Espresso machines", Path: "/espresso-machines/maintenance/", Title: "Espresso machine maintenance, week by week", Status: statusPublished},
+		{Name: "Descaling an espresso machine", Intent: "informational", Keyword: "how to descale an espresso machine", Anchor: "descaling", Parent: "Espresso machine maintenance", Path: "/espresso-machines/maintenance/descaling/", Title: "How to descale an espresso machine without ruining it", Status: statusExists},
 
-		{Name: "Grinders", Kind: "hub", Intent: "commercial", Keyword: "espresso grinders", Anchor: "grinders", Path: "/grinders/", Title: "Espresso grinders: the part that matters most", Status: statusPublished},
-		{Name: "Hand grinders", Kind: "topic", Intent: "commercial", Keyword: "hand grinder for espresso", Anchor: "hand grinders", Parent: "Grinders", Path: "/grinders/hand/", Title: "Hand grinders that can actually grind for espresso", Status: statusPublished},
-		{Name: "Electric burr grinders", Kind: "topic", Intent: "commercial", Keyword: "electric burr grinder", Anchor: "electric burr grinders", Parent: "Grinders", Path: "/grinders/electric/", Title: "Electric burr grinders for the home bar", Status: statusPublished},
-		{Name: "Flat burr grinders", Kind: "topic", Intent: "informational", Keyword: "flat burr grinder", Anchor: "flat burrs", Parent: "Grinders", Path: "/grinders/flat-burr/", Title: "Flat burr grinders and the cup they give you", Status: statusPlanned},
-		{Name: "Conical burr grinders", Kind: "topic", Intent: "informational", Keyword: "conical burr grinder", Anchor: "conical burrs", Parent: "Grinders", Path: "/grinders/conical-burr/", Title: "Conical burr grinders: forgiving and fast", Status: statusPlanned},
-		{Name: "Grind size for espresso", Kind: "topic", Intent: "informational", Keyword: "espresso grind size", Anchor: "grind size", Parent: "Grinders", Path: "/grinders/grind-size/", Title: "Grind size for espresso, and how to read the shot", Status: statusPublished},
-		{Name: "Single dosing", Kind: "topic", Intent: "informational", Keyword: "single dosing grinder", Anchor: "single dosing", Parent: "Grinders", Path: "/grinders/single-dosing/", Title: "Single dosing: weigh in, grind, walk away", Status: statusPlanned},
+		{Name: "Grinders", Intent: "commercial", Keyword: "espresso grinders", Anchor: "grinders", Path: "/grinders/", Title: "Espresso grinders: the part that matters most", Status: statusPublished},
+		{Name: "Hand grinders", Intent: "commercial", Keyword: "hand grinder for espresso", Anchor: "hand grinders", Parent: "Grinders", Path: "/grinders/hand/", Title: "Hand grinders that can actually grind for espresso", Status: statusPublished},
+		{Name: "Electric burr grinders", Intent: "commercial", Keyword: "electric burr grinder", Anchor: "electric burr grinders", Parent: "Grinders", Path: "/grinders/electric/", Title: "Electric burr grinders for the home bar", Status: statusPublished},
+		{Name: "Flat burr grinders", Intent: "informational", Keyword: "flat burr grinder", Anchor: "flat burrs", Parent: "Grinders", Path: "/grinders/flat-burr/", Title: "Flat burr grinders and the cup they give you", Status: statusPlanned},
+		{Name: "Conical burr grinders", Intent: "informational", Keyword: "conical burr grinder", Anchor: "conical burrs", Parent: "Grinders", Path: "/grinders/conical-burr/", Title: "Conical burr grinders: forgiving and fast", Status: statusPlanned},
+		{Name: "Grind size for espresso", Intent: "informational", Keyword: "espresso grind size", Anchor: "grind size", Parent: "Grinders", Path: "/grinders/grind-size/", Title: "Grind size for espresso, and how to read the shot", Status: statusPublished},
+		{Name: "Single dosing", Intent: "informational", Keyword: "single dosing grinder", Anchor: "single dosing", Parent: "Grinders", Path: "/grinders/single-dosing/", Title: "Single dosing: weigh in, grind, walk away", Status: statusPlanned},
 
-		{Name: "Brewing technique", Kind: "hub", Intent: "informational", Keyword: "espresso brewing technique", Anchor: "brewing technique", Path: "/brewing/", Title: "Espresso brewing technique from grind to cup", Status: statusPublished},
-		{Name: "Portafilter", Kind: "category", Intent: "informational", Keyword: "portafilter", Anchor: "the portafilter", Parent: "Brewing technique", Path: "/brewing/portafilter/", Title: "The portafilter, basket by basket", Status: statusPublished},
-		{Name: "Bottomless portafilter", Kind: "topic", Intent: "informational", Keyword: "bottomless portafilter", Anchor: "bottomless portafilter", Parent: "Portafilter", Path: "/brewing/portafilter/bottomless/", Title: "What a bottomless portafilter shows you", Status: statusPublished},
-		{Name: "Tamping", Kind: "topic", Intent: "informational", Keyword: "how to tamp espresso", Anchor: "tamping", Parent: "Brewing technique", Path: "/brewing/tamping/", Title: "Tamping: level matters more than force", Status: statusPublished},
-		{Name: "WDT distribution", Kind: "topic", Intent: "informational", Keyword: "wdt tool espresso", Anchor: "WDT", Parent: "Brewing technique", Path: "/brewing/wdt/", Title: "WDT: stirring the grounds before you tamp", Status: statusPublished},
-		{Name: "Puck preparation", Kind: "topic", Intent: "informational", Keyword: "espresso puck prep", Anchor: "puck preparation", Parent: "Brewing technique", Path: "/brewing/puck-preparation/", Title: "Puck preparation, the whole routine", Status: statusExists},
-		{Name: "Pre-infusion", Kind: "topic", Intent: "informational", Keyword: "espresso pre infusion", Anchor: "pre-infusion", Parent: "Brewing technique", Path: "/brewing/pre-infusion/", Title: "Pre-infusion: wetting the puck before the pressure", Status: statusPlanned},
-		{Name: "Extraction ratios", Kind: "topic", Intent: "informational", Keyword: "espresso brew ratio", Anchor: "extraction ratios", Parent: "Brewing technique", Path: "/brewing/extraction-ratios/", Title: "Extraction ratios: ristretto, normale, lungo", Status: statusPublished},
-		{Name: "Channeling", Kind: "topic", Intent: "informational", Keyword: "espresso channeling", Anchor: "channeling", Parent: "Brewing technique", Path: "/brewing/channeling/", Title: "Channeling: why one side of the puck runs fast", Status: statusPlanned},
-		{Name: "Dialing in espresso", Kind: "topic", Intent: "informational", Keyword: "how to dial in espresso", Anchor: "dialing in", Parent: "Brewing technique", Path: "/brewing/dialing-in/", Title: "Dialing in espresso in three shots", Status: statusPublished},
+		{Name: "Brewing technique", Intent: "informational", Keyword: "espresso brewing technique", Anchor: "brewing technique", Path: "/brewing/", Title: "Espresso brewing technique from grind to cup", Status: statusPublished},
+		{Name: "Portafilter", Intent: "informational", Keyword: "portafilter", Anchor: "the portafilter", Parent: "Brewing technique", Path: "/brewing/portafilter/", Title: "The portafilter, basket by basket", Status: statusPublished},
+		{Name: "Bottomless portafilter", Intent: "informational", Keyword: "bottomless portafilter", Anchor: "bottomless portafilter", Parent: "Portafilter", Path: "/brewing/portafilter/bottomless/", Title: "What a bottomless portafilter shows you", Status: statusPublished},
+		{Name: "Tamping", Intent: "informational", Keyword: "how to tamp espresso", Anchor: "tamping", Parent: "Brewing technique", Path: "/brewing/tamping/", Title: "Tamping: level matters more than force", Status: statusPublished},
+		{Name: "WDT distribution", Intent: "informational", Keyword: "wdt tool espresso", Anchor: "WDT", Parent: "Brewing technique", Path: "/brewing/wdt/", Title: "WDT: stirring the grounds before you tamp", Status: statusPublished},
+		{Name: "Puck preparation", Intent: "informational", Keyword: "espresso puck prep", Anchor: "puck preparation", Parent: "Brewing technique", Path: "/brewing/puck-preparation/", Title: "Puck preparation, the whole routine", Status: statusExists},
+		{Name: "Pre-infusion", Intent: "informational", Keyword: "espresso pre infusion", Anchor: "pre-infusion", Parent: "Brewing technique", Path: "/brewing/pre-infusion/", Title: "Pre-infusion: wetting the puck before the pressure", Status: statusPlanned},
+		{Name: "Extraction ratios", Intent: "informational", Keyword: "espresso brew ratio", Anchor: "extraction ratios", Parent: "Brewing technique", Path: "/brewing/extraction-ratios/", Title: "Extraction ratios: ristretto, normale, lungo", Status: statusPublished},
+		{Name: "Channeling", Intent: "informational", Keyword: "espresso channeling", Anchor: "channeling", Parent: "Brewing technique", Path: "/brewing/channeling/", Title: "Channeling: why one side of the puck runs fast", Status: statusPlanned},
+		{Name: "Dialing in espresso", Intent: "informational", Keyword: "how to dial in espresso", Anchor: "dialing in", Parent: "Brewing technique", Path: "/brewing/dialing-in/", Title: "Dialing in espresso in three shots", Status: statusPublished},
 
-		{Name: "Milk and drinks", Kind: "hub", Intent: "informational", Keyword: "espresso milk drinks", Anchor: "milk drinks", Path: "/milk-drinks/", Title: "Milk drinks built on espresso", Status: statusPublished},
-		{Name: "Milk texturing", Kind: "topic", Intent: "informational", Keyword: "how to steam milk", Anchor: "milk texturing", Parent: "Milk and drinks", Path: "/milk-drinks/texturing/", Title: "Milk texturing: air first, then the whirlpool", Status: statusPublished},
-		{Name: "Latte art", Kind: "topic", Intent: "informational", Keyword: "latte art for beginners", Anchor: "latte art", Parent: "Milk and drinks", Path: "/milk-drinks/latte-art/", Title: "Latte art for beginners: heart, tulip, rosetta", Status: statusPublished},
-		{Name: "Cappuccino", Kind: "topic", Intent: "informational", Keyword: "cappuccino recipe", Anchor: "cappuccino", Parent: "Milk and drinks", Path: "/milk-drinks/cappuccino/", Title: "The cappuccino, as it is served in Italy", Status: statusPublished},
-		{Name: "Flat white", Kind: "topic", Intent: "informational", Keyword: "flat white recipe", Anchor: "flat white", Parent: "Milk and drinks", Path: "/milk-drinks/flat-white/", Title: "The flat white and what makes it different", Status: statusExists},
-		{Name: "Cortado", Kind: "topic", Intent: "informational", Keyword: "cortado recipe", Anchor: "cortado", Parent: "Milk and drinks", Path: "/milk-drinks/cortado/", Title: "The cortado: equal parts, small glass", Status: statusPlanned},
+		{Name: "Milk and drinks", Intent: "informational", Keyword: "espresso milk drinks", Anchor: "milk drinks", Path: "/milk-drinks/", Title: "Milk drinks built on espresso", Status: statusPublished},
+		{Name: "Milk texturing", Intent: "informational", Keyword: "how to steam milk", Anchor: "milk texturing", Parent: "Milk and drinks", Path: "/milk-drinks/texturing/", Title: "Milk texturing: air first, then the whirlpool", Status: statusPublished},
+		{Name: "Latte art", Intent: "informational", Keyword: "latte art for beginners", Anchor: "latte art", Parent: "Milk and drinks", Path: "/milk-drinks/latte-art/", Title: "Latte art for beginners: heart, tulip, rosetta", Status: statusPublished},
+		{Name: "Cappuccino", Intent: "informational", Keyword: "cappuccino recipe", Anchor: "cappuccino", Parent: "Milk and drinks", Path: "/milk-drinks/cappuccino/", Title: "The cappuccino, as it is served in Italy", Status: statusPublished},
+		{Name: "Flat white", Intent: "informational", Keyword: "flat white recipe", Anchor: "flat white", Parent: "Milk and drinks", Path: "/milk-drinks/flat-white/", Title: "The flat white and what makes it different", Status: statusExists},
+		{Name: "Cortado", Intent: "informational", Keyword: "cortado recipe", Anchor: "cortado", Parent: "Milk and drinks", Path: "/milk-drinks/cortado/", Title: "The cortado: equal parts, small glass", Status: statusPlanned},
 
-		{Name: "Coffee beans", Kind: "hub", Intent: "commercial", Keyword: "espresso beans", Anchor: "coffee beans", Path: "/beans/", Title: "Coffee beans for espresso", Status: statusPublished},
-		{Name: "Espresso roast profiles", Kind: "topic", Intent: "informational", Keyword: "espresso roast profile", Anchor: "roast profiles", Parent: "Coffee beans", Path: "/beans/roast-profiles/", Title: "Espresso roast profiles from light to dark", Status: statusPublished},
-		{Name: "Single origin espresso", Kind: "topic", Intent: "commercial", Keyword: "single origin espresso", Anchor: "single origin", Parent: "Coffee beans", Path: "/beans/single-origin/", Title: "Single origin espresso: sweet, sharp, seasonal", Status: statusPlanned},
-		{Name: "Espresso blends", Kind: "topic", Intent: "commercial", Keyword: "espresso blend", Anchor: "espresso blends", Parent: "Coffee beans", Path: "/beans/blends/", Title: "Espresso blends and why roasters build them", Status: statusPlanned},
-		{Name: "Coffee freshness", Kind: "topic", Intent: "informational", Keyword: "coffee degassing time", Anchor: "coffee freshness", Parent: "Coffee beans", Path: "/beans/freshness/", Title: "Coffee freshness: rest it, then drink it", Status: statusPlanned},
+		{Name: "Coffee beans", Intent: "commercial", Keyword: "espresso beans", Anchor: "coffee beans", Path: "/beans/", Title: "Coffee beans for espresso", Status: statusPublished},
+		{Name: "Espresso roast profiles", Intent: "informational", Keyword: "espresso roast profile", Anchor: "roast profiles", Parent: "Coffee beans", Path: "/beans/roast-profiles/", Title: "Espresso roast profiles from light to dark", Status: statusPublished},
+		{Name: "Single origin espresso", Intent: "commercial", Keyword: "single origin espresso", Anchor: "single origin", Parent: "Coffee beans", Path: "/beans/single-origin/", Title: "Single origin espresso: sweet, sharp, seasonal", Status: statusPlanned},
+		{Name: "Espresso blends", Intent: "commercial", Keyword: "espresso blend", Anchor: "espresso blends", Parent: "Coffee beans", Path: "/beans/blends/", Title: "Espresso blends and why roasters build them", Status: statusPlanned},
+		{Name: "Coffee freshness", Intent: "informational", Keyword: "coffee degassing time", Anchor: "coffee freshness", Parent: "Coffee beans", Path: "/beans/freshness/", Title: "Coffee freshness: rest it, then drink it", Status: statusPlanned},
 
-		{Name: "Accessories", Kind: "hub", Intent: "transactional", Keyword: "espresso accessories", Anchor: "accessories", Path: "/accessories/", Title: "Espresso accessories worth the counter space", Status: statusPublished},
-		{Name: "Tampers", Kind: "product", Intent: "transactional", Keyword: "espresso tamper", Anchor: "tampers", Parent: "Accessories", Path: "/accessories/tampers/", Title: "Tampers: 58.5mm, flat, and heavy enough", Status: statusPublished},
-		{Name: "Distribution tools", Kind: "product", Intent: "transactional", Keyword: "espresso distribution tool", Anchor: "distribution tools", Parent: "Accessories", Path: "/accessories/distribution-tools/", Title: "Distribution tools that earn their price", Status: statusExists},
-		{Name: "Espresso scales", Kind: "product", Intent: "transactional", Keyword: "espresso scale", Anchor: "espresso scales", Parent: "Accessories", Path: "/accessories/scales/", Title: "Espresso scales with a timer that keeps up", Status: statusPublished},
-		{Name: "Knock boxes", Kind: "product", Intent: "transactional", Keyword: "espresso knock box", Anchor: "knock boxes", Parent: "Accessories", Path: "/accessories/knock-boxes/", Title: "Knock boxes that stay quiet on the bench", Status: statusPlanned},
+		{Name: "Accessories", Intent: "transactional", Keyword: "espresso accessories", Anchor: "accessories", Path: "/accessories/", Title: "Espresso accessories worth the counter space", Status: statusPublished},
+		{Name: "Tampers", Intent: "transactional", Keyword: "espresso tamper", Anchor: "tampers", Parent: "Accessories", Path: "/accessories/tampers/", Title: "Tampers: 58.5mm, flat, and heavy enough", Status: statusPublished},
+		{Name: "Distribution tools", Intent: "transactional", Keyword: "espresso distribution tool", Anchor: "distribution tools", Parent: "Accessories", Path: "/accessories/distribution-tools/", Title: "Distribution tools that earn their price", Status: statusExists},
+		{Name: "Espresso scales", Intent: "transactional", Keyword: "espresso scale", Anchor: "espresso scales", Parent: "Accessories", Path: "/accessories/scales/", Title: "Espresso scales with a timer that keeps up", Status: statusPublished},
+		{Name: "Knock boxes", Intent: "transactional", Keyword: "espresso knock box", Anchor: "knock boxes", Parent: "Accessories", Path: "/accessories/knock-boxes/", Title: "Knock boxes that stay quiet on the bench", Status: statusPlanned},
 
-		{Name: "Home roasting", Kind: "hub", Intent: "informational", Keyword: "home coffee roasting", Anchor: "home roasting", Path: "/home-roasting/", Title: "Home roasting: green beans to a first crack", Status: statusPlanned},
-		{Name: "Roasting drums", Kind: "topic", Intent: "informational", Keyword: "home roasting drum", Anchor: "roasting drums", Parent: "Home roasting", Path: "/home-roasting/drums/", Title: "Roasting drums that fit on a kitchen hob", Status: statusPlanned},
+		{Name: "Home roasting", Intent: "informational", Keyword: "home coffee roasting", Anchor: "home roasting", Path: "/home-roasting/", Title: "Home roasting: green beans to a first crack", Status: statusPlanned},
+		{Name: "Roasting drums", Intent: "informational", Keyword: "home roasting drum", Anchor: "roasting drums", Parent: "Home roasting", Path: "/home-roasting/drums/", Title: "Roasting drums that fit on a kitchen hob", Status: statusPlanned},
 	}
 }
 
@@ -160,6 +170,7 @@ func seedLoosePages() []seedPage {
 		{Path: "/blog/the-2025-buying-guide/", Title: "The 2025 buying guide", Status: statusArchived},
 		{Path: "/reviews/", Title: "Machine reviews", Status: statusPublished},
 		{Path: "/reviews/gaggia-classic-pro/", Title: "Gaggia Classic Pro review", Status: statusPublished},
+		{Path: "/reviews/breville-bambino-plus/", Title: duplicateTitle, Status: statusPublished},
 		{Path: "/reviews/rancilio-silvia/", Title: "Rancilio Silvia review", Status: statusExists},
 		{Path: "/reviews/lelit-anna/", Title: "Lelit Anna review", Status: statusExists},
 		{Path: "/glossary/", Title: "An espresso glossary", Status: statusPublished},
@@ -170,6 +181,87 @@ func seedLoosePages() []seedPage {
 		{Path: "/shipping-and-returns/", Title: "Shipping and returns", Status: statusPublished},
 		{Path: "/privacy-policy/", Title: "Privacy policy", Status: statusPublished},
 		{Path: "/terms/", Title: "Terms of sale", Status: statusPublished},
+	}
+}
+
+type seedTyped struct {
+	Path   string
+	Preset pagetype.Preset
+}
+
+func seedTypes() []seedTyped {
+	return []seedTyped{
+		{Path: "/espresso-machines/", Preset: pagetype.Hub},
+		{Path: "/grinders/", Preset: pagetype.Hub},
+		{Path: "/brewing/", Preset: pagetype.Hub},
+		{Path: "/brewing/portafilter/", Preset: pagetype.Hub},
+		{Path: "/milk-drinks/", Preset: pagetype.Hub},
+		{Path: "/beans/", Preset: pagetype.Hub},
+		{Path: "/accessories/", Preset: pagetype.Hub},
+		{Path: "/home-roasting/", Preset: pagetype.Hub},
+		{Path: "/accessories/tampers/", Preset: pagetype.Product},
+		{Path: "/accessories/distribution-tools/", Preset: pagetype.Product},
+		{Path: "/accessories/scales/", Preset: pagetype.Product},
+		{Path: "/accessories/knock-boxes/", Preset: pagetype.Product},
+	}
+}
+
+func harnessLinks() field.LinkPolicy {
+	return field.LinkPolicy{
+		Links: true,
+		Rules: field.LinkRules{
+			UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.6, MaxLinks: 10, MaxPerTarget: 1,
+			ParentLinkWithinParagraphs: 2, ChildrenSection: true,
+		},
+		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorRotate,
+	}
+}
+
+const (
+	subtitleKey   = "hero_subtitle"
+	subtitleLabel = "Hero subtitle"
+
+	hubPath           = "/espresso-machines/"
+	hubBodyPhrase     = "four kinds of machine sit on this bench"
+	storeCategoryID   = 100000
+	storeCategoryName = "Espresso machines"
+	storeCategorySlug = "espresso-machines"
+	storeCategoryPath = "/product-category/" + storeCategorySlug + "/"
+
+	editedPath     = "/brewing/extraction-ratios/"
+	editedPhrase   = "we weigh the shot, never its volume"
+	reviewedPath   = "/grinders/grind-size/"
+	reviewedPhrase = "only by one step at a time"
+	revertedField  = field.SEOTitle
+
+	proposedDefinition = "An espresso machine forces water at about nine bar through a puck of finely ground coffee; " +
+		"the boiler, the group and the pump decide how steady that shot is."
+	proposedReason = "Read from the hub's own text and the machines the store sells under it."
+)
+
+func seedBodies() map[string]string {
+	return map[string]string{
+		hubPath: "<p>Single boilers, heat exchangers, dual boilers and levers: " + hubBodyPhrase +
+			", and each one asks something different of the person pulling the shot.</p>\n\n" +
+			"<p>Start with the boiler, because it decides whether you can steam milk while the next shot runs.</p>",
+		editedPath: "<p>We pull a normale at one to two, eighteen grams in and thirty-six out, and " + editedPhrase + ".</p>\n\n" +
+			"<p>A ristretto stops near one to one and a half and a lungo runs past one to three; beyond that the cup turns thin.</p>",
+		reviewedPath: "<p>Grind size is the one setting we change between shots, and " + reviewedPhrase + ".</p>\n\n" +
+			"<p>When the shot runs under twenty-five seconds we go finer, over thirty-five we go coarser, and then we taste before touching it again.</p>",
+	}
+}
+
+func proposedFacts() []graph.Fact {
+	return []graph.Fact{
+		{Label: "Pressure", Value: "About nine bar at the puck"},
+		{Label: "Group", Value: "58 mm on every machine we keep"},
+	}
+}
+
+func seedSubtitles() map[string]string {
+	return map[string]string{
+		"/espresso-machines/": "Every machine we have pulled a shot on, and the one we would buy again",
+		"/grinders/":          "The part of the bench that decides the cup",
 	}
 }
 

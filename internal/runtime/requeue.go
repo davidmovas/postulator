@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -12,10 +13,16 @@ func (e *Engine) RetryStep(ctx context.Context, itemID string) error {
 	return e.requeueStep(ctx, itemID, nil)
 }
 
-func (e *Engine) Accept(ctx context.Context, itemID string) error {
+func (e *Engine) Accept(ctx context.Context, itemID string, fields []field.Key) error {
+	if fields == nil {
+		fields = []field.Key{}
+	}
 	return e.requeueStep(ctx, itemID, func(item *run.Item) error {
 		item.Checkpoint = item.Checkpoint.Clone()
-		return run.Set(item.Checkpoint, run.CheckpointAccept, item.CurrentStep)
+		if err := run.Set(item.Checkpoint, run.CheckpointAccept, item.CurrentStep); err != nil {
+			return err
+		}
+		return run.Set(item.Checkpoint, run.CheckpointAcceptFields, fields)
 	})
 }
 

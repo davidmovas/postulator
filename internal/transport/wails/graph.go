@@ -30,6 +30,9 @@ type GraphUseCase interface {
 	PreviewFromPages(ctx context.Context, req graph.PreviewFromPagesRequest) (graph.PreviewFromPagesResponse, error)
 	ProposeFromKeywords(ctx context.Context, req graph.ProposeFromKeywordsRequest) (graph.ProposeFromKeywordsResponse, error)
 	ApplyProposals(ctx context.Context, req graph.ApplyProposalsRequest) (graph.ApplyProposalsResponse, error)
+	CardProposals(ctx context.Context, req graph.CardProposalsRequest) (paging.List[graph.CardProposal], error)
+	AcceptCard(ctx context.Context, req graph.AcceptCardRequest) (graph.AcceptCardResponse, error)
+	DismissCard(ctx context.Context, req graph.DismissCardRequest) (graph.DismissCardResponse, error)
 }
 
 type GraphService struct {
@@ -52,6 +55,9 @@ type GraphService struct {
 	previewFromPages    middleware.Handler[graph.PreviewFromPagesRequest, graph.PreviewFromPagesResponse]
 	proposeFromKeywords middleware.Handler[graph.ProposeFromKeywordsRequest, graph.ProposeFromKeywordsResponse]
 	applyProposals      middleware.Handler[graph.ApplyProposalsRequest, graph.ApplyProposalsResponse]
+	cardProposals       middleware.Handler[graph.CardProposalsRequest, paging.List[graph.CardProposal]]
+	acceptCard          middleware.Handler[graph.AcceptCardRequest, graph.AcceptCardResponse]
+	dismissCard         middleware.Handler[graph.DismissCardRequest, graph.DismissCardResponse]
 }
 
 func NewGraphService(logger *zap.Logger, useCase Source[GraphUseCase]) *GraphService {
@@ -75,6 +81,9 @@ func NewGraphService(logger *zap.Logger, useCase Source[GraphUseCase]) *GraphSer
 		previewFromPages:    Wrap(logger, "graph.previewFromPages", call(useCase, GraphUseCase.PreviewFromPages)),
 		proposeFromKeywords: Wrap(logger, "graph.proposeFromKeywords", call(useCase, GraphUseCase.ProposeFromKeywords)),
 		applyProposals:      Wrap(logger, "graph.applyProposals", call(useCase, GraphUseCase.ApplyProposals)),
+		cardProposals:       Wrap(logger, "graph.cardProposals", call(useCase, GraphUseCase.CardProposals)),
+		acceptCard:          Wrap(logger, "graph.acceptCard", call(useCase, GraphUseCase.AcceptCard)),
+		dismissCard:         Wrap(logger, "graph.dismissCard", call(useCase, GraphUseCase.DismissCard)),
 	}
 }
 
@@ -152,4 +161,16 @@ func (s *GraphService) ProposeFromKeywords(c context.Context, req graph.ProposeF
 
 func (s *GraphService) ApplyProposals(c context.Context, req graph.ApplyProposalsRequest) (graph.ApplyProposalsResponse, error) {
 	return s.applyProposals(c, req)
+}
+
+func (s *GraphService) CardProposals(c context.Context, req graph.CardProposalsRequest) (paging.List[graph.CardProposal], error) {
+	return s.cardProposals(c, req)
+}
+
+func (s *GraphService) AcceptCard(c context.Context, req graph.AcceptCardRequest) (graph.AcceptCardResponse, error) {
+	return s.acceptCard(c, req)
+}
+
+func (s *GraphService) DismissCard(c context.Context, req graph.DismissCardRequest) (graph.DismissCardResponse, error) {
+	return s.dismissCard(c, req)
 }

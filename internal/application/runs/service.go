@@ -5,6 +5,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -19,7 +20,7 @@ type engine interface {
 	Resume(ctx context.Context, runID string) error
 	Cancel(ctx context.Context, runID string) error
 	RetryStep(ctx context.Context, itemID string) error
-	Accept(ctx context.Context, itemID string) error
+	Accept(ctx context.Context, itemID string, fields []field.Key) error
 	Regenerate(ctx context.Context, runID string, itemIDs []string) error
 }
 
@@ -83,8 +84,8 @@ func New(engine engine, runs runStore, items itemStore, artifacts artifactStore,
 	}
 }
 
-func invalid(message, field string) *errors.Error {
-	return errors.New(errors.Invalid, message).WithDetail("field", field)
+func invalid(message, name string) *errors.Error {
+	return errors.New(errors.Invalid, message).WithDetail("field", name)
 }
 
 func statusFilter(raw string) (*run.Status, error) {

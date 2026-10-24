@@ -52,6 +52,8 @@ export const describeRuns: Describer = (tool, args) => {
             return view([`${said.cancel} `, ref("run", text(args, "runId") ?? "")], [line("note", said.cancelBody)]);
         case "runs_retry_step":
             return view([`${said.retry} `, ref("item", text(args, "itemId") ?? "")], []);
+        case "runs_revert":
+            return view([`${said.revert} `, ref("run", text(args, "runId") ?? "")], [line("warn", said.revertBody, "warn")]);
         case "runs_regenerate":
             return view([`${said.regenerate(strings(args, "itemIds").length)} `, ref("run", text(args, "runId") ?? "")], [
                 line("note", said.regenerateBody),

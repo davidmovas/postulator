@@ -6,14 +6,16 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
-	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type tableStore interface {
@@ -38,12 +40,19 @@ type edgeStore interface {
 type pageStore interface {
 	Insert(ctx context.Context, p pagemap.Page) error
 	Update(ctx context.Context, p pagemap.Page) error
+	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+	SetRowKey(ctx context.Context, siteID, pageID, rowKey string, trail []string, at time.Time) error
+	Get(ctx context.Context, id string) (pagemap.Page, error)
+	Delete(ctx context.Context, id string) error
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 }
 
-type templateStore interface {
-	Get(ctx context.Context, id string) (template.Template, error)
-	List(ctx context.Context, q template.Query, page paging.Request) (paging.List[template.Template], error)
+type typeReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagetype.Type, error)
+}
+
+type fieldReader interface {
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
 }
 
 type mappingStore interface {
@@ -57,6 +66,24 @@ type siteReader interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 }
 
+type findingStore interface {
+	Upsert(ctx context.Context, f finding.Finding) error
+	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
+	OpenBySite(ctx context.Context, siteID string, code finding.Code) ([]finding.Finding, error)
+	Get(ctx context.Context, id string) (finding.Finding, error)
+	MoveToPage(ctx context.Context, id, pageID string, at time.Time) error
+	Settle(ctx context.Context, id string, status finding.Status, resolution, resolvedBy string, at time.Time) error
+}
+
+type termReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error)
+	ListTermsBySite(ctx context.Context, siteID string) (map[string][]pagemap.Term, error)
+}
+
+type itemReader interface {
+	ByTarget(ctx context.Context, targetID string, limit int) ([]run.Item, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -66,9 +93,13 @@ type Deps struct {
 	Entities   entityStore
 	Edges      edgeStore
 	Pages      pageStore
-	Templates  templateStore
+	Types      typeReader
+	Fields     fieldReader
 	Mappings   mappingStore
 	Sites      siteReader
+	Findings   findingStore
+	Terms      termReader
+	Items      itemReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

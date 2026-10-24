@@ -16,13 +16,13 @@ describe("diffRows", () => {
 
     it("names a changed rule with both values", () => {
         const below = blankDraft();
-        const here: SpecDraft = { ...below, maxLinks: 4 };
+        const here: SpecDraft = { ...below, descriptionMax: 140 };
         const rows = diffRows(below, here);
         expect(rows).toHaveLength(1);
-        expect(rows[0].key).toBe("maxLinks");
-        expect(rows[0].label).toBe(copy.templates.links.maxLinks);
-        expect(rows[0].below).toBe("8");
-        expect(rows[0].here).toBe("4");
+        expect(rows[0].key).toBe("descriptionMax");
+        expect(rows[0].label).toBe(copy.templates.meta.descriptionMax);
+        expect(rows[0].below).toBe("155");
+        expect(rows[0].here).toBe("140");
     });
 
     it("shows a density as a percentage, not as a fraction", () => {
@@ -39,17 +39,16 @@ describe("diffRows", () => {
             shortIntent: "",
             shortWords: 40,
             shortKeyword: false,
-            specifications: [{ name: "Form", intent: "" }],
         };
         const added = diffRows(below, { ...below, product: outputs });
         expect(added.map((row) => row.key)).toEqual(["product"]);
         expect(added[0].below).toBe(copy.templates.product.none);
-        expect(added[0].here).toBe(copy.templates.product.summary(true, 1));
+        expect(added[0].here).toBe(copy.templates.product.summary(true));
         expect(applied(below, added).product).toBeNull();
 
-        const changed = diffRows({ ...below, product: outputs }, { ...below, product: { ...outputs, specifications: [] } });
-        expect(changed[0].here).toBe(copy.templates.product.summary(true, 0));
-        expect(applied(below, changed).product?.specifications).toEqual([{ name: "Form", intent: "" }]);
+        const changed = diffRows({ ...below, product: outputs }, { ...below, product: { ...outputs, shortEnabled: false } });
+        expect(changed[0].here).toBe(copy.templates.product.summary(false));
+        expect(applied(below, changed).product?.shortEnabled).toBe(true);
     });
 
     it("counts the sections rather than listing them", () => {
@@ -104,7 +103,7 @@ describe("diffRows", () => {
         const below = blankDraft();
         const here: SpecDraft = {
             ...below,
-            maxLinks: 4,
+            descriptionMax: 140,
             tone: "plain",
             featuredImage: true,
             imageSource: "ai",
@@ -119,10 +118,10 @@ describe("diffRows", () => {
 
     it("reverting one row leaves the others alone", () => {
         const below = blankDraft();
-        const here: SpecDraft = { ...below, maxLinks: 4, upDepth: 3 };
+        const here: SpecDraft = { ...below, descriptionMax: 140, lengthMax: 1500 };
         const rows = diffRows(below, here);
-        const reverted = { ...here, ...rows.filter((row) => row.key === "maxLinks")[0].revert };
-        expect(reverted.maxLinks).toBe(below.maxLinks);
-        expect(reverted.upDepth).toBe(3);
+        const reverted = { ...here, ...rows.filter((row) => row.key === "descriptionMax")[0].revert };
+        expect(reverted.descriptionMax).toBe(below.descriptionMax);
+        expect(reverted.lengthMax).toBe(1500);
     });
 });

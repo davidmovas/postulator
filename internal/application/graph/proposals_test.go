@@ -96,7 +96,7 @@ func TestPreviewFromPagesWritesNothing(t *testing.T) {
 	for _, proposed := range out.Entities {
 		byName[proposed.Name] = proposed
 	}
-	if byName["Coffee"].PageID != hub.ID || byName["Coffee"].Path != "/coffee/" || byName["Coffee"].Kind != "hub" {
+	if byName["Coffee"].PageID != hub.ID || byName["Coffee"].Path != "/coffee/" {
 		t.Fatalf("the hub proposal = %+v", byName["Coffee"])
 	}
 	if byName["Espresso"].ExistingEntityID != existing.ID {
@@ -165,7 +165,7 @@ func TestApplyProposalsWritesWhatWasChosen(t *testing.T) {
 		t.Fatalf("applying the same proposals again = %+v, %v; want everything skipped", again, err)
 	}
 	if _, err = f.service.ApplyProposals(t.Context(), appgraph.ApplyProposalsRequest{
-		SiteID: f.siteID, Entities: []appgraph.ProposedEntity{{Name: " ", Kind: "topic"}},
+		SiteID: f.siteID, Entities: []appgraph.ProposedEntity{{Name: " "}},
 	}); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("a nameless proposal = %v, want INVALID", err)
 	}
@@ -185,7 +185,7 @@ func TestProposeFromKeywordsProposesWithoutPages(t *testing.T) {
 	}
 
 	prompt := f.model.calls[0].Messages[0].Text
-	for _, want := range []string{"- trail running shoes", "- road running shoes", "Coffee (", "sits under Coffee"} {
+	for _, want := range []string{"- trail running shoes", "- road running shoes", "- Coffee\n", "sits under Coffee"} {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("the prompt does not carry %q:\n%s", want, prompt)
 		}

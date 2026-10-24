@@ -3,6 +3,7 @@ package wp_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
 var httpMethods = []string{"get", "put", "post", "delete", "patch"}
@@ -53,11 +55,15 @@ func TestThePluginContractDocumentsEveryRoute(t *testing.T) {
 	t.Parallel()
 
 	want := map[string][]string{
-		"/manifest":             {"get"},
-		"/content":              {"get"},
-		"/seo-meta/{id}":        {"get", "put"},
-		"/content/{id}/raw":     {"get", "put"},
-		"/content/{id}/preview": {"post"},
+		"/manifest":              {"get"},
+		"/content":               {"get"},
+		"/seo-meta/{id}":         {"get", "put"},
+		"/content/{id}/raw":      {"get", "put"},
+		"/content/{id}/preview":  {"post"},
+		"/content/{id}/rendered": {"get"},
+		"/meta/{id}":             {"get", "put"},
+		"/terms/{id}":            {"get"},
+		"/settings":              {"get"},
 	}
 
 	routes := documentedRoutes(t)
@@ -120,12 +126,46 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "expected hash property", snippet: "\n        expectedHash:\n"},
 		{name: "anchor property", snippet: "\n        anchor:\n"},
 		{name: "href property", snippet: "\n        href:\n"},
+		{name: "content posts only", snippet: "The id of a content post, a post of a public post type other than an\n        attachment"},
+		{name: "href classification", snippet: "classified as\n            pagemap.Site.Resolve classifies it"},
+		{name: "href host and port", snippet: "its host and port equal the site's host and port"},
+		{name: "relative href against the document", snippet: "a relative href is internal and resolves\n            against the page's URL as a browser does: its path up to the\n            last slash."},
 		{name: "preview link schema", snippet: "\n    PreviewLink:\n"},
+		{name: "rendered content schema", snippet: "\n    RenderedContent:\n"},
+		{name: "rendered capability", snippet: "\n              - rendered\n"},
+		{name: "rendered inside a singular main query", snippet: "runs through the_content inside a singular main"},
+		{name: "meta values schema", snippet: "\n    MetaValues:\n"},
+		{name: "meta capability", snippet: "\n              - meta\n"},
+		{name: "meta deny rule", snippet: "is_protected_meta says it is protected"},
+		{name: "meta refusal code", snippet: "meta_key_denied"},
+		{name: "meta key ceiling", snippet: "too_many_keys"},
+		{name: "term schema", snippet: "\n    Term:\n"},
+		{name: "post terms schema", snippet: "\n    PostTerms:\n"},
+		{name: "terms capability", snippet: "\n              - terms\n"},
+		{name: "technical pages schema", snippet: "\n    TechnicalPages:\n"},
+		{name: "settings capability", snippet: "\n              - settings\n"},
+		{name: "privacy page", snippet: "\n            privacy:\n"},
+		{name: "excerpt property", snippet: "\n        excerpt:\n"},
+		{name: "terms property", snippet: "\n        terms:\n"},
+		{name: "post types property", snippet: "\n        postTypes:\n"},
+		{name: "taxonomies property", snippet: "\n        taxonomies:\n"},
+		{name: "unknown type code", snippet: "invalid_type"},
 		{name: "expires at property", snippet: "\n        expiresAt:\n"},
-		{name: "preview query argument", snippet: "postulator_preview"},
+		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
 		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
-		{name: "plugin version", snippet: "\n  version: 1.2.0\n"},
+		{name: "plugin version", snippet: "\n  version: 1.5.2\n"},
+		{name: "meta write request schema", snippet: "\n    MetaWriteRequest:\n"},
+		{name: "meta write result schema", snippet: "\n    MetaWriteResult:\n"},
+		{name: "moved conflict schema", snippet: "\n    MovedConflict:\n"},
+		{name: "meta write capability", snippet: "\n              - meta_write\n"},
+		{name: "guarded write capability", snippet: "\n              - guarded_write\n"},
+		{name: "unfiltered html property", snippet: "\n        unfilteredHtml:\n"},
+		{name: "save stable property", snippet: "\n        saveStable:\n"},
+		{name: "stored hashes property", snippet: "\n        hashes:\n"},
+		{name: "moved property", snippet: "\n        moved:\n"},
+		{name: "unguarded meta key code", snippet: "missing_expected"},
+		{name: "save filters named", snippet: "pre_post_content and content_save_pre"},
 	}
 
 	document := contractDocument(t)
@@ -137,6 +177,76 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 				t.Errorf("the contract does not carry %q", tc.snippet)
 			}
 		})
+	}
+}
+
+func documentedDenySet(t *testing.T) (keys, prefixes []string) {
+	t.Helper()
+
+	var list *[]string
+	inDeny := false
+	for line := range strings.SplitSeq(contractDocument(t), "\n") {
+		switch {
+		case line == "x-denied-meta:":
+			inDeny = true
+		case inDeny && line != "" && !strings.HasPrefix(line, " "):
+			inDeny = false
+		case inDeny && line == "  keys:":
+			list = &keys
+		case inDeny && line == "  prefixes:":
+			list = &prefixes
+		case inDeny && list != nil && strings.HasPrefix(line, "    - "):
+			*list = append(*list, strings.Trim(strings.TrimPrefix(line, "    - "), "\""))
+		case inDeny && strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   "):
+			list = nil
+		}
+	}
+	return keys, prefixes
+}
+
+func TestTheContractsDenySetIncludesTheCatalogs(t *testing.T) {
+	t.Parallel()
+
+	keys, prefixes := documentedDenySet(t)
+	denied := field.DeniedMeta()
+	slices.Sort(keys)
+	slices.Sort(prefixes)
+	slices.Sort(denied.Keys)
+	slices.Sort(denied.Prefixes)
+	if !slices.Equal(keys, denied.Keys) {
+		t.Errorf("the contract denies the keys %v, and the catalog %v", keys, denied.Keys)
+	}
+	if !slices.Equal(prefixes, denied.Prefixes) {
+		t.Errorf("the contract denies the prefixes %v, and the catalog %v", prefixes, denied.Prefixes)
+	}
+}
+
+func TestTheBundledPluginIsPluginVersion(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "wp-plugin", "postulator-companion", "postulator-companion.php"))
+	if err != nil {
+		t.Fatalf("read the plugin's main file: %v", err)
+	}
+	source := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	declared := []struct {
+		where   string
+		text    string
+		pattern *regexp.Regexp
+	}{
+		{where: "the plugin header", text: source, pattern: regexp.MustCompile(`(?m)^ \* Version: (\S+)$`)},
+		{where: "the plugin's VERSION", text: source, pattern: regexp.MustCompile(`(?m)^const VERSION\s+= '([^']+)';$`)},
+		{where: "the contract", text: contractDocument(t), pattern: regexp.MustCompile(`(?m)^ {2}version: (\S+)$`)},
+	}
+	for _, each := range declared {
+		found := each.pattern.FindStringSubmatch(each.text)
+		if found == nil {
+			t.Errorf("%s declares no version", each.where)
+			continue
+		}
+		if found[1] != wp.PluginVersion {
+			t.Errorf("%s declares %s, and the client bundles %s", each.where, found[1], wp.PluginVersion)
+		}
 	}
 }
 
@@ -153,13 +263,13 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	if _, err := client.ListContent(t.Context(), wp.ContentQuery{}); err != nil {
 		t.Fatalf("ListContent: %v", err)
 	}
-	if _, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{Title: "x"}); err != nil {
+	if _, err := client.SetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{Title: "x"}, nil); err != nil {
 		t.Fatalf("SetSEOMeta: %v", err)
 	}
 	if _, err := client.GetSEOMeta(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("GetSEOMeta: %v", err)
 	}
-	if _, err := client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, []string{"title"}); err != nil {
+	if _, err := client.ReplaceSEOMeta(t.Context(), wp.TypePage, seeded[0].ID, wp.SEOMeta{}, []string{"title"}, nil); err != nil {
 		t.Fatalf("ReplaceSEOMeta: %v", err)
 	}
 	raw, err := client.GetRaw(t.Context(), wp.TypePage, seeded[0].ID)
@@ -171,6 +281,18 @@ func TestTheClientHitsOnlyDocumentedPluginRoutes(t *testing.T) {
 	}
 	if _, err = client.PreviewLink(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
 		t.Fatalf("PreviewLink: %v", err)
+	}
+	if _, err = client.GetRendered(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
+		t.Fatalf("GetRendered: %v", err)
+	}
+	if _, err = client.GetMeta(t.Context(), wp.TypePage, seeded[0].ID, []string{"color"}); err != nil {
+		t.Fatalf("GetMeta: %v", err)
+	}
+	if _, err = client.GetTerms(t.Context(), wp.TypePage, seeded[0].ID); err != nil {
+		t.Fatalf("GetTerms: %v", err)
+	}
+	if _, err = client.PluginSettings(t.Context()); err != nil {
+		t.Fatalf("PluginSettings: %v", err)
 	}
 
 	documented := documentedRoutes(t)

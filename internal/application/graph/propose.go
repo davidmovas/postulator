@@ -36,7 +36,6 @@ var prompts = llm.MustPrompts(promptFS, "prompts/*.tmpl")
 type entityProposal struct {
 	Path              string   `json:"path" description:"The path of the page this entity is about, copied exactly"`
 	Name              string   `json:"name" description:"The topic of the page, two to four words in title case"`
-	Kind              string   `json:"kind" enum:"hub,category,topic,product" description:"What the page is"`
 	Intent            string   `json:"intent" description:"What the reader wants from the page, one short sentence"`
 	PrimaryKeyword    string   `json:"primaryKeyword" description:"The phrase a reader searches to reach the page"`
 	SecondaryKeywords []string `json:"secondaryKeywords" description:"At most four further phrases the page can rank for"`
@@ -62,7 +61,6 @@ type relatedProposals struct {
 
 type knownEntity struct {
 	Name string
-	Kind string
 	Path string
 }
 
@@ -113,7 +111,15 @@ func (s *Service) ProposeFromPages(ctx context.Context, req ProposeFromPagesRequ
 }
 
 func (s *Service) PreviewFromPages(ctx context.Context, req PreviewFromPagesRequest) (PreviewFromPagesResponse, error) {
-	return s.previewFromPages(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+	switch {
+	case !req.Source.valid():
+		return PreviewFromPagesResponse{}, errors.New(errors.Invalid, "a proposal comes from the model or from the site").
+			WithDetail("field", "source")
+	case req.Source == SourceSite:
+		return s.previewFromSite(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+	default:
+		return s.previewFromPages(ctx, req.SiteID, req.PageIDs, req.PathPrefix)
+	}
 }
 
 func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageIDs []string, pathPrefix string) (PreviewFromPagesResponse, error) {
@@ -175,7 +181,6 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 				PageID:           page.ID,
 				Path:             page.Path,
 				Name:             name,
-				Kind:             string(kindOf(proposed.Kind)),
 				Intent:           strings.TrimSpace(proposed.Intent),
 				Keywords:         proposedKeywords(page.Keywords, proposed.PrimaryKeyword, proposed.SecondaryKeywords),
 				Anchors:          graphdomain.Distinct(proposed.Anchors),
@@ -380,7 +385,7 @@ func unmappedPages(pages []pagemap.Page) []pagemap.Page {
 func pagesPromptOf(siteName string, state siteGraph, batch []pagemap.Page) pagesPrompt {
 	known := make([]knownEntity, 0, len(state.entities))
 	for i := range state.entities {
-		entry := knownEntity{Name: state.labels[state.entities[i].ID], Kind: string(state.entities[i].Kind)}
+		entry := knownEntity{Name: state.labels[state.entities[i].ID]}
 		for path, entityID := range state.byPath {
 			if entityID == state.entities[i].ID {
 				entry.Path = path
@@ -457,14 +462,6 @@ func pairsOf(state siteGraph) []relatedPair {
 		})
 	}
 	return pairs
-}
-
-func kindOf(raw string) graphdomain.Kind {
-	kind := graphdomain.Kind(strings.ToLower(strings.TrimSpace(raw)))
-	if !kind.Valid() {
-		return graphdomain.KindTopic
-	}
-	return kind
 }
 
 func proposedAnchors(texts []string) []graphdomain.Anchor {

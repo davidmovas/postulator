@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { pageStatuses } from "../../generated/vocab.js";
-import { pageStatusLabel, pageStatusTone } from "./labels.js";
+import { linkOwnerLabel, linkOwnerTone, pageStatusLabel, pageStatusTone } from "./labels.js";
 
 describe("the page vocabulary in words", () => {
     it("names every page status without printing the stored value", () => {
@@ -15,6 +15,13 @@ describe("the page vocabulary in words", () => {
 
     it("shows a status it has never heard of as it arrived", () => {
         expect(pageStatusLabel("teleported")).toBe("teleported");
+    });
+
+    it("tells our links from the client's by their mark alone", () => {
+        expect(linkOwnerLabel(true)).not.toBe("");
+        expect(linkOwnerLabel(false)).not.toBe("");
+        expect(linkOwnerLabel(true)).not.toBe(linkOwnerLabel(false));
+        expect([linkOwnerTone(true), linkOwnerTone(false)]).toStrictEqual(["accent", "muted"]);
     });
 
     it("gives every page status a tone and an unknown one a muted tone", () => {

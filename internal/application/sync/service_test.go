@@ -58,10 +58,12 @@ type prober struct {
 	state    site.PluginState
 	err      error
 	commerce site.Commerce
+	required string
+	outdated bool
 }
 
 func (p prober) Probe(context.Context, site.Site) (site.Extensions, error) {
-	return site.Extensions{Plugin: p.state, Commerce: p.commerce}, p.err
+	return site.Extensions{Plugin: p.state, Commerce: p.commerce, PluginRequired: p.required, PluginOutdated: p.outdated}, p.err
 }
 
 type packer struct {
@@ -107,6 +109,28 @@ func TestSyncSiteQueuesASiteScopedRun(t *testing.T) {
 	}
 	if q.queued.CreatedBy != kctx.ActorAgent {
 		t.Errorf("createdBy = %q", q.queued.CreatedBy)
+	}
+}
+
+func TestSyncSiteCarriesTheWalkOptionsToTheStep(t *testing.T) {
+	t.Parallel()
+
+	q := &queue{}
+	service := newService(newSites(), q, prober{}, packer{})
+
+	if _, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: siteID}); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	if q.queued.Recipe[0].Params != nil {
+		t.Fatalf("a plain sync carries params: %+v", q.queued.Recipe[0].Params)
+	}
+
+	if _, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: siteID, Full: true, RenderRescan: true}); err != nil {
+		t.Fatalf("SyncSite: %v", err)
+	}
+	params := q.queued.Recipe[0].Params
+	if params[run.ParamFullWalk] != true || params[run.ParamRenderRescan] != true {
+		t.Fatalf("the step params = %+v, want the full walk and the render rescan asked for", params)
 	}
 }
 
@@ -164,6 +188,23 @@ func TestCheckPluginStoresWhatItFound(t *testing.T) {
 	}
 	if len(store.written) != 1 || !store.written[0].Plugin.Installed || store.written[0].Commerce != site.CommerceReady {
 		t.Fatalf("the site was written as %+v", store.written)
+	}
+}
+
+func TestCheckPluginSaysThePluginIsOutdated(t *testing.T) {
+	t.Parallel()
+
+	store := newSites()
+	service := newService(store, &queue{}, prober{state: site.PluginState{
+		Installed: true, Version: "1.2.0", Capabilities: []string{"bulk"}, SEOPlugin: "none",
+	}, required: "1.4.0", outdated: true}, packer{})
+
+	resp, err := service.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("CheckPlugin: %v", err)
+	}
+	if !resp.Plugin.Outdated || resp.Plugin.RequiredVersion != "1.4.0" || resp.Plugin.Version != "1.2.0" {
+		t.Errorf("plugin = %+v, want version 1.2.0 outdated against 1.4.0", resp.Plugin)
 	}
 }
 
@@ -264,8 +305,11 @@ func TestCheckPluginReprobesASiteThatGainedThePlugin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CheckPlugin after the plugin was installed: %v", err)
 	}
-	if !present.Plugin.Installed || present.Plugin.Version != "1.2.0" {
+	if !present.Plugin.Installed || present.Plugin.Version != wp.PluginVersion {
 		t.Fatalf("plugin = %+v, want the companion reported as installed", present.Plugin)
+	}
+	if present.Plugin.Outdated || present.Plugin.RequiredVersion != wp.PluginVersion {
+		t.Errorf("plugin = %+v, want a current plugin measured against %s", present.Plugin, wp.PluginVersion)
 	}
 	if !slices.Contains(present.Plugin.Capabilities, "bulk") ||
 		!slices.Contains(present.Plugin.Capabilities, "seo_meta") {

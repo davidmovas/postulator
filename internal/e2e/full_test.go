@@ -23,6 +23,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
 )
@@ -39,6 +40,7 @@ func recipe() []template.StepSpec {
 		{Name: steps.NameResolveContext, Enabled: true},
 		{Name: steps.NameGenerateBody, Enabled: true},
 		{Name: steps.NameGenerateMeta, Enabled: true},
+		{Name: steps.NameGenerateFields, Enabled: true},
 		{Name: steps.NameInsertLinks, Enabled: true},
 		{Name: steps.NameRepairLinks, Enabled: true},
 		{Name: steps.NameValidate, Enabled: true},
@@ -75,6 +77,7 @@ func TestTheWholeLoopReachesTheDockerSite(t *testing.T) {
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
+	assertTheTypesCarryTheShippedTemplates(t, core, siteID)
 
 	checked, err := core.Sync.CheckPlugin(t.Context(), appsync.CheckPluginRequest{SiteID: siteID})
 	if err != nil {
@@ -185,6 +188,9 @@ func TestTheWholeLoopReachesTheDockerSite(t *testing.T) {
 		if draft.Meta.Title == "" || draft.Meta.Description == "" {
 			t.Fatalf("the draft %s carries no seo meta: %+v", planned.path, draft.Meta)
 		}
+		if draft.H1 != "" {
+			t.Fatalf("the draft %s carries an H1 of ours (%q) in its content, while the stand's theme prints the page's title", planned.path, draft.H1)
+		}
 	}
 
 	stored = pagesByPath(t, core.Pages, siteID)
@@ -201,8 +207,9 @@ func TestTheWholeLoopReachesTheDockerSite(t *testing.T) {
 		if !ok {
 			t.Fatalf("the site lost %s", path)
 		}
-		if !linksTo(parent.Links, child) {
-			t.Fatalf("the relink left %s without a link to %s: %+v", path, child, parent.Links)
+		if linksTo(parent.Links, child) {
+			t.Fatalf("the relink linked %s to %s, a draft this run created, which leads a visitor nowhere: %+v",
+				path, child, parent.Links)
 		}
 	}
 
@@ -321,6 +328,8 @@ func awaitRun(t *testing.T, service *runs.Service, runID string) {
 				done = true
 			case events.RunFailed, events.RunCancelled, events.RunBudgetExceeded:
 				done, reason = true, event.Type+" "+string(event.Payload)
+			case events.ItemNeedsHuman:
+				acceptAReview(t, service, event.Payload)
 			}
 		}
 		if !done {
@@ -333,6 +342,23 @@ func awaitRun(t *testing.T, service *runs.Service, runID string) {
 	if reason != "" {
 		t.Fatalf("the run ended with %s%s", reason, itemFailures(t, service, runID))
 	}
+}
+
+func acceptAReview(t *testing.T, service *runs.Service, payload json.RawMessage) {
+	t.Helper()
+
+	var held events.ItemNeedsHumanPayload
+	if err := json.Unmarshal(payload, &held); err != nil {
+		t.Fatalf("decode a paused item's event: %v", err)
+	}
+	if held.Reason != string(run.PauseAwaitingReview) {
+		return
+	}
+	asPerson := kctx.WithActor(t.Context(), kctx.ActorUser)
+	if _, err := service.RetryStep(asPerson, runs.RetryStepRequest{ItemID: held.ItemID, AcceptFindings: true}); err != nil {
+		t.Fatalf("accept the reviewed changes of %s as a person: %v", held.ItemID, err)
+	}
+	t.Logf("accepted, as a person would, the reviewed changes of item %s: %s", held.ItemID, held.Message)
 }
 
 func itemStates(t *testing.T, service *runs.Service, runID string) string {

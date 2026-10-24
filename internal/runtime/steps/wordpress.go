@@ -38,12 +38,6 @@ func onSiteType(page pagemap.Page) wp.ItemType {
 	return wp.ItemType(page.WPType)
 }
 
-func observedOf(item wp.Item) pagemap.Observed {
-	return pagemap.Observed{
-		Link: permalinkOf(item), Slug: item.Slug, Status: item.Status, Title: item.Title,
-	}
-}
-
 func permalinkOf(item wp.Item) string {
 	if strings.Contains(item.Link, "?") {
 		return ""

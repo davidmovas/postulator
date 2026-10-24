@@ -61,7 +61,7 @@ func TestApplyWritesTheGraphAndThePageMapOnce(t *testing.T) {
 		if pages[i].EntityID == nil {
 			t.Fatalf("%s is not mapped to an entity", pages[i].Path)
 		}
-		if pages[i].WPID != nil || pages[i].ContentHash != "" {
+		if pages[i].WPID != nil || pages[i].LastSyncedAt != nil {
 			t.Fatalf("%s carries wordpress state", pages[i].Path)
 		}
 	}
@@ -341,12 +341,38 @@ func TestApplyLinksEveryCreatedPageToItsParentPath(t *testing.T) {
 		if page.ParentPageID == nil || *page.ParentPageID != byPath[parent].ID {
 			t.Fatalf("%s carries the parent %v, want %s", child, page.ParentPageID, parent)
 		}
+		if page.ParentReason != pagemap.ParentWorkbook {
+			t.Fatalf("%s carries the parent reason %q, want the workbook's", child, page.ParentReason)
+		}
 	}
-	if top := byPath["/menu/"]; top.ParentPageID != nil {
+	if top := byPath["/menu/"]; top.ParentPageID != nil || top.ParentReason != pagemap.ParentNone {
 		t.Fatalf("the top of the tree carries a parent: %+v", top)
 	}
 	if root, ok := byPath["/"]; ok {
 		t.Fatalf("the import planned the root of the site: %+v", root)
+	}
+}
+
+func TestApplyMarksARowThatOwnsNoEntityAsAWorkbookTechnicalPage(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	path := h.file(t, "technical.csv", "url,title,is entity\n/about/,About,no\n/shop/,Shop,yes\n")
+
+	applied := h.apply(t, path, h.mapping(map[string]string{
+		string(importmap.FieldPath): "url", string(importmap.FieldTitle): "title", string(importmap.FieldOwnEntity): "is entity",
+	}))
+	if len(applied.Report.Errors) != 0 {
+		t.Fatalf("errors = %+v", applied.Report.Errors)
+	}
+	for _, page := range h.pages(t) {
+		want := pagemap.TechnicalNone
+		if page.Path == "/about/" {
+			want = pagemap.TechnicalWorkbook
+		}
+		if page.TechnicalReason != want {
+			t.Errorf("%s technical reason = %q, want %q", page.Path, page.TechnicalReason, want)
+		}
 	}
 }
 

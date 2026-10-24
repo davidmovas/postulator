@@ -48,9 +48,6 @@ func Validate(spec TemplateSpec) error {
 	if spec.KeywordRules.RequiredKeywords != nil && *spec.KeywordRules.RequiredKeywords < 0 {
 		return invalid("the number of required keywords must not be negative", "keywordRules.requiredKeywords")
 	}
-	if err := ValidateLinkRules(spec.LinkRules); err != nil {
-		return err
-	}
 	if err := validatePlaceholders(spec.MetaRules.TitlePattern, "metaRules.titlePattern"); err != nil {
 		return err
 	}
@@ -99,30 +96,7 @@ func validateProduct(product Product) error {
 	if product.ShortDescription.TargetWords < 0 {
 		return invalid("short description target words must not be negative", "product.shortDescription.targetWords")
 	}
-	if err := validatePlaceholders(product.ShortDescription.Intent, "product.shortDescription.intent"); err != nil {
-		return err
-	}
-
-	seen := make(map[string]struct{}, len(product.Specifications))
-	for i := range product.Specifications {
-		field := "product.specifications[" + strconv.Itoa(i) + "]"
-		name := strings.TrimSpace(product.Specifications[i].Name)
-		if name == "" {
-			return invalid("specification name must not be empty", field+".name")
-		}
-		key := strings.ToLower(name)
-		if _, twice := seen[key]; twice {
-			return invalid("specification name is repeated", field+".name")
-		}
-		seen[key] = struct{}{}
-		if err := validatePlaceholders(product.Specifications[i].Name, field+".name"); err != nil {
-			return err
-		}
-		if err := validatePlaceholders(product.Specifications[i].Intent, field+".intent"); err != nil {
-			return err
-		}
-	}
-	return nil
+	return validatePlaceholders(product.ShortDescription.Intent, "product.shortDescription.intent")
 }
 
 func validatePlaceholders(text, field string) error {
@@ -134,23 +108,6 @@ func validatePlaceholders(text, field string) error {
 		strings.Join(Placeholders(), ", ")+", written with single braces", field).
 		WithDetail("unknown", unknown).
 		WithDetail("placeholders", Placeholders())
-}
-
-func ValidateLinkRules(rules LinkRules) error {
-	switch {
-	case rules.UpDepth < 0:
-		return invalid("up depth must not be negative", "linkRules.upDepth")
-	case rules.SiblingMinWeight < 0 || rules.SiblingMinWeight > 1:
-		return invalid("sibling minimum weight must be between 0 and 1", "linkRules.siblingMinWeight")
-	case rules.MaxLinks < 0:
-		return invalid("maximum links must not be negative", "linkRules.maxLinks")
-	case rules.MaxPerTarget < 0:
-		return invalid("maximum links per target must not be negative", "linkRules.maxPerTarget")
-	case rules.ParentLinkWithinParagraphs < 0:
-		return invalid("parent link paragraph window must not be negative", "linkRules.parentLinkWithinParagraphs")
-	default:
-		return nil
-	}
 }
 
 func validateScope(scope Scope, siteID *string) error {
@@ -176,32 +133,10 @@ func (t Template) Validate() error {
 	if strings.TrimSpace(t.Name) == "" {
 		return invalid("template name must not be empty", "name")
 	}
-	if strings.TrimSpace(t.PageKind) == "" {
-		return invalid("template page kind must not be empty", "pageKind")
-	}
 	if t.Version < 1 {
 		return invalid("template version starts at 1", "version")
 	}
 	return Validate(t.Spec)
-}
-
-func (p LinkPolicy) Validate() error {
-	if p.ID == "" {
-		return invalid("link policy id must not be empty", "id")
-	}
-	if err := validateScope(p.Scope, p.SiteID); err != nil {
-		return err
-	}
-	if strings.TrimSpace(p.Name) == "" {
-		return invalid("link policy name must not be empty", "name")
-	}
-	if err := ValidateLinkRules(p.Rules); err != nil {
-		return err
-	}
-	if !p.AnchorStrategy.Valid() {
-		return invalid("anchor strategy is not recognized", "anchorStrategy")
-	}
-	return nil
 }
 
 func (o Override) Validate() error {

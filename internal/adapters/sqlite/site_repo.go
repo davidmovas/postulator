@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 
@@ -13,9 +14,11 @@ import (
 )
 
 const (
-	siteColumns = `id, name, base_url, username, secret_ref, status, allow_insecure, plugin_installed, plugin_version, plugin_capabilities, plugin_seo, commerce, default_template_id, default_link_policy_id, model_profiles, created_at, updated_at`
+	siteColumns = `id, name, base_url, username, secret_ref, status, allow_insecure, plugin_installed, plugin_version, plugin_capabilities, plugin_seo, commerce, default_template_id, model_profiles, settings, created_at, updated_at`
 	insertSite  = `INSERT INTO sites (` + siteColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateSite  = `UPDATE sites SET name = ?, base_url = ?, username = ?, status = ?, allow_insecure = ?, plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, default_template_id = ?, default_link_policy_id = ?, model_profiles = ?, updated_at = ? WHERE id = ?`
+	updateSite  = `UPDATE sites SET name = ?, base_url = ?, username = ?, status = ?, allow_insecure = ?, plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, default_template_id = ?, model_profiles = ?, settings = ?, updated_at = ? WHERE id = ?`
+	observeSite = `UPDATE sites SET settings = json_set(settings, '$.technical', json(?), '$.observation', json(?)), updated_at = ? WHERE id = ?`
+	pluginSite  = `UPDATE sites SET plugin_installed = ?, plugin_version = ?, plugin_capabilities = ?, plugin_seo = ?, commerce = ?, updated_at = ? WHERE id = ?`
 	deleteSite  = `DELETE FROM sites WHERE id = ?`
 	selectSite  = `SELECT ` + siteColumns + ` FROM sites WHERE id = ?`
 )
@@ -39,6 +42,7 @@ func siteConflict(id string) *errors.Error {
 type siteColumnsJSON struct {
 	capabilities string
 	profiles     string
+	settings     string
 }
 
 func encodeSiteColumns(s *site.Site) (siteColumnsJSON, error) {
@@ -59,7 +63,11 @@ func encodeSiteColumns(s *site.Site) (siteColumnsJSON, error) {
 	if err != nil {
 		return siteColumnsJSON{}, err
 	}
-	return siteColumnsJSON{capabilities: encodedCapabilities, profiles: encodedProfiles}, nil
+	encodedSettings, err := encodeJSON(s.Settings.Normalized())
+	if err != nil {
+		return siteColumnsJSON{}, err
+	}
+	return siteColumnsJSON{capabilities: encodedCapabilities, profiles: encodedProfiles, settings: encodedSettings}, nil
 }
 
 func (r *SiteRepo) Insert(ctx context.Context, s site.Site) error {
@@ -70,7 +78,7 @@ func (r *SiteRepo) Insert(ctx context.Context, s site.Site) error {
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertSite, []any{
 		s.ID, s.Name, s.BaseURL, s.Username, s.SecretRef, string(s.Status), boolInt(s.AllowInsecure),
 		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin, string(s.Commerce),
-		nullString(s.Defaults.TemplateID), nullString(s.Defaults.LinkPolicyID), encoded.profiles,
+		nullString(s.Defaults.TemplateID), encoded.profiles, encoded.settings,
 		formatTime(s.CreatedAt), formatTime(s.UpdatedAt),
 	}, siteConflict(s.ID), "insert the site")
 	return err
@@ -84,10 +92,40 @@ func (r *SiteRepo) Update(ctx context.Context, s site.Site) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateSite, []any{
 		s.Name, s.BaseURL, s.Username, string(s.Status), boolInt(s.AllowInsecure),
 		boolInt(s.Plugin.Installed), s.Plugin.Version, encoded.capabilities, s.Plugin.SEOPlugin, string(s.Commerce),
-		nullString(s.Defaults.TemplateID), nullString(s.Defaults.LinkPolicyID), encoded.profiles,
+		nullString(s.Defaults.TemplateID), encoded.profiles, encoded.settings,
 		formatTime(s.UpdatedAt), s.ID,
 	}, nil, "update the site")
 	return requireAffected(affected, err, siteNotFound(s.ID))
+}
+
+func (r *SiteRepo) UpdateObservation(ctx context.Context, id string, technical site.TechnicalPages, observation site.ObservationState, at time.Time) error {
+	encodedTechnical, err := encodeJSON(technical)
+	if err != nil {
+		return err
+	}
+	encodedObservation, err := encodeJSON(observation)
+	if err != nil {
+		return err
+	}
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), observeSite, []any{
+		encodedTechnical, encodedObservation, formatTime(at), id,
+	}, nil, "record the site's observation")
+	return requireAffected(affected, err, siteNotFound(id))
+}
+
+func (r *SiteRepo) UpdatePlugin(ctx context.Context, id string, plugin site.PluginState, commerce site.Commerce, at time.Time) error {
+	capabilities := plugin.Capabilities
+	if capabilities == nil {
+		capabilities = []string{}
+	}
+	encodedCapabilities, err := encodeJSON(capabilities)
+	if err != nil {
+		return err
+	}
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), pluginSite, []any{
+		boolInt(plugin.Installed), plugin.Version, encodedCapabilities, plugin.SEOPlugin, string(commerce), formatTime(at), id,
+	}, nil, "record the site's plugin")
+	return requireAffected(affected, err, siteNotFound(id))
 }
 
 func (r *SiteRepo) Delete(ctx context.Context, id string) error {
@@ -127,11 +165,12 @@ func scanSite(rows *sql.Rows) (site.Site, error) {
 		status, commerce               string
 		allowInsecure, pluginInstalled int64
 		capabilities, profiles         string
-		templateID, policyID           sql.NullString
+		settings                       string
+		templateID                     sql.NullString
 		createdAt, updatedAt           string
 	)
 	if err := rows.Scan(&s.ID, &s.Name, &s.BaseURL, &s.Username, &s.SecretRef, &status, &allowInsecure, &pluginInstalled,
-		&s.Plugin.Version, &capabilities, &s.Plugin.SEOPlugin, &commerce, &templateID, &policyID, &profiles,
+		&s.Plugin.Version, &capabilities, &s.Plugin.SEOPlugin, &commerce, &templateID, &profiles, &settings,
 		&createdAt, &updatedAt); err != nil {
 		return site.Site{}, err
 	}
@@ -141,13 +180,16 @@ func scanSite(rows *sql.Rows) (site.Site, error) {
 	s.AllowInsecure = allowInsecure == 1
 	s.Plugin.Installed = pluginInstalled == 1
 	s.Defaults.TemplateID = optString(templateID)
-	s.Defaults.LinkPolicyID = optString(policyID)
 	if err := decodeJSON(capabilities, &s.Plugin.Capabilities, "decode the site plugin capabilities"); err != nil {
 		return site.Site{}, err
 	}
 	if err := decodeJSON(profiles, &s.Defaults.ModelProfiles, "decode the site model profiles"); err != nil {
 		return site.Site{}, err
 	}
+	if err := decodeJSON(settings, &s.Settings, "decode the site settings"); err != nil {
+		return site.Site{}, err
+	}
+	s.Settings = s.Settings.Normalized()
 
 	var err error
 	if s.CreatedAt, err = parseTime(createdAt); err != nil {

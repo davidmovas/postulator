@@ -1,6 +1,6 @@
 import { copy } from "../../copy/index.js";
-import type { LinkOrigin, PageStatus } from "../../generated/vocab.js";
-import { isOneOf, linkOrigins, pageStatuses } from "../../generated/vocab.js";
+import type { PageStatus } from "../../generated/vocab.js";
+import { isOneOf, pageStatuses } from "../../generated/vocab.js";
 import type { IconComponent, Tone } from "../../ui/index.js";
 import { BoltIcon, TravelExploreIcon } from "../../ui/index.js";
 
@@ -19,20 +19,14 @@ export function pageStatusLabel(status: string): string {
     return isOneOf(pageStatuses, status) ? copy.pages.statuses[status] : status;
 }
 
-const originTones: Readonly<Record<LinkOrigin, Tone>> = {
-    generated: "accent",
-    observed: "muted",
-};
-
-const originIcons: Readonly<Record<LinkOrigin, IconComponent>> = {
-    generated: BoltIcon,
-    observed: TravelExploreIcon,
-};
-
-export function originTone(origin: string): Tone {
-    return isOneOf(linkOrigins, origin) ? originTones[origin] : "muted";
+export function linkOwnerTone(ours: boolean): Tone {
+    return ours ? "accent" : "muted";
 }
 
-export function originIcon(origin: string): IconComponent {
-    return isOneOf(linkOrigins, origin) ? originIcons[origin] : TravelExploreIcon;
+export function linkOwnerIcon(ours: boolean): IconComponent {
+    return ours ? BoltIcon : TravelExploreIcon;
+}
+
+export function linkOwnerLabel(ours: boolean): string {
+    return ours ? copy.pages.owners.ours : copy.pages.owners.theirs;
 }

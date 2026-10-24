@@ -7,6 +7,9 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -51,6 +54,14 @@ type workReader interface {
 	ActiveBySite(ctx context.Context, siteID string) ([]run.Item, error)
 }
 
+type identityReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error)
+}
+
+type fieldReader interface {
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+}
+
 type profileResolver interface {
 	Resolve(ctx context.Context, siteID string, role domainllm.Role, templateProfiles map[domainllm.Role]domainllm.ModelRef) (domainllm.ModelRef, error)
 }
@@ -59,11 +70,27 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type findingStore interface {
+	Upsert(ctx context.Context, f finding.Finding) error
+	Get(ctx context.Context, id string) (finding.Finding, error)
+	Settle(ctx context.Context, id string, status finding.Status, resolution, resolvedBy string, at time.Time) error
+	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
+	OpenBySite(ctx context.Context, siteID string, code finding.Code) ([]finding.Finding, error)
+}
+
+type siteMap interface {
+	Map(ctx context.Context, siteID string) (contextpack.Map, error)
+}
+
 type Deps struct {
 	Entities   entityStore
 	Edges      edgeStore
 	Sites      siteReader
 	Pages      pageStore
+	Identities identityReader
+	Fields     fieldReader
+	Findings   findingStore
+	Maps       siteMap
 	Work       workReader
 	Profiles   profileResolver
 	LLM        llm.Client
@@ -73,21 +100,26 @@ type Deps struct {
 }
 
 type Service struct {
-	entities  entityStore
-	edges     edgeStore
-	sites     siteReader
-	pages     pageStore
-	work      workReader
-	profiles  profileResolver
-	llm       llm.Client
-	uow       unitOfWork
-	publisher application.Publisher
-	clock     clock.Clock
+	entities   entityStore
+	edges      edgeStore
+	sites      siteReader
+	pages      pageStore
+	identities identityReader
+	fields     fieldReader
+	work       workReader
+	findings   findingStore
+	maps       siteMap
+	profiles   profileResolver
+	llm        llm.Client
+	uow        unitOfWork
+	publisher  application.Publisher
+	clock      clock.Clock
 }
 
 func New(deps Deps) *Service {
 	return &Service{
-		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, work: deps.Work,
+		entities: deps.Entities, edges: deps.Edges, sites: deps.Sites, pages: deps.Pages, identities: deps.Identities, fields: deps.Fields,
+		work: deps.Work, findings: deps.Findings, maps: deps.Maps,
 		profiles: deps.Profiles, llm: deps.LLM, uow: deps.UnitOfWork, publisher: deps.Publisher,
 		clock: deps.Clock,
 	}

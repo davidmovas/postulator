@@ -6,7 +6,7 @@ import (
 )
 
 type columnArgs struct {
-	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,entity_kind,parent_entity,related,page_kind,meta_title,meta_description,wp_type,own_entity" description:"Page field"`
+	Field  string `json:"field" enum:"path,title,h1,primary_keyword,keywords,anchors,entity,page_type,parent_entity,related,meta_title,meta_description,wp_type,own_entity,sku" description:"Page field"`
 	Column string `json:"column" description:"Source header"`
 }
 
@@ -20,7 +20,7 @@ type mappingArgs struct {
 type sheetArgs struct {
 	Sheet     string            `json:"sheet" description:"Sheet name from imports_inspect"`
 	MappingID string            `json:"mappingId,omitempty" description:"Saved mapping id; default detect"`
-	RowType   importmap.RowType `json:"rowType,omitempty" enum:"pages,products,kind" description:"New row type; default pages"`
+	RowType   importmap.RowType `json:"rowType,omitempty" enum:"pages,products,type" description:"New row type; default pages"`
 }
 
 func sheetMappings(siteID string, sheets []sheetArgs) []imports.SheetMapping {

@@ -1,6 +1,6 @@
 import type { SettingGroup } from "../../../generated/vocab.js";
 
-export const settingsTabKeys = ["models", "runs", "agent", "browser", "security", "about"] as const;
+export const settingsTabKeys = ["models", "types", "runs", "agent", "browser", "security", "about"] as const;
 export type SettingsTabKey = (typeof settingsTabKeys)[number];
 
 export type SectionId =
@@ -21,7 +21,7 @@ export type SectionId =
     | "tor"
     | "browserOther";
 
-export type UnitId = "pages" | "days" | "times" | "perSecond" | "steps" | "rows" | "characters" | "bytes";
+export type UnitId = "pages" | "days" | "times" | "perSecond" | "steps" | "rows" | "characters" | "bytes" | "tokens";
 
 export interface SectionSpec {
     id: SectionId;
@@ -68,12 +68,16 @@ const specs: readonly SectionSpec[] = [
 export const placements: readonly Placement[] = [
     { key: "llm.effort.writer", section: "reasoning" },
     { key: "llm.tier.writer", section: "reasoning" },
+    { key: "llm.inputBudget.writer", section: "reasoning", unit: "tokens" },
     { key: "llm.effort.editor", section: "reasoning" },
     { key: "llm.tier.editor", section: "reasoning" },
+    { key: "llm.inputBudget.editor", section: "reasoning", unit: "tokens" },
     { key: "llm.effort.linker", section: "reasoning" },
     { key: "llm.tier.linker", section: "reasoning" },
+    { key: "llm.inputBudget.linker", section: "reasoning", unit: "tokens" },
     { key: "llm.effort.judge", section: "reasoning" },
     { key: "llm.tier.judge", section: "reasoning" },
+    { key: "llm.inputBudget.judge", section: "reasoning", unit: "tokens" },
     { key: "llm.effort.titler", section: "reasoning" },
     { key: "llm.tier.titler", section: "reasoning" },
     { key: "llm.flexPatience", section: "reasoning" },

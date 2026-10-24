@@ -6,9 +6,10 @@ import { formErrorOf } from "../../../data/errors.js";
 import { useAddEdge } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
 import { Banner, Button, Drawer, Field, Input, toneClasses, WarningIcon } from "../../../ui/index.js";
-import { entityIcon, kindTone } from "../labels.js";
+import { presetIcon, presetTone } from "../../settings/types/labels.js";
 import { cycleOf } from "../model/cycle.js";
 import type { GraphIndex } from "../model/index.js";
+import { presetOf } from "../model/index.js";
 
 type Choice = "parentOfFrom" | "parentOfTo" | "related";
 
@@ -82,8 +83,10 @@ export function ConnectDrawer({ siteId, index, fromId, toId, onClose }: ConnectD
 
     const cycle = cycleOf(addEdge.error);
     const formError = cycle === null ? formErrorOf(addEdge.error) : null;
-    const FromIcon = entityIcon(from?.kind ?? "");
-    const ToIcon = entityIcon(to?.kind ?? "");
+    const fromPreset = presetOf(index, fromId ?? "");
+    const toPreset = presetOf(index, toId ?? "");
+    const FromIcon = presetIcon(fromPreset);
+    const ToIcon = presetIcon(toPreset);
 
     return (
         <Drawer
@@ -116,10 +119,10 @@ export function ConnectDrawer({ siteId, index, fromId, toId, onClose }: ConnectD
             {from === undefined || to === undefined ? null : (
                 <div className="flex flex-col gap-3 p-4">
                     <div className="flex items-center gap-2 text-sm text-ink">
-                        <FromIcon size={16} className={toneClasses[kindTone(from.kind)].ink} />
+                        <FromIcon size={16} className={toneClasses[presetTone(fromPreset)].ink} />
                         <span className="truncate">{from.name}</span>
                         <span className="text-ink-faint">·</span>
-                        <ToIcon size={16} className={toneClasses[kindTone(to.kind)].ink} />
+                        <ToIcon size={16} className={toneClasses[presetTone(toPreset)].ink} />
                         <span className="truncate">{to.name}</span>
                     </div>
                     <div className="flex flex-col gap-1.5">

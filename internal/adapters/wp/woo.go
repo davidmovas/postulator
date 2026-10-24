@@ -2,10 +2,14 @@ package wp
 
 import (
 	"context"
+	"encoding/json"
+	"maps"
 	"net/http"
 	"net/url"
+	"slices"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -29,9 +33,22 @@ type ProductAttribute struct {
 }
 
 type ProductImage struct {
-	Src string
-	Alt string
-	ID  int64
+	Src  string
+	Alt  string
+	Name string
+	ID   int64
+}
+
+type ProductCategory struct {
+	Name string
+	Slug string
+	ID   int64
+}
+
+type MetaEntry struct {
+	Key   string
+	Value json.RawMessage
+	ID    int64
 }
 
 type Product struct {
@@ -43,40 +60,55 @@ type Product struct {
 	Status           string
 	Description      string
 	ShortDescription string
+	Price            string
+	RegularPrice     string
+	SalePrice        string
+	SKU              string
+	StockStatus      string
+	StockQuantity    *int64
 	Attributes       []ProductAttribute
 	Images           []ProductImage
+	Categories       []ProductCategory
+	MetaData         []MetaEntry
+	VariationIDs     []int64
+	UpsellIDs        []int64
+	CrossSellIDs     []int64
+	ManageStock      StockManagement
 	ID               int64
 }
 
 type UpdateProduct struct {
 	ShortDescription *string
-	Attributes       *[]ProductAttribute
 	Images           *[]int64
+	UpsellIDs        *[]int64
+	CrossSellIDs     *[]int64
+	MetaData         map[string]string
+}
+
+func attributesPayload(held []ProductAttribute) []map[string]any {
+	attributes := make([]map[string]any, 0, len(held))
+	for _, attribute := range held {
+		entry := map[string]any{
+			"position":  attribute.Position,
+			"visible":   attribute.Visible,
+			"variation": attribute.Variation,
+			"options":   append([]string{}, attribute.Options...),
+		}
+		if attribute.ID != 0 {
+			entry["id"] = attribute.ID
+		}
+		if attribute.Name != "" {
+			entry["name"] = attribute.Name
+		}
+		attributes = append(attributes, entry)
+	}
+	return attributes
 }
 
 func (in UpdateProduct) payload() map[string]any {
 	fields := make(map[string]any)
 	if in.ShortDescription != nil {
 		fields["short_description"] = *in.ShortDescription
-	}
-	if in.Attributes != nil {
-		attributes := make([]map[string]any, 0, len(*in.Attributes))
-		for _, attribute := range *in.Attributes {
-			entry := map[string]any{
-				"position":  attribute.Position,
-				"visible":   attribute.Visible,
-				"variation": attribute.Variation,
-				"options":   append([]string{}, attribute.Options...),
-			}
-			if attribute.ID != 0 {
-				entry["id"] = attribute.ID
-			}
-			if attribute.Name != "" {
-				entry["name"] = attribute.Name
-			}
-			attributes = append(attributes, entry)
-		}
-		fields["attributes"] = attributes
 	}
 	if in.Images != nil {
 		images := make([]map[string]any, 0, len(*in.Images))
@@ -85,7 +117,30 @@ func (in UpdateProduct) payload() map[string]any {
 		}
 		fields["images"] = images
 	}
+	if in.UpsellIDs != nil {
+		fields["upsell_ids"] = append([]int64{}, *in.UpsellIDs...)
+	}
+	if in.CrossSellIDs != nil {
+		fields["cross_sell_ids"] = append([]int64{}, *in.CrossSellIDs...)
+	}
+	if len(in.MetaData) > 0 {
+		entries := make([]map[string]any, 0, len(in.MetaData))
+		for _, key := range slices.Sorted(maps.Keys(in.MetaData)) {
+			entries = append(entries, map[string]any{"key": key, "value": in.MetaData[key]})
+		}
+		fields["meta_data"] = entries
+	}
 	return fields
+}
+
+func (in UpdateProduct) refused() error {
+	for key := range in.MetaData {
+		if !field.MetaKeyAllowed(key) {
+			return errors.New(errors.Invalid, "the meta key is protected, the store's own, or not a plain key").
+				WithDetail("reason", field.ReasonDenied).WithDetail("key", key)
+		}
+	}
+	return nil
 }
 
 type productAttributePayload struct {
@@ -98,9 +153,10 @@ type productAttributePayload struct {
 }
 
 type productImagePayload struct {
-	Src string `json:"src"`
-	Alt string `json:"alt"`
-	ID  int64  `json:"id"`
+	Src  string `json:"src"`
+	Alt  string `json:"alt"`
+	Name string `json:"name"`
+	ID   int64  `json:"id"`
 }
 
 type productPayload struct {
@@ -111,9 +167,21 @@ type productPayload struct {
 	Status           string                    `json:"status"`
 	Description      string                    `json:"description"`
 	ShortDescription string                    `json:"short_description"`
+	Price            string                    `json:"price"`
+	RegularPrice     string                    `json:"regular_price"`
+	SalePrice        string                    `json:"sale_price"`
+	SKU              string                    `json:"sku"`
+	StockStatus      string                    `json:"stock_status"`
 	DateModifiedGMT  string                    `json:"date_modified_gmt"`
+	StockQuantity    quantity                  `json:"stock_quantity"`
+	ManageStock      StockManagement           `json:"manage_stock"`
 	Attributes       []productAttributePayload `json:"attributes"`
 	Images           []productImagePayload     `json:"images"`
+	Categories       []productCategoryPayload  `json:"categories"`
+	MetaData         []metaEntryPayload        `json:"meta_data"`
+	Variations       []int64                   `json:"variations"`
+	UpsellIDs        []int64                   `json:"upsell_ids"`
+	CrossSellIDs     []int64                   `json:"cross_sell_ids"`
 	ID               int64                     `json:"id"`
 }
 
@@ -139,6 +207,11 @@ func (p productPayload) product() Product {
 		images = append(images, ProductImage(image))
 	}
 
+	categories := make([]ProductCategory, 0, len(p.Categories))
+	for _, category := range p.Categories {
+		categories = append(categories, ProductCategory(category))
+	}
+
 	return Product{
 		ID:               p.ID,
 		Name:             p.Name,
@@ -148,8 +221,20 @@ func (p productPayload) product() Product {
 		Status:           p.Status,
 		Description:      p.Description,
 		ShortDescription: p.ShortDescription,
+		Price:            p.Price,
+		RegularPrice:     p.RegularPrice,
+		SalePrice:        p.SalePrice,
+		SKU:              p.SKU,
+		StockStatus:      p.StockStatus,
+		StockQuantity:    p.StockQuantity.value,
+		ManageStock:      p.ManageStock,
 		Attributes:       attributes,
 		Images:           images,
+		Categories:       categories,
+		MetaData:         metaEntries(p.MetaData),
+		VariationIDs:     slices.Clone(p.Variations),
+		UpsellIDs:        append([]int64{}, p.UpsellIDs...),
+		CrossSellIDs:     append([]int64{}, p.CrossSellIDs...),
 		Modified:         parseWPTime(p.DateModifiedGMT),
 	}
 }
@@ -183,11 +268,21 @@ func (c *Client) GetProduct(ctx context.Context, id int64) (Product, error) {
 }
 
 func (c *Client) UpdateProduct(ctx context.Context, id int64, in UpdateProduct) (Product, error) {
+	if err := in.refused(); err != nil {
+		return Product{}, err
+	}
 	fields := in.payload()
 	if len(fields) == 0 {
 		return Product{}, errors.New(errors.Invalid, "the product update carries no fields")
 	}
+	return c.saveProduct(ctx, id, fields)
+}
 
+func (c *Client) RestoreAttributes(ctx context.Context, id int64, attributes []ProductAttribute) (Product, error) {
+	return c.saveProduct(ctx, id, map[string]any{"attributes": attributesPayload(attributes)})
+}
+
+func (c *Client) saveProduct(ctx context.Context, id int64, fields map[string]any) (Product, error) {
 	body, err := encodeJSON(fields)
 	if err != nil {
 		return Product{}, err

@@ -1,6 +1,9 @@
 package pages
 
-import "github.com/davidmovas/postulator/internal/kernel/dto"
+import (
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
+)
 
 type CreateRequest struct {
 	SiteID          string        `json:"siteId"`
@@ -10,7 +13,6 @@ type CreateRequest struct {
 	H1              string        `json:"h1,omitempty" description:"H1; default the title"`
 	MetaTitle       string        `json:"metaTitle,omitempty" description:"SEO title; default from the template"`
 	MetaDescription string        `json:"metaDescription,omitempty" description:"SEO description; default from the template"`
-	Canonical       string        `json:"canonical,omitempty" description:"Canonical URL; default its own"`
 	Keywords        []dto.Keyword `json:"keywords,omitempty" description:"Search phrases; default its entity's"`
 	Status          string        `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Default planned"`
 	EntityID        *string       `json:"entityId,omitempty" description:"Id of the entity it is about"`
@@ -29,13 +31,22 @@ type UpdateRequest struct {
 	H1              *string        `json:"h1,omitempty" description:"New H1"`
 	MetaTitle       *string        `json:"metaTitle,omitempty" description:"New SEO title"`
 	MetaDescription *string        `json:"metaDescription,omitempty" description:"New SEO description"`
-	Canonical       *string        `json:"canonical,omitempty" description:"New canonical URL"`
 	Keywords        *[]dto.Keyword `json:"keywords,omitempty" description:"Whole new keyword list; empty follows its entity"`
 	Status          *string        `json:"status,omitempty" enum:"planned,exists,published,archived" description:"New status"`
 	TemplateID      *string        `json:"templateId,omitempty" description:"New template id"`
 }
 
 type UpdateResponse struct {
+	Page Page `json:"page"`
+}
+
+type SetTypeRequest struct {
+	PageID     string             `json:"pageId"`
+	PageTypeID string             `json:"pageTypeId"`
+	By         pagemap.TypeReason `json:"-"`
+}
+
+type SetTypeResponse struct {
 	Page Page `json:"page"`
 }
 
@@ -97,22 +108,6 @@ type TreeRequest struct {
 
 type TreeResponse struct {
 	Roots []TreeNode `json:"roots"`
-}
-
-type LinkInput struct {
-	ToPageID   *string `json:"toPageId,omitempty" description:"Target page id; omit for an external link"`
-	ToURL      string  `json:"toUrl" description:"Link address"`
-	AnchorText string  `json:"anchorText" description:"Link text"`
-	Origin     string  `json:"origin,omitempty" enum:"generated,observed" description:"Default generated; observed is read off the live page"`
-}
-
-type ReplaceLinksRequest struct {
-	PageID string      `json:"pageId" description:"Page id"`
-	Links  []LinkInput `json:"links,omitempty" description:"Whole new list; omit to clear all"`
-}
-
-type ReplaceLinksResponse struct {
-	Links []PageLink `json:"links"`
 }
 
 type PreviewLinkRequest struct {

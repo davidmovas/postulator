@@ -6,32 +6,16 @@ import { copy } from "../../copy/index.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
 import { useSyncSite } from "../../data/hooks/sync.js";
 import { wantsNew } from "../../data/params.js";
-import {
-    AccountTreeIcon,
-    AddIcon,
-    Button,
-    CountBadge,
-    Screen,
-    Segmented,
-    TableRowsIcon,
-} from "../../ui/index.js";
-import type { SegmentedOption } from "../../ui/index.js";
+import { AddIcon, Button, CountBadge, Screen } from "../../ui/index.js";
 import { PlanPageDialog } from "./create.js";
 import { PageDrawer } from "./drawer.js";
 import { useEntityIndex } from "./entities.js";
 import { readQuery, readTab, searchOf, withTab, writeQuery } from "./params.js";
-import type { PageTab, PagesQuery, PagesView } from "./params.js";
+import type { PageTab, PagesQuery } from "./params.js";
 import { PageRail } from "./rail.js";
 import { PageSummary } from "./summary.js";
 import { PageTable } from "./table.js";
 import { PageToolbar } from "./toolbar.js";
-import { PageTree } from "./tree.js";
-import { useTreeView } from "./tree-state.js";
-
-const views: readonly SegmentedOption<PagesView>[] = [
-    { value: "table", label: copy.pages.views.table, icon: TableRowsIcon },
-    { value: "tree", label: copy.pages.views.tree, icon: AccountTreeIcon },
-];
 
 export function PagesScreen(): ReactElement {
     const params = useParams();
@@ -47,8 +31,6 @@ export function PagesScreen(): ReactElement {
     const [selectedId, setSelectedId] = useState<string | null>(pageId);
     const [creating, setCreating] = useState(false);
     const asked = wantsNew(searchParams);
-    const isTree = query.view === "tree";
-    const tree = useTreeView(siteId, isTree, selectedId);
 
     useEffect(() => {
         if (asked) {
@@ -80,40 +62,19 @@ export function PagesScreen(): ReactElement {
             badge={total === undefined ? undefined : <CountBadge tone="muted" count={total} />}
             variant="split"
             actions={
-                <>
-                    <Segmented
-                        label={copy.pages.views.table}
-                        value={query.view}
-                        options={views}
-                        onValueChange={(view) => {
-                            change({ ...query, view });
-                        }}
-                    />
-                    <Button
-                        data-page-create={true}
-                        variant="primary"
-                        icon={AddIcon}
-                        onClick={() => {
-                            setCreating(true);
-                        }}
-                    >
-                        {copy.pages.newPage}
-                    </Button>
-                </>
+                <Button
+                    data-page-create={true}
+                    variant="primary"
+                    icon={AddIcon}
+                    onClick={() => {
+                        setCreating(true);
+                    }}
+                >
+                    {copy.pages.newPage}
+                </Button>
             }
-            toolbar={
-                <PageToolbar
-                    query={query}
-                    disabled={isTree}
-                    tree={
-                        isTree && tree.armed
-                            ? { nodes: tree.nodes, onExpandAll: tree.expandAll, onCollapseAll: tree.collapseAll }
-                            : null
-                    }
-                    onChange={change}
-                />
-            }
-            left={<PageRail siteId={siteId} query={query} index={index} disabled={isTree} onChange={change} />}
+            toolbar={<PageToolbar query={query} onChange={change} />}
+            left={<PageRail siteId={siteId} query={query} index={index} onChange={change} />}
             right={
                 selectedId === null ? undefined : (
                     <PageSummary
@@ -126,38 +87,25 @@ export function PagesScreen(): ReactElement {
                 )
             }
         >
-            {isTree ? (
-                <PageTree
-                    view={tree}
-                    index={index}
-                    selectedId={selectedId}
-                    onSelect={setSelectedId}
-                    onOpen={open}
-                    onCreate={() => {
-                        setCreating(true);
-                    }}
-                />
-            ) : (
-                <PageTable
-                    siteId={siteId}
-                    query={query}
-                    index={index}
-                    selectedId={selectedId}
-                    onQueryChange={change}
-                    onSelect={setSelectedId}
-                    onOpen={open}
-                    onCreate={() => {
-                        setCreating(true);
-                    }}
-                    onImport={() => {
-                        void navigate(`/s/${siteId}/import`);
-                    }}
-                    onSync={() => {
-                        sync.mutate({ siteId });
-                    }}
-                    syncing={sync.isPending}
-                />
-            )}
+            <PageTable
+                siteId={siteId}
+                query={query}
+                index={index}
+                selectedId={selectedId}
+                onQueryChange={change}
+                onSelect={setSelectedId}
+                onOpen={open}
+                onCreate={() => {
+                    setCreating(true);
+                }}
+                onImport={() => {
+                    void navigate(`/s/${siteId}/import`);
+                }}
+                onSync={() => {
+                    sync.mutate({ siteId });
+                }}
+                syncing={sync.isPending}
+            />
 
             {pageId === null ? null : (
                 <PageDrawer

@@ -18,18 +18,23 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/secrets/export"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/browser"
 	"github.com/davidmovas/postulator/internal/application/content"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/models"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -52,6 +57,7 @@ type Config struct {
 	DatabasePath string
 	KeyDir       string
 	Provider     llmport.Client
+	WordPress    []wp.Option
 	Environment  func(name string) string
 	Open         func(cfg sqlite.Config) (*sqlite.Store, error)
 }
@@ -115,7 +121,10 @@ type kit struct {
 	Graph           *graph.Service
 	Pages           *pages.Service
 	Imports         *imports.Service
+	Findings        *findings.Service
 	Templates       *templates.Service
+	PageTypes       *pagetypes.Service
+	SiteModel       *sitemodel.Service
 	Content         *content.Service
 	LLM             llmport.Client
 	Catalog         *catalog.Catalog
@@ -126,6 +135,7 @@ type kit struct {
 	Engine          *runtime.Engine
 	Runs            *runs.Service
 	Sync            *sync.Service
+	Observe         *observe.Service
 	Reports         *reports.Service
 	WordPress       *registry.Registry
 	Tools           *tools.Registry
@@ -220,7 +230,10 @@ func (c *Core) assemble(ctx context.Context, store *sqlite.Store, key []byte) (k
 		Graph:           services.graph,
 		Pages:           services.pages,
 		Imports:         services.imports,
+		Findings:        services.findings,
 		Templates:       writing.templates,
+		PageTypes:       writing.pageTypes,
+		SiteModel:       writing.siteModel,
 		Content:         writing.content,
 		LLM:             llm.client,
 		Catalog:         llm.catalog,
@@ -231,6 +244,7 @@ func (c *Core) assemble(ctx context.Context, store *sqlite.Store, key []byte) (k
 		Engine:          running.engine,
 		Runs:            services.runs,
 		Sync:            services.sync,
+		Observe:         running.observe,
 		Reports:         services.reports,
 		WordPress:       writing.wordpress,
 		Tools:           assistant.tools,

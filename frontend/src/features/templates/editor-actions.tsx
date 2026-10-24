@@ -124,7 +124,7 @@ export function EditorActions({
                     },
                     {
                         key: "rename",
-                        label: copy.templates.editor.changeKind,
+                        label: copy.templates.editor.nameEdit,
                         icon: EditNoteIcon,
                         disabled: layer !== "global",
                         onSelect: onRename,

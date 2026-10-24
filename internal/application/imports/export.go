@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -30,10 +31,6 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 	if err != nil {
 		return ExportResponse{}, err
 	}
-	kinds, err := s.pageKinds(ctx, state.pages)
-	if err != nil {
-		return ExportResponse{}, err
-	}
 
 	byID := make(map[string]graph.Entity, len(state.entities))
 	for i := range state.entities {
@@ -44,7 +41,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 	slices.SortFunc(pages, func(a, b pagemap.Page) int { return strings.Compare(a.Path, b.Path) })
 
 	options := importmap.DefaultOptions()
-	labels := noteLabels(pages)
+	labels := noteLabels(pages, state.entities)
 	table := importmap.Table{Headers: append(headers(), labels...), Rows: make([][]string, 0, len(pages)+len(state.entities))}
 	mapped := make(map[string]struct{}, len(state.entities))
 
@@ -55,8 +52,8 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 			entity = byID[*page.EntityID]
 			mapped[entity.ID] = struct{}{}
 		}
-		cells := row(page, &entity, kinds[refOf(page.TemplateID)], g, options)
-		table.Rows = append(table.Rows, append(cells, noteCells(page.Notes, labels)...))
+		cells := row(page, &entity, state.typeName(page.PageTypeID), g, options)
+		table.Rows = append(table.Rows, append(cells, noteCells(append(slices.Clone(page.Notes), entity.Notes...), labels)...))
 	}
 
 	loose := g.Entities()
@@ -65,7 +62,7 @@ func (s *Service) Export(ctx context.Context, req ExportRequest) (ExportResponse
 			continue
 		}
 		cells := row(nil, &loose[i], "", g, options)
-		table.Rows = append(table.Rows, append(cells, noteCells(nil, labels)...))
+		table.Rows = append(table.Rows, append(cells, noteCells(byID[loose[i].ID].Notes, labels)...))
 	}
 
 	if err := s.deps.Tables.Write(req.Path, table); err != nil {
@@ -93,36 +90,10 @@ func exportFormat(req ExportRequest) (importmap.Format, error) {
 	return format, nil
 }
 
-func (s *Service) pageKinds(ctx context.Context, pages []pagemap.Page) (map[string]string, error) {
-	kinds := make(map[string]string)
-	for i := range pages {
-		templateID := refOf(pages[i].TemplateID)
-		if templateID == "" {
-			continue
-		}
-		if _, known := kinds[templateID]; known {
-			continue
-		}
-		found, err := s.deps.Templates.Get(ctx, templateID)
-		if err != nil {
-			return nil, err
-		}
-		kinds[templateID] = found.PageKind
-	}
-	return kinds, nil
-}
-
-func refOf(ref *string) string {
-	if ref == nil {
-		return ""
-	}
-	return *ref
-}
-
 func exportedFields() []importmap.Field {
 	out := make([]importmap.Field, 0, len(importmap.Fields()))
 	for _, field := range importmap.Fields() {
-		if field != importmap.FieldPrimaryKeyword && field != importmap.FieldOwnEntity {
+		if field != importmap.FieldPrimaryKeyword && field != importmap.FieldOwnEntity && field != importmap.FieldSKU {
 			out = append(out, field)
 		}
 	}
@@ -138,7 +109,7 @@ func headers() []string {
 	return out
 }
 
-func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Graph, options importmap.Options) []string {
+func row(page *pagemap.Page, entity *graph.Entity, pageType string, g graph.Graph, options importmap.Options) []string {
 	cells := make(map[importmap.Field]string, len(importmap.Fields()))
 	if page != nil {
 		cells[importmap.FieldPath] = page.Path
@@ -150,12 +121,11 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 		cells[importmap.FieldMetaTitle] = page.MetaTitle
 		cells[importmap.FieldMetaDescription] = page.MetaDescription
 		cells[importmap.FieldWPType] = string(page.WPType)
-		cells[importmap.FieldPageKind] = pageKind
+		cells[importmap.FieldPageType] = pageType
 		cells[importmap.FieldKeywords] = page.Keywords.Cell()
 	}
 	if entity.ID != "" {
 		cells[importmap.FieldEntity] = entity.Name
-		cells[importmap.FieldEntityKind] = string(entity.Kind)
 		cells[importmap.FieldKeywords] = fill(cells[importmap.FieldKeywords], entity.Keywords.Cell())
 		cells[importmap.FieldAnchors] = options.Join(importmap.FieldAnchors, anchorTexts(entity.Anchors))
 		if parents := g.Parents(entity.ID, 1); len(parents) > 0 {
@@ -172,27 +142,33 @@ func row(page *pagemap.Page, entity *graph.Entity, pageKind string, g graph.Grap
 	return out
 }
 
-func noteLabels(pages []pagemap.Page) []string {
+func noteLabels(pages []pagemap.Page, entities []graph.Entity) []string {
 	out := make([]string, 0)
 	seen := make(map[string]struct{})
-	for i := range pages {
-		for _, note := range pages[i].Notes {
-			if _, held := seen[strings.ToLower(note.Label)]; held {
+	add := func(notes []note.Note) {
+		for _, n := range notes {
+			if _, held := seen[strings.ToLower(n.Label)]; held {
 				continue
 			}
-			seen[strings.ToLower(note.Label)] = struct{}{}
-			out = append(out, note.Label)
+			seen[strings.ToLower(n.Label)] = struct{}{}
+			out = append(out, n.Label)
 		}
+	}
+	for i := range pages {
+		add(pages[i].Notes)
+	}
+	for i := range entities {
+		add(entities[i].Notes)
 	}
 	return out
 }
 
-func noteCells(notes []pagemap.Note, labels []string) []string {
+func noteCells(notes []note.Note, labels []string) []string {
 	out := make([]string, len(labels))
 	for at, label := range labels {
-		for _, note := range notes {
-			if strings.EqualFold(note.Label, label) {
-				out[at] = note.Text
+		for _, n := range notes {
+			if strings.EqualFold(n.Label, label) && out[at] == "" {
+				out[at] = n.Text
 			}
 		}
 	}

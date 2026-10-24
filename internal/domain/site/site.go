@@ -56,13 +56,14 @@ func (c Commerce) Valid() bool {
 }
 
 type Extensions struct {
-	Plugin   PluginState
-	Commerce Commerce
+	Plugin         PluginState
+	Commerce       Commerce
+	PluginRequired string
+	PluginOutdated bool
 }
 
 type Defaults struct {
 	TemplateID    *string
-	LinkPolicyID  *string
 	ModelProfiles map[llm.Role]llm.ModelRef
 }
 
@@ -77,6 +78,7 @@ type Site struct {
 	Plugin        PluginState
 	Commerce      Commerce
 	Defaults      Defaults
+	Settings      Settings
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -184,5 +186,5 @@ func (s Site) Validate() error {
 			return invalid("model profile needs a provider and a model", field)
 		}
 	}
-	return nil
+	return s.Settings.Normalized().Validate()
 }

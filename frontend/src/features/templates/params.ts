@@ -2,8 +2,6 @@ import { choiceParam, queryCodec, sortParam, textParam } from "../../data/params
 import type { TemplateSort } from "../../data/sorts.js";
 import { templateSortFields } from "../../generated/vocab.js";
 
-export type TemplatesTab = "templates" | "policies";
-
 const scopeFilters = ["all", "global", "site"] as const;
 
 export type ScopeFilter = (typeof scopeFilters)[number];
@@ -12,14 +10,12 @@ export type SortChoice = "nameAsc" | "nameDesc" | "newest" | "oldest";
 
 export interface TemplatesQuery {
     scope: ScopeFilter;
-    pageKind: string;
     search: string;
     sort: TemplateSort | null;
 }
 
 const codec = queryCodec<TemplatesQuery>({
     scope: choiceParam("scope", scopeFilters, "all"),
-    pageKind: textParam("kind"),
     search: textParam("q"),
     sort: sortParam("sort", templateSortFields),
 });
@@ -33,7 +29,7 @@ export const writeQuery = codec.write;
 export const searchOf = codec.search;
 
 export function narrowed(query: TemplatesQuery): boolean {
-    return codec.carries(query, ["scope", "pageKind", "search"]);
+    return codec.carries(query, ["scope", "search"]);
 }
 
 export const sorts: Readonly<Record<SortChoice, TemplateSort>> = {

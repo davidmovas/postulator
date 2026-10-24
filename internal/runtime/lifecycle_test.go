@@ -113,7 +113,7 @@ func lifecycles() []lifecycle {
 			recipe:  []string{"report"},
 			stopsAt: run.StatusPaused,
 			then: func(t *testing.T, engine *runtime.Engine, _, itemID string) {
-				if err := engine.Accept(t.Context(), itemID); err != nil {
+				if err := engine.Accept(t.Context(), itemID, nil); err != nil {
 					t.Fatalf("Accept: %v", err)
 				}
 			},

@@ -4,11 +4,14 @@ package e2e_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -73,8 +76,8 @@ func replies() []fake.Reply {
 	out := make([]fake.Reply, 0, 2*len(generated)+2)
 	for _, page := range generated {
 		out = append(out,
-			fake.Reply{Step: steps.NameGenerateBody, Match: page.path, Text: draftOf(page.keyword)},
-			fake.Reply{Step: steps.NameGenerateMeta, Match: page.path, Text: metaOf(page.keyword)},
+			fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + page.path + "\n", Text: draftOf(page.keyword)},
+			fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + page.path + "\n", Text: metaOf(page.keyword)},
 		)
 	}
 	return append(out,
@@ -84,9 +87,13 @@ func replies() []fake.Reply {
 }
 
 type environment struct {
-	baseURL string
-	user    string
-	pass    string
+	baseURL        string
+	user           string
+	pass           string
+	stand          string
+	project        string
+	restrictedUser string
+	restrictedPass string
 }
 
 func repoRoot(t *testing.T) string {
@@ -108,17 +115,32 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
+const (
+	sandboxPort    = "8089"
+	sandboxProject = "postulator-e2e"
+	defaultStand   = "vanilla"
+)
+
+func envPath(t *testing.T) string {
+	t.Helper()
+
+	if override := os.Getenv("POSTULATOR_E2E_ENV"); override != "" {
+		return override
+	}
+	stand := os.Getenv("E2E_STAND")
+	if stand == "" {
+		stand = defaultStand
+	}
+	return filepath.Join(repoRoot(t), "docker", "e2e", ".env."+stand)
+}
+
 func loadEnvironment(t *testing.T) environment {
 	t.Helper()
 
-	path := os.Getenv("POSTULATOR_E2E_ENV")
-	if path == "" {
-		path = filepath.Join(repoRoot(t), "docker", "e2e", ".env.generated")
-	}
-
+	path := envPath(t)
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("%s is missing; run `task e2e:up` first: %v", path, err)
+		t.Fatalf("%s is missing; run `task e2e:up STAND=<vanilla|replica>` first: %v", path, err)
 	}
 
 	values := make(map[string]string)
@@ -138,28 +160,64 @@ func loadEnvironment(t *testing.T) environment {
 		baseURL: strings.TrimSuffix(values["E2E_WP_URL"], "/"),
 		user:    values["E2E_WP_USER"],
 		pass:    values["E2E_WP_APP_PASSWORD"],
+		stand:   values["E2E_STAND"],
+		project: values["E2E_PROJECT"],
+
+		restrictedUser: values["E2E_RESTRICTED_USER"],
+		restrictedPass: values["E2E_RESTRICTED_APP_PASSWORD"],
 	}
-	if env.baseURL == "" || env.user == "" || env.pass == "" {
-		t.Fatalf("%s does not carry the site, the user and the application password", path)
+	if env.baseURL == "" || env.user == "" || env.pass == "" || env.stand == "" || env.project == "" {
+		t.Fatalf("%s does not carry the stand, its project, the site, the user and the application password", path)
 	}
-	refuseTheSandbox(t, path, env.baseURL)
+	if asked := os.Getenv("E2E_STAND"); asked != "" && asked != env.stand {
+		t.Fatalf("E2E_STAND asks for the %s stand and %s describes the %s stand", asked, path, env.stand)
+	}
+	refuseTheSandbox(t, path, env)
 	return env
 }
 
-const sandboxPort = "8089"
-
-func refuseTheSandbox(t *testing.T, path, baseURL string) {
+func refuseTheSandbox(t *testing.T, path string, env environment) {
 	t.Helper()
 
-	parsed, err := url.Parse(baseURL)
+	parsed, err := url.Parse(env.baseURL)
 	if err != nil {
-		t.Fatalf("%s names %q, which is not an address: %v", path, baseURL, err)
+		t.Fatalf("%s names %q, which is not an address: %v", path, env.baseURL, err)
 	}
-	if parsed.Port() == sandboxPort {
-		t.Fatalf("%s points at %s, the sandbox people test the app against; these suites delete whole "+
-			"sections of the site they run on, so they run only on the stack `task e2e:up` starts on port 8088",
-			path, baseURL)
+	if parsed.Port() == sandboxPort || env.project == sandboxProject {
+		t.Fatalf("%s points at %s (project %s), the sandbox people test the app against; these suites delete "+
+			"whole sections of the site they run on, so they run only on a stand `task e2e:up` starts, "+
+			"vanilla on 8088 or replica on 8087", path, env.baseURL, env.project)
 	}
+}
+
+func wpCLI(t *testing.T, env environment, args ...string) string {
+	t.Helper()
+
+	output, err := wpRun(context.WithoutCancel(t.Context()), repoRoot(t), env, args...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return output
+}
+
+func wpRun(ctx context.Context, root string, env environment, args ...string) (string, error) {
+	parsed, err := url.Parse(env.baseURL)
+	if err != nil {
+		return "", fmt.Errorf("%s is not an address: %w", env.baseURL, err)
+	}
+	compose := filepath.Join(root, "docker", "e2e", "compose.yaml")
+	command := exec.CommandContext(ctx, "docker", append([]string{
+		"compose", "-p", env.project, "-f", compose,
+		"run", "--rm", "--no-deps", "-T", "--entrypoint", "wp", "bootstrap",
+	}, args...)...)
+	command.Env = append(os.Environ(), "WP_PORT="+parsed.Port())
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	output, err := command.Output()
+	if err != nil {
+		return "", fmt.Errorf("wp %s on the %s stand: %w: %s", strings.Join(args, " "), env.stand, err, stderr.String())
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 var companionProbe struct {

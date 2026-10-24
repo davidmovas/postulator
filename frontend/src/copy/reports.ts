@@ -40,7 +40,7 @@ export const reports = {
         title: "Coverage",
         order: "worst first",
         entity: "Entity",
-        kind: "Kind",
+        type: "Page type",
         path: "Page path",
         state: "Page",
         links: "Links",

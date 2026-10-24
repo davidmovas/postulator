@@ -1,10 +1,12 @@
 package imports
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -17,23 +19,81 @@ const (
 )
 
 type rowDraft struct {
-	at        importmap.Origin
-	path      string
-	title     string
-	h1        string
-	metaTitle string
-	metaDesc  string
-	wpType    string
-	pageKind  string
-	keywords  keyword.List
-	notes     []pagemap.Note
-	name      string
-	own       ownership
-	kind      string
-	anchors   []string
-	related   []string
-	parent    string
-	levels    []string
+	at           importmap.Origin
+	key          string
+	path         string
+	url          string
+	title        string
+	h1           string
+	sku          string
+	metaTitle    string
+	metaDesc     string
+	wpType       string
+	pageType     string
+	keywords     keyword.List
+	notes        []note.Note
+	name         string
+	own          ownership
+	anchors      []string
+	related      []string
+	parent       string
+	levels       []string
+	trail        []string
+	expected     []string
+	match        pagemap.Match
+	picked       []pagemap.Page
+	unreadable   bool
+	wantsProduct bool
+	modeProduct  bool
+}
+
+func (r *rowDraft) sheetPath() string {
+	if r.url != "" {
+		return r.url
+	}
+	return r.path
+}
+
+func (r *rowDraft) names() bool {
+	return r.name != "" || r.title != "" || r.h1 != "" || r.sku != "" || len(r.levels) > 0
+}
+
+func (r *rowDraft) asked(product bool) pagemap.Row {
+	return pagemap.Row{Key: r.key, Path: r.url, Entity: r.name, Parent: r.parent, Title: r.title, H1: r.h1, SKU: r.sku, Product: product}
+}
+
+func (r *rowDraft) trailBelow(slug string) []string {
+	if len(r.trail) == 0 {
+		return nil
+	}
+	last := groupNode{name: r.trail[len(r.trail)-1]}
+	if last.namedBy(r) || sameSlug(slug, last.name) {
+		return slices.Clone(r.trail[:len(r.trail)-1])
+	}
+	return slices.Clone(r.trail)
+}
+
+func (r *rowDraft) cardNotes() []note.Note {
+	if r.path == "" {
+		return r.notes
+	}
+	out := make([]note.Note, 0, len(r.notes))
+	for _, n := range r.notes {
+		if importmap.DescribesEntity(n.Label) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func (r *rowDraft) pageNotes() []note.Note {
+	out := make([]note.Note, 0, len(r.notes))
+	for _, n := range r.notes {
+		if !importmap.DescribesEntity(n.Label) {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 func (r *rowDraft) named() string {
@@ -45,7 +105,7 @@ func (r *rowDraft) named() string {
 	case r.title != "":
 		return r.title
 	default:
-		return titleFrom(r.path)
+		return titleFrom(r.sheetPath())
 	}
 }
 
@@ -95,14 +155,20 @@ func readRow(binding importmap.Binding, row []string, raw string, at importmap.O
 		return rowDraft{}, false
 	}
 	draft := cellsOf(binding, row, at)
-	if draft.name == "" && raw == "" && len(draft.levels) == 0 {
-		p.noteAt(at, "", CodeNoTarget, "the row names neither a path, an entity nor a group")
+	if raw == "" && !draft.names() {
+		noTarget(at, p)
 		return rowDraft{}, false
 	}
 	draft.own = rowOwnership(binding, row, at, p)
 	draft.keywords = rowKeywords(binding, row, at, p)
-	draft.path = rowPath(raw, at, p)
+	draft.url, draft.unreadable = rowURL(raw, at, p)
+	draft.key = pagemap.RowKey(p.rowSheet(at), draft.asked(false))
+	p.sawRow(p.rowSheet(at), draft.key)
 	return draft, true
+}
+
+func noTarget(at importmap.Origin, p *plan) {
+	p.noteAt(at, "", CodeNoTarget, "the row names no page, no entity and no group")
 }
 
 func cellsOf(binding importmap.Binding, row []string, at importmap.Origin) rowDraft {
@@ -110,16 +176,17 @@ func cellsOf(binding importmap.Binding, row []string, at importmap.Origin) rowDr
 		at:        at,
 		title:     binding.Text(row, importmap.FieldTitle),
 		h1:        binding.Text(row, importmap.FieldH1),
+		sku:       binding.Text(row, importmap.FieldSKU),
 		metaTitle: binding.Text(row, importmap.FieldMetaTitle),
 		metaDesc:  binding.Text(row, importmap.FieldMetaDescription),
 		wpType:    binding.Text(row, importmap.FieldWPType),
-		pageKind:  binding.Text(row, importmap.FieldPageKind),
+		pageType:  binding.Text(row, importmap.FieldPageType),
 		name:      binding.Text(row, importmap.FieldEntity),
-		kind:      binding.Text(row, importmap.FieldEntityKind),
 		anchors:   binding.List(row, importmap.FieldAnchors),
 		related:   binding.List(row, importmap.FieldRelated),
 		parent:    binding.Text(row, importmap.FieldParentEntity),
 		levels:    binding.Levels(row),
+		trail:     binding.Trail(row),
 		notes:     binding.Notes(row),
 	}
 }
@@ -134,14 +201,14 @@ func rowOwnership(binding importmap.Binding, row []string, at importmap.Origin, 
 	return own
 }
 
-func rowPath(raw string, at importmap.Origin, p *plan) string {
+func rowURL(raw string, at importmap.Origin, p *plan) (url string, unreadable bool) {
 	if raw == "" {
-		return ""
+		return "", false
 	}
 	normalized, err := pagemap.NormalizePath(raw)
 	if err != nil {
 		p.noteAt(at, string(importmap.FieldPath), CodeBadPath, "the path cannot be read: "+raw)
-		return ""
+		return "", true
 	}
-	return normalized
+	return normalized, false
 }

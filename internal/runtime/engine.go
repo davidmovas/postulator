@@ -23,11 +23,13 @@ type Deps struct {
 	Events     eventStore
 	Pages      pageReader
 	Specs      specResolver
+	Types      typeSets
 	Keys       keyStore
 	Spend      spendReader
 	Catalog    modelCatalog
 	Profiles   profileResolver
 	Tuning     modelTuning
+	Snapshots  snapshotScope
 	UnitOfWork unitOfWork
 	Publisher  publisher
 }

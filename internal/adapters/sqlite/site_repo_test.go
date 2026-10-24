@@ -16,10 +16,19 @@ import (
 )
 
 func fullSite(name string, at time.Time) site.Site {
+	started := at.Add(-time.Hour)
+	settings := site.DefaultSettings()
+	settings.LinkURLForm = site.URLFormRelative
+	settings.UserAgent = "Mozilla/5.0 (compatible; Reader)"
+	settings.Observe = site.ObserveSettings{RenderConcurrency: 8, FullWalkEvery: 5}
+	settings.Builders = []site.BuilderRule{{Name: "house", DataAttributes: []string{"data-house"}, ClassPrefixes: []string{"house-"}, ShortcodePrefixes: []string{}}}
+	settings.Technical = site.TechnicalPages{Front: 2, Shop: 7, Cart: 8, Checkout: 9}
+	settings.Observation = site.ObservationState{LastStartedAt: &started, LastFullWalkAt: &started, SinceFullWalk: 3}
 	record := site.Site{
 		ID: id.New(), Name: name, BaseURL: "https://" + name + ".example.com", Username: "editor", Status: site.StatusPaused, AllowInsecure: true,
 		Plugin:    site.PluginState{Installed: true, Version: "1.2.0", Capabilities: []string{"bulk", "seo_meta"}, SEOPlugin: "yoast"},
 		Defaults:  site.Defaults{ModelProfiles: map[llm.Role]llm.ModelRef{llm.RoleWriter: {Provider: "openai", Model: "gpt"}}},
+		Settings:  settings,
 		CreatedAt: at, UpdatedAt: at,
 	}
 	record.SecretRef = site.SecretRef(record.ID)
@@ -67,6 +76,8 @@ func TestSiteRepoRoundTrip(t *testing.T) {
 
 	want.Name = "Shop Two"
 	want.Status = site.StatusActive
+	want.Settings.LinkURLForm = site.URLFormAbsolute
+	want.Settings.Observation.SinceFullWalk = 4
 	templateID := "t1"
 	want.Defaults.TemplateID = &templateID
 	want.UpdatedAt = sqlitetest.Stamp.Add(time.Hour)
@@ -177,6 +188,112 @@ func TestSiteRepoListPagesForwardAndBackward(t *testing.T) {
 
 	if _, err = repo.List(t.Context(), site.Query{Sort: site.SortName}, paging.Request{After: first.Next, Limit: 2}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a cursor from another sort must be INVALID, got %v", err)
+	}
+}
+
+func TestSiteRepoReadsTheSettingsNormalized(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	repo := sqlite.NewSiteRepo(store)
+	record := fullSite("bare", sqlitetest.Stamp)
+	record.Settings = site.Settings{UserAgent: "Kept/1.0"}
+	if err := repo.Insert(t.Context(), record); err != nil {
+		t.Fatalf("Insert with sparse settings: %v", err)
+	}
+	want := site.DefaultSettings()
+	want.UserAgent = "Kept/1.0"
+	got, err := repo.Get(t.Context(), record.ID)
+	if err != nil || !reflect.DeepEqual(got.Settings, want) {
+		t.Fatalf("the sparse settings read back as %+v, %v\nwant %+v", got.Settings, err, want)
+	}
+
+	record.Settings = site.Settings{}
+	if err = repo.Update(t.Context(), record); err != nil {
+		t.Fatalf("Update with empty settings: %v", err)
+	}
+	if got, err = repo.Get(t.Context(), record.ID); err != nil || !reflect.DeepEqual(got.Settings, site.DefaultSettings()) {
+		t.Fatalf("the empty settings read back as %+v, %v\nwant the defaults", got.Settings, err)
+	}
+}
+
+func TestSiteRepoUpdateObservationTouchesOnlyTheObservationsKeys(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	repo := sqlite.NewSiteRepo(store)
+	record := fullSite("observed", sqlitetest.Stamp)
+	if err := repo.Insert(t.Context(), record); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	edited := record
+	edited.Name = "renamed while the walk ran"
+	edited.Settings.UserAgent = "Edited/2.0"
+	edited.Settings.Observe.RenderConcurrency = 2
+	if err := repo.Update(t.Context(), edited); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	finished := sqlitetest.Stamp.Add(2 * time.Hour)
+	technical := site.TechnicalPages{Posts: 3, Shop: 70, Cart: 80}
+	observation := site.ObservationState{LastStartedAt: &finished, LastFinishedAt: &finished, SinceFullWalk: 4}
+	at := sqlitetest.Stamp.Add(3 * time.Hour)
+	if err := repo.UpdateObservation(t.Context(), record.ID, technical, observation, at); err != nil {
+		t.Fatalf("UpdateObservation: %v", err)
+	}
+
+	got, err := repo.Get(t.Context(), record.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	want := edited.Settings.Normalized()
+	want.Technical = technical
+	want.Observation = observation
+	if !reflect.DeepEqual(got.Settings, want) {
+		t.Errorf("settings = %+v\nwant %+v", got.Settings, want)
+	}
+	if got.Name != edited.Name || !got.UpdatedAt.Equal(at) {
+		t.Errorf("name %q updated %v, want %q and %v", got.Name, got.UpdatedAt, edited.Name, at)
+	}
+
+	if err = repo.UpdateObservation(t.Context(), id.New(), technical, observation, at); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("UpdateObservation of an unknown site = %v, want NOT_FOUND", err)
+	}
+}
+
+func TestSiteRepoUpdatePluginTouchesOnlyThePluginAndCommerce(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	repo := sqlite.NewSiteRepo(store)
+	record := fullSite("probed", sqlitetest.Stamp)
+	if err := repo.Insert(t.Context(), record); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+	edited := record
+	edited.Settings.UserAgent = "Edited/2.0"
+	if err := repo.Update(t.Context(), edited); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	plugin := site.PluginState{Installed: true, Version: "1.4.1", Capabilities: []string{"bulk", "rendered"}, SEOPlugin: "rankmath"}
+	at := sqlitetest.Stamp.Add(time.Hour)
+	if err := repo.UpdatePlugin(t.Context(), record.ID, plugin, site.CommerceReady, at); err != nil {
+		t.Fatalf("UpdatePlugin: %v", err)
+	}
+	got, err := repo.Get(t.Context(), record.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !reflect.DeepEqual(got.Plugin, plugin) || got.Commerce != site.CommerceReady || !got.UpdatedAt.Equal(at) {
+		t.Errorf("plugin %+v commerce %s updated %v, want %+v editable %v", got.Plugin, got.Commerce, got.UpdatedAt, plugin, at)
+	}
+	if got.Settings.UserAgent != "Edited/2.0" {
+		t.Errorf("the User-Agent = %q, want the edit kept", got.Settings.UserAgent)
+	}
+	if err = repo.UpdatePlugin(t.Context(), id.New(), plugin, site.CommerceReady, at); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("UpdatePlugin of an unknown site = %v, want NOT_FOUND", err)
 	}
 }
 

@@ -8,37 +8,39 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
 type pageDraft struct {
-	path       string
-	title      string
-	h1         string
-	metaTitle  string
-	metaDesc   string
-	wpType     string
-	pageKind   string
-	entity     string
-	keywords   keyword.List
-	notes      []pagemap.Note
-	own        ownership
-	modeType   pagemap.WPType
-	matchedBy  pagemap.MatchedBy
-	rows       []int
-	unit       int
-	generated  bool
-	entityOnly bool
-	at         importmap.Origin
-}
-
-func (p *pageDraft) kind() string {
-	return strings.ToLower(strings.TrimSpace(p.pageKind))
+	path        string
+	url         string
+	title       string
+	h1          string
+	metaTitle   string
+	metaDesc    string
+	wpType      string
+	pageType    string
+	entity      string
+	keywords    keyword.List
+	notes       []note.Note
+	trail       []string
+	own         ownership
+	modeType    pagemap.WPType
+	match       pagemap.Match
+	picked      []pagemap.Page
+	chosenKey   string
+	rows        []int
+	unit        int
+	generated   bool
+	entityOnly  bool
+	typeUnknown bool
+	at          importmap.Origin
 }
 
 func (p *pageDraft) cellType() pagemap.WPType {
 	wpType := pagemap.WPType(strings.ToLower(strings.TrimSpace(p.wpType)))
-	if !wpType.Valid() {
+	if p.typeUnknown || !wpType.Valid() {
 		return ""
 	}
 	return wpType
@@ -52,15 +54,44 @@ func (p *pageDraft) technical() bool {
 	return p.own == ownNo
 }
 
+func (p *pageDraft) page() (pagemap.Page, bool) {
+	return p.match.Page, p.match.Found()
+}
+
+func (p *pageDraft) plansAtItsURL() bool {
+	if p.url == "" || p.path != p.url {
+		return false
+	}
+	current, exists := p.page()
+	return !exists || (current.WPID == nil && current.Status != pagemap.StatusArchived)
+}
+
+func (p *pageDraft) sheetPath() string {
+	if p.url != "" {
+		return p.url
+	}
+	return p.path
+}
+
+func (p *pageDraft) matchedBy() string {
+	if !p.match.Found() {
+		return ""
+	}
+	return string(p.match.Rule)
+}
+
 func (p *pageDraft) merge(row *rowDraft, at int) {
 	p.title = fill(p.title, row.title)
 	p.h1 = fill(p.h1, row.h1)
 	p.metaTitle = fill(p.metaTitle, row.metaTitle)
 	p.metaDesc = fill(p.metaDesc, row.metaDesc)
 	p.wpType = fill(p.wpType, row.wpType)
-	p.pageKind = fill(p.pageKind, row.pageKind)
+	p.pageType = fill(p.pageType, row.pageType)
 	p.keywords = p.keywords.Merge(row.keywords)
-	p.notes = pagemap.MergeNotes(p.notes, row.notes)
+	p.notes = note.Merge(p.notes, row.pageNotes())
+	if len(p.trail) == 0 {
+		p.trail = row.expected
+	}
 	if p.own == ownUnset {
 		p.own = row.own
 	}
@@ -69,11 +100,12 @@ func (p *pageDraft) merge(row *rowDraft, at int) {
 
 type drafts struct {
 	pages  map[string]*pageDraft
+	byURL  map[string]*pageDraft
 	sorted []string
 }
 
 func newDrafts() *drafts {
-	return &drafts{pages: make(map[string]*pageDraft)}
+	return &drafts{pages: make(map[string]*pageDraft), byURL: make(map[string]*pageDraft)}
 }
 
 func (d *drafts) page(path string, at importmap.Origin) (draft *pageDraft, known bool) {
@@ -84,6 +116,14 @@ func (d *drafts) page(path string, at importmap.Origin) (draft *pageDraft, known
 	d.pages[path] = draft
 	d.sorted = nil
 	return draft, false
+}
+
+func (d *drafts) at(path string) (*pageDraft, bool) {
+	if draft, held := d.pages[path]; held {
+		return draft, true
+	}
+	draft, held := d.byURL[path]
+	return draft, held
 }
 
 func (d *drafts) sortedPaths() []string {
@@ -103,6 +143,17 @@ func pagesOf(rows []rowDraft, p *plan) *drafts {
 		draft, known := sheet.page(row.path, row.at)
 		if known {
 			p.noteAt(row.at, string(importmap.FieldPath), CodeDuplicatePath, "the path repeats an earlier row and was merged: "+row.path)
+		} else {
+			draft.url, draft.match = row.url, row.match
+			if row.picked != nil {
+				draft.picked, draft.chosenKey = row.picked, row.key
+			}
+			if row.modeProduct {
+				draft.modeType = pagemap.WPProduct
+			}
+		}
+		if _, claimed := sheet.byURL[row.url]; row.url != "" && !claimed {
+			sheet.byURL[row.url] = draft
 		}
 		draft.merge(row, i)
 	}
@@ -113,12 +164,16 @@ func fillGaps(sheet *drafts, state *siteState, p *plan) {
 	needsPage := make(map[string]bool)
 	order := make([]string, 0)
 	for _, path := range sheet.sortedPaths() {
-		product := state.productDraft(sheet.pages[path])
-		for parent := pagemap.ParentPath(path); parent != "" && parent != pagemap.RootPath; parent = pagemap.ParentPath(parent) {
-			if _, planned := sheet.pages[parent]; planned {
+		draft := sheet.pages[path]
+		if !draft.plansAtItsURL() {
+			continue
+		}
+		product := draft.product()
+		for parent := pagemap.ParentPath(draft.url); parent != "" && parent != pagemap.RootPath; parent = pagemap.ParentPath(parent) {
+			if _, planned := sheet.at(parent); planned {
 				continue
 			}
-			if _, exists := state.held(parent); exists {
+			if _, exists := state.pageAt(parent); exists {
 				continue
 			}
 			page, seen := needsPage[parent]

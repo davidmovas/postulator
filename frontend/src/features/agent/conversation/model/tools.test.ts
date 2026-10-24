@@ -6,8 +6,9 @@ describe("familyOf and verbOf", () => {
     it("reads the family off the prefix and the verb off the rest", () => {
         expect(familyOf("graph_list_entities")).toBe("graph");
         expect(verbOf("graph_list_entities")).toBe("list entities");
-        expect(familyOf("policies_effective")).toBe("policies");
-        expect(verbOf("policies_effective")).toBe("effective");
+        expect(familyOf("pagetypes_set_scope")).toBe("pagetypes");
+        expect(verbOf("pagetypes_set_scope")).toBe("set scope");
+        expect(familyOf("policies_effective")).toBe("other");
         expect(familyOf("content_judge_page")).toBe("content");
         expect(verbOf("content_judge_page")).toBe("judge page");
     });
@@ -30,6 +31,7 @@ describe("resultSummary", () => {
         expect(resultSummary("pages_list", { items: [{}, {}, {}], hasMore: true })).toBe("3 pages, more available");
         expect(resultSummary("graph_list_entities", { items: [], hasMore: false })).toBe("no entities");
         expect(resultSummary("sites_list", { items: [{}], hasMore: false })).toBe("1 site");
+        expect(resultSummary("pagetypes_list", { items: [{}, {}], hasMore: false })).toBe("2 page types");
     });
 
     it("names the record a read or a write answered with", () => {
@@ -40,12 +42,35 @@ describe("resultSummary", () => {
     });
 
     it("says what a truncated or empty answer is", () => {
-        expect(resultSummary("pages_tree", { truncated: true, totalBytes: 40_000, preview: "…" })).toBe(
+        expect(resultSummary("sites_explore", { truncated: true, totalBytes: 40_000, preview: "…" })).toBe(
             "40 KB, shortened to fit",
         );
         expect(resultSummary("pages_delete", {})).toBe("done");
         expect(resultSummary("pages_delete", null)).toBe("done");
         expect(resultSummary("runs_cancel", { cancelled: true })).toBe("done");
+    });
+
+    it("says which view of the site's model the agent read", () => {
+        const page = { pageId: "p1", path: "/peptides/", title: "Peptides" };
+        expect(resultSummary("pages_get", { page: { page, parent: { trail: [] } }, template: null })).toBe("the page /peptides/");
+        expect(
+            resultSummary("sites_explore", { view: "tree", tree: { parent: page, nodes: { items: [{}, {}], hasMore: true } } }),
+        ).toBe("2 pages under /peptides/, more available");
+        expect(resultSummary("sites_explore", { view: "tree", tree: { parent: null, nodes: { items: [{}], hasMore: false } } })).toBe(
+            "1 page at the top of the site",
+        );
+        expect(resultSummary("sites_explore", { view: "links", links: { page: { path: "/peptides/" }, required: [{}, {}, {}] } })).toBe(
+            "the links of /peptides/, 3 links owed",
+        );
+        expect(resultSummary("sites_explore", { view: "gaps", gaps: { items: [], hasMore: false } })).toBe("no page with a gap");
+        expect(resultSummary("sites_explore", { view: "pack", pack: { path: "/peptides/", tokens: 1840, text: "…" } })).toBe(
+            "what the writer reads for /peptides/, 1,840 tokens",
+        );
+    });
+
+    it("tells proposed cards from written ones", () => {
+        expect(resultSummary("graph_propose_cards", { proposals: [{}, {}], skipped: [] })).toBe("proposed 2 cards for review");
+        expect(resultSummary("graph_propose_cards", { entities: [{}], skipped: [{}] })).toBe("wrote 1 card, 1 left as it was");
     });
 
     it("never leaks JSON into the summary", () => {
@@ -62,6 +87,8 @@ describe("toolLabel", () => {
         expect(toolLabel("graph_create_entity")).toBe("Create entity");
         expect(toolLabel("sites_get")).toBe("Get site");
         expect(toolLabel("schedules_search")).toBe("Search schedules");
+        expect(toolLabel("pagetypes_list")).toBe("List page types");
+        expect(toolLabel("pagetypes_save")).toBe("Save page type");
     });
 
     it("spells out a tool of no known family and carries no underscore", () => {

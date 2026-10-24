@@ -66,11 +66,31 @@ type cursor struct {
 func (s *Server) routePlugin(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+pluginNamespace+"/manifest", s.handleManifest)
 	mux.HandleFunc("GET "+pluginNamespace+"/content", s.handleContent)
-	mux.HandleFunc("GET "+pluginNamespace+"/seo-meta/{id}", s.handleSEOMetaGet)
-	mux.HandleFunc("PUT "+pluginNamespace+"/seo-meta/{id}", s.handleSEOMeta)
-	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/raw", s.handleRawGet)
-	mux.HandleFunc("PUT "+pluginNamespace+"/content/{id}/raw", s.handleRawPut)
-	mux.HandleFunc("POST "+pluginNamespace+"/content/{id}/preview", s.handlePreview)
+	mux.HandleFunc("GET "+pluginNamespace+"/seo-meta/{id}", s.editing(s.handleSEOMetaGet))
+	mux.HandleFunc("PUT "+pluginNamespace+"/seo-meta/{id}", s.editing(s.handleSEOMeta))
+	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/raw", s.editing(s.handleRawGet))
+	mux.HandleFunc("PUT "+pluginNamespace+"/content/{id}/raw", s.editing(s.handleRawPut))
+	mux.HandleFunc("POST "+pluginNamespace+"/content/{id}/preview", s.editing(s.handlePreview))
+	mux.HandleFunc("GET "+pluginNamespace+"/content/{id}/rendered", s.editing(s.handleRendered))
+	mux.HandleFunc("GET "+pluginNamespace+"/meta/{id}", s.editing(s.handleMeta))
+	mux.HandleFunc("PUT "+pluginNamespace+"/meta/{id}", s.editing(s.handleMetaPut))
+	mux.HandleFunc("GET "+pluginNamespace+"/terms/{id}", s.editing(s.handleTerms))
+	mux.HandleFunc("GET "+pluginNamespace+"/settings", s.handlePluginSettings)
+}
+
+func (s *Server) editing(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathID(r)
+		s.mu.Lock()
+		stored, found := s.items[id]
+		closed := ok && found && !s.noPlugin && stored.Closed
+		s.mu.Unlock()
+		if closed {
+			s.fail(w, http.StatusForbidden, "forbidden", "editing this post is not allowed")
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (s *Server) pluginMissing(w http.ResponseWriter) bool {
@@ -91,15 +111,21 @@ func (s *Server) handleManifest(w http.ResponseWriter, _ *http.Request) {
 
 	s.mu.Lock()
 	plugin := s.seoPlugin
+	version := s.pluginVersion
 	capabilities := slices.Clone(s.capabilities)
+	postTypes, taxonomies := s.contentTypes(), s.contentTaxonomies()
+	unfiltered := !s.filteredHTML
 	s.mu.Unlock()
 
 	s.respond(w, http.StatusOK, map[string]any{
-		"version":      "1.2.0",
-		"capabilities": capabilities,
-		"seoPlugin":    plugin,
-		"wpVersion":    "6.9.1",
-		"site":         s.http.URL,
+		"postTypes":      postTypes,
+		"taxonomies":     taxonomies,
+		"version":        version,
+		"capabilities":   capabilities,
+		"seoPlugin":      plugin,
+		"wpVersion":      "6.9.1",
+		"site":           s.http.URL,
+		"unfilteredHtml": unfiltered,
 	})
 }
 
@@ -113,6 +139,15 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 	if len(types) == 0 {
 		types = []string{TypePage, TypePost, TypeProduct, TypeProductCategory}
 	}
+	s.mu.Lock()
+	listable := append(append(s.contentTypes(), s.contentTaxonomies()...), TypeProduct, TypeProductCategory)
+	s.mu.Unlock()
+	for _, asked := range types {
+		if !slices.Contains(listable, asked) {
+			s.fail(w, http.StatusBadRequest, "invalid_type", "unknown content type: "+asked)
+			return
+		}
+	}
 
 	after, ok := decodeCursor(query.Get("cursor"))
 	if !ok {
@@ -122,8 +157,9 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 
 	since := parseQueryTime(query.Get("since"))
 	limit := contentLimit(query.Get("limit"))
-	wantsTerms := slices.Contains(types, TypeProductCategory)
-	postTypes := slices.DeleteFunc(slices.Clone(types), term)
+	termTypes := slices.DeleteFunc(slices.Clone(types), func(asked string) bool { return !s.term(asked) })
+	wantsTerms := len(termTypes) > 0
+	postTypes := slices.DeleteFunc(slices.Clone(types), s.term)
 
 	phase := after.Phase
 	if phase == "" {
@@ -159,7 +195,7 @@ func (s *Server) handleContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scanned := s.termsAfter(after.ID, remaining)
+	scanned := s.termsAfter(termTypes, after.ID, remaining)
 	for _, stored := range scanned {
 		if !since.IsZero() && !stored.Modified.After(since) {
 			continue
@@ -179,7 +215,7 @@ func (s *Server) postsAfter(types []string, since time.Time, after cursor) []*It
 	matched := make([]*Item, 0, len(s.order))
 	for _, id := range s.order {
 		stored := s.items[id]
-		if !slices.Contains(types, stored.Type) {
+		if !slices.Contains(types, stored.Type) || stored.Status == "trash" || stored.Status == "auto-draft" {
 			continue
 		}
 		if !since.IsZero() && !stored.Modified.After(since) {
@@ -199,13 +235,13 @@ func (s *Server) postsAfter(types []string, since time.Time, after cursor) []*It
 	return matched
 }
 
-func (s *Server) termsAfter(after int64, limit int) []*Item {
+func (s *Server) termsAfter(taxonomies []string, after int64, limit int) []*Item {
 	ids := slices.Clone(s.termOrder)
 	slices.Sort(ids)
 
 	scanned := make([]*Item, 0, limit)
 	for _, id := range ids {
-		if id <= after {
+		if id <= after || !slices.Contains(taxonomies, s.terms[id].Type) {
 			continue
 		}
 		if len(scanned) == limit {
@@ -279,7 +315,15 @@ func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keys := seoKeys[s.seoPlugin]
+	if moved := s.movedSEO(stored, keys, body); len(moved) > 0 {
+		s.mu.Unlock()
+		s.respond(w, http.StatusConflict, map[string]any{
+			"code": "hash_mismatch", "message": "an SEO field changed since it was read.", "moved": moved,
+		})
+		return
+	}
 	applied := make([]string, 0, len(seoFieldOrder))
+	hashes := make(map[string]string, len(seoFieldOrder))
 	for _, field := range seoFieldOrder {
 		held, present := body[field]
 		if !present {
@@ -291,17 +335,19 @@ func (s *Server) handleSEOMeta(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, http.StatusBadRequest, "invalid_param", field+" must be a string.")
 			return
 		}
+		value = s.seoStored(value)
 		if value == "" {
 			delete(stored.Meta, keys[field])
 		} else {
 			stored.Meta[keys[field]] = value
 		}
 		applied = append(applied, field)
+		hashes[field] = contentHash(value)
 	}
 	plugin := s.seoPlugin
 	s.mu.Unlock()
 
-	s.respond(w, http.StatusOK, map[string]any{"applied": applied, "seoPlugin": plugin})
+	s.respond(w, http.StatusOK, map[string]any{"applied": applied, "seoPlugin": plugin, "hashes": hashes})
 }
 
 func (s *Server) handleRawGet(w http.ResponseWriter, r *http.Request) {
@@ -324,6 +370,7 @@ func (s *Server) handleRawGet(w http.ResponseWriter, r *http.Request) {
 			"type":        stored.Type,
 			"content":     stored.Content,
 			"contentHash": s.reportedHash(stored.Content),
+			"saveStable":  s.saveStable(stored.Content, stored.Title, stored.Excerpt),
 		}
 	}
 	s.mu.Unlock()
@@ -378,12 +425,28 @@ func (s *Server) handleRawPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stored.Content = content
+	stored.Content = s.saved(content)
+	stored.Title, stored.Excerpt = s.saved(stored.Title), s.saved(stored.Excerpt)
 	stored.Modified = s.tick()
-	updated := contentHash(content)
+	kept := stored.Content
+	lost := 0
+	if len(s.rawAnswerFaults) > 0 {
+		lost, s.rawAnswerFaults = s.rawAnswerFaults[0], s.rawAnswerFaults[1:]
+	}
 	s.mu.Unlock()
 
-	s.respond(w, http.StatusOK, map[string]any{"contentHash": updated})
+	if lost != 0 {
+		s.fail(w, lost, faultCode(lost), "the injected fault fired after the write")
+		return
+	}
+	s.respond(w, http.StatusOK, map[string]any{"content": kept, "contentHash": contentHash(kept)})
+}
+
+func (s *Server) LoseTheAnswerOfTheNextRawWrite(status int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.rawAnswerFaults = append(s.rawAnswerFaults, status)
 }
 
 func (s *Server) contentItem(stored *Item) map[string]any {
@@ -404,18 +467,22 @@ func (s *Server) contentItem(stored *Item) map[string]any {
 			"description": stored.Meta[keys["description"]],
 			"canonical":   stored.Meta[keys["canonical"]],
 		},
-		"links": s.internalLinks(stored.Content),
+		"links":   s.internalLinks(stored),
+		"excerpt": stored.Excerpt,
+		"terms":   termsPayload(stored.Terms),
 	}
-	if term(stored.Type) {
+	if s.term(stored.Type) {
 		item["h1"] = ""
 		item["links"] = []map[string]any{}
+		item["excerpt"] = ""
+		item["terms"] = []map[string]any{}
 	}
 	return item
 }
 
 func (s *Server) editablePost(id int64) (*Item, bool) {
 	stored, found := s.items[id]
-	if !found || stored.Status == "trash" {
+	if !found || stored.Status == "trash" || stored.Type == TypeProductVariation {
 		return nil, false
 	}
 	return stored, true
@@ -440,11 +507,11 @@ func headingOne(stored *Item) string {
 	return strings.TrimSpace(tagPattern.ReplaceAllString(match[1], ""))
 }
 
-func (s *Server) internalLinks(content string) []map[string]any {
-	host := hostOf(s.http.URL)
+func (s *Server) internalLinks(stored *Item) []map[string]any {
+	host, document := hostOf(s.http.URL), normalisePath(s.itemPath(stored))
 	links := make([]map[string]any, 0)
-	for _, match := range linkPattern.FindAllStringSubmatch(content, -1) {
-		target, ok := internalTarget(host, match[1])
+	for _, match := range linkPattern.FindAllStringSubmatch(stored.Content, -1) {
+		target, ok := internalTarget(host, document, match[1])
 		if !ok {
 			continue
 		}
@@ -464,7 +531,7 @@ func hostOf(rawURL string) string {
 	return parsed.Host
 }
 
-func internalTarget(host, href string) (string, bool) {
+func internalTarget(host, document, href string) (string, bool) {
 	trimmed := strings.TrimSpace(href)
 	if trimmed == "" {
 		return "", false
@@ -485,7 +552,22 @@ func internalTarget(host, href string) (string, bool) {
 	if target == "" && parsed.Host == "" {
 		return "", false
 	}
+	if target != "" && target[0] != '/' {
+		target = documentBase(document) + target
+	}
+	for segment := range strings.SplitSeq(target, "/") {
+		if segment == "." || segment == ".." {
+			return "", false
+		}
+	}
 	return normalisePath(target), true
+}
+
+func documentBase(document string) string {
+	if !strings.HasPrefix(document, "/") {
+		return "/"
+	}
+	return document[:strings.LastIndex(document, "/")+1]
 }
 
 func normalisePath(value string) string {
@@ -616,7 +698,7 @@ func (s *Server) previewURL(stored *Item, token string) string {
 	}
 	query := parsed.Query()
 	query.Set("preview", "true")
-	query.Set("postulator_preview", token)
+	query.Set("preview_token", token)
 	parsed.RawQuery = query.Encode()
 	return parsed.String()
 }

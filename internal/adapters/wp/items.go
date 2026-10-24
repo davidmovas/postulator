@@ -11,14 +11,14 @@ import (
 )
 
 func (c *Client) ListItems(ctx context.Context, itemType ItemType, query ListQuery) (ItemPage, error) {
-	namespace, path, err := itemType.route()
+	path, err := c.readRoute(ctx, itemType)
 	if err != nil {
 		return ItemPage{}, err
 	}
 
 	resp, body, err := c.do(ctx, request{
 		method:    http.MethodGet,
-		namespace: namespace,
+		namespace: coreNamespace,
 		path:      path,
 		query:     query.values(),
 	})
@@ -37,14 +37,14 @@ func (c *Client) ListItems(ctx context.Context, itemType ItemType, query ListQue
 }
 
 func (c *Client) GetItem(ctx context.Context, itemType ItemType, id int64) (Item, error) {
-	namespace, path, err := itemType.route()
+	path, err := c.readRoute(ctx, itemType)
 	if err != nil {
 		return Item{}, err
 	}
 
 	_, body, err := c.do(ctx, request{
 		method:    http.MethodGet,
-		namespace: namespace,
+		namespace: coreNamespace,
 		path:      resourcePath(path, id),
 		query:     url.Values{"context": {"edit"}},
 	})
@@ -88,7 +88,7 @@ func (c *Client) CreateItem(ctx context.Context, itemType ItemType, in CreateIte
 		return Item{}, coreOnly(itemType)
 	}
 
-	namespace, path, err := itemType.route()
+	path, _, err := itemType.fixedRoute()
 	if err != nil {
 		return Item{}, err
 	}
@@ -100,7 +100,7 @@ func (c *Client) CreateItem(ctx context.Context, itemType ItemType, in CreateIte
 
 	_, raw, err := c.do(ctx, request{
 		method:      http.MethodPost,
-		namespace:   namespace,
+		namespace:   coreNamespace,
 		path:        path,
 		body:        body,
 		contentType: contentTypeJSON,
@@ -121,7 +121,7 @@ func (c *Client) UpdateItem(ctx context.Context, itemType ItemType, id int64, in
 		return Item{}, coreOnly(itemType)
 	}
 
-	namespace, path, err := itemType.route()
+	path, _, err := itemType.fixedRoute()
 	if err != nil {
 		return Item{}, err
 	}
@@ -138,7 +138,7 @@ func (c *Client) UpdateItem(ctx context.Context, itemType ItemType, id int64, in
 
 	_, raw, err := c.do(ctx, request{
 		method:      http.MethodPost,
-		namespace:   namespace,
+		namespace:   coreNamespace,
 		path:        resourcePath(path, id),
 		body:        body,
 		contentType: contentTypeJSON,
@@ -154,7 +154,7 @@ func (c *Client) DeleteItem(ctx context.Context, itemType ItemType, id int64, fo
 		return coreOnly(itemType)
 	}
 
-	namespace, path, err := itemType.route()
+	path, _, err := itemType.fixedRoute()
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (c *Client) DeleteItem(ctx context.Context, itemType ItemType, id int64, fo
 
 	_, _, err = c.do(ctx, request{
 		method:    http.MethodDelete,
-		namespace: namespace,
+		namespace: coreNamespace,
 		path:      resourcePath(path, id),
 		query:     query,
 	})

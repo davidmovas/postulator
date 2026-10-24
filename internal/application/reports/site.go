@@ -34,7 +34,7 @@ func (s *Service) SiteOverview(ctx context.Context, req SiteOverviewRequest) (Si
 	}
 
 	index := pagemap.NewIndex(pages)
-	outgoing, incoming := linkSets(links)
+	outgoing, incoming := linkSets(contextual(links))
 
 	return SiteOverviewResponse{
 		SiteID:   siteID,
@@ -96,10 +96,7 @@ func pageTotals(pages []pagemap.Page, incoming map[string]int) PageTotals {
 		if page.EntityID == nil {
 			totals.Unmapped++
 		}
-		if page.Status == pagemap.StatusArchived || page.WPID == nil {
-			continue
-		}
-		if incoming[page.ID] == 0 {
+		if orphan(*page, incoming[page.ID]) {
 			totals.Orphans++
 		}
 	}

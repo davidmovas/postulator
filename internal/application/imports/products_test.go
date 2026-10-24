@@ -8,8 +8,10 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/importer"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
@@ -19,15 +21,16 @@ func (h harness) storeProduct(t *testing.T, slug, name string, wpID int64) pagem
 	now := time.Date(2026, time.September, 18, 8, 0, 0, 0, time.UTC)
 	page, err := pagemap.NewPage(pagemap.Page{
 		ID: id.New(), SiteID: h.siteID, Path: "/product/" + slug + "/", WPType: pagemap.WPProduct, WPID: &wpID,
-		Status: pagemap.StatusPublished, Title: name,
-		Observed:  pagemap.Observed{Title: name, Slug: slug, Status: "publish", Link: "/product/" + slug + "/"},
-		CreatedAt: now, UpdatedAt: now,
+		Status: pagemap.StatusPublished, Title: "The plan's own title", CreatedAt: now, UpdatedAt: now,
 	})
 	if err != nil {
 		t.Fatalf("NewPage: %v", err)
 	}
 	if err = sqlite.NewPageRepo(h.store).Insert(t.Context(), page); err != nil {
 		t.Fatalf("Insert: %v", err)
+	}
+	if err = sqlite.NewPageFieldRepo(h.store).Observe(t.Context(), page.ID, []field.Value{field.NewValue(page.ID, field.Title, name, now)}); err != nil {
+		t.Fatalf("observe the store's name: %v", err)
 	}
 	return page
 }
@@ -73,8 +76,8 @@ func TestASheetOfProductsFindsThemInTheStore(t *testing.T) {
 		by      string
 		store   string
 	}{
-		{path: liquid.Path, planned: "/mak/mak-liquid/", by: string(pagemap.MatchedBySlug), store: "Mak Liquid"},
-		{path: capsule.Path, planned: "/mak/capsule/", by: string(pagemap.MatchedByName), store: "Mak Capsule"},
+		{path: liquid.Path, planned: "/mak/mak-liquid/", by: string(pagemap.RuleSlug), store: "Mak Liquid"},
+		{path: capsule.Path, planned: "/mak/capsule/", by: string(pagemap.RuleH1), store: "Mak Capsule"},
 	}
 	for _, tc := range cases {
 		view, found := page(report, tc.path)
@@ -87,8 +90,8 @@ func TestASheetOfProductsFindsThemInTheStore(t *testing.T) {
 	if !found || waiting.WPType != string(pagemap.WPProduct) || waiting.Action != string(imports.ActionCreate) || waiting.Title != "" {
 		t.Errorf("the preview shows the row without a product as %+v", waiting)
 	}
-	if missing := findings(report.Warnings, imports.CodeProductNotInStore); len(missing) != 1 || missing[0].Row != 4 {
-		t.Errorf("not-in-store findings = %+v, want the powder row", missing)
+	if missing := findings(report.Warnings, imports.CodeRowWithoutPage); len(missing) != 1 || missing[0].Row != 4 {
+		t.Errorf("rows without a product = %+v, want the powder row", missing)
 	}
 	if _, generated := page(report, "/mak/"); generated {
 		t.Error("the preview plans a page for the level above the products")
@@ -147,12 +150,13 @@ func TestASheetOfProductsFindsThemInTheStore(t *testing.T) {
 func TestTheRowTypeDecidesWhatARowBecomes(t *testing.T) {
 	t.Parallel()
 
-	const sheet = "path,entity kind,wp type\n" +
+	const sheet = "path,page type,wp type\n" +
 		"/tea/,product,\n" +
-		"/tea/green/,product,\n" +
-		"/mug/,product,\n" +
+		"/tea/green/,Compound,\n" +
+		"/mug/,Goods,\n" +
 		"/about/,topic,\n" +
-		"/cup/,product,page\n"
+		"/cup/,product,page\n" +
+		"/hub/,Hub,\n"
 
 	cases := []struct {
 		rows importmap.RowType
@@ -160,15 +164,19 @@ func TestTheRowTypeDecidesWhatARowBecomes(t *testing.T) {
 	}{
 		{rows: "", want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPPage, "/mug/": pagemap.WPPage, "/about/": pagemap.WPPage, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPPage,
 		}},
 		{rows: importmap.RowPages, want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPPage, "/mug/": pagemap.WPPage, "/about/": pagemap.WPPage, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPPage,
 		}},
 		{rows: importmap.RowProducts, want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPProduct, "/mug/": pagemap.WPProduct, "/about/": pagemap.WPProduct, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPProduct,
 		}},
-		{rows: importmap.RowKind, want: map[string]pagemap.WPType{
+		{rows: importmap.RowTyped, want: map[string]pagemap.WPType{
 			"/tea/": pagemap.WPPage, "/tea/green/": pagemap.WPProduct, "/mug/": pagemap.WPProduct, "/about/": pagemap.WPPage, "/cup/": pagemap.WPPage,
+			"/hub/": pagemap.WPPage,
 		}},
 	}
 
@@ -177,15 +185,19 @@ func TestTheRowTypeDecidesWhatARowBecomes(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
+			h.rename(t, pagetype.Product, "Goods")
 			mapping := h.mapping(map[string]string{
-				string(importmap.FieldPath): "path", string(importmap.FieldEntityKind): "entity kind", string(importmap.FieldWPType): "wp type",
+				string(importmap.FieldPath): "path", string(importmap.FieldPageType): "page type", string(importmap.FieldWPType): "wp type",
 			})
 			mapping.Options.RowType = tc.rows
-			report := h.preview(t, h.file(t, "kinds.csv", sheet), mapping)
+			report := h.preview(t, h.file(t, "types.csv", sheet), mapping)
 			for path, want := range tc.want {
 				if view, found := page(report, path); !found || view.WPType != string(want) {
 					t.Errorf("%s reads as %+v, want a %s", path, view, want)
 				}
+			}
+			if unknown := findings(report.Warnings, imports.CodeUnknownPageType); len(unknown) != 0 {
+				t.Errorf("unknown page types = %+v", unknown)
 			}
 		})
 	}

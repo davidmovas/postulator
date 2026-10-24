@@ -21,7 +21,9 @@ const (
 )
 
 type SiteContext struct {
+	SiteID    string
 	SiteName  string
+	Brief     string
 	Mode      string
 	Templates []string
 	Entities  int

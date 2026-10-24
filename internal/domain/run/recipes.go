@@ -6,13 +6,13 @@ func (k Kind) Recipe() ([]template.StepSpec, bool) {
 	switch k {
 	case KindRelink:
 		return RelinkRecipe(), true
-	case KindRepair:
-		return RepairRecipe(), true
 	case KindSync:
 		return SyncRecipe(), true
 	case KindRevert:
 		return RevertRecipe(), true
-	case KindGenerate, KindAudit, KindImport, KindCustom:
+	case KindEdit:
+		return steps(string(StepEditPage)), true
+	case KindGenerate, KindAudit, KindImport, KindRepair, KindCustom:
 		return nil, false
 	default:
 		return nil, false
@@ -29,7 +29,7 @@ func steps(names ...string) []template.StepSpec {
 
 func GenerateRecipe() []template.StepSpec {
 	return steps(
-		string(StepResolveContext), string(StepGenerateBody), string(StepGenerateMeta),
+		string(StepResolveContext), string(StepGenerateBody), string(StepGenerateMeta), string(StepGenerateFields),
 		string(StepInsertLinks), string(StepRepairLinks), string(StepGenerateImages), string(StepValidate),
 		string(StepJudge), string(StepPublish), string(StepRelinkNeighbors), string(StepSyncBack), string(StepReport),
 	)
@@ -37,10 +37,6 @@ func GenerateRecipe() []template.StepSpec {
 
 func RelinkRecipe() []template.StepSpec {
 	return steps(string(StepResolveContext), string(StepRelinkPage), string(StepSyncBack), string(StepReport))
-}
-
-func RepairRecipe() []template.StepSpec {
-	return steps(string(StepRepairHierarchy), string(StepSyncBack), string(StepReport))
 }
 
 func RevertRecipe() []template.StepSpec {

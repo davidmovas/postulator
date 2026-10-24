@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"embed"
 	"fmt"
 	"strings"
 
@@ -16,15 +15,8 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
-//go:embed prompts/*.tmpl
-var promptFS embed.FS
-
-var prompts = llm.MustPrompts(promptFS, "prompts/*.tmpl")
-
 const (
-	instructionsPrompt = "chat.instructions"
-	contextPrompt      = "chat.context"
-	cacheFamily        = "chat:"
+	cacheFamily = "chat:"
 
 	ChatStep = domainllm.StepChat
 )
@@ -80,11 +72,11 @@ func (r *Runner) Run(ctx context.Context, spec agentapp.RunSpec) (agentapp.RunRe
 		return agentapp.RunResult{}, errors.New(errors.Invalid, "an agent turn needs a model")
 	}
 
-	instructions, err := prompts.One(instructionsPrompt, spec.Context)
+	instructions, err := agentapp.Instructions(spec.Context)
 	if err != nil {
 		return agentapp.RunResult{}, err
 	}
-	situation, err := prompts.One(contextPrompt, spec.Context)
+	situation, err := agentapp.Situation(spec.Context)
 	if err != nil {
 		return agentapp.RunResult{}, err
 	}
@@ -123,6 +115,13 @@ func (r *Runner) offered(built []tools.Tool) []llm.Tool {
 	return offered
 }
 
+func cacheKey(situation agentapp.SiteContext) string {
+	if situation.SiteID == "" {
+		return cacheFamily + situation.Mode
+	}
+	return cacheFamily + situation.Mode + ":" + situation.SiteID
+}
+
 func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *turn {
 	built := r.deps.Registry.Build(spec.Binding)
 	offered := r.offered(built)
@@ -148,7 +147,7 @@ func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *tu
 			},
 			Effort:   domainllm.EffortNone,
 			Tier:     domainllm.TierDefault,
-			CacheKey: cacheFamily + spec.Context.Mode,
+			CacheKey: cacheKey(spec.Context),
 		},
 		opening: []llm.Message{
 			{Role: llm.RoleDeveloper, Text: situation},

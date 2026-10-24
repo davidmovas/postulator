@@ -1,7 +1,7 @@
 import { copy } from "../../copy/index.js";
 import { imageSources } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { decimal, imageSourceLabel, percent } from "./labels.js";
+import { imageSourceLabel, percent } from "./labels.js";
 import { paths } from "./patch.js";
 import type { Rule, RuleBlock } from "./rules-model.js";
 import { unsetSource } from "./rules-model.js";
@@ -119,86 +119,6 @@ export const ruleBlocks: readonly RuleBlock[] = [
                     draft.requiredKeywords === null
                         ? copy.templates.content.requiredKeywordsEvery
                         : String(draft.requiredKeywords),
-            },
-        ],
-    },
-    {
-        key: "links",
-        title: copy.templates.links.title,
-        rules: [
-            {
-                kind: "number",
-                key: "upDepth",
-                label: copy.templates.links.upDepth,
-                hint: copy.templates.links.upDepthHint,
-                field: "linkRules.upDepth",
-                path: paths.upDepth,
-                min: 0,
-                read: (draft) => draft.upDepth,
-                write: (upDepth) => ({ upDepth }),
-            },
-            {
-                kind: "switch",
-                key: "downLinks",
-                label: copy.templates.links.downLinks,
-                field: "linkRules.downLinks",
-                path: paths.downLinks,
-                read: (draft) => draft.downLinks,
-                write: (downLinks) => ({ downLinks }),
-            },
-            {
-                kind: "number",
-                key: "siblingMinWeight",
-                label: copy.templates.links.siblingMinWeight,
-                hint: copy.templates.links.siblingMinWeightHint,
-                field: "linkRules.siblingMinWeight",
-                path: paths.siblingMinWeight,
-                min: 0,
-                max: 1,
-                step: 0.05,
-                read: (draft) => draft.siblingMinWeight,
-                write: (siblingMinWeight) => ({ siblingMinWeight }),
-                show: (draft) => decimal(draft.siblingMinWeight),
-            },
-            {
-                kind: "number",
-                key: "maxLinks",
-                label: copy.templates.links.maxLinks,
-                field: "linkRules.maxLinks",
-                path: paths.maxLinks,
-                min: 0,
-                read: (draft) => draft.maxLinks,
-                write: (maxLinks) => ({ maxLinks }),
-            },
-            {
-                kind: "number",
-                key: "maxPerTarget",
-                label: copy.templates.links.maxPerTarget,
-                field: "linkRules.maxPerTarget",
-                path: paths.maxPerTarget,
-                min: 0,
-                read: (draft) => draft.maxPerTarget,
-                write: (maxPerTarget) => ({ maxPerTarget }),
-            },
-            {
-                kind: "number",
-                key: "parentLinkWithinParagraphs",
-                label: copy.templates.links.parentLinkWithinParagraphs,
-                hint: copy.templates.links.parentLinkWithinParagraphsHint,
-                field: "linkRules.parentLinkWithinParagraphs",
-                path: paths.parentLinkWithinParagraphs,
-                min: 0,
-                read: (draft) => draft.parentLinkWithinParagraphs,
-                write: (parentLinkWithinParagraphs) => ({ parentLinkWithinParagraphs }),
-            },
-            {
-                kind: "switch",
-                key: "childrenSection",
-                label: copy.templates.links.childrenSection,
-                field: "linkRules.childrenSection",
-                path: paths.childrenSection,
-                read: (draft) => draft.childrenSection,
-                write: (childrenSection) => ({ childrenSection }),
             },
         ],
     },

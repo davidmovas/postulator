@@ -13,6 +13,7 @@ import {
     Button,
     ChevronRightIcon,
     EditNoteIcon,
+    HubIcon,
     IconButton,
     LinkIcon,
     LinkOffIcon,
@@ -23,7 +24,6 @@ import {
     TaskAltIcon,
     VerifiedIcon,
 } from "../../ui/index.js";
-import { entityIcon } from "../graph/labels.js";
 import { DriftBadge, PageStatusBadge } from "./badges.js";
 
 const shownLinks = 6;
@@ -79,10 +79,9 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
     }
 
     const links = detail.data?.links ?? [];
-    const generated = links.filter((held) => held.origin === "generated").length;
+    const ours = links.filter((held) => held.ours).length;
     const url = liveUrl(site.data?.site.baseUrl ?? "", page.path);
     const reachable = isBrowsable(url) && page.wpId !== null && page.status !== "archived";
-    const Icon = entityIcon(entity.data?.entity.kind ?? "");
     const canonical = entity.data?.entity.canonicalPageId === page.id;
 
     return (
@@ -139,7 +138,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                         </span>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <Icon size={16} className="shrink-0 text-accent" />
+                            <HubIcon size={16} className="shrink-0 text-accent" />
                             <Link
                                 to={`/s/${siteId}/graph/${page.entityId}`}
                                 className="min-w-0 flex-1 truncate text-sm"
@@ -166,9 +165,6 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                                 {copy.pages.detail.characters(page.metaDescription.length)}
                             </span>
                         </Row>
-                        <Row label={copy.pages.detail.canonicalUrl}>
-                            <span className="font-mono text-xs">{page.canonical}</span>
-                        </Row>
                         <Row label={copy.pages.columns.synced}>
                             <span title={absoluteTime(page.lastSyncedAt)}>{relativeTime(page.lastSyncedAt)}</span>
                         </Row>
@@ -179,7 +175,7 @@ export function PageSummary({ pageId, siteId, search, onOpen }: PageSummaryProps
                     <div className="flex items-baseline justify-between gap-2">
                         <SectionLabel>{copy.pages.summary.links}</SectionLabel>
                         <span className="font-mono text-2xs text-ink-faint">
-                            {copy.pages.detail.linksSummary(links.length, generated)}
+                            {copy.pages.detail.linksSummary(links.length, ours)}
                         </span>
                     </div>
                     {links.length === 0 ? (

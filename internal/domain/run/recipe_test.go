@@ -18,6 +18,26 @@ func names(recipe []template.StepSpec) []string {
 	return out
 }
 
+func TestAKindAPersonMayStartIsNeitherARepairNorARevert(t *testing.T) {
+	t.Parallel()
+
+	startable := []run.Kind{run.KindGenerate, run.KindRelink, run.KindAudit, run.KindSync, run.KindImport, run.KindCustom}
+	for _, kind := range startable {
+		if !kind.Startable() {
+			t.Errorf("%s is not startable, yet a person may ask for it", kind)
+		}
+	}
+	for _, kind := range []run.Kind{run.KindRepair, run.KindRevert, run.KindEdit, run.Kind("teleport")} {
+		if kind.Startable() {
+			t.Errorf("%s is startable: a repair writes nothing any more, a revert starts from the run it undoes, "+
+				"an edit from the change a person confirmed", kind)
+		}
+	}
+	if run.KindEdit.PageScoped() {
+		t.Error("an edit run loads its page itself, so it needs no template resolved for it")
+	}
+}
+
 func TestAKindThatOwnsARecipeHandsItOut(t *testing.T) {
 	t.Parallel()
 
@@ -31,12 +51,10 @@ func TestAKindThatOwnsARecipeHandsItOut(t *testing.T) {
 			name: "relink", kind: run.KindRelink, owned: true,
 			want: []string{"resolve_context", "relink_page", "sync_back", "report"},
 		},
-		{
-			name: "repair", kind: run.KindRepair, owned: true,
-			want: []string{"repair_hierarchy", "sync_back", "report"},
-		},
+		{name: "repair", kind: run.KindRepair},
 		{name: "sync", kind: run.KindSync, owned: true, want: []string{"sync_site"}},
 		{name: "revert", kind: run.KindRevert, owned: true, want: []string{"revert"}},
+		{name: "edit", kind: run.KindEdit, owned: true, want: []string{"edit_page"}},
 		{name: "generate", kind: run.KindGenerate},
 		{name: "custom", kind: run.KindCustom},
 		{name: "audit", kind: run.KindAudit},
@@ -68,7 +86,7 @@ func TestTheGenerateRecipeWritesAndPublishesOnePage(t *testing.T) {
 	t.Parallel()
 
 	want := []string{
-		"resolve_context", "generate_body", "generate_meta", "insert_links", "repair_links",
+		"resolve_context", "generate_body", "generate_meta", "generate_fields", "insert_links", "repair_links",
 		"generate_images", "validate", "judge", "publish", "relink_neighbors", "sync_back", "report",
 	}
 	if got := names(run.GenerateRecipe()); !slices.Equal(got, want) {
@@ -112,10 +130,10 @@ func TestEveryPerKindStepIsNamedByExactlyOneKind(t *testing.T) {
 
 	kinds := []run.Kind{
 		run.KindGenerate, run.KindRelink, run.KindAudit, run.KindSync, run.KindImport,
-		run.KindRepair, run.KindRevert, run.KindCustom,
+		run.KindRepair, run.KindRevert, run.KindEdit, run.KindCustom,
 	}
 
-	for _, step := range []string{"repair_hierarchy", "sync_site", "relink_page", "revert"} {
+	for _, step := range []string{"sync_site", "relink_page", "revert", "edit_page"} {
 		owners := make([]run.Kind, 0, 1)
 		for _, kind := range kinds {
 			recipe, owned := kind.Recipe()

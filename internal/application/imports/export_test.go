@@ -1,28 +1,26 @@
 package imports_test
 
 import (
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/importer"
-	"github.com/davidmovas/postulator/internal/adapters/sqlite"
-	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
-	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const richSheet = "path,title,h1,primary keyword,keywords,anchors,entity,entity kind,parent,related,page type,meta title,meta description,post type\n" +
-	"/,Home,Welcome,shop,shop|store,our shop,Shop,hub,,,hub,Shop,The shop,page\n" +
-	"/hosting/,Hosting,Hosting plans,hosting,vps|servers,hosting plans|cheap hosting,Hosting,category,Shop,Domains,category,Hosting,Hosting plans,page\n" +
-	"/domains/,Domains,Domains,domains,tld|registrar,buy a domain,Domains,category,Shop,Hosting,category,Domains,Buy a domain,page\n" +
-	",,,,,,Support,topic,Shop,,,,,\n"
+const richSheet = "path,title,h1,primary keyword,keywords,anchors,entity,page type,parent,related,meta title,meta description,post type\n" +
+	"/,Home,Welcome,shop,shop|store,our shop,Shop,hub,,,Shop,The shop,page\n" +
+	"/hosting/,Hosting,Hosting plans,hosting,vps|servers,hosting plans|cheap hosting,Hosting,Category,Shop,Domains,Hosting,Hosting plans,page\n" +
+	"/domains/,Domains,Domains,domains,tld|registrar,buy a domain,Domains,guide,Shop,Hosting,Domains,Buy a domain,page\n" +
+	",,,,,,Support,topic,Shop,,,,\n"
 
 func richMapping(h harness) imports.Mapping {
 	mapping := h.mapping(map[string]string{
@@ -33,10 +31,9 @@ func richMapping(h harness) imports.Mapping {
 		string(importmap.FieldKeywords):        "keywords",
 		string(importmap.FieldAnchors):         "anchors",
 		string(importmap.FieldEntity):          "entity",
-		string(importmap.FieldEntityKind):      "entity kind",
+		string(importmap.FieldPageType):        "page type",
 		string(importmap.FieldParentEntity):    "parent",
 		string(importmap.FieldRelated):         "related",
-		string(importmap.FieldPageKind):        "page type",
 		string(importmap.FieldMetaTitle):       "meta title",
 		string(importmap.FieldMetaDescription): "meta description",
 		string(importmap.FieldWPType):          "post type",
@@ -50,29 +47,11 @@ type shape struct {
 	pages    []string
 }
 
-func seedTemplates(t *testing.T, h harness) map[string]string {
-	t.Helper()
-
-	repo := sqlite.NewTemplateRepo(h.store)
-	kinds := make(map[string]string)
-	seeds := template.Seed()
-	for i := range seeds {
-		record := template.Template{
-			ID: id.New(), Scope: template.ScopeGlobal, Name: seeds[i].Name, PageKind: seeds[i].PageKind,
-			Version: 1, Spec: seeds[i].Spec, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
-		}
-		if err := repo.Insert(t.Context(), record); err != nil {
-			t.Fatalf("insert %s: %v", record.Name, err)
-		}
-		kinds[record.ID] = record.PageKind
-	}
-	return kinds
-}
-
-func snapshot(t *testing.T, h harness, kinds map[string]string) shape {
+func snapshot(t *testing.T, h harness) shape {
 	t.Helper()
 
 	entities := h.entities(t)
+	typed := h.typeNames(t)
 	byID := make(map[string]graph.Entity, len(entities))
 	out := shape{}
 	for i := range entities {
@@ -82,7 +61,7 @@ func snapshot(t *testing.T, h harness, kinds map[string]string) shape {
 			anchors = append(anchors, anchor.Text)
 		}
 		out.entities = append(out.entities, strings.Join([]string{
-			entities[i].Name, string(entities[i].Kind), entities[i].Keywords.Main(),
+			entities[i].Name, entities[i].Keywords.Main(),
 			strings.Join(entities[i].Keywords.Rest(), ","), strings.Join(anchors, ","),
 		}, "|"))
 	}
@@ -107,13 +86,9 @@ func snapshot(t *testing.T, h harness, kinds map[string]string) shape {
 		if entity, ok := byID[refOfEntity(found, entities)]; ok {
 			canonical = entity.Name
 		}
-		kind := ""
-		if found.TemplateID != nil {
-			kind = kinds[*found.TemplateID]
-		}
 		out.pages = append(out.pages, strings.Join([]string{
 			found.Path, found.Title, found.H1, found.MetaTitle, found.MetaDescription,
-			string(found.WPType), string(found.Status), name, canonical, kind,
+			string(found.WPType), string(found.Status), name, canonical, typed[found.Path],
 		}, "|"))
 	}
 
@@ -136,8 +111,10 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	t.Parallel()
 
 	source := newHarness(t)
-	sourceKinds := seedTemplates(t, source)
 	source.apply(t, source.file(t, "rich.csv", richSheet), richMapping(source))
+	if typed := source.typeNames(t); !maps.Equal(typed, map[string]string{"/hosting/": "Hub", "/domains/": "Entity"}) {
+		t.Fatalf("the source typed its pages %v, want the two pages its rows name and none for the entity-only row", typed)
+	}
 
 	exported := filepath.Join(source.dir, "export.xlsx")
 	got, err := source.service.Export(t.Context(), imports.ExportRequest{SiteID: source.siteID, Path: exported})
@@ -149,7 +126,6 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	}
 
 	target := newHarness(t)
-	targetKinds := seedTemplates(t, target)
 	detected, err := target.service.Inspect(t.Context(), imports.InspectRequest{SiteID: target.siteID, Path: exported})
 	if err != nil {
 		t.Fatalf("Inspect the export: %v", err)
@@ -165,11 +141,11 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 	if len(applied.Report.Errors) != 0 {
 		t.Fatalf("errors = %+v", applied.Report.Errors)
 	}
-	if len(applied.Report.Warnings) != 0 {
-		t.Fatalf("warnings = %+v", applied.Report.Warnings)
+	if left := besidesPlanned(applied.Report.Warnings); len(left) != 0 {
+		t.Fatalf("warnings = %+v", left)
 	}
 
-	before, after := snapshot(t, source, sourceKinds), snapshot(t, target, targetKinds)
+	before, after := snapshot(t, source), snapshot(t, target)
 	if !slices.Equal(before.entities, after.entities) {
 		t.Fatalf("entities\n before %v\n after  %v", before.entities, after.entities)
 	}
@@ -177,7 +153,8 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 		t.Fatalf("edges\n before %v\n after  %v", before.edges, after.edges)
 	}
 	if !slices.Equal(before.pages, after.pages) {
-		t.Fatalf("pages\n before %v\n after  %v", before.pages, after.pages)
+		t.Fatalf("pages\n before %v\n after  %v\n want the site's pages alone: an exported entity without a page plans none",
+			before.pages, after.pages)
 	}
 }
 
@@ -251,7 +228,7 @@ func TestTheClientSamplesStillImport(t *testing.T) {
 			name: "sitemap-import-example.xlsx",
 			detected: []importmap.Field{
 				importmap.FieldPath, importmap.FieldTitle, importmap.FieldKeywords, importmap.FieldPrimaryKeyword,
-				importmap.FieldEntity, importmap.FieldParentEntity, importmap.FieldAnchors, importmap.FieldPageKind,
+				importmap.FieldEntity, importmap.FieldParentEntity, importmap.FieldAnchors, importmap.FieldPageType,
 			},
 			pages:    8,
 			entities: 8,
@@ -293,35 +270,22 @@ func TestTheClientSamplesStillImport(t *testing.T) {
 	}
 }
 
-func TestThePageKindPicksTheSiteTemplateOverTheGlobalOne(t *testing.T) {
+func TestTheExportWritesThePageTypeByName(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	seed := template.Seed()[3]
-	repo := sqlite.NewTemplateRepo(h.store)
-	global := template.Template{
-		ID: id.New(), Scope: template.ScopeGlobal, Name: "global hub", PageKind: seed.PageKind,
-		Version: 1, Spec: seed.Spec, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	h.rename(t, pagetype.Hub, "Collection")
+	mapping := h.mapping(map[string]string{
+		string(importmap.FieldPath): "path", string(importmap.FieldEntity): "entity", string(importmap.FieldPageType): "page type",
+	})
+	got := h.apply(t, h.file(t, "types.csv", "path,entity,page type\n/hub/,Hub,Pillar\n/plain/,Plain,\n,Loose,Hub\n"), mapping)
+	if left := besidesPlanned(got.Report.Warnings); len(left) != 0 || len(got.Report.Errors) != 0 {
+		t.Fatalf("findings = %+v %+v", left, got.Report.Errors)
 	}
-	owned := template.Template{
-		ID: id.New(), Scope: template.ScopeSite, SiteID: &h.siteID, Name: "site hub", PageKind: seed.PageKind,
-		Version: 1, Spec: seed.Spec, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
-	}
-	for _, record := range []template.Template{global, owned} {
-		if err := repo.Insert(t.Context(), record); err != nil {
-			t.Fatalf("insert %s: %v", record.Name, err)
+	for _, held := range h.pages(t) {
+		if held.TemplateID != nil {
+			t.Fatalf("the import gave %s the template %s, want the template left to the type", held.Path, *held.TemplateID)
 		}
-	}
-
-	mapping := h.mapping(map[string]string{string(importmap.FieldPath): "path", string(importmap.FieldPageKind): "page type"})
-	got := h.apply(t, h.file(t, "kinds.csv", "path,page type\n/hub/,"+seed.PageKind+"\n"), mapping)
-	if len(got.Report.Warnings) != 0 {
-		t.Fatalf("warnings = %+v", got.Report.Warnings)
-	}
-
-	pages := h.pages(t)
-	if len(pages) != 1 || pages[0].TemplateID == nil || *pages[0].TemplateID != owned.ID {
-		t.Fatalf("pages = %+v, want the site template", pages)
 	}
 
 	exported := filepath.Join(h.dir, "export.xlsx")
@@ -332,12 +296,25 @@ func TestThePageKindPicksTheSiteTemplateOverTheGlobalOne(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read the export: %v", err)
 	}
+	for _, gone := range []string{"entity_kind", "page_kind"} {
+		if slices.Contains(table.Headers, gone) {
+			t.Fatalf("the export still writes %s: %v", gone, table.Headers)
+		}
+	}
+	if !slices.Contains(table.Headers, string(importmap.FieldPageType)) {
+		t.Fatalf("headers = %v, want a page_type column", table.Headers)
+	}
 	binding, err := importmap.AutoDetect(table.Headers).Bind(table.Headers)
 	if err != nil {
 		t.Fatalf("Bind: %v", err)
 	}
-	if got := binding.Text(table.Rows[0], importmap.FieldPageKind); got != seed.PageKind {
-		t.Fatalf("the exported page kind = %q, want %q", got, seed.PageKind)
+	cells := make(map[string]string, len(table.Rows))
+	for _, row := range table.Rows {
+		cells[binding.Text(row, importmap.FieldPath)+"#"+binding.Text(row, importmap.FieldEntity)] = binding.Text(row, importmap.FieldPageType)
+	}
+	want := map[string]string{"/hub/#Hub": "Collection", "/plain/#Plain": "", "#Loose": ""}
+	if !maps.Equal(cells, want) {
+		t.Fatalf("the exported page types = %v, want %v", cells, want)
 	}
 }
 

@@ -40,6 +40,23 @@ func (s *Store) writeFrom(ctx context.Context) executor {
 	return s.writer
 }
 
+func (s *Store) Read(ctx context.Context, fn func(context.Context) error) (err error) {
+	if _, ok := txFrom(ctx); ok {
+		return fn(ctx)
+	}
+
+	tx, err := s.reader.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return dbx.Convert(err, "begin the read")
+	}
+	defer func() {
+		if rollback := tx.Rollback(); rollback != nil && !stderrors.Is(rollback, sql.ErrTxDone) {
+			err = stderrors.Join(err, dbx.Convert(rollback, "end the read"))
+		}
+	}()
+	return fn(withTx(ctx, tx))
+}
+
 func (s *Store) Do(ctx context.Context, fn func(context.Context) error) error {
 	if _, ok := txFrom(ctx); ok {
 		return fn(ctx)

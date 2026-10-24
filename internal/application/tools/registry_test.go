@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tiktoken-go/tokenizer"
+
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/tools"
@@ -23,6 +25,7 @@ func registered() []string {
 	return []string{
 		"sites_list",
 		"sites_get",
+		"sites_explore",
 		"sites_create",
 		"sites_update",
 		"sites_delete",
@@ -46,6 +49,7 @@ func registered() []string {
 		"graph_preview_from_pages",
 		"graph_propose_from_keywords",
 		"graph_apply_proposals",
+		"graph_propose_cards",
 		"pages_list",
 		"pages_get",
 		"pages_preview_link",
@@ -55,8 +59,12 @@ func registered() []string {
 		"pages_map_to_entity",
 		"pages_unmap",
 		"pages_set_canonical",
-		"pages_tree",
-		"pages_replace_links",
+		"pages_fields",
+		"pages_blocks",
+		"pagetypes_list",
+		"pagetypes_save",
+		"pagetypes_delete",
+		"pagetypes_set_scope",
 		"templates_list",
 		"templates_get",
 		"templates_create",
@@ -64,13 +72,6 @@ func registered() []string {
 		"templates_delete",
 		"templates_set_override",
 		"templates_delete_override",
-		"templates_resolve_for_page",
-		"policies_list",
-		"policies_get",
-		"policies_create",
-		"policies_update",
-		"policies_delete",
-		"policies_effective",
 		"runs_start",
 		"runs_get",
 		"runs_list",
@@ -89,7 +90,6 @@ func registered() []string {
 		"reports_page",
 		"reports_run",
 		"reports_link_audit",
-		"reports_link_audit_page",
 		"imports_inspect",
 		"imports_preview",
 		"imports_apply",
@@ -97,6 +97,7 @@ func registered() []string {
 		"imports_save_mapping",
 		"imports_list_mappings",
 		"imports_delete_mapping",
+		"findings",
 		"models_list",
 		"models_upsert",
 		"models_disable",
@@ -166,9 +167,9 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes = 63200
-	charactersPerToken = 4
-	widestLogged       = 8
+	schemaCeilingBytes  = 66407
+	schemaCeilingTokens = 14782
+	widestLogged        = 8
 )
 
 type sentTool struct {
@@ -178,11 +179,12 @@ type sentTool struct {
 }
 
 type measuredTool struct {
-	name  string
-	bytes int
+	name   string
+	bytes  int
+	tokens int
 }
 
-func schemaBytes(t *testing.T, tool tools.Tool) int {
+func wireSchema(t *testing.T, tool tools.Tool) []byte {
 	t.Helper()
 
 	encoded, err := json.Marshal(sentTool{
@@ -191,16 +193,36 @@ func schemaBytes(t *testing.T, tool tools.Tool) int {
 	if err != nil {
 		t.Fatalf("encode the schema of %s: %v", tool.Def.Name, err)
 	}
-	return len(encoded)
+	return encoded
+}
+
+func o200k(t *testing.T) tokenizer.Codec {
+	t.Helper()
+
+	codec, err := tokenizer.Get(tokenizer.O200kBase)
+	if err != nil {
+		t.Fatalf("the o200k_base encoding: %v", err)
+	}
+	return codec
+}
+
+func tokensOf(t *testing.T, codec tokenizer.Codec, text []byte) int {
+	t.Helper()
+
+	count, err := codec.Count(string(text))
+	if err != nil {
+		t.Fatalf("count the tokens of %q: %v", text, err)
+	}
+	return count
 }
 
 func widestOf(measured []measuredTool) string {
 	sorted := slices.Clone(measured)
-	slices.SortStableFunc(sorted, func(a, b measuredTool) int { return b.bytes - a.bytes })
+	slices.SortStableFunc(sorted, func(a, b measuredTool) int { return b.tokens - a.tokens })
 
 	named := make([]string, 0, widestLogged)
 	for _, tool := range sorted[:min(widestLogged, len(sorted))] {
-		named = append(named, tool.name+" "+strconv.Itoa(tool.bytes))
+		named = append(named, tool.name+" "+strconv.Itoa(tool.tokens)+" tokens ("+strconv.Itoa(tool.bytes)+" bytes)")
 	}
 	return strings.Join(named, ", ")
 }
@@ -208,23 +230,30 @@ func widestOf(measured []measuredTool) string {
 func TestTheToolSchemasFitTheirCeiling(t *testing.T) {
 	t.Parallel()
 
+	codec := o200k(t)
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
 
-	total := 0
+	bytes, tokens := 0, 0
 	measured := make([]measuredTool, 0, len(built))
 	for _, tool := range built {
-		size := schemaBytes(t, tool)
-		total += size
-		measured = append(measured, measuredTool{name: tool.Def.Name, bytes: size})
+		encoded := wireSchema(t, tool)
+		counted := tokensOf(t, codec, encoded)
+		bytes += len(encoded)
+		tokens += counted
+		measured = append(measured, measuredTool{name: tool.Def.Name, bytes: len(encoded), tokens: counted})
 	}
 
-	t.Logf("%d tools, %d bytes of schema, about %d tokens; the widest: %s",
-		len(built), total, total/charactersPerToken, widestOf(measured))
+	t.Logf("%d tools, %d bytes and %d o200k_base tokens of wire JSON schema; the widest: %s",
+		len(built), bytes, tokens, widestOf(measured))
 
-	if total > schemaCeilingBytes {
-		t.Fatalf("the tool schemas grew to %d bytes, over the %d this build allows; "+
-			"every round of every turn resends all of it", total, schemaCeilingBytes)
+	if bytes > schemaCeilingBytes {
+		t.Errorf("the tool schemas grew to %d bytes, over the %d this build allows; "+
+			"every round of every turn resends all of it", bytes, schemaCeilingBytes)
+	}
+	if tokens > schemaCeilingTokens {
+		t.Errorf("the tool schemas grew to %d o200k_base tokens of wire JSON, over the %d this build allows; "+
+			"every round of every turn resends all of it", tokens, schemaCeilingTokens)
 	}
 }
 
@@ -237,18 +266,22 @@ type sentGroup struct {
 func TestADeferredRoundSendsTheOrientingToolsWholeAndOnlyTheNamesOfTheGroups(t *testing.T) {
 	t.Parallel()
 
+	codec := o200k(t)
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	built := registry.Build(tools.Binding{SiteID: "site-1", Mode: agent.ModeAutonomous})
 
-	every, eager, whole := 0, 0, 0
+	every, eager, whole, everyTokens, eagerTokens := 0, 0, 0, 0, 0
 	named := map[string]bool{}
 	headers := []sentGroup{{Type: "tool_search"}}
 	for _, tool := range built {
-		size := schemaBytes(t, tool)
-		every += size
+		schema := wireSchema(t, tool)
+		counted := tokensOf(t, codec, schema)
+		every += len(schema)
+		everyTokens += counted
 		group, deferred := tools.OnDemand(tool.Def.Name)
 		if !deferred {
-			eager += size
+			eager += len(schema)
+			eagerTokens += counted
 			whole++
 			continue
 		}
@@ -263,8 +296,9 @@ func TestADeferredRoundSendsTheOrientingToolsWholeAndOnlyTheNamesOfTheGroups(t *
 	}
 
 	payload := eager + len(encoded)
-	t.Logf("loading tools on demand sends %d tools whole and %d groups, %d bytes, about %d tokens, before any "+
-		"search; every tool at once is %d bytes", whole, len(named), payload, payload/charactersPerToken, every)
+	payloadTokens := eagerTokens + tokensOf(t, codec, encoded)
+	t.Logf("loading tools on demand sends %d tools whole and %d groups, %d bytes and %d o200k_base tokens, before any "+
+		"search; every tool at once is %d bytes and %d tokens", whole, len(named), payload, payloadTokens, every, everyTokens)
 
 	if whole == 0 || len(named) == 0 || payload >= every {
 		t.Fatalf("a deferred round sends %d tools whole in %d groups for %d bytes of %d, want fewer bytes than every tool",
@@ -378,11 +412,26 @@ func TestSchemaIsDerivedFromTheRequest(t *testing.T) {
 	}
 }
 
+func TestThePageToolsOfferNoCanonical(t *testing.T) {
+	t.Parallel()
+
+	registry := newRegistry(&actionRecorder{}, &busRecorder{})
+	for _, name := range []string{"pages_create", "pages_update"} {
+		def, known := registry.Lookup(name)
+		if !known {
+			t.Fatalf("%s is not registered", name)
+		}
+		if def.Schema.Properties["canonical"] != nil {
+			t.Errorf("%s offers a canonical; a creation's comes from WordPress's link and an update never sends one", name)
+		}
+	}
+}
+
 func TestASiteScopedToolRefusesAConversationWithoutASite(t *testing.T) {
 	t.Parallel()
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
-	_, err := registry.Call(t.Context(), tools.Binding{Mode: agent.ModeAutonomous}, "pages_tree", nil)
+	_, err := registry.Call(t.Context(), tools.Binding{Mode: agent.ModeAutonomous}, "sites_explore", nil)
 	if !errors.IsCode(err, errors.Unauthorized) {
 		t.Fatalf("Call without a site = %v, want unauthorized", err)
 	}
@@ -406,7 +455,7 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 		switch tool.Def.Name {
 		case "pages_delete":
 			proposed = tool
-		case "pages_tree":
+		case "sites_explore":
 			read = tool
 		}
 	}
@@ -436,7 +485,7 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	}
 
 	if read.Authorize == nil {
-		t.Fatal("pages_tree is site scoped and must authorize")
+		t.Fatal("sites_explore is site scoped and must authorize")
 	}
 	if len(actions.actions) != 1 {
 		t.Fatal("a read tool must not propose anything")
@@ -509,17 +558,17 @@ func TestAnUnusableCallNeverBecomesAConfirmation(t *testing.T) {
 		{
 			name: "a field the tool does not take",
 			tool: "graph_create_entity",
-			args: `{"name":"Creatine","kind":"topic","shade":"blue"}`,
+			args: `{"name":"Creatine","shade":"blue"}`,
 		},
 		{
 			name: "a field of the wrong shape",
 			tool: "templates_create",
-			args: `{"name":"Guide","pageKind":"guide","spec":{"tone":{"voice":"warm"}}}`,
+			args: `{"name":"Guide","spec":{"tone":{"voice":"warm"}}}`,
 		},
 		{
 			name: "a specification the domain refuses",
 			tool: "templates_create",
-			args: `{"name":"Guide","pageKind":"guide","spec":{"sections":[],"tone":"plain"}}`,
+			args: `{"name":"Guide","spec":{"sections":[],"tone":"plain"}}`,
 		},
 	}
 

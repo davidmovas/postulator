@@ -69,7 +69,7 @@ func TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated(t *testing.T
 	parentBody := &firstDraftsFail{}
 	script := append([]fake.Reply{
 		{Step: steps.NameGenerateBody, Match: "Path: " + heldChild + "\n", Text: draftOf(childTopic)},
-		{Step: steps.NameGenerateMeta, Match: heldChild, Text: metaOf(childTopic)},
+		{Step: steps.NameGenerateMeta, Match: "Path: " + heldChild + "\n", Text: metaOf(childTopic)},
 		{Step: steps.NameGenerateBody, Match: "Path: " + heldParent + "\n", Make: parentBody.reply},
 	}, replies()...)
 	core := openCoreWith(t, fake.NewScripted(script...))
@@ -82,6 +82,7 @@ func TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated(t *testing.T
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
+	assertTheTypesCarryTheShippedTemplates(t, core, siteID)
 
 	synced, err := core.Sync.SyncSite(t.Context(), appsync.SyncSiteRequest{SiteID: siteID})
 	if err != nil {
@@ -160,12 +161,8 @@ func plantChild(t *testing.T, entities *graph.Service, service *pages.Service, s
 	siteID string, parent pages.Page) pages.Page {
 	t.Helper()
 
-	kin, err := entities.GetEntity(t.Context(), graph.GetEntityRequest{ID: *parent.EntityID})
-	if err != nil {
-		t.Fatalf("read the parent entity: %v", err)
-	}
 	created, err := entities.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: siteID, Name: "House Cocktails", Kind: kin.Entity.Kind, Keywords: []dto.Keyword{{Text: childTopic}},
+		SiteID: siteID, Name: "House Cocktails", Keywords: []dto.Keyword{{Text: childTopic}},
 	})
 	if err != nil {
 		t.Fatalf("create the child entity: %v", err)

@@ -4,12 +4,15 @@ import (
 	"context"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
@@ -26,12 +29,16 @@ type edgeStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
 }
 
+type fieldStore interface {
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+}
+
 type specResolver interface {
 	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
 }
 
-type policyReader interface {
-	GetEffectivePolicy(ctx context.Context, req templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error)
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
 type profileResolver interface {
@@ -42,14 +49,20 @@ type rawReader interface {
 	RawContent(ctx context.Context, siteID string, wpID int64, wpType string) (string, error)
 }
 
+type pictures interface {
+	Picture(ctx context.Context, req sitemodel.PackRequest) (sitemodel.Picture, error)
+}
+
 type Deps struct {
 	Pages    pageStore
 	Entities entityStore
 	Edges    edgeStore
+	Fields   fieldStore
 	Specs    specResolver
-	Policies policyReader
+	Types    typeSets
 	Profiles profileResolver
 	Raw      rawReader
+	Pictures pictures
 	LLM      llm.Client
 }
 
@@ -75,6 +88,7 @@ type judgePrompt struct {
 	Meta     Snippet
 	HasMeta  bool
 	Store    bool
-	Product  *contentdomain.ProductDraft
+	Short    string
 	Targets  []contentdomain.LinkTarget
+	Picture  string
 }

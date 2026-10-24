@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -192,6 +193,84 @@ func TestGenerateImagesDrawsUploadsAndPlaces(t *testing.T) {
 	if strings.Index(body, "<figure>") > strings.Index(body, "<h2>Brewing</h2>") {
 		t.Fatalf("the figure landed after the second section: %s", body)
 	}
+}
+
+func imageOnTheSite(t *testing.T, server *wptest.Server, sc *run.StepContext, item wptest.Item) {
+	t.Helper()
+
+	seeded := server.Seed(item)
+	sc.Page.WPID = new(seeded[0].ID)
+	sc.Page.Status = pagemap.StatusPublished
+	if item.Type == wptest.TypeProduct {
+		sc.Page.WPType = pagemap.WPProduct
+	}
+}
+
+func TestTheImageStepNeverDrawsOverAPagesFeaturedImage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	drawn := &drawing{}
+	deps.ImageProvider = drawn
+	sc := imageContext(t, template.Images{Featured: true, Inline: 1, Source: template.ImagesAI})
+	clients := server.SeedUpload(wptest.Upload{Filename: "theirs.jpg", MimeType: "image/jpeg", Alt: "their shop"})
+	imageOnTheSite(t, server, sc, wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Content: imageBody, FeaturedMedia: clients.ID})
+
+	manifest, _ := runImages(t, deps, sc)
+	if drawn.calls != 1 || len(server.Uploads()) != 2 {
+		t.Fatalf("the step drew %d images and the library holds %d, want only the inline one drawn and uploaded beside the client's",
+			drawn.calls, len(server.Uploads()))
+	}
+	if manifest.FeaturedID != 0 || manifest.Wanted != 1 || len(manifest.Images) != 1 || manifest.Images[0].Role != steps.RoleInline {
+		t.Fatalf("manifest = %+v, want no featured image of ours over the client's", manifest)
+	}
+	if !hasImageFinding(manifest, steps.CodeFeaturedImageKept) {
+		t.Errorf("findings = %+v, want the client's featured image named as kept", manifest.Findings)
+	}
+}
+
+func TestTheImageStepNeverDrawsOverAProductsGallery(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	drawn := &drawing{}
+	deps.ImageProvider = drawn
+	sc := imageContext(t, template.Images{Featured: true, Source: template.ImagesAI})
+	clients := server.SeedUpload(wptest.Upload{Filename: "vial.jpg", MimeType: "image/jpeg", Alt: "the vial"})
+	imageOnTheSite(t, server, sc, wptest.Item{Type: wptest.TypeProduct, Title: "Espresso", Slug: "espresso", Content: imageBody, Images: []int64{clients.ID}})
+
+	manifest, _ := runImages(t, deps, sc)
+	if drawn.calls != 0 || len(server.Uploads()) != 1 || manifest.FeaturedID != 0 {
+		t.Fatalf("the step drew %d images, the library holds %d and the manifest is %+v, want the product's gallery left alone",
+			drawn.calls, len(server.Uploads()), manifest)
+	}
+	if !hasImageFinding(manifest, steps.CodeFeaturedImageKept) {
+		t.Errorf("findings = %+v, want the product's own image named as kept", manifest.Findings)
+	}
+}
+
+func TestTheImageStepFillsAPageWithoutAFeaturedImage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	drawn := &drawing{}
+	deps.ImageProvider = drawn
+	sc := imageContext(t, template.Images{Featured: true, Source: template.ImagesAI})
+	imageOnTheSite(t, server, sc, wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Content: imageBody})
+
+	manifest, _ := runImages(t, deps, sc)
+	if drawn.calls != 1 || len(server.Uploads()) != 1 || manifest.FeaturedID == 0 {
+		t.Fatalf("the step drew %d images and the manifest is %+v, want a featured image for a page that has none", drawn.calls, manifest)
+	}
+}
+
+func hasImageFinding(manifest steps.ImagesResult, code string) bool {
+	for i := range manifest.Findings {
+		if manifest.Findings[i].Code == code {
+			return true
+		}
+	}
+	return false
 }
 
 func TestGenerateImagesPicksFromASource(t *testing.T) {

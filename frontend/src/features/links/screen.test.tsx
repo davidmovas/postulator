@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../copy/index.js";
 import type { LinkAudit, PageAudit } from "../../data/types.js";
-import { auditRows, row } from "./model/fixture.js";
+import { auditRows, row, typed } from "./model/fixture.js";
 import { relinkCap } from "./model/relink.js";
 
 const held: { audit: LinkAudit | undefined } = { audit: undefined };
@@ -27,7 +27,6 @@ const { LinksScreen } = await import("./screen.js");
 function audited(rows: readonly PageAudit[]): LinkAudit {
     return {
         siteId: "s1",
-        policy: { id: "p1", name: "Default", forbidExternal: false, forbidSelf: true, anchorStrategy: "first" },
         totals: {
             pages: rows.length,
             audited: rows.length,
@@ -41,6 +40,7 @@ function audited(rows: readonly PageAudit[]): LinkAudit {
             orphans: 0,
             pending: 0,
             unpublished: 0,
+            byType: typed(),
         },
         pages: [...rows],
     };

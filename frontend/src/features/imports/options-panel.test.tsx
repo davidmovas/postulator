@@ -95,11 +95,12 @@ describe("the options of a workbook import", () => {
         expect(screen.queryByText(copy.imports.columns.levels)).toBeNull();
     });
 
-    it("explains that only a Root Entity or Root column makes a group", () => {
+    it("explains that only a Root Entity or Root column makes a group and a Category column is compared", () => {
         show();
         const hint = screen.getByText(copy.imports.columns.levelsHint).textContent ?? "";
-        expect(hint).toContain("Tick the Root Entity or Root columns");
+        expect(hint).toContain("A Root Entity or Root column makes the groups");
         expect(hint).toContain("under a hub entity");
+        expect(hint).toContain("compared with the site and never written to it");
         expect(hint).toContain("No other column makes a group");
     });
 

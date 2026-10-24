@@ -30,7 +30,7 @@ func (f *fixture) chain(links ...chain) {
 	}}
 	f.mapping.known = make(map[string]pagemap.Page, len(links))
 	for _, link := range links {
-		page := pagemap.Page{ID: link.id, Path: link.path, WPType: link.wpType, WPID: link.wpID}
+		page := pagemap.Page{ID: link.id, SiteID: f.siteID, Path: link.path, WPType: link.wpType, WPID: link.wpID}
 		if link.parent != "" {
 			parent := link.parent
 			page.ParentPageID = &parent
@@ -77,6 +77,35 @@ func TestStartAddsTheAncestorsThatAreNotOnTheSite(t *testing.T) {
 	estimated, err := fixture.service.Estimate(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"max"}})
 	if err != nil || !slices.Equal(estimated.Added, want) {
 		t.Fatalf("Estimate = %+v, %v; want the same parents named before the run starts", estimated.Added, err)
+	}
+}
+
+func TestTheParentsASelectionWritesFirstAreAnsweredBeforeTheStart(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "bikes", path: "/bikes/", mapped: true},
+		chain{id: "cargo", path: "/bikes/cargo/", parent: "bikes", mapped: true},
+		chain{id: "max", path: "/bikes/cargo/max/", parent: "cargo", mapped: true},
+		chain{id: "road", path: "/road/", wpID: onSite(), mapped: true},
+	)
+
+	got, err := fixture.service.Parents(t.Context(), runs.ParentsRequest{SiteID: fixture.siteID, PageIDs: []string{"max", "cargo", "road"}})
+	if err != nil {
+		t.Fatalf("Parents: %v", err)
+	}
+	want := []runs.AddedPage{{PageID: "bikes", Path: "/bikes/", NeededBy: "/bikes/cargo/max/"}}
+	if !slices.Equal(got.Added, want) {
+		t.Errorf("Added = %+v, want the one parent the selection lacks", got.Added)
+	}
+	if fixture.engine.queued.ID != "" {
+		t.Errorf("answering the parents queued the run %+v", fixture.engine.queued)
+	}
+	for _, req := range []runs.ParentsRequest{{PageIDs: []string{"max"}}, {SiteID: fixture.siteID}, {SiteID: "another-site", PageIDs: []string{"max"}}} {
+		if _, err = fixture.service.Parents(t.Context(), req); !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("Parents(%+v) = %v, want Invalid", req, err)
+		}
 	}
 }
 
@@ -170,14 +199,6 @@ func TestStartRefusesAnAncestorItCannotWrite(t *testing.T) {
 			links: []chain{{id: "cargo", path: "/bikes/cargo/", mapped: true}},
 			names: "/bikes/",
 		},
-		{
-			name: "the link disagrees with the path",
-			links: []chain{
-				{id: "trikes", path: "/trikes/", mapped: true},
-				{id: "cargo", path: "/bikes/cargo/", parent: "trikes", mapped: true},
-			},
-			names: "/trikes/",
-		},
 	}
 
 	for _, tc := range cases {
@@ -202,6 +223,61 @@ func TestStartRefusesAnAncestorItCannotWrite(t *testing.T) {
 				t.Fatalf("a run whose parent cannot be written reached the engine: %+v", fixture.engine.queued)
 			}
 		})
+	}
+}
+
+func TestStartFollowsTheDerivedParentNotThePath(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "peptides", path: "/peptides/", mapped: true},
+		chain{id: "bpc", path: "/bpc-157/", parent: "peptides", mapped: true},
+	)
+
+	resp, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"bpc"}})
+	if err != nil {
+		t.Fatalf("Start: %v; a flat URL under a breadcrumb parent is the client's site", err)
+	}
+	want := []runs.AddedPage{{PageID: "peptides", Path: "/peptides/", NeededBy: "/bpc-157/"}}
+	if !slices.Equal(resp.Added, want) {
+		t.Fatalf("Added = %+v, want the derived parent %+v", resp.Added, want)
+	}
+	if got := fixture.engine.queued.Targets; !slices.Equal(got, []string{"bpc", "peptides"}) {
+		t.Fatalf("the run targets %v, want the page and its derived parent", got)
+	}
+}
+
+func TestStartNeverMakesTheFrontPageAParent(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(
+		chain{id: "home", path: "/", mapped: true},
+		chain{id: "semax", path: "/semax/", parent: "home", mapped: true},
+	)
+
+	resp, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"semax"}})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if len(resp.Added) != 0 || !slices.Equal(fixture.engine.queued.Targets, []string{"semax"}) {
+		t.Fatalf("Added = %+v, targets %v; the front page is never written first as a parent", resp.Added, fixture.engine.queued.Targets)
+	}
+}
+
+func TestStartLeavesAPageOnTheSiteWithoutAParentAlone(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.chain(chain{id: "setup", path: "/guide/setup/", wpID: onSite(), mapped: true})
+
+	resp, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"setup"}})
+	if err != nil {
+		t.Fatalf("Start: %v; a page already on the site needs no parent to sit under", err)
+	}
+	if len(resp.Added) != 0 {
+		t.Fatalf("Added = %+v, want nothing", resp.Added)
 	}
 }
 

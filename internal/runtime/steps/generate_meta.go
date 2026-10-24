@@ -6,6 +6,8 @@ import (
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
@@ -19,14 +21,14 @@ const (
 
 	CodeMetaNotWritten = "meta_not_written"
 
-	metaTokens = 512
-	ellipsis   = "…"
+	metaTokens       = 512
+	metaPromptTokens = 440
+	ellipsis         = "…"
 )
 
 type metaAnswer struct {
 	Title         string `json:"title" description:"The meta title of the page, following the title pattern"`
 	Description   string `json:"description" description:"The meta description, one sentence that earns the click"`
-	Canonical     string `json:"canonical" description:"The absolute canonical URL of the page"`
 	OGTitle       string `json:"ogTitle" description:"The Open Graph title, which may be shorter than the meta title"`
 	OGDescription string `json:"ogDescription" description:"The Open Graph description"`
 }
@@ -34,36 +36,80 @@ type metaAnswer struct {
 type Meta struct {
 	Title         string            `json:"title"`
 	Description   string            `json:"description"`
-	Canonical     string            `json:"canonical"`
 	OGTitle       string            `json:"ogTitle"`
 	OGDescription string            `json:"ogDescription"`
 	Findings      []content.Finding `json:"findings,omitempty"`
 }
 
 type metaPrompt struct {
-	Page      pagemap.Page
-	Entity    graph.Entity
-	Keywords  keyword.List
-	Spec      template.TemplateSpec
-	Draft     content.ContentDraft
-	SiteName  string
-	Canonical string
-	Pattern   string
+	Page        pagemap.Page
+	Entity      graph.Entity
+	Keywords    keyword.List
+	Spec        template.TemplateSpec
+	Draft       content.ContentDraft
+	SiteName    string
+	Pattern     string
+	Picture     string
+	Description []string
+	Standing    bool
+}
+
+func metaRequires(scope []field.Key) []run.ArtifactKind {
+	if run.WritesBody(scope) {
+		return []run.ArtifactKind{run.ArtifactDraft}
+	}
+	return nil
+}
+
+func keepsBody(sc *run.StepContext) bool {
+	scope := sc.Fields()
+	return len(scope) > 0 && !run.WritesBody(scope)
+}
+
+func asItStands(facts contextpack.Facts, page pagemap.Page) content.ContentDraft {
+	standing := content.ContentDraft{Title: page.Title, H1: facts.H1, Summary: facts.Page.Summary.Text}
+	if title, held := facts.Field(field.Title); held && strings.TrimSpace(title.Current) != "" {
+		standing.Title = strings.TrimSpace(title.Current)
+	}
+	body, held := facts.Field(field.Body)
+	if !held {
+		body, held = facts.Field(field.ProductDescription)
+	}
+	if !held {
+		return standing
+	}
+	doc, err := content.Parse(body.Current)
+	if err != nil {
+		return standing
+	}
+	for _, heading := range doc.Headings() {
+		if text := strings.TrimSpace(content.TextOf(heading)); heading.Data != "h1" && text != "" {
+			standing.Sections = append(standing.Sections, content.DraftSection{Heading: text})
+		}
+	}
+	return standing
 }
 
 func GenerateMeta(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameGenerateMeta,
-		Role:     domainllm.RoleEditor,
-		Requires: []run.ArtifactKind{run.ArtifactDraft},
-		Produces: []run.ArtifactKind{run.ArtifactMeta},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  editorTimeout,
-		Price:    run.Price{OutputTokens: metaTokens},
+		Name:      NameGenerateMeta,
+		Role:      domainllm.RoleEditor,
+		Requires:  []run.ArtifactKind{run.ArtifactDraft},
+		Scoped:    metaRequires,
+		Produces:  []run.ArtifactKind{run.ArtifactMeta},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   editorTimeout,
+		Price:     run.Price{OutputTokens: metaTokens, Overhead: metaPromptTokens, Input: packInput(deps, domainllm.RoleEditor, seoTitleKey)},
+		Preflight: inputPreflight(deps, domainllm.RoleEditor, seoTitleKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
-			draft, err := draftOf(sc)
-			if err != nil {
-				return run.Result{}, err
+			standing := keepsBody(sc)
+			var draft content.ContentDraft
+			if !standing {
+				read, err := draftOf(sc)
+				if err != nil {
+					return run.Result{}, err
+				}
+				draft = read
 			}
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {
@@ -78,16 +124,32 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			canonical := pagemap.NewSite(owner.BaseURL).URL(sc.Page.Path)
 			keywords := pagemap.Keywords(sc.Page, entity)
-			request, err := stepRequest(sc, call, metaPrompt{
-				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft,
-				SiteName:  owner.Name,
-				Canonical: canonical,
+			prompt := metaPrompt{
+				Page: sc.Page, Entity: entity, Keywords: keywords, Spec: sc.Spec, Draft: draft, Standing: standing,
+				SiteName: owner.Name,
 				Pattern: template.Expand(sc.Spec.MetaRules.TitlePattern, template.Vars{
 					PrimaryKeyword: keywords.Main(), EntityName: entity.Name, SiteName: owner.Name, PageTitle: sc.Page.Title,
 				}),
-			}, metaTokens)
+			}
+			seen, err := deps.fitted(ctx, sc, call, field.SEOTitle, nil, metaTokens, func() (string, string, error) {
+				return prompts.Render(NameGenerateMeta, prompt)
+			}, schemaText[metaAnswer]())
+			if err != nil {
+				return run.Result{}, err
+			}
+			prompt.Picture = picture(seen.Fitted, contextpack.SectionTargets)
+			if standing {
+				draft = asItStands(seen.Facts, sc.Page)
+				prompt.Draft = draft
+			}
+			if description, held := seen.Facts.Field(field.SEODescription); held {
+				prompt.Description = contextpack.FieldRules(seen.Facts, description.Scope)
+				if current := strings.TrimSpace(description.Current); current != "" {
+					prompt.Description = append(prompt.Description, "Its current value: "+current)
+				}
+			}
+			request, err := stepRequest(sc, call, prompt, metaTokens)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -97,7 +159,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			settled := settleMeta(answer, draft, canonical, sc.Spec.MetaRules, sc.Page)
+			settled := settleMeta(answer, draft, sc.Spec.MetaRules, sc.Page)
 			blob, err := encode(settled, "page meta")
 			if err != nil {
 				return run.Result{}, err
@@ -112,12 +174,10 @@ func GenerateMeta(deps Deps) run.StepDef {
 	}
 }
 
-func settleMeta(answer metaAnswer, draft content.ContentDraft, canonical string, rules template.MetaRules,
-	page pagemap.Page) Meta {
+func settleMeta(answer metaAnswer, draft content.ContentDraft, rules template.MetaRules, page pagemap.Page) Meta {
 	meta := Meta{
 		Title:         strings.TrimSpace(answer.Title),
 		Description:   strings.TrimSpace(answer.Description),
-		Canonical:     strings.TrimSpace(answer.Canonical),
 		OGTitle:       strings.TrimSpace(answer.OGTitle),
 		OGDescription: strings.TrimSpace(answer.OGDescription),
 	}
@@ -130,9 +190,6 @@ func settleMeta(answer metaAnswer, draft content.ContentDraft, canonical string,
 	if meta.Description == "" {
 		meta.Description = strings.TrimSpace(draft.Summary)
 		borrowed = append(borrowed, "description")
-	}
-	if meta.Canonical == "" {
-		meta.Canonical = canonical
 	}
 	if meta.OGTitle == "" {
 		meta.OGTitle = meta.Title

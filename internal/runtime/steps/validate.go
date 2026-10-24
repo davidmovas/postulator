@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
@@ -40,10 +41,7 @@ func Validate(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
+			policy := sc.Links
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {
 				return run.Result{}, err
@@ -67,23 +65,31 @@ func Validate(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
+			whole, err := wholeBody(doc, draft.Kept)
+			if err != nil {
+				return run.Result{}, err
+			}
 			keywords := pagemap.Keywords(sc.Page, entity)
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
-				Compliance: content.Compliance(doc, lc, policy, sc.Page.ID),
+				Compliance: content.ComplianceOf(whole, doc, lc, policy, sc.Page.ID),
 				Structure:  content.Structure(doc, keywords, sc.Spec),
 				Links:      links,
 			}
-			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(doc, lc, live, sc.Page.ID)...)
+			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(whole, lc, live, sc.Page.ID)...)
 			report.Compliance.Score = content.ScoreOf(report.Compliance.Items)
 			if drafted {
 				report.Structure.Items = append(report.Structure.Items, draft.Findings...)
 			}
-			if drafted && draft.Product != nil && sc.Spec.Product != nil {
-				report.Structure.Items = append(report.Structure.Items,
-					content.ProductFindings(*draft.Product, *sc.Spec.Product, keywords.Main())...)
-			}
 			if sc.Page.WPType == pagemap.WPProduct {
+				short, written, shortErr := writtenField(sc, field.ProductShortDescription)
+				if shortErr != nil {
+					return run.Result{}, shortErr
+				}
+				if written && sc.Spec.Product != nil {
+					report.Structure.Items = append(report.Structure.Items,
+						content.ShortDescriptionFindings(short, *sc.Spec.Product, keywords.Main())...)
+				}
 				report.Structure = content.ForStore(report.Structure)
 			}
 			report.Structure.Items = plannedH1Wins(append(report.Structure.Items, repairs...))

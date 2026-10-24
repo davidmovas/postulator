@@ -36,17 +36,22 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
+type typeSeeder interface {
+	Seed(ctx context.Context, siteID string) error
+}
+
 type Service struct {
 	store     siteStore
 	secrets   secretStore
 	uow       unitOfWork
+	types     typeSeeder
 	probe     connectionProbe
 	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(store siteStore, secrets secretStore, uow unitOfWork, probe connectionProbe, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{store: store, secrets: secrets, uow: uow, probe: probe, publisher: publisher, clock: clk}
+func New(store siteStore, secrets secretStore, uow unitOfWork, types typeSeeder, probe connectionProbe, publisher application.Publisher, clk clock.Clock) *Service {
+	return &Service{store: store, secrets: secrets, uow: uow, types: types, probe: probe, publisher: publisher, clock: clk}
 }
 
 func (s *Service) now() time.Time {
@@ -84,6 +89,9 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	err = s.uow.Do(ctx, func(c context.Context) error {
 		if insertErr := s.store.Insert(c, record); insertErr != nil {
 			return insertErr
+		}
+		if seedErr := s.types.Seed(c, record.ID); seedErr != nil {
+			return seedErr
 		}
 		if req.Password == "" {
 			return nil
@@ -158,11 +166,26 @@ func apply(current *site.Site, req *UpdateRequest) (site.Site, error) {
 	if req.Defaults != nil {
 		next.Defaults = site.Defaults{
 			TemplateID:    req.Defaults.TemplateID,
-			LinkPolicyID:  req.Defaults.LinkPolicyID,
 			ModelProfiles: profilesOf(req.Defaults.ModelProfiles),
 		}
 	}
+	if req.Settings != nil {
+		next.Settings = settingsOver(&current.Settings, req.Settings)
+	}
 	return next, nil
+}
+
+func settingsOver(stored, asked *site.Settings) site.Settings {
+	return site.Settings{
+		LinkURLForm:         asked.LinkURLForm,
+		UserAgent:           strings.TrimSpace(asked.UserAgent),
+		Observe:             asked.Observe,
+		Builders:            asked.Builders,
+		TechnicalShortcodes: asked.TechnicalShortcodes,
+		TechnicalBlocks:     asked.TechnicalBlocks,
+		Technical:           stored.Technical,
+		Observation:         stored.Observation,
+	}.Normalized()
 }
 
 func (s *Service) rotate(ctx context.Context, ref, password string) error {

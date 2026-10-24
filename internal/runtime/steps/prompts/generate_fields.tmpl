@@ -1,0 +1,19 @@
+{{define "generate_fields.system"}}
+You are an SEO editor writing the short fields of a WordPress page beside its body, in English.
+Return one JSON object with the field fields: one entry for every field the brief asks for, each with the
+field's key exactly as given and its text. Write plain text: no markup, no quotation marks around a value,
+no emoji. Follow each field's own rules: its instruction and its length. Never invent a fact the picture of
+the page does not carry, and never repeat another field word for word.
+{{end}}
+
+{{define "generate_fields.user"}}
+THE FULL PICTURE
+What the site and its owner hold about the page, the most important first.
+
+{{if .Picture}}{{.Picture}}{{else}}Nothing is known of the page beyond its path, {{.Page.Path}}.
+{{end}}
+THE FIELDS TO WRITE
+{{range .Asked}}{{.Name}} (key {{.Key}})
+{{range .Rules}}{{.}}
+{{end}}
+{{end}}{{end}}

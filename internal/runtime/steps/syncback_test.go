@@ -6,10 +6,13 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -73,6 +76,35 @@ func runSyncBack(t *testing.T, deps steps.Deps, sc *run.StepContext) steps.SyncR
 	return synced
 }
 
+func TestSyncBackKeepsTheBaseOfWhatTheRunWrote(t *testing.T) {
+	t.Parallel()
+
+	edited := `<h1>Espresso</h1><p>The owner rewrote the page seconds after the run.</p>`
+	deps, server, _, wpID := syncBackDeps(t)
+	log := &bodyLog{}
+	deps.Bodies = log
+	if err := log.Record(t.Context(), "page-child", syncedBody, time.Time{}); err != nil {
+		t.Fatalf("record the body the run wrote: %v", err)
+	}
+	server.Rewrite(wpID, edited)
+
+	synced := runSyncBack(t, deps, syncBackContext(t, wpID))
+
+	current, base, found, err := log.Get(t.Context(), "page-child")
+	if err != nil || !found {
+		t.Fatalf("Get = %v, found %t", err, found)
+	}
+	if base.Hash != block.BodyHash(syncedBody) {
+		t.Errorf("the base is %q, want what the run wrote kept as the base", base.Raw)
+	}
+	if current.Hash != block.BodyHash(edited) {
+		t.Errorf("the current body is %q, want the owner's edit", current.Raw)
+	}
+	if !slices.ContainsFunc(synced.Findings, func(f content.Finding) bool { return f.Code == string(finding.BodyChangedOnSite) }) {
+		t.Errorf("findings = %+v, want the owner's edit reported as a change on the site", synced.Findings)
+	}
+}
+
 func TestSyncBackReadsThroughThePlugin(t *testing.T) {
 	t.Parallel()
 
@@ -90,7 +122,7 @@ func TestSyncBackReadsThroughThePlugin(t *testing.T) {
 	if len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != "page-parent" {
 		t.Fatalf("the recorded links are %+v", links)
 	}
-	if links[0].Origin != pagemap.OriginObserved || links[0].AnchorText != "coffee" {
+	if links[0].Ours || links[0].AnchorText != "coffee" {
 		t.Fatalf("link = %+v", links[0])
 	}
 }
@@ -118,13 +150,13 @@ func TestSyncBackResolvesALinkAgainstTheFolderTheSiteLivesIn(t *testing.T) {
 			Status: pagemap.StatusPublished, EntityID: pointer("parent"),
 		},
 		{
-			ID: "page-child", SiteID: "site", Path: "/blog/coffee/espresso/", Slug: "espresso",
+			ID: "page-child", SiteID: "site", Path: "/blog/", Slug: "espresso",
 			WPType: pagemap.WPPage, Status: pagemap.StatusExists, EntityID: pointer("child"), WPID: &wpID,
 		},
 	}}
 
 	sc := syncBackContext(t, wpID)
-	sc.Page.Path = "/blog/coffee/espresso/"
+	sc.Page.Path = "/blog/"
 
 	synced := runSyncBack(t, deps, sc)
 	if synced.Links != 1 {
@@ -154,11 +186,11 @@ func TestSyncBackRecordsWhatTheSiteHolds(t *testing.T) {
 
 	synced := runSyncBack(t, deps, syncBackContext(t, wpID))
 
-	if stored.Observed.H1 != "Espresso" || stored.Observed.Title != "Espresso" {
-		t.Fatalf("the stored mirror = %+v, want the heading and the title the site holds", stored.Observed)
+	if stored.WPID == nil || *stored.WPID != wpID || stored.LastSyncedAt == nil {
+		t.Fatalf("the stored page = %+v, want the id the site answers and the time it was read", stored)
 	}
-	if stored.Observed.Status != "draft" || stored.Observed.Slug != "espresso" {
-		t.Fatalf("the stored mirror = %+v", stored.Observed)
+	if synced.WPID != wpID || synced.Status != "draft" {
+		t.Fatalf("synced = %+v, want the status the site holds", synced)
 	}
 	if len(synced.Mismatches) != 0 {
 		t.Errorf("mismatches = %+v, want none: nothing was planned to disagree with", synced.Mismatches)
@@ -175,7 +207,7 @@ func TestSyncBackReportsAHeadingThatIsNotTheOneAskedFor(t *testing.T) {
 
 	synced := runSyncBack(t, deps, sc)
 
-	if len(synced.Mismatches) != 1 || synced.Mismatches[0].Field != pagemap.FieldH1 {
+	if len(synced.Mismatches) != 1 || synced.Mismatches[0].Field != steps.FieldH1 {
 		t.Fatalf("mismatches = %+v, want the heading reported", synced.Mismatches)
 	}
 	if synced.Mismatches[0].Planned != "How Far Can an E-Bike Go?" || synced.Mismatches[0].Actual != "Espresso" {
@@ -254,9 +286,8 @@ func TestSyncBackReadsAProductFromTheStore(t *testing.T) {
 			if len(synced.Mismatches) != 0 || len(synced.Findings) != 0 {
 				t.Errorf("a product the store names and places reports %+v / %+v", synced.Mismatches, synced.Findings)
 			}
-			if recorded.Observed.Title != "Espresso Machine" || recorded.Observed.Slug != "espresso-machine" ||
-				!strings.HasSuffix(recorded.Observed.Link, "/product/espresso-machine/") {
-				t.Errorf("the page observes %+v", recorded.Observed)
+			if recorded.WPID == nil || *recorded.WPID != product.ID || !strings.HasSuffix(synced.URL, "/product/espresso-machine/") {
+				t.Errorf("the page records %+v and the read back %+v", recorded, synced)
 			}
 			if links := recorder.byPage["page-child"]; len(links) != 1 || links[0].ToPageID == nil || *links[0].ToPageID != "page-parent" {
 				t.Errorf("the recorded links are %+v", links)

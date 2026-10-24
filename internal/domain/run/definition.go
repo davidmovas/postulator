@@ -9,15 +9,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
-	MaxRetryAttempts = 10
-	CheckpointAccept = "accept"
+	MaxRetryAttempts       = 10
+	CheckpointAccept       = "accept"
+	CheckpointAcceptFields = "accept.fields"
 )
 
 type RetryPolicy struct {
@@ -30,6 +33,8 @@ type StepContext struct {
 	Item      Item
 	Page      pagemap.Page
 	Spec      template.TemplateSpec
+	Type      pagetype.Type
+	Links     field.LinkPolicy
 	Params    map[string]any
 	Artifacts map[ArtifactKind]Artifact
 	Check     Checkpoint
@@ -51,6 +56,24 @@ func (c *StepContext) Artifact(kind ArtifactKind) (Artifact, error) {
 func (c *StepContext) Accepted() bool {
 	step, found, err := Get[string](c.Check, CheckpointAccept)
 	return err == nil && found && step == c.Item.CurrentStep
+}
+
+func (c *StepContext) AcceptedFields() []field.Key {
+	if !c.Accepted() {
+		return nil
+	}
+	keys, found, err := Get[[]field.Key](c.Check, CheckpointAcceptFields)
+	if err != nil || !found || len(keys) == 0 {
+		return nil
+	}
+	return keys
+}
+
+func ClearAcceptance(c Checkpoint) error {
+	if err := Set(c, CheckpointAccept, ""); err != nil {
+		return err
+	}
+	return Set(c, CheckpointAcceptFields, []field.Key{})
 }
 
 func (c *StepContext) Param(name string) (any, bool) {
@@ -76,15 +99,20 @@ type Result struct {
 }
 
 type Price struct {
-	Calls        func(spec template.TemplateSpec, params map[string]any) int
+	Calls        func(target Target, params map[string]any) int
+	Input        func(ctx context.Context, target Target) (int, error)
+	Applies      func(ctx context.Context, target Target, params map[string]any) (bool, error)
 	Ref          *llm.ModelRef
 	OutputTokens int
+	Overhead     int
+	ReadsBody    bool
 	Unpriced     bool
 }
 
 type Target struct {
-	Page pagemap.Page
-	Spec template.TemplateSpec
+	Page  pagemap.Page
+	Spec  template.TemplateSpec
+	Links field.LinkPolicy
 }
 
 type Preflight func(ctx context.Context, record Run, targets map[string]Target) ([]EstimateFinding, error)
@@ -92,6 +120,7 @@ type Preflight func(ctx context.Context, record Run, targets map[string]Target) 
 type StepDef struct {
 	Run       func(ctx context.Context, sc *StepContext) (Result, error)
 	Preflight Preflight
+	Scoped    func(scope []field.Key) []ArtifactKind
 	Name      string
 	Role      llm.Role
 	Requires  []ArtifactKind
@@ -196,7 +225,7 @@ func ValidateRecipe(registry StepCatalog, recipe []template.StepSpec) error {
 		}
 		seen[spec.Name] = struct{}{}
 
-		for _, required := range def.Requires {
+		for _, required := range def.RequiresFor(spec.Params) {
 			if _, ok := produced[required]; !ok {
 				return invalid("step "+spec.Name+" requires "+string(required)+", which no earlier step produces", "recipe")
 			}
@@ -223,6 +252,30 @@ func Plan(registry *Registry, kind Kind, recipe []template.StepSpec, deadline ti
 		steps = append(steps, def)
 	}
 	return Definition{Kind: kind, Steps: steps, Deadline: deadline}, nil
+}
+
+const (
+	ParamRewrite = "rewrite"
+	ParamFields  = "fields"
+)
+
+func (c *StepContext) Fields() []field.Key {
+	return FieldsOf(c.Params)
+}
+
+func (c *StepContext) Rewrites(pageID string) bool {
+	listed, held := c.Param(ParamRewrite)
+	if !held {
+		return false
+	}
+	switch pages := listed.(type) {
+	case []string:
+		return slices.Contains(pages, pageID)
+	case []any:
+		return slices.Contains(pages, any(pageID))
+	default:
+		return false
+	}
 }
 
 func ParamsFor(recipe []template.StepSpec, step string) map[string]any {

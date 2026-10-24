@@ -4,6 +4,7 @@ import type { Run, RunItem } from "../types.js";
 
 export const startRun = one(Runs.Start);
 export const estimateRun = one(Runs.Estimate);
+export const runParents = one(Runs.Parents);
 export const getRun = one(Runs.Get);
 export const listRuns = listed<Parameters<typeof Runs.List>[0], Run>(Runs.List);
 export const listRunItems = listed<Parameters<typeof Runs.ListItems>[0], RunItem>(Runs.ListItems);

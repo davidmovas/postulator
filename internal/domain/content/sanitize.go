@@ -7,6 +7,8 @@ import (
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
+
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
 const CodeMarkupStripped = "markup_stripped"
@@ -27,14 +29,67 @@ func (s Stripped) Any() bool {
 	return s.Links > 0 || len(s.Elements) > 0 || s.Attributes > 0 || s.Demoted > 0
 }
 
-func Sanitize(fragment string) (string, Stripped) {
+type LinkAllowance struct {
+	context LinkContext
+	policy  field.LinkPolicy
+	placed  map[string]int
+	total   int
+}
+
+func NewLinkAllowance(lc LinkContext, policy field.LinkPolicy) *LinkAllowance {
+	return &LinkAllowance{context: lc, policy: policy, placed: make(map[string]int)}
+}
+
+func (a *LinkAllowance) Context() LinkContext {
+	return a.context
+}
+
+func (a *LinkAllowance) keep(node *html.Node) (string, bool) {
+	if a == nil || !a.policy.Links {
+		return "", false
+	}
+	resolved := a.context.Resolve(Attr(node, "href"))
+	if resolved.Class != ClassGraph || !AnchorAllowed(resolved.Target, TextOf(node)) {
+		return "", false
+	}
+	if rules := a.policy.Rules; (rules.MaxLinks > 0 && a.total >= rules.MaxLinks) || a.placed[resolved.Target.PageID] >= max(rules.MaxPerTarget, 1) {
+		return "", false
+	}
+	a.placed[resolved.Target.PageID]++
+	a.total++
+	return a.context.Href(resolved.Target), true
+}
+
+type demotion struct {
+	from []string
+	to   atom.Atom
+}
+
+var (
+	sectionDemotion = demotion{from: demotedHeadings, to: atom.H3}
+	blockDemotion   = demotion{from: []string{"h1"}, to: atom.H2}
+)
+
+func Sanitize(fragment string, allowance *LinkAllowance) (string, Stripped) {
+	return sanitized(fragment, allowance, sectionDemotion)
+}
+
+func SanitizeBlock(fragment string, keepH1 bool) (string, Stripped) {
+	rule := blockDemotion
+	if keepH1 {
+		rule = demotion{}
+	}
+	return sanitized(fragment, nil, rule)
+}
+
+func sanitized(fragment string, allowance *LinkAllowance, rule demotion) (string, Stripped) {
 	doc, err := Parse(fragment)
 	if err != nil {
 		return "", Stripped{}
 	}
 
 	var stripped Stripped
-	scrub(doc.root, &stripped)
+	scrub(doc.root, allowance, rule, &stripped)
 
 	rendered, err := doc.Render()
 	if err != nil {
@@ -43,7 +98,7 @@ func Sanitize(fragment string) (string, Stripped) {
 	return rendered, stripped
 }
 
-func scrub(parent *html.Node, stripped *Stripped) {
+func scrub(parent *html.Node, allowance *LinkAllowance, rule demotion, stripped *Stripped) {
 	for child := parent.FirstChild; child != nil; {
 		next := child.NextSibling
 		if child.Type != html.ElementNode {
@@ -55,16 +110,22 @@ func scrub(parent *html.Node, stripped *Stripped) {
 			parent.RemoveChild(child)
 			stripped.Elements = append(stripped.Elements, child.Data)
 		case child.Data == "a":
+			if href, kept := allowance.keep(child); kept {
+				child.Attr = []html.Attribute{{Key: "href", Val: href}}
+				scrub(child, nil, rule, stripped)
+				break
+			}
+			scrub(child, nil, rule, stripped)
 			unwrap(parent, child)
 			stripped.Links++
 		default:
-			if slices.Contains(demotedHeadings, child.Data) {
-				child.Data = "h3"
-				child.DataAtom = atom.H3
+			if slices.Contains(rule.from, child.Data) {
+				child.Data = rule.to.String()
+				child.DataAtom = rule.to
 				stripped.Demoted++
 			}
 			child.Attr = keptAttributes(child.Attr, stripped)
-			scrub(child, stripped)
+			scrub(child, allowance, rule, stripped)
 		}
 		child = next
 	}
@@ -84,7 +145,8 @@ func keptAttributes(attrs []html.Attribute, stripped *Stripped) []html.Attribute
 	kept := make([]html.Attribute, 0, len(attrs))
 	for _, attr := range attrs {
 		key := strings.ToLower(attr.Key)
-		if strings.HasPrefix(key, "on") || strings.HasPrefix(strings.ToLower(strings.TrimSpace(attr.Val)), "javascript:") {
+		if strings.HasPrefix(key, "on") || strings.HasPrefix(strings.ToLower(strings.TrimSpace(attr.Val)), "javascript:") ||
+			slices.Contains(markingAttributes, key) || strings.HasPrefix(key, "data-") {
 			stripped.Attributes++
 			continue
 		}
@@ -92,6 +154,8 @@ func keptAttributes(attrs []html.Attribute, stripped *Stripped) []html.Attribute
 	}
 	return kept
 }
+
+var markingAttributes = []string{"class", "id", "style"}
 
 func strippedFindings(heading string, stripped Stripped) []Finding {
 	if !stripped.Any() {

@@ -6,6 +6,7 @@ import (
 
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
@@ -14,6 +15,8 @@ const (
 	NameJudge = appcontent.NameJudge
 
 	CodeJudgeUnavailable = "judge_unavailable"
+
+	judgePromptTokens = 510
 )
 
 type JudgeReport = appcontent.JudgeReport
@@ -25,7 +28,11 @@ func Judge(deps Deps) run.StepDef {
 		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
 		Produces: []run.ArtifactKind{run.ArtifactJudgeReport},
 		Retry:    run.RetryPolicy{Max: 2},
-		Price:    run.Price{OutputTokens: appcontent.JudgeTokens},
+		Price: run.Price{
+			OutputTokens: appcontent.JudgeTokens, Overhead: judgePromptTokens, ReadsBody: true,
+			Input: packInput(deps, domainllm.RoleJudge, pageKey),
+		},
+		Preflight: inputPreflight(deps, domainllm.RoleJudge, pageKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			report, tokens, err := judgement(ctx, deps, sc)
 			if err != nil {
@@ -85,15 +92,24 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	}
 
 	var targets []content.LinkTarget
+	var links *content.LinkContext
 	if lc, lcErr := linkContextOf(sc); lcErr == nil {
-		targets = lc.Targets
+		targets, links = lc.Targets, &lc
+	}
+	call, err := modelFor(ctx, deps, sc, NameJudge, domainllm.RoleJudge)
+	if err != nil {
+		return JudgeReport{}, 0, err
+	}
+	seen, err := deps.pictureOf(ctx, sc, bodyField(sc), links, deps.inputBudget(ctx, call, appcontent.JudgeTokens))
+	if err != nil {
+		return JudgeReport{}, 0, err
 	}
 
 	body, err := doc.Render()
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
-	draft, _, err := decodeArtifact[content.ContentDraft](sc, run.ArtifactDraft)
+	short, _, err := writtenField(sc, field.ProductShortDescription)
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
@@ -101,7 +117,8 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	assessed, err := deps.Content.Assess(ctx, appcontent.AssessRequest{
 		SiteID: sc.Run.SiteID, Page: sc.Page, Entity: entity, Spec: sc.Spec, Body: body,
 		Snippet:    appcontent.Snippet{Title: snippet.Title, Description: snippet.Description},
-		HasSnippet: hasSnippet, Product: draft.Product, Targets: targets, Call: callMeta(sc, NameJudge, domainllm.RoleJudge),
+		HasSnippet: hasSnippet, ShortDescription: short, Targets: targets, Picture: appcontent.JudgedPicture(seen.Fitted),
+		Call: callMeta(sc, NameJudge, domainllm.RoleJudge),
 	})
 	return assessed.Report, assessed.Tokens, err
 }

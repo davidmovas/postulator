@@ -22,7 +22,7 @@ function wide(rootsCount: number, perRoot: number) {
     const entities: Entity[] = [];
     const edges: Edge[] = [];
     for (let root = 0; root < rootsCount; root += 1) {
-        entities.push(entity({ id: `r${root}`, name: `Root ${root}`, kind: "hub", score: 1 - root / 10 }));
+        entities.push(entity({ id: `r${root}`, name: `Root ${root}`, score: 1 - root / 10 }));
         for (let child = 0; child < perRoot; child += 1) {
             const id = `r${root}c${child}`;
             entities.push(entity({ id, name: `Child ${child}`, score: 1 - child / perRoot }));

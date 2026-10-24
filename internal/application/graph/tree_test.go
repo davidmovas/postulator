@@ -9,10 +9,10 @@ import (
 
 func supplements() []graph.EntityInput {
 	return []graph.EntityInput{
-		{Name: "Supplements", Kind: "hub", Keywords: phrases("supplements")},
-		{Name: "Vitamins", Kind: "category", Keywords: phrases("vitamins"), ParentName: "Supplements"},
-		{Name: "Vitamin D", Kind: "topic", Keywords: phrases("vitamin d"), ParentName: "Vitamins"},
-		{Name: "Magnesium", Kind: "topic", Keywords: phrases("magnesium"), ParentName: "Vitamins"},
+		{Name: "Supplements", Keywords: phrases("supplements")},
+		{Name: "Vitamins", Keywords: phrases("vitamins"), ParentName: "Supplements"},
+		{Name: "Vitamin D", Keywords: phrases("vitamin d"), ParentName: "Vitamins"},
+		{Name: "Magnesium", Keywords: phrases("magnesium"), ParentName: "Vitamins"},
 	}
 }
 
@@ -66,20 +66,14 @@ func TestABatchThatCannotStandIsWrittenAtAll(t *testing.T) {
 		{
 			name: "a parent nobody declares",
 			entities: []graph.EntityInput{
-				{Name: "Vitamin D", Kind: "topic", Keywords: phrases("vitamin d"), ParentName: "Vitamins"},
+				{Name: "Vitamin D", Keywords: phrases("vitamin d"), ParentName: "Vitamins"},
 			},
 		},
 		{
 			name: "the same name twice",
 			entities: []graph.EntityInput{
-				{Name: "Vitamins", Kind: "category", Keywords: phrases("vitamins")},
-				{Name: "vitamins", Kind: "topic", Keywords: phrases("vitamins b")},
-			},
-		},
-		{
-			name: "a kind the domain does not know",
-			entities: []graph.EntityInput{
-				{Name: "Vitamins", Kind: "chapter", Keywords: phrases("vitamins")},
+				{Name: "Vitamins", Keywords: phrases("vitamins")},
+				{Name: "vitamins", Keywords: phrases("vitamins b")},
 			},
 		},
 		{
@@ -89,7 +83,7 @@ func TestABatchThatCannotStandIsWrittenAtAll(t *testing.T) {
 		{
 			name: "an entity that is its own parent",
 			entities: []graph.EntityInput{
-				{Name: "Vitamins", Kind: "category", Keywords: phrases("vitamins"), ParentName: "Vitamins"},
+				{Name: "Vitamins", Keywords: phrases("vitamins"), ParentName: "Vitamins"},
 			},
 		},
 	}
@@ -122,12 +116,12 @@ func TestABatchHangsOffWhatTheSiteAlreadyHas(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	root := h.entity(t, "Supplements", "hub")
+	root := h.entity(t, "Supplements")
 
 	created, err := h.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
 		SiteID: h.siteID,
 		Entities: []graph.EntityInput{
-			{Name: "Vitamins", Kind: "category", Keywords: phrases("vitamins"), ParentName: "Supplements"},
+			{Name: "Vitamins", Keywords: phrases("vitamins"), ParentName: "Supplements"},
 		},
 	})
 	if err != nil {
@@ -139,7 +133,7 @@ func TestABatchHangsOffWhatTheSiteAlreadyHas(t *testing.T) {
 
 	_, err = h.service.CreateEntities(t.Context(), graph.CreateEntitiesRequest{
 		SiteID:   h.siteID,
-		Entities: []graph.EntityInput{{Name: "Supplements", Kind: "hub", Keywords: phrases("supplements")}},
+		Entities: []graph.EntityInput{{Name: "Supplements", Keywords: phrases("supplements")}},
 	})
 	if !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("a name the site already carries = %v, want an invalid batch", err)

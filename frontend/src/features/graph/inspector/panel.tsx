@@ -6,13 +6,27 @@ import { Link } from "react-router";
 import { copy } from "../../../copy/index.js";
 import type { PageAudit } from "../../../data/types.js";
 import { relativeTime } from "../../../domain/format.js";
-import { Button, CloseIcon, cx, DeleteIcon, IconButton, SectionLabel, SmartToyIcon, toneClasses } from "../../../ui/index.js";
+import {
+    Button,
+    CloseIcon,
+    cx,
+    DeleteIcon,
+    EditNoteIcon,
+    IconButton,
+    SectionLabel,
+    SmartToyIcon,
+    toneClasses,
+} from "../../../ui/index.js";
 import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
-import { entityIcon, formatScore, entityKindLabel, kindTone } from "../labels.js";
-import type { GraphIndex } from "../model/index.js";
+import { pageTypesOf } from "../../settings/tabs.js";
+import { presetIcon, presetLabel, presetTone } from "../../settings/types/labels.js";
+import { entityTypeLabel, formatScore } from "../labels.js";
+import type { EntityType, GraphIndex } from "../model/index.js";
+import { presetOf, typeOf } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 import { AnchorsEditor } from "./anchors.js";
+import { EntityCard } from "./card.js";
 import { EntityFields } from "./fields.js";
 import { CanonicalPage } from "./page.js";
 import { Relations } from "./relations.js";
@@ -31,6 +45,31 @@ export interface InspectorProps {
     onRecompute: () => void;
     recomputing: boolean;
     audit: readonly PageAudit[] | null;
+    proposed: ReadonlySet<string>;
+    onReviewCard: (entityId: string) => void;
+}
+
+interface PageTypeLineProps {
+    siteId: string;
+    type: EntityType | null;
+}
+
+function PageTypeLine({ siteId, type }: PageTypeLineProps): ReactElement {
+    if (type === null) {
+        return <p className="text-2xs text-ink-faint">{copy.graph.inspector.typeNone}</p>;
+    }
+    const Icon = presetIcon(type.preset);
+    const role = presetLabel(type.preset);
+    return (
+        <div className="flex items-center gap-1.5 text-xs" data-entity-page-type={type.preset}>
+            <span className="text-ink-faint">{copy.graph.inspector.type}</span>
+            <Icon size={14} className={toneClasses[presetTone(type.preset)].ink} />
+            <span className="min-w-0 truncate text-ink">{type.name === role ? type.name : `${type.name} · ${role}`}</span>
+            <Link to={`${pageTypesOf(siteId)}&type=${encodeURIComponent(type.id)}`} className="ml-auto shrink-0 text-2xs">
+                {copy.graph.inspector.typeOpen}
+            </Link>
+        </div>
+    );
 }
 
 interface AuditRowsProps {
@@ -97,6 +136,8 @@ export function Inspector({
     onRecompute,
     recomputing,
     audit,
+    proposed,
+    onReviewCard,
 }: InspectorProps): ReactElement {
     const entity = selectedId === null ? undefined : index.byId.get(selectedId);
     const rank = useMemo(() => {
@@ -126,16 +167,17 @@ export function Inspector({
         );
     }
 
-    const Icon = entityIcon(entity.kind);
+    const preset = presetOf(index, entity.id);
+    const Icon = presetIcon(preset);
 
     return (
         <section aria-label={copy.graph.inspector.title} className="flex h-full min-h-0 flex-col bg-panel">
             <header className="flex items-start gap-2 border-b border-hairline p-3">
-                <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[kindTone(entity.kind)].ink}`} />
+                <Icon size={20} className={`mt-0.5 shrink-0 ${toneClasses[presetTone(preset)].ink}`} />
                 <div className="min-w-0 flex-1">
                     <h2 className="truncate text-base font-semibold text-ink">{entity.name}</h2>
                     <p className="flex items-center gap-2 text-2xs text-ink-dim">
-                        <span>{entityKindLabel(entity.kind)}</span>
+                        <span data-entity-type={preset}>{entityTypeLabel(typeOf(index, entity.id))}</span>
                         <span className="font-mono">{formatScore(entity.score)}</span>
                         <span>{copy.graph.inspector.rank(rank, index.counts.total)}</span>
                     </p>
@@ -170,10 +212,34 @@ export function Inspector({
                             onPlanPage(entity.id);
                         }}
                     />
+                    {entity.canonicalPageId === null ? null : <PageTypeLine siteId={siteId} type={typeOf(index, entity.id)} />}
                 </section>
 
                 <section className="flex flex-col gap-1">
                     <EntityFields entity={entity} />
+                </section>
+
+                <section className="flex flex-col gap-1" data-entity-card={entity.id}>
+                    <SectionLabel>{copy.graph.entityCard.title}</SectionLabel>
+                    {proposed.has(entity.id) ? (
+                        <div
+                            className="flex items-center gap-2 rounded-md border border-hairline bg-inset px-2.5 py-1.5"
+                            data-card-proposal-waiting={entity.id}
+                        >
+                            <EditNoteIcon size={14} className={`shrink-0 ${toneClasses.info.ink}`} />
+                            <span className="min-w-0 flex-1 text-xs text-ink-soft">{copy.graph.cards.waitingFor}</span>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                    onReviewCard(entity.id);
+                                }}
+                            >
+                                {copy.graph.cards.review}
+                            </Button>
+                        </div>
+                    ) : null}
+                    <EntityCard entity={entity} />
                 </section>
 
                 <section className="flex flex-col gap-1">

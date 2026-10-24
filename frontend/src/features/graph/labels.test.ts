@@ -1,8 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { entityKinds } from "../../generated/vocab.js";
-import { StarShineIcon } from "../../ui/index.js";
-import { entityIcon, formatScore, entityKindLabel, scored } from "./labels.js";
+import { copy } from "../../copy/index.js";
+import { proposalClashes } from "../../generated/vocab.js";
+import { clashLabel, entityTypeLabel, formatScore, scored } from "./labels.js";
+
+describe("clashLabel", () => {
+    it("words every clash a site proposal can carry", () => {
+        for (const clash of proposalClashes.filter((held) => held !== "")) {
+            expect(clashLabel(clash)).not.toBe(clash);
+            expect(clashLabel(clash).length).toBeGreaterThan(0);
+        }
+    });
+
+    it("says nothing for a proposal that does not clash", () => {
+        expect(clashLabel("")).toBe("");
+    });
+});
 
 describe("formatScore", () => {
     it("shows a computed score to two places", () => {
@@ -26,26 +39,12 @@ describe("scored", () => {
     });
 });
 
-describe("the entity kinds in words and icons", () => {
-    it("names every entity kind from one source", () => {
-        for (const kind of entityKinds) {
-            expect(entityKindLabel(kind)).not.toBe("");
-            expect(entityKindLabel(kind)).not.toBe(kind);
-        }
+describe("entityTypeLabel", () => {
+    it("names the type of the canonical page by the client's own name", () => {
+        expect(entityTypeLabel({ id: "t1", name: "Category", preset: "hub" })).toBe("Category");
     });
 
-    it("shows a kind it has never heard of as it arrived", () => {
-        expect(entityKindLabel("galaxy")).toBe("galaxy");
-        expect(entityKindLabel("")).toBe("");
-    });
-
-    it("draws every entity kind with its own icon", () => {
-        const icons = new Set(entityKinds.map((kind) => entityIcon(kind)));
-        expect(icons.size).toBe(entityKinds.length);
-    });
-
-    it("draws a kind it has never heard of as a custom one", () => {
-        expect(entityIcon("galaxy")).toBe(StarShineIcon);
-        expect(entityIcon("custom")).toBe(StarShineIcon);
+    it("says so when the canonical page carries no type", () => {
+        expect(entityTypeLabel(null)).toBe(copy.pageTypes.untyped);
     });
 });

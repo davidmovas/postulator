@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -179,7 +180,7 @@ func TestOnlyTheRootColumnMakesAGroupAndTheUrlPlacesTheRowsInIt(t *testing.T) {
 	h := newHarness(t)
 	path := h.file(t, "client.csv", clientSheet)
 	mapping := h.detected(t, path)
-	if !slices.Equal(mapping.Options.LevelColumns, []string{"Root Entity"}) {
+	if !slices.Equal(mapping.Options.LevelColumns, []string{"Root Entity", "Category", "Subcategory"}) {
 		t.Fatalf("levels = %v", mapping.Options.LevelColumns)
 	}
 
@@ -187,8 +188,11 @@ func TestOnlyTheRootColumnMakesAGroupAndTheUrlPlacesTheRowsInIt(t *testing.T) {
 	if len(report.Errors) != 0 {
 		t.Fatalf("errors = %+v", report.Errors)
 	}
-	if left := ignored(report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
-		t.Fatalf("ignored = %v, want the category columns", left)
+	if left := ignored(report); len(left) != 0 {
+		t.Fatalf("ignored = %v, want the category columns read as the trail", left)
+	}
+	if groupsBy := usedAs(report, "level"); !slices.Equal(groupsBy, []string{"Root Entity"}) {
+		t.Fatalf("group columns = %v, want the root alone", groupsBy)
 	}
 	owners := map[string]string{
 		"/peptides/":                "Peptides",
@@ -243,14 +247,15 @@ func TestOnlyTheRootColumnMakesAGroupAndTheUrlPlacesTheRowsInIt(t *testing.T) {
 	}
 }
 
-func (h harness) kinds(t *testing.T) map[string]graph.Kind {
+func (h harness) names(t *testing.T) []string {
 	t.Helper()
 
 	stored := h.entities(t)
-	out := make(map[string]graph.Kind, len(stored))
+	out := make([]string, 0, len(stored))
 	for i := range stored {
-		out[stored[i].Name] = stored[i].Kind
+		out = append(out, stored[i].Name)
 	}
+	slices.Sort(out)
 	return out
 }
 
@@ -260,28 +265,33 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 	cases := []struct {
 		name  string
 		sheet string
-		want  map[string]graph.Kind
+		want  []string
+		types map[string]string
 	}{
 		{
 			name: "a root beside category and subcategory columns",
 			sheet: "Root Entity,Category,Subcategory,URL,H1\nPeptides,,,/peptides/,Peptides\nPeptides,BPC-157,,/peptides/bpc-157/,BPC-157\n" +
 				"Peptides,BPC-157,Liquid,/peptides/bpc-157/liquid/,BPC-157 Liquid\n",
-			want: map[string]graph.Kind{"Peptides": graph.KindHub, "BPC-157": graph.KindTopic, "BPC-157 Liquid": graph.KindTopic},
+			want:  []string{"BPC-157", "BPC-157 Liquid", "Peptides"},
+			types: map[string]string{},
 		},
 		{
 			name:  "a root category column is ignored",
 			sheet: "Root Category,Category,URL,H1\nPeptides,,/peptides/,Peptides\nPeptides,BPC-157,/peptides/bpc-157/,BPC-157\n",
-			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "BPC-157": graph.KindTopic},
+			want:  []string{"BPC-157", "Peptides"},
+			types: map[string]string{},
 		},
 		{
-			name:  "a kind cell names the kind",
+			name:  "a level cell names the page type",
 			sheet: "Root,Category,URL,Entity Level\nPeptides,,/peptides/,Topic\nPeptides,BPC-157,/peptides/bpc-157/,Compound/Product\n",
-			want:  map[string]graph.Kind{"Peptides": graph.KindTopic, "Bpc 157": graph.KindProduct},
+			want:  []string{"Bpc 157", "Peptides"},
+			types: map[string]string{"/peptides/": "Entity", "/peptides/bpc-157/": "Product"},
 		},
 		{
 			name:  "category columns alone make no entity",
 			sheet: "Category,Subcategory,URL,H1\nPeptides,Liquid,/a/,Alpha\nPeptides,Powder,/b/,Beta\n",
-			want:  map[string]graph.Kind{"Alpha": graph.KindTopic, "Beta": graph.KindTopic},
+			want:  []string{"Alpha", "Beta"},
+			types: map[string]string{},
 		},
 	}
 
@@ -298,8 +308,11 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 			if orphaned := findings(applied.Report.Warnings, imports.CodeGroupWithoutPage); len(orphaned) != 0 {
 				t.Fatalf("groups without a page = %+v", orphaned)
 			}
-			if got := h.kinds(t); !maps.Equal(got, tc.want) {
-				t.Fatalf("entities = %+v, want %+v", got, tc.want)
+			if got := h.names(t); !slices.Equal(got, tc.want) {
+				t.Fatalf("entities = %v, want %v", got, tc.want)
+			}
+			if got := h.typeNames(t); !maps.Equal(got, tc.types) {
+				t.Fatalf("page types = %v, want %v", got, tc.types)
 			}
 		})
 	}
@@ -428,7 +441,7 @@ func TestAUrlParentWinsInsideTheRowsRootGroup(t *testing.T) {
 	}
 }
 
-func TestASavedCategoryLevelColumnIsIgnored(t *testing.T) {
+func TestASavedCategoryLevelColumnIsReadAsTheTrailAndMakesNoGroup(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
@@ -444,8 +457,11 @@ func TestASavedCategoryLevelColumnIsIgnored(t *testing.T) {
 	}
 
 	report := h.preview(t, path, imports.Mapping{ID: saved.Mapping.ID})
-	if left := ignored(report); !slices.Equal(left, []string{"Category", "Subcategory"}) {
-		t.Fatalf("ignored = %v, want the category columns", left)
+	if left := ignored(report); len(left) != 0 {
+		t.Fatalf("ignored = %v, want every column read", left)
+	}
+	if read := usedAs(report, "trail"); !slices.Equal(read, []string{"Category", "Subcategory"}) {
+		t.Fatalf("trail columns = %v, want the category columns", read)
 	}
 	if groups := report.Groups; len(groups) != 1 || !slices.Equal(groups[0].Path, []string{"Peptides"}) {
 		t.Fatalf("groups = %+v, want the root alone", groups)
@@ -566,13 +582,23 @@ func TestTheVariationSheetPutsEachFormUnderItsProduct(t *testing.T) {
 func TestAParentOrANameTwoEntitiesShareIsAnErrorNotAGuess(t *testing.T) {
 	t.Parallel()
 
+	const twoPagelessLiquids = "Root Entity,Root\nBPC-157,Liquid\nTB-500,Liquid\n"
 	cases := []struct {
-		name  string
-		sheet string
-		code  imports.FindingCode
+		name    string
+		before  string
+		sheet   string
+		code    imports.FindingCode
+		warning bool
 	}{
-		{name: "a parent named Liquid", sheet: "url,entity,parent\n/drops/,Drops,Liquid\n", code: imports.CodeAmbiguousParent},
-		{name: "an entity named Liquid with nothing above it", sheet: "url,entity\n/liquid/,Liquid\n", code: imports.CodeAmbiguousEntity},
+		{name: "a parent named Liquid", before: twoLiquids, sheet: "url,entity,parent\n/drops/,Drops,Liquid\n", code: imports.CodeAmbiguousParent},
+		{
+			name: "an entity named Liquid with nothing above it, which two pages carry", before: twoLiquids,
+			sheet: "url,entity\n/liquids/,Liquid\n", code: imports.CodeRowAmbiguous, warning: true,
+		},
+		{
+			name: "an entity named Liquid with nothing above it, which no page carries", before: twoPagelessLiquids,
+			sheet: "url,entity\n/liquids/,Liquid\n", code: imports.CodeAmbiguousEntity,
+		},
 	}
 
 	for _, tc := range cases {
@@ -580,13 +606,17 @@ func TestAParentOrANameTwoEntitiesShareIsAnErrorNotAGuess(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
-			liquids := h.file(t, "liquids.csv", twoLiquids)
+			liquids := h.file(t, "liquids.csv", tc.before)
 			h.apply(t, liquids, h.detected(t, liquids))
 
 			path := h.file(t, "ambiguous.csv", tc.sheet)
 			report := h.preview(t, path, h.detected(t, path))
-			if len(findings(report.Errors, tc.code)) != 1 {
-				t.Fatalf("errors = %+v, want one %s", report.Errors, tc.code)
+			list := report.Errors
+			if tc.warning {
+				list = report.Warnings
+			}
+			if len(findings(list, tc.code)) != 1 {
+				t.Fatalf("findings = %+v %+v, want one %s", report.Errors, report.Warnings, tc.code)
 			}
 		})
 	}
@@ -630,7 +660,7 @@ func TestThePreviewSaysWhatEachColumnBecame(t *testing.T) {
 	}
 }
 
-func notesAt(t *testing.T, h harness, path string) []pagemap.Note {
+func notesAt(t *testing.T, h harness, path string) []note.Note {
 	t.Helper()
 
 	stored := h.pages(t)
@@ -654,7 +684,7 @@ func TestNoteColumnsTravelWithThePage(t *testing.T) {
 	}
 	h.apply(t, first, mapping)
 
-	want := []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
+	want := []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Sold as a 10 ml vial"}}
 	if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, want) {
 		t.Fatalf("notes = %+v, want %+v", got, want)
 	}
@@ -664,7 +694,7 @@ func TestNoteColumnsTravelWithThePage(t *testing.T) {
 
 	second := h.file(t, "again.csv", "URL,Title,Notes\n/bpc-157/,BPC-157,Now a 5 ml vial\n/tb-500/,TB-500,\n")
 	h.apply(t, second, h.detected(t, second))
-	want = []pagemap.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Now a 5 ml vial"}}
+	want = []note.Note{{Label: "Intent Owner", Text: "Commercial"}, {Label: "Notes", Text: "Now a 5 ml vial"}}
 	if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, want) {
 		t.Fatalf("notes after a second import = %+v, want %+v", got, want)
 	}
@@ -678,6 +708,68 @@ func TestNoteColumnsTravelWithThePage(t *testing.T) {
 	if got := notesAt(t, target, "/bpc-157/"); !slices.Equal(got, want) {
 		t.Fatalf("notes after an export and an import = %+v, want %+v", got, want)
 	}
+}
+
+func cardNotesOf(t *testing.T, h harness, name string) []note.Note {
+	t.Helper()
+
+	entities, err := sqlite.NewEntityRepo(h.store).ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the entities: %v", err)
+	}
+	for i := range entities {
+		if entities[i].Name == name {
+			return entities[i].Notes
+		}
+	}
+	t.Fatalf("no entity %s", name)
+	return nil
+}
+
+func TestANoteThatDescribesTheEntityGoesToItsCard(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	sheet := h.file(t, "card.csv", "URL,Entity,Title,Notes,Entity notes\n"+
+		"/bpc-157/,BPC-157,BPC-157,Sold as a 10 ml vial,A pentadecapeptide\n"+
+		",Healing,,Peptides that repair tissue,\n")
+	mapping := h.detected(t, sheet)
+	if !slices.Equal(mapping.Options.NoteColumns, []string{"Notes", "Entity notes"}) {
+		t.Fatalf("note columns = %v", mapping.Options.NoteColumns)
+	}
+	h.apply(t, sheet, mapping)
+
+	check := func(h harness, when string) {
+		t.Helper()
+		if got := notesAt(t, h, "/bpc-157/"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Sold as a 10 ml vial"}}) {
+			t.Fatalf("%s: the page's notes = %+v, want only the note about the page", when, got)
+		}
+		if got := cardNotesOf(t, h, "BPC-157"); !slices.Equal(got, []note.Note{{Label: "Entity notes", Text: "A pentadecapeptide"}}) {
+			t.Fatalf("%s: BPC-157's card = %+v, want the note that names the entity", when, got)
+		}
+		if _, planned := h.pageAt(t, "/healing/"); planned {
+			t.Fatalf("%s: a row that names only an entity planned /healing/", when)
+		}
+		if got := cardNotesOf(t, h, "Healing"); !slices.Equal(got, []note.Note{{Label: "Notes", Text: "Peptides that repair tissue"}}) {
+			t.Fatalf("%s: Healing's card = %+v, want the row's note: a row with no page keeps every note on its entity", when, got)
+		}
+	}
+	check(h, "after the import")
+
+	report := h.preview(t, sheet, mapping)
+	for _, entity := range report.Entities {
+		if entity.Action != string(imports.ActionSkip) {
+			t.Fatalf("a second import of the same sheet would %s %s", entity.Action, entity.Name)
+		}
+	}
+
+	exported := filepath.Join(h.dir, "card.xlsx")
+	if _, err := h.service.Export(t.Context(), imports.ExportRequest{SiteID: h.siteID, Path: exported}); err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	target := newHarness(t)
+	target.apply(t, exported, target.detected(t, exported))
+	check(target, "after an export and an import")
 }
 
 func TestAnUnpublishedAncestorWithoutAnEntityGetsOne(t *testing.T) {

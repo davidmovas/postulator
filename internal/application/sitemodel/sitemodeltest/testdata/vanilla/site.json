@@ -1,0 +1,5563 @@
+{
+  "bodies": [
+    {
+      "Hash": "c620a62abe3d4851d369ff8dfc742484c3c9419e91cca35eae3e3c8b36221696",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/cart/",
+      "Raw": "<!-- wp:woocommerce/cart -->\n<div class=\"wp-block-woocommerce-cart alignwide is-loading\"><!-- wp:woocommerce/filled-cart-block -->\n<div class=\"wp-block-woocommerce-filled-cart-block\"><!-- wp:woocommerce/cart-items-block -->\n<div class=\"wp-block-woocommerce-cart-items-block\"><!-- wp:woocommerce/cart-line-items-block -->\n<div class=\"wp-block-woocommerce-cart-line-items-block\"></div>\n<!-- /wp:woocommerce/cart-line-items-block -->\n\n<!-- wp:woocommerce/product-collection {\"queryId\":0,\"query\":{\"perPage\":3,\"pages\":1,\"offset\":0,\"postType\":\"product\",\"order\":\"asc\",\"orderBy\":\"title\",\"search\":\"\",\"exclude\":[],\"inherit\":false,\"taxQuery\":{},\"isProductCollectionBlock\":true,\"featured\":false,\"woocommerceOnSale\":false,\"woocommerceStockStatus\":[\"instock\",\"outofstock\",\"onbackorder\"],\"woocommerceAttributes\":[],\"woocommerceHandPickedProducts\":[],\"filterable\":false,\"relatedBy\":{\"categories\":true,\"tags\":true}},\"tagName\":\"div\",\"displayLayout\":{\"type\":\"flex\",\"columns\":3,\"shrinkColumns\":true},\"dimensions\":{\"widthType\":\"fill\"},\"collection\":\"woocommerce/product-collection/cross-sells\",\"hideControls\":[\"filterable\"],\"queryContextIncludes\":[\"collection\"]} -->\n<div class=\"wp-block-woocommerce-product-collection\"><!-- wp:heading {\"textAlign\":\"left\",\"style\":{\"spacing\":{\"margin\":{\"bottom\":\"1rem\"}}}} -->\n<h2 class=\"wp-block-heading has-text-align-left\" style=\"margin-bottom:1rem\">You may be interested in&hellip;</h2>\n\n<!-- /wp:heading -->\n\n<!-- wp:woocommerce/product-template -->\n<!-- wp:woocommerce/product-image {\"showSaleBadge\":false,\"imageSizing\":\"thumbnail\",\"isDescendentOfQueryLoop\":true} -->\n<!-- wp:woocommerce/product-sale-badge {\"align\":\"right\"} /-->\n<!-- /wp:woocommerce/product-image -->\n\n<!-- wp:post-title {\"textAlign\":\"center\",\"isLink\":true,\"style\":{\"spacing\":{\"margin\":{\"bottom\":\"0.75rem\",\"top\":\"0\"}},\"typography\":{\"lineHeight\":\"1.4\"}},\"fontSize\":\"medium\",\"__woocommerceNamespace\":\"woocommerce/product-collection/product-title\"} /-->\n\n<!-- wp:woocommerce/product-price {\"isDescendentOfQueryLoop\":true,\"textAlign\":\"center\",\"fontSize\":\"small\"} /-->\n\n<!-- wp:woocommerce/product-button {\"textAlign\":\"center\",\"isDescendentOfQueryLoop\":true,\"fontSize\":\"small\"} /-->\n<!-- /wp:woocommerce/product-template --></div>\n<!-- /wp:woocommerce/product-collection --></div>\n\n<!-- /wp:woocommerce/cart-items-block -->\n\n<!-- wp:woocommerce/cart-totals-block -->\n<div class=\"wp-block-woocommerce-cart-totals-block\"><!-- wp:woocommerce/cart-order-summary-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-block\"><!-- wp:woocommerce/cart-order-summary-heading-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-heading-block\"></div>\n<!-- /wp:woocommerce/cart-order-summary-heading-block -->\n\n<!-- wp:woocommerce/cart-order-summary-coupon-form-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-coupon-form-block\"></div>\n<!-- /wp:woocommerce/cart-order-summary-coupon-form-block -->\n\n<!-- wp:woocommerce/cart-order-summary-subtotal-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-subtotal-block\"></div>\n<!-- /wp:woocommerce/cart-order-summary-subtotal-block -->\n\n<!-- wp:woocommerce/cart-order-summary-fee-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-fee-block\"></div>\n<!-- /wp:woocommerce/cart-order-summary-fee-block -->\n\n<!-- wp:woocommerce/cart-order-summary-discount-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-discount-block\"></div>\n<!-- /wp:woocommerce/cart-order-summary-discount-block -->\n\n<!-- wp:woocommerce/cart-order-summary-shipping-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-shipping-block\"></div>\n<!-- /wp:woocommerce/cart-order-summary-shipping-block -->\n\n<!-- wp:woocommerce/cart-order-summary-taxes-block -->\n<div class=\"wp-block-woocommerce-cart-order-summary-taxes-block\"></div>\n<!-- /wp:woocommerce/cart-order-summary-taxes-block --></div>\n<!-- /wp:woocommerce/cart-order-summary-block -->\n\n<!-- wp:woocommerce/cart-express-payment-block -->\n<div class=\"wp-block-woocommerce-cart-express-payment-block\"></div>\n<!-- /wp:woocommerce/cart-express-payment-block -->\n\n<!-- wp:woocommerce/proceed-to-checkout-block -->\n<div class=\"wp-block-woocommerce-proceed-to-checkout-block\"></div>\n<!-- /wp:woocommerce/proceed-to-checkout-block -->\n\n<!-- wp:woocommerce/cart-accepted-payment-methods-block -->\n<div class=\"wp-block-woocommerce-cart-accepted-payment-methods-block\"></div>\n<!-- /wp:woocommerce/cart-accepted-payment-methods-block --></div>\n<!-- /wp:woocommerce/cart-totals-block --></div>\n<!-- /wp:woocommerce/filled-cart-block -->\n\n<!-- wp:woocommerce/empty-cart-block -->\n<div class=\"wp-block-woocommerce-empty-cart-block\"><!-- wp:heading {\"textAlign\":\"center\",\"className\":\"with-empty-cart-icon wc-block-cart__empty-cart__title\"} -->\n<h2 class=\"wp-block-heading has-text-align-center with-empty-cart-icon wc-block-cart__empty-cart__title\">Your cart is currently empty!</h2>\n<!-- /wp:heading -->\n\n<!-- wp:separator {\"className\":\"is-style-dots\"} -->\n<hr class=\"wp-block-separator has-alpha-channel-opacity is-style-dots\"/>\n<!-- /wp:separator -->\n\n<!-- wp:heading {\"textAlign\":\"center\"} -->\n<h2 class=\"wp-block-heading has-text-align-center\">New in store</h2>\n<!-- /wp:heading -->\n\n<!-- wp:woocommerce/product-new {\"columns\":4,\"rows\":1} /--></div>\n<!-- /wp:woocommerce/empty-cart-block --></div>\n<!-- /wp:woocommerce/cart -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "5beaa3e7a0b206e553928e70dbb82b0d03aea5d0ef911d06e496a106eb4bcf62",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/checkout/",
+      "Raw": "<!-- wp:woocommerce/checkout -->\n<div class=\"wp-block-woocommerce-checkout alignwide wc-block-checkout is-loading\"><!-- wp:woocommerce/checkout-fields-block -->\n<div class=\"wp-block-woocommerce-checkout-fields-block\"><!-- wp:woocommerce/checkout-express-payment-block -->\n<div class=\"wp-block-woocommerce-checkout-express-payment-block\"></div>\n<!-- /wp:woocommerce/checkout-express-payment-block -->\n\n<!-- wp:woocommerce/checkout-contact-information-block -->\n<div class=\"wp-block-woocommerce-checkout-contact-information-block\"></div>\n<!-- /wp:woocommerce/checkout-contact-information-block -->\n\n<!-- wp:woocommerce/checkout-shipping-method-block -->\n<div class=\"wp-block-woocommerce-checkout-shipping-method-block\"></div>\n<!-- /wp:woocommerce/checkout-shipping-method-block -->\n\n<!-- wp:woocommerce/checkout-pickup-options-block -->\n<div class=\"wp-block-woocommerce-checkout-pickup-options-block\"></div>\n<!-- /wp:woocommerce/checkout-pickup-options-block -->\n\n<!-- wp:woocommerce/checkout-shipping-address-block -->\n<div class=\"wp-block-woocommerce-checkout-shipping-address-block\"></div>\n<!-- /wp:woocommerce/checkout-shipping-address-block -->\n\n<!-- wp:woocommerce/checkout-billing-address-block -->\n<div class=\"wp-block-woocommerce-checkout-billing-address-block\"></div>\n<!-- /wp:woocommerce/checkout-billing-address-block -->\n\n<!-- wp:woocommerce/checkout-shipping-methods-block -->\n<div class=\"wp-block-woocommerce-checkout-shipping-methods-block\"></div>\n<!-- /wp:woocommerce/checkout-shipping-methods-block -->\n\n<!-- wp:woocommerce/checkout-payment-block -->\n<div class=\"wp-block-woocommerce-checkout-payment-block\"></div>\n<!-- /wp:woocommerce/checkout-payment-block -->\n\n<!-- wp:woocommerce/checkout-additional-information-block -->\n<div class=\"wp-block-woocommerce-checkout-additional-information-block\"></div>\n<!-- /wp:woocommerce/checkout-additional-information-block -->\n\n<!-- wp:woocommerce/checkout-order-note-block -->\n<div class=\"wp-block-woocommerce-checkout-order-note-block\"></div>\n<!-- /wp:woocommerce/checkout-order-note-block -->\n\n<!-- wp:woocommerce/checkout-terms-block -->\n<div class=\"wp-block-woocommerce-checkout-terms-block\"></div>\n<!-- /wp:woocommerce/checkout-terms-block -->\n\n<!-- wp:woocommerce/checkout-actions-block -->\n<div class=\"wp-block-woocommerce-checkout-actions-block\"></div>\n<!-- /wp:woocommerce/checkout-actions-block --></div>\n<!-- /wp:woocommerce/checkout-fields-block -->\n\n<!-- wp:woocommerce/checkout-totals-block -->\n<div class=\"wp-block-woocommerce-checkout-totals-block\"><!-- wp:woocommerce/checkout-order-summary-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-block\"><!-- wp:woocommerce/checkout-order-summary-cart-items-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-cart-items-block\"></div>\n<!-- /wp:woocommerce/checkout-order-summary-cart-items-block -->\n\n<!-- wp:woocommerce/checkout-order-summary-coupon-form-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-coupon-form-block\"></div>\n<!-- /wp:woocommerce/checkout-order-summary-coupon-form-block -->\n\n<!-- wp:woocommerce/checkout-order-summary-subtotal-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-subtotal-block\"></div>\n<!-- /wp:woocommerce/checkout-order-summary-subtotal-block -->\n\n<!-- wp:woocommerce/checkout-order-summary-fee-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-fee-block\"></div>\n<!-- /wp:woocommerce/checkout-order-summary-fee-block -->\n\n<!-- wp:woocommerce/checkout-order-summary-discount-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-discount-block\"></div>\n<!-- /wp:woocommerce/checkout-order-summary-discount-block -->\n\n<!-- wp:woocommerce/checkout-order-summary-shipping-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-shipping-block\"></div>\n<!-- /wp:woocommerce/checkout-order-summary-shipping-block -->\n\n<!-- wp:woocommerce/checkout-order-summary-taxes-block -->\n<div class=\"wp-block-woocommerce-checkout-order-summary-taxes-block\"></div>\n<!-- /wp:woocommerce/checkout-order-summary-taxes-block --></div>\n<!-- /wp:woocommerce/checkout-order-summary-block --></div>\n<!-- /wp:woocommerce/checkout-totals-block --></div>\n<!-- /wp:woocommerce/checkout -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "2ef96b280497980b55c357437e67853659114da40aa6822558e165bb6625312a",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/guide/",
+      "Raw": "<!-- wp:paragraph -->\n<p>Every order ships with a short guide to storing and brewing what you bought.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Start with the <a href=\"/guide/setup/\">setup</a> before the first cup.</p>\n<!-- /wp:paragraph -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "f8b3fb19c76f8e6854326b7d89e027101353f30159722130684fa3964244f01f",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/guide/setup/",
+      "Raw": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Grinding</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Grind the beans just before you brew them, and keep the rest sealed.</p>\n<!-- /wp:paragraph -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "01a4f5d1bb06f7b58aa738268df2413b42b0aac6c5acf483268836d388d7ebdc",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/hello-world/",
+      "Raw": "<!-- wp:paragraph -->\n<p>Welcome to WordPress. This is your first post. Edit or delete it, then start writing!</p>\n<!-- /wp:paragraph -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "91793c7142ce612ecaf0f78a8f87474898a2cd22ca75bd44a7cf04a684f12200",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/my-account/",
+      "Raw": "<!-- wp:shortcode -->[woocommerce_my_account]<!-- /wp:shortcode -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "be1a3f8544539827f24c682f7943a9440087b3b2c5712a26355ba414f62fc7db",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/privacy-policy/",
+      "Raw": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Who we are</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>Our website address is: https://stand.example.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Comments</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>When visitors leave comments on the site we collect the data shown in the comments form, and also the visitor&#8217;s IP address and browser user agent string to help spam detection.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph -->\n<p>An anonymized string created from your email address (also called a hash) may be provided to the Gravatar service to see if you are using it. The Gravatar service privacy policy is available here: https://automattic.com/privacy/. After approval of your comment, your profile picture is visible to the public in the context of your comment.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Media</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>If you upload images to the website, you should avoid uploading images with embedded location data (EXIF GPS) included. Visitors to the website can download and extract any location data from images on the website.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Cookies</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>If you leave a comment on our site you may opt-in to saving your name, email address and website in cookies. These are for your convenience so that you do not have to fill in your details again when you leave another comment. These cookies will last for one year.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph -->\n<p>If you visit our login page, we will set a temporary cookie to determine if your browser accepts cookies. This cookie contains no personal data and is discarded when you close your browser.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph -->\n<p>When you log in, we will also set up several cookies to save your login information and your screen display choices. Login cookies last for two days, and screen options cookies last for a year. If you select &quot;Remember Me&quot;, your login will persist for two weeks. If you log out of your account, the login cookies will be removed.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph -->\n<p>If you edit or publish an article, an additional cookie will be saved in your browser. This cookie includes no personal data and simply indicates the post ID of the article you just edited. It expires after 1 day.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Embedded content from other websites</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>Articles on this site may include embedded content (e.g. videos, images, articles, etc.). Embedded content from other websites behaves in the exact same way as if the visitor has visited the other website.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph -->\n<p>These websites may collect data about you, use cookies, embed additional third-party tracking, and monitor your interaction with that embedded content, including tracking your interaction with the embedded content if you have an account and are logged in to that website.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Who we share your data with</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>If you request a password reset, your IP address will be included in the reset email.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">How long we retain your data</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>If you leave a comment, the comment and its metadata are retained indefinitely. This is so we can recognize and approve any follow-up comments automatically instead of holding them in a moderation queue.</p>\n<!-- /wp:paragraph -->\n<!-- wp:paragraph -->\n<p>For users that register on our website (if any), we also store the personal information they provide in their user profile. All users can see, edit, or delete their personal information at any time (except they cannot change their username). Website administrators can also see and edit that information.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">What rights you have over your data</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>If you have an account on this site, or have left comments, you can request to receive an exported file of the personal data we hold about you, including any data you have provided to us. You can also request that we erase any personal data we hold about you. This does not include any data we are obliged to keep for administrative, legal, or security purposes.</p>\n<!-- /wp:paragraph -->\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Where your data is sent</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p><strong class=\"privacy-policy-tutorial\">Suggested text: </strong>Visitor comments may be checked through an automated spam detection service.</p>\n<!-- /wp:paragraph -->\n",
+      "Side": "current"
+    },
+    {
+      "Hash": "88ed73dd1a3fe4f62dfc3dbc23556286b0597e7861dc0b6b746e1657c308953d",
+      "Kind": "classic",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/product/coffee-beans/",
+      "Raw": "<p>Roasted every week and sold whole.</p>",
+      "Side": "current"
+    },
+    {
+      "Hash": "ce4aab02061052a910e2464511f8eff8cfb510e0b78349bf4135db2a991eaa6f",
+      "Kind": "classic",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/product/powder/",
+      "Raw": "<p>See <a href=\"/product-category/koffein/\">Koffein</a>.</p>",
+      "Side": "current"
+    },
+    {
+      "Hash": "310e36ac14b32cb482dc4fdd092e5445223dbb8188d7f76fe176d75c8127acb5",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/refund_returns/",
+      "Raw": "<!-- wp:paragraph -->\n<p><b>This is a sample page.</b></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Overview</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Our refund and returns policy lasts 30 days. If 30 days have passed since your purchase, we can’t offer you a full refund or exchange.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>To be eligible for a return, your item must be unused and in the same condition that you received it. It must also be in the original packaging.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Several types of goods are exempt from being returned. Perishable goods such as food, flowers, newspapers or magazines cannot be returned. We also do not accept products that are intimate or sanitary goods, hazardous materials, or flammable liquids or gases.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Additional non-returnable items:</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:list -->\n<ul>\n<li>Gift cards</li>\n<li>Downloadable software products</li>\n<li>Some health and personal care items</li>\n</ul>\n<!-- /wp:list -->\n\n<!-- wp:paragraph -->\n<p>To complete your return, we require a receipt or proof of purchase.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Please do not send your purchase back to the manufacturer.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>There are certain situations where only partial refunds are granted:</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:list -->\n<ul>\n<li>Book with obvious signs of use</li>\n<li>CD, DVD, VHS tape, software, video game, cassette tape, or vinyl record that has been opened.</li>\n<li>Any item not in its original condition, is damaged or missing parts for reasons not due to our error.</li>\n<li>Any item that is returned more than 30 days after delivery</li>\n</ul>\n<!-- /wp:list -->\n\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Refunds</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Once your return is received and inspected, we will send you an email to notify you that we have received your returned item. We will also notify you of the approval or rejection of your refund.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>If you are approved, then your refund will be processed, and a credit will automatically be applied to your credit card or original method of payment, within a certain amount of days.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading {\"level\":3} -->\n<h3 class=\"wp-block-heading\">Late or missing refunds</h3>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>If you haven’t received a refund yet, first check your bank account again.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Then contact your credit card company, it may take some time before your refund is officially posted.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Next contact your bank. There is often some processing time before a refund is posted.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>If you’ve done all of this and you still have not received your refund yet, please contact us at {email address}.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading {\"level\":3} -->\n<h3 class=\"wp-block-heading\">Sale items</h3>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Only regular priced items may be refunded. Sale items cannot be refunded.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Exchanges</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>We only replace items if they are defective or damaged. If you need to exchange it for the same item, send us an email at {email address} and send your item to: {physical address}.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Gifts</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>If the item was marked as a gift when purchased and shipped directly to you, you’ll receive a gift credit for the value of your return. Once the returned item is received, a gift certificate will be mailed to you.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>If the item wasn’t marked as a gift when purchased, or the gift giver had the order shipped to themselves to give to you later, we will send a refund to the gift giver and they will find out about your return.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Shipping returns</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>To return your product, you should mail your product to: {physical address}.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>You will be responsible for paying for your own shipping costs for returning your item. Shipping costs are non-refundable. If you receive a refund, the cost of return shipping will be deducted from your refund.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Depending on where you live, the time it may take for your exchanged product to reach you may vary.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>If you are returning more expensive items, you may consider using a trackable shipping service or purchasing shipping insurance. We don’t guarantee that we will receive your returned item.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Need help?</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Contact us at {email} for questions related to refunds and returns.</p>\n<!-- /wp:paragraph -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "550f5e93cb64c398e22973065db6bdc2abbdbaec021699033e984f600511db95",
+      "Kind": "blocks",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/sample-page/",
+      "Raw": "<!-- wp:paragraph -->\n<p>This is an example page. It's different from a blog post because it will stay in one place and will show up in your site navigation (in most themes). Most people start with an About page that introduces them to potential site visitors. It might say something like this:</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:quote -->\n<blockquote class=\"wp-block-quote\">\n<!-- wp:paragraph -->\n<p>Hi there! I'm a bike messenger by day, aspiring actor by night, and this is my website. I live in Los Angeles, have a great dog named Jack, and I like pi&#241;a coladas. (And gettin' caught in the rain.)</p>\n<!-- /wp:paragraph -->\n</blockquote>\n<!-- /wp:quote -->\n\n<!-- wp:paragraph -->\n<p>...or something like this:</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:quote -->\n<blockquote class=\"wp-block-quote\">\n<!-- wp:paragraph -->\n<p>The XYZ Doohickey Company was founded in 1971, and has been providing quality doohickeys to the public ever since. Located in Gotham City, XYZ employs over 2,000 people and does all kinds of awesome things for the Gotham community.</p>\n<!-- /wp:paragraph -->\n</blockquote>\n<!-- /wp:quote -->\n\n<!-- wp:paragraph -->\n<p>As a new WordPress user, you should go to <a href=\"https://stand.example/wp-admin/\">your dashboard</a> to delete this page and create new pages for your content. Have fun!</p>\n<!-- /wp:paragraph -->",
+      "Side": "current"
+    },
+    {
+      "Hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "Kind": "classic",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "PageID": "page:/shop/",
+      "Raw": "",
+      "Side": "current"
+    }
+  ],
+  "edges": [
+    {
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "FromEntityID": "entity:Setup",
+      "ID": "edge:parent:entity:Setup>entity:Guide",
+      "Kind": "parent",
+      "Reason": "",
+      "SiteID": "site",
+      "Source": "user",
+      "Status": "approved",
+      "ToEntityID": "entity:Guide",
+      "Weight": 1
+    }
+  ],
+  "entities": [
+    {
+      "Anchors": [],
+      "CanonicalPageID": "page:/guide/",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Definition": "",
+      "Facts": [],
+      "ID": "entity:Guide",
+      "Intent": "",
+      "Keywords": [
+        {
+          "text": "coffee guide",
+          "volume": 880
+        }
+      ],
+      "Name": "Guide",
+      "Notes": [],
+      "ScopeID": null,
+      "Score": 0,
+      "SiteID": "site",
+      "Source": "user",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "Anchors": [],
+      "CanonicalPageID": "page:/guide/setup/",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Definition": "",
+      "Facts": [],
+      "ID": "entity:Setup",
+      "Intent": "",
+      "Keywords": [
+        {
+          "text": "coffee setup",
+          "volume": 320
+        }
+      ],
+      "Name": "Setup",
+      "Notes": [],
+      "ScopeID": "entity:Guide",
+      "Score": 0,
+      "SiteID": "site",
+      "Source": "user",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    }
+  ],
+  "fields": {
+    "page:/cart/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/cart/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Cart",
+        "BaseHash": "6d2d59aed44f1efab446c09e60a3da7794ed1e652cd88d0a67914e72d1f9eae8",
+        "Current": "Cart",
+        "CurrentHash": "6d2d59aed44f1efab446c09e60a3da7794ed1e652cd88d0a67914e72d1f9eae8",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/cart/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/checkout/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/checkout/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Checkout",
+        "BaseHash": "99e71f48c48f121baddd4def9d50fa3363580ae26c2d22dfe364c23f6da15240",
+        "Current": "Checkout",
+        "CurrentHash": "99e71f48c48f121baddd4def9d50fa3363580ae26c2d22dfe364c23f6da15240",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/checkout/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/guide/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/guide/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Guide",
+        "BaseHash": "8dd65d0952ed144ccf6e76ebf8aa45644afb2b9236762c414d07e813d42f588e",
+        "Current": "Guide",
+        "CurrentHash": "8dd65d0952ed144ccf6e76ebf8aa45644afb2b9236762c414d07e813d42f588e",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/guide/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/guide/setup/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/guide/setup/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Setup",
+        "BaseHash": "7013af4c42fe43802a9e8b0affc4f521fcd126160569969fb2ec09e1b7c422b1",
+        "Current": "Setup",
+        "CurrentHash": "7013af4c42fe43802a9e8b0affc4f521fcd126160569969fb2ec09e1b7c422b1",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/guide/setup/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/hello-world/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/hello-world/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Hello world!",
+        "BaseHash": "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a",
+        "Current": "Hello world!",
+        "CurrentHash": "c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/hello-world/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/my-account/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/my-account/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "My account",
+        "BaseHash": "b53181a4d853c390c1e2f834272e076f8b0e5c4778d81af88475e3c2f1713ae5",
+        "Current": "My account",
+        "CurrentHash": "b53181a4d853c390c1e2f834272e076f8b0e5c4778d81af88475e3c2f1713ae5",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/my-account/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/privacy-policy/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/privacy-policy/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Privacy Policy",
+        "BaseHash": "506ff394621596dd88138642eddfc1e41833b3ae92d95e5c77c94327098abd9a",
+        "Current": "Privacy Policy",
+        "CurrentHash": "506ff394621596dd88138642eddfc1e41833b3ae92d95e5c77c94327098abd9a",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/privacy-policy/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/product-category/koffein/": [
+      {
+        "Base": "Koffein",
+        "BaseHash": "bf75e28433abf6be6931f3fb7945707d14b3b2527e1e4bc4cbed421f4b4098dc",
+        "Current": "Koffein",
+        "CurrentHash": "bf75e28433abf6be6931f3fb7945707d14b3b2527e1e4bc4cbed421f4b4098dc",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product-category/koffein/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/product-category/uncategorized/": [
+      {
+        "Base": "Uncategorized",
+        "BaseHash": "8d40d123b2e1e296abdb30fe018ab76c8ec3d7fad9d1837db1410b1601ce9b28",
+        "Current": "Uncategorized",
+        "CurrentHash": "8d40d123b2e1e296abdb30fe018ab76c8ec3d7fad9d1837db1410b1601ce9b28",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product-category/uncategorized/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/product/coffee-beans/": [
+      {
+        "Base": "[{\"name\":\"Weight\",\"options\":[\"250 g\",\"1 kg\"],\"visible\":true,\"variation\":true}]",
+        "BaseHash": "725a7313c5b8fcced6fc0952856cb1ab4f0ca13269e0f45fb413db71845526ea",
+        "Current": "[{\"name\":\"Weight\",\"options\":[\"250 g\",\"1 kg\"],\"visible\":true,\"variation\":true}]",
+        "CurrentHash": "725a7313c5b8fcced6fc0952856cb1ab4f0ca13269e0f45fb413db71845526ea",
+        "Key": "attributes",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "<p>Whole beans, roasted every week.</p>",
+        "BaseHash": "87839ab540bfc6ebe5aec124236e895af9ad5bc2b4ba50aaf0a5af089e187ccd",
+        "Current": "<p>Whole beans, roasted every week.</p>",
+        "CurrentHash": "87839ab540bfc6ebe5aec124236e895af9ad5bc2b4ba50aaf0a5af089e187ccd",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "false",
+        "BaseHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+        "Current": "false",
+        "CurrentHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+        "Key": "manage_stock",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "9.00",
+        "BaseHash": "4cc019de7a747650855142af31a90fa652d0e00ee24e804acf171b4c82d675e9",
+        "Current": "9.00",
+        "CurrentHash": "4cc019de7a747650855142af31a90fa652d0e00ee24e804acf171b4c82d675e9",
+        "Key": "price",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "<p>Roasted every week and sold whole.</p>",
+        "BaseHash": "88ed73dd1a3fe4f62dfc3dbc23556286b0597e7861dc0b6b746e1657c308953d",
+        "Current": "<p>Roasted every week and sold whole.</p>",
+        "CurrentHash": "88ed73dd1a3fe4f62dfc3dbc23556286b0597e7861dc0b6b746e1657c308953d",
+        "Key": "product_description",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "<p>Whole beans, roasted every week.</p>",
+        "BaseHash": "87839ab540bfc6ebe5aec124236e895af9ad5bc2b4ba50aaf0a5af089e187ccd",
+        "Current": "<p>Whole beans, roasted every week.</p>",
+        "CurrentHash": "87839ab540bfc6ebe5aec124236e895af9ad5bc2b4ba50aaf0a5af089e187ccd",
+        "Key": "product_short_description",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "regular_price",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "sale_price",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "BEANS",
+        "BaseHash": "91bd6037274b180a01a5e063853c86c7ddb5dfbdaf24d042cb6827d521f7c16f",
+        "Current": "BEANS",
+        "CurrentHash": "91bd6037274b180a01a5e063853c86c7ddb5dfbdaf24d042cb6827d521f7c16f",
+        "Key": "sku",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "stock_quantity",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "instock",
+        "BaseHash": "8ab1d1f50ce23c16847228ba5e4da5b101b0dae2d3ff6af5a86333ddaf5971cd",
+        "Current": "instock",
+        "CurrentHash": "8ab1d1f50ce23c16847228ba5e4da5b101b0dae2d3ff6af5a86333ddaf5971cd",
+        "Key": "stock_status",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Coffee Beans",
+        "BaseHash": "2374ae15d4b173eb4b497fdc4036908412951a1f6c8b7ebffb3c943f26ff69f9",
+        "Current": "Coffee Beans",
+        "CurrentHash": "2374ae15d4b173eb4b497fdc4036908412951a1f6c8b7ebffb3c943f26ff69f9",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "{\"sku\":\"BEANS-250G\",\"price\":\"9.00\",\"regularPrice\":\"9.00\",\"salePrice\":\"\",\"stockStatus\":\"instock\",\"stockQuantity\":\"\",\"manageStock\":\"false\",\"status\":\"publish\",\"attributes\":[{\"name\":\"Weight\",\"option\":\"250 g\"}]}",
+        "BaseHash": "86018746a61599714a70f92a694bea993ed7fac07ebdb04329e7de8cb9e94233",
+        "Current": "{\"sku\":\"BEANS-250G\",\"price\":\"9.00\",\"regularPrice\":\"9.00\",\"salePrice\":\"\",\"stockStatus\":\"instock\",\"stockQuantity\":\"\",\"manageStock\":\"false\",\"status\":\"publish\",\"attributes\":[{\"name\":\"Weight\",\"option\":\"250 g\"}]}",
+        "CurrentHash": "86018746a61599714a70f92a694bea993ed7fac07ebdb04329e7de8cb9e94233",
+        "Key": "variation:14",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "{\"sku\":\"BEANS-1KG\",\"price\":\"29.00\",\"regularPrice\":\"29.00\",\"salePrice\":\"\",\"stockStatus\":\"instock\",\"stockQuantity\":\"\",\"manageStock\":\"false\",\"status\":\"publish\",\"attributes\":[{\"name\":\"Weight\",\"option\":\"1 kg\"}]}",
+        "BaseHash": "f54d91abdbf13bbf7a38480fe5e612102d28aa1dc41777f1a0577fbab8f99a8f",
+        "Current": "{\"sku\":\"BEANS-1KG\",\"price\":\"29.00\",\"regularPrice\":\"29.00\",\"salePrice\":\"\",\"stockStatus\":\"instock\",\"stockQuantity\":\"\",\"manageStock\":\"false\",\"status\":\"publish\",\"attributes\":[{\"name\":\"Weight\",\"option\":\"1 kg\"}]}",
+        "CurrentHash": "f54d91abdbf13bbf7a38480fe5e612102d28aa1dc41777f1a0577fbab8f99a8f",
+        "Key": "variation:15",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "variation_description:14",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "variation_description:15",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/coffee-beans/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/product/powder/": [
+      {
+        "Base": "[]",
+        "BaseHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "Current": "[]",
+        "CurrentHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "Key": "attributes",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "false",
+        "BaseHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+        "Current": "false",
+        "CurrentHash": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+        "Key": "manage_stock",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "12.00",
+        "BaseHash": "143dac93168e485ebb2583b43e5945842f7e750a0ddfa3bf85abfa330021fde4",
+        "Current": "12.00",
+        "CurrentHash": "143dac93168e485ebb2583b43e5945842f7e750a0ddfa3bf85abfa330021fde4",
+        "Key": "price",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "<p>See <a href=\"/product-category/koffein/\">Koffein</a>.</p>",
+        "BaseHash": "ce4aab02061052a910e2464511f8eff8cfb510e0b78349bf4135db2a991eaa6f",
+        "Current": "<p>See <a href=\"/product-category/koffein/\">Koffein</a>.</p>",
+        "CurrentHash": "ce4aab02061052a910e2464511f8eff8cfb510e0b78349bf4135db2a991eaa6f",
+        "Key": "product_description",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "product_short_description",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "12.00",
+        "BaseHash": "143dac93168e485ebb2583b43e5945842f7e750a0ddfa3bf85abfa330021fde4",
+        "Current": "12.00",
+        "CurrentHash": "143dac93168e485ebb2583b43e5945842f7e750a0ddfa3bf85abfa330021fde4",
+        "Key": "regular_price",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "sale_price",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "POWDER",
+        "BaseHash": "1c32bf190fa392fc2193e1b19602d233af05bad4d43f9e5ab198dd51af6506df",
+        "Current": "POWDER",
+        "CurrentHash": "1c32bf190fa392fc2193e1b19602d233af05bad4d43f9e5ab198dd51af6506df",
+        "Key": "sku",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "stock_quantity",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "instock",
+        "BaseHash": "8ab1d1f50ce23c16847228ba5e4da5b101b0dae2d3ff6af5a86333ddaf5971cd",
+        "Current": "instock",
+        "CurrentHash": "8ab1d1f50ce23c16847228ba5e4da5b101b0dae2d3ff6af5a86333ddaf5971cd",
+        "Key": "stock_status",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Powder",
+        "BaseHash": "4073bdb829811faa79292efdfc7e5e3f93b26d7628d724309a4a0a627f832f81",
+        "Current": "Powder",
+        "CurrentHash": "4073bdb829811faa79292efdfc7e5e3f93b26d7628d724309a4a0a627f832f81",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/product/powder/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/refund_returns/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/refund_returns/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Refund and Returns Policy",
+        "BaseHash": "7a845af8d2c4feeca0f5545f7b0bf998fce5e31ab1920b7d92855caa2fec5f46",
+        "Current": "Refund and Returns Policy",
+        "CurrentHash": "7a845af8d2c4feeca0f5545f7b0bf998fce5e31ab1920b7d92855caa2fec5f46",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/refund_returns/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/sample-page/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/sample-page/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Sample Page",
+        "BaseHash": "e905c0c04250b289103305f83f1c79b2f590a0112c137ae6c20aa65b6b73b5cf",
+        "Current": "Sample Page",
+        "CurrentHash": "e905c0c04250b289103305f83f1c79b2f590a0112c137ae6c20aa65b6b73b5cf",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/sample-page/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ],
+    "page:/shop/": [
+      {
+        "Base": "",
+        "BaseHash": "",
+        "Current": "",
+        "CurrentHash": "",
+        "Key": "excerpt",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/shop/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      },
+      {
+        "Base": "Shop",
+        "BaseHash": "d00aae6b7fbf77a4566d8df36805d7ae973894da9f533ec96516b31e028b71eb",
+        "Current": "Shop",
+        "CurrentHash": "d00aae6b7fbf77a4566d8df36805d7ae973894da9f533ec96516b31e028b71eb",
+        "Key": "title",
+        "ObservedAt": "2026-10-19T09:00:00Z",
+        "PageID": "page:/shop/",
+        "WrittenAt": null,
+        "WrittenRunID": null
+      }
+    ]
+  },
+  "findings": [
+    {
+      "Code": "render_redirected",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "EntityID": null,
+      "ID": "finding:render_redirected#1",
+      "Options": [
+        "rescan",
+        "ignore"
+      ],
+      "PageID": "page:/checkout/",
+      "Resolution": "",
+      "ResolvedBy": "",
+      "Severity": "info",
+      "SiteID": "site",
+      "Status": "open",
+      "Subject": {
+        "target": "/cart/"
+      },
+      "SubjectKey": "page:page:/checkout/",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "Code": "technical_detected",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "EntityID": null,
+      "ID": "finding:technical_detected#1",
+      "Options": [
+        "clear_technical",
+        "ignore"
+      ],
+      "PageID": "page:/cart/",
+      "Resolution": "",
+      "ResolvedBy": "",
+      "Severity": "info",
+      "SiteID": "site",
+      "Status": "open",
+      "Subject": {
+        "reason": "cart"
+      },
+      "SubjectKey": "page:page:/cart/",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "Code": "technical_detected",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "EntityID": null,
+      "ID": "finding:technical_detected#2",
+      "Options": [
+        "clear_technical",
+        "ignore"
+      ],
+      "PageID": "page:/checkout/",
+      "Resolution": "",
+      "ResolvedBy": "",
+      "Severity": "info",
+      "SiteID": "site",
+      "Status": "open",
+      "Subject": {
+        "reason": "checkout"
+      },
+      "SubjectKey": "page:page:/checkout/",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "Code": "technical_detected",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "EntityID": null,
+      "ID": "finding:technical_detected#3",
+      "Options": [
+        "clear_technical",
+        "ignore"
+      ],
+      "PageID": "page:/my-account/",
+      "Resolution": "",
+      "ResolvedBy": "",
+      "Severity": "info",
+      "SiteID": "site",
+      "Status": "open",
+      "Subject": {
+        "reason": "account"
+      },
+      "SubjectKey": "page:page:/my-account/",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "Code": "technical_detected",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "EntityID": null,
+      "ID": "finding:technical_detected#4",
+      "Options": [
+        "clear_technical",
+        "ignore"
+      ],
+      "PageID": "page:/privacy-policy/",
+      "Resolution": "",
+      "ResolvedBy": "",
+      "Severity": "info",
+      "SiteID": "site",
+      "Status": "open",
+      "Subject": {
+        "reason": "privacy"
+      },
+      "SubjectKey": "page:page:/privacy-policy/",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "Code": "technical_detected",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "EntityID": null,
+      "ID": "finding:technical_detected#5",
+      "Options": [
+        "clear_technical",
+        "ignore"
+      ],
+      "PageID": "page:/refund_returns/",
+      "Resolution": "",
+      "ResolvedBy": "",
+      "Severity": "info",
+      "SiteID": "site",
+      "Status": "open",
+      "Subject": {
+        "reason": "noindex"
+      },
+      "SubjectKey": "page:page:/refund_returns/",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "Code": "technical_detected",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "EntityID": null,
+      "ID": "finding:technical_detected#6",
+      "Options": [
+        "clear_technical",
+        "ignore"
+      ],
+      "PageID": "page:/shop/",
+      "Resolution": "",
+      "ResolvedBy": "",
+      "Severity": "info",
+      "SiteID": "site",
+      "Status": "open",
+      "Subject": {
+        "reason": "shop"
+      },
+      "SubjectKey": "page:page:/shop/",
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    }
+  ],
+  "links": [
+    {
+      "Absolute": false,
+      "AnchorText": "Coffee Beans",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Select options",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Powder",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/powder/",
+      "ToURL": "/product/powder/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#10",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/cart/",
+      "ID": "link:page:/cart/#11",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "setup",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": 1,
+      "Region": "content",
+      "SiteID": "site",
+      "Source": "raw",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "contextual"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/guide/",
+      "ID": "link:page:/guide/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/guide/setup/",
+      "ID": "link:page:/guide/setup/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Uncategorized",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/category/uncategorized/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#10",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "shopadmin",
+      "FromPageID": "page:/hello-world/",
+      "ID": "link:page:/hello-world/#11",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "unknown",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/author/shopadmin/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Lost your password?",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "content_dynamic",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/my-account/lost-password/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/my-account/",
+      "ID": "link:page:/my-account/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/privacy-policy/",
+      "ID": "link:page:/privacy-policy/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Home",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "breadcrumb",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "breadcrumb"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "View cart",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Coffee Beans",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Placeholder",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Select options",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Placeholder",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/powder/",
+      "ToURL": "/product/powder/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Powder",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/powder/",
+      "ToURL": "/product/powder/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#10",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#11",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#12",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#13",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#14",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#15",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/product-category/koffein/",
+      "ID": "link:page:/product-category/koffein/#16",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Home",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "breadcrumb",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "breadcrumb"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "store's home",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "generated",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#10",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/product-category/uncategorized/",
+      "ID": "link:page:/product-category/uncategorized/#11",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Home",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "breadcrumb",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "breadcrumb"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Koffein",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "breadcrumb",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product-category/koffein/",
+      "ToURL": "/product-category/koffein/",
+      "Type": "breadcrumb"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Koffein",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#10",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product-category/koffein/",
+      "ToURL": "/product-category/koffein/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#11",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#12",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "View cart",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#13",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "unknown",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Placeholder",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#14",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "unknown",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/powder/",
+      "ToURL": "/product/powder/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Powder",
+      "FromPageID": "page:/product/coffee-beans/",
+      "ID": "link:page:/product/coffee-beans/#15",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "unknown",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/powder/",
+      "ToURL": "/product/powder/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Koffein",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": 0,
+      "Region": "content",
+      "SiteID": "site",
+      "Source": "raw",
+      "ToPageID": "page:/product-category/koffein/",
+      "ToURL": "/product-category/koffein/",
+      "Type": "contextual"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Home",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "breadcrumb",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "breadcrumb"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Koffein",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "breadcrumb",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product-category/koffein/",
+      "ToURL": "/product-category/koffein/",
+      "Type": "breadcrumb"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#10",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Koffein",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#11",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product-category/koffein/",
+      "ToURL": "/product-category/koffein/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#12",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#13",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Coffee Beans",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#14",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "unknown",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Placeholder",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#15",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "unknown",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Select options",
+      "FromPageID": "page:/product/powder/",
+      "ID": "link:page:/product/powder/#16",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "unknown",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "unknown"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/refund_returns/",
+      "ID": "link:page:/refund_returns/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": true,
+      "AnchorText": "your dashboard",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": 4,
+      "Region": "content",
+      "SiteID": "site",
+      "Source": "raw",
+      "ToPageID": null,
+      "ToURL": "/wp-admin/",
+      "Type": "contextual"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Shop",
+      "FromPageID": "page:/sample-page/",
+      "ID": "link:page:/sample-page/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/shop/",
+      "ToURL": "/shop/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Home",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#1",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "breadcrumb",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "breadcrumb"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "View cart",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#2",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Coffee Beans",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#3",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Placeholder",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#4",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Select options",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#5",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/coffee-beans/",
+      "ToURL": "/product/coffee-beans/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Placeholder",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#6",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/powder/",
+      "ToURL": "/product/powder/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Powder",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#7",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "listing",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/product/powder/",
+      "ToURL": "/product/powder/",
+      "Type": "listing"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#8",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Vanilla Store",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#9",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": null,
+      "ToURL": "/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Cart",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#10",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/cart/",
+      "ToURL": "/cart/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Checkout",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#11",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/checkout/",
+      "ToURL": "/checkout/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Guide",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#12",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/",
+      "ToURL": "/guide/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Setup",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#13",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/guide/setup/",
+      "ToURL": "/guide/setup/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "My account",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#14",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/my-account/",
+      "ToURL": "/my-account/",
+      "Type": "navigation"
+    },
+    {
+      "Absolute": false,
+      "AnchorText": "Sample Page",
+      "FromPageID": "page:/shop/",
+      "ID": "link:page:/shop/#15",
+      "ObservedAt": "2026-10-19T09:00:00Z",
+      "Origin": "observed",
+      "Ours": false,
+      "Position": null,
+      "Region": "navigation",
+      "SiteID": "site",
+      "Source": "render",
+      "ToPageID": "page:/sample-page/",
+      "ToURL": "/sample-page/",
+      "Type": "navigation"
+    }
+  ],
+  "pages": [
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/cart/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/cart/",
+        "Slug": "cart",
+        "Status": "publish",
+        "Title": "Cart"
+      },
+      "PageTypeID": "type:technical",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/cart/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "cart",
+      "Status": "published",
+      "TechnicalReason": "cart",
+      "TemplateID": null,
+      "Title": "Cart",
+      "TypeReason": "technical",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 6,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/checkout/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/checkout/",
+        "Slug": "checkout",
+        "Status": "publish",
+        "Title": "Checkout"
+      },
+      "PageTypeID": "type:technical",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/checkout/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "checkout",
+      "Status": "published",
+      "TechnicalReason": "checkout",
+      "TemplateID": null,
+      "Title": "Checkout",
+      "TypeReason": "technical",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 7,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": "entity:Guide",
+      "H1": "",
+      "ID": "page:/guide/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/guide/",
+        "Slug": "guide",
+        "Status": "publish",
+        "Title": "Guide"
+      },
+      "PageTypeID": "type:entity",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/guide/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "guide",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Guide",
+      "TypeReason": "default",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 10,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": "entity:Setup",
+      "H1": "",
+      "ID": "page:/guide/setup/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/guide/setup/",
+        "Slug": "setup",
+        "Status": "publish",
+        "Title": "Setup"
+      },
+      "PageTypeID": "type:entity",
+      "ParentMethod": "",
+      "ParentPageID": "page:/guide/",
+      "ParentReason": "wp_parent",
+      "Path": "/guide/setup/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "setup",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Setup",
+      "TypeReason": "default",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 11,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/hello-world/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/hello-world/",
+        "Slug": "hello-world",
+        "Status": "publish",
+        "Title": "Hello world!"
+      },
+      "PageTypeID": "type:entity",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/hello-world/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "hello-world",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Hello world!",
+      "TypeReason": "default",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 1,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "post"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/my-account/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/my-account/",
+        "Slug": "my-account",
+        "Status": "publish",
+        "Title": "My account"
+      },
+      "PageTypeID": "type:technical",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/my-account/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "my-account",
+      "Status": "published",
+      "TechnicalReason": "account",
+      "TemplateID": null,
+      "Title": "My account",
+      "TypeReason": "technical",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 8,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/privacy-policy/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/privacy-policy/",
+        "Slug": "privacy-policy",
+        "Status": "draft",
+        "Title": "Privacy Policy"
+      },
+      "PageTypeID": "type:technical",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/privacy-policy/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "privacy-policy",
+      "Status": "exists",
+      "TechnicalReason": "privacy",
+      "TemplateID": null,
+      "Title": "Privacy Policy",
+      "TypeReason": "technical",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 3,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/product-category/koffein/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/product-category/koffein/",
+        "Slug": "koffein",
+        "Status": "publish",
+        "Title": "Koffein"
+      },
+      "PageTypeID": "type:store_category",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/product-category/koffein/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "term",
+      "SiteID": "site",
+      "Slug": "koffein",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Koffein",
+      "TypeReason": "store_category",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 100014,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "product_cat"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/product-category/uncategorized/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/product-category/uncategorized/",
+        "Slug": "uncategorized",
+        "Status": "publish",
+        "Title": "Uncategorized"
+      },
+      "PageTypeID": "type:store_category",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/product-category/uncategorized/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "term",
+      "SiteID": "site",
+      "Slug": "uncategorized",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Uncategorized",
+      "TypeReason": "store_category",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 100013,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "product_cat"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/product/coffee-beans/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/product/coffee-beans/",
+        "Slug": "coffee-beans",
+        "Status": "publish",
+        "Title": "Coffee Beans"
+      },
+      "PageTypeID": "type:product",
+      "ParentMethod": "href",
+      "ParentPageID": "page:/product-category/koffein/",
+      "ParentReason": "jsonld_breadcrumb",
+      "Path": "/product/coffee-beans/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "coffee-beans",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Coffee Beans",
+      "TypeReason": "product",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 12,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "product"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/product/powder/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/product/powder/",
+        "Slug": "powder",
+        "Status": "publish",
+        "Title": "Powder"
+      },
+      "PageTypeID": "type:product",
+      "ParentMethod": "href",
+      "ParentPageID": "page:/product-category/koffein/",
+      "ParentReason": "jsonld_breadcrumb",
+      "Path": "/product/powder/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "powder",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Powder",
+      "TypeReason": "product",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 13,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "product"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/refund_returns/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/refund_returns/",
+        "Slug": "refund_returns",
+        "Status": "draft",
+        "Title": "Refund and Returns Policy"
+      },
+      "PageTypeID": "type:technical",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/refund_returns/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "refund_returns",
+      "Status": "exists",
+      "TechnicalReason": "noindex",
+      "TemplateID": null,
+      "Title": "Refund and Returns Policy",
+      "TypeReason": "technical",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 9,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/sample-page/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/sample-page/",
+        "Slug": "sample-page",
+        "Status": "publish",
+        "Title": "Sample Page"
+      },
+      "PageTypeID": "type:entity",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/sample-page/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "sample-page",
+      "Status": "published",
+      "TechnicalReason": "",
+      "TemplateID": null,
+      "Title": "Sample Page",
+      "TypeReason": "default",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 2,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    },
+    {
+      "Canonical": "",
+      "ContentHash": "",
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "Drift": false,
+      "EntityID": null,
+      "H1": "",
+      "ID": "page:/shop/",
+      "Keywords": [],
+      "LastSyncedAt": "2026-10-19T09:00:00Z",
+      "MetaDescription": "",
+      "MetaTitle": "",
+      "Notes": [],
+      "Observed": {
+        "H1": "",
+        "Link": "/shop/",
+        "Slug": "shop",
+        "Status": "publish",
+        "Title": "Shop"
+      },
+      "PageTypeID": "type:catalog",
+      "ParentMethod": "",
+      "ParentPageID": null,
+      "ParentReason": "none",
+      "Path": "/shop/",
+      "PlannedPath": "",
+      "ReadOnlyReason": "",
+      "SiteID": "site",
+      "Slug": "shop",
+      "Status": "published",
+      "TechnicalReason": "shop",
+      "TemplateID": null,
+      "Title": "Shop",
+      "TypeReason": "shop",
+      "TypeSource": "auto",
+      "UpdatedAt": "2026-10-19T09:00:00Z",
+      "WPID": 5,
+      "WPModifiedAt": "2026-10-19T09:00:00Z",
+      "WPType": "page"
+    }
+  ],
+  "renders": [
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "6615b0e0de0d6414093eae0da08874983106877096b3efcacae966d6b0951704",
+      "headings": [
+        {
+          "generated": true,
+          "level": 1,
+          "text": "Cart"
+        },
+        {
+          "generated": true,
+          "level": 2,
+          "text": "Your cart is currently empty!"
+        },
+        {
+          "generated": true,
+          "level": 2,
+          "text": "New in store"
+        }
+      ],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/cart/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 7,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": true,
+          "kind": "listing",
+          "links": 3,
+          "signal": "links",
+          "words": 28
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content_dynamic",
+          "links": 0,
+          "signal": "",
+          "words": 1
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 3
+        }
+      ],
+      "robots": "max-image-preview:large, noindex, follow",
+      "root": "dynamic_only",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 0,
+      "wordsGenerated": 29
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "/cart/",
+      "hash": "9715c792e37719135b7cf4cf44d31309343ca3cecf71df85c01d8e0bcb8cc33d",
+      "headings": [],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/checkout/",
+      "regions": [],
+      "robots": "",
+      "root": "dynamic_only",
+      "trails": [],
+      "urlForm": "",
+      "wordsContent": 0,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "b255ac9f5874cb92d8fd64b46f5189c23cccc3ab66ff59429cb9a5451467a7ac",
+      "headings": [],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/guide/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 7,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 1,
+          "signal": "",
+          "words": 22
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 4
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "found",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 22,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "12f9d28f820b2bfc3940a621f2bf63188a3c60bfb287be7cadf7ebebeb5c13fb",
+      "headings": [
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Grinding"
+        }
+      ],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/guide/setup/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 7,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 0,
+          "signal": "",
+          "words": 14
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 4
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "found",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 14,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "841b95c1880f9e6d19beed11f925b06e4a1af513e0724f728ca2980300b75c94",
+      "headings": [],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/hello-world/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 8,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 1,
+          "signal": "rel",
+          "words": 1
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 0,
+          "signal": "",
+          "words": 15
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 3,
+          "signal": "",
+          "words": 91
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "found",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 15,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "c35649da95753923c2c9f681244f1c6be4dbcc1f09c6328f6f2bbc6842b9f783",
+      "headings": [
+        {
+          "generated": true,
+          "level": 1,
+          "text": "My account"
+        },
+        {
+          "generated": true,
+          "level": 2,
+          "text": "Login"
+        }
+      ],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/my-account/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 7,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content_dynamic",
+          "links": 1,
+          "signal": "",
+          "words": 17
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 3
+        }
+      ],
+      "robots": "max-image-preview:large, noindex, follow",
+      "root": "dynamic_only",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 0,
+      "wordsGenerated": 17
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "bd23c48cd9fe79ee7daf1455619e63f6f2613600f216e93af479b158738e6927",
+      "headings": [
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Who we are"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Comments"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Media"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Cookies"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Embedded content from other websites"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Who we share your data with"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "How long we retain your data"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "What rights you have over your data"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Where your data is sent"
+        }
+      ],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/privacy-policy/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 8,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 0,
+          "signal": "",
+          "words": 620
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 5
+        }
+      ],
+      "robots": "max-image-preview:large, noindex, follow",
+      "root": "found",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 620,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "b80bdc4e08485b996934043c0398d77d17761da00f09fa75252206d4dfa41d18",
+      "headings": [
+        {
+          "generated": true,
+          "level": 1,
+          "text": "Koffein"
+        },
+        {
+          "generated": true,
+          "level": 2,
+          "text": "Coffee Beans"
+        },
+        {
+          "generated": true,
+          "level": 2,
+          "text": "Powder"
+        }
+      ],
+      "jsonld": {
+        "BreadcrumbList": [
+          {
+            "@context": "https://schema.org/",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example",
+                  "name": "Home"
+                },
+                "position": 1
+              },
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example/product-category/koffein/",
+                  "name": "Koffein"
+                },
+                "position": 2
+              }
+            ]
+          }
+        ]
+      },
+      "links": null,
+      "pageId": "page:/product-category/koffein/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 8,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": true,
+          "kind": "breadcrumb",
+          "links": 1,
+          "signal": "jsonld",
+          "words": 2
+        },
+        {
+          "inside": true,
+          "kind": "listing",
+          "links": 6,
+          "signal": "links",
+          "words": 22
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "generated",
+          "links": 0,
+          "signal": "",
+          "words": 31
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 4
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "archive",
+      "trails": [
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "href": "https://stand.example/product-category/koffein/",
+              "name": "Koffein",
+              "path": "/product-category/koffein/"
+            }
+          ],
+          "source": "jsonld"
+        },
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "name": "Koffein",
+              "path": "/product-category/koffein/"
+            }
+          ],
+          "source": "nav"
+        }
+      ],
+      "urlForm": "absolute",
+      "wordsContent": 0,
+      "wordsGenerated": 55
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "665adf932f35982fa15f5b1998c5ebe895f2d54b16768038e80ef02146c22350",
+      "headings": [
+        {
+          "generated": true,
+          "level": 1,
+          "text": "Uncategorized"
+        }
+      ],
+      "jsonld": {
+        "BreadcrumbList": [
+          {
+            "@context": "https://schema.org/",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example",
+                  "name": "Home"
+                },
+                "position": 1
+              },
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example/product-category/uncategorized/",
+                  "name": "Uncategorized"
+                },
+                "position": 2
+              }
+            ]
+          }
+        ]
+      },
+      "links": null,
+      "pageId": "page:/product-category/uncategorized/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 8,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": true,
+          "kind": "breadcrumb",
+          "links": 1,
+          "signal": "jsonld",
+          "words": 2
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "generated",
+          "links": 2,
+          "signal": "",
+          "words": 17
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 4
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "archive",
+      "trails": [
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "href": "https://stand.example/product-category/uncategorized/",
+              "name": "Uncategorized",
+              "path": "/product-category/uncategorized/"
+            }
+          ],
+          "source": "jsonld"
+        },
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "name": "Uncategorized",
+              "path": "/product-category/uncategorized/"
+            }
+          ],
+          "source": "nav"
+        }
+      ],
+      "urlForm": "absolute",
+      "wordsContent": 0,
+      "wordsGenerated": 19
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "8c33d4066760e99de61c9f16d73f7f2993da6e56a30d8883ee1daf8d8147f414",
+      "headings": [],
+      "jsonld": {
+        "BreadcrumbList": [
+          {
+            "@context": "https://schema.org/",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example",
+                  "name": "Home"
+                },
+                "position": 1
+              },
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example/product-category/koffein/",
+                  "name": "Koffein"
+                },
+                "position": 2
+              },
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example/product/coffee-beans/",
+                  "name": "Coffee Beans"
+                },
+                "position": 3
+              }
+            ]
+          }
+        ],
+        "Product": [
+          {
+            "@context": "https://schema.org/",
+            "@id": "https://stand.example/product/coffee-beans/#product",
+            "@type": "Product",
+            "description": "Whole beans, roasted every week.",
+            "name": "Coffee Beans",
+            "offers": [
+              {
+                "@type": "AggregateOffer",
+                "availability": "https://schema.org/InStock",
+                "highPrice": "29.00",
+                "lowPrice": "9.00",
+                "offerCount": 2,
+                "priceCurrency": "USD",
+                "priceValidUntil": "2027-12-31",
+                "seller": {
+                  "@type": "Organization",
+                  "name": "Vanilla Store",
+                  "url": "https://stand.example"
+                },
+                "url": "https://stand.example/product/coffee-beans/"
+              }
+            ],
+            "sku": "BEANS",
+            "url": "https://stand.example/product/coffee-beans/"
+          }
+        ]
+      },
+      "links": null,
+      "pageId": "page:/product/coffee-beans/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 8,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "breadcrumb",
+          "links": 2,
+          "signal": "jsonld",
+          "words": 4
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 1,
+          "signal": "rel",
+          "words": 2
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 0,
+          "signal": "",
+          "words": 6
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 3,
+          "signal": "",
+          "words": 114
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "found",
+      "trails": [
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "href": "https://stand.example/product-category/koffein/",
+              "name": "Koffein",
+              "path": "/product-category/koffein/"
+            },
+            {
+              "href": "https://stand.example/product/coffee-beans/",
+              "name": "Coffee Beans",
+              "path": "/product/coffee-beans/"
+            }
+          ],
+          "source": "jsonld"
+        },
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "href": "https://stand.example/product-category/koffein/",
+              "name": "Koffein",
+              "path": "/product-category/koffein/"
+            },
+            {
+              "name": "Coffee Beans",
+              "path": "/product/coffee-beans/"
+            }
+          ],
+          "source": "nav"
+        }
+      ],
+      "urlForm": "absolute",
+      "wordsContent": 6,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "ea06782b912c8f73a085cfa7228f6135f5302b597579f166b91150f7d03b3f14",
+      "headings": [],
+      "jsonld": {
+        "BreadcrumbList": [
+          {
+            "@context": "https://schema.org/",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example",
+                  "name": "Home"
+                },
+                "position": 1
+              },
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example/product-category/koffein/",
+                  "name": "Koffein"
+                },
+                "position": 2
+              },
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example/product/powder/",
+                  "name": "Powder"
+                },
+                "position": 3
+              }
+            ]
+          }
+        ],
+        "Product": [
+          {
+            "@context": "https://schema.org/",
+            "@id": "https://stand.example/product/powder/#product",
+            "@type": "Product",
+            "description": "See Koffein.",
+            "name": "Powder",
+            "offers": [
+              {
+                "@type": "Offer",
+                "availability": "https://schema.org/InStock",
+                "price": "12.00",
+                "priceCurrency": "USD",
+                "priceSpecification": [
+                  {
+                    "@type": "UnitPriceSpecification",
+                    "price": "12.00",
+                    "priceCurrency": "USD",
+                    "validThrough": "2027-12-31"
+                  }
+                ],
+                "priceValidUntil": "2027-12-31",
+                "seller": {
+                  "@type": "Organization",
+                  "name": "Vanilla Store",
+                  "url": "https://stand.example"
+                },
+                "url": "https://stand.example/product/powder/"
+              }
+            ],
+            "sku": "POWDER",
+            "url": "https://stand.example/product/powder/"
+          }
+        ]
+      },
+      "links": null,
+      "pageId": "page:/product/powder/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 8,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "breadcrumb",
+          "links": 2,
+          "signal": "jsonld",
+          "words": 3
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 1,
+          "signal": "rel",
+          "words": 2
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 1,
+          "signal": "",
+          "words": 2
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 3,
+          "signal": "",
+          "words": 91
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "found",
+      "trails": [
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "href": "https://stand.example/product-category/koffein/",
+              "name": "Koffein",
+              "path": "/product-category/koffein/"
+            },
+            {
+              "href": "https://stand.example/product/powder/",
+              "name": "Powder",
+              "path": "/product/powder/"
+            }
+          ],
+          "source": "jsonld"
+        },
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "href": "https://stand.example/product-category/koffein/",
+              "name": "Koffein",
+              "path": "/product-category/koffein/"
+            },
+            {
+              "name": "Powder",
+              "path": "/product/powder/"
+            }
+          ],
+          "source": "nav"
+        }
+      ],
+      "urlForm": "absolute",
+      "wordsContent": 2,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "d8890d7bbbbc8bd015bef0ec5ef6061c6f1f62546b0cb9f719ff4a91a1c98b21",
+      "headings": [
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Overview"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Refunds"
+        },
+        {
+          "generated": false,
+          "level": 3,
+          "text": "Late or missing refunds"
+        },
+        {
+          "generated": false,
+          "level": 3,
+          "text": "Sale items"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Exchanges"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Gifts"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Shipping returns"
+        },
+        {
+          "generated": false,
+          "level": 2,
+          "text": "Need help?"
+        }
+      ],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/refund_returns/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 8,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 0,
+          "signal": "",
+          "words": 586
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 7
+        }
+      ],
+      "robots": "max-image-preview:large, noindex, follow",
+      "root": "found",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 586,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "ccb66194f4bb8b45a0fe9b6e43f77b314296e07dc69a8d38f0dab92161064bb4",
+      "headings": [],
+      "jsonld": {},
+      "links": null,
+      "pageId": "page:/sample-page/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 7,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "content",
+          "links": 1,
+          "signal": "",
+          "words": 158
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 5
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "found",
+      "trails": [],
+      "urlForm": "absolute",
+      "wordsContent": 158,
+      "wordsGenerated": 0
+    },
+    {
+      "builder": "",
+      "extractedAt": "2026-10-19T09:00:00Z",
+      "finalPath": "",
+      "hash": "98d4a19f246ce390d90c36553f016b58abaec2ed30b0610171a30b850d3438f2",
+      "headings": [
+        {
+          "generated": true,
+          "level": 1,
+          "text": "Shop"
+        },
+        {
+          "generated": true,
+          "level": 2,
+          "text": "Coffee Beans"
+        },
+        {
+          "generated": true,
+          "level": 2,
+          "text": "Powder"
+        }
+      ],
+      "jsonld": {
+        "BreadcrumbList": [
+          {
+            "@context": "https://schema.org/",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example",
+                  "name": "Home"
+                },
+                "position": 1
+              },
+              {
+                "@type": "ListItem",
+                "item": {
+                  "@id": "https://stand.example/shop/",
+                  "name": "Shop"
+                },
+                "position": 2
+              }
+            ]
+          }
+        ]
+      },
+      "links": null,
+      "pageId": "page:/shop/",
+      "regions": [
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 7,
+          "signal": "landmark",
+          "words": 11
+        },
+        {
+          "inside": true,
+          "kind": "breadcrumb",
+          "links": 1,
+          "signal": "jsonld",
+          "words": 2
+        },
+        {
+          "inside": true,
+          "kind": "listing",
+          "links": 6,
+          "signal": "links",
+          "words": 22
+        },
+        {
+          "inside": false,
+          "kind": "navigation",
+          "links": 2,
+          "signal": "landmark",
+          "words": 16
+        },
+        {
+          "inside": true,
+          "kind": "generated",
+          "links": 0,
+          "signal": "",
+          "words": 29
+        },
+        {
+          "inside": false,
+          "kind": "unknown",
+          "links": 0,
+          "signal": "",
+          "words": 4
+        }
+      ],
+      "robots": "max-image-preview:large",
+      "root": "archive",
+      "trails": [
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "href": "https://stand.example/shop/",
+              "name": "Shop",
+              "path": "/shop/"
+            }
+          ],
+          "source": "jsonld"
+        },
+        {
+          "crumbs": [
+            {
+              "href": "https://stand.example",
+              "name": "Home",
+              "path": "/"
+            },
+            {
+              "name": "Shop",
+              "path": "/shop/"
+            }
+          ],
+          "source": "nav"
+        }
+      ],
+      "urlForm": "absolute",
+      "wordsContent": 0,
+      "wordsGenerated": 53
+    }
+  ],
+  "scopes": [
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "body",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": true,
+        "forbidSelf": true,
+        "links": true,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": true,
+          "maxLinks": 12,
+          "maxPerTarget": 1,
+          "parentLinkWithinParagraphs": 2,
+          "siblingMinWeight": 0.5,
+          "upDepth": 2
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:entity",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "seo_description",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": false,
+        "forbidSelf": false,
+        "links": false,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 0,
+          "maxPerTarget": 0,
+          "parentLinkWithinParagraphs": 0,
+          "siblingMinWeight": 0,
+          "upDepth": 0
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:entity",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "seo_title",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": false,
+        "forbidSelf": false,
+        "links": false,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 0,
+          "maxPerTarget": 0,
+          "parentLinkWithinParagraphs": 0,
+          "siblingMinWeight": 0,
+          "upDepth": 0
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:entity",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "body",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": true,
+        "forbidSelf": true,
+        "links": true,
+        "rules": {
+          "childrenSection": true,
+          "downLinks": true,
+          "maxLinks": 20,
+          "maxPerTarget": 1,
+          "parentLinkWithinParagraphs": 2,
+          "siblingMinWeight": 0.5,
+          "upDepth": 1
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:hub",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "seo_description",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": false,
+        "forbidSelf": false,
+        "links": false,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 0,
+          "maxPerTarget": 0,
+          "parentLinkWithinParagraphs": 0,
+          "siblingMinWeight": 0,
+          "upDepth": 0
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:hub",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "seo_title",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": false,
+        "forbidSelf": false,
+        "links": false,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 0,
+          "maxPerTarget": 0,
+          "parentLinkWithinParagraphs": 0,
+          "siblingMinWeight": 0,
+          "upDepth": 0
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:hub",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "product_description",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": true,
+        "forbidSelf": true,
+        "links": true,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 3,
+          "maxPerTarget": 1,
+          "parentLinkWithinParagraphs": 1,
+          "siblingMinWeight": 1,
+          "upDepth": 1
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:product",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "product_short_description",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": false,
+        "forbidSelf": false,
+        "links": false,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 0,
+          "maxPerTarget": 0,
+          "parentLinkWithinParagraphs": 0,
+          "siblingMinWeight": 0,
+          "upDepth": 0
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:product",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "seo_description",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": false,
+        "forbidSelf": false,
+        "links": false,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 0,
+          "maxPerTarget": 0,
+          "parentLinkWithinParagraphs": 0,
+          "siblingMinWeight": 0,
+          "upDepth": 0
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:product",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "AIWrites": true,
+      "Enabled": true,
+      "Instruction": "",
+      "Key": "seo_title",
+      "Label": "",
+      "Links": {
+        "anchorStrategy": "prefer_user",
+        "forbidExternal": false,
+        "forbidSelf": false,
+        "links": false,
+        "rules": {
+          "childrenSection": false,
+          "downLinks": false,
+          "maxLinks": 0,
+          "maxPerTarget": 0,
+          "parentLinkWithinParagraphs": 0,
+          "siblingMinWeight": 0,
+          "upDepth": 0
+        }
+      },
+      "MaxLength": 0,
+      "MinLength": 0,
+      "PageTypeID": "type:product",
+      "Provider": "",
+      "Rewrites": false,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    }
+  ],
+  "site": {
+    "AllowInsecure": true,
+    "BaseURL": "https://stand.example",
+    "Commerce": "ready",
+    "CreatedAt": "2026-10-19T09:00:00Z",
+    "Defaults": {
+      "ModelProfiles": {},
+      "TemplateID": null
+    },
+    "ID": "site",
+    "Name": "Captured Shop",
+    "Plugin": {
+      "Capabilities": [
+        "bulk",
+        "seo_meta",
+        "seo_meta_read",
+        "content_hash",
+        "raw",
+        "preview",
+        "rendered",
+        "meta",
+        "terms",
+        "settings"
+      ],
+      "Installed": true,
+      "SEOPlugin": "none",
+      "Version": "1.4.1"
+    },
+    "SecretRef": "site:site:wp_password",
+    "Settings": {
+      "builders": [
+        {
+          "classPrefixes": [
+            "elementor-"
+          ],
+          "dataAttributes": [
+            "data-elementor-type",
+            "data-elementor-id"
+          ],
+          "name": "elementor",
+          "shortcodePrefixes": []
+        },
+        {
+          "classPrefixes": [
+            "vc_row",
+            "vc_column"
+          ],
+          "dataAttributes": [],
+          "name": "wpbakery",
+          "shortcodePrefixes": [
+            "vc_"
+          ]
+        },
+        {
+          "classPrefixes": [
+            "et_pb_"
+          ],
+          "dataAttributes": [],
+          "name": "divi",
+          "shortcodePrefixes": [
+            "et_pb_"
+          ]
+        },
+        {
+          "classPrefixes": [
+            "fl-builder"
+          ],
+          "dataAttributes": [],
+          "name": "beaver-builder",
+          "shortcodePrefixes": []
+        },
+        {
+          "classPrefixes": [
+            "ct-section"
+          ],
+          "dataAttributes": [],
+          "name": "oxygen",
+          "shortcodePrefixes": [
+            "ct_"
+          ]
+        },
+        {
+          "classPrefixes": [
+            "brxe-"
+          ],
+          "dataAttributes": [],
+          "name": "bricks",
+          "shortcodePrefixes": []
+        },
+        {
+          "classPrefixes": [
+            "breakdance"
+          ],
+          "dataAttributes": [],
+          "name": "breakdance",
+          "shortcodePrefixes": []
+        }
+      ],
+      "linkUrlForm": "auto",
+      "observation": {
+        "lastFinishedAt": "2026-10-19T09:00:00Z",
+        "lastFullWalkAt": "2026-10-19T09:00:00Z",
+        "lastModifiedSeen": "2026-10-19T09:00:00Z",
+        "lastStartedAt": "2026-10-19T09:00:00Z",
+        "sinceFullWalk": 0
+      },
+      "observe": {
+        "fullWalkEvery": 10,
+        "renderConcurrency": 4
+      },
+      "technical": {
+        "account": 8,
+        "cart": 6,
+        "checkout": 7,
+        "front": 0,
+        "posts": 0,
+        "privacy": 3,
+        "shop": 5,
+        "terms": 0
+      },
+      "technicalBlocks": [
+        "woocommerce/cart",
+        "woocommerce/checkout"
+      ],
+      "technicalShortcodes": [
+        "woocommerce_cart",
+        "woocommerce_checkout",
+        "woocommerce_my_account"
+      ],
+      "userAgent": ""
+    },
+    "Status": "active",
+    "UpdatedAt": "2026-10-19T09:00:00Z",
+    "Username": "shopadmin"
+  },
+  "terms": {
+    "page:/hello-world/": [
+      {
+        "name": "Uncategorized",
+        "parentTermId": 0,
+        "slug": "uncategorized",
+        "taxonomy": "category",
+        "termId": 1
+      }
+    ],
+    "page:/product/coffee-beans/": [
+      {
+        "name": "Koffein",
+        "parentTermId": 0,
+        "slug": "koffein",
+        "taxonomy": "product_cat",
+        "termId": 100014
+      },
+      {
+        "name": "variable",
+        "parentTermId": 0,
+        "slug": "variable",
+        "taxonomy": "product_type",
+        "termId": 100002
+      }
+    ],
+    "page:/product/powder/": [
+      {
+        "name": "Koffein",
+        "parentTermId": 0,
+        "slug": "koffein",
+        "taxonomy": "product_cat",
+        "termId": 100014
+      },
+      {
+        "name": "simple",
+        "parentTermId": 0,
+        "slug": "simple",
+        "taxonomy": "product_type",
+        "termId": 100000
+      }
+    ]
+  },
+  "types": [
+    {
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "ID": "type:catalog",
+      "Name": "Catalog",
+      "Preset": "catalog",
+      "SiteID": "site",
+      "TemplateID": null,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "ID": "type:entity",
+      "Name": "Entity",
+      "Preset": "entity",
+      "SiteID": "site",
+      "TemplateID": null,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "ID": "type:hub",
+      "Name": "Hub",
+      "Preset": "hub",
+      "SiteID": "site",
+      "TemplateID": null,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "ID": "type:product",
+      "Name": "Product",
+      "Preset": "product",
+      "SiteID": "site",
+      "TemplateID": null,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "ID": "type:store_category",
+      "Name": "Store category",
+      "Preset": "store_category",
+      "SiteID": "site",
+      "TemplateID": null,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    },
+    {
+      "CreatedAt": "2026-10-19T09:00:00Z",
+      "ID": "type:technical",
+      "Name": "Technical",
+      "Preset": "technical",
+      "SiteID": "site",
+      "TemplateID": null,
+      "UpdatedAt": "2026-10-19T09:00:00Z"
+    }
+  ],
+  "written": []
+}

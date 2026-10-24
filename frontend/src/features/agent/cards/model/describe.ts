@@ -2,11 +2,13 @@ import { copy } from "../../../../copy/index.js";
 import type { ToolSchema } from "../../../../data/types.js";
 import { verbOf } from "../../conversation/model/tools.js";
 import type { Args, CardView, DescribeContext, Describer, Line } from "./card.js";
-import { isArgs, line, listed, masked } from "./card.js";
+import { clipped, isArgs, line, listed, masked } from "./card.js";
+import { describeBlocks, describeFields } from "./edits.js";
+import { describeFindings } from "./findings.js";
 import { describeGraph } from "./graph.js";
 import { describeContent, describeImports, describeModels, describeSchedules, describeSync } from "./operations.js";
 import { describePages } from "./pages.js";
-import { describePolicies } from "./policies.js";
+import { describePageTypes } from "./pagetypes.js";
 import { describeRuns } from "./runs.js";
 import { describeSites } from "./sites.js";
 import { describeTemplates } from "./templates.js";
@@ -15,8 +17,11 @@ const describers: readonly Describer[] = [
     describeSites,
     describeGraph,
     describePages,
+    describeFields,
+    describeBlocks,
+    describeFindings,
+    describePageTypes,
     describeTemplates,
-    describePolicies,
     describeRuns,
     describeSync,
     describeImports,
@@ -24,8 +29,6 @@ const describers: readonly Describer[] = [
     describeContent,
     describeSchedules,
 ];
-
-const maxTextShown = 240;
 
 function humanKey(key: string): string {
     return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase();
@@ -41,7 +44,7 @@ function scalar(value: unknown): string | null {
         if (masked(value)) {
             return copy.agent.describe.hidden;
         }
-        return value.length > maxTextShown ? `${value.slice(0, maxTextShown - 1)}…` : value;
+        return clipped(value);
     }
     if (typeof value === "number") {
         return String(value);

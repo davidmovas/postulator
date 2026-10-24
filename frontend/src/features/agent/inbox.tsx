@@ -212,6 +212,7 @@ export function InboxScreen(): ReactElement {
                                             key={action.id}
                                             tool={action.tool}
                                             args={action.args}
+                                            summary={action.summary}
                                             risk={null}
                                             status={action.status}
                                             createdAt={action.createdAt}

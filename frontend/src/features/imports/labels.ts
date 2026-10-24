@@ -10,8 +10,9 @@ import {
     importFindingCodes,
     importRowTypes,
     isOneOf,
+    matchRules,
 } from "../../generated/vocab.js";
-import type { ImportField } from "../../generated/vocab.js";
+import type { ImportField, MatchRule } from "../../generated/vocab.js";
 import type { Tone } from "../../ui/index.js";
 
 export function fieldLabel(field: string): string {
@@ -75,7 +76,16 @@ export interface ProductRow {
     matchedBy?: string;
 }
 
-const matchedBy = copy.imports.preview.matchedBy as Readonly<Record<string, string>>;
+const matchedBy: Readonly<Record<MatchRule, string>> = copy.imports.preview.matchedBy;
+const ruleWords: Readonly<Record<MatchRule, string>> = copy.imports.preview.matchRules;
+
+export function matchRuleLabel(rule: string): string {
+    return isOneOf(matchRules, rule) ? ruleWords[rule] : rule;
+}
+
+export function matchRulePhrase(rule: string): string {
+    return isOneOf(matchRules, rule) ? matchedBy[rule] : matchedBy.url;
+}
 
 export function productNote(page: ProductRow): string | null {
     if (page.wpType !== "product") {
@@ -85,8 +95,7 @@ export function productNote(page: ProductRow): string | null {
     if (name === "") {
         return copy.imports.preview.waitingProduct;
     }
-    const by = matchedBy[page.matchedBy ?? ""] ?? matchedBy["path"] ?? "";
-    return copy.imports.preview.storeProduct(name, by, page.plannedPath ?? "");
+    return copy.imports.preview.storeProduct(name, matchRulePhrase(page.matchedBy ?? ""), page.plannedPath ?? "");
 }
 
 export function blocking(code: string): boolean {

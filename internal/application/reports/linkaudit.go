@@ -8,29 +8,29 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 type siteLinks struct {
 	site     pagemap.Site
-	policy   template.LinkPolicy
-	view     LinkPolicySummary
+	types    pagetype.Set
 	g        graph.Graph
 	index    pagemap.Index
 	entities map[string]graph.Entity
 	outgoing map[string][]pagemap.PageLink
 	incoming map[string]int
+	typed    map[string]LinkTypeCounts
 }
 
 type pageDetail struct {
-	summary    PageAudit
-	templateID string
-	rules      template.LinkRules
-	required   []RequiredLink
-	extra      []ExtraLink
+	summary  PageAudit
+	rules    field.LinkRules
+	required []RequiredLink
+	extra    []ExtraLink
 }
 
 func (s *Service) LinkAudit(ctx context.Context, req LinkAuditRequest) (LinkAuditResponse, error) {
@@ -45,16 +45,12 @@ func (s *Service) LinkAudit(ctx context.Context, req LinkAuditRequest) (LinkAudi
 	}
 
 	pages := state.index.Pages()
-	response := LinkAuditResponse{SiteID: siteID, Policy: state.view, Pages: make([]PageAudit, 0, len(pages))}
+	response := LinkAuditResponse{SiteID: siteID, Pages: make([]PageAudit, 0, len(pages))}
 	for i := range pages {
 		if pages[i].Status == pagemap.StatusArchived {
 			continue
 		}
-		templateID, rules, skip, rulesErr := s.rulesFor(ctx, pages[i], state.policy.Rules)
-		if rulesErr != nil {
-			return LinkAuditResponse{}, rulesErr
-		}
-		detail := auditPage(&state, pages[i], templateID, rules, skip)
+		detail := auditPage(&state, pages[i])
 		response.Pages = append(response.Pages, detail.summary)
 		tally(&response.Totals, detail.summary)
 	}
@@ -75,16 +71,30 @@ func (s *Service) LinkAuditPage(ctx context.Context, req LinkAuditPageRequest) (
 	if err != nil {
 		return LinkAuditPageResponse{}, err
 	}
-	templateID, rules, skip, err := s.rulesFor(ctx, page, state.policy.Rules)
+	templateID, err := s.templateOf(ctx, page)
 	if err != nil {
 		return LinkAuditPageResponse{}, err
 	}
 
-	detail := auditPage(&state, page, templateID, rules, skip)
+	detail := auditPage(&state, page)
 	return LinkAuditPageResponse{
-		Page: detail.summary, TemplateID: detail.templateID, Rules: detail.rules,
+		Page: detail.summary, TemplateID: templateID, Rules: detail.rules,
 		Required: detail.required, Extra: detail.extra,
 	}, nil
+}
+
+func (s *Service) templateOf(ctx context.Context, page pagemap.Page) (string, error) {
+	if page.EntityID == nil {
+		return "", nil
+	}
+	resolved, err := s.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: page.ID})
+	if errors.IsCode(err, errors.NotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return resolved.TemplateID, nil
 }
 
 func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, error) {
@@ -104,11 +114,15 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	if err != nil {
 		return siteLinks{}, err
 	}
+	fields, err := s.fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return siteLinks{}, err
+	}
 	links, err := s.links.ListBySite(ctx, siteID)
 	if err != nil {
 		return siteLinks{}, err
 	}
-	effective, err := s.policies.GetEffectivePolicy(ctx, templates.GetEffectivePolicyRequest{SiteID: siteID})
+	types, err := s.types.Set(ctx, siteID)
 	if err != nil {
 		return siteLinks{}, err
 	}
@@ -121,66 +135,87 @@ func (s *Service) loadLinks(ctx context.Context, siteID string) (siteLinks, erro
 	for i := range entities {
 		byID[entities[i].ID] = entities[i]
 	}
-	_, incoming := linkSets(links)
+	owed := contextual(links)
+	_, incoming := linkSets(owed)
 
 	return siteLinks{
-		site: pagemap.NewSite(owner.BaseURL),
-		policy: template.LinkPolicy{
-			Rules:          effective.Policy.Rules,
-			ForbidExternal: effective.Policy.ForbidExternal,
-			ForbidSelf:     effective.Policy.ForbidSelf,
-			AnchorStrategy: template.AnchorStrategy(effective.Policy.AnchorStrategy),
-		},
-		view: LinkPolicySummary{
-			ID: effective.Policy.ID, Name: effective.Policy.Name,
-			ForbidExternal: effective.Policy.ForbidExternal, ForbidSelf: effective.Policy.ForbidSelf,
-			AnchorStrategy: effective.Policy.AnchorStrategy,
-		},
-		g: g, index: pagemap.NewIndex(pages), entities: byID,
-		outgoing: linksByPage(links), incoming: incoming,
+		site:  pagemap.NewSite(owner.BaseURL),
+		types: types,
+		g:     g, index: pagemap.NewIndexNamed(pages, pagemap.Names(fields)), entities: byID,
+		outgoing: linksByPage(owed), incoming: incoming, typed: typesByPage(links),
 	}, nil
 }
 
-func (s *Service) rulesFor(ctx context.Context, page pagemap.Page,
-	base template.LinkRules) (string, template.LinkRules, SkipReason, error) {
-	if page.EntityID == nil {
-		return "", template.LinkRules{}, SkipUnmapped, nil
+func contextual(links []pagemap.PageLink) []pagemap.PageLink {
+	out := make([]pagemap.PageLink, 0, len(links))
+	for i := range links {
+		if links[i].Type == pagemap.LinkContextual {
+			out = append(out, links[i])
+		}
 	}
-	resolved, err := s.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: page.ID})
-	if errors.IsCode(err, errors.NotFound) {
-		return "", template.LinkRules{}, SkipNoTemplate, nil
-	}
-	if err != nil {
-		return "", template.LinkRules{}, "", err
-	}
-	return resolved.TemplateID, templates.EffectiveRules(base, resolved.Spec.LinkRules), "", nil
+	return out
 }
 
-func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules template.LinkRules, skip SkipReason) pageDetail {
+func typesByPage(links []pagemap.PageLink) map[string]LinkTypeCounts {
+	out := make(map[string]LinkTypeCounts)
+	for i := range links {
+		counts := out[links[i].FromPageID]
+		counts.add(links[i].Type)
+		out[links[i].FromPageID] = counts
+	}
+	return out
+}
+
+func (c *LinkTypeCounts) add(kind pagemap.LinkType) {
+	switch kind {
+	case pagemap.LinkBreadcrumb:
+		c.Breadcrumb++
+	case pagemap.LinkListing:
+		c.Listing++
+	case pagemap.LinkNavigation:
+		c.Navigation++
+	case pagemap.LinkContextual:
+		c.Contextual++
+	default:
+		c.Unknown++
+	}
+}
+
+func (c *LinkTypeCounts) plus(other LinkTypeCounts) {
+	c.Breadcrumb += other.Breadcrumb
+	c.Listing += other.Listing
+	c.Navigation += other.Navigation
+	c.Contextual += other.Contextual
+	c.Unknown += other.Unknown
+}
+
+func orphan(page pagemap.Page, inbound int) bool {
+	return page.WPID != nil && page.Status != pagemap.StatusArchived && page.TechnicalReason == pagemap.TechnicalNone &&
+		!page.WPType.Term() && page.Path != pagemap.RootPath && inbound == 0
+}
+
+func auditPage(state *siteLinks, page pagemap.Page) pageDetail {
 	inbound := state.incoming[page.ID]
 	onSite := page.WPID != nil
 	detail := pageDetail{
 		summary: PageAudit{
-			PageID: page.ID, Path: page.Path, Status: string(page.Status), SkipReason: string(skip), OnSite: onSite,
-			Inbound: inbound, Orphan: onSite && inbound == 0 && page.Status != pagemap.StatusArchived,
+			PageID: page.ID, Path: page.Path, Status: string(page.Status), OnSite: onSite,
+			Inbound: inbound, Orphan: orphan(page, inbound), ByType: state.typed[page.ID],
 		},
 		required: make([]RequiredLink, 0),
 		extra:    make([]ExtraLink, 0),
 	}
-	if page.EntityID != nil {
-		if entity, ok := state.entities[*page.EntityID]; ok {
-			detail.summary.EntityID = entity.ID
-			detail.summary.EntityName = state.g.Label(entity.ID)
-		}
-	}
-	if skip != "" {
+	if page.EntityID == nil {
+		detail.summary.SkipReason = string(SkipUnmapped)
 		return detail
 	}
+	if entity, ok := state.entities[*page.EntityID]; ok {
+		detail.summary.EntityID = entity.ID
+		detail.summary.EntityName = state.g.Label(entity.ID)
+	}
 
-	detail.templateID = templateID
-	detail.rules = rules
-	policy := state.policy
-	policy.Rules = rules
+	policy := state.types.Policy(page)
+	detail.rules = policy.Rules
 	plan := content.PlanLinks(state.g, state.index, content.Subject{
 		Site: state.site, PageID: page.ID, PagePath: page.Path, EntityID: *page.EntityID,
 	}, policy)
@@ -219,7 +254,7 @@ func auditPage(state *siteLinks, page pagemap.Page, templateID string, rules tem
 		if !class.OffGraph() {
 			continue
 		}
-		extra := ExtraLink{ToURL: links[i].ToURL, Anchor: links[i].AnchorText, Kind: string(class), Origin: string(links[i].Origin)}
+		extra := ExtraLink{ToURL: links[i].ToURL, Anchor: links[i].AnchorText, Kind: string(class), Ours: links[i].Ours}
 		if links[i].ToPageID != nil {
 			extra.ToPageID = *links[i].ToPageID
 		}
@@ -302,6 +337,7 @@ func tally(totals *LinkTotals, row PageAudit) {
 	if row.Orphan {
 		totals.Orphans++
 	}
+	totals.ByType.plus(row.ByType)
 }
 
 func linksByPage(links []pagemap.PageLink) map[string][]pagemap.PageLink {

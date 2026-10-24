@@ -13,12 +13,15 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/ledger"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application"
 	agentapp "github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/application/tools"
@@ -136,6 +139,37 @@ type wiring struct {
 	outer    func(next llmport.Client) llmport.Client
 }
 
+type wholeWindow struct{}
+
+func (wholeWindow) InputBudget(domainllm.Role) int {
+	return 0
+}
+
+func briefsOver(store *sqlite.Store, publisher application.Publisher, now clock.Clock) *sitemodel.Service {
+	siteRepo := sqlite.NewSiteRepo(store)
+	pageRepo := sqlite.NewPageRepo(store)
+	entityRepo := sqlite.NewEntityRepo(store)
+	edgeRepo := sqlite.NewEdgeRepo(store)
+	linkRepo := sqlite.NewPageLinkRepo(store)
+	templateRepo := sqlite.NewTemplateRepo(store)
+	types := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
+		Sites: siteRepo, UnitOfWork: store, Publisher: publisher, Clock: now,
+	})
+	audits := reports.New(reports.Deps{
+		Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Fields: sqlite.NewPageFieldRepo(store), Links: linkRepo,
+		Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store), Sites: siteRepo,
+		Specs: templates.New(templateRepo, pageRepo, entityRepo, siteRepo, sqlite.NewPageTypeRepo(store), store, publisher, now), Types: types,
+	})
+	return sitemodel.New(sitemodel.Deps{
+		Budgets: wholeWindow{}, Audits: audits, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
+		Sites: siteRepo, Pages: pageRepo, Entities: entityRepo,
+		Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo,
+		Findings: sqlite.NewFindingRepo(store),
+	})
+}
+
 func build(t *testing.T, store *sqlite.Store, model *fake.Client, bus *applicationtest.Recorder,
 	allowed ...string) *harness {
 	t.Helper()
@@ -163,19 +197,22 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 	actionRepo := sqlite.NewPendingActionRepo(store)
 	callRepo := sqlite.NewLLMCallRepo(store)
 
-	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, bus, now)
+	templateService := templates.New(sqlite.NewTemplateRepo(store), pageRepo, sqlite.NewEntityRepo(store), siteRepo,
+		sqlite.NewPageTypeRepo(store), store, bus, now)
 	registered := tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, nil, store, nil, bus, now),
+		Sites: sites.New(siteRepo, nil, store, pagetypes.New(pagetypes.Deps{
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: sqlite.NewTemplateRepo(store),
+			Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now,
+		}), nil, bus, now),
 		Pages: pages.New(pages.Deps{
 			Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
-			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+			Bodies: sqlite.NewPageBodyRepo(store), UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 		}),
 		Templates: templateService,
 		Reports: reports.New(reports.Deps{
-			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Fields: sqlite.NewPageFieldRepo(store), Links: linkRepo,
 			Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
-			Sites: siteRepo, Specs: templateService, Policies: templateService,
+			Sites: siteRepo, Specs: templateService,
 		}),
 		Actions:   actionRepo,
 		Publisher: bus,
@@ -208,10 +245,11 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 		Calls:         sqlite.NewToolCallRepo(store),
 		Sites:         siteRepo,
 		Reports: reports.New(reports.Deps{
-			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Fields: sqlite.NewPageFieldRepo(store), Links: linkRepo,
 			Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
-			Sites: siteRepo, Specs: templateService, Policies: templateService,
+			Sites: siteRepo, Specs: templateService,
 		}),
+		Briefs:    briefsOver(store, bus, now),
 		Templates: templateService,
 		Profiles:  chatProfiles{},
 		LLM:       titler,

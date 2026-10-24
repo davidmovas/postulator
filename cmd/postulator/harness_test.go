@@ -4,26 +4,40 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"go.uber.org/zap/zaptest"
 
+	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -103,11 +117,11 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 44 {
-		t.Errorf("entities = %d, want 44", len(loaded.Entities))
+	if len(loaded.Entities) != 45 {
+		t.Errorf("entities = %d, want 45, the workbook's planned guide included", len(loaded.Entities))
 	}
-	if len(loaded.Edges) != 48 {
-		t.Errorf("edges = %d, want 48", len(loaded.Edges))
+	if len(loaded.Edges) != 49 {
+		t.Errorf("edges = %d, want 49, the planned guide's parent included", len(loaded.Edges))
 	}
 
 	proposed := 0
@@ -151,11 +165,11 @@ func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 		cursor = string(page.Next)
 	}
 
-	if total != 65 {
-		t.Errorf("pages = %d, want 65", total)
+	if total != 68 {
+		t.Errorf("pages = %d, want 68, the duplicated review and the workbook's planned guide included", total)
 	}
-	if mapped != 47 {
-		t.Errorf("mapped pages = %d, want 47", mapped)
+	if mapped != 48 {
+		t.Errorf("mapped pages = %d, want 48", mapped)
 	}
 }
 
@@ -355,6 +369,135 @@ func TestTheSeededRunsCoverEveryKindAScreenOffers(t *testing.T) {
 	}
 }
 
+func TestTheHarnessSeedsAnEditItsReviewAndTheRevertOfAField(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	held := pagesByPath(t, core, listed.Items[0].ID)
+
+	cases := []struct {
+		name     string
+		kind     run.Kind
+		mode     run.PublishMode
+		path     string
+		status   run.Status
+		pause    run.PauseReason
+		artifact run.ArtifactKind
+		check    func(t *testing.T, content string)
+	}{
+		{
+			name: "a live edit of a page the client wrote", kind: run.KindGenerate, mode: run.PublishLive, path: editedPath,
+			status: run.StatusCompleted, artifact: run.ArtifactPublishResult,
+			check: func(t *testing.T, content string) {
+				var published steps.PublishResult
+				decodeArtifact(t, content, &published)
+				if !slices.ContainsFunc(published.Fields, func(change field.Change) bool {
+					return change.Key == revertedField && change.Moves()
+				}) {
+					t.Errorf("the publish result's fields are %+v, want the %s it wrote among them", published.Fields, revertedField)
+				}
+				if !oursBesideTheClients(published.Blocks, editedPhrase) {
+					t.Errorf("the publish result's blocks are %+v, want ours added beside the client's kept block", published.Blocks)
+				}
+			},
+		},
+		{
+			name: "a draft edit waiting for a person", kind: run.KindGenerate, mode: run.PublishDraft, path: reviewedPath,
+			status: run.StatusPaused, pause: run.PauseAwaitingReview, artifact: run.ArtifactEditPlan,
+			check: func(t *testing.T, content string) {
+				var plan steps.EditPlan
+				decodeArtifact(t, content, &plan)
+				if len(plan.Pages) != 1 || plan.Pages[0].Path != reviewedPath {
+					t.Fatalf("the edit plan holds %+v, want the one page %s", plan.Pages, reviewedPath)
+				}
+				if len(plan.Pages[0].Fields) == 0 || !oursBesideTheClients(plan.Pages[0].Blocks, reviewedPhrase) {
+					t.Errorf("the edit plan of %s changes the fields %+v and the blocks %+v, want fields and ours beside the client's",
+						reviewedPath, plan.Pages[0].Fields, plan.Pages[0].Blocks)
+				}
+			},
+		},
+		{
+			name: "the revert of one field of the live edit", kind: run.KindRevert, mode: run.PublishLive, path: editedPath,
+			status: run.StatusCompleted, artifact: run.ArtifactRevertResult,
+			check: func(t *testing.T, content string) {
+				var reverted steps.RevertResult
+				decodeArtifact(t, content, &reverted)
+				if len(reverted.Fields) != 1 || reverted.Fields[0].Key != revertedField || reverted.Fields[0].Outcome != steps.OutcomeRestored {
+					t.Errorf("the revert result names %+v, want the %s alone, put back", reverted.Fields, revertedField)
+				}
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			page, found := held[tc.path]
+			if !found || page.WPID == nil {
+				t.Fatalf("the seed holds no page on the site at %s", tc.path)
+			}
+			item := seededItem(t, core, tc.kind, tc.mode, page.ID)
+			if item.Status != string(tc.status) || item.PauseReason != string(tc.pause) {
+				t.Fatalf("the %s %s item for %s is %s %q (%s), want %s %q", tc.mode, tc.kind, tc.path, item.Status,
+					item.PauseReason, item.Note, tc.status, tc.pause)
+			}
+			stored, getErr := core.Runs.GetArtifact(t.Context(), runs.GetArtifactRequest{ItemID: item.ID, Kind: string(tc.artifact)})
+			if getErr != nil {
+				t.Fatalf("the %s item for %s holds no %s: %v", tc.kind, tc.path, tc.artifact, getErr)
+			}
+			tc.check(t, stored.Artifact.Content)
+		})
+	}
+}
+
+func seededItem(t *testing.T, core *app.Core, kind run.Kind, mode run.PublishMode, pageID string) runs.Item {
+	t.Helper()
+
+	listed, err := core.Runs.List(t.Context(), runs.ListRequest{Kind: string(kind), ListRequest: dto.ListRequest{Limit: 50}})
+	if err != nil {
+		t.Fatalf("List runs: %v", err)
+	}
+	found := make([]runs.Item, 0, 1)
+	for index := range listed.Items {
+		if listed.Items[index].PublishMode != string(mode) {
+			continue
+		}
+		items, itemsErr := core.Runs.ListItems(t.Context(), runs.ListItemsRequest{
+			RunID: listed.Items[index].ID, ListRequest: dto.ListRequest{Limit: 20},
+		})
+		if itemsErr != nil {
+			t.Fatalf("ListItems: %v", itemsErr)
+		}
+		for item := range items.Items {
+			if items.Items[item].TargetID == pageID {
+				found = append(found, items.Items[item])
+			}
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("the seed holds %d %s %s items for %s, want one", len(found), mode, kind, pageID)
+	}
+	return found[0]
+}
+
+func decodeArtifact(t *testing.T, content string, out any) {
+	t.Helper()
+
+	if err := json.Unmarshal([]byte(content), out); err != nil {
+		t.Fatalf("decode the artifact %s: %v", content, err)
+	}
+}
+
+func oursBesideTheClients(changes []block.Change, phrase string) bool {
+	return slices.ContainsFunc(changes, func(change block.Change) bool {
+		return change.Owner == block.OwnerOurs && change.Change == block.ChangeAdded
+	}) && slices.ContainsFunc(changes, func(change block.Change) bool {
+		return change.Owner == block.OwnerClient && change.Change == block.ChangeKept && strings.Contains(change.Raw, phrase)
+	})
+}
+
 func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	core := seeded(t)
 	if closeErr := core.Close(); closeErr != nil {
@@ -397,8 +540,8 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 44 {
-		t.Fatalf("entities after the restart = %d, want the forty-four that were seeded", len(loaded.Entities))
+	if len(loaded.Entities) != 45 {
+		t.Fatalf("entities after the restart = %d, want the forty-five that were seeded", len(loaded.Entities))
 	}
 }
 
@@ -626,16 +769,25 @@ func TestTheHarnessSeedsAProductTheStoreLetsARunEdit(t *testing.T) {
 	if report.Status != string(run.StatusCompleted) || len(report.Product) == 0 {
 		t.Fatalf("the product's last run is %q with outputs %s, want a completed run that wrote them", report.Status, report.Product)
 	}
+	var outputs struct {
+		ShortDescription string `json:"shortDescription"`
+	}
+	if err = json.Unmarshal(report.Product, &outputs); err != nil || !strings.Contains(outputs.ShortDescription, "rewards a good grinder") {
+		t.Errorf("the product's outputs are %s (%v), want the short description generate_fields wrote", report.Product, err)
+	}
 	var published struct {
 		PreviousProduct *struct {
-			Added []string `json:"added"`
+			Added          []string `json:"added"`
+			AttributesSent bool     `json:"attributesSent"`
+			ShortWritten   bool     `json:"shortWritten"`
 		} `json:"previousProduct"`
 	}
 	if err = json.Unmarshal(report.Publish, &published); err != nil || published.PreviousProduct == nil {
 		t.Fatalf("the publish result %s keeps no snapshot of the product (%v)", report.Publish, err)
 	}
-	if len(published.PreviousProduct.Added) != 1 || published.PreviousProduct.Added[0] != "Form" {
-		t.Errorf("the run filled %v, want the one empty attribute the template names", published.PreviousProduct.Added)
+	if snapshot := published.PreviousProduct; len(snapshot.Added) != 0 || snapshot.AttributesSent || !snapshot.ShortWritten {
+		t.Errorf("the run filled %v (attributes sent %t, short description %t), want the short description alone: the attributes are the store's",
+			snapshot.Added, snapshot.AttributesSent, snapshot.ShortWritten)
 	}
 }
 
@@ -789,6 +941,37 @@ func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
 		}
 		if link.Kind == "preview" && !link.ExpiresAt.Std().After(time.Now()) {
 			t.Fatalf("the preview link for %s expired at %s, which is already past", page.Path, link.ExpiresAt)
+		}
+	}
+}
+
+func TestARestorePutsBackTheBodiesTheSiteHeld(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	restored := wptest.New(t)
+	if err = placeOnSite(t.Context(), core, restored, siteID); err != nil {
+		t.Fatalf("placeOnSite: %v", err)
+	}
+
+	held := pagesByPath(t, core, siteID)
+	for _, path := range []string{hubPath, editedPath, reviewedPath, completedRun[0]} {
+		page := held[path]
+		if page.WPID == nil {
+			t.Fatalf("the seed holds no page on the site at %s", path)
+		}
+		model, modelErr := core.Observe.Page(t.Context(), page.ID)
+		if modelErr != nil || model.Body == nil {
+			t.Fatalf("the model of %s holds no body (%v)", path, modelErr)
+		}
+		item, found := restored.Lookup(*page.WPID)
+		if !found || item.Content != model.Body.Raw {
+			t.Errorf("the restore put %q at %s, want the body the site held %q", item.Content, path, model.Body.Raw)
 		}
 	}
 }
@@ -1005,6 +1188,197 @@ func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 	}
 }
 
+func TestTheSeededSiteIsObservedIntoTheModel(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	summary, err := core.Observe.SummaryOf(t.Context(), observe.SummaryRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("SummaryOf: %v", err)
+	}
+	if summary.Rendered == 0 || summary.TrailsResolved == 0 || summary.LinksByType["breadcrumb"] == 0 || summary.LinksByType["navigation"] == 0 {
+		t.Fatalf("summary = %+v, want rendered pages with trails, breadcrumb and navigation links", summary)
+	}
+
+	shown := 0
+	held := pagesByPath(t, core, siteID)
+	for path, page := range held {
+		parent := parentOf(path)
+		if above, nested := held[parent]; page.WPID == nil || page.Status != "published" || !nested || above.WPID == nil {
+			continue
+		}
+		view, modelErr := core.Observe.Model(t.Context(), observe.ModelRequest{PageID: page.ID})
+		if modelErr != nil {
+			t.Fatalf("Model of %s: %v", path, modelErr)
+		}
+		if view.Render == nil || len(view.Render.Trails) == 0 || view.Hierarchy.ParentPath != parent || view.Hierarchy.Reason != "jsonld_breadcrumb" {
+			t.Errorf("%s reads render %v hierarchy %+v, want its trail naming %s", path, view.Render != nil, view.Hierarchy, parent)
+		}
+		shown++
+	}
+	if shown == 0 {
+		t.Fatal("the seed holds no nested published page to read as the model")
+	}
+}
+
+func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	typed, err := core.PageTypes.List(t.Context(), pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("List page types: %v", err)
+	}
+	byPreset := make(map[pagetype.Preset]pagetypes.Type, len(typed.Types))
+	for index := range typed.Types {
+		preset := pagetype.Preset(typed.Types[index].Preset)
+		if _, twice := byPreset[preset]; twice {
+			t.Errorf("the site carries two %s types", preset)
+		}
+		byPreset[preset] = typed.Types[index]
+	}
+	for _, preset := range pagetype.Presets() {
+		if kind, held := byPreset[preset]; !held || kind.Name != preset.DefaultName() {
+			t.Errorf("the %s type is %+v, want it seeded as %q", preset, kind, preset.DefaultName())
+		}
+	}
+
+	type typedPage struct {
+		path   string
+		preset pagetype.Preset
+		source pagemap.TypeSource
+		reason pagemap.TypeReason
+	}
+	cases := make([]typedPage, 0, len(seedTypes())+1)
+	for _, declared := range seedTypes() {
+		cases = append(cases, typedPage{declared.Path, declared.Preset, pagemap.TypeSourceManual, pagemap.TypeByUser})
+	}
+	cases = append(cases, typedPage{productPath, pagetype.Product, pagemap.TypeSourceAuto, pagemap.TypeByProduct})
+
+	held := pagesByPath(t, core, siteID)
+	for _, want := range cases {
+		page, found := held[want.path]
+		if !found {
+			t.Errorf("the seed holds no page at %s", want.path)
+			continue
+		}
+		kind, typedAs := byPreset[want.preset], ""
+		if page.PageTypeID != nil {
+			typedAs = *page.PageTypeID
+		}
+		if typedAs != kind.ID || page.TypeSource != string(want.source) || page.TypeReason != string(want.reason) {
+			t.Errorf("%s is typed %q by %q %q, want %s (%s) by %s %s", want.path, typedAs, page.TypeSource, page.TypeReason,
+				kind.Name, kind.ID, want.source, want.reason)
+		}
+	}
+
+	hub := byPreset[pagetype.Hub]
+	if body, found := scopeOf(hub, field.Body); !found || !body.Stored || !body.Enabled || !body.AIWrites || body.Links != harnessLinks() {
+		t.Errorf("the Hub type's body scope is %+v, want the harness's link rules with rotating anchors %+v", body, harnessLinks())
+	}
+
+	custom, found := scopeOf(hub, field.Instance(field.Meta, subtitleKey))
+	if !found || !custom.Stored || !custom.Enabled || custom.AIWrites || custom.Label != subtitleLabel || custom.Provider != string(field.ProviderPlugin) {
+		t.Errorf("the Hub type's custom scope is %+v, want %s named %q, read through the plugin", custom, subtitleKey, subtitleLabel)
+	}
+	for path, subtitle := range seedSubtitles() {
+		model, modelErr := core.Observe.Page(t.Context(), held[path].ID)
+		if modelErr != nil {
+			t.Fatalf("Page model of %s: %v", path, modelErr)
+		}
+		if !slices.ContainsFunc(model.Fields, func(value field.Value) bool {
+			return value.Key == field.Instance(field.Meta, subtitleKey) && value.Current == subtitle
+		}) {
+			t.Errorf("%s holds the fields %+v, want its %s read as %q", path, model.Fields, subtitleKey, subtitle)
+		}
+	}
+}
+
+func TestTheSeededHubShowsTheWriterItsPictureAndTheGraphAProposal(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	logger, err := app.Logger()
+	if err != nil {
+		t.Fatalf("Logger: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := logger.Close(); closeErr != nil {
+			t.Errorf("close the logger: %v", closeErr)
+		}
+	})
+	var (
+		pagesService *wails.PagesService
+		graphService *wails.GraphService
+	)
+	for _, service := range core.Services(logger) {
+		switch bound := service.Instance().(type) {
+		case *wails.PagesService:
+			pagesService = bound
+		case *wails.GraphService:
+			graphService = bound
+		}
+	}
+	if pagesService == nil || graphService == nil {
+		t.Fatal("the core binds no pages or graph service")
+	}
+
+	held := pagesByPath(t, core, siteID)
+	if term, found := held[storeCategoryPath]; !found || term.WPType != "product_cat" || term.WPID == nil || *term.WPID != storeCategoryID {
+		t.Fatalf("the store category %s is %+v, want the term the hub twins with", storeCategoryPath, term)
+	}
+	pack, err := pagesService.WriterPack(t.Context(), sitemodel.PackRequest{PageID: held[hubPath].ID, Field: string(field.Body)})
+	if err != nil {
+		t.Fatalf("WriterPack of %s: %v", hubPath, err)
+	}
+	shown := make(map[string]string, len(pack.Sections))
+	for index := range pack.Sections {
+		section := &pack.Sections[index]
+		shown[section.Heading] = strings.Join(append(slices.Clone(section.Lines), section.Items...), "\n")
+	}
+	for heading, want := range map[string]string{
+		"The field's current value (the client's)":            hubBodyPhrase,
+		"Its other fields":                                    "- Title: Espresso machines: every type explained",
+		"Products of its store category " + storeCategoryName: "- " + productName + " (" + productPath + ")",
+	} {
+		if !strings.Contains(shown[heading], want) {
+			t.Errorf("the writer's pack of %s shows %q under %q, want %q in it; it holds %v", hubPath, shown[heading], heading, want,
+				slices.Sorted(maps.Keys(shown)))
+		}
+	}
+	if pack.Tokens == 0 || len(pack.Dropped) != 0 {
+		t.Errorf("the pack carries %d tokens and dropped %+v, want a whole pack", pack.Tokens, pack.Dropped)
+	}
+
+	proposals, err := graphService.CardProposals(t.Context(), graph.CardProposalsRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("CardProposals: %v", err)
+	}
+	if len(proposals.Items) != 1 {
+		t.Fatalf("open card proposals = %d, want 1", len(proposals.Items))
+	}
+	proposal := proposals.Items[0]
+	if proposal.Name != productHub || proposal.Current.Definition != "" || proposal.Proposed.Definition != proposedDefinition ||
+		len(proposal.Proposed.Facts) != len(proposedFacts()) || proposal.Changed {
+		t.Errorf("the proposal is %+v, want the seeded card for %s against its empty card", proposal, productHub)
+	}
+}
+
 func TestTheHarnessRecordsSpendWorthReading(t *testing.T) {
 	core := seeded(t)
 
@@ -1094,6 +1468,120 @@ func stopActiveRuns(t *testing.T, core *app.Core) {
 			t.Fatalf("Cancel %s: %v", listed.Items[index].ID, cancelErr)
 		}
 	}
+}
+
+func openFindings(t *testing.T, core *app.Core, siteID, code string) []findings.Finding {
+	t.Helper()
+
+	out := make([]findings.Finding, 0)
+	cursor := ""
+	for {
+		listed, err := core.Findings.List(t.Context(), findings.ListRequest{
+			SiteID: siteID, Status: string(finding.Open), Code: code, Cursor: cursor, Limit: 100,
+		})
+		if err != nil {
+			t.Fatalf("List findings: %v", err)
+		}
+		out = append(out, listed.Items...)
+		if !listed.HasMore {
+			return out
+		}
+		cursor = string(listed.Next)
+	}
+}
+
+func TestTheSeededWorkbookFillsTheInboxTheMapAndThePreview(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	counts, err := core.Findings.Counts(t.Context(), findings.CountsRequest{SiteID: siteID, Status: string(finding.Open)})
+	if err != nil {
+		t.Fatalf("Counts: %v", err)
+	}
+	t.Logf("the inbox opens on %d findings: %+v", counts.Total, counts.Codes)
+	for _, code := range []finding.Code{finding.RowAmbiguous, finding.RowWithoutPage, finding.ParentDiffers} {
+		if held := openFindings(t, core, siteID, string(code)); len(held) == 0 {
+			t.Errorf("the seeded workbook raised no %s", code)
+		}
+	}
+	misplaced := openFindings(t, core, siteID, string(finding.ParentDiffers))
+	if !slices.ContainsFunc(misplaced, func(f findings.Finding) bool { return f.PagePath == misplacedPath }) {
+		t.Errorf("parent_differs = %+v, want one on %s named by its path", misplaced, misplacedPath)
+	}
+
+	workbookPath := filepath.Join(os.Getenv(app.HomeVariable), workbookName)
+	preview, err := core.Imports.Preview(t.Context(), imports.PreviewRequest{SiteID: siteID, Path: workbookPath, Mapping: workbookMapping(siteID)})
+	if err != nil {
+		t.Fatalf("Preview the kept workbook: %v", err)
+	}
+	at := slices.IndexFunc(preview.Report.Pages, func(p imports.PreviewPage) bool { return p.Action == string(imports.ActionAmbiguous) })
+	if at < 0 || len(preview.Report.Pages[at].Candidates) != 2 || preview.Report.Pages[at].RowKey == "" {
+		t.Fatalf("the preview's pages = %+v, want the duplicated review as one row with two candidates", preview.Report.Pages)
+	}
+	ambiguous := preview.Report.Pages[at]
+	picked, err := core.Imports.Preview(t.Context(), imports.PreviewRequest{
+		SiteID: siteID, Path: workbookPath, Mapping: workbookMapping(siteID),
+		Choices: []imports.Choice{{RowKey: ambiguous.RowKey, PageID: ambiguous.Candidates[0].PageID}},
+	})
+	if err != nil {
+		t.Fatalf("Preview with the pick: %v", err)
+	}
+	if !slices.ContainsFunc(picked.Report.Pages, func(p imports.PreviewPage) bool {
+		return p.Path == ambiguous.Candidates[0].Path && p.MatchedBy == string(pagemap.RuleMapped)
+	}) {
+		t.Errorf("the picked preview = %+v, want %s matched by the mapping", picked.Report.Pages, ambiguous.Candidates[0].Path)
+	}
+
+	byPath := pagesByPath(t, core, siteID)
+	hub := byPath[hubPath]
+	first, err := core.SiteModel.SiteMap(t.Context(), sitemodel.MapRequest{SiteID: siteID, ParentID: hub.ID, Limit: 3})
+	if err != nil {
+		t.Fatalf("SiteMap of the hub: %v", err)
+	}
+	if first.Parent == nil || first.Parent.Twin == nil || len(first.Nodes.Items) != 3 || !first.Nodes.HasMore {
+		t.Fatalf("the hub's first page = %+v, want three children, more to come, and its store category beside it", first)
+	}
+	rest, err := core.SiteModel.SiteMap(t.Context(), sitemodel.MapRequest{SiteID: siteID, ParentID: hub.ID, Limit: 200, Cursor: first.Nodes.Next})
+	if err != nil {
+		t.Fatalf("SiteMap of the hub's rest: %v", err)
+	}
+	if got := len(first.Nodes.Items) + len(rest.Nodes.Items); got != first.Parent.Children {
+		t.Errorf("the hub's children come back %d over two pages, want %d", got, first.Parent.Children)
+	}
+
+	code, many := "", []findings.Finding{}
+	for _, held := range counts.Codes {
+		found := openFindings(t, core, siteID, held.Code)
+		if len(found) >= 2 && slices.ContainsFunc(found[0].Options, func(o findings.Option) bool { return o.Name == string(finding.Ignore) }) {
+			code, many = held.Code, found
+			break
+		}
+	}
+	if code == "" {
+		t.Fatalf("no code of %+v holds two findings to ignore at once", counts.Codes)
+	}
+	ids := make([]string, 0, len(many))
+	for i := range many {
+		ids = append(ids, many[i].ID)
+	}
+	settled, err := core.Findings.ResolveMany(t.Context(), findings.ResolveManyRequest{SiteID: siteID, Code: code, Option: string(finding.Ignore), FindingIDs: ids})
+	if err != nil {
+		t.Fatalf("ResolveMany: %v", err)
+	}
+	for _, held := range settled.Findings {
+		if held.Status != string(finding.Dismissed) || held.ResolvedBy != finding.ResolvedByPerson {
+			t.Errorf("%s = %+v, want it dismissed by the person", held.ID, held)
+		}
+	}
+	if left := openFindings(t, core, siteID, code); len(left) != 0 {
+		t.Errorf("%d findings %s stay open after the bulk ignore", len(left), code)
+	}
+	t.Logf("a bulk ignore dismissed %d findings %s", len(settled.Findings), code)
 }
 
 func pagesByPath(t *testing.T, core *app.Core, siteID string) map[string]pages.Page {

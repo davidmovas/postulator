@@ -2,23 +2,10 @@ package pages
 
 import (
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
-
-type Observed struct {
-	Link   string `json:"link"`
-	Slug   string `json:"slug"`
-	Status string `json:"status"`
-	Title  string `json:"title"`
-	H1     string `json:"h1"`
-}
-
-type Mismatch struct {
-	Field   string `json:"field"`
-	Planned string `json:"planned"`
-	Actual  string `json:"actual"`
-}
 
 type Note struct {
 	Label string `json:"label"`
@@ -38,15 +25,14 @@ type Page struct {
 	H1              string        `json:"h1"`
 	MetaTitle       string        `json:"metaTitle"`
 	MetaDescription string        `json:"metaDescription"`
-	Canonical       string        `json:"canonical"`
 	Keywords        []dto.Keyword `json:"keywords"`
 	Notes           []Note        `json:"notes"`
 	Status          string        `json:"status"`
 	EntityID        *string       `json:"entityId"`
 	TemplateID      *string       `json:"templateId"`
-	ContentHash     string        `json:"contentHash"`
-	Observed        Observed      `json:"observed"`
-	Mismatches      []Mismatch    `json:"mismatches"`
+	PageTypeID      *string       `json:"pageTypeId"`
+	TypeSource      string        `json:"typeSource"`
+	TypeReason      string        `json:"typeReason"`
 	WPModifiedAt    dto.Time      `json:"wpModifiedAt"`
 	LastSyncedAt    dto.Time      `json:"lastSyncedAt"`
 	Drift           bool          `json:"drift"`
@@ -61,7 +47,11 @@ type PageLink struct {
 	ToPageID   *string  `json:"toPageId"`
 	ToURL      string   `json:"toUrl"`
 	AnchorText string   `json:"anchorText"`
-	Origin     string   `json:"origin"`
+	Type       string   `json:"type"`
+	Region     string   `json:"region"`
+	Source     string   `json:"source"`
+	Position   *int     `json:"position"`
+	Ours       bool     `json:"ours"`
 	ObservedAt dto.Time `json:"observedAt"`
 }
 
@@ -77,7 +67,7 @@ type Conflict struct {
 	EntityID string `json:"entityId,omitempty"`
 }
 
-func view(p pagemap.Page) Page {
+func view(p pagemap.Page, drifted bool) Page {
 	return Page{
 		ID:              p.ID,
 		SiteID:          p.SiteID,
@@ -93,37 +83,24 @@ func view(p pagemap.Page) Page {
 		MetaDescription: p.MetaDescription,
 		Keywords:        application.KeywordViews(p.Keywords),
 		Notes:           noteViews(p.Notes),
-		Canonical:       p.Canonical,
 		Status:          string(p.Status),
 		EntityID:        p.EntityID,
 		TemplateID:      p.TemplateID,
-		ContentHash:     p.ContentHash,
-		Observed: Observed{
-			Link: p.Observed.Link, Slug: p.Observed.Slug, Status: p.Observed.Status,
-			Title: p.Observed.Title, H1: p.Observed.H1,
-		},
-		Mismatches:   mismatchViews(p),
-		WPModifiedAt: dto.TimeOf(p.WPModifiedAt),
-		LastSyncedAt: dto.TimeOf(p.LastSyncedAt),
-		Drift:        p.Drift,
-		CreatedAt:    dto.NewTime(p.CreatedAt),
-		UpdatedAt:    dto.NewTime(p.UpdatedAt),
+		PageTypeID:      p.PageTypeID,
+		TypeSource:      string(p.TypeSource),
+		TypeReason:      string(p.TypeReason),
+		WPModifiedAt:    dto.TimeOf(p.WPModifiedAt),
+		LastSyncedAt:    dto.TimeOf(p.LastSyncedAt),
+		Drift:           drifted,
+		CreatedAt:       dto.NewTime(p.CreatedAt),
+		UpdatedAt:       dto.NewTime(p.UpdatedAt),
 	}
 }
 
-func noteViews(notes []pagemap.Note) []Note {
+func noteViews(notes []note.Note) []Note {
 	out := make([]Note, 0, len(notes))
-	for _, note := range notes {
-		out = append(out, Note{Label: note.Label, Text: note.Text})
-	}
-	return out
-}
-
-func mismatchViews(p pagemap.Page) []Mismatch {
-	found := p.Mismatches()
-	out := make([]Mismatch, 0, len(found))
-	for i := range found {
-		out = append(out, Mismatch{Field: found[i].Field, Planned: found[i].Planned, Actual: found[i].Actual})
+	for _, n := range notes {
+		out = append(out, Note{Label: n.Label, Text: n.Text})
 	}
 	return out
 }
@@ -136,7 +113,11 @@ func linkView(l pagemap.PageLink) PageLink {
 		ToPageID:   l.ToPageID,
 		ToURL:      l.ToURL,
 		AnchorText: l.AnchorText,
-		Origin:     string(l.Origin),
+		Type:       string(l.Type),
+		Region:     l.Region,
+		Source:     string(l.Source),
+		Position:   l.Position,
+		Ours:       l.Ours,
 		ObservedAt: dto.NewTime(l.ObservedAt),
 	}
 }
@@ -149,10 +130,10 @@ func linkViews(links []pagemap.PageLink) []PageLink {
 	return out
 }
 
-func nodeViews(nodes []pagemap.Node) []TreeNode {
+func nodeViews(nodes []pagemap.Node, drifted map[string]bool) []TreeNode {
 	out := make([]TreeNode, 0, len(nodes))
 	for i := range nodes {
-		out = append(out, TreeNode{Page: view(nodes[i].Page), Children: nodeViews(nodes[i].Children)})
+		out = append(out, TreeNode{Page: view(nodes[i].Page, drifted[nodes[i].Page.ID]), Children: nodeViews(nodes[i].Children, drifted)})
 	}
 	return out
 }

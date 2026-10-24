@@ -14,8 +14,9 @@ import {
     toneClasses,
     WarningIcon,
 } from "../../../ui/index.js";
-import { familyOf, toolLabel } from "../conversation/model/tools.js";
-import { familyIcon, familyLabel, riskLabel, riskTone } from "../labels.js";
+import { toolLabel } from "../conversation/model/tools.js";
+import { riskLabel, riskTone } from "../labels.js";
+import { CardBody } from "./body.js";
 import type { CardKeys } from "./model/keys.js";
 import { cardChoice } from "./model/keys.js";
 
@@ -41,6 +42,7 @@ export interface ConfirmationCardProps {
     outcome: string | null;
     title: ReactNode;
     lines?: ReactNode;
+    summary?: string | null;
     busy: CardBusy;
     focus?: boolean;
     keys?: CardKeys;
@@ -75,6 +77,7 @@ export function ConfirmationCard({
     outcome,
     title,
     lines,
+    summary = null,
     busy,
     focus = false,
     keys = "none",
@@ -87,8 +90,6 @@ export function ConfirmationCard({
     const pending = status === "pending";
     const tone = riskTone(risk);
     const classes = toneClasses[tone];
-    const family = familyOf(tool);
-    const FamilyIcon = familyIcon(family);
     const RiskIcon = dangerous ? GavelIcon : ShieldIcon;
 
     useEffect(() => {
@@ -151,16 +152,7 @@ export function ConfirmationCard({
                 </span>
             </div>
             <div className="flex flex-col gap-2.5 p-3">
-                <div className="flex items-start gap-2">
-                    <FamilyIcon size={16} className={cx("mt-0.5 shrink-0", pending ? classes.ink : "text-ink-faint")} />
-                    <div className="flex min-w-0 flex-col">
-                        <span className="text-2xs font-semibold tracking-label text-ink-faint uppercase">
-                            {familyLabel(family)}
-                        </span>
-                        <span className="text-sm leading-snug font-semibold text-ink">{title}</span>
-                    </div>
-                </div>
-                {lines === undefined ? null : <div className="flex flex-col gap-1.5">{lines}</div>}
+                <CardBody tool={tool} tone={pending ? tone : null} title={title} lines={lines} summary={summary} />
                 {dangerous && pending ? (
                     <div className={cx("flex items-start gap-2 rounded-md border px-2.5 py-2", classes.soft, classes.border)}>
                         <WarningIcon size={15} className={cx("mt-px shrink-0", classes.ink)} />

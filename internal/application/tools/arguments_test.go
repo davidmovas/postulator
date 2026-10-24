@@ -159,13 +159,13 @@ func TestARefusedCallNamesTheFieldTheModelGotWrong(t *testing.T) {
 		{
 			name: "a field the tool does not take",
 			tool: "graph_create_entity",
-			args: `{"name":"Creatine","kind":"topic","shade":"blue"}`,
+			args: `{"name":"Creatine","shade":"blue"}`,
 			want: []string{"graph_create_entity", "shade", "only the fields its schema declares"},
 		},
 		{
 			name: "a nested field the tool does not take",
 			tool: "graph_create_entity",
-			args: `{"name":"Creatine","kind":"topic","anchors":[{"text":"c","hue":"blue"}]}`,
+			args: `{"name":"Creatine","anchors":[{"text":"c","hue":"blue"}]}`,
 			want: []string{"graph_create_entity", "hue"},
 		},
 		{

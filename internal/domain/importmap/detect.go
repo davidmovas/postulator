@@ -17,19 +17,38 @@ var aliases = map[Field][]string{
 	FieldKeywords:        {"keywords", "secondary keywords", "tags", "keyword", "secondary kw"},
 	FieldAnchors:         {"anchors", "anchor texts", "anchor", "anchor text"},
 	FieldEntity:          {"entity", "topic", "cluster", "entity name", "topic name"},
-	FieldEntityKind:      {"entity kind", "entity level", "entity type", "topic type", "cluster type"},
+	FieldPageType:        {"entity kind", "entity level", "entity type", "topic type", "cluster type", "page type", "kind", "page kind"},
 	FieldParentEntity:    {"parent", "parent entity", "pillar", "parent topic", "parent cluster", "parent product entity", "parent product"},
 	FieldRelated:         {"related", "siblings", "related entities", "related topics"},
-	FieldPageKind:        {"page type", "template", "kind", "page kind", "page template"},
 	FieldMetaTitle:       {"meta title", "seo title"},
 	FieldMetaDescription: {"meta description", "seo description", "description"},
 	FieldWPType:          {"post type", "wp type", "wordpress type", "content type"},
 	FieldOwnEntity:       {"own entity", "is entity", "has entity"},
+	FieldSKU:             {"sku"},
 }
 
-var levelAliases = []string{"root entity", "root"}
+var weakAliases = map[Field][]string{
+	FieldPageType: {"page type", "kind", "page kind"},
+}
 
-var noteAliases = []string{"notes", "note", "intent owner", "reason", "detected form variation"}
+func weak(field Field, header string) bool {
+	written := compact(Words(header))
+	return slices.ContainsFunc(weakAliases[field], func(alias string) bool { return written == compact(alias) })
+}
+
+var (
+	rootAliases  = []string{"root entity", "root"}
+	trailAliases = []string{"category", "subcategory", "sub subcategory"}
+)
+
+var noteAliases = []string{
+	"notes", "note", "intent owner", "reason", "detected form variation",
+	"entity notes", "entity note", "entity definition", "entity description",
+}
+
+func DescribesEntity(header string) bool {
+	return slices.Contains(strings.Fields(Words(header)), "entity")
+}
 
 var aliasIndex, compactIndex = buildIndexes()
 
@@ -71,22 +90,38 @@ func compact(normalized string) string {
 	return strings.ReplaceAll(normalized, " ", "")
 }
 
-func rootLevel(header string) bool {
+func namedAs(header string, aliases []string) bool {
 	if asked(header) {
 		return false
 	}
 	written := compact(Words(header))
-	return slices.ContainsFunc(levelAliases, func(alias string) bool { return written == compact(alias) })
+	return slices.ContainsFunc(aliases, func(alias string) bool { return written == compact(alias) })
 }
 
-func rootColumns(columns []string) []string {
+func rootLevel(header string) bool {
+	return namedAs(header, rootAliases)
+}
+
+func level(header string) bool {
+	return rootLevel(header) || namedAs(header, trailAliases)
+}
+
+func columnsWhere(columns []string, keep func(string) bool) []string {
 	out := make([]string, 0, len(columns))
 	for _, column := range columns {
-		if rootLevel(column) {
+		if keep(column) {
 			out = append(out, column)
 		}
 	}
 	return out
+}
+
+func rootColumns(columns []string) []string {
+	return columnsWhere(columns, rootLevel)
+}
+
+func levelColumns(columns []string) []string {
+	return columnsWhere(columns, level)
 }
 
 func noteOf(header string) bool {
@@ -99,12 +134,12 @@ func AutoDetect(headers []string) Mapping {
 	notes := make([]string, 0)
 	for _, header := range headers {
 		if field, known := Detect(header); known {
-			if _, taken := columns[field]; !taken {
+			if held, taken := columns[field]; !taken || weak(field, held) && !weak(field, header) {
 				columns[field] = header
 			}
 			continue
 		}
-		if rootLevel(header) {
+		if level(header) {
 			options.LevelColumns = append(options.LevelColumns, header)
 			continue
 		}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -26,19 +27,8 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	if _, err := s.sites.Get(ctx, siteID); err != nil {
 		return ApplyProposalsResponse{}, err
 	}
-	if len(req.Entities) == 0 {
-		return ApplyProposalsResponse{}, errors.New(errors.Invalid, "there is no proposal to write").
-			WithDetail("field", "entities")
-	}
-	for i := range req.Entities {
-		field := "entities[" + strconv.Itoa(i) + "]"
-		if strings.TrimSpace(req.Entities[i].Name) == "" {
-			return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a proposal needs a name").
-				WithDetail("field", field+".name")
-		}
-		if _, keywordsErr := application.KeywordList(req.Entities[i].Keywords, field+".keywords"); keywordsErr != nil {
-			return ApplyProposalsResponse{}, keywordsErr
-		}
+	if err := req.Validate(); err != nil {
+		return ApplyProposalsResponse{}, err
 	}
 
 	state, err := s.snapshot(ctx, siteID)
@@ -49,6 +39,12 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	response := ApplyProposalsResponse{Entities: []Entity{}, Edges: []Edge{}}
 	now := s.now()
 	err = s.uow.Do(ctx, func(c context.Context) error {
+		if req.Source == SourceSite {
+			if siteErr := s.applyFromSite(c, siteID, req.Entities, &state, &response, now); siteErr != nil {
+				return siteErr
+			}
+			return s.settleScopes(c, siteID)
+		}
 		for i := range req.Entities {
 			if adoptErr := s.adopt(c, siteID, &req.Entities[i], &state, &response, now); adoptErr != nil {
 				return adoptErr
@@ -77,6 +73,34 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	return response, nil
 }
 
+func (r ApplyProposalsRequest) Validate() error {
+	if !r.Source.valid() {
+		return errors.New(errors.Invalid, "a proposal comes from the model or from the site").WithDetail("field", "source")
+	}
+	if len(r.Entities) == 0 {
+		return errors.New(errors.Invalid, "there is no proposal to write").WithDetail("field", "entities")
+	}
+	for i := range r.Entities {
+		field := "entities[" + strconv.Itoa(i) + "]"
+		if strings.TrimSpace(r.Entities[i].Name) == "" {
+			return errors.New(errors.Invalid, "a proposal needs a name").WithDetail("field", field+".name")
+		}
+		if _, err := application.KeywordList(r.Entities[i].Keywords, field+".keywords"); err != nil {
+			return err
+		}
+		for j, fact := range r.Entities[i].Facts {
+			at := field + ".facts[" + strconv.Itoa(j) + "]"
+			if strings.TrimSpace(fact.Label) == "" {
+				return errors.New(errors.Invalid, "a fact needs a label").WithDetail("field", at+".label")
+			}
+			if strings.TrimSpace(fact.Value) == "" {
+				return errors.New(errors.Invalid, "a fact needs a value").WithDetail("field", at+".value")
+			}
+		}
+	}
+	return nil
+}
+
 func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEntity, state *siteGraph,
 	out *ApplyProposalsResponse, now time.Time) error {
 	name := strings.TrimSpace(proposed.Name)
@@ -101,7 +125,6 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 			ID:        id.New(),
 			SiteID:    siteID,
 			Name:      name,
-			Kind:      kindOf(proposed.Kind),
 			Intent:    strings.TrimSpace(proposed.Intent),
 			Keywords:  keywords,
 			Anchors:   proposedAnchors(proposed.Anchors),
@@ -151,7 +174,15 @@ func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEn
 			return canonicalErr
 		}
 	}
-	return nil
+	return s.carried(ctx, siteID, page.ID, now)
+}
+
+func (s *Service) carried(ctx context.Context, siteID, pageID string, now time.Time) error {
+	if s.findings == nil {
+		return nil
+	}
+	return s.findings.Clear(ctx, siteID, finding.PageWithoutEntity, finding.SubjectPage(pageID),
+		finding.ResolvedByModel, finding.ResolutionPageMapped, now)
 }
 
 func (s *Service) mappable(state *siteGraph, page pagemap.Page, entityID string) bool {

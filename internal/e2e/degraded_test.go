@@ -43,8 +43,8 @@ const (
 
 	newsPath = "/menu-news/"
 
-	productPath      = "/product/postulator-powder/"
-	productTermPath  = "/product-category/postulator-koffein/"
+	productPath      = "/product/powder/"
+	productTermPath  = "/product-category/koffein/"
 	vanishedPagePath = "/menu/gone/"
 )
 
@@ -76,6 +76,7 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 		t.Fatalf("create the site: %v", err)
 	}
 	siteID := owner.Site.ID
+	assertTheTypesCarryTheShippedTemplates(t, core, siteID)
 
 	checked, err := core.Sync.CheckPlugin(t.Context(), appsync.CheckPluginRequest{SiteID: siteID})
 	if err != nil {
@@ -174,9 +175,8 @@ func TestTheWholeLoopDegradesWithoutThePlugin(t *testing.T) {
 	if len(drafts) != len(degradedTargets) {
 		t.Fatalf("the run wrote %d drafts, want %d: %v", len(drafts), len(degradedTargets), drafts)
 	}
-	if !slices.Contains(standDowns, steps.ReasonNoPlugin) {
-		t.Fatalf("no neighbor stood down for the missing plugin; they stood down for %v, so the gate "+
-			"that needs the plugin was never reached", standDowns)
+	if !slices.Contains(standDowns, content.CodeTargetNotPublished) {
+		t.Fatalf("the neighbors stood down for %v, want them to wait for the drafts to be published", standDowns)
 	}
 	for _, planned := range degradedTargets {
 		wpID, ok := drafts[planned.path]
@@ -242,7 +242,7 @@ func assertAProductIsRefusedWithoutThePlugin(t *testing.T, core *app.Core, siteI
 	t.Helper()
 
 	entity, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: siteID, Name: "Gift card", Kind: "product", Keywords: []dto.Keyword{{Text: "restaurant gift card"}},
+		SiteID: siteID, Name: "Gift card", Keywords: []dto.Keyword{{Text: "restaurant gift card"}},
 	})
 	if err != nil {
 		t.Fatalf("give the product row an entity: %v", err)
@@ -421,7 +421,7 @@ func assertPluginCallsAreRefusedAsInvalid(t *testing.T, core *app.Core, siteID s
 			return callErr
 		},
 		"seo meta": func() error {
-			_, callErr := client.SetSEOMeta(t.Context(), wp.TypePage, wpID, wp.SEOMeta{Title: "Our Menu"})
+			_, callErr := client.SetSEOMeta(t.Context(), wp.TypePage, wpID, wp.SEOMeta{Title: "Our Menu"}, nil)
 			return callErr
 		},
 		"raw read": func() error { _, callErr := client.GetRaw(t.Context(), wp.TypePage, wpID); return callErr },
@@ -491,13 +491,23 @@ func assertCorePull(t *testing.T, core *app.Core, siteID string, stored map[stri
 		t.Fatalf("%s hangs off %v, want the row of %s", child.Path, child.ParentPageID, parent.Path)
 	}
 
-	links := linksOf(t, core.Pages, stored[newsPath].ID)
+	links := rawLinksOf(t, core, stored[newsPath].ID)
 	if len(links) != 1 || links[0].ToURL != "/menu/" {
-		t.Fatalf("%s carries the links %+v, want the one to /menu/", newsPath, links)
+		t.Fatalf("%s carries the raw links %+v, want the one to /menu/", newsPath, links)
 	}
 	if links[0].ToPageID == nil || *links[0].ToPageID != parent.ID {
 		t.Fatalf("the link of %s resolved to %v, want the row of /menu/", newsPath, links[0].ToPageID)
 	}
+}
+
+func rawLinksOf(t *testing.T, core *app.Core, pageID string) []pagemap.PageLink {
+	t.Helper()
+
+	model, err := core.Observe.Page(t.Context(), pageID)
+	if err != nil {
+		t.Fatalf("read the model of %s: %v", pageID, err)
+	}
+	return slices.DeleteFunc(model.Links, func(link pagemap.PageLink) bool { return link.Source != pagemap.SourceRaw })
 }
 
 func assertNothingUnseenWasArchived(t *testing.T, stored map[string]pages.Page) {
@@ -576,12 +586,22 @@ func assertRelinkStoodDown(t *testing.T, final steps.FinalReport) []string {
 	if final.Relink == nil {
 		t.Fatalf("%s carries no relink result", final.Path)
 	}
+	if final.Publish != nil && final.Publish.Status != "publish" {
+		if final.Relink.Linked != 0 || len(final.Relink.Neighbors) != 0 {
+			t.Fatalf("%s relinked %+v, want no neighbor linked to a draft", final.Path, final.Relink)
+		}
+		if _, ok := findingOf(final.Relink.Findings, content.CodeTargetNotPublished); !ok {
+			t.Fatalf("%s reports the findings %+v, want a %q warning", final.Path,
+				final.Relink.Findings, content.CodeTargetNotPublished)
+		}
+		return []string{content.CodeTargetNotPublished}
+	}
 	if final.Relink.Linked != 0 || final.Relink.Conflicts != 0 || final.Relink.Skipped == 0 {
 		t.Fatalf("%s relinked %+v, want every neighbor skipped", final.Path, final.Relink)
 	}
 
 	standing := []string{steps.ReasonNoPlugin, steps.ReasonNeighborOwesNothing,
-		steps.ReasonNeighborOwesTheCanonicalPage, steps.ReasonNeighborUnmapped, steps.ReasonNeighborNoTemplate}
+		steps.ReasonNeighborOwesTheCanonicalPage, steps.ReasonNeighborUnmapped}
 
 	reasons := make([]string, 0, len(final.Relink.Neighbors))
 	for i := range final.Relink.Neighbors {

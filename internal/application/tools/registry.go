@@ -11,18 +11,22 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -34,20 +38,24 @@ type actionStore interface {
 }
 
 type Deps struct {
-	Sites     *sites.Service
-	Graph     *graph.Service
-	Pages     *pages.Service
-	Templates *templates.Service
-	Runs      *runs.Service
-	Sync      *sync.Service
-	Reports   *reports.Service
-	Imports   *imports.Service
-	Models    *models.Service
-	Content   *content.Service
-	Schedules *schedules.Service
-	Actions   actionStore
-	Publisher application.Publisher
-	Clock     clock.Clock
+	Sites       *sites.Service
+	Graph       *graph.Service
+	Pages       *pages.Service
+	PageTypes   *pagetypes.Service
+	Templates   *templates.Service
+	Runs        *runs.Service
+	Sync        *sync.Service
+	Reports     *reports.Service
+	Imports     *imports.Service
+	Findings    *findings.Service
+	Models      *models.Service
+	Content     *content.Service
+	Schedules   *schedules.Service
+	SiteModel   *sitemodel.Service
+	ResultBytes func() int
+	Actions     actionStore
+	Publisher   application.Publisher
+	Clock       clock.Clock
 }
 
 type factory func(Deps) Tool
@@ -77,12 +85,38 @@ func (r *Registry) Build(b Binding) []Tool {
 	built := make([]Tool, 0, len(r.order))
 	for _, name := range r.order {
 		tool := r.byName[name](r.deps)
-		if b.Mode == agent.ModeConfirm && tool.Def.Risk.NeedsConfirmation() {
-			tool.Run = r.proposal(tool.Def, tool.Check)
-		}
+		tool.Run = asTheAgent(r.gated(tool))
 		built = append(built, tool)
 	}
 	return built
+}
+
+func (r *Registry) gated(tool Tool) func(context.Context, Binding, json.RawMessage) (any, error) {
+	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
+		risk := tool.risk(args)
+		if b.Approved || !risk.NeedsConfirmation() {
+			return tool.Run(ctx, b, args)
+		}
+		if tool.Confirm != nil {
+			summary, err := tool.Confirm(ctx, b, args)
+			if err != nil {
+				return nil, err
+			}
+			if summary != "" {
+				return r.proposal(tool.Def, risk, tool.Check, summary)(ctx, b, args)
+			}
+		}
+		if b.Mode == agent.ModeConfirm {
+			return r.proposal(tool.Def, risk, tool.Check, "")(ctx, b, args)
+		}
+		return tool.Run(ctx, b, args)
+	}
+}
+
+func asTheAgent(run func(context.Context, Binding, json.RawMessage) (any, error)) func(context.Context, Binding, json.RawMessage) (any, error) {
+	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
+		return run(kctx.WithActor(ctx, kctx.ActorAgent), b, args)
+	}
 }
 
 func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.RawMessage) (any, error) {
@@ -92,15 +126,13 @@ func (r *Registry) Call(ctx context.Context, b Binding, name string, args json.R
 	}
 
 	tool := build(r.deps)
-	if b.Mode == agent.ModeConfirm && !b.Approved && tool.Def.Risk.NeedsConfirmation() {
-		tool.Run = r.proposal(tool.Def, tool.Check)
-	}
+	ctx = kctx.WithActor(ctx, kctx.ActorAgent)
 	if tool.Authorize != nil {
 		if err := tool.Authorize(ctx, b); err != nil {
 			return nil, err
 		}
 	}
-	return tool.Run(ctx, b, args)
+	return r.gated(tool)(ctx, b, args)
 }
 
 func (r *Registry) Lookup(name string) (Def, bool) {
@@ -111,7 +143,7 @@ func (r *Registry) Lookup(name string) (Def, bool) {
 	return build(r.deps).Def, true
 }
 
-func (r *Registry) proposal(def Def, check func(json.RawMessage) error) func(
+func (r *Registry) proposal(def Def, risk Risk, check func(json.RawMessage) error, said string) func(
 	context.Context, Binding, json.RawMessage) (any, error) {
 	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
 		if b.ConversationID == "" {
@@ -124,10 +156,14 @@ func (r *Registry) proposal(def Def, check func(json.RawMessage) error) func(
 			}
 		}
 
+		summary := said
+		if summary == "" {
+			summary = Summary(def, args)
+		}
 		now := r.now()
 		action, err := agent.NewPendingAction(agent.PendingAction{
 			ID: id.New(), ConversationID: b.ConversationID, Tool: def.Name, Args: args,
-			Summary: Summary(def, args), CreatedAt: now, UpdatedAt: now,
+			Summary: summary, CreatedAt: now, UpdatedAt: now,
 		})
 		if err != nil {
 			return nil, err
@@ -138,7 +174,7 @@ func (r *Registry) proposal(def Def, check func(json.RawMessage) error) func(
 		if publishErr := r.deps.Publisher.Publish(events.AgentConfirmRequested,
 			events.AgentConfirmRequestedPayload{
 				ConversationID: b.ConversationID, ConfirmationID: action.ID, Tool: def.Name,
-				Args: Redact(action.Args), Risk: string(def.Risk), Summary: action.Summary,
+				Args: Redact(action.Args), Risk: string(risk), Summary: action.Summary,
 			}); publishErr != nil {
 			return nil, publishErr
 		}

@@ -112,6 +112,7 @@ const pauseTones: Readonly<Record<PauseReason, Tone>> = {
     needs_human: "warn",
     user: "muted",
     awaiting_parent: "info",
+    awaiting_review: "info",
 };
 
 export function pauseReasonTone(reason: string): Tone {
@@ -187,6 +188,7 @@ const artifactIcons: Readonly<Record<ArtifactKind, IconComponent>> = {
     draft: DescriptionIcon,
     body_html: VisibilityIcon,
     meta: DescriptionIcon,
+    fields: DescriptionIcon,
     images: ShieldIcon,
     validation_report: LinkIcon,
     judge_report: GavelIcon,
@@ -195,6 +197,7 @@ const artifactIcons: Readonly<Record<ArtifactKind, IconComponent>> = {
     sync_result: SyncAltIcon,
     final_report: MonitoringIcon,
     revert_result: HistoryIcon,
+    edit_plan: VisibilityIcon,
 };
 
 export function artifactLabel(kind: string): string {

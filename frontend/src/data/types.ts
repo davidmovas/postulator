@@ -2,17 +2,23 @@ import type {
     AgentModels,
     CatalogModels,
     ContentModels,
+    ContextPackModels,
     DtoModels,
+    FieldModels,
+    FindingsModels,
     GraphModels,
     ImportModels,
     LlmModels,
+    ObserveModels,
     PagesModels,
+    PageTypesModels,
     ReportsModels,
     RunDomainModels,
     RunsModels,
     SchedulesModels,
     SchemaModels,
     SettingsModels,
+    SiteModelModels,
     SitesModels,
     SyncModels,
     TemplateDomainModels,
@@ -31,13 +37,49 @@ export type SiteDefaults = Wire<SitesModels.Defaults>;
 export type SitePlugin = Wire<SitesModels.Plugin>;
 export type SiteFilter = ListFilter<SitesModels.ListRequest>;
 export type Reachability = Wire<SitesModels.Reachability>;
+export type SiteSettings = Site["settings"];
 
 export type Page = Wire<PagesModels.Page>;
 export type PageLink = Wire<PagesModels.PageLink>;
 export type PageTreeNode = Wire<PagesModels.TreeNode>;
 export type PreviewLink = Wire<PagesModels.PreviewLinkResponse>;
-export type PageLinkInput = Wire<PagesModels.LinkInput>;
 export type PageFilter = ListFilter<PagesModels.ListRequest>;
+
+export type PageModel = Wire<ObserveModels.ModelView>;
+export type ModelIdentity = Wire<ObserveModels.IdentityView>;
+export type ModelHierarchy = Wire<ObserveModels.HierarchyView>;
+export type ModelTerm = Wire<ObserveModels.TermView>;
+export type ModelRender = Wire<ObserveModels.RenderView>;
+export type ModelRegion = Wire<ObserveModels.RegionView>;
+export type ModelTrail = Wire<ObserveModels.TrailView>;
+export type ModelCrumb = Wire<ObserveModels.CrumbView>;
+export type ModelLink = Wire<ObserveModels.LinkView>;
+export type ModelBlock = Wire<ObserveModels.BlockView>;
+export type ModelField = Wire<ObserveModels.FieldView>;
+export type ModelFinding = Wire<ObserveModels.FindingView>;
+export type ModelSummary = Wire<ObserveModels.Summary>;
+
+export type Finding = Wire<FindingsModels.Finding>;
+export type FindingChoice = Wire<FindingsModels.Option>;
+export type FindingFilter = ListFilter<FindingsModels.ListRequest>;
+export type FindingCountsRequest = FindingsModels.CountsRequest;
+export type FindingCounts = Wire<FindingsModels.CountsResponse>;
+export type FindingCodeCount = Wire<FindingsModels.CodeCount>;
+export type ExplainRequest = FindingsModels.ExplainRequest;
+export type Explanation = Wire<FindingsModels.Explanation>;
+export type ResolveFindingRequest = FindingsModels.ResolveRequest;
+export type ResolveFindingResponse = Wire<FindingsModels.ResolveResponse>;
+export type ResolveFindingsRequest = FindingsModels.ResolveManyRequest;
+export type ResolveFindingsResponse = Wire<FindingsModels.ResolveManyResponse>;
+
+export type SiteMapView = Wire<SiteModelModels.MapView>;
+export type SiteMapNode = Wire<ContextPackModels.MapNode>;
+export type SiteMapRef = Wire<ContextPackModels.Ref>;
+export type SiteMapFilter = Omit<SiteModelModels.MapRequest, "cursor" | "limit">;
+
+export type WriterPack = Wire<SiteModelModels.PackView>;
+export type WriterPackSection = Wire<SiteModelModels.Section>;
+export type WriterPackDrop = Wire<SiteModelModels.Drop>;
 
 export type Entity = Wire<GraphModels.Entity>;
 export type Edge = Wire<GraphModels.Edge>;
@@ -45,19 +87,27 @@ export type Anchor = Wire<GraphModels.Anchor>;
 export type EntityPage = Wire<GraphModels.EntityPage>;
 export type EntityFilter = ListFilter<GraphModels.ListEntitiesRequest>;
 export type ProposedEntity = Wire<GraphModels.ProposedEntity>;
+export type PreviewFromPagesRequest = GraphModels.PreviewFromPagesRequest;
 export type PreviewFromPagesResponse = Wire<GraphModels.PreviewFromPagesResponse>;
 export type ProposeFromKeywordsResponse = Wire<GraphModels.ProposeFromKeywordsResponse>;
 export type ApplyProposalsResponse = Wire<GraphModels.ApplyProposalsResponse>;
 export type EdgeFilter = ListFilter<GraphModels.ListEdgesRequest>;
+export type CardProposal = Wire<GraphModels.CardProposal>;
+export type ProposedCard = Wire<GraphModels.Card>;
+export type CardFact = Wire<GraphModels.Fact>;
 
 export type Template = Wire<TemplatesModels.Template>;
 export type TemplateOverride = Wire<TemplatesModels.Override>;
-export type LinkPolicy = Wire<TemplatesModels.LinkPolicy>;
 export type TemplateFilter = ListFilter<TemplatesModels.ListTemplatesRequest>;
-export type PolicyFilter = ListFilter<TemplatesModels.ListPoliciesRequest>;
 export type TemplateSpec = Wire<TemplateDomainModels.TemplateSpec>;
 export type TemplateSection = Wire<TemplateDomainModels.Section>;
-export type LinkRules = Wire<TemplateDomainModels.LinkRules>;
+export type LinkRules = Wire<FieldModels.LinkRules>;
+export type LinkPolicy = Wire<FieldModels.LinkPolicy>;
+export type PageType = Wire<PageTypesModels.Type>;
+export type FieldScope = Wire<PageTypesModels.Scope>;
+export type CatalogField = Wire<PageTypesModels.Field>;
+export type PageTypeList = Wire<PageTypesModels.ListResponse>;
+export type SetScopeRequest = Wire<PageTypesModels.SetScopeRequest>;
 export type MetaRules = Wire<TemplateDomainModels.MetaRules>;
 export type KeywordRules = Wire<TemplateDomainModels.KeywordRules>;
 export type StepSpec = Wire<TemplateDomainModels.StepSpec>;
@@ -70,6 +120,7 @@ export type RunArtifact = Wire<RunsModels.Artifact>;
 export type RunEventRow = Wire<RunsModels.Event>;
 export type RunFilter = ListFilter<RunsModels.ListRequest>;
 export type RunItemFilter = ListFilter<RunsModels.ListItemsRequest>;
+export type RunStartRequest = RunsModels.StartRequest;
 export type Budget = Wire<RunDomainModels.Budget>;
 export type Estimate = Wire<RunDomainModels.Estimate>;
 export type RunTotals = Wire<RunDomainModels.Stats>;
@@ -105,6 +156,8 @@ export type ImportConflict = Wire<ImportModels.Conflict>;
 export type ImportCounts = Wire<ImportModels.Counts>;
 export type PreviewReport = Wire<ImportModels.PreviewReport>;
 export type PreviewPage = Wire<ImportModels.PreviewPage>;
+export type ImportCandidate = Wire<ImportModels.Candidate>;
+export type ImportChoice = ImportModels.Choice;
 export type PreviewEntity = Wire<ImportModels.PreviewEntity>;
 export type PreviewGroup = Wire<ImportModels.PreviewGroup>;
 export type PreviewEdge = Wire<ImportModels.PreviewEdge>;
@@ -125,11 +178,12 @@ export type PageAudit = Wire<ReportsModels.PageAudit>;
 export type RequiredLink = Wire<ReportsModels.RequiredLink>;
 export type ExtraLink = Wire<ReportsModels.ExtraLink>;
 export type LinkTotals = Wire<ReportsModels.LinkTotals>;
-export type LinkPolicySummary = Wire<ReportsModels.LinkPolicySummary>;
+export type LinkTypeCounts = Wire<ReportsModels.LinkTypeCounts>;
 export type JudgeResult = Wire<ContentModels.JudgeResponse>;
 export type JudgeReport = Wire<ContentModels.JudgeReport>;
 
 export type PluginState = Wire<SyncModels.Plugin>;
+export type SyncSiteRequest = SyncModels.SyncSiteRequest;
 
 export type SettingDescriptor = Wire<SettingsModels.Descriptor>;
 export type SettingValue = Wire<TransportModels.GetSettingResponse>;

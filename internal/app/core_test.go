@@ -14,8 +14,11 @@ import (
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/browser"
+	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/models"
+	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/runs"
+	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -40,10 +43,10 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 		if core.Steps == nil || core.Engine == nil || core.Runs == nil {
 			t.Fatal("the core must carry the run engine")
 		}
-		if core.Sync == nil || core.Reports == nil || core.WordPress == nil {
-			t.Fatal("the core must carry the wordpress sync and the read models")
+		if core.Sync == nil || core.Observe == nil || core.Reports == nil || core.WordPress == nil {
+			t.Fatal("the core must carry the wordpress sync, the observation and the read models")
 		}
-		if names := core.Steps.Names(); len(names) != 16 || names[0] != "resolve_context" {
+		if names := core.Steps.Names(); len(names) != 17 || names[0] != "resolve_context" || names[16] != "edit_page" {
 			t.Fatalf("round %d: the step registry holds %v", round, names)
 		}
 		if _, err := core.Runs.List(t.Context(), runs.ListRequest{}); err != nil {
@@ -62,14 +65,65 @@ func TestOpenWiresTheUseCasesAndSeedsTheStarterTemplates(t *testing.T) {
 		if len(seeded.Items) != 5 {
 			t.Errorf("round %d: seeded templates = %d, want 5", round, len(seeded.Items))
 		}
-		policies, err := core.Templates.ListPolicies(t.Context(), templates.ListPoliciesRequest{Scope: "global"})
-		if err != nil || len(policies.Items) != 1 {
-			t.Errorf("round %d: seeded policies = %d, %v; want 1", round, len(policies.Items), err)
-		}
-
 		if err = core.Close(); err != nil {
 			t.Fatalf("Close: %v", err)
 		}
+	}
+}
+
+func TestAFreshSiteStartsARunOnAuto(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	core, err := app.Open(t.Context(), app.Config{
+		DatabasePath: filepath.Join(home, "postulator.db"), KeyDir: home, Provider: fake.New(),
+	}, zaptest.NewLogger(t))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() {
+		if closeErr := core.Close(); closeErr != nil {
+			t.Errorf("Close: %v", closeErr)
+		}
+	})
+
+	owner, err := core.Sites.Create(t.Context(), sites.CreateRequest{Name: "Fresh", BaseURL: "https://fresh.example", Username: "editor"})
+	if err != nil {
+		t.Fatalf("create the site: %v", err)
+	}
+	entity, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: owner.Site.ID, Name: "First"})
+	if err != nil {
+		t.Fatalf("create the entity: %v", err)
+	}
+	entityID := entity.Entity.ID
+	created, err := core.Pages.Create(t.Context(), pages.CreateRequest{SiteID: owner.Site.ID, Path: "/first/", Title: "First", EntityID: &entityID})
+	if err != nil {
+		t.Fatalf("plan a page: %v", err)
+	}
+	planned := created.Page.ID
+	if _, err = core.Pages.SetCanonical(t.Context(), pages.SetCanonicalRequest{EntityID: entityID, PageID: planned}); err != nil {
+		t.Fatalf("make the page its entity's: %v", err)
+	}
+
+	shipped, err := core.Templates.ListTemplates(t.Context(), templates.ListTemplatesRequest{Scope: "global"})
+	if err != nil {
+		t.Fatalf("list the shipped templates: %v", err)
+	}
+	guide := ""
+	for i := range shipped.Items {
+		if shipped.Items[i].Name == "Guide" {
+			guide = shipped.Items[i].ID
+		}
+	}
+	resolved, err := core.Templates.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: planned})
+	if err != nil {
+		t.Fatalf("a page of a fresh site resolves no template: %v", err)
+	}
+	if guide == "" || resolved.TemplateID != guide {
+		t.Errorf("the untyped page resolves %q, want the Entity type's Guide %q", resolved.TemplateID, guide)
+	}
+	if _, err = core.Runs.Estimate(t.Context(), runs.StartRequest{SiteID: owner.Site.ID, PageIDs: []string{planned}}); err != nil {
+		t.Fatalf("a run on auto over a fresh site is refused: %v", err)
 	}
 }
 

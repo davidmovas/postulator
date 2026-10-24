@@ -1,7 +1,6 @@
 package steps
 
 import (
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
@@ -13,7 +12,7 @@ const (
 	ceilingDoublings  = 1
 )
 
-func plannedWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
+func plannedWords(spec template.TemplateSpec) int {
 	words := 0
 	for i := range spec.Sections {
 		words += spec.Sections[i].TargetWords
@@ -24,14 +23,11 @@ func plannedWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
 	if words == 0 {
 		words = fallbackWords
 	}
-	if wpType == pagemap.WPProduct {
-		words += spec.Product.Words()
-	}
 	return words
 }
 
-func writerCeiling(spec template.TemplateSpec, wpType pagemap.WPType, attempts int) int {
-	ceiling := max(leastWriterTokens, plannedWords(spec, wpType)*tokensPerWord+tokenHeadroom)
+func writerCeiling(spec template.TemplateSpec, attempts int) int {
+	ceiling := max(leastWriterTokens, plannedWords(spec)*tokensPerWord+tokenHeadroom)
 	return ceiling << min(max(attempts, 0), ceilingDoublings)
 }
 

@@ -4,11 +4,8 @@ import { defaultQuery, filterOf, narrowed, readQuery, readTab, searchOf, withTab
 
 describe("readQuery", () => {
     it("reads every filter the list endpoint supports", () => {
-        const query = readQuery(
-            new URLSearchParams("view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=/shop/&sort=path:desc"),
-        );
+        const query = readQuery(new URLSearchParams("status=published&entity=e1&under=1&unmapped=1&prefix=/shop/&sort=path:desc"));
         expect(query).toStrictEqual({
-            view: "tree",
             status: "published",
             entityId: "e1",
             descendants: true,
@@ -30,8 +27,8 @@ describe("readQuery", () => {
         });
     });
 
-    it("falls back to the table view", () => {
-        expect(readQuery(new URLSearchParams("view=canvas")).view).toBe("table");
+    it("ignores the tree view an old address still asks for, since the tree is the Site map", () => {
+        expect(readQuery(new URLSearchParams("view=tree"))).toStrictEqual(defaultQuery);
         expect(readQuery(new URLSearchParams())).toStrictEqual(defaultQuery);
     });
 });
@@ -39,7 +36,6 @@ describe("readQuery", () => {
 describe("writeQuery", () => {
     it("round-trips through readQuery", () => {
         const query = {
-            view: "tree" as const,
             status: "archived",
             entityId: "e9",
             descendants: true,
@@ -57,7 +53,6 @@ describe("writeQuery", () => {
 
     it("writes every filter under its own key, in the order the address has always had", () => {
         const query = {
-            view: "tree" as const,
             status: "published",
             entityId: "e1",
             descendants: true,
@@ -65,9 +60,7 @@ describe("writeQuery", () => {
             pathPrefix: "/shop/",
             sort: { field: "path" as const, desc: true },
         };
-        expect(searchOf(query)).toBe(
-            "?view=tree&status=published&entity=e1&under=1&unmapped=1&prefix=%2Fshop%2F&sort=path%3Adesc",
-        );
+        expect(searchOf(query)).toBe("?status=published&entity=e1&under=1&unmapped=1&prefix=%2Fshop%2F&sort=path%3Adesc");
     });
 });
 
@@ -96,7 +89,7 @@ describe("narrowed", () => {
     it("is false only for the untouched query", () => {
         expect(narrowed(defaultQuery)).toBe(false);
         expect(narrowed({ ...defaultQuery, unmapped: true })).toBe(true);
-        expect(narrowed({ ...defaultQuery, view: "tree" })).toBe(false);
+        expect(narrowed({ ...defaultQuery, sort: { field: "path", desc: true } })).toBe(false);
     });
 });
 
@@ -112,6 +105,8 @@ describe("the drawer tab in the address", () => {
     it("reads a tab another screen asked for", () => {
         expect(readTab(new URLSearchParams("tab=preview"))).toBe("preview");
         expect(readTab(new URLSearchParams("tab=mapping"))).toBe("mapping");
+        expect(readTab(new URLSearchParams("tab=model"))).toBe("model");
+        expect(readTab(new URLSearchParams("tab=writer"))).toBe("writer");
     });
 
     it("falls back to the details tab for anything it does not know", () => {
@@ -120,7 +115,7 @@ describe("the drawer tab in the address", () => {
     });
 
     it("writes every tab but the default one, so a plain link stays plain", () => {
-        expect(withTab(new URLSearchParams("view=tree"), "preview").toString()).toBe("view=tree&tab=preview");
-        expect(withTab(new URLSearchParams("view=tree"), "details").toString()).toBe("view=tree");
+        expect(withTab(new URLSearchParams("status=planned"), "preview").toString()).toBe("status=planned&tab=preview");
+        expect(withTab(new URLSearchParams("status=planned"), "details").toString()).toBe("status=planned");
     });
 });

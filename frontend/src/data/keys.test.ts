@@ -31,7 +31,7 @@ describe("the limit is part of a list key", () => {
         expect(isPrefix(keys.sites.lists(), keys.sites.list({}, null, 25))).toBe(true);
         expect(isPrefix(keys.runs.lists(), keys.runs.list({}, null, 25))).toBe(true);
         expect(isPrefix(keys.templates.lists(), keys.templates.list({}, null, 25))).toBe(true);
-        expect(isPrefix(keys.policies.lists(), keys.policies.list({}, null, 25))).toBe(true);
+        expect(isPrefix(keys.sites.root(), keys.sites.types("s1"))).toBe(true);
         expect(isPrefix(keys.schedules.lists(), keys.schedules.list({}, 25))).toBe(true);
         expect(isPrefix(keys.graph.entityLists(), keys.graph.entities(filter, null, 25))).toBe(true);
         expect(isPrefix(keys.graph.edgeLists(), keys.graph.edges(filter, 25))).toBe(true);
@@ -87,6 +87,44 @@ describe("the spend keys", () => {
     test("spend is not under the usage handle, so a usage refresh leaves it alone", () => {
         expect(isPrefix(keys.models.usageAll(), keys.models.spendOver(30))).toBe(false);
         expect(isPrefix(keys.models.usageAll(), keys.models.calls({}, 25))).toBe(false);
+    });
+});
+
+describe("the page model lives under the page cache", () => {
+    test("every model and every summary sits under its handle and under the page root", () => {
+        expect(isPrefix(keys.pages.models(), keys.pages.model("p1"))).toBe(true);
+        expect(isPrefix(keys.pages.summaries(), keys.pages.summary("s1"))).toBe(true);
+        expect(isPrefix(keys.pages.root(), keys.pages.model("p1"))).toBe(true);
+        expect(isPrefix(keys.pages.root(), keys.pages.summary("s1"))).toBe(true);
+    });
+
+    test("what the writer sees sits under its own handle, one entry per page and field", () => {
+        expect(isPrefix(keys.pages.packs(), keys.pages.pack("p1", ""))).toBe(true);
+        expect(isPrefix(keys.pages.root(), keys.pages.pack("p1", "seo_title"))).toBe(true);
+        expect(isPrefix(keys.pages.models(), keys.pages.pack("p1", ""))).toBe(false);
+        expect(keys.pages.pack("p1", "")).not.toEqual(keys.pages.pack("p1", "seo_title"));
+    });
+
+    test("a model is not a page detail, so a detail refresh leaves it alone", () => {
+        expect(isPrefix(keys.pages.details(), keys.pages.model("p1"))).toBe(false);
+        expect(isPrefix(keys.pages.summaries(), keys.pages.model("s1"))).toBe(false);
+    });
+});
+
+describe("the card proposals of a site", () => {
+    test("sit under the graph, one list per site", () => {
+        expect(isPrefix(keys.graph.root(), keys.graph.cards("s1"))).toBe(true);
+        expect(isPrefix(keys.graph.cardLists(), keys.graph.cards("s1"))).toBe(true);
+        expect(isPrefix(keys.graph.entityLists(), keys.graph.cards("s1"))).toBe(false);
+        expect(keys.graph.cards("s1")).not.toEqual(keys.graph.cards("s2"));
+    });
+});
+
+describe("a template resolved for a page", () => {
+    test("through a picked template, it is refreshed with the page's own resolution", () => {
+        expect(isPrefix(keys.templates.resolved("p1"), keys.templates.resolvedWith("p1", "t1"))).toBe(true);
+        expect(isPrefix(keys.templates.resolvedAll(), keys.templates.resolvedWith("p1", "t1"))).toBe(true);
+        expect(keys.templates.resolvedWith("p1", "t1")).not.toEqual(keys.templates.resolved("p1"));
     });
 });
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -24,7 +25,7 @@ const (
 var stamp = time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
 
 func page(id, path string, entityID *string) pagemap.Page {
-	return pagemap.Page{ID: id, SiteID: siteA, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: entityID, CreatedAt: stamp, UpdatedAt: stamp}
+	return pagemap.Page{ID: id, SiteID: siteA, Path: path, WPType: pagemap.WPPage, Status: pagemap.StatusPlanned, EntityID: entityID, CreatedAt: stamp, UpdatedAt: stamp}
 }
 
 func ptr(s string) *string {
@@ -50,7 +51,7 @@ func TestNewPageNormalises(t *testing.T) {
 	p := page(pageA, "/Shop/Bags", nil)
 	p.Title = "  Bags  "
 	p.Keywords = keyword.List{{Text: " totes"}, {Text: "Totes"}, {Text: ""}, {Text: "clutches"}, {Text: " leather bags ", Volume: new(700)}}
-	p.Notes = []pagemap.Note{
+	p.Notes = []note.Note{
 		{Label: " Intent Owner ", Text: " GEO Commercial "}, {Label: "Notes", Text: "  "}, {Label: " ", Text: "no label"},
 		{Label: "intent owner", Text: "said twice"}, {Label: "Reason", Text: "one form of the product"},
 	}
@@ -64,7 +65,7 @@ func TestNewPageNormalises(t *testing.T) {
 	if !slices.Equal(got.Keywords.Texts(), []string{"leather bags", "totes", "clutches"}) {
 		t.Errorf("NewPage keywords = %v, want them trimmed, deduplicated and ordered by volume", got.Keywords.Texts())
 	}
-	wantNotes := []pagemap.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Reason", Text: "one form of the product"}}
+	wantNotes := []note.Note{{Label: "Intent Owner", Text: "GEO Commercial"}, {Label: "Reason", Text: "one form of the product"}}
 	if !slices.Equal(got.Notes, wantNotes) {
 		t.Errorf("NewPage notes = %+v, want %+v", got.Notes, wantNotes)
 	}
@@ -96,7 +97,7 @@ func TestNewPageRejects(t *testing.T) {
 		{name: "no id", mutate: func(p *pagemap.Page) { p.ID = "" }, field: "id"},
 		{name: "no site", mutate: func(p *pagemap.Page) { p.SiteID = "" }, field: "siteId"},
 		{name: "bad path", mutate: func(p *pagemap.Page) { p.Path = "/a b/" }, field: "path"},
-		{name: "unknown wp type", mutate: func(p *pagemap.Page) { p.WPType = "widget" }, field: "wpType"},
+		{name: "unknown wp type", mutate: func(p *pagemap.Page) { p.WPType = "Widget Type" }, field: "wpType"},
 		{name: "unknown status", mutate: func(p *pagemap.Page) { p.Status = "lost" }, field: "status"},
 		{name: "own parent", mutate: func(p *pagemap.Page) { p.ParentPageID = new(p.ID) }, field: "parentPageId"},
 		{name: "empty entity", mutate: func(p *pagemap.Page) { p.EntityID = new("") }, field: "entityId"},
@@ -122,7 +123,10 @@ func TestNewPageRejects(t *testing.T) {
 func TestNewPageLink(t *testing.T) {
 	t.Parallel()
 
-	valid := pagemap.PageLink{ID: "l1", SiteID: siteA, FromPageID: pageA, ToPageID: new(pageB), ToURL: " https://a/b/ ", AnchorText: " bags ", Origin: pagemap.OriginGenerated, ObservedAt: stamp}
+	valid := pagemap.PageLink{
+		ID: "l1", SiteID: siteA, FromPageID: pageA, ToPageID: new(pageB), ToURL: " https://a/b/ ", AnchorText: " bags ",
+		Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, ObservedAt: stamp,
+	}
 	link, err := pagemap.NewPageLink(valid)
 	if err != nil {
 		t.Fatalf("NewPageLink: %v", err)
@@ -130,10 +134,10 @@ func TestNewPageLink(t *testing.T) {
 	if link.ToURL != "https://a/b/" || link.AnchorText != "bags" {
 		t.Errorf("NewPageLink did not trim: %+v", link)
 	}
-	observed := valid
-	observed.Origin = pagemap.OriginObserved
-	if _, err = pagemap.NewPageLink(observed); err != nil {
-		t.Fatalf("NewPageLink of an observed link: %v", err)
+	theirs := valid
+	theirs.Ours = false
+	if _, err = pagemap.NewPageLink(theirs); err != nil {
+		t.Fatalf("NewPageLink of the client's link: %v", err)
 	}
 
 	cases := []struct {
@@ -147,7 +151,6 @@ func TestNewPageLink(t *testing.T) {
 		{name: "empty target page", mutate: func(l *pagemap.PageLink) { l.ToPageID = new("") }, field: "toPageId"},
 		{name: "no target at all", mutate: func(l *pagemap.PageLink) { l.ToPageID = nil; l.ToURL = " " }, field: "toUrl"},
 		{name: "target page without a url", mutate: func(l *pagemap.PageLink) { l.ToURL = " " }, field: "toUrl"},
-		{name: "unknown origin", mutate: func(l *pagemap.PageLink) { l.Origin = "guessed" }, field: "origin"},
 	}
 
 	for _, tc := range cases {
@@ -166,6 +169,28 @@ func TestNewPageLink(t *testing.T) {
 	}
 }
 
+func TestAPageIsLiveOnlyWhenTheSitePublishesIt(t *testing.T) {
+	t.Parallel()
+
+	wpID := int64(7)
+	cases := []struct {
+		name string
+		page pagemap.Page
+		live bool
+	}{
+		{name: "published with an id", page: pagemap.Page{WPID: &wpID, Status: pagemap.StatusPublished}, live: true},
+		{name: "a draft on the site", page: pagemap.Page{WPID: &wpID, Status: pagemap.StatusExists}},
+		{name: "planned", page: pagemap.Page{Status: pagemap.StatusPlanned}},
+		{name: "published with no id", page: pagemap.Page{Status: pagemap.StatusPublished}},
+		{name: "archived", page: pagemap.Page{WPID: &wpID, Status: pagemap.StatusArchived}},
+	}
+	for _, tc := range cases {
+		if got := tc.page.Live(); got != tc.live {
+			t.Errorf("%s: Live = %v, want %v", tc.name, got, tc.live)
+		}
+	}
+}
+
 func TestEnums(t *testing.T) {
 	t.Parallel()
 
@@ -179,7 +204,7 @@ func TestEnums(t *testing.T) {
 			t.Errorf("%q must be valid", status)
 		}
 	}
-	if pagemap.WPType("x").Valid() || pagemap.Status("x").Valid() {
+	if pagemap.WPType("X y").Valid() || pagemap.Status("x").Valid() {
 		t.Error("unknown enum values must be invalid")
 	}
 	if !pagemap.SortCreatedAt.Valid() || !pagemap.SortPath.Valid() || pagemap.Sort("x").Valid() {

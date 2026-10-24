@@ -21,7 +21,7 @@ function now_rfc3339(): string {
 }
 
 function touch_term( int $term_id, int $term_taxonomy_id, string $taxonomy ): void {
-	if ( ! in_array( $taxonomy, TERM_TYPES, true ) ) {
+	if ( ! in_array( $taxonomy, term_families(), true ) ) {
 		return;
 	}
 	update_term_meta( $term_id, TERM_MODIFIED_KEY, now_rfc3339() );
@@ -61,6 +61,78 @@ function rendered_content( \WP_Post $post ): string {
 	$GLOBALS['post'] = $previous;
 
 	return $rendered;
+}
+
+function filtered_content( \WP_Post $post ): string {
+	$saved_query = isset( $GLOBALS['wp_query'] ) ? $GLOBALS['wp_query'] : null;
+	$saved_main  = isset( $GLOBALS['wp_the_query'] ) ? $GLOBALS['wp_the_query'] : null;
+	$saved_post  = isset( $GLOBALS['post'] ) ? $GLOBALS['post'] : null;
+
+	$query_args = array(
+		'post_type'           => (string) $post->post_type,
+		'post_status'         => 'any',
+		'posts_per_page'      => 1,
+		'no_found_rows'       => true,
+		'ignore_sticky_posts' => true,
+	);
+	if ( 'page' === $post->post_type ) {
+		$query_args['page_id'] = (int) $post->ID;
+	} else {
+		$query_args['p'] = (int) $post->ID;
+	}
+
+	$query                   = new \WP_Query( $query_args );
+	$GLOBALS['wp_query']     = $query;
+	$GLOBALS['wp_the_query'] = $query;
+
+	$content = '';
+	if ( $query->have_posts() ) {
+		$query->the_post();
+		$content = (string) apply_filters( 'the_content', $post->post_content );
+	}
+
+	$GLOBALS['wp_query']     = $saved_query;
+	$GLOBALS['wp_the_query'] = $saved_main;
+	$GLOBALS['post']         = $saved_post;
+	if ( $saved_post instanceof \WP_Post ) {
+		setup_postdata( $saved_post );
+	}
+	return $content;
+}
+
+function post_terms( \WP_Post $post ): array {
+	$taxonomies = get_object_taxonomies( (string) $post->post_type, 'names' );
+	if ( empty( $taxonomies ) ) {
+		return array();
+	}
+
+	$terms = array();
+	foreach ( $taxonomies as $taxonomy ) {
+		$held = get_the_terms( $post, $taxonomy );
+		if ( ! is_array( $held ) ) {
+			continue;
+		}
+		foreach ( $held as $term ) {
+			if ( ! $term instanceof \WP_Term ) {
+				continue;
+			}
+			$terms[] = array(
+				'taxonomy' => (string) $term->taxonomy,
+				'id'       => (int) $term->term_id,
+				'name'     => (string) $term->name,
+				'slug'     => (string) $term->slug,
+				'parent'   => (int) $term->parent,
+			);
+		}
+	}
+	usort(
+		$terms,
+		function ( array $a, array $b ): int {
+			$by_taxonomy = strcmp( $a['taxonomy'], $b['taxonomy'] );
+			return 0 !== $by_taxonomy ? $by_taxonomy : $a['id'] <=> $b['id'];
+		}
+	);
+	return $terms;
 }
 
 function first_h1( string $rendered ): string {
@@ -152,9 +224,9 @@ function query_posts_page( array $types, string $since_gmt, ?array $cursor, int 
 	return is_array( $rows ) ? $rows : array();
 }
 
-function permalink_path( \WP_Post $post ): string {
+function permalink_url( \WP_Post $post ): string {
 	if ( ! in_array( $post->post_status, array( 'draft', 'pending', 'auto-draft', 'future' ), true ) ) {
-		return url_to_path( (string) get_permalink( $post ) );
+		return (string) get_permalink( $post );
 	}
 
 	$publishable              = clone $post;
@@ -172,12 +244,13 @@ function permalink_path( \WP_Post $post ): string {
 		(int) $publishable->post_parent
 	);
 
-	return url_to_path( (string) get_permalink( $publishable ) );
+	return (string) get_permalink( $publishable );
 }
 
 function post_item( \WP_Post $post ): array {
-	$path    = permalink_path( $post );
-	$content = (string) $post->post_content;
+	$permalink = permalink_url( $post );
+	$path      = url_to_path( $permalink );
+	$content   = (string) $post->post_content;
 
 	return array(
 		'id'          => (int) $post->ID,
@@ -190,18 +263,21 @@ function post_item( \WP_Post $post ): array {
 		'contentHash' => content_hash( $content ),
 		'title'       => (string) $post->post_title,
 		'h1'          => first_h1( rendered_content( $post ) ),
+		'excerpt'     => (string) $post->post_excerpt,
 		'meta'        => read_post_seo( (int) $post->ID ),
-		'links'       => extract_links( $content, parent_path( $path ) ),
+		'links'       => extract_links( $content, href_base( $permalink ) ),
+		'terms'       => post_terms( $post ),
 	);
 }
 
-function query_terms_page( string $since_gmt, ?array $cursor, int $limit ): array {
+function query_terms_page( array $taxonomies, string $since_gmt, ?array $cursor, int $limit ): array {
 	global $wpdb;
 
-	$sql  = "SELECT t.term_id AS term_id FROM {$wpdb->term_taxonomy} tt
+	$placeholders = implode( ', ', array_fill( 0, count( $taxonomies ), '%s' ) );
+	$sql          = "SELECT t.term_id AS term_id FROM {$wpdb->term_taxonomy} tt
 		INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
-		WHERE tt.taxonomy = %s";
-	$args = array( 'product_cat' );
+		WHERE tt.taxonomy IN ( {$placeholders} )";
+	$args         = $taxonomies;
 
 	if ( null !== $cursor && isset( $cursor['i'] ) ) {
 		$sql   .= ' AND t.term_id > %d';
@@ -246,14 +322,17 @@ function term_item( \WP_Term $term, string $modified ): array {
 		'contentHash' => content_hash( $description ),
 		'title'       => (string) $term->name,
 		'h1'          => '',
+		'excerpt'     => '',
 		'meta'        => read_term_seo( $term ),
 		'links'       => array(),
+		'terms'       => array(),
 	);
 }
 
 function collect( array $types, string $since_gmt, ?array $cursor, int $limit ): array {
-	$post_types = array_values( array_diff( $types, TERM_TYPES ) );
-	$term_types = array_values( array_intersect( $types, TERM_TYPES ) );
+	$families   = term_families();
+	$post_types = array_values( array_diff( $types, $families ) );
+	$term_types = array_values( array_intersect( $types, $families ) );
 
 	$items = array();
 	$phase = null !== $cursor ? (string) $cursor['p'] : ( empty( $post_types ) ? 'term' : 'post' );
@@ -261,6 +340,9 @@ function collect( array $types, string $since_gmt, ?array $cursor, int $limit ):
 
 	if ( 'post' === $phase ) {
 		$rows = empty( $post_types ) ? array() : query_posts_page( $post_types, $since_gmt, $state, $limit );
+		if ( ! empty( $rows ) ) {
+			update_object_term_cache( array_map( 'intval', array_column( $rows, 'ID' ) ), $post_types );
+		}
 		foreach ( $rows as $row ) {
 			$post = get_post( (int) $row['ID'] );
 			if ( $post instanceof \WP_Post ) {
@@ -288,7 +370,7 @@ function collect( array $types, string $since_gmt, ?array $cursor, int $limit ):
 		return array( 'items' => $items, 'nextCursor' => null );
 	}
 
-	$page = query_terms_page( $since_gmt, $state, $remaining );
+	$page = query_terms_page( $term_types, $since_gmt, $state, $remaining );
 	foreach ( $page['rows'] as $row ) {
 		$term = get_term( (int) $row['term_id'] );
 		if ( $term instanceof \WP_Term ) {

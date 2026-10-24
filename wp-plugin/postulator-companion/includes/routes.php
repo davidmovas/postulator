@@ -61,6 +61,53 @@ function register_routes(): void {
 
 	register_rest_route(
 		NAMESPACE_PATH,
+		'/content/(?P<id>\d+)/rendered',
+		array(
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => __NAMESPACE__ . '\\rendered_get',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
+		'/meta/(?P<id>\d+)',
+		array(
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => __NAMESPACE__ . '\\meta_get',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
+			array(
+				'methods'             => \WP_REST_Server::EDITABLE,
+				'callback'            => __NAMESPACE__ . '\\meta_put',
+				'permission_callback' => __NAMESPACE__ . '\\permission_check',
+			),
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
+		'/settings',
+		array(
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => __NAMESPACE__ . '\\settings_get',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
+		'/terms/(?P<id>\d+)',
+		array(
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => __NAMESPACE__ . '\\terms_get',
+			'permission_callback' => __NAMESPACE__ . '\\permission_check',
+		)
+	);
+
+	register_rest_route(
+		NAMESPACE_PATH,
 		'/content/(?P<id>\d+)/preview',
 		array(
 			'methods'             => \WP_REST_Server::CREATABLE,
@@ -73,11 +120,14 @@ function register_routes(): void {
 function manifest(): \WP_REST_Response {
 	return new \WP_REST_Response(
 		array(
-			'version'      => VERSION,
-			'capabilities' => CAPABILITIES,
-			'seoPlugin'    => detect_plugin(),
-			'wpVersion'    => (string) get_bloginfo( 'version' ),
-			'site'         => (string) home_url(),
+			'version'        => VERSION,
+			'capabilities'   => CAPABILITIES,
+			'postTypes'      => content_post_types(),
+			'taxonomies'     => content_taxonomies(),
+			'seoPlugin'      => detect_plugin(),
+			'wpVersion'      => (string) get_bloginfo( 'version' ),
+			'site'           => (string) home_url(),
+			'unfilteredHtml' => current_user_can( 'unfiltered_html' ),
 		),
 		200
 	);
@@ -89,8 +139,9 @@ function parse_types( string $types ) {
 	}
 
 	$requested = array_values( array_filter( array_map( 'trim', explode( ',', $types ) ), 'strlen' ) );
+	$listable  = array_merge( TYPES, content_post_types(), content_taxonomies() );
 	foreach ( $requested as $type ) {
-		if ( ! in_array( $type, TYPES, true ) ) {
+		if ( ! in_array( $type, $listable, true ) ) {
 			return invalid( 'invalid_type', 'unknown content type: ' . $type );
 		}
 	}
@@ -174,10 +225,37 @@ function content_list( \WP_REST_Request $request ) {
 	);
 }
 
+function content_post_types(): array {
+	$types = get_post_types( array( 'public' => true ), 'names' );
+	unset( $types['attachment'] );
+	$types = array_values( $types );
+	sort( $types );
+	return $types;
+}
+
+function content_taxonomies(): array {
+	$posts      = content_post_types();
+	$taxonomies = array();
+	foreach ( get_taxonomies( array( 'public' => true ), 'names' ) as $taxonomy ) {
+		if ( ! in_array( $taxonomy, $posts, true ) ) {
+			$taxonomies[] = (string) $taxonomy;
+		}
+	}
+	sort( $taxonomies );
+	return $taxonomies;
+}
+
+function term_families(): array {
+	return array_values( array_unique( array_merge( TERM_TYPES, content_taxonomies() ) ) );
+}
+
 function editable_post( \WP_REST_Request $request ) {
 	$post = get_post( (int) $request['id'] );
 	if ( ! $post instanceof \WP_Post || in_array( $post->post_status, array( 'auto-draft', 'trash' ), true ) ) {
 		return not_found( 'no post with that id' );
+	}
+	if ( ! in_array( $post->post_type, content_post_types(), true ) ) {
+		return not_found( 'no content post with that id' );
 	}
 	if ( ! current_user_can( 'edit_post', $post->ID ) ) {
 		return forbidden( 'editing this post is not allowed' );
@@ -222,9 +300,30 @@ function seo_meta_update( \WP_REST_Request $request ) {
 		$fields[ $field ] = $body[ $field ];
 	}
 
+	$expected = array();
+	if ( array_key_exists( 'expected', $body ) ) {
+		if ( ! is_array( $body['expected'] ) ) {
+			return invalid( 'invalid_param', 'expected must be an object of hashes' );
+		}
+		$expected = $body['expected'];
+	}
+	$moved = seo_moved( (int) $post->ID, $fields, $expected );
+	if ( ! empty( $moved ) ) {
+		return new \WP_REST_Response(
+			array(
+				'code'    => 'hash_mismatch',
+				'message' => 'an SEO field changed since it was read',
+				'moved'   => (object) $moved,
+			),
+			409
+		);
+	}
+
+	$written = write_post_seo( (int) $post->ID, $fields );
 	return new \WP_REST_Response(
 		array(
-			'applied'   => write_post_seo( (int) $post->ID, $fields ),
+			'applied'   => $written['applied'],
+			'hashes'    => (object) $written['hashes'],
 			'seoPlugin' => detect_plugin(),
 		),
 		200
@@ -244,6 +343,208 @@ function raw_get( \WP_REST_Request $request ) {
 			'type'        => (string) $post->post_type,
 			'content'     => $content,
 			'contentHash' => content_hash( $content ),
+			'saveStable'  => save_stable( $post ),
+		),
+		200
+	);
+}
+
+function save_stable( \WP_Post $post ): bool {
+	return save_keeps( 'pre_post_content', 'content_save_pre', (string) $post->post_content )
+		&& save_keeps( 'pre_post_title', 'title_save_pre', (string) $post->post_title )
+		&& save_keeps( 'pre_post_excerpt', 'excerpt_save_pre', (string) $post->post_excerpt );
+}
+
+function save_keeps( string $pre, string $save, string $value ): bool {
+	$filtered = apply_filters( $pre, wp_slash( $value ) );
+	$filtered = apply_filters( $save, $filtered );
+	return is_string( $filtered ) && wp_unslash( $filtered ) === $value;
+}
+
+function rendered_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$content = filtered_content( $post );
+	return new \WP_REST_Response(
+		array(
+			'id'          => (int) $post->ID,
+			'type'        => (string) $post->post_type,
+			'content'     => $content,
+			'contentHash' => content_hash( $content ),
+		),
+		200
+	);
+}
+
+function meta_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$raw = text_param( $request, 'keys' );
+	if ( is_wp_error( $raw ) ) {
+		return $raw;
+	}
+	$keys = array_values( array_unique( array_filter( array_map( 'trim', explode( ',', $raw ) ), 'strlen' ) ) );
+	if ( empty( $keys ) ) {
+		return invalid( 'invalid_param', 'keys must name at least one meta key' );
+	}
+	if ( count( $keys ) > MAX_META_KEYS ) {
+		return invalid( 'too_many_keys', 'keys names more than ' . MAX_META_KEYS . ' meta keys' );
+	}
+
+	$denied = array();
+	foreach ( $keys as $key ) {
+		if ( is_protected_meta( $key, 'post' ) || meta_key_denied( $key ) ) {
+			$denied[] = $key;
+		}
+	}
+	if ( ! empty( $denied ) ) {
+		return denied_meta( $denied, 'read' );
+	}
+
+	$values = array();
+	foreach ( $keys as $key ) {
+		$values[ $key ] = metadata_exists( 'post', (int) $post->ID, $key ) ? get_post_meta( (int) $post->ID, $key, true ) : null;
+	}
+	return new \WP_REST_Response(
+		array(
+			'id'   => (int) $post->ID,
+			'meta' => (object) $values,
+		),
+		200
+	);
+}
+
+function meta_put( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	$body = $request->get_json_params();
+	if ( ! is_array( $body ) || ! isset( $body['meta'], $body['expected'] ) || ! is_array( $body['meta'] ) || ! is_array( $body['expected'] ) || empty( $body['meta'] ) ) {
+		return invalid( 'invalid_body', 'meta and expected are required objects' );
+	}
+	$values   = array();
+	$expected = $body['expected'];
+	foreach ( $body['meta'] as $key => $value ) {
+		$values[ (string) $key ] = $value;
+	}
+	if ( count( $values ) > MAX_META_KEYS ) {
+		return invalid( 'too_many_keys', 'meta names more than ' . MAX_META_KEYS . ' meta keys' );
+	}
+
+	$post_id = (int) $post->ID;
+	$denied  = array();
+	foreach ( $values as $key => $value ) {
+		if ( ! array_key_exists( $key, $expected ) ) {
+			return invalid( 'missing_expected', 'every key written names the hash it was read with: ' . $key );
+		}
+		$text = null === $value || is_string( $value );
+		if ( ! $text || meta_key_denied( $key ) || is_protected_meta( $key, 'post' ) || ! current_user_can( 'edit_post_meta', $post_id, $key ) ) {
+			$denied[] = $key;
+		}
+	}
+	if ( ! empty( $denied ) ) {
+		return denied_meta( $denied, 'written' );
+	}
+
+	$moved = array();
+	foreach ( array_keys( $values ) as $key ) {
+		$state = meta_state( $post_id, $key );
+		if ( ! $state['scalar'] ) {
+			$denied[] = $key;
+			continue;
+		}
+		if ( meta_moved( $expected[ $key ], $state['hash'] ) ) {
+			$moved[ $key ] = $state['hash'];
+		}
+	}
+	if ( ! empty( $denied ) ) {
+		return denied_meta( $denied, 'written over a value that is not one plain text' );
+	}
+	if ( ! empty( $moved ) ) {
+		return new \WP_REST_Response(
+			array(
+				'code'    => 'hash_mismatch',
+				'message' => 'a meta value changed since it was read',
+				'moved'   => (object) $moved,
+			),
+			409
+		);
+	}
+
+	$stored = array();
+	foreach ( $values as $key => $value ) {
+		if ( null === $value ) {
+			delete_post_meta( $post_id, $key );
+		} else {
+			update_post_meta( $post_id, $key, wp_slash( $value ) );
+		}
+		$state          = meta_state( $post_id, $key );
+		$stored[ $key ] = array(
+			'value' => $state['value'],
+			'hash'  => $state['hash'],
+		);
+	}
+	return new \WP_REST_Response(
+		array(
+			'id'   => $post_id,
+			'meta' => (object) $stored,
+		),
+		200
+	);
+}
+
+function settings_get(): \WP_REST_Response {
+	$show_on_front = 'page' === get_option( 'show_on_front' ) ? 'page' : 'posts';
+	$pages         = array(
+		'front'    => 'page' === $show_on_front ? (int) get_option( 'page_on_front', 0 ) : 0,
+		'posts'    => 'page' === $show_on_front ? (int) get_option( 'page_for_posts', 0 ) : 0,
+		'privacy'  => (int) get_option( 'wp_page_for_privacy_policy', 0 ),
+		'shop'     => 0,
+		'cart'     => 0,
+		'checkout' => 0,
+		'account'  => 0,
+		'terms'    => 0,
+	);
+	if ( function_exists( 'wc_get_page_id' ) ) {
+		$store = array(
+			'shop'     => 'shop',
+			'cart'     => 'cart',
+			'checkout' => 'checkout',
+			'account'  => 'myaccount',
+			'terms'    => 'terms',
+		);
+		foreach ( $store as $field => $name ) {
+			$pages[ $field ] = max( 0, (int) wc_get_page_id( $name ) );
+		}
+	}
+
+	return new \WP_REST_Response(
+		array(
+			'showOnFront' => $show_on_front,
+			'pages'       => $pages,
+		),
+		200
+	);
+}
+
+function terms_get( \WP_REST_Request $request ) {
+	$post = editable_post( $request );
+	if ( is_wp_error( $post ) ) {
+		return $post;
+	}
+
+	return new \WP_REST_Response(
+		array(
+			'id'    => (int) $post->ID,
+			'terms' => post_terms( $post ),
 		),
 		200
 	);
@@ -285,7 +586,13 @@ function raw_update( \WP_REST_Request $request ) {
 	}
 
 	$stored = (string) get_post_field( 'post_content', (int) $post->ID, 'raw' );
-	return new \WP_REST_Response( array( 'contentHash' => content_hash( $stored ) ), 200 );
+	return new \WP_REST_Response(
+		array(
+			'content'     => $stored,
+			'contentHash' => content_hash( $stored ),
+		),
+		200
+	);
 }
 
 function preview_create( \WP_REST_Request $request ) {

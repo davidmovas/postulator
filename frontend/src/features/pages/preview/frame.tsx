@@ -1,31 +1,12 @@
 import type { ReactElement } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { cx, SkeletonRows } from "../../../ui/index.js";
+import { cx, SkeletonRows, useWidthOf } from "../../../ui/index.js";
 import type { Viewport } from "./model.js";
 import { frameScale, viewports } from "./model.js";
 
 const gutter = 24;
-
-function useWidthOf(): [(node: HTMLDivElement | null) => void, number] {
-    const [width, setWidth] = useState(0);
-    const observer = useRef<ResizeObserver | null>(null);
-    const attach = (node: HTMLDivElement | null): void => {
-        observer.current?.disconnect();
-        if (node === null) {
-            return;
-        }
-        observer.current = new ResizeObserver((entries) => {
-            const box = entries[0]?.contentRect;
-            if (box !== undefined) {
-                setWidth(box.width);
-            }
-        });
-        observer.current.observe(node);
-    };
-    return [attach, width];
-}
 
 export interface PreviewFrameProps {
     url: string;

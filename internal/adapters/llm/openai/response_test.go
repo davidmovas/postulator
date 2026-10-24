@@ -205,6 +205,15 @@ type keywordsShape struct {
 	Entities []keywordShape `json:"entities"`
 }
 
+type fieldShape struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type fieldsShape struct {
+	Fields []fieldShape `json:"fields"`
+}
+
 func TestEveryAnswerTheStepsAskForCrossesTheStrictContract(t *testing.T) {
 	t.Parallel()
 
@@ -214,15 +223,10 @@ func TestEveryAnswerTheStepsAskForCrossesTheStrictContract(t *testing.T) {
 			content.DraftAnswer{Title: "Koffein", H1: "Koffein Powder", Summary: "Pure.",
 				Sections: []content.AnswerSection{{Slot: 1, Heading: "Dose", HTML: "<p>3 g</p>"}}})
 	})
-	t.Run("the writer's product", func(t *testing.T) {
+	t.Run("the editor's fields", func(t *testing.T) {
 		t.Parallel()
-		roundTrip(t, `{"title":"Koffein","h1":"Koffein","sections":[],"summary":"s","shortDescription":"<p>short</p>",`+
-			`"specifications":[{"name":"Purity","value":"99%"}]}`,
-			content.ProductAnswer{
-				DraftAnswer:      content.DraftAnswer{Title: "Koffein", H1: "Koffein", Sections: []content.AnswerSection{}, Summary: "s"},
-				ShortDescription: "<p>short</p>",
-				Specifications:   []content.AnswerSpecification{{Name: "Purity", Value: "99%"}},
-			})
+		roundTrip(t, `{"fields":[{"key":"product_short_description","value":"A compact machine."}]}`,
+			fieldsShape{Fields: []fieldShape{{Key: "product_short_description", Value: "A compact machine."}}})
 	})
 	t.Run("the linker's repair", func(t *testing.T) {
 		t.Parallel()

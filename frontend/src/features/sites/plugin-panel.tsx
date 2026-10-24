@@ -16,7 +16,7 @@ import {
     Skeleton,
     SyncIcon,
 } from "../../ui/index.js";
-import { capabilityLabel, seoPluginLabel, storeBanner } from "./plugin.js";
+import { pluginBanner, storeBanner } from "./plugin.js";
 
 const packageFilename = "postulator-companion.zip";
 
@@ -92,37 +92,23 @@ export function PluginPanel({ site }: PluginPanelProps): ReactElement {
             />
         );
 
-    if (plugin.installed) {
-        const listed = plugin.capabilities ?? [];
-        const capabilities =
-            listed.length === 0 ? copy.sites.plugin.noCapabilities : listed.map(capabilityLabel).join(", ");
-        const seo = plugin.seoPlugin === "" ? copy.sites.plugin.noSeo : seoPluginLabel(plugin.seoPlugin);
-        return (
-            <>
-                <Banner
-                    tone="ok"
-                    icon={ExtensionIcon}
-                    title={copy.sites.plugin.installed(plugin.version)}
-                    body={`${copy.sites.plugin.capabilities}: ${capabilities} · ${copy.sites.plugin.seo}: ${seo}`}
-                    actions={recheck}
-                />
-                {storePanel}
-            </>
-        );
-    }
-
+    const banner = pluginBanner(plugin, site.name);
     return (
         <>
             <Banner
-                tone="warn"
-                icon={ExtensionOffIcon}
-                title={copy.sites.plugin.missingTitle(site.name)}
-                body={copy.sites.plugin.missingBody}
+                tone={banner.tone}
+                icon={plugin.installed ? ExtensionIcon : ExtensionOffIcon}
+                title={banner.title}
+                body={banner.body}
                 actions={
-                    <>
-                        {recheck}
-                        {downloadButton}
-                    </>
+                    banner.offersZip ? (
+                        <>
+                            {recheck}
+                            {downloadButton}
+                        </>
+                    ) : (
+                        recheck
+                    )
                 }
             />
             {storePanel}

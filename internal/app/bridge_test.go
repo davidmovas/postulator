@@ -75,7 +75,7 @@ func plannedPage(t *testing.T, core *app.Core) (siteID, pageID string) {
 	}
 
 	entity, err := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: owner.Site.ID, Name: "running shoes", Kind: "topic", Keywords: []dto.Keyword{{Text: "running shoes"}},
+		SiteID: owner.Site.ID, Name: "running shoes", Keywords: []dto.Keyword{{Text: "running shoes"}},
 	})
 	if err != nil {
 		t.Fatalf("create the entity: %v", err)

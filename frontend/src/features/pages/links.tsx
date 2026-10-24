@@ -6,7 +6,8 @@ import type { PageLink } from "../../data/types.js";
 import { copy } from "../../copy/index.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { LinkIcon, OpenInNewIcon, Panel, PanelHeader, PublicIcon, toneClasses } from "../../ui/index.js";
-import { originIcon, originTone } from "./labels.js";
+import { linkOwnerIcon, linkOwnerLabel, linkOwnerTone } from "./labels.js";
+import { linkSourceLabel, linkTypeLabel } from "./model/labels.js";
 
 export interface PageLinksProps {
     links: readonly PageLink[];
@@ -15,13 +16,13 @@ export interface PageLinksProps {
 }
 
 export function PageLinks({ links, siteId, search }: PageLinksProps): ReactElement {
-    const generated = links.filter((held) => held.origin === "generated").length;
+    const ours = links.filter((held) => held.ours).length;
 
     return (
         <Panel>
             <PanelHeader title={copy.pages.detail.links}>
                 <span className="shrink-0 font-mono text-2xs text-ink-faint">
-                    {copy.pages.detail.linksSummary(links.length, generated)}
+                    {copy.pages.detail.linksSummary(links.length, ours)}
                 </span>
             </PanelHeader>
             {links.length === 0 ? (
@@ -29,16 +30,25 @@ export function PageLinks({ links, siteId, search }: PageLinksProps): ReactEleme
             ) : (
                 <ul className="flex flex-col">
                     {links.map((held) => {
-                        const Icon = originIcon(held.origin);
-                        const tone = toneClasses[originTone(held.origin)];
+                        const Icon = linkOwnerIcon(held.ours);
+                        const tone = toneClasses[linkOwnerTone(held.ours)];
                         return (
                             <li
                                 key={held.id}
                                 className="flex min-w-0 items-center gap-2 border-b border-inset px-3 py-1.5 last:border-b-0"
                             >
-                                <span className="flex shrink-0" title={held.origin}>
+                                <span
+                                    className="flex shrink-0"
+                                    title={linkOwnerLabel(held.ours)}
+                                    aria-label={linkOwnerLabel(held.ours)}
+                                >
                                     <Icon size={13} className={tone.ink} />
                                 </span>
+                                {held.type === "" ? null : (
+                                    <span className="w-36 shrink-0 truncate text-2xs text-ink-dim">
+                                        {copy.pages.linkKind(linkTypeLabel(held.type), linkSourceLabel(held.source))}
+                                    </span>
+                                )}
                                 {held.toPageId === null ? (
                                     isBrowsable(held.toUrl) ? (
                                         <button

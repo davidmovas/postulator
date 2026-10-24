@@ -109,6 +109,52 @@ func TestNestedFailureRollsBackEverything(t *testing.T) {
 	}
 }
 
+func TestReadSeesOneSnapshotAndRefusesAWrite(t *testing.T) {
+	t.Parallel()
+
+	store := openStore(t, nil)
+	if _, err := store.writer.ExecContext(t.Context(), insertSetting, "a", "1"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	var before, after int
+	err := store.Read(t.Context(), func(c context.Context) error {
+		if scanErr := store.execFrom(c).QueryRowContext(c, `SELECT count(*) FROM settings`).Scan(&before); scanErr != nil {
+			return scanErr
+		}
+		if _, execErr := store.writer.ExecContext(t.Context(), insertSetting, "b", "2"); execErr != nil {
+			return execErr
+		}
+		if scanErr := store.execFrom(c).QueryRowContext(c, `SELECT count(*) FROM settings`).Scan(&after); scanErr != nil {
+			return scanErr
+		}
+		_, writeErr := store.writeFrom(c).ExecContext(c, insertSetting, "c", "3")
+		if writeErr == nil {
+			return errors.New(errors.Internal, "a read must not write")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if before != 1 || after != 1 {
+		t.Errorf("the read saw %d then %d rows, want one snapshot of 1", before, after)
+	}
+	if got := countSettings(t, store); got != 2 {
+		t.Errorf("rows after the read = %d, want the writer's 2", got)
+	}
+
+	err = store.Do(t.Context(), func(c context.Context) error {
+		return store.Read(c, func(nested context.Context) error {
+			_, execErr := store.writeFrom(nested).ExecContext(nested, insertSetting, "d", "4")
+			return execErr
+		})
+	})
+	if err != nil {
+		t.Fatalf("a read inside a unit of work must use it: %v", err)
+	}
+}
+
 func TestExecutorRouting(t *testing.T) {
 	t.Parallel()
 

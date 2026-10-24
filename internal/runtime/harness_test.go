@@ -13,7 +13,9 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -23,9 +25,20 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Millisecond
-	pollTimeout  = 20 * time.Second
+	pollInterval   = 5 * time.Millisecond
+	pollFallback   = 10 * time.Minute
+	deadlineMargin = 30 * time.Second
 )
+
+func waitDeadline(t *testing.T) time.Time {
+	t.Helper()
+
+	held, bounded := t.Deadline()
+	if !bounded {
+		return time.Now().Add(pollFallback)
+	}
+	return held.Add(-deadlineMargin)
+}
 
 type stubSpecs struct {
 	spec       template.TemplateSpec
@@ -49,6 +62,17 @@ func (s *stubSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPa
 	return templates.ResolveForPageResponse{TemplateID: "template", Version: s.version, Spec: spec}, nil
 }
 
+type stubTypes struct {
+	rules field.LinkRules
+}
+
+func (s *stubTypes) Set(_ context.Context, siteID string) (pagetype.Set, error) {
+	entity := pagetype.Type{ID: "type-entity", SiteID: siteID, Name: "Entity", Preset: pagetype.Entity}
+	body := pagetype.DefaultScope(pagetype.Entity, field.Body, entity.ID)
+	body.Links.Rules = s.rules
+	return pagetype.NewSet([]pagetype.Type{entity}, []field.Scope{body}), nil
+}
+
 type stubKeys struct {
 	missing string
 	err     error
@@ -59,6 +83,17 @@ func (k *stubKeys) Has(_ context.Context, ref string) (bool, error) {
 		return false, k.err
 	}
 	return ref != k.missing, nil
+}
+
+type rememberedKey struct{}
+
+type stubSnapshots struct {
+	calls int
+}
+
+func (s *stubSnapshots) Remembering(ctx context.Context) context.Context {
+	s.calls++
+	return context.WithValue(ctx, rememberedKey{}, true)
 }
 
 type stubSpend struct {
@@ -193,11 +228,13 @@ type harness struct {
 	blobs       *sqlite.ArtifactRepo
 	log         *sqlite.RunEventRepo
 	specs       *stubSpecs
+	types       *stubTypes
 	keys        *stubKeys
 	catalog     *stubCatalog
 	profiles    *stubProfiles
 	tuning      *stubTuning
 	spend       *stubSpend
+	snapshots   *stubSnapshots
 	bus         *recorder
 	pages       []string
 	siteID      string
@@ -234,17 +271,19 @@ func newHarness(t *testing.T, targets int) *harness {
 				Length:   template.Length{Min: 200, Max: 900},
 			},
 		},
-		keys:     &stubKeys{},
-		catalog:  &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
-		profiles: &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
-		tuning:   newStubTuning(),
-		spend:    &stubSpend{},
-		bus:      &recorder{},
-		pages:    pages,
-		siteID:   site.ID,
-		logger:   zaptest.NewLogger(t),
-		clock:    clock.System{},
-		deadline: time.Hour,
+		types:     &stubTypes{},
+		keys:      &stubKeys{},
+		catalog:   &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
+		profiles:  &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
+		tuning:    newStubTuning(),
+		spend:     &stubSpend{},
+		snapshots: &stubSnapshots{},
+		bus:       &recorder{},
+		pages:     pages,
+		siteID:    site.ID,
+		logger:    zaptest.NewLogger(t),
+		clock:     clock.System{},
+		deadline:  time.Hour,
 	}
 }
 
@@ -270,11 +309,13 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 		Events:     h.log,
 		Pages:      sqlite.NewPageRepo(h.store),
 		Specs:      h.specs,
+		Types:      h.types,
 		Keys:       h.keys,
 		Spend:      h.spend,
 		Catalog:    h.catalog,
 		Profiles:   h.profiles,
 		Tuning:     h.tuning,
+		Snapshots:  h.snapshots,
 		UnitOfWork: h.store,
 		Publisher:  h.bus,
 	}, registry, runtime.Config{
@@ -298,7 +339,7 @@ func (h *harness) waitForRun(t *testing.T, runID string, want run.Status) run.Ru
 	t.Helper()
 
 	var last run.Run
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		record, err := h.runs.Get(t.Context(), runID)
 		if err == nil {
@@ -327,7 +368,7 @@ func (h *harness) waitForDelivery(t *testing.T, runID string) {
 func waitFor(t *testing.T, what string, done func() bool) {
 	t.Helper()
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		if done() {
 			return

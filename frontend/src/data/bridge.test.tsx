@@ -162,3 +162,74 @@ describe("the spend panel follows the ledger", () => {
         expect(stale(client)).toEqual(["lastWeek", "lastMonth", "calls"]);
     });
 });
+
+describe("the page model follows the observation", () => {
+    const modelled = {
+        model: keys.pages.model("p1"),
+        pack: keys.pages.pack("p1", ""),
+        summary: keys.pages.summary("s1"),
+        otherSummary: keys.pages.summary("s2"),
+    } as const;
+
+    type Modelled = keyof typeof modelled;
+
+    function seeded(): QueryClient {
+        const client = bridged();
+        for (const key of Object.values(modelled)) {
+            client.setQueryData(key, { held: true });
+        }
+        client.setQueryData(keys.runs.detail("r1"), { run: { siteId: "s1" } });
+        return client;
+    }
+
+    function refreshed(client: QueryClient): Modelled[] {
+        return (Object.keys(modelled) as Modelled[]).filter(
+            (name) => client.getQueryState(modelled[name])?.isInvalidated === true,
+        );
+    }
+
+    it("refreshes every page model, what the writer sees and the site's summary when the site's pages change", () => {
+        const client = seeded();
+
+        fire("pages.changed", { siteId: "s1" });
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual(["model", "pack", "summary"]);
+    });
+
+    it("refreshes them when a run on the site completes", () => {
+        const client = seeded();
+
+        fire("run.completed", { runId: "r1", succeeded: 1, failed: 0 }, "r1");
+
+        expect(refreshed(client)).toEqual(["model", "pack", "summary"]);
+    });
+
+    it("refreshes the site's card proposals, and only that site's, when its graph changes or a run on it completes", () => {
+        const client = seeded();
+        client.setQueryData(keys.graph.cards("s1"), { held: true });
+        client.setQueryData(keys.graph.cards("s2"), { held: true });
+        const stale = (siteId: string): boolean => client.getQueryState(keys.graph.cards(siteId))?.isInvalidated === true;
+
+        fire("graph.changed", { siteId: "s1" });
+        vi.advanceTimersByTime(usageCoalesceMs);
+        expect([stale("s1"), stale("s2")]).toEqual([true, false]);
+
+        client.setQueryData(keys.graph.cards("s1"), { held: true });
+        fire("run.completed", { runId: "r1", succeeded: 1, failed: 0 }, "r1");
+        expect([stale("s1"), stale("s2")]).toEqual([true, false]);
+    });
+
+    it.each([
+        ["settings.changed", {}],
+        ["templates.changed", {}],
+        ["graph.changed", { siteId: "s1" }],
+    ] as const)("refreshes what the writer sees, and only that of the model, on %s", (type, payload) => {
+        const client = seeded();
+
+        fire(type, payload);
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual(["pack"]);
+    });
+});

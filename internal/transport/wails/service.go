@@ -41,21 +41,25 @@ func bind[T any](instance *T) application.Service {
 }
 
 type Deps struct {
-	Sites     Source[SitesUseCase]
-	Graph     Source[GraphUseCase]
-	Pages     Source[PagesUseCase]
-	Templates Source[TemplatesUseCase]
-	Runs      Source[RunsUseCase]
-	Sync      Source[SyncUseCase]
-	Reports   Source[ReportsUseCase]
-	Judge     Source[JudgeUseCase]
-	Imports   Source[ImportsUseCase]
-	Models    Source[ModelsUseCase]
-	Agent     Source[AgentUseCase]
-	Schedules Source[SchedulesUseCase]
-	Tools     Source[ToolCatalog]
-	Browser   Source[BrowserUseCase]
-	Settings  SettingsDeps
+	Sites      Source[SitesUseCase]
+	Graph      Source[GraphUseCase]
+	Pages      Source[PagesUseCase]
+	PageModels Source[ModelUseCase]
+	SiteModel  Source[SiteModelUseCase]
+	Findings   Source[FindingsUseCase]
+	Templates  Source[TemplatesUseCase]
+	PageTypes  Source[PageTypesUseCase]
+	Runs       Source[RunsUseCase]
+	Sync       Source[SyncUseCase]
+	Reports    Source[ReportsUseCase]
+	Judge      Source[JudgeUseCase]
+	Imports    Source[ImportsUseCase]
+	Models     Source[ModelsUseCase]
+	Agent      Source[AgentUseCase]
+	Schedules  Source[SchedulesUseCase]
+	Tools      Source[ToolCatalog]
+	Browser    Source[BrowserUseCase]
+	Settings   SettingsDeps
 }
 
 func Services(logger *zap.Logger, build BuildInfo, deps Deps) []application.Service {
@@ -63,8 +67,9 @@ func Services(logger *zap.Logger, build BuildInfo, deps Deps) []application.Serv
 		bind(NewHealthService(logger, build)),
 		bind(NewSitesService(logger, deps.Sites)),
 		bind(NewGraphService(logger, deps.Graph)),
-		bind(NewPagesService(logger, deps.Pages)),
-		bind(NewTemplatesService(logger, deps.Templates)),
+		bind(NewPagesService(logger, deps.Pages, deps.PageModels, deps.SiteModel)),
+		bind(NewFindingsService(logger, deps.Findings)),
+		bind(NewTemplatesService(logger, deps.Templates, deps.PageTypes)),
 		bind(NewRunsService(logger, deps.Runs)),
 		bind(NewSyncService(logger, deps.Sync)),
 		bind(NewReportsService(logger, deps.Reports, deps.Judge)),

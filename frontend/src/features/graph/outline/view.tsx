@@ -16,10 +16,11 @@ import {
     toneClasses,
     VirtualRows,
 } from "../../../ui/index.js";
-import { entityIcon, formatScore, entityKindLabel, kindTone, stateLabel, stateTone } from "../labels.js";
+import { presetIcon, presetTone } from "../../settings/types/labels.js";
+import { entityTypeLabel, formatScore, stateLabel, stateTone } from "../labels.js";
 import type { VisibleRow } from "../model/fold.js";
 import { childLimit } from "../model/fold.js";
-import { nodeStateOf } from "../model/index.js";
+import { nodeStateOf, presetOf, typeOf } from "../model/index.js";
 import type { GraphIndex } from "../model/index.js";
 import { move } from "../model/navigation.js";
 import type { NavKey } from "../model/navigation.js";
@@ -96,13 +97,15 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
         const entity = index.byId.get(held.id);
         const flags = index.problems.get(held.id);
         const state = nodeStateOf(index, held.id);
-        const Icon = entityIcon(entity?.kind ?? "");
+        const preset = presetOf(index, held.id);
+        const Icon = presetIcon(preset);
         const dim = matched !== null && !matched.has(held.id);
         return (
             <TableRow
                 key={held.id}
                 interactive={true}
                 selected={held.id === selectedId}
+                data-entity-row={preset}
                 className={cx(dim && "opacity-40")}
                 onClick={() => {
                     onPick(held.id);
@@ -126,14 +129,14 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                         ) : (
                             <span className="w-5 shrink-0" aria-hidden={true} />
                         )}
-                        <Icon size={14} className={cx("shrink-0", toneClasses[kindTone(entity?.kind ?? "")].ink)} />
+                        <Icon size={14} className={cx("shrink-0", toneClasses[presetTone(preset)].ink)} />
                         <span className="truncate">{entity?.name ?? held.id}</span>
                         {held.childCount > 0 && !held.expanded ? (
                             <span className="shrink-0 font-mono text-2xs text-ink-faint">{copy.graph.outline.children(held.hiddenChildren)}</span>
                         ) : null}
                     </span>
                 </TableCell>
-                <TableCell muted={true}>{entityKindLabel(entity?.kind ?? "")}</TableCell>
+                <TableCell muted={true}>{entityTypeLabel(typeOf(index, held.id))}</TableCell>
                 <TableCell mono={true} align="right">
                     {entity === undefined ? "" : formatScore(entity.score)}
                 </TableCell>
@@ -168,7 +171,7 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
             <DenseTable columns={columns} label={copy.graph.views.outline} className="flex min-h-0 flex-1 flex-col">
                 <TableHead>
                     <TableCell>{copy.graph.outline.columns.name}</TableCell>
-                    <TableCell>{copy.graph.outline.columns.kind}</TableCell>
+                    <TableCell>{copy.graph.outline.columns.type}</TableCell>
                     <TableCell align="right">{copy.graph.outline.columns.score}</TableCell>
                     <TableCell>{copy.graph.outline.columns.page}</TableCell>
                     <TableCell align="right">{copy.graph.outline.columns.attention}</TableCell>

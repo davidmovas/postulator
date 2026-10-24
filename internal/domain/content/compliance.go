@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
 type Severity string
@@ -51,11 +51,15 @@ const (
 	warnPenalty  = 0.05
 )
 
-func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageID string) Report {
+func Compliance(doc *Document, lc LinkContext, policy field.LinkPolicy, pageID string) Report {
+	return ComplianceOf(doc, doc, lc, policy, pageID)
+}
+
+func ComplianceOf(owed, judged *Document, lc LinkContext, policy field.LinkPolicy, pageID string) Report {
 	report := Report{Items: make([]Finding, 0)}
 
 	for _, target := range lc.Targets {
-		if len(existingFor(doc, lc, target)) > 0 {
+		if len(existingFor(owed, lc, target)) > 0 {
 			continue
 		}
 		severity := SeverityWarn
@@ -70,7 +74,7 @@ func Compliance(doc *Document, lc LinkContext, policy template.LinkPolicy, pageI
 	}
 
 	graphLinks := 0
-	for _, link := range doc.Links() {
+	for _, link := range judged.Links() {
 		href := strings.TrimSpace(link.Href)
 		resolution := lc.Resolve(href)
 		if resolution.SameDocument {

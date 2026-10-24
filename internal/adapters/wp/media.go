@@ -25,6 +25,7 @@ type MediaItem struct {
 	Title     string
 	MimeType  string
 	ID        int64
+	Parent    int64
 }
 
 type mediaPayload struct {
@@ -33,6 +34,7 @@ type mediaPayload struct {
 	AltText   string       `json:"alt_text"`
 	MimeType  string       `json:"mime_type"`
 	ID        int64        `json:"id"`
+	Post      int64        `json:"post"`
 }
 
 func (p mediaPayload) mediaItem() MediaItem {
@@ -42,7 +44,63 @@ func (p mediaPayload) mediaItem() MediaItem {
 		Alt:       p.AltText,
 		Title:     p.Title.value(),
 		MimeType:  p.MimeType,
+		Parent:    p.Post,
 	}
+}
+
+type UpdateMedia struct {
+	Alt   *string
+	Title *string
+}
+
+func (c *Client) GetMedia(ctx context.Context, id int64) (MediaItem, error) {
+	_, body, err := c.do(ctx, request{
+		method:    http.MethodGet,
+		namespace: coreNamespace,
+		path:      resourcePath("/media", id),
+		query:     url.Values{"context": {"edit"}},
+	})
+	if err != nil {
+		return MediaItem{}, err
+	}
+	var held mediaPayload
+	if err := decodeJSON(body, &held); err != nil {
+		return MediaItem{}, err
+	}
+	return held.mediaItem(), nil
+}
+
+func (c *Client) UpdateMedia(ctx context.Context, id int64, in UpdateMedia) (MediaItem, error) {
+	fields := make(map[string]any, 2)
+	if in.Alt != nil {
+		fields["alt_text"] = *in.Alt
+	}
+	if in.Title != nil {
+		fields["title"] = *in.Title
+	}
+	if len(fields) == 0 {
+		return MediaItem{}, errors.New(errors.Invalid, "the media update carries no fields")
+	}
+	payload, err := encodeJSON(fields)
+	if err != nil {
+		return MediaItem{}, err
+	}
+	_, body, err := c.do(ctx, request{
+		method:      http.MethodPost,
+		namespace:   coreNamespace,
+		path:        resourcePath("/media", id),
+		query:       url.Values{"context": {"edit"}},
+		body:        payload,
+		contentType: contentTypeJSON,
+	})
+	if err != nil {
+		return MediaItem{}, err
+	}
+	var written mediaPayload
+	if err := decodeJSON(body, &written); err != nil {
+		return MediaItem{}, err
+	}
+	return written.mediaItem(), nil
 }
 
 func (c *Client) UploadMedia(ctx context.Context, media Media) (MediaItem, error) {

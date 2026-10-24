@@ -11,16 +11,16 @@ import (
 )
 
 var narrowed = map[string]bool{
-	"templates_create.parameters.pageKind":   true,
-	"templates_update.parameters.pageKind":   true,
-	"templates_list.parameters.pageKind":     true,
 	"graph_list_edges.parameters.sort.field": true,
 	"imports_export.parameters.format":       true,
+	"runs_pause.parameters.reason":           true,
+	"runs_get_artifact.parameters.kind":      true,
+	"pagetypes_set_scope.parameters.field":   true,
 }
 
 var choiceNames = []string{
 	"kind", "source", "status", "scope", "wpType", "anchorStrategy", "role", "mode", "format",
-	"risk", "relation", "linkClass", "publishMode", "step", "field", "action", "reason", "origin",
+	"risk", "relation", "linkClass", "publishMode", "step", "field", "action", "reason",
 }
 
 var freeText = map[string]bool{
@@ -29,7 +29,8 @@ var freeText = map[string]bool{
 }
 
 var prose = map[string]bool{
-	"graph_add_edge.parameters.reason": true,
+	"graph_add_edge.parameters.reason":              true,
+	"graph_propose_cards.parameters.cards[].reason": true,
 }
 
 func vocabularies(t *testing.T) map[string]string {
@@ -46,6 +47,15 @@ func vocabularies(t *testing.T) map[string]string {
 			t.Fatalf("read %s.%s: %v", entry.pkg, entry.typeName, err)
 		}
 		known[settled(values)] = entry.export
+		for _, derived := range entry.derived {
+			kept := make([]string, 0, len(values))
+			for _, value := range values {
+				if derived.keep(value) {
+					kept = append(kept, value)
+				}
+			}
+			known[settled(kept)] = derived.export
+		}
 	}
 	return known
 }
@@ -95,8 +105,8 @@ func TestEveryToolChoiceIsADomainVocabulary(t *testing.T) {
 
 	known := vocabularies(t)
 	for name, schema := range schemas(t) {
-		eachProperty(schema, name+".parameters", func(path, _ string, property *llm.Schema) {
-			if len(property.Enum) == 0 {
+		eachProperty(schema, name+".parameters", func(path, field string, property *llm.Schema) {
+			if len(property.Enum) == 0 || field == "op" {
 				return
 			}
 			if _, ok := known[settled(property.Enum)]; ok {

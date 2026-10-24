@@ -3,7 +3,8 @@ import type { ReactElement } from "react";
 import { copy } from "../../../copy/index.js";
 import { plainText } from "../../../domain/text.js";
 import { HtmlPreview, SectionLabel } from "../../../ui/index.js";
-import { draftView, imagesView, metaView } from "../artifacts.js";
+import { fieldLabel } from "../../settings/types/labels.js";
+import { draftView, fieldsView, imagesView, metaView } from "../artifacts.js";
 import { FindingList } from "../findings.js";
 import { Rows, Unreadable } from "./shared.js";
 
@@ -70,11 +71,53 @@ export function MetaPane({ payload }: PayloadPaneProps): ReactElement {
             entries={[
                 [copy.pages.detail.metaTitle, view.title],
                 [copy.pages.detail.metaDescription, view.description],
-                [copy.pages.detail.canonicalUrl, view.canonical],
                 ["og:title", view.ogTitle],
                 ["og:description", view.ogDescription],
             ]}
         />
+    );
+}
+
+export function FieldsPane({ payload }: PayloadPaneProps): ReactElement {
+    const view = fieldsView(payload);
+    if (view === null) {
+        return <Unreadable />;
+    }
+    const said = copy.runs.review.fields;
+    if (view.values.length === 0 && view.skipped.length === 0) {
+        return <p className="p-3 text-xs text-ink-dim">{said.none}</p>;
+    }
+    return (
+        <div className="flex flex-col gap-2 py-2">
+            {view.values.length === 0 ? null : (
+                <section aria-label={said.written} className="flex flex-col">
+                    <SectionLabel className="px-3">{said.written}</SectionLabel>
+                    <ul className="flex flex-col">
+                        {view.values.map((row) => (
+                            <li key={row.key} className="flex flex-col gap-0.5 border-b border-inset px-3 py-1.5 last:border-b-0">
+                                <span className="text-2xs text-ink-faint">{fieldLabel(row.key)}</span>
+                                <p className="text-xs whitespace-pre-wrap text-ink-soft">
+                                    {row.value === "" ? said.empty : row.value}
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
+            {view.skipped.length === 0 ? null : (
+                <section aria-label={said.skipped} className="flex flex-col">
+                    <SectionLabel className="px-3">{said.skipped}</SectionLabel>
+                    <ul className="flex flex-col">
+                        {view.skipped.map((row) => (
+                            <li key={row.key} className="flex flex-col gap-0.5 border-b border-inset px-3 py-1.5 last:border-b-0">
+                                <span className="text-2xs text-ink-faint">{fieldLabel(row.key)}</span>
+                                <p className="text-xs text-ink-dim">{row.reason}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
+        </div>
     );
 }
 

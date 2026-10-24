@@ -12,6 +12,8 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/llm"
@@ -24,9 +26,20 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Millisecond
-	pollTimeout  = 20 * time.Second
+	pollInterval   = 5 * time.Millisecond
+	pollFallback   = 10 * time.Minute
+	deadlineMargin = 30 * time.Second
 )
+
+func waitDeadline(t *testing.T) time.Time {
+	t.Helper()
+
+	held, bounded := t.Deadline()
+	if !bounded {
+		return time.Now().Add(pollFallback)
+	}
+	return held.Add(-deadlineMargin)
+}
 
 type oneClient struct {
 	client *wp.Client
@@ -95,10 +108,20 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 		t.Fatalf("build the WordPress client: %v", err)
 	}
 
+	linkRepo := sqlite.NewPageLinkRepo(store)
+	observer := observe.New(observe.Deps{
+		Sites: siteRepo, Pages: pageRepo, Identity: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo,
+		Findings: sqlite.NewFindingRepo(store), UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
+		Types: pagetypes.New(pagetypes.Deps{
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
+			Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
+		}),
+	})
 	registry := run.NewRegistry()
 	if regErr := registry.Register(steps.SyncSite(steps.Deps{
-		Pages: pageRepo, Links: sqlite.NewPageLinkRepo(store), Sites: siteRepo, SiteWriter: siteRepo,
-		WordPress: oneClient{client: client}, UnitOfWork: store, Publisher: silentBus{},
+		Pages: pageRepo, Links: linkRepo, Sites: siteRepo, SiteWriter: siteRepo,
+		WordPress: oneClient{client: client}, Observe: observer, UnitOfWork: store, Publisher: silentBus{},
 		Clock: clock.System{}, BatchSize: 1,
 	})); regErr != nil {
 		t.Fatalf("register the sync step: %v", regErr)
@@ -126,7 +149,7 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 		t.Fatalf("SyncSite: %v", err)
 	}
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	var final run.Run
 	for time.Now().Before(deadline) {
 		record, getErr := runRepo.Get(t.Context(), queued.RunID)

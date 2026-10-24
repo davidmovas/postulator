@@ -1,0 +1,922 @@
+=== / · Entity · body · 354 tokens
+THE PAGE
+Path: /
+Title: Home
+Page type: Entity, an article about one entity: it links up to its parents and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+Browse the peptides or read about BPC-157 and TB-500.
+
+CHILDREN, THE PAGES BELOW IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Home
+--- fits in 3000 tokens
+
+=== /bpc-157/ · Hub · body · 806 tokens
+THE PAGE
+Path: /bpc-157/
+Title: BPC-157
+Page type: Hub, a hub: it introduces its topic and links down to its children and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: BPC-157
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+(a [products] shortcode, kept where it stands)
+
+KEYWORDS, BY VOLUME
+1. bpc-157 (9000 a month)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Healing Peptides (/product-category/peptides/healing-peptides/, Store category): Store category for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are BPC-157, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /healing-peptides/ (Healing Peptides, above it, required). Anchors: Healing Peptides. About it: Hub for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are TB-500
+
+PRODUCTS IT LISTS
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- BPC-157 Capsules (/product/bpc-157-capsules/, Product): Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/, Product): A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/, Product): Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/, Product): Lyophilized TB-500 in a sealed vial.
+
+ITS OTHER FIELDS
+- Title: BPC-157
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb inside the content area; a product listing of 10 links inside the content area; a product listing of 3 links inside the content area; 102 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /cart/ · Technical · body · 499 tokens
+THE PAGE
+Path: /cart/
+Title: Cart
+Page type: Technical, a technical page; it carries no links and is never written
+WordPress type: page; on the site, published
+Technical: cart
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: none in this field
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+You may be interested in… Your cart is currently empty! New in store
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PRODUCTS IT LISTS
+- Bacteriostatic Water (/product/bacteriostatic-water/): price 9.00, SKU BACWATER, in stock; Sterile water with benzyl alcohol.
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Cart
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a product listing of 5 links inside the content area; 48 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /checkout/ · Technical · body · 308 tokens
+THE PAGE
+Path: /checkout/
+Title: Checkout
+Page type: Technical, a technical page; it carries no links and is never written
+WordPress type: page; on the site, published
+Technical: checkout
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: none in this field
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+(a woocommerce/checkout block, kept where it stands)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from its address.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Checkout
+--- fits in 3000 tokens
+
+=== /healing-peptides/ · Hub · body · 726 tokens
+THE PAGE
+Path: /healing-peptides/
+Title: Healing Peptides
+Page type: Hub, a hub: it introduces its topic and links down to its children and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: Healing Peptides
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+KEYWORDS, BY VOLUME
+1. healing peptides (2400 a month)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /peptides/ (Peptides, above it, required). Anchors: Peptides. About it: Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- /bpc-157/ (BPC-157, below it). Anchors: BPC-157. About it: Hub for BPC-157 under Healing Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more
+- /product/bpc-157-peptide/ (BPC-157 Peptide, below it). Anchors: BPC-157 Peptide. About it: Lyophilized BPC-157 in a sealed vial.
+- /tb-500/ (TB-500, below it). Anchors: TB-500. About it: TB-500 is a synthetic fragment of thymosin beta-4, sold for research use only.
+
+PRODUCTS IT LISTS
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+CHILDREN, THE PAGES BELOW IT
+- TB-500 (/tb-500/, Hub): TB-500 is a synthetic fragment of thymosin beta-4, sold for research use only.
+
+ITS OTHER FIELDS
+- Title: Healing Peptides
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb inside the content area; a product listing of 4 links inside the content area; 20 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /hello-world/ · Entity · body · 386 tokens
+THE PAGE
+Path: /hello-world/
+Title: Hello world!
+Page type: Entity, an article about one entity: it links up to its parents and sideways to related pages
+WordPress type: post; on the site, published
+Terms: category Uncategorized
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+Welcome to WordPress. This is your first post. Edit or delete it, then start writing!
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from its address.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Hello world!
+--- fits in 3000 tokens
+
+=== /lab-guides/ · Entity · body · 500 tokens
+THE PAGE
+Path: /lab-guides/
+Title: Lab Guides
+Page type: Entity, an article about one entity: it links up to its parents and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: Lab Guides
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+Step-by-step guides for handling research peptides in the laboratory.
+
+KEYWORDS, BY VOLUME
+1. peptide lab guides (300 a month)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /reconstitution/ (Reconstitution, below it). Anchors: Reconstitution. About it: Reconstitute a lyophilized peptide with bacteriostatic water, adding it slowly along the wall of the vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+CHILDREN, THE PAGES BELOW IT
+- Reconstitution (/reconstitution/, Entity): Reconstitute a lyophilized peptide with bacteriostatic water, adding it slowly along the wall of the vial.
+
+ITS OTHER FIELDS
+- Title: Lab Guides
+--- fits in 3000 tokens
+
+=== /my-account/ · Technical · body · 356 tokens
+THE PAGE
+Path: /my-account/
+Title: My account
+Page type: Technical, a technical page; it carries no links and is never written
+WordPress type: page; on the site, published
+Technical: account
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: none in this field
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+(a [woocommerce_my_account] shortcode, kept where it stands)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: My account
+
+WHAT THE SITE ADDS AROUND THE FIELD
+content a shortcode or a dynamic block renders; 17 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /peptides/ · Hub · body · 684 tokens
+THE PAGE
+Path: /peptides/
+Title: Peptides
+Page type: Hub, a hub: it introduces its topic and links down to its children and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: Peptides
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+KEYWORDS, BY VOLUME
+1. research peptides (12000 a month)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /healing-peptides/ (Healing Peptides, below it). Anchors: Healing Peptides. About it: Hub for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are TB-500
+
+PRODUCTS IT LISTS
+- Bacteriostatic Water (/product/bacteriostatic-water/): price 9.00, SKU BACWATER, in stock; Sterile water with benzyl alcohol.
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+CHILDREN, THE PAGES BELOW IT
+- Healing Peptides (/healing-peptides/, Hub): Hub for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are TB-500
+
+ITS OTHER FIELDS
+- Title: Peptides
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb inside the content area; a product listing of 5 links inside the content area; 19 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /privacy-policy/ · Technical · body · 1361 tokens
+THE PAGE
+Path: /privacy-policy/
+Title: Privacy Policy
+Page type: Technical, a technical page; it carries no links and is never written
+WordPress type: page; on the site, exists
+Technical: privacy
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: none in this field
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+Who we are
+Suggested text: Our website address is: https://stand.example.
+Comments
+Suggested text: When visitors leave comments on the site we collect the data shown in the comments form, and also the visitor’s IP address and browser user agent string to help spam detection.
+An anonymized string created from your email address (also called a hash) may be provided to the Gravatar service to see if you are using it. The Gravatar service privacy policy is available here: https://automattic.com/privacy/. After approval of your comment, your profile picture is visible to the public in the context of your comment.
+Media
+Suggested text: If you upload images to the website, you should avoid uploading images with embedded location data (EXIF GPS) included. Visitors to the website can download and extract any location data from images on the website.
+Cookies
+Suggested text: If you leave a comment on our site you may opt-in to saving your name, email address and website in cookies. These are for your convenience so that you do not have to fill in your details again when you leave another comment. These cookies will last for one year.
+If you visit our login page, we will set a temporary cookie to determine if your browser accepts cookies. This cookie contains no personal data and is discarded when you close your browser.
+When you log in, we will also set up several cookies to save your login information and your screen display choices. Login cookies last for two days, and screen options cookies last for a year. If you select "Remember Me", your login will persist for two weeks. If you log out of your account, the login cookies will be removed.
+If you edit or publish an article, an additional cookie will be saved in your browser. This cookie includes no personal data and simply indicates the post ID of the article you just edited. It expires after 1 day.
+Embedded content from other websites
+Suggested text: Articles on this site may include embedded content (e.g. videos, images, articles, etc.). Embedded content from other websites behaves in the exact same way as if the visitor has visited the other website.
+These websites may collect data about you, use cookies, embed additional third-party tracking, and monitor your interaction with that embedded content, including tracking your interaction with the embedded content if you have an account and are logged in to that website.
+Who we share your data with
+Suggested text: If you request a password reset, your IP address will be included in the reset email.
+How long we retain your data
+Suggested text: If you leave a comment, the comment and its metadata are retained indefinitely. This is so we can recognize and approve any follow-up comments automatically instead of holding them in a moderation queue.
+For users that register on our website (if any), we also store the personal information they provide in their user profile. All users can see, edit, or delete their personal information at any time (except they cannot change their username). Website administrators can also see and edit that information.
+What rights you have over your data
+Suggested text: If you have an account on this site, or have left comments, you can request to receive an exported file of the personal data we hold about you, including any data you have provided to us. You can also request that we erase any personal data we hold about you. This does not include any data we are obliged to keep for administrative, legal, or security purposes.
+Where your data is sent
+Suggested text: Visitor comments may be checked through an automated spam detection service.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Privacy Policy
+--- fits in 3000 tokens
+
+=== /product-category/peptides/ · Store category · body · 556 tokens
+THE PAGE
+Path: /product-category/peptides/
+Title: Peptides
+Page type: Store category, a store category archive the store generates; it is read, never written
+WordPress type: product_cat; on the site, published
+Read only: term
+
+THE FIELD'S RULES
+Field: Body
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PRODUCTS IT LISTS
+- Bacteriostatic Water (/product/bacteriostatic-water/): price 9.00, SKU BACWATER, in stock; Sterile water with benzyl alcohol.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+CHILDREN, THE PAGES BELOW IT
+- Healing Peptides (/product-category/peptides/healing-peptides/, Store category): Store category for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are BPC-157, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more
+- Bacteriostatic Water (/product/bacteriostatic-water/, Product): Sterile water with benzyl alcohol.
+
+ITS OTHER FIELDS
+- Title: Peptides
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a product listing of 12 links inside the content area; 125 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /product-category/peptides/healing-peptides/ · Store category · body · 653 tokens
+THE PAGE
+Path: /product-category/peptides/healing-peptides/
+Title: Healing Peptides
+Page type: Store category, a store category archive the store generates; it is read, never written
+WordPress type: product_cat; on the site, published
+Read only: term
+
+THE FIELD'S RULES
+Field: Body
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from its WordPress parent.
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PRODUCTS IT LISTS
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Bacteriostatic Water (/product/bacteriostatic-water/, Product): Sterile water with benzyl alcohol.
+
+CHILDREN, THE PAGES BELOW IT
+- BPC-157 (/bpc-157/, Hub): Hub for BPC-157 under Healing Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more
+- BPC-157 Capsules (/product/bpc-157-capsules/, Product): Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/, Product): A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/, Product): Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/, Product): Lyophilized TB-500 in a sealed vial.
+
+ITS OTHER FIELDS
+- Title: Healing Peptides
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a product listing of 10 links inside the content area; 113 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /product-category/uncategorized/ · Store category · body · 441 tokens
+THE PAGE
+Path: /product-category/uncategorized/
+Title: Uncategorized
+Page type: Store category, a store category archive the store generates; it is read, never written
+WordPress type: product_cat; on the site, published
+Technical: noindex
+Read only: term
+
+THE FIELD'S RULES
+Field: Body
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Uncategorized
+
+WHAT THE SITE ADDS AROUND THE FIELD
+8 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /product/bacteriostatic-water/ · Product · product_description · 364 tokens
+THE PAGE
+Path: /product/bacteriostatic-water/
+Title: Bacteriostatic Water
+Page type: Product, a product page: its descriptions sell the product; it carries no children section
+WordPress type: product; on the site, published
+Terms: product_cat Peptides; product_type simple
+
+THE FIELD'S RULES
+Field: Product description
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+Reconstitute any of our Peptides with it.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+ITS OTHER FIELDS
+- Title: Bacteriostatic Water
+- Short description: Sterile water with benzyl alcohol.
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb outside the content
+--- fits in 3000 tokens
+
+=== /product/bpc-157-capsules/ · Product · product_description · 664 tokens
+THE PAGE
+Path: /product/bpc-157-capsules/
+Title: BPC-157 Capsules
+Page type: Product, a product page: its descriptions sell the product; it carries no children section
+WordPress type: product; on the site, published
+Terms: entity BPC-157; product_cat Healing Peptides; product_type simple
+
+THE FIELD'S RULES
+Field: Product description
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Healing Peptides (/product-category/peptides/healing-peptides/, Store category): Store category for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are BPC-157, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PRODUCTS IT LISTS
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- BPC-157 (/bpc-157/, Hub): Hub for BPC-157 under Healing Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/, Product): A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/, Product): Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/, Product): Lyophilized TB-500 in a sealed vial.
+
+ITS OTHER FIELDS
+- Title: BPC-157 Capsules
+- Short description: Capsules for research use.
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a product listing of 8 links inside the content area; a breadcrumb inside the content area; 164 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /product/bpc-157-nasal-spray/ · Product · product_description · 689 tokens
+THE PAGE
+Path: /product/bpc-157-nasal-spray/
+Title: BPC-157 Nasal Spray
+Page type: Product, a product page: its descriptions sell the product; it carries no children section
+WordPress type: product; on the site, published
+Terms: entity BPC-157; product_cat Healing Peptides; product_type simple
+
+THE FIELD'S RULES
+Field: Product description
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+BPC-157 in a metered nasal spray for research use.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Healing Peptides (/product-category/peptides/healing-peptides/, Store category): Store category for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are BPC-157, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PRODUCTS IT LISTS
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- BPC-157 (/bpc-157/, Hub): Hub for BPC-157 under Healing Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more
+- BPC-157 Capsules (/product/bpc-157-capsules/, Product): Capsules for research use.
+- BPC-157 Peptide (/product/bpc-157-peptide/, Product): Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/, Product): Lyophilized TB-500 in a sealed vial.
+
+ITS OTHER FIELDS
+- Title: BPC-157 Nasal Spray
+- Short description: A metered nasal spray.
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb outside the content; a product listing of 8 links outside the content
+--- fits in 3000 tokens
+
+=== /product/bpc-157-peptide/ · Product · product_description · 801 tokens
+THE PAGE
+Path: /product/bpc-157-peptide/
+Title: BPC-157 Peptide
+Page type: Product, a product page: its descriptions sell the product; it carries no children section
+WordPress type: product; on the site, published
+Terms: entity BPC-157; pa_strength 5 mg; pa_strength 10 mg; product_cat Healing Peptides; product_type variable
+
+THE FIELD'S RULES
+Field: Product description
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: BPC-157 Peptide
+- Strength: 10 mg, 5 mg
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+BPC-157 is a pentadecapeptide studied for tissue repair.
+Each vial is sealed under nitrogen.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Healing Peptides (/product-category/peptides/healing-peptides/, Store category): Store category for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are BPC-157, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /healing-peptides/ (Healing Peptides, above it, required). Anchors: Healing Peptides. About it: Hub for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are TB-500
+
+PRODUCTS IT LISTS
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- BPC-157 (/bpc-157/, Hub): Hub for BPC-157 under Healing Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more
+- BPC-157 Capsules (/product/bpc-157-capsules/, Product): Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/, Product): A metered nasal spray.
+- TB-500 Peptide (/product/tb-500-peptide/, Product): Lyophilized TB-500 in a sealed vial.
+
+ITS OTHER FIELDS
+- Title: BPC-157 Peptide
+- Short description: Lyophilized BPC-157 in a sealed vial.
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb outside the content; a product listing of 7 links outside the content
+--- fits in 3000 tokens
+
+=== /product/tb-500-peptide/ · Product · product_description · 695 tokens
+THE PAGE
+Path: /product/tb-500-peptide/
+Title: TB-500 Peptide
+Page type: Product, a product page: its descriptions sell the product; it carries no children section
+WordPress type: product; on the site, published
+Terms: entity TB-500; pa_strength 5 mg; pa_strength 2 mg; product_cat Healing Peptides; product_type variable
+
+THE FIELD'S RULES
+Field: Product description
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+TB-500 is a synthetic fragment of thymosin beta-4.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Healing Peptides (/product-category/peptides/healing-peptides/, Store category): Store category for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are BPC-157, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more
+- Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PRODUCTS IT LISTS
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- BPC-157 (/bpc-157/, Hub): Hub for BPC-157 under Healing Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more
+- BPC-157 Capsules (/product/bpc-157-capsules/, Product): Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/, Product): A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/, Product): Lyophilized BPC-157 in a sealed vial.
+
+ITS OTHER FIELDS
+- Title: TB-500 Peptide
+- Short description: Lyophilized TB-500 in a sealed vial.
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb outside the content; a product listing of 7 links outside the content
+--- fits in 3000 tokens
+
+=== /reconstitution/ · Entity · body · 439 tokens
+THE PAGE
+Path: /reconstitution/
+Title: Reconstitution
+Page type: Entity, an article about one entity: it links up to its parents and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: Reconstitution
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+Reconstitute a lyophilized peptide with bacteriostatic water, adding it slowly along the wall of the vial.
+Swirl gently and never shake the vial.
+
+KEYWORDS, BY VOLUME
+1. peptide reconstitution (1300 a month)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's breadcrumb navigation.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /lab-guides/ (Lab Guides, above it, required). Anchors: Lab Guides. About it: Step-by-step guides for handling research peptides in the laboratory.
+
+ITS OTHER FIELDS
+- Title: Reconstitution
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb inside the content area; 4 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /refund_returns/ · Technical · body · 1316 tokens
+THE PAGE
+Path: /refund_returns/
+Title: Refund and Returns Policy
+Page type: Technical, a technical page; it carries no links and is never written
+WordPress type: page; on the site, exists
+Technical: noindex
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: none in this field
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+This is a sample page.
+Overview
+Our refund and returns policy lasts 30 days. If 30 days have passed since your purchase, we can’t offer you a full refund or exchange.
+To be eligible for a return, your item must be unused and in the same condition that you received it. It must also be in the original packaging.
+Several types of goods are exempt from being returned. Perishable goods such as food, flowers, newspapers or magazines cannot be returned. We also do not accept products that are intimate or sanitary goods, hazardous materials, or flammable liquids or gases.
+Additional non-returnable items:
+Gift cards Downloadable software products Some health and personal care items
+To complete your return, we require a receipt or proof of purchase.
+Please do not send your purchase back to the manufacturer.
+There are certain situations where only partial refunds are granted:
+Book with obvious signs of use CD, DVD, VHS tape, software, video game, cassette tape, or vinyl record that has been opened. Any item not in its original condition, is damaged or missing parts for reasons not due to our error. Any item that is returned more than 30 days after delivery
+Refunds
+Once your return is received and inspected, we will send you an email to notify you that we have received your returned item. We will also notify you of the approval or rejection of your refund.
+If you are approved, then your refund will be processed, and a credit will automatically be applied to your credit card or original method of payment, within a certain amount of days.
+Late or missing refunds
+If you haven’t received a refund yet, first check your bank account again.
+Then contact your credit card company, it may take some time before your refund is officially posted.
+Next contact your bank. There is often some processing time before a refund is posted.
+If you’ve done all of this and you still have not received your refund yet, please contact us at {email address}.
+Sale items
+Only regular priced items may be refunded. Sale items cannot be refunded.
+Exchanges
+We only replace items if they are defective or damaged. If you need to exchange it for the same item, send us an email at {email address} and send your item to: {physical address}.
+Gifts
+If the item was marked as a gift when purchased and shipped directly to you, you’ll receive a gift credit for the value of your return. Once the returned item is received, a gift certificate will be mailed to you.
+If the item wasn’t marked as a gift when purchased, or the gift giver had the order shipped to themselves to give to you later, we will send a refund to the gift giver and they will find out about your return.
+Shipping returns
+To return your product, you should mail your product to: {physical address}.
+You will be responsible for paying for your own shipping costs for returning your item. Shipping costs are non-refundable. If you receive a refund, the cost of return shipping will be deducted from your refund.
+Depending on where you live, the time it may take for your exchanged product to reach you may vary.
+If you are returning more expensive items, you may consider using a trackable shipping service or purchasing shipping insurance. We don’t guarantee that we will receive your returned item.
+Need help?
+Contact us at {email} for questions related to refunds and returns.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Refund and Returns Policy
+--- fits in 3000 tokens
+
+=== /sample-page/ · Entity · body · 622 tokens
+THE PAGE
+Path: /sample-page/
+Title: Sample Page
+Page type: Entity, an article about one entity: it links up to its parents and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+This is an example page. It's different from a blog post because it will stay in one place and will show up in your site navigation (in most themes). Most people start with an About page that introduces them to potential site visitors. It might say something like this:
+Hi there! I'm a bike messenger by day, aspiring actor by night, and this is my website. I live in Los Angeles, have a great dog named Jack, and I like piña coladas. (And gettin' caught in the rain.)
+...or something like this:
+The XYZ Doohickey Company was founded in 1971, and has been providing quality doohickeys to the public ever since. Located in Gotham City, XYZ employs over 2,000 people and does all kinds of awesome things for the Gotham community.
+As a new WordPress user, you should go to your dashboard to delete this page and create new pages for your content. Have fun!
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+
+ITS OTHER FIELDS
+- Title: Sample Page
+--- fits in 3000 tokens
+
+=== /shop/ · Catalog · body · 550 tokens
+THE PAGE
+Path: /shop/
+Title: Shop
+Page type: Catalog, the shop or a listing root
+WordPress type: page; on the site, published
+Technical: shop
+
+THE FIELD'S RULES
+Field: Body
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PRODUCTS IT LISTS
+- Bacteriostatic Water (/product/bacteriostatic-water/): price 9.00, SKU BACWATER, in stock; Sterile water with benzyl alcohol.
+- BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.
+- BPC-157 Nasal Spray (/product/bpc-157-nasal-spray/): price 29.00, SKU BPC157-SPRAY, in stock; A metered nasal spray.
+- BPC-157 Peptide (/product/bpc-157-peptide/): price 39.00, SKU BPC157, in stock; Lyophilized BPC-157 in a sealed vial.
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+SIBLINGS, THE PAGES BESIDE IT
+- Hello world! (/hello-world/, Entity): Welcome to WordPress.
+- Lab Guides (/lab-guides/, Entity): Step-by-step guides for handling research peptides in the laboratory.
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Sample Page (/sample-page/, Entity): This is an example page.
+
+ITS OTHER FIELDS
+- Title: Shop
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a product listing of 12 links inside the content area; 120 words the site generates inside the content area
+--- fits in 3000 tokens
+
+=== /tb-500/ · Hub · body · 589 tokens
+THE PAGE
+Path: /tb-500/
+Title: TB-500
+Page type: Hub, a hub: it introduces its topic and links down to its children and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+The current value is the client's: keep it as it stands and write only what it lacks.
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: TB-500
+
+THE FIELD'S CURRENT VALUE (THE CLIENT'S)
+TB-500 is a synthetic fragment of thymosin beta-4, sold for research use only.
+Every vial ships with a certificate of analysis. Compare it with BPC-157 before you order.
+
+KEYWORDS, BY VOLUME
+1. tb-500 (6000 a month)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Healing Peptides (/healing-peptides/, Hub): Hub for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are TB-500
+- Peptides (/peptides/, Hub): Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
+- Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /healing-peptides/ (Healing Peptides, above it, required). Anchors: Healing Peptides. About it: Hub for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are TB-500
+
+PRODUCTS IT LISTS
+- TB-500 Peptide (/product/tb-500-peptide/): price 45.00, SKU TB500, in stock; Lyophilized TB-500 in a sealed vial.
+
+ITS OTHER FIELDS
+- Title: TB-500
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb inside the content area; a product listing of 1 links inside the content area; 12 words the site generates inside the content area
+--- fits in 3000 tokens
+

@@ -16,12 +16,14 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/llm/fake"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/imports"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	appsync "github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -126,12 +128,20 @@ func productAnswer(keyword string) string {
 		`{"heading":"Key Features","html":"<ul><li>A dropper cap that measures the dose.</li><li>A dark glass bottle.</li></ul>"},` +
 		`{"heading":"Who It Is For","html":"<p>It suits the buyer who measures a dose every morning, and not the one who travels light.</p>"},` +
 		`{"heading":"Frequently Asked Questions","html":"<p>It ships in two days and comes back within thirty days unopened.</p>"}],` +
-		`"summary":"What the ` + keyword + ` is and who should buy it.",` +
-		`"shortDescription":"<p>The ` + keyword + ` in a dark glass bottle with a dropper cap.</p>",` +
-		`"specifications":[{"name":"Form","value":"Liquid"},{"name":"Size","value":""}]}`
+		`"summary":"What the ` + keyword + ` is and who should buy it."}`
+}
+
+func productFields(keyword string) string {
+	return `{"fields":[{"key":"product_short_description","value":"The ` + keyword + ` in a dark glass bottle with a dropper cap."}]}`
 }
 
 func productTemplate(t *testing.T, core *app.Core) string {
+	t.Helper()
+
+	return templateNamed(t, core, "Product")
+}
+
+func templateNamed(t *testing.T, core *app.Core, name string) string {
 	t.Helper()
 
 	listed, err := core.Templates.ListTemplates(t.Context(), templates.ListTemplatesRequest{
@@ -141,12 +151,34 @@ func productTemplate(t *testing.T, core *app.Core) string {
 		t.Fatalf("list the templates: %v", err)
 	}
 	for i := range listed.Items {
-		if listed.Items[i].PageKind == "product" {
+		if listed.Items[i].Name == name {
 			return listed.Items[i].ID
 		}
 	}
-	t.Fatal("the shipped product template is missing")
+	t.Fatalf("the shipped %s template is missing", name)
 	return ""
+}
+
+func assertTheTypesCarryTheShippedTemplates(t *testing.T, core *app.Core, siteID string) {
+	t.Helper()
+
+	listed, err := core.PageTypes.List(t.Context(), pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("list the page types: %v", err)
+	}
+	for i := range listed.Types {
+		want := ""
+		if name := pagetype.Preset(listed.Types[i].Preset).DefaultTemplate(); name != "" {
+			want = templateNamed(t, core, name)
+		}
+		got := ""
+		if listed.Types[i].TemplateID != nil {
+			got = *listed.Types[i].TemplateID
+		}
+		if got != want {
+			t.Fatalf("the fresh site's %s type carries the template %q, want %q", listed.Types[i].Name, got, want)
+		}
+	}
 }
 
 func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
@@ -164,10 +196,12 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	liquidPath, capsulePath := "/product/"+liquid.Slug+"/", "/product/"+capsule.Slug+"/"
 
 	core := openCoreWith(t, fake.NewScripted(append(replies(),
-		fake.Reply{Step: steps.NameGenerateBody, Match: liquidPath, Text: productAnswer("mak liquid")},
-		fake.Reply{Step: steps.NameGenerateMeta, Match: liquidPath, Text: metaOf("mak liquid")},
-		fake.Reply{Step: steps.NameGenerateBody, Match: capsulePath, Text: productAnswer("mak capsule")},
-		fake.Reply{Step: steps.NameGenerateMeta, Match: capsulePath, Text: metaOf("mak capsule")},
+		fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + liquidPath + "\n", Text: productAnswer("mak liquid")},
+		fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + liquidPath + "\n", Text: metaOf("mak liquid")},
+		fake.Reply{Step: steps.NameGenerateFields, Match: "Path: " + liquidPath + "\n", Text: productFields("mak liquid")},
+		fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + capsulePath + "\n", Text: productAnswer("mak capsule")},
+		fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + capsulePath + "\n", Text: metaOf("mak capsule")},
+		fake.Reply{Step: steps.NameGenerateFields, Match: "Path: " + capsulePath + "\n", Text: productFields("mak capsule")},
 	)...))
 	owner, err := core.Sites.Create(t.Context(), sites.CreateRequest{
 		Name: "Docker Store", BaseURL: live.env.baseURL, Username: live.env.user, Password: live.env.pass,
@@ -200,7 +234,7 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	}
 	mapping := imports.Mapping{SiteID: siteID, Name: "products", Columns: map[string]string{
 		string(importmap.FieldPath): "path", string(importmap.FieldH1): "h1", string(importmap.FieldKeywords): "keywords",
-		string(importmap.FieldPageKind): "page kind",
+		string(importmap.FieldPageType): "page kind",
 	}, Options: imports.Options{RowType: importmap.RowProducts}}
 
 	applied, err := core.Imports.Apply(t.Context(), imports.ApplyRequest{SiteID: siteID, Path: sheet, Mapping: mapping})
@@ -209,7 +243,7 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 	}
 	waiting := 0
 	for _, finding := range applied.Report.Warnings {
-		if finding.Code == string(imports.CodeProductNotInStore) {
+		if finding.Code == string(imports.CodeRowWithoutPage) {
 			waiting++
 		}
 	}
@@ -233,8 +267,9 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 		t.Fatalf("a second import of the sheet = %+v (%v), want nothing to do", again.Counts, err)
 	}
 
+	products := []string{stored[liquidPath].ID, stored[capsulePath].ID}
 	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
-		SiteID: siteID, PageIDs: []string{stored[liquidPath].ID, stored[capsulePath].ID},
+		SiteID: siteID, PageIDs: products, Rewrite: products,
 		TemplateID: productTemplate(t, core), PublishMode: string(run.PublishLive), Recipe: recipe(),
 	})
 	if err != nil {
@@ -277,8 +312,8 @@ func TestTheProductLoopEditsWhatTheClientCreatedInTheStore(t *testing.T) {
 		for _, attribute := range written.Attributes {
 			names = append(names, attribute.Name+"="+strings.Join(attribute.Options, "|"))
 		}
-		if !slices.Contains(names, "Origin=Client") || !slices.Contains(names, "Form=Liquid") || len(names) != 2 {
-			t.Errorf("%s carries the attributes %v, want the client's kept and the form added", held.Name, names)
+		if !slices.Equal(names, []string{"Origin=Client"}) {
+			t.Errorf("%s carries the attributes %v, want the client's alone, the store owning them", held.Name, names)
 		}
 	}
 	if hub, ok := live.byPath(t, hubPath); !ok || !linksTo(hub.Links, liquidPath) {

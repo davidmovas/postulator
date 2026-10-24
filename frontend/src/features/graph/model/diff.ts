@@ -12,7 +12,6 @@ export interface IndexDiff {
 function changed(before: Entity, after: Entity): boolean {
     return (
         before.name !== after.name ||
-        before.kind !== after.kind ||
         before.score !== after.score ||
         before.canonicalPageId !== after.canonicalPageId ||
         mainKeyword(keywordList(before.keywords)) !== mainKeyword(keywordList(after.keywords))

@@ -2,10 +2,12 @@ import type { ReactElement } from "react";
 import { useMemo } from "react";
 
 import { copy } from "../../../copy/index.js";
-import { entityKinds } from "../../../generated/vocab.js";
 import { Button, CalculateIcon, SectionLabel, toneClasses } from "../../../ui/index.js";
-import { entityIcon, formatScore, entityKindLabel, kindTone, lensLabel, lensTone, scored } from "../labels.js";
+import type { PresetRole } from "../../settings/types/labels.js";
+import { presetIcon, presetLabel, presetRoles, presetTone } from "../../settings/types/labels.js";
+import { formatScore, lensLabel, lensTone, scored } from "../labels.js";
 import type { GraphIndex } from "../model/index.js";
+import { presetOf } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
 
 const topCount = 5;
@@ -24,12 +26,13 @@ interface AttentionRow {
 }
 
 export function Summary({ index, recomputing, onLens, onSelect, onRecompute }: SummaryProps): ReactElement {
-    const byKind = useMemo(() => {
-        const counts = new Map<string, number>();
+    const byPreset = useMemo(() => {
+        const counts = new Map<PresetRole, number>();
         for (const held of index.byId.values()) {
-            counts.set(held.kind, (counts.get(held.kind) ?? 0) + 1);
+            const preset = presetOf(index, held.id);
+            counts.set(preset, (counts.get(preset) ?? 0) + 1);
         }
-        return entityKinds.map((kind) => ({ kind, count: counts.get(kind) ?? 0 })).filter((entry) => entry.count > 0);
+        return presetRoles.map((preset) => ({ preset, count: counts.get(preset) ?? 0 })).filter((entry) => entry.count > 0);
     }, [index]);
 
     const ranked = scored(index.entities);
@@ -59,15 +62,15 @@ export function Summary({ index, recomputing, onLens, onSelect, onRecompute }: S
             </div>
 
             <section className="flex flex-col gap-1">
-                <SectionLabel>{copy.graph.summary.byKind}</SectionLabel>
+                <SectionLabel>{copy.graph.summary.byType}</SectionLabel>
                 <ul className="flex flex-col gap-0.5">
-                    {byKind.map(({ kind, count }) => {
-                        const Icon = entityIcon(kind);
+                    {byPreset.map(({ preset, count }) => {
+                        const Icon = presetIcon(preset);
                         return (
-                            <li key={kind} className="flex items-center justify-between text-xs">
+                            <li key={preset} className="flex items-center justify-between text-xs">
                                 <span className="flex items-center gap-2 text-ink-soft">
-                                    <Icon size={14} className={toneClasses[kindTone(kind)].ink} />
-                                    {entityKindLabel(kind)}
+                                    <Icon size={14} className={toneClasses[presetTone(preset)].ink} />
+                                    {presetLabel(preset)}
                                 </span>
                                 <span className="font-mono text-2xs text-ink-dim">{count}</span>
                             </li>
@@ -110,7 +113,8 @@ export function Summary({ index, recomputing, onLens, onSelect, onRecompute }: S
                     {ranked ? (
                         <ol className="flex flex-col gap-0.5">
                             {top.map((held) => {
-                                const Icon = entityIcon(held.kind);
+                                const preset = presetOf(index, held.id);
+                                const Icon = presetIcon(preset);
                                 return (
                                     <li key={held.id}>
                                         <button
@@ -120,7 +124,7 @@ export function Summary({ index, recomputing, onLens, onSelect, onRecompute }: S
                                                 onSelect(held.id);
                                             }}
                                         >
-                                            <Icon size={14} className={toneClasses[kindTone(held.kind)].ink} />
+                                            <Icon size={14} className={toneClasses[presetTone(preset)].ink} />
                                             <span className="flex-1 truncate">{held.name}</span>
                                             <span className="font-mono text-2xs text-ink-dim">{formatScore(held.score)}</span>
                                         </button>

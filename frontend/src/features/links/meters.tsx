@@ -1,9 +1,12 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
-import type { LinkPolicySummary, LinkTotals } from "../../data/types.js";
+import type { LinkTotals, LinkTypeCounts } from "../../data/types.js";
+import type { LinkType } from "../../generated/vocab.js";
+import { linkTypes } from "../../generated/vocab.js";
 import { cx, toneClasses } from "../../ui/index.js";
 import type { Tone } from "../../ui/index.js";
+import { linkTypeLabel } from "../pages/model/labels.js";
 
 interface Segment {
     key: string;
@@ -40,25 +43,36 @@ function Stat({ label, value, tone }: StatProps): ReactElement {
     );
 }
 
-function policyLine(policy: LinkPolicySummary): string {
-    return [
-        copy.links.policy(policy.name),
-        policy.forbidExternal ? copy.links.forbidExternal : copy.links.allowExternal,
-        policy.forbidSelf ? copy.links.forbidSelf : copy.links.allowSelf,
-    ].join(" · ");
+const contextual: LinkType = "contextual";
+
+function TypeStrip({ counts }: { counts: LinkTypeCounts }): ReactElement {
+    return (
+        <ul aria-label={copy.links.meters.byType} className="flex flex-wrap gap-x-3 gap-y-0.5">
+            <li className="text-2xs text-ink-faint">{copy.links.meters.byType}</li>
+            {linkTypes.map((type) => (
+                <li
+                    key={type}
+                    title={type === contextual ? copy.links.meters.contextualOnly : undefined}
+                    className="flex items-baseline gap-1.5 text-2xs text-ink-dim"
+                >
+                    <span className={cx("font-mono", type === contextual ? "text-ink" : "text-ink-soft")}>{counts[type]}</span>
+                    <span className={type === contextual ? "text-ink-soft" : undefined}>{linkTypeLabel(type)}</span>
+                </li>
+            ))}
+        </ul>
+    );
 }
 
 export interface AuditStripProps {
     totals: LinkTotals;
-    policy: LinkPolicySummary;
 }
 
-export function AuditStrip({ totals, policy }: AuditStripProps): ReactElement {
+export function AuditStrip({ totals }: AuditStripProps): ReactElement {
     const segments = segmentsOf(totals);
     const total = Math.max(totals.targets, 1);
     return (
         <div className="flex shrink-0 items-center gap-4 border-b border-hairline px-4 py-2">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5" title={policyLine(policy)}>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5" title={copy.links.meters.rulesFromTypes}>
                 <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-sm bg-inset" role="img" aria-label={copy.links.meters.required}>
                     {segments
                         .filter((segment) => segment.count > 0)
@@ -80,6 +94,7 @@ export function AuditStrip({ totals, policy }: AuditStripProps): ReactElement {
                     ))}
                     <li className="text-2xs text-ink-faint">{copy.links.meters.targets(totals.targets)}</li>
                 </ul>
+                <TypeStrip counts={totals.byType} />
             </div>
             <div className="flex shrink-0 items-center gap-4">
                 <Stat label={copy.links.meters.audited} value={copy.links.meters.ofPages(totals.audited, totals.pages)} />

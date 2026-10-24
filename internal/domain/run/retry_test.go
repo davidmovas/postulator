@@ -136,7 +136,7 @@ func TestTheStepNamesAreDeclaredInPipelineOrder(t *testing.T) {
 
 	names := run.StepNames()
 	want := []run.StepName{
-		run.StepResolveContext, run.StepGenerateBody, run.StepGenerateMeta, run.StepInsertLinks,
+		run.StepResolveContext, run.StepGenerateBody, run.StepGenerateMeta, run.StepGenerateFields, run.StepInsertLinks,
 		run.StepRepairLinks, run.StepGenerateImages, run.StepValidate, run.StepJudge,
 		run.StepPublish, run.StepRelinkNeighbors, run.StepSyncBack, run.StepReport,
 	}

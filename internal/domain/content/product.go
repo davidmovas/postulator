@@ -2,112 +2,55 @@ package content
 
 import (
 	stdhtml "html"
+	"regexp"
+	"strconv"
 	"strings"
 
-	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 const (
 	CodePrimaryMissingInName             = "primary_missing_in_name"
 	CodePrimaryMissingInShortDescription = "primary_missing_in_short_description"
-	CodeSpecificationMissing             = "specification_missing"
 )
 
-type AnswerSpecification struct {
-	Name  string `json:"name" description:"The specification name, exactly as the brief gives it"`
-	Value string `json:"value" description:"Its value as plain text; empty when neither the name nor the page notes state it"`
+var (
+	blankLines  = regexp.MustCompile(`\n[ \t\r]*\n`)
+	textEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+)
+
+func StoreName(name string) string {
+	return stdhtml.UnescapeString(strings.TrimSpace(name))
 }
 
-type ProductAnswer struct {
-	DraftAnswer
-	ShortDescription string                `json:"shortDescription" description:"The short description the store shows beside the price, as HTML paragraphs"`
-	Specifications   []AnswerSpecification `json:"specifications" description:"One value for every specification the brief lists"`
+func WritesShortDescription(product *template.Product) bool {
+	return product != nil && product.ShortDescription.Enabled
 }
 
-type Specification struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-type ProductDraft struct {
-	ShortDescription string          `json:"shortDescription"`
-	Specifications   []Specification `json:"specifications"`
-}
-
-type BriefSpecification struct {
-	Name   string `json:"name"`
-	Intent string `json:"intent"`
-}
-
-type BriefProduct struct {
-	ShortIntent      string               `json:"shortIntent"`
-	Specifications   []BriefSpecification `json:"specifications"`
-	ShortWords       int                  `json:"shortWords"`
-	ShortDescription bool                 `json:"shortDescription"`
-	ShortKeyword     bool                 `json:"shortKeyword"`
-}
-
-func StoreName(page pagemap.Page) string {
-	return stdhtml.UnescapeString(strings.TrimSpace(page.Observed.Title))
-}
-
-func productBrief(product template.Product) *BriefProduct {
-	brief := &BriefProduct{
-		ShortDescription: product.ShortDescription.Enabled,
-		ShortIntent:      strings.TrimSpace(product.ShortDescription.Intent),
-		ShortWords:       product.ShortDescription.TargetWords,
-		ShortKeyword:     product.ShortDescription.PrimaryKeyword,
-		Specifications:   make([]BriefSpecification, 0, len(product.Specifications)),
+func ShortDescriptionRules(product template.Product) []string {
+	short := product.ShortDescription
+	rules := make([]string, 0, 3)
+	if intent := strings.TrimSpace(short.Intent); intent != "" {
+		rules = append(rules, "The template asks: "+intent)
 	}
-	for _, specification := range product.Specifications {
-		brief.Specifications = append(brief.Specifications, BriefSpecification{
-			Name: strings.TrimSpace(specification.Name), Intent: strings.TrimSpace(specification.Intent),
-		})
+	if short.TargetWords > 0 {
+		rules = append(rules, "About "+strconv.Itoa(short.TargetWords)+" words")
 	}
-	return brief
+	if short.PrimaryKeyword {
+		rules = append(rules, "It carries the primary keyword")
+	}
+	return rules
 }
 
-func AssembleProduct(answer ProductAnswer, brief Brief) (ContentDraft, *Document, error) {
-	draft, doc, err := Assemble(answer.DraftAnswer, brief)
-	if err != nil || brief.Product == nil {
-		return draft, doc, err
-	}
-
-	product := ProductDraft{Specifications: make([]Specification, 0, len(brief.Product.Specifications))}
-	if brief.Product.ShortDescription {
-		short, stripped := Sanitize(answer.ShortDescription)
-		if strings.TrimSpace(short) == "" {
-			return ContentDraft{}, nil, incomplete("the model left the short description empty", nil)
+func PlainParagraphs(plain string) string {
+	paragraphs := make([]string, 0)
+	for _, chunk := range blankLines.Split(strings.ReplaceAll(plain, "\r\n", "\n"), -1) {
+		text := strings.Join(strings.Fields(chunk), " ")
+		if text != "" {
+			paragraphs = append(paragraphs, "<p>"+textEscaper.Replace(text)+"</p>")
 		}
-		product.ShortDescription = strings.TrimSpace(short)
-		draft.Findings = append(draft.Findings, strippedFindings("the short description", stripped)...)
 	}
-
-	for _, wanted := range brief.Product.Specifications {
-		value := specificationValue(answer.Specifications, wanted.Name)
-		if value == "" {
-			draft.Findings = append(draft.Findings, Finding{
-				Severity: SeverityWarn, Code: CodeSpecificationMissing,
-				Message: "the writer stated no value for " + wanted.Name + ", so the product does not get it",
-				Details: map[string]any{"specification": wanted.Name},
-			})
-			continue
-		}
-		product.Specifications = append(product.Specifications, Specification{Name: wanted.Name, Value: value})
-	}
-	draft.Product = &product
-	return draft, doc, nil
-}
-
-func specificationValue(answered []AnswerSpecification, name string) string {
-	for _, specification := range answered {
-		if !strings.EqualFold(strings.TrimSpace(specification.Name), name) {
-			continue
-		}
-		return plainText(specification.Value)
-	}
-	return ""
+	return strings.Join(paragraphs, "\n")
 }
 
 func plainText(value string) string {
@@ -118,13 +61,13 @@ func plainText(value string) string {
 	return strings.Join(strings.Fields(doc.Text()), " ")
 }
 
-func ProductFindings(draft ProductDraft, product template.Product, primary string) []Finding {
+func ShortDescriptionFindings(short string, product template.Product, primary string) []Finding {
 	out := make([]Finding, 0)
-	short := product.ShortDescription
-	if !short.Enabled || !short.PrimaryKeyword || primary == "" {
+	rule := product.ShortDescription
+	if !rule.Enabled || !rule.PrimaryKeyword || primary == "" {
 		return out
 	}
-	if !carries(plainText(draft.ShortDescription), primary) {
+	if !carries(plainText(short), primary) {
 		out = append(out, Finding{
 			Severity: SeverityError, Code: CodePrimaryMissingInShortDescription,
 			Message: "the primary keyword does not appear in the short description",

@@ -5,9 +5,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 type Relation string
@@ -50,7 +50,15 @@ type LinkContext struct {
 	PageURL  string       `json:"pageUrl"`
 	EntityID string       `json:"entityId"`
 	Site     pagemap.Site `json:"site"`
+	Absolute bool         `json:"absolute,omitempty"`
 	Targets  []LinkTarget `json:"targets"`
+}
+
+func (c LinkContext) Href(target LinkTarget) string {
+	if c.Absolute {
+		return c.Site.URL(target.URL)
+	}
+	return target.URL
 }
 
 type LinkPlan struct {
@@ -82,13 +90,14 @@ type Subject struct {
 	PageID   string
 	PagePath string
 	EntityID string
+	Absolute bool
 }
 
-func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy template.LinkPolicy) LinkPlan {
+func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy field.LinkPolicy) LinkPlan {
 	plan := LinkPlan{
 		Context: LinkContext{
 			PageID: subject.PageID, PageURL: subject.PagePath, EntityID: subject.EntityID,
-			Site: subject.Site, Targets: make([]LinkTarget, 0),
+			Site: subject.Site, Absolute: subject.Absolute, Targets: make([]LinkTarget, 0),
 		},
 		Blocked: make([]BlockedTarget, 0),
 	}
@@ -97,18 +106,20 @@ func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy templ
 	if !known {
 		return plan
 	}
+	page, mapped := canonical(index, self)
+	if subject.PageID == "" && mapped {
+		plan.Context.PageID = page.ID
+		plan.Context.PageURL = page.Path
+	}
+	if !policy.Links {
+		return plan
+	}
 
 	walk := planner{
 		g: g, index: index, seen: map[string]struct{}{subject.EntityID: {}},
 		targets: make([]LinkTarget, 0), blocked: make([]BlockedTarget, 0),
 	}
-
-	page, mapped := canonical(index, self)
-	switch {
-	case subject.PageID == "" && mapped:
-		plan.Context.PageID = page.ID
-		plan.Context.PageURL = page.Path
-	case subject.PageID != "" && mapped && page.ID != subject.PageID:
+	if subject.PageID != "" && mapped && page.ID != subject.PageID {
 		walk.targets = append(walk.targets, LinkTarget{
 			EntityID: self.ID, PageID: page.ID, URL: page.Path, Anchors: targetAnchors(self, g.Label(self.ID)),
 			Relation: RelationUp, Weight: 1,
@@ -121,9 +132,43 @@ func PlanLinks(g graph.Graph, index pagemap.Index, subject Subject, policy templ
 	}
 	walk.siblings(subject.EntityID, policy.Rules.SiblingMinWeight)
 
-	plan.Context.Targets = walk.targets
+	plan.Context.Targets = settle(walk.targets, index, plan.Context.PageID)
 	plan.Blocked = walk.blocked
 	return plan
+}
+
+func settle(targets []LinkTarget, index pagemap.Index, selfID string) []LinkTarget {
+	out := make([]LinkTarget, 0, len(targets))
+	at := make(map[string]int, len(targets))
+	for i := range targets {
+		target := targets[i]
+		if page, found := index.ByID(target.PageID); found {
+			if hub, twin := index.HubTwin(page); twin {
+				target.PageID, target.URL = hub.ID, hub.Path
+			}
+		}
+		if target.PageID == selfID {
+			continue
+		}
+		if held, dup := at[target.PageID]; dup {
+			out[held] = merged(out[held], target)
+			continue
+		}
+		at[target.PageID] = len(out)
+		out = append(out, target)
+	}
+	return out
+}
+
+func merged(kept, other LinkTarget) LinkTarget {
+	kept.Required = kept.Required || other.Required
+	kept.Weight = max(kept.Weight, other.Weight)
+	for _, anchor := range other.Anchors {
+		if !slices.Contains(kept.Anchors, anchor) {
+			kept.Anchors = append(kept.Anchors, anchor)
+		}
+	}
+	return kept
 }
 
 type planner struct {

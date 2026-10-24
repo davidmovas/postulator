@@ -62,7 +62,7 @@ func TestInspectDetectsEverySheetOnItsOwn(t *testing.T) {
 	if !slices.Equal(names, clientSheets) {
 		t.Fatalf("sheets = %v, want %v", names, clientSheets)
 	}
-	if groups := seen.Sheets[0].Detected.Options.LevelColumns; !slices.Equal(groups, []string{"Root Entity"}) {
+	if groups := seen.Sheets[0].Detected.Options.LevelColumns; !slices.Equal(groups, []string{"Root Entity", "Category", "Subcategory"}) {
 		t.Fatalf("the group sheet detects the levels %v", groups)
 	}
 }
@@ -169,11 +169,11 @@ func TestAWorkbookRequestSaysWhatItCannotRead(t *testing.T) {
 func TestTheRowBudgetIsSharedAcrossTheSheets(t *testing.T) {
 	t.Parallel()
 
-	h := newHarnessWithRows(t, 10)
+	h := newHarnessWithRows(t, 12)
 	if _, err := h.service.Preview(t.Context(), imports.PreviewRequest{
 		SiteID: h.siteID, Path: clientWorkbook, Sheets: sheetMappings("Groups", "Catalog"),
 	}); !errors.IsCode(err, errors.Invalid) {
-		t.Fatalf("Preview of twelve rows = %v, want the ten row budget refused", err)
+		t.Fatalf("Preview of fifteen rows = %v, want the twelve row budget refused", err)
 	}
 	h.workbookPreview(t, clientWorkbook, "Groups")
 }
@@ -288,7 +288,7 @@ func TestAWorkbookApplySavesTheMappingOfEachSheet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	if applied.Counts.EntitiesCreated != 8+5 {
+	if applied.Counts.EntitiesCreated != 11+5 {
 		t.Fatalf("counts = %+v, want the groups and the catalog written together", applied.Counts)
 	}
 

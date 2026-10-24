@@ -9,6 +9,7 @@ import {
     itemRunning,
     itemWaiting,
     pauseAwaitingParent,
+    pauseAwaitingReview,
     pauseNeedsHuman,
     statusCancelled,
     statusCompleted,
@@ -41,6 +42,9 @@ export type ItemAction = "accept" | "retry" | "regenerate" | "parent";
 export function primaryAction(item: RunItem): ItemAction | null {
     if (heldForParent(item)) {
         return "parent";
+    }
+    if (item.status === itemPaused && item.pauseReason === pauseAwaitingReview) {
+        return "accept";
     }
     if (item.status === itemPaused && item.pauseReason === pauseNeedsHuman) {
         return item.currentStep === stepValidate ? "accept" : "retry";

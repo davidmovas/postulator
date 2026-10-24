@@ -68,7 +68,7 @@ func TestTheSweepPurgesArtifactsAndEventsPastTheirRetention(t *testing.T) {
 
 	engine := runtime.New(runtime.Deps{
 		Runs: h.runs, Items: h.items, Artifacts: h.blobs, Execs: h.execs, Events: h.log,
-		Pages: sqlite.NewPageRepo(h.store), Specs: h.specs, Spend: h.spend,
+		Pages: sqlite.NewPageRepo(h.store), Specs: h.specs, Types: h.types, Spend: h.spend,
 		Keys: h.keys, Catalog: &stubCatalog{}, Profiles: &stubProfiles{}, Tuning: h.tuning,
 		UnitOfWork: h.store, Publisher: h.bus,
 	}, mustRegister(t, bodyStep(newCounter())), runtime.Config{

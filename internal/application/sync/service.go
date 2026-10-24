@@ -66,12 +66,24 @@ func (s *Service) SyncSite(ctx context.Context, req SyncSiteRequest) (SyncSiteRe
 		actor = kctx.ActorUser
 	}
 
+	recipe := run.SyncRecipe()
+	params := map[string]any{}
+	if req.Full {
+		params[run.ParamFullWalk] = true
+	}
+	if req.RenderRescan {
+		params[run.ParamRenderRescan] = true
+	}
+	if len(params) > 0 {
+		recipe[0].Params = params
+	}
+
 	queued, err := s.engine.Enqueue(ctx, run.Run{
 		ID:          id.New(),
 		SiteID:      record.ID,
 		Kind:        run.KindSync,
 		Targets:     []string{record.ID},
-		Recipe:      run.SyncRecipe(),
+		Recipe:      recipe,
 		PublishMode: run.PublishDraft,
 		CreatedBy:   actor,
 		CreatedAt:   s.now(),
@@ -108,7 +120,7 @@ func (s *Service) CheckPlugin(ctx context.Context, req CheckPluginRequest) (Chec
 	if updateErr := s.sites.Update(ctx, next); updateErr != nil {
 		return CheckPluginResponse{}, updateErr
 	}
-	return CheckPluginResponse{Plugin: pluginView(found.Plugin), Commerce: string(found.Commerce)}, nil
+	return CheckPluginResponse{Plugin: pluginView(found), Commerce: string(found.Commerce)}, nil
 }
 
 func (s *Service) PluginPackage(_ context.Context, _ PluginPackageRequest) (PluginPackageResponse, error) {

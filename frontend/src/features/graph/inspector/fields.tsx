@@ -6,19 +6,10 @@ import { fieldErrorOf, formErrorOf } from "../../../data/errors.js";
 import { useUpdateEntity } from "../../../data/hooks/graph.js";
 import type { Entity, Keyword } from "../../../data/types.js";
 import { keywordList, sameKeywords } from "../../../domain/keywords.js";
-import { entityKinds } from "../../../generated/vocab.js";
-import { Button, Field, Input, KeywordInput, Select, Textarea } from "../../../ui/index.js";
-import { entityKindLabel } from "../labels.js";
-import type { SelectOption } from "../../../ui/index.js";
-
-const kindOptions: readonly SelectOption<string>[] = entityKinds.map((value) => ({
-    value,
-    label: entityKindLabel(value),
-}));
+import { Button, Field, Input, KeywordInput, Textarea } from "../../../ui/index.js";
 
 interface Draft {
     name: string;
-    kind: string;
     intent: string;
     keywords: Keyword[];
 }
@@ -26,7 +17,6 @@ interface Draft {
 function draftOf(entity: Entity): Draft {
     return {
         name: entity.name,
-        kind: entity.kind,
         intent: entity.intent,
         keywords: keywordList(entity.keywords),
     };
@@ -52,7 +42,6 @@ export function EntityFields({ entity }: EntityFieldsProps): ReactElement {
     const base = draftOf(entity);
     const dirty =
         draft.name !== base.name ||
-        draft.kind !== base.kind ||
         draft.intent !== base.intent ||
         !sameKeywords(draft.keywords, base.keywords);
 
@@ -60,7 +49,6 @@ export function EntityFields({ entity }: EntityFieldsProps): ReactElement {
         update.mutate({
             id: entity.id,
             name: draft.name !== base.name ? draft.name : null,
-            kind: draft.kind !== base.kind ? draft.kind : null,
             intent: draft.intent !== base.intent ? draft.intent : null,
             keywords: sameKeywords(draft.keywords, base.keywords) ? null : draft.keywords,
         });
@@ -85,20 +73,6 @@ export function EntityFields({ entity }: EntityFieldsProps): ReactElement {
                         value={draft.name}
                         onChange={(event) => {
                             edit({ name: event.target.value });
-                        }}
-                    />
-                )}
-            </Field>
-            <Field label={copy.graph.form.kind} error={fieldErrorOf(update.error, "kind")}>
-                {(control) => (
-                    <Select
-                        id={control.id}
-                        aria-describedby={control["aria-describedby"]}
-                        invalid={control.invalid}
-                        value={draft.kind}
-                        options={kindOptions}
-                        onValueChange={(kind) => {
-                            edit({ kind });
                         }}
                     />
                 )}

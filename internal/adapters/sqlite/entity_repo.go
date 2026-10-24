@@ -10,14 +10,15 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const (
-	entityColumns         = `id, site_id, name, kind, intent, keywords, scope_entity_id, canonical_page_id, score, source, created_at, updated_at`
-	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	updateEntity          = `UPDATE entities SET name = ?, kind = ?, intent = ?, keywords = ?, scope_entity_id = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
+	entityColumns         = `id, site_id, name, intent, definition, facts, notes, keywords, scope_entity_id, canonical_page_id, score, source, created_at, updated_at`
+	insertEntity          = `INSERT INTO entities (` + entityColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	updateEntity          = `UPDATE entities SET name = ?, intent = ?, definition = ?, facts = ?, notes = ?, keywords = ?, scope_entity_id = ?, canonical_page_id = ?, score = ?, source = ?, updated_at = ? WHERE id = ?`
 	updateEntityScope     = `UPDATE entities SET scope_entity_id = ?, updated_at = ? WHERE id = ?`
 	updateEntityScore     = `UPDATE entities SET score = ? WHERE id = ?`
 	updateEntityCanonical = `UPDATE entities SET canonical_page_id = ?, updated_at = ? WHERE id = ?`
@@ -49,14 +50,47 @@ func anchorConflict(entityID string) *errors.Error {
 	return errors.New(errors.Conflict, "an anchor text is repeated").WithDetail("entityId", entityID)
 }
 
+type storedFact struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+type encodedEntity struct {
+	keywords string
+	facts    string
+	notes    string
+}
+
+func encodeEntity(e graph.Entity) (encodedEntity, error) {
+	var (
+		out encodedEntity
+		err error
+	)
+	if out.keywords, err = encodeJSON(keyword.New(e.Keywords)); err != nil {
+		return encodedEntity{}, err
+	}
+	facts := graph.CleanFacts(e.Facts)
+	stored := make([]storedFact, 0, len(facts))
+	for _, fact := range facts {
+		stored = append(stored, storedFact(fact))
+	}
+	if out.facts, err = encodeJSON(stored); err != nil {
+		return encodedEntity{}, err
+	}
+	if out.notes, err = encodeJSON(note.Clean(e.Notes)); err != nil {
+		return encodedEntity{}, err
+	}
+	return out, nil
+}
+
 func (r *EntityRepo) Insert(ctx context.Context, e graph.Entity) error {
-	keywords, err := encodeJSON(keyword.New(e.Keywords))
+	encoded, err := encodeEntity(e)
 	if err != nil {
 		return err
 	}
 	if _, err = execWrite(ctx, r.store.writeFrom(ctx), insertEntity, []any{
-		e.ID, e.SiteID, e.Name, string(e.Kind), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
-		e.Score, string(e.Source), formatTime(e.CreatedAt), formatTime(e.UpdatedAt),
+		e.ID, e.SiteID, e.Name, e.Intent, e.Definition, encoded.facts, encoded.notes, encoded.keywords,
+		nullString(e.ScopeID), nullString(e.CanonicalPageID), e.Score, string(e.Source), formatTime(e.CreatedAt), formatTime(e.UpdatedAt),
 	}, entityConflict(e.Name), "insert the entity"); err != nil {
 		return err
 	}
@@ -64,13 +98,13 @@ func (r *EntityRepo) Insert(ctx context.Context, e graph.Entity) error {
 }
 
 func (r *EntityRepo) Update(ctx context.Context, e graph.Entity) error {
-	keywords, err := encodeJSON(keyword.New(e.Keywords))
+	encoded, err := encodeEntity(e)
 	if err != nil {
 		return err
 	}
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), updateEntity, []any{
-		e.Name, string(e.Kind), e.Intent, keywords, nullString(e.ScopeID), nullString(e.CanonicalPageID),
-		e.Score, string(e.Source), formatTime(e.UpdatedAt), e.ID,
+		e.Name, e.Intent, e.Definition, encoded.facts, encoded.notes, encoded.keywords,
+		nullString(e.ScopeID), nullString(e.CanonicalPageID), e.Score, string(e.Source), formatTime(e.UpdatedAt), e.ID,
 	}, entityConflict(e.Name), "update the entity")
 	if updateErr := requireAffected(affected, err, entityNotFound(e.ID)); updateErr != nil {
 		return updateErr
@@ -171,9 +205,6 @@ func (r *EntityRepo) List(ctx context.Context, q graph.EntityQuery, page paging.
 	if q.SiteID != "" {
 		builder = builder.Where(squirrel.Eq{"site_id": q.SiteID})
 	}
-	if q.Kind != nil {
-		builder = builder.Where(squirrel.Eq{"kind": string(*q.Kind)})
-	}
 	if q.HasCanonicalPage != nil {
 		if *q.HasCanonicalPage {
 			builder = builder.Where("canonical_page_id IS NOT NULL")
@@ -249,16 +280,28 @@ func scanAnchor(rows *sql.Rows) (anchorRow, error) {
 
 func scanEntity(rows *sql.Rows) (graph.Entity, error) {
 	var (
-		e                    graph.Entity
-		kind, source         string
-		keywords             string
-		scope, canonical     sql.NullString
-		createdAt, updatedAt string
+		e                     graph.Entity
+		source                string
+		keywords, facts, held string
+		scope, canonical      sql.NullString
+		createdAt, updatedAt  string
 	)
-	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &kind, &e.Intent, &keywords, &scope, &canonical, &e.Score, &source, &createdAt, &updatedAt); err != nil {
+	if err := rows.Scan(&e.ID, &e.SiteID, &e.Name, &e.Intent, &e.Definition, &facts, &held, &keywords, &scope, &canonical,
+		&e.Score, &source, &createdAt, &updatedAt); err != nil {
 		return graph.Entity{}, err
 	}
-	e.Kind = graph.Kind(kind)
+	var stored []storedFact
+	if err := decodeJSON(facts, &stored, "decode the entity facts"); err != nil {
+		return graph.Entity{}, err
+	}
+	e.Facts = make([]graph.Fact, 0, len(stored))
+	for _, fact := range stored {
+		e.Facts = append(e.Facts, graph.Fact(fact))
+	}
+	if err := decodeJSON(held, &e.Notes, "decode the entity notes"); err != nil {
+		return graph.Entity{}, err
+	}
+	e.Notes = note.Clean(e.Notes)
 	e.Source = graph.Source(source)
 	e.ScopeID = optString(scope)
 	e.CanonicalPageID = optString(canonical)

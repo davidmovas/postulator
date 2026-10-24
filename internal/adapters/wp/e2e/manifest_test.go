@@ -15,6 +15,8 @@ type manifest struct {
 	SEOPlugin    string   `json:"seoPlugin"`
 	WPVersion    string   `json:"wpVersion"`
 	Site         string   `json:"site"`
+	PostTypes    []string `json:"postTypes"`
+	Taxonomies   []string `json:"taxonomies"`
 }
 
 func readManifest(t *testing.T, c *client) manifest {
@@ -30,15 +32,18 @@ func TestManifestDescribesTheSite(t *testing.T) {
 
 	got := readManifest(t, c)
 
-	if got.Version != "1.2.0" {
-		t.Errorf("version = %q, want 1.2.0", got.Version)
+	if got.Version != "1.5.2" {
+		t.Errorf("version = %q, want 1.5.2", got.Version)
 	}
-	want := []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"}
+	want := []string{
+		"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms", "settings",
+		"meta_write", "guarded_write",
+	}
 	if !slices.Equal(got.Capabilities, want) {
 		t.Errorf("capabilities = %v, want %v", got.Capabilities, want)
 	}
-	if got.SEOPlugin != env.seo {
-		t.Errorf("seoPlugin = %q, want %q", got.SEOPlugin, env.seo)
+	if want := standOf(t, env).seoPlugin; got.SEOPlugin != want {
+		t.Errorf("seoPlugin = %q, want %q", got.SEOPlugin, want)
 	}
 	if !regexp.MustCompile(`^\d+\.\d+`).MatchString(got.WPVersion) {
 		t.Errorf("wpVersion = %q, want a major.minor version", got.WPVersion)

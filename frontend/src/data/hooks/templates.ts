@@ -1,25 +1,24 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
-    createPolicy,
+    createPageType,
     createTemplate,
     deleteOverride,
-    deletePolicy,
+    deletePageType,
     deleteTemplate,
-    getEffectivePolicy,
-    getPolicy,
     getTemplate,
-    listPolicies,
+    listPageTypes,
     listTemplates,
     resolveForPage,
+    savePageType,
     setOverride,
-    updatePolicy,
+    setScope,
     updateTemplate,
 } from "../endpoints/templates.js";
 import { keys } from "../keys.js";
 import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
-import type { PolicySort, TemplateSort } from "../sorts.js";
-import type { LinkPolicy, PolicyFilter, Template, TemplateFilter } from "../types.js";
+import type { TemplateSort } from "../sorts.js";
+import type { Template, TemplateFilter } from "../types.js";
 
 export function useTemplates(
     filter: TemplateFilter = {},
@@ -43,11 +42,13 @@ export function useTemplate(id: string | null) {
     });
 }
 
-export function useResolvedTemplate(pageId: string | null) {
+export function useResolvedTemplate(pageId: string | null, templateId = "") {
+    const page = pageId ?? "";
     return useUnlockedQuery({
-        queryKey: keys.templates.resolved(pageId ?? ""),
-        queryFn: ({ signal }) => resolveForPage({ pageId: pageId ?? "" }, signal),
-        enabled: pageId !== null && pageId !== "",
+        queryKey: templateId === "" ? keys.templates.resolved(page) : keys.templates.resolvedWith(page, templateId),
+        queryFn: ({ signal }) =>
+            resolveForPage(templateId === "" ? { pageId: page } : { pageId: page, templateId }, signal),
+        enabled: page !== "",
     });
 }
 
@@ -107,62 +108,40 @@ export function useDeleteOverride() {
     });
 }
 
-export function usePolicies(filter: PolicyFilter = {}, sort: PolicySort | null = null, limit?: number) {
-    return useUnlockedInfinite<PolicyFilter, LinkPolicy>({
-        queryKey: keys.policies.list(filter, sort, limit),
-        fetch: listPolicies,
-        filters: filter,
-        sort,
-        limit,
-    });
-}
-
-export function usePolicy(id: string | null) {
+export function usePageTypes(siteId: string | null) {
     return useUnlockedQuery({
-        queryKey: keys.policies.detail(id ?? ""),
-        queryFn: ({ signal }) => getPolicy({ id: id ?? "" }, signal),
-        enabled: id !== null && id !== "",
-    });
-}
-
-export function useEffectivePolicy(siteId: string | null) {
-    return useUnlockedQuery({
-        queryKey: keys.policies.effective(siteId ?? ""),
-        queryFn: ({ signal }) => getEffectivePolicy({ siteId: siteId ?? "" }, signal),
+        queryKey: keys.sites.types(siteId ?? ""),
+        queryFn: ({ signal }) => listPageTypes({ siteId: siteId ?? "" }, signal),
         enabled: siteId !== null && siteId !== "",
     });
 }
 
-function usePolicyWrite<Request, Answer extends { policy: LinkPolicy }>(
-    call: (request: Request) => Promise<Answer>,
-) {
+function usePageTypeWrite<Request, Answer>(call: (request: Request) => Promise<Answer>, movesPages: boolean) {
     const client = useQueryClient();
     return useMutation({
         mutationFn: call,
-        onSuccess: (answered) => {
-            client.setQueryData(keys.policies.detail(answered.policy.id), answered);
-            void client.invalidateQueries({ queryKey: keys.policies.lists() });
-            void client.invalidateQueries({ queryKey: keys.policies.effectives() });
+        onSuccess: () => {
+            void client.invalidateQueries({ queryKey: keys.sites.typesAll() });
+            if (movesPages) {
+                void client.invalidateQueries({ queryKey: keys.pages.root() });
+                void client.invalidateQueries({ queryKey: keys.graph.fulls() });
+            }
         },
     });
 }
 
-export function useCreatePolicy() {
-    return usePolicyWrite((request: Parameters<typeof createPolicy>[0]) => createPolicy(request));
+export function useCreatePageType() {
+    return usePageTypeWrite((request: Parameters<typeof createPageType>[0]) => createPageType(request), false);
 }
 
-export function useUpdatePolicy() {
-    return usePolicyWrite((request: Parameters<typeof updatePolicy>[0]) => updatePolicy(request));
+export function useSavePageType() {
+    return usePageTypeWrite((request: Parameters<typeof savePageType>[0]) => savePageType(request), false);
 }
 
-export function useDeletePolicy() {
-    const client = useQueryClient();
-    return useMutation({
-        mutationFn: (request: Parameters<typeof deletePolicy>[0]) => deletePolicy(request),
-        onSuccess: (_answered, request) => {
-            client.removeQueries({ queryKey: keys.policies.detail(request.id) });
-            void client.invalidateQueries({ queryKey: keys.policies.lists() });
-            void client.invalidateQueries({ queryKey: keys.policies.effectives() });
-        },
-    });
+export function useDeletePageType() {
+    return usePageTypeWrite((request: Parameters<typeof deletePageType>[0]) => deletePageType(request), true);
+}
+
+export function useSetScope() {
+    return usePageTypeWrite((request: Parameters<typeof setScope>[0]) => setScope(request), false);
 }

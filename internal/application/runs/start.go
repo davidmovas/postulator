@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -131,8 +132,20 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	}
 
 	chosen := slices.Clone(targets)
+	if recipe, err = withRewrite(recipe, req.Rewrite, chosen); err != nil {
+		return planned{}, err
+	}
+	if recipe, err = run.ScopeRecipe(recipe, req.Fields); err != nil {
+		return planned{}, err
+	}
+	bodyKept := len(req.Fields) > 0 && !run.WritesBody(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish))))
+	if bodyKept {
+		if offSite := s.onTheSite(ctx, targets); offSite != nil {
+			return planned{}, offSite
+		}
+	}
 	added := make([]AddedPage, 0)
-	if kind.PageScoped() && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
+	if kind.PageScoped() && !bodyKept && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
 		if added, err = s.ancestors(ctx, siteID, targets); err != nil {
 			return planned{}, err
 		}
@@ -214,6 +227,32 @@ func (s *Service) resolve(ctx context.Context, siteID, pageID, templateID string
 	return resolved, nil
 }
 
+func (s *Service) Parents(ctx context.Context, req ParentsRequest) (ParentsResponse, error) {
+	siteID := strings.TrimSpace(req.SiteID)
+	if siteID == "" {
+		return ParentsResponse{}, invalid("name the site of the selection", "siteId")
+	}
+	targets, err := uniqueTargets(req.PageIDs)
+	if err != nil {
+		return ParentsResponse{}, err
+	}
+	for _, pageID := range targets {
+		page, getErr := s.pages.Get(ctx, pageID)
+		if getErr != nil {
+			return ParentsResponse{}, getErr
+		}
+		if page.SiteID != siteID {
+			return ParentsResponse{}, invalid("a selected page belongs to another site", "pageIds").
+				WithDetail("pageId", pageID).WithDetail("siteId", page.SiteID)
+		}
+	}
+	added, err := s.ancestors(ctx, siteID, targets)
+	if err != nil {
+		return ParentsResponse{}, err
+	}
+	return ParentsResponse{Added: added}, nil
+}
+
 func (s *Service) ancestors(ctx context.Context, siteID string, targets []string) ([]AddedPage, error) {
 	chosen := make(map[string]struct{}, len(targets))
 	for _, pageID := range targets {
@@ -267,29 +306,30 @@ func (s *Service) ancestors(ctx context.Context, siteID string, targets []string
 }
 
 func (s *Service) parentOf(ctx context.Context, child pagemap.Page) (pagemap.Page, bool, error) {
-	wanted := pagemap.ParentPath(child.Path)
-	if wanted == "" || wanted == "/" || child.WPType.StoreAddressed() {
+	if child.WPType.StoreAddressed() {
 		return pagemap.Page{}, false, nil
 	}
-
-	missing := invalid("the page map holds no page at "+wanted+", so "+child.Path+
-		" has no parent to sit under; add "+wanted+" to the page map first", "pageIds").
-		WithDetail("parentPath", wanted).WithDetail("path", child.Path)
+	above := pagemap.ParentPath(child.Path)
 	if child.ParentPageID == nil {
-		return pagemap.Page{}, false, missing
+		if above == "" || above == pagemap.RootPath || child.WPID != nil {
+			return pagemap.Page{}, false, nil
+		}
+		return pagemap.Page{}, false, invalid("the page map holds no page at "+above+", so "+child.Path+
+			" has no parent to sit under; add "+above+" to the page map first", "pageIds").
+			WithDetail("parentPath", above).WithDetail("path", child.Path)
 	}
 
 	parent, err := s.pages.Get(ctx, *child.ParentPageID)
 	if errors.IsCode(err, errors.NotFound) {
-		return pagemap.Page{}, false, missing
+		return pagemap.Page{}, false, invalid("the parent of "+child.Path+" is no longer in the page map; "+
+			"observe the site or fix the link on the Pages screen first", "pageIds").
+			WithDetail("path", child.Path)
 	}
 	if err != nil {
 		return pagemap.Page{}, false, err
 	}
-	if parent.Path != wanted {
-		return pagemap.Page{}, false, invalid(child.Path+" is linked to "+parent.Path+" while its path asks for "+
-			wanted+"; fix the link on the Pages screen first", "pageIds").
-			WithDetail("parentPath", wanted).WithDetail("linkedPath", parent.Path).WithDetail("path", child.Path)
+	if parent.Path == pagemap.RootPath {
+		return pagemap.Page{}, false, nil
 	}
 	return parent, true, nil
 }
@@ -318,9 +358,69 @@ func (s *Service) mapped(ctx context.Context, targets []string) error {
 		WithDetail("paths", unmapped)
 }
 
+func withRewrite(recipe []template.StepSpec, rewrite, chosen []string) ([]template.StepSpec, error) {
+	if len(rewrite) == 0 {
+		return recipe, nil
+	}
+	for _, pageID := range rewrite {
+		if !slices.Contains(chosen, pageID) {
+			return nil, invalid("a page whose own text may be rewritten must be one of the pages the run writes", "rewrite").
+				WithDetail("pageId", pageID)
+		}
+	}
+	writes := slices.ContainsFunc(recipe, func(step template.StepSpec) bool {
+		return step.Enabled && step.Name == string(run.StepGenerateBody)
+	})
+	if !writes {
+		return nil, invalid("the run writes no body, so it has no client text to rewrite", "rewrite")
+	}
+	listed := slices.Clone(rewrite)
+	slices.Sort(listed)
+	listed = slices.Compact(listed)
+	out := slices.Clone(recipe)
+	for at := range out {
+		if !out[at].Enabled {
+			continue
+		}
+		params := make(map[string]any, len(out[at].Params)+1)
+		for key, value := range out[at].Params {
+			params[key] = value
+		}
+		params[run.ParamRewrite] = slices.Clone(listed)
+		out[at].Params = params
+	}
+	return out, nil
+}
+
+func (s *Service) onTheSite(ctx context.Context, targets []string) error {
+	planned := make([]string, 0)
+	for _, pageID := range targets {
+		page, err := s.pages.Get(ctx, pageID)
+		if err != nil {
+			return err
+		}
+		if page.WPID == nil {
+			planned = append(planned, cmp.Or(page.Path, pageID))
+		}
+	}
+	if len(planned) == 0 {
+		return nil
+	}
+	return invalid("a run scoped to fields without the body writes only to pages on the site, and "+
+		strings.Join(planned, ", ")+" is not on it yet; publish it with a whole run first", "fields").
+		WithDetail("paths", planned)
+}
+
 func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]template.StepSpec, error) {
 	if kind == run.KindRevert {
 		return nil, invalid("a revert is started from the run it undoes, not from a list of pages", "kind")
+	}
+	if kind == run.KindEdit {
+		return nil, invalid("an edit is started from the one change a person confirmed, not from a list of pages", "kind")
+	}
+	if kind == run.KindRepair {
+		return nil, invalid("a repair run can no longer be started: the hierarchy is read from the site and never written, "+
+			"so there is nothing to repair; start a relink run to fix the links", "kind")
 	}
 
 	own, owns := kind.Recipe()
@@ -356,7 +456,7 @@ func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]templ
 }
 
 func ownerOf(step string) string {
-	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync, run.KindRevert} {
+	for _, kind := range []run.Kind{run.KindRelink, run.KindSync, run.KindRevert} {
 		own, _ := kind.Recipe()
 		if slices.Contains(stepsOf(own), step) {
 			return string(kind)

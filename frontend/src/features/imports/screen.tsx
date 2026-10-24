@@ -225,6 +225,8 @@ export function ImportScreen(): ReactElement {
             return (
                 <StepPreview
                     report={previewed.report}
+                    choices={flow.choices}
+                    onPick={flow.pick}
                     onBack={() => {
                         goto("columns");
                     }}

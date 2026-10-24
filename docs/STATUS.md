@@ -4,11 +4,541 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02,
-2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
-run is under **The gate**.
+**Released:** `v2.4.0` on 2026-10-04 (PR #30: the client's workbooks, the WooCommerce products,
+OpenAI only and the spend in view, the categories taken out again). **2.5.0 is built and waits in
+pull request #31 from `dev` to `master`** (https://github.com/davidmovas/postulator/pull/31), neither
+merged nor tagged: the site-model redesign (phase 14,
+2026-10-17 to 24) and the release work (phase 15, 2026-10-24), its notes under **Release 2.5.0**
+below and in the pull request's body. Its gate is under **The gate**.
+
+## Next, in order
+
+1. **The owner merges the pull request and tags `v2.5.0` on `master`**; the tag's workflow builds and
+   publishes the installer, the executable and the plugin zip.
+2. **Plugin 1.5.2 on the client's sites**, uploaded over the old one ("Replace current with
+   uploaded"); it installs on PHP 7.2 and WordPress 5.7, and 2.5.0 writes nothing through a plugin
+   below 1.5.1.
+3. **The first sync on a real site**, then the client's workbook, then typing and scoping; what to look
+   at first is under **Release 2.5.0**.
+4. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+   `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24); settle the
+   output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and whether tools load on demand
+   (`agent.toolLoading: deferred`). Until then the owner judges the writer by hand from
+   `go run ./cmd/tokenreport -prompts out/prompts`.
+
+## What Postulator does
+
+A Windows desktop application (Wails v3, Go 1.27, a local encrypted SQLite database, no server, no
+account) for one SEO specialist who runs dozens of WordPress and WooCommerce sites of up to a few
+thousand pages each. It builds **one structured model of each site** and edits the site's content
+through it; [`VISION.md`](VISION.md) is the longer version.
+
+- **The site, read as a model.** A sync walks every page of every public post type and the store's
+  categories: its identity and terms, its fields (title, excerpt, SEO meta, the product's
+  descriptions, custom fields by key), its body as blocks, what its public render adds (regions,
+  breadcrumbs, product grids, JSON-LD), its links by type, and a parent derived from its breadcrumbs
+  with the reason. Later syncs read only what changed; every tenth walks the whole site.
+- **Page types and field scopes.** The client names his types over six presets (Hub, Store category,
+  Catalog, Product, Entity, Technical) and enables, per type, the fields the writer may write, each
+  with an instruction, limits, a switch for rewriting his own text, and the link policy.
+- **The workbook, reconciled through findings.** Each row of his xlsx workbooks finds its page by
+  URL, slug, entity, title, H1 or SKU. What disagrees becomes a finding in the inbox (a row two
+  pages answer, a row no page answers, a parent the sheet and the site disagree on, a field changed
+  on the site, a page no entity carries), which he or the agent settles one at a time or a whole code
+  at once. The Site map shows the site by its derived hierarchy.
+- **The entity graph** says what links where: up to parents, down to children, sideways only to the
+  related pages the graph names. A page without an entity gets one through proposals named from the
+  site itself, with no model call.
+- **The writer's full picture.** Before it writes a field, the model sees the page's type, its entity
+  card, its breadcrumb path, its children and siblings, the products it lists, the keywords with
+  their volumes, the anchors, the notes and the field's own instruction and policy, fitted to a
+  budget.
+- **Edits that keep the client's text.** The body changes block by block. Every block we did not
+  write is the client's and stays byte for byte unless a run confirmed rewriting it. Nothing
+  structural (slug, status, parent, prices, stock, SKU, taxonomies, a variation's attributes) is
+  ever written to an existing page. Every write goes under the hash of what was read and keeps what
+  it replaced.
+- **Runs** generate, relink, sync and revert, scoped to chosen fields when asked, priced before they
+  start, resumed after a crash, and reviewed by a person, whole or field by field, when they write a
+  draft. A revert puts back per field and per block and hands back what the client changed since.
+- **The agent** in the dock works the same loop through the same use cases: it reads the model,
+  resolves findings, starts runs and edits a page field by field or block by block. Every write it
+  makes to a page waits for the person.
+
+## Release 2.5.0
+
+The notes as the pull request carries them, in short:
+
+- **What is new**: the site read as a model; page types and field scopes; the workbook reconciled
+  through findings; the writer's full picture; edits that keep the client's text; field-scoped runs;
+  the agent working the loop; revert per field and per block; pages without an entity made writable
+  through proposals; the Site map, the Findings inbox and screens that stay fast at 5,000 pages.
+- **What the client does**: upload `postulator-companion.zip` 1.5.2 over the old plugin on every site
+  (the Sites panel hands it out); connect a site with its address and an administrator's
+  application password; run the first sync (a first walk of 2,000 pages takes about half an hour at
+  the default four requests a second); import his workbook and settle the findings; give his pages
+  their types and scope the fields each type may write.
+- **What to look at first on a real site**: the Overview's observation summary (pages, types,
+  trails resolved), the Site map against the site's own breadcrumbs, the Findings inbox's counts by
+  code, and one page's Model tab and "What the writer will see".
+- **The known limits** are below; the first is that **no run has been made with a funded OpenAI key**.
+
+## Known limits at 2.5.0
+
+- **No live smoke test yet.** No run has been made with a funded key, so nothing a model call costs
+  has been compared with a bill. The input side of the estimate was adopted from offline
+  `o200k_base` counts (every measured input within ±25%); the output side stays conservative on
+  purpose (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3), and on-demand tool loading
+  (`agent.toolLoading: deferred`) stays off.
+- **The first real run's checks**: the ledger's `input_tokens` for each step (Settings → Models, or
+  `ModelsService.ListCalls`) against `go run ./cmd/tokenreport` for the same pages; then the live
+  probe's open tests and the seven checks before tool loading, under **Known gaps**.
+- **The plugin's floors**: PHP 7.2 and WordPress 5.7. Without the plugin, on WordPress below 6.0 or
+  WooCommerce below 6.9, the front page and the store's pages cannot be learned; Yoast 18.3 on the
+  oldest WordPress was not exercised.
+- **Scale**: the screens hold at 5,000 pages, but the writer's pack still reads a whole-site snapshot
+  (0.7 s at 2,000 pages, 4.6 s at 5,000), and a first walk is paced by the site's request limit.
+- **Bulk resolution** settles 1,000 findings per transaction; a refused batch stops the action and the
+  dialog says what was settled and what was not.
+- **At the window's least width with the dock open** the Site map fits; the Runs table still scrolls
+  sideways, the Models table cuts a model's name, and the rail shows a horizontal scrollbar at 600 px
+  high.
+- **The rest** is under **Known gaps**, each with its reason.
 
 ## Where we are
+
+**2026-10-24, phase 15 session 2: the polish, the docs, the build and the pull request.** The
+reasoning is under "phase 15, session 2" in `DECISIONS.md`; the task list is in the phase plan.
+
+- **The Site map fits beside the dock** (`1329d97`): the table measures itself and drops the links and
+  the children counts, then the parent's source, keeping the tree, the type, the body's state and the
+  findings; the page and type columns shrink before anything scrolls. The harness walk gains a `fits`
+  step, which fails a shot whose element scrolls sideways, and three Site map shots at 960 × 600 with
+  the dock open, narrow and wide; it fails on the Runs table there, as it should.
+- **The two oversized screen files are split** (`123fae2`, `004fc29`): the graph screen into its state
+  hook, its map view and its empty state (556 lines to 277 at most), the palette into its sections
+  and its list (332 to 181 at most), with the harness's graph and palette shots the same before and
+  after.
+- **Bulk resolution says what a refused batch left** (`b550336`, `b4efaca`): batches of 1,000 stay,
+  one transaction each, because one transaction over a 10,000-finding code would hold SQLite's writer
+  past the 5 s busy timeout (measured on the 5,003-page store); the dialog names what was settled,
+  what was not and why.
+- **2.5.0** (`8feaa56`): the version files, and `wails_tools.nsh`, so the installer stops registering
+  itself as 2.0.0.
+- **The docs**: STATUS for a fresh reader, VISION and ARCHITECTURE with the plugin's floors, the
+  findings, the Site map's `page_map` and the `edit` kind, CONTRACTS with `FindingsService`,
+  `SiteMap`, `Parents`, the proposals' `source`, 92 tools and the floors' proof, `CLAUDE.md` short.
+- Schemas unchanged (66,394 bytes and 14,779 tokens, 92 tools); migrations to 0074; plugin 1.5.2; 137
+  bound methods in 16 services.
+
+**2026-10-24, phase 15 session 1: what must hold before the client gets it.** The reasoning is under
+"phase 15, session 1" in `DECISIONS.md`; the task list and the checkpoint are in the phase plan.
+
+- **The owner's answers at the plan**: the run start's picker reads the Site map's tree; accepting a
+  site proposal approves its parent edge; the old-WordPress stand stays as `STAND=legacy`.
+- **The plugin** (agent P, `07d80d4`, `434f3fb`, `7ecb29f`):
+  - **Floors**: PHP 7.2 and WordPress 5.7.0 (`wp_robots`), proven by a function scan
+    (`tests/functions.php`) and strict tests on PHP 7.2.34, 7.4.33 and 8.5.12.
+  - **Version**: 1.5.2, with `wp.PluginMinimum` 1.5.1 still accepted.
+  - **The legacy stand** (WordPress 5.7.2, PHP 7.3, WooCommerce 6.5.2, Rank Math 1.0.98.1): the
+    contract suite ran 60 passed, with every skip naming what the stand lacks.
+- **Pages without an entity** (`d526041` to `0565751`, the screens `42bb440`, the proof `958d677`):
+  - **The finding**: `page_without_entity` per writable page.
+  - **The site proposal**: `contextpack.Map.EntityProposals` (no model call), behind
+    `PreviewFromPages{source: site}`.
+  - **The apply**: under the parent, with the edge approved and a clash skipped.
+  - **The person's path**: the inbox opens the proposal drawer, for one finding or the whole code.
+  - **The agent**: both proposal writers wait for the person in either mode.
+  - **The proof on the replica**: a planted product gets its entity under its category's twin hub,
+    then its run writes the description with no store key on the wire.
+- **The estimate's input side** (`692f710`, `faa5242`, `347a04e`):
+  - **The counter**: `llm.Tokens` at 1.7 tokens a word and 3.7 runes a token.
+  - **Overheads**: each step's own (writer 1,040, meta writer 440, linker call 290, judge 510 plus
+    the body it reads); none scales with the answer.
+  - **`Fit`**: it keeps a twentieth of its budget as headroom.
+  - **Result**: every measured input is within ±25% of its real count. It used to be 2 to 3.6 times
+    too high.
+- **Scale on a real store** (agent S, `99f7183` to `ad5e692`):
+  - **The test**: a seeded generator of 2,003 and 5,003 pages; the statements of the map, the
+    picker, the findings list, the pack, the estimate and the walk are equal at both sizes.
+  - **`page_map`** (0074): the folded map, kept fresh by triggers and a generation.
+  - **The reads**: the Site map and the findings read it by index.
+  - **The picker**: the run start's picker pages the map (`8f215d8`), with `RunsService.Parents`.
+- **The prompts** (`16553bd`): `go run ./cmd/tokenreport -prompts out/prompts` writes ten plain-text
+  files: the body writer, the meta writer and the judge on three replica pages, and an agent turn's
+  first round.
+- Schemas 66,394 bytes and 14,779 tokens (92 tools); the instructions with the replica's brief 1,929
+  tokens; migrations to 0074; plugin 1.5.2.
+
+**2026-10-24, stage 4.3b: the screens, the full gate, and phase 14 closed.** The reasoning is under
+"stage 4.3b" in `DECISIONS.md`; the task list and the checkpoint are under 4.3b in the phase plan.
+
+- **The owner's answers**: the Site map is its own screen and the Pages screen's Tree toggle is gone;
+  the flake is fixed (`66517ed`): a harness waits until its test's deadline, and the two scoped sweeps
+  took 25.7 to 72.9 s at one CPU, past the old fixed 20 s.
+- **Go** (`71de2ee` to `edffadf`): `contextpack.Map`, the site by derived parent with a store
+  category folded into its twin hub, read by the findings' subtree and the Site map; findings listed
+  and counted by page type and subtree with their pages named; `findings.Explain`, the one sentence
+  of a resolution; `findings.ResolveMany` for a code in one unit; `sitemodel.SiteMap`, a node's
+  children at a time; the import preview's pick of an ambiguous row's page (`choices`); a
+  `FindingsService` and `PagesService.SiteMap` (16 services); `vocab.ts` gains the match rules, the
+  bulk options, the option kinds and the body states.
+- **The screens** (one agent, `c45cfba` to `8d5fa5e`): the Findings inbox (codes with counts,
+  filters in the address, each option with its sentence and kind, who settled what, the agent card's
+  body in its confirmation, bulk by code); a run option opens the seeded run start or the rescan
+  dialog; the Site map (lazy branches, a hundred children a page, search and type as flat matches with
+  trails, twins, the page drawer); the import preview's "Found by" column and its pick; a card per op
+  for `pages_fields`, `pages_blocks` and `findings`.
+- **The harness** (`074b20c`, `993ad8a`): a client workbook it keeps in its home seeds an ambiguous
+  row, a row without a page and a differing trail; shots of the map and the inbox.
+- **The gate found one red**: `TestTheClientLoopFromTheSamples` had failed since 4.1 on a sample row
+  that named something after all; the sample is fixed (`b75063c`).
+- Schemas unchanged: 65,722 bytes and 14,623 tokens (92 tools); migrations to 0073; plugin 1.5.1;
+  bound services 16 (`FindingsService` with six methods, `PagesService.SiteMap`).
+
+**2026-10-24, stage 4.3a: real token counts beside bytes, and 4.2's two loose ends.** The reasoning is
+under "stage 4.3a" in `DECISIONS.md`; the task list and the checkpoint are under 4.3a in the phase plan.
+
+- **The tokenizer** (`c2b277a`): `tiktoken-go/tokenizer` v0.8.1. It counts `o200k_base` offline and is
+  imported only from `_test.go` files and `cmd/tokenreport`. `TestTheTokenizerStaysOutOfTheBinary`
+  proves `cmd/postulator` carries none of it. It is verified against the library's own vectors, and
+  every count the report makes is byte-identical under v0.10.0.
+- **Tokens beside bytes:**
+  - `schemaCeilingTokens` 14,626 for the schemas' 14,623 tokens (65,722 bytes) (`60344bb`).
+  - `instructionsCeilingTokens` 1,924 for the instructions with the replica's brief, 1,921 tokens
+    (`4bd0b17`). To make this measurable, the chat prompts moved into `application/agent`
+    (`f994786`).
+  - The stand captures load through `sitemodeltest` (`6ac52a2`).
+  - `runtime.EstimatedInput` is the estimate's input for one step (`0fe8dbe`).
+- **`go run ./cmd/tokenreport`** (`6058376`, `0d2cc0c`, `304eb41`, `85d3889`) is a report, not a gate.
+  - Every agent round sends 16,587 tokens on the replica before the conversation (3,668 with tools on
+    demand).
+  - The writer's prompt is 1,258 to 1,825 tokens on the eight measurable stand pages.
+  - The run estimate prices inputs at 2 to 3.6 times their real count.
+  - `llm.Tokens` counts a pack at 136% of its real tokens.
+  - The captured prose runs 1.77 tokens per word as a writer answers it.
+  - Proposed, not changed: 1.8 for `llm.WordTokens`, 1.7 tokens per word and 3.7 runes per token for
+    `llm.Tokens`; the writer's ceiling of 3 holds.
+- **The replica's client blocks** (`7caa03d`): `TestTheAgentEditsABlock` proves on `/tb-500/`, a hub
+  holding the client's two paragraphs and his link, that a run and the agent's edit keep them byte for
+  byte. Its first run found that six steps recorded a body's links with no region, resolved against
+  the site's root, while the observation records them in the content, resolved against the page. One
+  `observe.ContentLinks` now does both (`1c7bf8d`, plus `3207739`, the file that commit left out).
+  Green on both stands with the whole loop and the block-by-block edit.
+- **The runtime flake**, found and not fixed. The owner stopped the hunt after two runs.
+  - `TestATitleSweepIsAnsweredByTheFieldsStepAlone` and `TestAMetaSweepIsNotHeldOnAPageASaveWouldChange`
+    in `runtime/steps` time out under `-race` at one CPU.
+  - The working cause is starvation against the harness's fixed 20 s wait.
+  - Their timeout now names each item's state (`97671c1`).
+  - To reproduce: `go test -race -count=10 -cpu 1 -v ./internal/runtime/steps/`.
+- Schemas 65,722 bytes and 14,623 tokens (92 tools); migrations to 0073; plugin 1.5.1; no bound
+  method moved.
+
+**2026-10-23, stage 4.2: the agent works the loop.** The reasoning is under "The owner's answers at
+4.2's plan" and "4.2, decided while building" in `DECISIONS.md`; the task list, the checkpoint and the
+commands owed are under 4.2 in the phase plan.
+
+- **The owner's answers at the plan**: the agent's writes to a page's fields or blocks wait for the
+  person in either mode, resolving a finding and starting a run follow the mode; a title scoped
+  without the body is answered by one editor call.
+- **Part 0** (agent): gaps only from a row that plans its page (`8c6d75d`), a CSV's rows keyed by its
+  file (`c85378e`), a row named by its SKU has a key (`96a3874`), one `pagemap.TermParents`
+  (`71ea057`).
+- **The field-scoped run** (`112e73f`, `247124f`): the steps a scope does not need are disabled at the
+  start, publish requires only its fields' drafts and writes no body without it, `generate_meta`
+  writes from the page as it stands, the estimate prices the kept steps. A meta sweep over three
+  pages: 5,309 tokens against 55,941 for the whole recipe.
+- **The tools**: a call's risk from its arguments (`7dae806`); `findings` and `runs_start`'s `fields`,
+  `rewrite` and estimate card (`d1978f9`); every agent write a run of the kind `edit`, migration 0073
+  (`3c5e54e`, `85052a6`); `pages_fields` and `pages_blocks` (`57b5a91`); `pages_get` over
+  `sitemodel.Page`, `templates_resolve_for_page` and the explore `page` view gone (`d1691f4`);
+  `sites_update`'s detection settings (`111e9b2`).
+- **The instructions** (`20700b9`) and **the stands** (`1fa2d1e`): the agent's part of the reconcile
+  proof and `TestTheAgentEditsABlock` green on the replica, the block test and the reconcile proof on
+  vanilla, with `TestTheWholeLoopReachesTheDockerSite` and `TestTheAgentSeesTheSite`.
+- Schemas 65,722 bytes (92 tools, ceiling 65,735; 61,361 and 90 before); migrations to 0073; plugin
+  1.5.1.
+
+**2026-10-23, stage 4.1, second session: the findings last, and one use case resolves them.** The
+reasoning is under "The owner's answers to 4.1's first session" and "4.1, the second session" in
+`DECISIONS.md`; the checkpoint and the commands owed are under 4.1 in the phase plan.
+
+- **The owner's answers** (`92eb616`): a run scoped to chosen fields is 4.2's; a row that names only
+  an entity plans no page (`a480bbb`, failing first).
+- **4.1.4**: the row codes, `pagemap.RowKey` and their words (`f34a492`); the import persists
+  `row_ambiguous`, `row_without_page` and `parent_differs` and closes what it no longer raises
+  (`0c5a6e0`); the observation closes a row's finding once its page is on the site (`a64f5da`).
+- **4.1.5**: `application/findings` (`04caaf5`, `core.Findings`), `imports.MapRow` (`6e341ea`), a
+  page a person typed as regular is never detected technical again (`5a0fbd2`), a run scoped to the
+  fields publish writes (`9bc1f59`), a card accepted by the agent recorded as the agent's
+  (`8aac371`).
+- **4.1.6**: the client's sheets carry URL-less rows the replica answers (`4f4f62d`).
+- **4.1.7**: `TestTheWorkbookReconcilesWithTheSite` (`d13ff6c`, `4116950`), green on both stands
+  beside `TestTheWholeLoopReachesTheDockerSite`. On the replica the client's workbook updates 9
+  pages (4 by URL, 2 by slug, 2 by title, 1 by entity name), plans 13, finds no ambiguous row and
+  carries 2 entity-only rows; after one import and one sync the open findings are
+  `row_without_page` 14, `technical_detected` 7, `parent_differs` 3, `parent_unresolved` 1 and
+  `render_redirected` 1 (under "What the stands found at 4.1's close" in `DECISIONS.md`).
+- **4.1.8**: spec 16.8 and the docs.
+- Schemas unchanged (61,361 bytes, 90 tools); migrations to 0072; bound methods 129 (`StartRequest`
+  gains `fields`); plugin 1.5.1.
+
+**2026-10-23, stage 4.1, first session: the owner's three answers, the matcher, the workbook's
+hierarchy.** The reasoning is under 2026-10-23 in `DECISIONS.md`. The task list, the checkpoint
+and the commands owed are under 4.1 in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **Part 0, the owner's answers to stage 3's open questions:**
+  - `8013230`: our H1 goes in only where the theme prints none, one rule for every page; the
+    extraction records `theme_h1` (0071), `printed` on both stands.
+  - `5cfdee2`: a reverted variation description is accepted in the store's form and recorded as
+    the store answered it.
+  - `58e067d`: the title, excerpt and SEO fields compare with their entities decoded, so kses's
+    `&amp;` is no change, no pause and no finding.
+- **The re-plan** (`cb76bc3`): three sessions. The nine planned agent tools fold into
+  `pages_fields`, `pages_blocks` and `findings`, each with an `op` enum.
+- **4.1 so far:**
+  - `2e76024`: `pagemap.MatchRow`, one matcher (mapped, URL, slug, entity, title, H1, SKU).
+  - `a1f62eb`: the import matches every row through it, with or without a URL. A URL-less row
+    with no page is planned under the page its sheet trail names. The rows are `row_ambiguous`
+    or `row_without_page` in the preview, and the preview names each row's rule.
+  - `2f1813f`: the sheet's Category and Subcategory columns are the row's expected trail,
+    compared with the site's into `parent_differs` (`{sheet, site}`), cleared when they agree. A
+    person may pin the model's parent to the workbook.
+  - `079f791`: migration 0072.
+  - `b3e4f27`, `14e5cc2`: a finding a person settled stays settled while its facts stand, and
+    each option is a model change or a run.
+  - `7287d4e`: the resolution's writes.
+- **Owed in 4.1:** the row codes persisted with their lifecycle, `application/findings`
+  (`List`, `Resolve`), the samples' URL-less rows, `TestTheWorkbookReconcilesWithTheSite` on both
+  stands, and the gate legs listed in the checkpoint.
+- Schemas 61,361 bytes (90 tools, ceiling 61,374, from the `sku` column); migrations to 0072;
+  bound methods 129; plugin 1.5.1.
+
+**2026-10-20/21, stage 3 of the site model: editing the client's pages field by field and block by
+block, Part 0 to C.** The reasoning is under **stage 3** in `DECISIONS.md`; the task list, both
+sessions' checkpoints and the commands still owed are under stage 3 in
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **Part 0, the owner's rulings on stage 2's open items** (`c366e79` to `4d5762f`): the seeded types
+  carry their preset's template (0066); an existing page's status is never written and a draft run's
+  writes wait for a person's review; the canonical is written once, as WordPress's permalink; the
+  agent cannot switch a page into rewriting, or trash one, unseen; a relink's lost answer is
+  recognised; our links are ours by their mark.
+- **Part A, block operations and the field registry** (`3b4e1a4` to `0c130b2`): `domain/block`'s
+  operations keep every untouched byte; `application/edit` writes through a core, a store and a
+  plugin writer under the hash read; plugin 1.5.0 writes meta and SEO under expected hashes and says
+  whether a save is stable; `publish` writes every field through the registry, the body last.
+- **Part B, products through the registry** (`76fb97f` to `388ce72`): the attribute filling retired
+  (0067), the short description, variation descriptions, image alt and title, custom fields by key,
+  upsells and cross-sells as fields.
+- **Part C** (`4f27f48`, `d60922e` to `fb77a22`): the revert per field and per block; 0068 drops the
+  pages' old copies of the site (the site's title and H1 read from the fields, drift as the body's
+  move from its base, no canonical in the plan); 0069 drops the link origin and `pages_replace_links`
+  goes.
+- **What the stands found** (`76bc5e1` to `e2080f7`): a page the site's user may not edit stopped
+  every walk; a revert took our own variation description, which WooCommerce formats on every read,
+  for the client's edit. And the image step no longer draws over a page's or product's own image
+  (`7fe0c6c`).
+- **2026-10-22, G's safety work** (`462696c` to `c8aef9c`; the reasoning under "G's safety work" and
+  "What the closing review found" in `DECISIONS.md`, the checkpoint under stage 3 in the phase plan):
+  the owed stand runs are green (the block edit on both stands, vanilla after a fix to the test's own
+  whitespace comparison; the adapters group on an idle machine); a relink and a revert record what
+  the site stored and a relink keeps off a page its save would alter; `sync_back` keeps the base of
+  what the run wrote; our mark on a link is tied to the block that holds it (0070) and moves only
+  with our own changes to that block; the closing review's one blocking and five serious findings are
+  closed, each failing first: the plugin's save-stability probe covers the title and the excerpt
+  (**plugin 1.5.1**, required), the SEO record and the excerpt's base are what the site stored, a
+  revert gives `page_blocks_written` back, an older run's SEO meta is guarded, a lost answer keeps the
+  client's text on record, and our textless blocks survive a relink. Four minors are kept with their
+  reasons; one (`PublishResult.Blocks` as the composed diff) is open for the next session.
+- **2026-10-22/23, session 4** (`929613b` to `6441006`; the reasoning under "Session 4" in
+  `DECISIONS.md`):
+  - the publish result's blocks and `page_blocks_written` are what the site stored
+    (`block.Landed`, owner `site`);
+  - a person accepts a draft run's review field by field (`RetryStep.fields`; the agent's tool
+    keeps its schema);
+  - the page model answers the fields a run wrote, and the catalog whether a model may write each;
+  - the screens: the diff per field and per block, the review with its ticks, revert per field
+    from the run and the Pages drawer, the canonical as a person's switch, the confirmation
+    summaries, the plugin's capability labels; the harness seeds them;
+  - a field revert never trashes a page the run created;
+  - our H1 is never written into an existing page with no text of the client's (found on the
+    replica's main hub by the gate);
+  - two e2e fixes: the cancelled-run sync point, and the product proof's wire log.
+- The tool schemas stay at 61,343 bytes (90 tools, ceiling 61,356); bound methods 129; migrations to
+  0070; plugin 1.5.1.
+
+**2026-10-19, stage 2b of the site model: one read layer, the writer's pack and the agent's
+view. Stage 2 is done, its stand legs green on both stands on 2026-10-20.** The reasoning is
+under **stage 2b** in
+`DECISIONS.md`, the task list under 2b in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **Part 0, 2a's tail** (`c566586`, `ffb6d9f` to `814c8a1`, `0bc4a98`, `3242f6a`, `219e9b4`): page
+  types and scopes bound and on screen, policies and entity kinds gone from every screen.
+- **The read layer** (`02d3c78` to `2e494a1`, `b6b6e08`, `7737de6`): `domain/contextpack` reads a
+  snapshot of the model (a page's facts, its summary, the site's link form, the overview, gaps and
+  tree) and builds the writer's pack, fitted to a budget by priority; `application/sitemodel`
+  alone loads snapshots, a page's neighbourhood by ids inside one read-only `Store.Read`, and reads
+  the link audit through `reports`. Name twins and the site's link form live in `PlanLinks`.
+- **The writer** (`327c065`, `984af71`, `b016f50`, `a08f9ce`, `6abd188`): `generate_body`,
+  `generate_meta`, `repair_links` and the judge read the pack under `llm.inputBudget.<role>`,
+  refused in preflight when too small; with `rewrites` off the client's blocks are kept byte for
+  byte and ours added after them; a run may rewrite pages the person confirms at its start;
+  `generate_fields` writes the excerpt; `Sanitize` keeps a writer's link the policy allows.
+- **The agent** (`fef0134`, `62569de`, `42ce38b`, `905a895`, `f138c89`): a conversation on a site
+  opens with the site's brief, kept per conversation (0064, cache key `chat:<mode>:<siteId>`);
+  `sites_explore` (views page, tree, links, gaps, pack) replaces `pages_tree` and
+  `reports_link_audit_page`; the instructions teach the model's words; `graph_propose_cards`
+  files card proposals a person accepts on the Graph screen.
+- **The screens** (agent F, `dc79c7b`, `09b1472`, `d88b5ef`, `53a1aee`, `6c36e21`, `4fb5f0e`,
+  `e977d91`): the Pages drawer's Writer tab shows the pack as `Fit` left it and what it dropped;
+  input budgets in Settings → Models; the run start's confirmed rewrite switch; the run report's
+  fields; card proposals on the Graph screen; the agent's cards for `sites_explore` and proposals.
+- **The proofs** (agent H, `ff8b74c`, `e2789f0`, `cba2801`, `d3bc27a`; `676133b`):
+  `TestTheWriterSeesTheFullPicture`, the stand capture, `TestTheAgentSeesTheSite` and
+  `TestThePackOfEveryStandPage` compile, vet and lint; the harness seeds a writer pack and a card
+  proposal.
+- **The closing reviews** (`6fa8f1b` to `16515ed`): two whole-branch reviews found the writer
+  could still lose the client's content with rewrites off; every finding was closed with a test
+  that failed first (the guard on the client's own blocks for every write over an existing page,
+  a block-editor part of its own, relinks that splice, our blocks found by aligned renders, the
+  fields' live values, a card accepted as shown, twins as pages, the link's href form in 0065).
+  What stays open is listed under "What stays open" in `DECISIONS.md`.
+- The tool schemas went from 61,437 to 63,107 bytes (ceiling 63,120); `PagesService.WriterPack`
+  and the three card methods take the bound methods to 130.
+
+**2026-10-19, stage 2a of the site model landed in full** (its last five tasks as stage 2b's Part
+0; the reasoning under stage 2a in `DECISIONS.md`). The client names his page types over six
+presets in Settings → Page types, enables fields per type with an instruction, limits, a rewrites
+switch and the link policy, and a page's type shows with its source and reason in the drawer;
+the entity card (definition, facts, notes) is edited on the Graph screen; the Policies screen and
+every entity kind are gone. `task build` is green with no generated drift, `npm run typecheck`
+clean, 1663 vitest tests in 157 files. `TestThePageTypesFollowTheSite` waits for the stands at 2b's
+gate.
+
+**2026-10-18, stage 1c of the site model: 1b's gaps closed and the screens. Stage 1 is done.**
+The reasoning is under **stage 1c** in `DECISIONS.md`; the task list is under 1c in
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **The hierarchy follows the breadcrumbs.** A crumb resolves by its link against every modelled
+  page (a modelled page whose own visit lands on another is followed), else through the redirect
+  its link led to (looked up once in the render stage, kept on the crumb), else by its exact name
+  when it has no link or a dead one; one name candidate resolves, several are `parent_ambiguous`.
+  `pages.parent_method` (0055) says which. The front page is the root and no longer technical
+  (0056); a Home-only trail is weak; a parent loop is broken and named `parent_cycle`.
+- **The diagnosis**: the replica's mu-plugin linked a crumb to an address that answered 404, and
+  the derivation had no redirect and no name to fall back on; the third `parent_unresolved` was the
+  post's "Uncategorized", a post category archive the model never holds, and it stays.
+- **The replica carries every breadcrumb shape**: a hub linking its parent hub, a hub linking term
+  archives, a middle crumb with no link, a legacy category address answering 301 to a hub, a
+  nav-only trail beside a Home-only JSON-LD list, and a product with no description.
+- **Every root state is truthful**: `archive` (0057 recreates the render cache) for term pages, the
+  shop and the posts page; the state follows the body when the root is not located; a page whose
+  visit lands elsewhere keeps only its body's state and `render_redirected`. `not_found` is 0 on
+  both stands.
+- **Links are typed site-agnostically**: self links are dropped, `rel` tag, category and author
+  links are navigation, the listing rule holds outside the root, ARIA landmark roles count. The
+  replica's unknown links went from 39 to 2, vanilla's from 39 to 9.
+- **The derivation writes only what it owns** (`UpdateDerived`, `UpdateObservation`), and so do
+  the plugin probes (`UpdatePlugin`), so an edit made while a walk runs is kept.
+- **The screens**: the Pages drawer's **Model** tab (identity, the parent with its reason and
+  method, trails crumb by crumb, the render's root and regions, typed links, technical and
+  read-only reasons, blocks read-only, the open findings); the Links tab's type and source; the
+  Sites settings (User-Agent, render concurrency, full-walk cadence, link URL form) and a sync with
+  "Full walk" and "Render every page again"; the observation summary on Overview; Linking by type,
+  owed links contextual only. `PagesService.Model` and `ModelSummary` are bound; `vocab.ts` gains
+  the model's vocabularies.
+- **The UI harness** places nested pages with their breadcrumb, and its sync failure (the fake
+  listed trashed posts, which the plugin never does) is fixed.
+
+**2026-10-18, stage 1b of the site model.** The reasoning is under **stage 1b** in
+`DECISIONS.md`; the plan's task list is under 1b in
+`docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+
+- **The model exists.** Every page of a site, of any public post type plus the `product_cat`
+  term family, has an identity (`page_identity`), its terms (`page_terms`), its fields with a
+  current and a base value (`page_fields`), its body as blocks, current and base
+  (`page_bodies`, `page_blocks_written`), the extraction of its render (`page_renders`: the
+  content root, the regions, every trail, the JSON-LD facts, headings, word counts, the builder,
+  the URL form, the robots meta), typed links per source (`page_links` rebuilt), and a parent with
+  its reason, a technical reason and a read-only reason on `pages`. `findings` holds what the
+  observation disagrees with, `sites.settings` what a site is told. Migrations 0045 to 0054.
+- **`sync_site` is the observation**: five stages inside one step, each batch checkpointed, over
+  `application/observe`, incremental through `since` with a full walk every tenth and on demand
+  (`full`, `renderRescan`); renders fetched four at a time; `parent_unresolved`,
+  `plugin_outdated`, `field_changed_on_site`, `body_changed_on_site`, `render_unreachable`,
+  `builder_detected`, `technical_detected`, `page_title_differs`, `page_h1_differs`,
+  `parent_differs` and `url_form_mixed` are its findings, and nothing is merged silently.
+- **Nothing new is written to a site**: `publish` sends neither slug nor parent to an existing
+  page, `publish_parent` is the creation-only lookup, `repair_hierarchy` and the `repair`
+  recipe are gone, and every writer records the body it wrote as the page's base.
+- **The extraction reads the stands as they are**: Rank Math's and WooCommerce's JSON-LD shapes,
+  the fixture's own lists, a microdata-only breadcrumb nav (Blocksy), WooCommerce's list-less
+  nav, two `BreadcrumbList` objects on one page, the hubs' empty and shortcode-only raws. Goldens
+  from both stands live under `internal/domain/render/testdata`.
+- **A relative href resolves against the document on every side**; the plugin is **1.4.1**.
+- **A site has settings**: `sites.Update` and the `sites_update` tool take the User-Agent
+  override, the render concurrency, the full-walk cadence and the link URL form; every client the
+  registry builds, the connection test of a saved site included, sends the site's agent.
+- **A fresh whole-branch review closed the stage**: one body hash everywhere (our own write and
+  a product without a description raised `body_changed_on_site` before), the render stage skipping
+  archived pages with a stable finding subject, the site read outside the SQLite write unit, a
+  render batch reading its own bodies, `since` anchored on the site's own stamps, and the trail
+  cut at the page's own crumb. The minors it left are listed under stage 1b in `DECISIONS.md`.
+- **`TestTheSiteIsObservedIntoTheModel`** passes on both stands: vanilla 14 pages observed and
+  rendered, 2 trails resolved, 0 listings, 7 breadcrumb and 3 contextual links, shop, cart,
+  checkout, account, privacy and a noindex page technical; the replica 19 pages observed and
+  rendered, 4 trails resolved, 8 listings, 18 breadcrumb, 6 contextual and 79 listing links, the
+  front page and the store pages technical, and three `parent_unresolved` findings naming
+  Healing Peptides. The owner sees nothing new on screen yet: the model fills behind the Pages
+  screen.
+
+**2026-10-17, stage 1a of the site model.** The reasoning is under **the owner's answers** and
+**stage 1a** in `DECISIONS.md`.
+
+- **The companion plugin keeps its name and moves to 1.4.0.** It gains:
+  - `GET /content/{id}/rendered`, the content as `the_content` filters it inside a singular main
+    query;
+  - `GET /meta/{id}?keys=`, which reads only the keys asked and refuses a protected one;
+  - `GET /terms/{id}`, every taxonomy a post carries;
+  - `GET /settings`, the technical pages;
+  - on `/content`: `excerpt`, `terms` and every public type and taxonomy, the default still the
+    four types;
+  - a neutral `preview_token`, a noindex preview under Rank Math and Yoast, post routes that
+    answer content posts only, and an `uninstall.php` that keeps the SEO values.
+- **`normalize.php` classifies an href as `Site.Resolve` does**, the host with its port, which one
+  table proves on both sides.
+- **The client** sends a neutral `Mozilla/5.0` (with `wp.WithUserAgent`) and reads the post
+  types, routing by `rest_base`, the embedded terms and the site settings. It reads every new
+  plugin route, and the store's products, variations and pages as read-only facts.
+  `Capabilities.Outdated` names a plugin below 1.4.0 or missing a capability, and the Sites panel
+  says to upload the new zip over it.
+- **The two stands.**
+  - Vanilla runs on 8088: Twenty Twenty-Five, the block editor, nested pages.
+  - The replica of the client's first site runs on 8087: Classic Editor, Blocksy and Rank Math,
+    a mu-plugin injecting a breadcrumb nav and a product grid into the content with its JSON-LD,
+    hubs with an empty or a shortcode-only raw, flat pages, and variable products from a CSV.
+  - `task sandbox:provision STAND=` makes the owner's sandbox either stand on command.
+- **New client methods waiting for callers.** `GetRendered`, `GetMeta`, `GetTerms`,
+  `PluginSettings`, `PostTypes`, `SiteSettings`, `ListProducts`, `ListVariations` and
+  `StoreSettings` have no production caller yet. 1b's observation is their caller; they are
+  meant, not dead.
+
+**2026-10-17, stage 0 of the site-model redesign**: an audit, the contract and a design, no code.
+The client's sites exist and are edited, never rewritten, so Postulator becomes one structured
+model of a site (every page of every type: identity, fields, a body of blocks, the regions of its
+render, typed links, JSON-LD, a page type, a derived read-only hierarchy) filled by four providers
+behind a field registry, with the writer's context pack as the spine. The decision record and its
+reasoning are under **2026-10-17** in `DECISIONS.md`, the design is part 16 of the binding spec, and
+the four stages (observe read-only with the strengthened plugin and two docker stands; page types, field
+scopes and the context pack; editing as blocks and fields with revert; reconciliation, findings and
+the tools over the model) are in `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`. The
+audit found what the stages undo: every sync walks the whole site, the WordPress parent is read and
+dropped, the render is never kept, links carry no type or region, `publish` sends slug, status and
+parent on every write, the writer sees a fraction of the context pack, every request names the
+program in its User-Agent, and no custom post type or taxonomy can be observed. The owner answered
+the seven questions the same day (under **the owner's answers** in `DECISIONS.md`): the plugin
+keeps its name and the footprint ruling covers only what a visitor receives.
 
 **2026-10-03 and 04** answers the client's $10 of OpenAI spend that bought little, imports a
 whole workbook at once, and reads again the code that had been rewritten many times; the
@@ -32,8 +562,8 @@ the same day on his word. The reasoning is under the four sections of those date
 - **The agent runs on the same chain as the runs**, with a ledger row per attempt and its own
   `responses/1` history: a conversation from before keeps its transcript and the model forgets
   it. Its tool schemas went from 85,991 to 63,183 bytes a round; loading tools on demand
-  (`agent.toolLoading: deferred`, 6,506 bytes a round) is built and off until a funded key has
-  tried it.
+  (`agent.toolLoading: deferred`, 6,421 bytes a round as the registry test logs it today) is built
+  and off until a funded key has tried it.
 - **WordPress categories were built and removed the same day.** Records of their own
   (`categories`, `category_terms`, `pages.category_id`, migrations 0039 to 0041, after a first
   model as a flag on an entity that 0042 and 0043 undid) filed pages, posts and products under the
@@ -44,7 +574,9 @@ the same day on his word. The reasoning is under the four sections of those date
   row's Root group. The Catalog's products, which no Root names, sit under its Shop page by the URL
   tree.
 - **The companion plugin stays 1.2.0**: the 1.3.0 that filed pages under categories never shipped,
-  and the plugin's sources are those of `v2.3.0` again.
+  and the plugin's sources are those of `v2.3.0` again. Since 2026-10-12 it requires PHP 7.4, the
+  client's host, instead of 8.1; the released app's Sites panel still hands out the 8.1 header
+  until the next release.
 - **A workbook imports in one go**: one preview and one apply over the chosen sheets in the
   workbook's order, a tab per sheet, every finding naming its sheet, a scope clash caught in the
   preview, and a saved mapping or the sheet's own headers resolved before use, which is what makes
@@ -166,6 +698,357 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 
 ## The gate
 
+`go run ./cmd/tokenreport` (`-json` for JSON) belongs to every gate as a report, not a gate: it prints
+what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
+tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
+
+**2026-10-24, on Windows, at the close of phase 15 session 2, for 2.5.0. Green on the final code
+(`03265bc`), every leg, exit codes checked, one leg at a time:**
+
+- The comment check over 1,141 Go files and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`; `golangci-lint run ./...` and `--build-tags
+  uiharness`, then `task lint:e2e` alone: 0 issues each.
+- The five race groups, `-count=1` with coverage, in sequence: kernel and domain 28 packages (130 s);
+  application 22 at `-p 2` (758 s, `imports` 496 s); runtime 3 at `-p 1` (257 s); adapters 30 at
+  `-p 1 -timeout 30m` (618 s, `sqlite` 330 s); app, transport, cmd and frontend 10 at `-p 1` (510 s).
+  `covergate` over the five profiles merged one line per block: domain and application 88.05% of
+  17,800 statements (gate 80%), total 87.66% of 35,629 (gate 70%).
+- `go test -count=1 ./internal/app/scale/` (it skips under `-race`), 91 s.
+- `task plugin:lint` and `task plugin:test` on PHP 7.2.34, 7.4.33 and 8.5.12: 14 files parse clean;
+  the function scan (112 functions, 23 hooks, the newest `wp_robots_no_robots` at 5.7.0), 53 href
+  cases and 35 meta-key cases on each.
+- `task build VERSION=2.5.0` (246 s) with no generated drift; its first try stopped on a transient
+  `EBUSY` while `npm ci` emptied `node_modules`, and the retry was clean. The executable's file
+  version is 2.5.0.0.
+- `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 1,954 tests in 188 files (181 s);
+  `task ui:lint`, the harness tests in 124 s. The walk's three Site map shots at 960 × 600 with the
+  dock open pass `fits`.
+- **The replica**, after `task e2e:reset` and `task plugin:deploy`: `task e2e:full -- -v`, 14 passed
+  and 2 skipped by design, 553 s; taken down.
+- **Vanilla**, the same: `task e2e:full -- -v`, 12 passed and 4 skipped by design, 375 s; then `task
+  e2e:full:noplugin`, 176 s; the plugin restored with `e2e:up`; taken down.
+- `task package VERSION=2.5.0`: `bin/postulator-amd64-installer.exe`, 13,995,424 bytes, product and
+  file version 2.5.0. `task plugin:zip`: `bin/postulator-companion.zip`, 15,098 bytes, plugin 1.5.2,
+  `Requires PHP: 7.2`, `Requires at least: 5.7`, packed by the same `plugin.Pack` the Sites panel
+  uses.
+- `go run ./cmd/tokenreport`: 92 tools, 66,394 bytes and 14,779 tokens of schema, unchanged; a
+  deferred round would send 7,671 bytes and 1,704 tokens of tools.
+
+**2026-10-24, on Windows, at the close of phase 15 session 1. Green on the final code, every leg:
+the record below, then the owed legs run on the owner's word the same evening.**
+
+- **The owed legs, run green.** Every other race profile came from the record below, on the same Go
+  code.
+  - **The application race group**, in three foreground chunks, each with its own profile:
+    `imports` (193 s); `graph` and `tools`; the other 21 packages at `-p 2`.
+  - **`covergate`** over all eight profiles, merged one line per block: domain and application
+    88.05% of 17,800 statements (gate 80%), total 87.66% of 35,629 (gate 70%).
+  - **The replica, from a fresh reset after `task plugin:deploy`**: `internal/e2e` in its own order,
+    in three chunks; 14 passed and 2 skipped by design.
+    - **The first run found one red**: `TestTheWriterSeesTheFullPicture` read the client's hub
+      `/healing-peptides/` with a link sentence that the proposal proof's run had relinked into it.
+      The planted product had been deleted, but the sentence stayed. The proof now reverts its run
+      and asserts the hub is back byte for byte (`feaf2d6`); a second run from a fresh reset was
+      green throughout.
+  - **Vanilla, from a fresh reset**: the same three chunks, 12 passed and 4 skipped by design. Then
+    `task e2e:full:noplugin`, the plugin restored with `e2e:up`, and the stand taken down.
+
+The first record, from before the owner's word:
+
+- **Run and green on the final code:**
+  - `task build` with no generated drift;
+  - `go vet` plain, `-tags e2e` and `-tags uiharness`; `gofmt -l .` silent; the comment check;
+  - `golangci-lint run ./...` and `--build-tags uiharness`, then `task lint:e2e` alone, 0 issues
+    each;
+  - the race groups:
+    - kernel and domain, 28 packages;
+    - runtime at `-p 1`, `runtime` 157 s and `steps` 67 s;
+    - adapters at `-p 1 -timeout 30m`, 28 packages with `sqlite` at 458 s. `wptest` failed once
+      inside the group, every failure a dial to the fake's own 127.0.0.1 port timing out on a
+      loaded machine; alone it passed in 5 s;
+    - app, transport, cmd and frontend at `-p 1`, 10 packages;
+  - `go test -count=1 ./internal/app/scale/` (it skips under `-race`), 113 s;
+  - `task plugin:lint` and `task plugin:test` on PHP 7.2.34, 7.4.33 and 8.5.12;
+  - `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 1,943 tests in 187 files;
+    `task ui:lint`, the harness in 195 s;
+  - `go run ./cmd/tokenreport`: 92 tools, 66,394 bytes and 14,779 tokens; every measured input
+    within ±25%.
+- **On the stands, before the gate:**
+  - the replica's fresh capture, then `TestAProductWithoutAnEntityIsWrittenThroughAProposal`, green;
+  - the legacy stand's contract suite (agent P), 60 passed and none failed.
+- **Stopped by the memory guard, owed.** Other sessions held the machine; once the WSL VM had kept
+  7.3 GB of cache, 1.3 GB stayed free.
+  - The application race group: `internal/application/...`. The packages S touched passed race at
+    `-p 1` during S's work, and every application package passed without race during the session.
+  - Therefore `covergate`.
+  - The replica's `e2e:full`, stopped while it compiled; no test had finished, and vanilla's was
+    never started.
+- **The commands owed**, one at a time on an idle machine (`wsl --shutdown` first frees the VM's
+  cache; Docker Desktop then needs a start). The merge keeps one line per block, because a package
+  measured twice would otherwise count twice:
+  ```
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov1.out ./internal/kernel/... ./internal/domain/...
+  go test -race -count=1 -p 1 -timeout 40m -covermode=atomic -coverprofile=cov2.out ./internal/application/...
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 1 -timeout 40m -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  awk 'FNR==1{next} {k=$1" "$2; if (!(k in c) || $3>c[k]) c[k]=$3} END {print "mode: atomic"; for (k in c) print k, c[k]}' cov1.out cov2.out cov3.out cov4.out cov5.out > coverage.out
+  go run ./cmd/covergate
+  task e2e:reset STAND=replica ; task plugin:deploy STAND=replica ; task e2e:full STAND=replica -- -v ; task e2e:down STAND=replica
+  task e2e:reset STAND=vanilla ; task plugin:deploy STAND=vanilla ; task e2e:full STAND=vanilla -- -v
+  task e2e:full:noplugin STAND=vanilla ; task e2e:up STAND=vanilla ; task e2e:down STAND=vanilla
+  ```
+
+**2026-10-24, on Windows, at the close of stage 4.3b and phase 14. Green on the final code, every
+leg.**
+- `go build ./...`; `go vet ./...`, `-tags e2e` and `-tags uiharness`; `gofmt -l .` silent; the
+  comment check; `golangci-lint run ./...`, `--build-tags uiharness` and `task lint:e2e` (alone), 0
+  issues each.
+- `go test -race -count=1` in five groups: kernel and domain (28 packages), application (22),
+  runtime at `-p 1` (3; `runtime` 187 s, `steps` 71 s), adapters at `-p 1 -timeout 30m` (sqlite 258 s,
+  `TestMigrationsRoundTrip` to 0073 within it), app, transport, cmd and frontend (11);
+  `go run ./cmd/covergate`: domain and application 88.43% of 17,008 statements (gate 80%), total
+  87.81% of 34,463 (gate 70%).
+- The flake's check: `go test -race -count=3 -cpu 1 -timeout 60m ./internal/runtime/steps/`, 839 s.
+- `task plugin:lint` and `task plugin:test` on PHP 7.4 (53 href cases, 35 meta-key cases).
+- `task build` with no generated drift; `npm run typecheck`; `npm run test:run -- --maxWorkers=2`,
+  1,934 tests in 185 files; `task ui:lint` (the harness tests in 115 s); the harness window seen on the
+  inbox and the map.
+- `go run ./cmd/tokenreport`: the schemas did not move.
+- **The replica**, after `task e2e:reset` and `task plugin:deploy`: stage 4's exit tests
+  (`TestTheWorkbookReconcilesWithTheSite`, `TestTheAgentEditsABlock`, `TestTheAgentSeesTheSite`,
+  `TestTheWholeLoopReachesTheDockerSite`, 152 s); then from a fresh reset `TestTheSiteIsObservedIntoTheModel`
+  alone for the census, and `task e2e:full` (13 passed, 2 skipped by design, 754 s with the reset). The
+  first `e2e:full` failed `TestTheClientLoopFromTheSamples`, fixed in `b75063c` and run again in full.
+- **Vanilla**, the same: the exit tests (`TestTheAgentSeesTheSite` skips there), the census,
+  `task e2e:full` (10 passed, 5 skipped by design), `task e2e:full:noplugin`, the plugin restored, 656 s
+  in all. Both stands were taken down.
+
+**2026-10-24, on Windows, at the close of stage 4.3a. Green, with the flake owed.**
+- **Run and green:**
+  - `go build ./...`; `go vet ./...` and its `-tags e2e` and `-tags uiharness` builds.
+  - `gofmt -l .` silent; the comment check; `golangci-lint run ./...` 0 issues; `task lint:e2e` 0
+    issues.
+  - `go test -race -count=1 -p 2` over the packages 4.3a touched, ten packages in 494 s: `cmd/tokenreport`,
+    `tools`, `sitemodel`, `application/agent`, `observe`, `transport/agent`, `runtime`, `runtime/steps`
+    and `app`, with `sitemodeltest` holding no tests.
+  - `go run ./cmd/tokenreport`, plain and `-json`.
+  - On the replica, then vanilla, each after `task plugin:deploy`: `TestTheAgentEditsABlock`,
+    `TestTheWholeLoopReachesTheDockerSite` and `TestAnExistingPageIsEditedBlockByBlock`. Both stands
+    were taken down and Docker Desktop stopped.
+- **The flake hunt**:
+  - `-race -count=10 -p 1 ./internal/runtime/...` was green in 3,219 s.
+  - The same with `-cpu 1,4` failed two scoped sweeps in `runtime/steps` at one CPU (8,484 s).
+  - The owner stopped the hunt there; the fix is owed.
+- **Not run, 4.3b's:** race in five groups, `covergate`, the whole vitest, `ui:lint`, the stands' full
+  suites.
+
+**2026-10-23, on Windows, at the close of stage 4.1. Partial: the memory guard stopped the adapters
+race group.**
+- **Run and green:** on the replica, then vanilla, each after `task plugin:deploy`:
+  `TestTheWorkbookReconcilesWithTheSite` and `TestTheWholeLoopReachesTheDockerSite` (no draft of
+  ours carries an H1, the first stand run of that assertion); both stands taken down. `task lint:e2e`
+  0 issues; `task build` with no generated drift; `npm run typecheck`; `go test -race -count=1 -p 2
+  -covermode=atomic` over kernel and domain, application and runtime. Every touched package's
+  tests, golangci-lint and `gofmt` during the session; the comment check.
+- **Not finished:** the adapters race group. Its first run hit the default 10-minute test timeout
+  in `internal/adapters/sqlite` (57 s without race; the package has outgrown ten minutes under the
+  race detector); the rerun with `-timeout 30m` was stopped by the session's memory guard. Owed, one
+  at a time on an idle machine:
+  ```
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  (merge cov1.out to cov5.out into coverage.out) ; go run ./cmd/covergate
+  cd frontend ; npm run test:run -- --maxWorkers=2 ; cd .. ; task ui:lint
+  ```
+
+**2026-10-23, on Windows, stage 3's gate, completed after the memory freed. Green on the final
+code.**
+- **Second run, every owed leg, one at a time:**
+  - `go test -race` green over runtime (3 packages), adapters with `-p 1` (30) and app, transport,
+    cmd and frontend (9);
+  - `go run ./cmd/covergate`: domain+application 88.84% of 15,168 (gate 80%), total 88.14% of
+    31,508 (gate 70%);
+  - `task build` green with no generated drift; `npm run typecheck` clean; `npm run test:run` 1,790
+    tests in 170 files; `task ui:lint` 0 issues, the harness suite in 226 s;
+  - the replica: `e2e:full` from a fresh reset (566 s);
+  - vanilla after `task plugin:deploy`: the six contract tests, the four exit tests (the
+    restricted-user test skips there), `e2e:full` from a fresh reset (247 s), and
+    `e2e:full:noplugin` (42 s).
+- **What the second run found, each closed with a test that failed first:**
+  - `a7e5d68`: the restricted-user proof left its kept page with our text, which failed the
+    writer's proof later in the same suite;
+  - the no-plugin revert answered `restored` while our body stood.
+- Both stands were taken down.
+
+The first run's record follows. It was partial: the memory guard stopped the runtime race group
+and the replica's fresh `e2e:full` while another workload held about 5 GB.
+- **Run and green:**
+  - `gofmt -l .` silent; the comment check; `go vet` plain, `-tags uiharness` and `-tags e2e`
+    clean; `golangci-lint run` plain and `--build-tags uiharness` 0 issues; `task lint:e2e` alone
+    0 issues;
+  - `task build` green with no generated drift at `11f095c`, the last commit that changed a bound
+    shape;
+  - `go test -race -count=1 -p 2 -covermode=atomic` over kernel and domain (28 packages) and
+    application (21 packages);
+  - `TestMigrationsRoundTrip` to 0070; `task plugin:lint` (12 files) and `task plugin:test` (53
+    href cases, 35 meta-key cases) on PHP 7.4;
+  - on the replica after `task plugin:deploy`: the six plugin contract tests, and the four exit
+    tests on the final code (`TestAnExistingPageIsEditedBlockByBlock`,
+    `TestTheSiteFiltersAreRespectedUnderARestrictedUser`, `TestAProductIsEditedThroughTheRegistry`,
+    `TestTheProductLoopEditsWhatTheClientCreatedInTheStore`, 188 s);
+  - `TestTheClientLoopFromTheSamples` alone after its fix;
+  - the packages each fix touched (`block`, `steps`, `runs`, `tools`, `runtime`, `observe`,
+    `pagetypes`, `transport/wails`);
+  - the agents' runs: vitest 1,790 tests in 170 files, and the harness suite in 609 s (both
+    before `9499faa` and `8acd0ec`).
+- **The first replica `e2e:full`** (on a stand the exit tests had edited) failed two tests: the
+  client loop's sync point, fixed in `6441006`, and the writer's picture, which refuses an edited
+  stand. Its rerun from a fresh reset was stopped by the memory guard while provisioning; the stand
+  was taken down.
+- **The commands the second run used, one at a time on an idle machine:**
+  ```
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
+  go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  (merge the five profiles into coverage.out) ; go run ./cmd/covergate
+  task build ; git status --short
+  cd frontend ; npm run typecheck ; npm run test:run -- --maxWorkers=2 ; cd ..
+  task ui:lint
+  task e2e:reset STAND=replica ; task plugin:deploy STAND=replica ; task e2e:full STAND=replica ; task e2e:down STAND=replica
+  task e2e:up STAND=vanilla ; task plugin:deploy STAND=vanilla
+  E2E_STAND=vanilla go test -tags e2e -count=1 -run 'TestMetaWritesOnlyWhatTheUserMayEdit|TestTheRawWriteAnswersWhatWasStored|TestSaveStabilityFollowsTheUsersFilters|TestSEOMetaWritesUnderTheHashesRead|TestManifestDescribesTheSite|TestMetaReadsOnlyTheKeysAsked' ./internal/adapters/wp/e2e/
+  E2E_STAND=vanilla go test -tags e2e -count=1 -timeout 45m -run 'TestAnExistingPageIsEditedBlockByBlock|TestTheSiteFiltersAreRespectedUnderARestrictedUser|TestAProductIsEditedThroughTheRegistry|TestTheProductLoopEditsWhatTheClientCreatedInTheStore' ./internal/e2e/
+  task e2e:reset STAND=vanilla ; task plugin:deploy STAND=vanilla ; task e2e:full STAND=vanilla
+  task e2e:full:noplugin STAND=vanilla ; task e2e:up STAND=vanilla ; task e2e:down STAND=vanilla
+  ```
+
+**2026-10-20, on Windows, stage 2b's stand legs on both stands. Green on the final code
+(`07d4b70`).**
+- **The captures, from fresh resets:** the replica's `sitemodel/testdata/replica` holds 23 pages,
+  6 entities, 4 edges, 6 types, 20 bodies, 23 renders, 703 links and 9 open findings, and
+  vanilla's holds 14 pages, 2 entities, 1 edge, 6 types, 12 bodies, 14 renders, 148 links and 7
+  open findings. `TestThePackOfEveryStandPage` goldens every page of both stands, each within
+  3,000 tokens; both goldens were read line by line before they were committed.
+- **The first runs found nine things**, seven in the replica's capture, exit tests and first
+  `e2e:full` and two in vanilla's golden and writer test, all listed under stage 2b in
+  `DECISIONS.md` (`e1a52eb` to `07d4b70`). A second replica run was stopped during its reset by the machine's
+  memory, before any test ran.
+- **The final runs, each from a fresh reset, one stand at a time:** `task e2e:full STAND=vanilla`
+  (522 s, the reset included) 7 passed and 3 skipped. `task e2e:full STAND=replica` (559 s) 8
+  passed and 2 skipped. The skips are by design: the capture skips without `E2E_CAPTURE`, the
+  degraded loop skips while the plugin is active, and `TestTheAgentSeesTheSite` skips on vanilla.
+  The replica's brief is 681 bytes, and the `/peptides/` body pack through `sites_explore` is 880
+  tokens of a 4,096-token budget with nothing dropped. Both stands were taken down and Docker
+  Desktop was stopped.
+- **After the fixes:** `go test -race` over `block`, `contextpack`, `sitemodel` and `observe`
+  green; `go test` of `render`, the other caller of `Body.Shortcodes`, green; `golangci-lint` on
+  `block` and `contextpack` and `task lint:e2e` 0 issues; `gofmt` silent; `go vet -tags e2e`
+  clean.
+- **Not run in this round:** `task e2e:full:noplugin`, which belongs to stage 1b's legs, and the
+  frontend legs, which nothing in this round touched.
+
+**2026-10-19, on Windows, at the close of stage 2b. Everything that runs without Docker is
+green; the stand legs wait for it.**
+- **Run and green on the final code:** `gofmt -l .` silent; the comment check; `go vet ./...`,
+  `go vet -tags e2e` and `go vet -tags uiharness` clean; `golangci-lint run`, its `uiharness` build
+  and `task lint:e2e` (alone) 0 issues; `task build` green in 90 s with no generated drift;
+  `go test -race` in five groups (kernel and domain, application, adapters, runtime, transport with
+  app and cmd) all green, the groups the closing fixes touched run again after them;
+  `go run ./cmd/covergate` 88.44% on domain and application and 88.37% overall, every kernel
+  package at 96% or more; `npm run typecheck` clean; `npm run test:run` **1728 tests in 162
+  files** with two workers; `task ui:lint` green (the harness's tests in 129 s).
+- **Not run, Docker being down for the whole stage**, one stand at a time, the replica first:
+  ```
+  task e2e:reset STAND=replica
+  $env:E2E_CAPTURE='1'; task e2e:full STAND=replica -- -run TestTheStandModelIsCaptured
+  Remove-Item Env:E2E_CAPTURE
+  go test ./internal/application/sitemodel -run TestThePackOfEveryStandPage -update-packs
+  task e2e:full STAND=replica -- -run 'TestThePageTypesFollowTheSite|TestTheWriterSeesTheFullPicture|TestTheAgentSeesTheSite' -v
+  task e2e:full STAND=replica
+  task e2e:down STAND=replica
+  ```
+  then the same with `STAND=vanilla` (`TestTheAgentSeesTheSite` skips there). Review the two
+  `packs.golden` files before committing them; the agent test prints the replica's brief and the
+  hub's pack.
+
+**2026-10-18, on Windows, at the close of stage 1c. Partial: the machine ran out of memory before
+the heavy legs.**
+- **Run and green on the final code:** `gofmt -l .` silent; the comment check; `go vet ./...`,
+  `go vet -tags e2e` and `go vet -tags uiharness` clean; `golangci-lint run` and `task lint:e2e`
+  (alone) 0 issues; `task build` green in 212 s with no generated drift; `npm run typecheck`
+  clean; `npm run test:run` **1604 tests in 151 files** with two workers (the first full run had
+  eight workers fail to start under memory pressure, no test failing). Every package this stage
+  touched passed its tests on its own (`pagemap`, `observe`, `sqlite`, `reports`, `pages`,
+  `transport/wails`, `app`, `runtime/steps`, `render`, `wp`, `wptest`, `finding`, `vocabgen`), and
+  the harness's `TestTheSeededSiteIsObservedIntoTheModel` and `TestASyncKeepsThePagesTheSiteStillHolds`
+  pass. `TestTheSiteIsObservedIntoTheModel` passes on both stands with the full wiring (replica 23
+  pages, vanilla 14).
+- **1b's three legs** at the start of the stage: `task e2e:full:noplugin STAND=vanilla` green
+  (288 s), `task e2e:up STAND=vanilla` restored the plugin, and `task ui:lint` found the harness's
+  sync test red (the fake listed trashed posts), fixed in `63d009e` and green alone; a rerun of the
+  whole `ui:lint` was invalidated by an edit made during it.
+- **Not run, for the owner to run one at a time:** `go test -race -count=1 -p 2 -covermode=atomic`
+  in the five groups and `go run ./cmd/covergate` (the run's first group failed to start the
+  linker, `0xc0000142`, with about a gigabyte free, and the session's memory guard then stopped
+  it); `task ui:lint`; `task e2e:test` on both stands; `task e2e:full` on both stands;
+  `task e2e:full:noplugin STAND=vanilla` followed by `task e2e:up STAND=vanilla`. The plugin did
+  not change, so its lint and tests are not owed.
+- **Counts:** migrations end at **0057**; **93 tools**; **126 bound methods**; plugin **1.4.1**.
+
+**2026-10-18, on Windows, at the close of stage 1b, at `8f0c80a`.** The last two commits after
+the whole run are the sync request's JSON tags (`8e88fbe`) and the harness seam (`8f0c80a`); the
+checks they touched were run again on the final tree, the rest stands from `d2e939b`.
+- **Static checks**, on the final tree: `gofmt -l .` silent; the comment check passes;
+  `go vet ./...`, `go vet -tags e2e` and `go vet -tags uiharness` are clean; `golangci-lint run`
+  and `task lint:e2e` (run alone) report 0 issues at `8e88fbe`, and the two packages the seam
+  touched 0 issues at the final tree.
+- **The Go suite:** `go test -race -count=1 -p 2 -covermode=atomic` is green in the same five
+  groups, 86 packages, groups 3 and 5 rerun on the final tree and the profiles merged.
+  `go run ./cmd/covergate`: **domain+application 88.12% of 11488** (gate 80%), **total 88.39% of
+  25055** (gate 70%). Run whole for the first time this stage, it found the vocabulary tripwire
+  red since the `repair` kind left the start enum; fixed under stage 1b in `DECISIONS.md`.
+- **The build and the frontend:** `task build` is green on the final tree and leaves no generated
+  diff, after it caught the sync request's two walk options bound as required fields;
+  `npm run typecheck` is clean against the regenerated bindings; **1512 vitest tests in 143
+  files**. `task ui:lint`: the lint half reports 0 issues on the final tree; its harness-test half
+  has no result on this tree, because the run before the seam fix ran past its 15-minute budget
+  (every scenario re-seeded a core whose adoption sync was paced at four requests a second, which
+  `8f0c80a` lifts for the fake) and the two reruns were stopped by the session's memory guard.
+  Run `task ui:lint` once more before a tag.
+- **The plugin:** `task plugin:lint` covers 10 files and `task plugin:test` agrees on 53 cases,
+  both on PHP 7.4.
+- **The stands**, at `d2e939b` (the two later commits touch neither the observation nor the
+  plugin): `task e2e:test` passes on vanilla (67 s) and on the replica (111 s); `task e2e:full`
+  passes on vanilla (154 s) and on the replica (196 s), the observation proof among them.
+  `task e2e:full:noplugin` passed at `d2076a9`, one commit before; its rerun was stopped by the
+  session's memory guard mid-test together with the step that restores vanilla's plugin, so
+  vanilla stands without the plugin until `task e2e:up STAND=vanilla` runs. Run
+  `task e2e:full:noplugin STAND=vanilla` once more before a tag.
+- **Counts:** migrations end at **0054**; **93 tools**; plugin **1.4.1**.
+- **Not run:** a live OpenAI call with a funded key, and the `E2E_SEO=yoast` pass.
+
+**2026-10-17, on Windows, whole, at the close of stage 1a, at `66a7d58`.**
+- **Static checks:** `gofmt -l .` silent; the comment check passes; `go vet ./...` and
+  `go vet -tags e2e` are clean; `golangci-lint run` and `task lint:e2e` (run alone) report 0
+  issues.
+- **The Go suite:** `go test -race -count=1 -p 2 -covermode=atomic` is green in five groups
+  (kernel+domain, adapters, application, runtime, transport+app+cmd+wp-plugin+frontend), the
+  profiles merged into `coverage.out`. `go run ./cmd/covergate`: **domain+application 87.87% of
+  9166** (gate 80%), **total 88.49% of 22606** (gate 70%).
+- **The build and the frontend:** `task build` is green and leaves no generated diff;
+  `npm run typecheck` is clean; **1512 vitest tests in 143 files**; `task ui:lint` is green
+  (377 s).
+- **The plugin:** `task plugin:lint` covers 10 files and `task plugin:test` agrees on 41 cases,
+  both on PHP 7.4.
+- **The stands:**
+  - `task e2e:test` on vanilla passes 58 tests;
+  - on the replica it passes 57, with `TestSEOMetaEscapesRenderedHead` skipped because it runs
+    only without an SEO plugin;
+  - `task e2e:full` is green on both stands, and `e2e:full:noplugin` on vanilla.
+- **Counts:** migrations end at **0044**; **93 tools**; plugin **1.4.0**.
+- **Not run:** a live OpenAI call with a funded key, and the `E2E_SEO=yoast` pass.
+
 **2026-10-04, on Windows, whole, after the categories came out, at `2b74b4a`.** `gofmt -l .`
 silent, the comment check, `golangci-lint run` and `task lint:e2e` 0 issues, `go vet -tags e2e`
 and `-tags uiharness` clean; `go test -race -count=1 -p 2 -covermode=atomic` green over every
@@ -237,8 +1120,15 @@ task package · plugin:zip         the NSIS installer and the plugin archive, in
 task ui:run · walk · shot · reset the harness window, seeded, DevTools on 9222
 task ui:lint                      lint and tests behind the uiharness build tag
 task lint:e2e                     the build-tagged sources golangci-lint run skips
-task e2e:up · test · full · full:noplugin · down     the suites' WordPress on 8088
+task e2e:up · test · full · full:noplugin · down STAND=vanilla|replica   8088 or 8087; -- <args> to go test
+task e2e:up · test · down STAND=legacy   WordPress 5.7.2 on PHP 7.3 on 8086, the plugin's contract suite only
+task e2e:both                     both stands up and their suites, one after the other
+task plugin:deploy STAND=         the zip reinstalled over the plugin on a running stand
+task plugin:lint · plugin:test    every plugin file and test on PHP 7.2, 7.4 and 8.5 (the href table, the meta deny list, the function scan)
+go run ./cmd/tokenreport -prompts out/prompts   the steps' and the agent's prompts as plain text, beside the report
+go test -count=1 ./internal/app/scale/          the 2,000- and 5,000-page counts, which a -race run skips
 task sandbox:up · down · reset    the owner's WordPress on 8089, bare unless E2E_PLUGIN=1
+task sandbox:provision STAND=     the owner's sandbox made a stand, on that command only
 go test -race -count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...
 go run ./cmd/covergate            the coverage gates on that profile
 $(go env GOPATH)/bin/golangci-lint.exe run
@@ -272,8 +1162,37 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | done, closed 2026-10-24 with the whole gate green on both stands |
+| 15 | The release (2026-10-24), two sessions in `2026-10-24-phase-15-release.md` | done on 2026-10-24: session 1 (the plugin's floors, pages without an entity, the input estimate, scale, the prompts) and session 2 (the polish, the docs, 2.5.0 built, the pull request open) |
 
 ## Known gaps
+
+- **Phase 15 left these:**
+  - **No funded key has run**: see **Known limits at 2.5.0**.
+  - **The UI at the window's least width with the dock open**: the Runs table scrolls sideways
+    inside its panel (the walk's `fits` step names it: 726 px of content in 288 px), the Models
+    table shows about ten characters of a model's name, and the rail shows a horizontal scrollbar
+    at 600 px high. The Site map fits.
+  - **Three feature files are still over 300 lines**: `graph/canvas/map.tsx` (849, the canvas
+    renderer), `agent/conversation/model/markdown.ts` (494) and `links/panel.tsx` (311).
+  - **Whole-tree reads**: the Overview's drift count and the Reports' run panel and site tab still
+    read `Pages.Tree`, the whole tree. The run start's picker no longer does, but `Pages.Tree` stays
+    while they call it.
+  - **"Select the whole branch" is gone from the run start's picker**, since a branch loads a page
+    at a time; a server pick of a node's descendants (`page_map`'s trail makes it one query) would
+    bring it back.
+  - **The writer's pack reads a whole-site snapshot** once per pack and once per estimate: the same
+    statements at 2,003 and 5,003 pages, but 0.7 s against 4.6 s.
+  - **The observation's content and store stages read all pages every batch**, since a cached row
+    would let an update overwrite an edit made during the stage.
+  - **`page_map`'s triggers**: a migration that rebuilds `pages`, `page_fields` or `page_types`
+    must recreate them.
+  - **Without the plugin, on WordPress below 6.0 or WooCommerce below 6.9**, the front page or the
+    store's pages cannot be learned; with it, `/settings` answers both. Yoast 18.3 on the legacy
+    stand was not exercised.
+  - **The judge's and the meta writer's measured prompts read stand-ins** of what a run's writer
+    would write.
+  - **The estimate's sample is nine pages** of mostly WordPress boilerplate.
 
 - **`agent.Deps.Allowed` is never set**, so `Permit` can never deny in production and the
   transcript's refused tool row has no producer; `TestTheSeededConversationShowsADeniedToolCall`
@@ -344,24 +1263,45 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
   SQLite DSN, which `Lock()` cannot zero; `export.opener.complete` would call a valid archive
   truncated if the tar stream were an exact multiple of `FrameSize`; `task package` is not
   byte reproducible, `BUILD_DATE` being `now`.
+- **Found by the 2026-10-17 audit, fixed by the stages that touch them:** the import's
+  `Options.AnchorSeparator` description says comma while the default is `|` (`imports/views.go:61`
+  against `importmap/mapping.go:12`); `Sanitize` lets a class or id the model emits through. The
+  port mismatch between `normalize.php` and `Site.Resolve` was fixed in 1a.
+- **What the extraction leaves to stage 2.** `page_renders.url_form` is the majority form of
+  every internal href of the page, which follows the theme (absolute on both stands) while the
+  client's own content links are relative; the writer's "URL form the site already uses" should
+  weigh the contextual links. The H1 sits outside the content root on both themes, so a heading
+  list never carries it; `page_h1_differs` reads the plugin's `h1`.
+- **A first walk is paced by the client's limiter.** It costs three to four requests a page
+  (the raw, the terms, the visit, the filtered render), and the default `wp.rateLimitPerSecond`
+  is 4, so two thousand pages take about half an hour the first time; later walks read only what
+  changed. The setting goes up to 100 for a host that allows it.
+- **`parent_differs` is raised once and never cleared by the observation**, the workbook's
+  parent it records having been replaced by the derived one; stage 4's `findings.Resolve`
+  settles it. A page deleted on the site is archived on the next full walk, not the next
+  observation.
+- **`TestTheServerTakesAnAddress` in `wptest` can flake** under a parallel `go test`, because it
+  reserves an ephemeral port, releases it and binds it again; another process took the port once
+  during 1a. It passes alone.
 
 ## Next steps
 
-1. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
+1. **The owner merges the 2.5.0 pull request and tags `v2.5.0`**; then plugin 1.5.2 goes onto the
+   client's sites and the first sync runs on a real one.
+2. **The smoke with a funded OpenAI key**, whenever there is one: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
    probe's open tests and the seven checks under **Known gaps**, and only then a decision on
    `agent.toolLoading`.
-2. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
+3. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
    E2E_PLUGIN=1 E2E_WOO=1`, after `task sandbox:reset` if it still carries plugin 1.3.0 and its
    terms): import `samples/client-sheets.xlsx` as one workbook and check each sheet's tab, the
-   Groups segment, that Category and Subcategory read ignored, and the Groups sheet's deeper rows
-   under their URL parent inside Peptides; sync; run a page under TB-500 › Liquid; create a product
-   by hand in WooCommerce under a category of the client's own, import the variation sheet in
-   products mode, run it and see its categories untouched; revert both.
-3. **The client's own sites**: what a real model writes into the attributes, and whether a page
-   builder hides the description, which `product_description_hidden` will say.
-4. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
-   minor version.
-5. The residue above: the denied tool row's decision, the four narrow-width UI items,
+   Groups segment, the Category and Subcategory columns compared as each row's expected trail, and
+   the findings the import raises; sync; run a page under TB-500 › Liquid; create a product by hand
+   in WooCommerce under a category of the client's own, settle its `page_without_entity` through a
+   proposal, run it and see its categories untouched; revert both.
+4. **The client's own sites**: what a real model writes into a short description and a body, and
+   whether a page builder hides the description, which `product_description_hidden` will say.
+5. The residue above: the denied tool row's decision, the narrow-width UI items (the Runs table, the
+   Models table, the rail), the last callers of `Pages.Tree`, the three feature files over 300 lines,
    `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared value.

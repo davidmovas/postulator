@@ -22,7 +22,8 @@ describe("the placement of every declared setting", () => {
     it("keeps the promised settings out of the advanced cards", () => {
         const open = (tab: (typeof settingsTabKeys)[number]): number =>
             tabLayout(tab, declared).plain.flatMap((section) => section.keys).length;
-        expect(open("models")).toBe(11);
+        expect(open("models")).toBe(15);
+        expect(open("types")).toBe(0);
         expect(open("runs")).toBe(7);
         expect(open("agent")).toBe(2);
         expect(open("browser")).toBe(1);
@@ -36,6 +37,21 @@ describe("the placement of every declared setting", () => {
         const keys = shaped.plain[0]?.keys ?? [];
         expect(keys.slice(0, 2)).toEqual(["llm.effort.writer", "llm.tier.writer"]);
         expect(keys.at(-1)).toBe("llm.flexPatience");
+    });
+
+    it.each(["writer", "editor", "linker", "judge"])("sets the %s's input budget beside its reasoning and speed", (role) => {
+        const keys = tabLayout("models", declared).plain[0]?.keys ?? [];
+        const at = keys.indexOf(`llm.inputBudget.${role}`);
+        expect(keys.slice(at - 2, at)).toEqual([`llm.effort.${role}`, `llm.tier.${role}`]);
+        expect(unitOf(`llm.inputBudget.${role}`)).toBe("tokens");
+    });
+
+    it("says what a budget of 0 means and that a budget too small is refused before a run", () => {
+        for (const role of ["writer", "editor", "linker", "judge"]) {
+            const help = copy.settings.keys[`llm.inputBudget.${role}` as keyof typeof copy.settings.keys].help;
+            expect(help).toMatch(/0 means the model's context window/);
+            expect(help).toMatch(/refused before a run starts/);
+        }
     });
 
     it("keeps the experimental tool loading among the advanced agent settings", () => {

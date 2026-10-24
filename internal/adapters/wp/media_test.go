@@ -1,6 +1,9 @@
 package wp_test
 
 import (
+	"encoding/json"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
@@ -83,6 +86,58 @@ func TestUploadMediaRefusesAnEmptyUpload(t *testing.T) {
 				t.Errorf("code = %q, want %q", errors.CodeOf(err), errors.Invalid)
 			}
 		})
+	}
+}
+
+func TestAMediaItemIsReadWithItsParentAndWrittenAltAndTitleAlone(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	product := server.Seed(wptest.Item{Type: wptest.TypeProduct, Title: "Powder", Status: "publish"})[0]
+	image := server.SeedUpload(wptest.Upload{Filename: "powder.jpg", MimeType: "image/jpeg", Title: "powder", Alt: "", Parent: product.ID})
+	client := newClient(t, server)
+
+	held, err := client.GetMedia(t.Context(), image.ID)
+	if err != nil {
+		t.Fatalf("GetMedia: %v", err)
+	}
+	if held.ID != image.ID || held.Parent != product.ID || held.Title != "powder" || held.Alt != "" {
+		t.Fatalf("media = %+v", held)
+	}
+	if recorded, _ := server.LastRequest(); recorded.Query.Get("context") != "edit" {
+		t.Errorf("context = %q, want edit, or the title answers rendered", recorded.Query.Get("context"))
+	}
+
+	written, err := client.UpdateMedia(t.Context(), image.ID, wp.UpdateMedia{Alt: pointerTo("A tin of powder"), Title: pointerTo("Powder tin")})
+	if err != nil {
+		t.Fatalf("UpdateMedia: %v", err)
+	}
+	if written.Alt != "A tin of powder" || written.Title != "Powder tin" || written.Parent != product.ID {
+		t.Errorf("written = %+v", written)
+	}
+	recorded, _ := server.LastRequest()
+	var body map[string]any
+	if err = json.Unmarshal(recorded.Body, &body); err != nil {
+		t.Fatalf("decode the sent body: %v", err)
+	}
+	keys := slices.Sorted(maps.Keys(body))
+	if !slices.Equal(keys, []string{"alt_text", "title"}) {
+		t.Errorf("the update sent %v, want the alt text and the title alone: the file, its caption and its parent are the client's", keys)
+	}
+	if _, err = client.UpdateMedia(t.Context(), image.ID, wp.UpdateMedia{}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an empty media update = %v, want refused before it leaves", err)
+	}
+	if _, err = client.GetMedia(t.Context(), image.ID+1000); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("an unknown media item = %v, want NotFound", err)
+	}
+
+	server.Restore(wptest.Item{ID: product.ID, Type: wptest.TypeProduct, Title: "Powder", Status: "publish", Images: []int64{image.ID}})
+	stored, err := client.GetProduct(t.Context(), product.ID)
+	if err != nil {
+		t.Fatalf("GetProduct: %v", err)
+	}
+	if len(stored.Images) != 1 || stored.Images[0].Name != "Powder tin" || stored.Images[0].Alt != "A tin of powder" {
+		t.Errorf("the product's images = %+v, want each with its title as WooCommerce names it", stored.Images)
 	}
 }
 

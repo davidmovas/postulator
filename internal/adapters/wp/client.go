@@ -50,11 +50,15 @@ type Client struct {
 	logger    Logger
 	username  string
 	password  string
+	userAgent string
 	retries   int
 
 	manifestMu   sync.Mutex
 	manifest     *Manifest
 	manifestGone bool
+
+	typesMu sync.Mutex
+	types   []PostType
 }
 
 func New(cfg Config, opts ...Option) (*Client, error) {
@@ -67,11 +71,12 @@ func New(cfg Config, opts ...Option) (*Client, error) {
 	}
 
 	resolved := options{
-		timeout: DefaultTimeout,
-		retries: DefaultRetries,
-		rate:    DefaultRateLimitPerSecond,
-		backoff: defaultBackoff,
-		logger:  zap.NewNop(),
+		timeout:   DefaultTimeout,
+		retries:   DefaultRetries,
+		rate:      DefaultRateLimitPerSecond,
+		userAgent: DefaultUserAgent,
+		backoff:   defaultBackoff,
+		logger:    zap.NewNop(),
 	}
 	for _, opt := range opts {
 		opt(&resolved)
@@ -95,6 +100,7 @@ func New(cfg Config, opts ...Option) (*Client, error) {
 		logger:    resolved.logger,
 		username:  cfg.Username,
 		password:  cfg.AppPassword,
+		userAgent: resolved.userAgent,
 		retries:   resolved.retries,
 	}, nil
 }

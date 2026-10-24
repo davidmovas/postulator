@@ -8,11 +8,13 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/applicationtest"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -26,6 +28,8 @@ type fixture struct {
 	store      *sqlite.Store
 	siteID     string
 	templateID string
+	hubType    string
+	types      *pagetypes.Service
 	pages      map[string]pagemap.Page
 	entities   map[string]graph.Entity
 	runID      string
@@ -46,8 +50,8 @@ func newFixture(t *testing.T) *fixture {
 	itemRepo := sqlite.NewRunItemRepo(store)
 	artifactRepo := sqlite.NewArtifactRepo(store)
 	siteRepo := sqlite.NewSiteRepo(store)
-	templateService := templates.New(sqlite.NewTemplateRepo(store), sqlite.NewLinkPolicyRepo(store),
-		pageRepo, sqlite.NewEntityRepo(store), siteRepo, store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
+	templateService := templates.New(sqlite.NewTemplateRepo(store), pageRepo, sqlite.NewEntityRepo(store), siteRepo,
+		sqlite.NewPageTypeRepo(store), store, &applicationtest.Recorder{}, clock.NewFake(sqlitetest.Stamp))
 	if err := templateService.EnsureSeeded(t.Context()); err != nil {
 		t.Fatalf("seed the templates: %v", err)
 	}
@@ -57,13 +61,27 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatalf("give the site a default template: %v", err)
 	}
 
+	types := pagetypes.New(pagetypes.Deps{
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
+		Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: &applicationtest.Recorder{},
+		Clock: clock.NewFake(sqlitetest.Stamp),
+	})
+	if err := types.Seed(t.Context(), owner.ID); err != nil {
+		t.Fatalf("seed the page types: %v", err)
+	}
+	set, err := types.Set(t.Context(), owner.ID)
+	if err != nil {
+		t.Fatalf("read the page types: %v", err)
+	}
+	hubType, _ := set.ByPreset(pagetype.Hub)
+
 	f := &fixture{
-		store: store, siteID: owner.ID, templateID: hub.ID,
+		store: store, siteID: owner.ID, templateID: hub.ID, hubType: hubType.ID, types: types,
 		pages: make(map[string]pagemap.Page), entities: make(map[string]graph.Entity),
 		service: reports.New(reports.Deps{
-			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Links: linkRepo,
+			Entities: entityRepo, Edges: edgeRepo, Pages: pageRepo, Fields: sqlite.NewPageFieldRepo(store), Links: linkRepo,
 			Runs: runRepo, Items: itemRepo, Artifacts: artifactRepo,
-			Sites: siteRepo, Specs: templateService, Policies: templateService,
+			Sites: siteRepo, Specs: templateService, Types: types,
 		}),
 	}
 
@@ -97,6 +115,7 @@ func (f *fixture) page(t *testing.T, repo *sqlite.PageRepo, path string, status 
 
 	record := pagemap.Page{
 		ID: id.New(), SiteID: f.siteID, Path: path, Slug: pagemap.Slug(path), WPType: pagemap.WPPage,
+		PageTypeID: &f.hubType, TypeSource: pagemap.TypeSourceAuto, TypeReason: pagemap.TypeByKind,
 		Title: path, H1: path, Status: status, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
 	if status != pagemap.StatusPlanned {
@@ -124,7 +143,7 @@ func (f *fixture) entity(t *testing.T, repo *sqlite.EntityRepo, name string, sco
 	t.Helper()
 
 	record := graph.Entity{
-		ID: id.New(), SiteID: f.siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		ID: id.New(), SiteID: f.siteID, Name: name, Keywords: keyword.Of(name),
 		Anchors: []graph.Anchor{{Text: name, Source: graph.AnchorUser, Weight: 1}},
 		Source:  graph.SourceUser, Score: score, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}
@@ -165,9 +184,10 @@ func (f *fixture) link(t *testing.T, repo *sqlite.PageLinkRepo, from pagemap.Pag
 	target := f.byID(toPageID)
 	link := pagemap.PageLink{
 		ID: id.New(), SiteID: f.siteID, FromPageID: from.ID, ToPageID: &toPageID, ToURL: target.Path,
-		AnchorText: target.Title, Origin: pagemap.OriginObserved, ObservedAt: sqlitetest.Stamp,
+		AnchorText: target.Title, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+		ObservedAt: sqlitetest.Stamp,
 	}
-	if err := repo.ReplaceForPage(t.Context(), from.ID, []pagemap.PageLink{link}); err != nil {
+	if err := repo.ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, []pagemap.PageLink{link}); err != nil {
 		t.Fatalf("insert the link: %v", err)
 	}
 }
@@ -306,21 +326,45 @@ func TestPageReportReadsTheNewestItem(t *testing.T) {
 	}
 }
 
+func TestPageReportReadsTheShortDescriptionFromTheFields(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	f.withRun(t, run.StatusCompleted, map[run.ArtifactKind]string{
+		run.ArtifactPublishResult: `{"wpId":7}`,
+		run.ArtifactDraft:         `{"title":"Espresso","sections":[]}`,
+		run.ArtifactFields:        `{"values":[{"key":"excerpt","value":"x"},{"key":"product_short_description","value":"<p>short</p>"}],"skipped":[]}`,
+	})
+	report, err := f.service.PageReport(t.Context(), reports.PageReportRequest{PageID: f.pages["/coffee/espresso/"].ID})
+	if err != nil {
+		t.Fatalf("PageReport: %v", err)
+	}
+	if got := string(report.Product); got != `{"shortDescription":"<p>short</p>"}` {
+		t.Errorf("product = %s, want the short description generate_fields wrote", got)
+	}
+}
+
 func TestPageReportCarriesNoProductForADraftWithout(t *testing.T) {
 	t.Parallel()
 
-	for name, draft := range map[string]string{
-		"no draft":                "",
-		"a page's draft":          `{"title":"Espresso","sections":[]}`,
-		"a draft with no outputs": `{"title":"Espresso","product":null}`,
+	for name, held := range map[string]struct{ draft, fields string }{
+		"no draft":                {},
+		"a page's draft":          {draft: `{"title":"Espresso","sections":[]}`},
+		"a draft with no outputs": {draft: `{"title":"Espresso","product":null}`},
+		"fields with no short description": {
+			draft: `{"title":"Espresso","sections":[]}`, fields: `{"values":[{"key":"excerpt","value":"x"}],"skipped":[]}`,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			f := newFixture(t)
 			blobs := map[run.ArtifactKind]string{run.ArtifactPublishResult: `{"wpId":7}`}
-			if draft != "" {
-				blobs[run.ArtifactDraft] = draft
+			if held.draft != "" {
+				blobs[run.ArtifactDraft] = held.draft
+			}
+			if held.fields != "" {
+				blobs[run.ArtifactFields] = held.fields
 			}
 			f.withRun(t, run.StatusCompleted, blobs)
 			report, err := f.service.PageReport(t.Context(), reports.PageReportRequest{PageID: f.pages["/coffee/espresso/"].ID})

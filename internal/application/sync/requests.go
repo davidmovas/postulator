@@ -3,7 +3,9 @@ package sync
 const Filename = "postulator-companion.zip"
 
 type SyncSiteRequest struct {
-	SiteID string `json:"siteId"`
+	SiteID       string `json:"siteId"`
+	Full         bool   `json:"full,omitempty"`
+	RenderRescan bool   `json:"renderRescan,omitempty"`
 }
 
 type SyncSiteResponse struct {

@@ -15,6 +15,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -25,20 +26,21 @@ import (
 )
 
 type fakeEngine struct {
-	assigned    map[string]string
-	queued      run.Run
-	estimated   run.Run
-	estimate    run.Estimate
-	enqueueErr  error
-	failWith    error
-	paused      string
-	reason      run.PauseReason
-	resumed     string
-	cancelled   string
-	retried     string
-	accepted    string
-	regenerated string
-	restarted   []string
+	assigned       map[string]string
+	queued         run.Run
+	estimated      run.Run
+	estimate       run.Estimate
+	enqueueErr     error
+	failWith       error
+	paused         string
+	reason         run.PauseReason
+	resumed        string
+	cancelled      string
+	retried        string
+	accepted       string
+	regenerated    string
+	restarted      []string
+	acceptedFields []field.Key
 }
 
 func (f *fakeEngine) Enqueue(_ context.Context, record run.Run) (run.Run, error) {
@@ -78,8 +80,8 @@ func (f *fakeEngine) RetryStep(_ context.Context, itemID string) error {
 	return f.failWith
 }
 
-func (f *fakeEngine) Accept(_ context.Context, itemID string) error {
-	f.accepted = itemID
+func (f *fakeEngine) Accept(_ context.Context, itemID string, fields []field.Key) error {
+	f.accepted, f.acceptedFields = itemID, fields
 	return f.failWith
 }
 
@@ -221,7 +223,9 @@ func stepRegistry(t *testing.T) *run.Registry {
 		{Name: string(run.StepResolveContext), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactLinkContext}},
 		{Name: string(run.StepGenerateBody), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactLinkContext},
 			Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
-		{Name: string(run.StepPublish), Run: nothing,
+		{Name: string(run.StepGenerateMeta), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactMeta}},
+		{Name: string(run.StepGenerateFields), Run: nothing, Produces: []run.ArtifactKind{run.ArtifactFields}},
+		{Name: string(run.StepPublish), Run: nothing, Scoped: run.DraftsOf,
 			Requires: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML}},
 		{Name: string(run.StepSyncBack), Run: nothing, Requires: []run.ArtifactKind{run.ArtifactPublishResult}},
 	}
@@ -980,6 +984,41 @@ func TestListItemsNamesTheParentAHeldItemWaitsFor(t *testing.T) {
 	}
 	if parent := byTarget[parentID]; parent.WaitingFor != nil || parent.BlockedBy != "" {
 		t.Fatalf("the parent item waits for %+v behind %q, want nothing", parent.WaitingFor, parent.BlockedBy)
+	}
+}
+
+func TestTheAgentCannotAcceptADraftReview(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	record, _ := fixture.seedRun(t, run.StatusPaused)
+	reviewed := run.Item{
+		ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: fixture.pages[1], Status: run.StatusPaused,
+		CurrentStep: string(run.StepPublish), PauseReason: run.PauseAwaitingReview, Seq: 5,
+		Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp.Add(time.Second), UpdatedAt: sqlitetest.Stamp,
+	}
+	if err := fixture.items.Insert(t.Context(), reviewed); err != nil {
+		t.Fatalf("insert the reviewed item: %v", err)
+	}
+
+	asAgent := kctx.WithActor(t.Context(), kctx.ActorAgent)
+	_, err := fixture.service.RetryStep(asAgent, runs.RetryStepRequest{ItemID: reviewed.ID, AcceptFindings: true})
+	if !errors.IsCode(err, errors.Conflict) {
+		t.Fatalf("the agent's acceptance = %v, want a refusal: only a person accepts a draft's changes", err)
+	}
+	if fixture.engine.accepted != "" {
+		t.Fatalf("the engine accepted %q for the agent", fixture.engine.accepted)
+	}
+
+	asPerson := kctx.WithActor(t.Context(), kctx.ActorUser)
+	if _, err = fixture.service.RetryStep(asPerson, runs.RetryStepRequest{ItemID: reviewed.ID, AcceptFindings: true}); err != nil {
+		t.Fatalf("a person's acceptance: %v", err)
+	}
+	if fixture.engine.accepted != reviewed.ID {
+		t.Fatalf("the engine accepted %q, want the reviewed item", fixture.engine.accepted)
+	}
+	if _, err = fixture.service.Pause(t.Context(), runs.PauseRequest{RunID: record.ID, Reason: string(run.PauseAwaitingReview)}); !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("a hand pause for review = %v, want it refused: only a draft run's step holds a page for review", err)
 	}
 }
 

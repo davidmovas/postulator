@@ -54,7 +54,44 @@ type Tool struct {
 	Authorize func(ctx context.Context, b Binding) error
 	Check     func(args json.RawMessage) error
 	Run       func(ctx context.Context, b Binding, args json.RawMessage) (any, error)
+	Confirm   func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
+	RiskOf    func(args json.RawMessage) Risk
 	Def       Def
+}
+
+func (t Tool) risk(args json.RawMessage) Risk {
+	if t.RiskOf == nil {
+		return t.Def.Risk
+	}
+	return t.RiskOf(args)
+}
+
+type opOnly struct {
+	Op string `json:"op"`
+}
+
+func readsOn(tool Tool, ops ...string) Tool {
+	tool.RiskOf = func(args json.RawMessage) Risk {
+		var in opOnly
+		if err := json.Unmarshal(args, &in); err == nil && slices.Contains(ops, in.Op) {
+			return RiskRead
+		}
+		return tool.Def.Risk
+	}
+	return tool
+}
+
+func confirming[In any](tool Tool, ask func(ctx context.Context, b Binding, in In) (string, error)) Tool {
+	tool.Confirm = func(ctx context.Context, b Binding, args json.RawMessage) (string, error) {
+		var in In
+		if len(args) > 0 {
+			if err := json.Unmarshal(args, &in); err != nil {
+				return "", refused(tool.Def.Name, err)
+			}
+		}
+		return ask(ctx, b, in)
+	}
+	return tool
 }
 
 type Confirmation struct {
@@ -189,6 +226,24 @@ func sortedBy(tool Tool, fields ...string) Tool {
 	widened := *schema
 	widened.Properties = maps.Clone(schema.Properties)
 	widened.Properties[sortField] = &nested
+	tool.Def.Schema = &widened
+	return tool
+}
+
+func enumOn(tool Tool, property string, values []string) Tool {
+	schema := tool.Def.Schema
+	if schema == nil || schema.Properties == nil {
+		return tool
+	}
+	held, ok := schema.Properties[property]
+	if !ok {
+		return tool
+	}
+	closed := *held
+	closed.Enum = slices.Clone(values)
+	widened := *schema
+	widened.Properties = maps.Clone(schema.Properties)
+	widened.Properties[property] = &closed
 	tool.Def.Schema = &widened
 	return tool
 }

@@ -1,62 +1,68 @@
 package imports
 
 import (
-	"github.com/davidmovas/postulator/internal/domain/graph"
+	"strings"
+
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
-func (s *siteState) productDraft(draft *pageDraft) bool {
-	current, held := s.held(draft.path)
+func (p *pageDraft) product() bool {
+	current, held := p.page()
 	switch {
 	case held && current.WPID != nil:
 		return current.WPType == pagemap.WPProduct
-	case draft.cellType() != "":
-		return draft.cellType() == pagemap.WPProduct
+	case p.cellType() != "":
+		return p.cellType() == pagemap.WPProduct
 	case held:
 		return current.WPType == pagemap.WPProduct
 	default:
-		return draft.modeType == pagemap.WPProduct
+		return p.modeType == pagemap.WPProduct
 	}
 }
 
-func typeRows(sheet *drafts, rows []rowDraft, rowType importmap.RowType, state *siteState) {
-	if rowType == "" || rowType == importmap.RowPages {
-		return
+func (r *rowDraft) cellType(state *siteState) pagemap.WPType {
+	wpType := pagemap.WPType(strings.ToLower(strings.TrimSpace(r.wpType)))
+	if !wpType.Valid() || !state.knows(wpType) {
+		return ""
 	}
+	return wpType
+}
 
-	byMode := make(map[string]bool, len(sheet.pages))
-	for _, path := range sheet.sortedPaths() {
-		if draft := sheet.pages[path]; draft.cellType() == "" {
-			byMode[path] = rowType == importmap.RowProducts || kindOfDraft(draft, rows) == graph.KindProduct
+func modeProducts(rows []rowDraft, rowType importmap.RowType, state *siteState) {
+	byMode := make([]bool, len(rows))
+	if rowType != "" && rowType != importmap.RowPages {
+		for i := range rows {
+			if rows[i].cellType(state) == "" {
+				byMode[i] = rowType == importmap.RowProducts || rowType == importmap.RowTyped && state.namesProduct(&rows[i])
+			}
 		}
 	}
-	product := func(path string) bool {
-		if cell := sheet.pages[path].cellType(); cell != "" {
+	product := func(at int) bool {
+		if cell := rows[at].cellType(state); cell != "" {
 			return cell == pagemap.WPProduct
 		}
-		return byMode[path]
+		return byMode[at]
 	}
-
-	for _, path := range sheet.sortedPaths() {
-		if byMode[path] && !productsUnder(path, sheet, product, state) {
-			sheet.pages[path].modeType = pagemap.WPProduct
-		}
+	for i := range rows {
+		rows[i].modeProduct = byMode[i] && !productsUnder(i, rows, product, state)
+		rows[i].wantsProduct = rows[i].cellType(state) == pagemap.WPProduct || rows[i].modeProduct
 	}
 }
 
-func kindOfDraft(draft *pageDraft, rows []rowDraft) graph.Kind {
-	for _, at := range draft.rows {
-		if kind, known := kindOf(rows[at].kind); known && kind != "" {
-			return kind
-		}
-	}
-	return ""
+func (s *siteState) namesProduct(row *rowDraft) bool {
+	named, known := s.pageType(row.pageType, pagemap.WPPage)
+	return known && named.Preset == pagetype.Product
 }
 
-func productsUnder(path string, sheet *drafts, product func(string) bool, state *siteState) bool {
-	for _, other := range sheet.sortedPaths() {
-		if ancestorOf(path, other) && product(other) {
+func productsUnder(at int, rows []rowDraft, product func(int) bool, state *siteState) bool {
+	path := rows[at].url
+	if path == "" {
+		return false
+	}
+	for i := range rows {
+		if ancestorOf(path, rows[i].url) && product(i) {
 			return true
 		}
 	}
@@ -67,63 +73,4 @@ func productsUnder(path string, sheet *drafts, product func(string) bool, state 
 		}
 	}
 	return false
-}
-
-func matchProducts(sheet *drafts, state *siteState, p *plan) {
-	claimed := make(map[string]bool)
-	for i := range state.pages {
-		if state.pages[i].PlannedPath != "" {
-			claimed[state.pages[i].ID] = true
-		}
-	}
-	for _, draft := range openProducts(sheet, state, claimed) {
-		matchProduct(draft, state, claimed, p)
-	}
-}
-
-func openProducts(sheet *drafts, state *siteState, claimed map[string]bool) []*pageDraft {
-	open := make([]*pageDraft, 0)
-	for _, path := range sheet.sortedPaths() {
-		draft := sheet.pages[path]
-		if draft.generated || !state.productDraft(draft) {
-			continue
-		}
-		if current, held := state.held(path); held && current.WPID != nil {
-			claimed[current.ID] = true
-			draft.matchedBy = pagemap.MatchedByPath
-			continue
-		}
-		open = append(open, draft)
-	}
-	return open
-}
-
-func matchProduct(draft *pageDraft, state *siteState, claimed map[string]bool, p *plan) {
-	candidates := make([]pagemap.Page, 0, len(state.pages))
-	for i := range state.pages {
-		if !claimed[state.pages[i].ID] {
-			candidates = append(candidates, state.pages[i])
-		}
-	}
-
-	match := pagemap.MatchProduct(pagemap.ProductRow{Path: draft.path, H1: draft.h1, Title: draft.title}, candidates)
-	switch {
-	case match.Found:
-		claimed[match.Page.ID] = true
-		state.byPlanned[draft.path] = match.Page
-		draft.matchedBy = match.By
-		if waiting, left := state.byPath[draft.path]; left && waiting.WPID == nil {
-			p.noteAt(draft.at, string(importmap.FieldPath), CodeProductRowLeft,
-				"the row planned at "+draft.path+" waited for the product the store now holds at "+match.Page.Path+
-					"; the import writes to the store's product, so delete the waiting row on the Pages screen")
-		}
-	case match.Ambiguous:
-		p.noteAt(draft.at, string(importmap.FieldPath), CodeProductNotInStore,
-			"more than one product in the store answers to "+draft.path+" by its "+string(match.By)+
-				"; give the row the product's own address or slug, or rename one of the products in WooCommerce")
-	default:
-		p.noteAt(draft.at, string(importmap.FieldPath), CodeProductNotInStore,
-			draft.path+" names a product the store does not hold yet; create it in WooCommerce and sync the site, "+
-				"and the row finds it")
-	}
 }

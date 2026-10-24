@@ -1,33 +1,22 @@
 import { copy } from "../../copy/index.js";
-import type { EntityKind } from "../../generated/vocab.js";
-import { entityKinds, isOneOf } from "../../generated/vocab.js";
-import type { IconComponent, Tone } from "../../ui/index.js";
-import { CategoryIcon, HubIcon, Inventory2Icon, StarShineIcon, TopicIcon } from "../../ui/index.js";
-import type { NodeState } from "./model/index.js";
+import type { ProposalClash } from "../../generated/vocab.js";
+import { isOneOf, proposalClashes } from "../../generated/vocab.js";
+import type { Tone } from "../../ui/index.js";
+import type { EntityType, NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
 
-const entityIcons: Readonly<Record<EntityKind, IconComponent>> = {
-    hub: HubIcon,
-    product: Inventory2Icon,
-    topic: TopicIcon,
-    category: CategoryIcon,
-    custom: StarShineIcon,
-};
+type Clash = Exclude<ProposalClash, "">;
 
-export function entityIcon(kind: string): IconComponent {
-    return isOneOf(entityKinds, kind) ? entityIcons[kind] : StarShineIcon;
+const clashKinds: readonly Clash[] = proposalClashes.filter((held): held is Clash => held !== "");
+
+const clashWords: Readonly<Record<Clash, string>> = copy.graph.ai.clashes;
+
+export function clashLabel(clash: string): string {
+    return isOneOf(clashKinds, clash) ? clashWords[clash] : clash;
 }
 
-const kindTones: Readonly<Record<EntityKind, Tone>> = {
-    hub: "accent",
-    category: "info",
-    product: "ok",
-    topic: "muted",
-    custom: "warn",
-};
-
-export function kindTone(kind: string): Tone {
-    return isOneOf(entityKinds, kind) ? kindTones[kind] : "muted";
+export function entityTypeLabel(type: EntityType | null): string {
+    return type === null ? copy.pageTypes.untyped : type.name;
 }
 
 const lensTones: Readonly<Record<Lens, Tone>> = {
@@ -48,10 +37,6 @@ export function lensLabel(lens: Lens): string {
 
 export function lensHint(lens: Lens): string {
     return copy.graph.lens.hint[lens];
-}
-
-export function entityKindLabel(kind: string): string {
-    return isOneOf(entityKinds, kind) ? copy.graph.kinds[kind] : kind;
 }
 
 export function formatScore(score: number): string {

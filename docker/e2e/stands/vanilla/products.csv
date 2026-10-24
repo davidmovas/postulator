@@ -1,0 +1,5 @@
+Type,SKU,Name,Published,Visibility in catalog,Short description,Description,In stock?,Regular price,Categories,Parent,Attribute 1 name,Attribute 1 value(s),Attribute 1 visible,Attribute 1 global,Attribute 1 default
+simple,POWDER,Powder,1,visible,,"<p>See <a href=""/product-category/koffein/"">Koffein</a>.</p>",1,12.00,Koffein,,,,,,
+variable,BEANS,Coffee Beans,1,visible,"<p>Whole beans, roasted every week.</p>",<p>Roasted every week and sold whole.</p>,1,,Koffein,,Weight,"250 g, 1 kg",1,0,250 g
+variation,BEANS-250G,Coffee Beans - 250 g,1,visible,,,1,9.00,,BEANS,Weight,250 g,,0,
+variation,BEANS-1KG,Coffee Beans - 1 kg,1,visible,,,1,29.00,,BEANS,Weight,1 kg,,0,

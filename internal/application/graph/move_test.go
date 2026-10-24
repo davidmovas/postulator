@@ -34,9 +34,9 @@ func TestMoveEntityChangesTheParentInOneWrite(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	other := h.entity(t, "Other", "hub")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	other := h.entity(t, "Other")
+	leaf := h.entity(t, "Leaf")
 	h.edge(t, leaf.ID, hub.ID, "parent", "approved")
 	h.recorder.Reset()
 
@@ -65,9 +65,9 @@ func TestMoveEntityKeepsBothParentsWhenAsked(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	other := h.entity(t, "Other", "hub")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	other := h.entity(t, "Other")
+	leaf := h.entity(t, "Leaf")
 	h.edge(t, leaf.ID, hub.ID, "parent", "approved")
 
 	moved, err := h.service.MoveEntity(t.Context(), graph.MoveEntityRequest{
@@ -91,9 +91,9 @@ func TestMoveEntityLeavesTheGraphAloneWhenItWouldMakeACycle(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	mid := h.entity(t, "Mid", "topic")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	mid := h.entity(t, "Mid")
+	leaf := h.entity(t, "Leaf")
 	h.edge(t, mid.ID, hub.ID, "parent", "approved")
 	h.edge(t, leaf.ID, mid.ID, "parent", "approved")
 
@@ -115,8 +115,8 @@ func TestMoveEntityRefusesWhatItCannotDo(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	leaf := h.entity(t, "Leaf")
 
 	cases := []struct {
 		name    string
@@ -157,9 +157,9 @@ func TestMoveEntityRunAgainIsQuiet(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	hub := h.entity(t, "Hub", "hub")
-	other := h.entity(t, "Other", "hub")
-	leaf := h.entity(t, "Leaf", "topic")
+	hub := h.entity(t, "Hub")
+	other := h.entity(t, "Other")
+	leaf := h.entity(t, "Leaf")
 	h.edge(t, leaf.ID, hub.ID, "parent", "approved")
 
 	first, err := h.service.MoveEntity(t.Context(), graph.MoveEntityRequest{
@@ -203,7 +203,7 @@ func TestAnAnchorTakesItsSourceFromWhoAsked(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
-			leaf := h.entity(t, "Leaf", "topic")
+			leaf := h.entity(t, "Leaf")
 			ctx := kctx.WithActor(t.Context(), tc.actor)
 
 			set, err := h.service.SetAnchors(ctx, graph.SetAnchorsRequest{

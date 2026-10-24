@@ -7,12 +7,14 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -20,7 +22,7 @@ import (
 func (f *fixture) storedLink(from pagemap.Page, toPageID *string, toURL, anchor string, order int) pagemap.PageLink {
 	return pagemap.PageLink{
 		ID: id.New(), SiteID: f.siteID, FromPageID: from.ID, ToPageID: toPageID, ToURL: toURL,
-		AnchorText: anchor, Origin: pagemap.OriginObserved,
+		AnchorText: anchor, Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
 		ObservedAt: sqlitetest.Stamp.Add(time.Duration(order) * time.Second),
 	}
 }
@@ -28,7 +30,7 @@ func (f *fixture) storedLink(from pagemap.Page, toPageID *string, toURL, anchor 
 func (f *fixture) replaceLinks(t *testing.T, from pagemap.Page, links ...pagemap.PageLink) {
 	t.Helper()
 
-	if err := sqlite.NewPageLinkRepo(f.store).ReplaceForPage(t.Context(), from.ID, links); err != nil {
+	if err := sqlite.NewPageLinkRepo(f.store).ReplaceForPage(t.Context(), from.ID, pagemap.SourceRaw, links); err != nil {
 		t.Fatalf("replace the links of %s: %v", from.Path, err)
 	}
 }
@@ -43,10 +45,12 @@ func auditFixture(t *testing.T) *fixture {
 	espresso := f.pages["/coffee/espresso/"]
 	coffee := f.pages["/coffee/"]
 	tea := f.pages["/tea/"]
+	ours := f.storedLink(espresso, &tea.ID, "/tea/", "tea", 2)
+	ours.Ours = true
 	f.replaceLinks(t, espresso,
 		f.storedLink(espresso, &coffee.ID, "/coffee/", "Coffee", 0),
 		f.storedLink(espresso, nil, "https://example.org/", "elsewhere", 1),
-		f.storedLink(espresso, &tea.ID, "/tea/", "tea", 2),
+		ours,
 		f.storedLink(espresso, &espresso.ID, "/coffee/espresso/", "here", 3),
 	)
 	return f
@@ -81,25 +85,21 @@ func TestLinkAuditAuditsEveryMappedPage(t *testing.T) {
 		f.row("/coffee/filter/", "planned", "Filter", "", [10]int{2, 1, 1, 0, 0, 0, 0, 0, 1, 0}, false, false),
 		f.row("/tea/", "exists", "", "unmapped", [10]int{0, 0, 0, 0, 0, 0, 0, 1, 0, 0}, false, true),
 	}
+	want[1].ByType = reports.LinkTypeCounts{Contextual: 4}
+	want[2].ByType = reports.LinkTypeCounts{Contextual: 1}
 	if !reflect.DeepEqual(got.Pages, want) {
 		t.Fatalf("pages =\n%+v\nwant\n%+v", got.Pages, want)
 	}
 
 	totals := reports.LinkTotals{
 		Pages: 4, Audited: 3, Targets: 7, Required: 2, Satisfied: 2, Missing: 1, MissingRequired: 0,
-		Blocked: 1, OffGraph: 3, Orphans: 0, Pending: 3, Unpublished: 0,
+		Blocked: 1, OffGraph: 3, Orphans: 0, Pending: 3, Unpublished: 0, ByType: reports.LinkTypeCounts{Contextual: 5},
 	}
 	if got.Totals != totals {
 		t.Fatalf("totals = %+v, want %+v", got.Totals, totals)
 	}
 	if got.SiteID != f.siteID {
 		t.Fatalf("siteId = %s", got.SiteID)
-	}
-
-	policy := got.Policy
-	if policy.ID == "" || policy.Name != "Default" || !policy.ForbidExternal || !policy.ForbidSelf ||
-		policy.AnchorStrategy != "prefer_user" {
-		t.Fatalf("policy = %+v", policy)
 	}
 }
 
@@ -128,7 +128,7 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 	if espresso.TemplateID != f.templateID {
 		t.Fatalf("templateId = %s, want %s", espresso.TemplateID, f.templateID)
 	}
-	rules := template.LinkRules{
+	rules := field.LinkRules{
 		UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 20, MaxPerTarget: 1,
 		ParentLinkWithinParagraphs: 2, ChildrenSection: true,
 	}
@@ -154,9 +154,9 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 		t.Fatalf("required =\n%+v\nwant\n%+v", espresso.Required, wantRequired)
 	}
 	wantExtra := []reports.ExtraLink{
-		{ToURL: "https://example.org/", Anchor: "elsewhere", Kind: "external", Origin: "observed"},
-		{ToURL: "/tea/", ToPageID: f.pages["/tea/"].ID, Anchor: "tea", Kind: "unknown_internal", Origin: "observed"},
-		{ToURL: "/coffee/espresso/", ToPageID: f.pages["/coffee/espresso/"].ID, Anchor: "here", Kind: "self", Origin: "observed"},
+		{ToURL: "https://example.org/", Anchor: "elsewhere", Kind: "external"},
+		{ToURL: "/tea/", ToPageID: f.pages["/tea/"].ID, Anchor: "tea", Kind: "unknown_internal", Ours: true},
+		{ToURL: "/coffee/espresso/", ToPageID: f.pages["/coffee/espresso/"].ID, Anchor: "here", Kind: "self"},
 	}
 	if !reflect.DeepEqual(espresso.Extra, wantExtra) {
 		t.Fatalf("extra =\n%+v\nwant\n%+v", espresso.Extra, wantExtra)
@@ -191,7 +191,7 @@ func TestTheAuditNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 	}
 	tea := f.entity(t, repo, "Tea", 0.1, nil)
 	if err := repo.Insert(t.Context(), graph.Entity{
-		ID: id.New(), SiteID: f.siteID, Name: "Espresso", Kind: graph.KindTopic, Keywords: keyword.Of("tea espresso"),
+		ID: id.New(), SiteID: f.siteID, Name: "Espresso", Keywords: keyword.Of("tea espresso"),
 		Source: graph.SourceUser, ScopeID: &tea.ID, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	}); err != nil {
 		t.Fatalf("insert the other Espresso: %v", err)
@@ -277,11 +277,27 @@ func TestTheAuditSaysWhyALinkIsAbsent(t *testing.T) {
 	}
 }
 
-func TestLinkAuditSkipsAPageWithoutATemplate(t *testing.T) {
+func TestLinkAuditAuditsAPageWithoutATemplateByItsType(t *testing.T) {
 	t.Parallel()
 
 	f := newFixture(t)
 	other := sqlitetest.Site(t, f.store, "bare")
+	if err := f.types.Seed(t.Context(), other.ID); err != nil {
+		t.Fatalf("seed the bare site's types: %v", err)
+	}
+	seeded, err := f.types.List(t.Context(), pagetypes.ListRequest{SiteID: other.ID})
+	if err != nil {
+		t.Fatalf("list the bare site's types: %v", err)
+	}
+	none := ""
+	for i := range seeded.Types {
+		if seeded.Types[i].Preset != string(pagetype.Entity) {
+			continue
+		}
+		if _, err = f.types.Save(t.Context(), pagetypes.SaveRequest{ID: seeded.Types[i].ID, TemplateID: &none}); err != nil {
+			t.Fatalf("take the Entity type's template away: %v", err)
+		}
+	}
 	page := sqlitetest.Page(t, f.store, other.ID, "/alone/")
 	entity := sqlitetest.Entity(t, f.store, other.ID, "Alone")
 	page.EntityID = &entity.ID
@@ -293,11 +309,18 @@ func TestLinkAuditSkipsAPageWithoutATemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LinkAudit: %v", err)
 	}
-	if len(got.Pages) != 1 || got.Pages[0].SkipReason != "no_template" || got.Pages[0].Targets != 0 {
-		t.Fatalf("pages = %+v", got.Pages)
+	if len(got.Pages) != 1 || got.Pages[0].SkipReason != "" || got.Pages[0].Targets != 0 {
+		t.Fatalf("pages = %+v, want the page audited although no template answers for it", got.Pages)
 	}
-	if got.Totals.Audited != 0 || got.Totals.Pages != 1 {
+	if got.Totals.Audited != 1 || got.Totals.Pages != 1 {
 		t.Fatalf("totals = %+v", got.Totals)
+	}
+	detail, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: page.ID})
+	if err != nil {
+		t.Fatalf("LinkAuditPage: %v", err)
+	}
+	if detail.TemplateID != "" || detail.Rules.MaxLinks != 12 {
+		t.Fatalf("detail = template %q rules %+v, want no template and the Entity type's rules", detail.TemplateID, detail.Rules)
 	}
 }
 
@@ -315,6 +338,89 @@ func TestLinkAuditOrphansAgreeWithTheOverview(t *testing.T) {
 	}
 	if audit.Totals.Orphans != overview.Pages.Orphans || audit.Totals.Orphans == 0 {
 		t.Fatalf("audit orphans = %d, overview orphans = %d", audit.Totals.Orphans, overview.Pages.Orphans)
+	}
+}
+
+func TestOnlyAContextualLinkSatisfiesAnOwedLink(t *testing.T) {
+	t.Parallel()
+
+	f := auditFixture(t)
+	espresso := f.pages["/coffee/espresso/"]
+	coffee := f.pages["/coffee/"]
+	tea := f.pages["/tea/"]
+	f.replaceLinks(t, espresso, f.storedLink(espresso, &tea.ID, "/tea/", "tea", 0))
+	crumb := f.storedLink(espresso, &coffee.ID, "/coffee/", "Coffee", 1)
+	crumb.Type, crumb.Source, crumb.Region = pagemap.LinkBreadcrumb, pagemap.SourceRender, "breadcrumb"
+	menu := f.storedLink(espresso, &coffee.ID, "/coffee/", "Coffee", 2)
+	menu.Type, menu.Source, menu.Region = pagemap.LinkNavigation, pagemap.SourceRender, "navigation"
+	if err := sqlite.NewPageLinkRepo(f.store).ReplaceForPage(t.Context(), espresso.ID, pagemap.SourceRender, []pagemap.PageLink{crumb, menu}); err != nil {
+		t.Fatalf("store the render links: %v", err)
+	}
+
+	detail, err := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: espresso.ID})
+	if err != nil {
+		t.Fatalf("LinkAuditPage: %v", err)
+	}
+	owed, ok := requiredFor(detail.Required, coffee.ID)
+	if !ok || owed.Satisfied || owed.State != string(reports.LinkMissing) {
+		t.Errorf("the link owed to /coffee/ = %+v %t, want missing although a breadcrumb and a menu link reach it", owed, ok)
+	}
+
+	audit, err := f.service.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("LinkAudit: %v", err)
+	}
+	want := reports.LinkTypeCounts{Breadcrumb: 1, Navigation: 1, Contextual: 1}
+	if site := (reports.LinkTypeCounts{Breadcrumb: 1, Navigation: 1, Contextual: 2}); audit.Totals.ByType != site {
+		t.Errorf("links by type = %+v, want %+v", audit.Totals.ByType, site)
+	}
+	for _, row := range audit.Pages {
+		switch row.Path {
+		case "/coffee/espresso/":
+			if row.ByType != want {
+				t.Errorf("espresso's links by type = %+v, want %+v", row.ByType, want)
+			}
+		case "/coffee/":
+			if !row.Orphan || row.Inbound != 0 {
+				t.Errorf("/coffee/ inbound %d orphan %t, want an orphan: no contextual link reaches it", row.Inbound, row.Orphan)
+			}
+		}
+	}
+}
+
+func TestTechnicalTermAndFrontPagesAreNeverOrphans(t *testing.T) {
+	t.Parallel()
+
+	f := newFixture(t)
+	repo := sqlite.NewPageRepo(f.store)
+	f.page(t, repo, "/", pagemap.StatusPublished)
+	cart := f.page(t, repo, "/cart/", pagemap.StatusPublished)
+	cart.TechnicalReason = pagemap.TechnicalCart
+	term := f.page(t, repo, "/product-category/beans/", pagemap.StatusPublished)
+	term.WPType = pagemap.WPProductCategory
+	for _, page := range []pagemap.Page{cart, term} {
+		if err := repo.Update(t.Context(), page); err != nil {
+			t.Fatalf("update %s: %v", page.Path, err)
+		}
+	}
+	f.page(t, repo, "/lonely/", pagemap.StatusPublished)
+
+	audit, err := f.service.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("LinkAudit: %v", err)
+	}
+	want := map[string]bool{"/": false, "/cart/": false, "/product-category/beans/": false, "/lonely/": true}
+	for _, row := range audit.Pages {
+		if orphan, asked := want[row.Path]; asked && row.Orphan != orphan {
+			t.Errorf("%s orphan = %t, want %t", row.Path, row.Orphan, orphan)
+		}
+	}
+	overview, err := f.service.SiteOverview(t.Context(), reports.SiteOverviewRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("SiteOverview: %v", err)
+	}
+	if overview.Pages.Orphans != audit.Totals.Orphans {
+		t.Errorf("overview orphans %d, audit orphans %d, want the same rule", overview.Pages.Orphans, audit.Totals.Orphans)
 	}
 }
 
@@ -346,7 +452,7 @@ func TestLinkAuditRefusesWhatItCannotRead(t *testing.T) {
 	}
 }
 
-func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules template.LinkRules) content.LinkContext {
+func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules field.LinkRules) content.LinkContext {
 	t.Helper()
 
 	entities, err := sqlite.NewEntityRepo(f.store).ListBySite(t.Context(), f.siteID)
@@ -372,7 +478,7 @@ func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules t
 
 	return content.PlanLinks(built, pagemap.NewIndex(pages), content.Subject{
 		Site: pagemap.NewSite(owner.BaseURL), PageID: page.ID, PagePath: page.Path, EntityID: entityID,
-	}, template.LinkPolicy{Rules: rules, ForbidExternal: true, ForbidSelf: true}).Context
+	}, field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true}).Context
 }
 
 func TestASecondPageOfAnEntityIsAuditedAndValidatedAlike(t *testing.T) {
@@ -420,8 +526,8 @@ func TestASecondPageOfAnEntityIsAuditedAndValidatedAlike(t *testing.T) {
 				t.Fatalf("parse the body: %v", err)
 			}
 
-			report := content.Compliance(doc, lc, template.LinkPolicy{
-				Rules: detail.Rules, ForbidExternal: true, ForbidSelf: true,
+			report := content.Compliance(doc, lc, field.LinkPolicy{
+				Links: true, Rules: detail.Rules, ForbidExternal: true, ForbidSelf: true,
 			}, second.ID)
 			selfLinks, offGraph := 0, 0
 			for _, item := range report.Items {

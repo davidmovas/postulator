@@ -8,6 +8,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -56,24 +57,52 @@ func TestEstimatePricesAStepAtTheCeilingItDeclares(t *testing.T) {
 	}
 }
 
+func TestAnEstimateRemembersTheSiteAcrossItsPreflightsAndPrices(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 3)
+	var preflights, inputs int
+	body := pricedStep("generate_body", llm.RoleWriter, run.Price{Input: func(ctx context.Context, _ run.Target) (int, error) {
+		if remembered, ok := ctx.Value(rememberedKey{}).(bool); ok && remembered {
+			inputs++
+		}
+		return 100, nil
+	}})
+	body.Preflight = func(ctx context.Context, _ run.Run, _ map[string]run.Target) ([]run.EstimateFinding, error) {
+		if remembered, ok := ctx.Value(rememberedKey{}).(bool); ok && remembered {
+			preflights++
+		}
+		return nil, nil
+	}
+	engine := harness.engine(t, mustRegister(t, body))
+
+	if _, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil); err != nil {
+		t.Fatalf("EstimateRun: %v", err)
+	}
+	if harness.snapshots.calls != 1 || preflights != 1 || inputs != 3 {
+		t.Errorf("one estimate remembered %d times, over %d preflights and %d priced inputs, want once over all of them",
+			harness.snapshots.calls, preflights, inputs)
+	}
+}
+
 func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 	t.Parallel()
 
 	harness := newHarness(t, 1)
 	repair := pricedStep("repair_links", llm.RoleLinker, run.Price{
 		OutputTokens: 256,
-		Calls: func(spec template.TemplateSpec, params map[string]any) int {
-			return spec.LinkRules.UpDepth * 2
+		Calls: func(target run.Target, params map[string]any) int {
+			return target.Links.Rules.UpDepth * 2
 		},
 	})
 	engine := harness.engine(t, mustRegister(t, repair))
 
-	harness.specs.spec = template.TemplateSpec{LinkRules: template.LinkRules{UpDepth: 1}}
+	harness.types.rules = field.LinkRules{UpDepth: 1}
 	one, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
-	harness.specs.spec = template.TemplateSpec{LinkRules: template.LinkRules{UpDepth: 3}}
+	harness.types.rules = field.LinkRules{UpDepth: 3}
 	three, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
@@ -82,13 +111,13 @@ func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 		t.Fatalf("three levels of parents cost %d against one level's %d", three.Tokens, one.Tokens)
 	}
 
-	harness.specs.spec = template.TemplateSpec{}
+	harness.types.rules = field.LinkRules{}
 	none, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("repair_links")), nil)
 	if err != nil {
 		t.Fatalf("EstimateRun: %v", err)
 	}
 	if none.Tokens != 0 || none.USD != 0 {
-		t.Fatalf("a template that asks for no parent links costs %+v", none)
+		t.Fatalf("a page type that asks for no parent links costs %+v", none)
 	}
 }
 
@@ -157,7 +186,7 @@ func TestEstimateWarnsWhenAPageWantsImagesTheRecipeWillNotDraw(t *testing.T) {
 				Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
 				Produces: []run.ArtifactKind{run.ArtifactImages},
 				Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
-				Price:    run.Price{Calls: func(template.TemplateSpec, map[string]any) int { return 0 }},
+				Price:    run.Price{Calls: func(run.Target, map[string]any) int { return 0 }},
 			}
 			engine := harness.engine(t, mustRegister(t, body, images))
 			harness.specs.spec = template.TemplateSpec{Images: tc.images}
@@ -185,6 +214,50 @@ func TestEstimateWarnsWhenAPageWantsImagesTheRecipeWillNotDraw(t *testing.T) {
 	}
 }
 
+func TestARunScopedToFieldsIsPricedOnTheStepsItKeeps(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 2)
+	body := pricedStep("generate_body", llm.RoleWriter, run.Price{})
+	meta := pricedStep("generate_meta", llm.RoleEditor, run.Price{OutputTokens: 512})
+	publish := run.StepDef{
+		Name:     "publish",
+		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
+		Scoped:   run.DraftsOf,
+		Produces: []run.ArtifactKind{run.ArtifactPublishResult},
+		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
+	}
+	engine := harness.engine(t, mustRegister(t, body, meta, publish))
+	whole := recipeOf("generate_body", "generate_meta", "publish")
+	harness.specs.spec = template.TemplateSpec{
+		Sections: []template.Section{{Heading: "Intro", TargetWords: 1200}}, Recipe: whole,
+	}
+	scoped, err := run.ScopeRecipe(whole, []string{string(field.SEODescription)})
+	if err != nil {
+		t.Fatalf("ScopeRecipe: %v", err)
+	}
+
+	full, err := engine.EstimateRun(t.Context(), harness.newRun(whole), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun of the whole recipe: %v", err)
+	}
+	swept, err := engine.EstimateRun(t.Context(), harness.newRun(scoped), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun of the scoped recipe: %v", err)
+	}
+	metaOnly, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_meta")), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun of the meta alone: %v", err)
+	}
+	if swept.Tokens != metaOnly.Tokens || swept.Tokens >= full.Tokens {
+		t.Fatalf("the scoped run is priced at %d tokens, the meta alone at %d and the whole recipe at %d; "+
+			"want the scoped run priced as its meta step alone", swept.Tokens, metaOnly.Tokens, full.Tokens)
+	}
+	if len(swept.Findings) != 0 {
+		t.Errorf("the scoped run's estimate says %+v, want nothing about a recipe it narrowed on purpose", swept.Findings)
+	}
+}
+
 func TestAStepThatMakesNoCallIsNotReportedUnpriced(t *testing.T) {
 	t.Parallel()
 
@@ -195,7 +268,7 @@ func TestAStepThatMakesNoCallIsNotReportedUnpriced(t *testing.T) {
 		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
 		Price: run.Price{
 			Unpriced: true,
-			Calls:    func(spec template.TemplateSpec, _ map[string]any) int { return spec.Images.Wanted() },
+			Calls:    func(target run.Target, _ map[string]any) int { return target.Spec.Images.Wanted() },
 		},
 	}
 	engine := harness.engine(t, mustRegister(t, images))
@@ -605,7 +678,7 @@ func TestEstimatePricesImagesOnTheModelThatDrawsThem(t *testing.T) {
 		Run:      func(context.Context, *run.StepContext) (run.Result, error) { return run.Result{}, nil },
 		Price: run.Price{
 			Ref: &drawer, OutputTokens: 1000,
-			Calls: func(spec template.TemplateSpec, _ map[string]any) int { return spec.Images.Inline },
+			Calls: func(target run.Target, _ map[string]any) int { return target.Spec.Images.Inline },
 		},
 	}
 	engine := harness.engine(t, mustRegister(t, images))
@@ -634,5 +707,59 @@ func TestEstimatePricesImagesOnTheModelThatDrawsThem(t *testing.T) {
 	}
 	if len(unkeyed.Blocking()) != 1 || unkeyed.Blocking()[0].Code != runtime.CodeProviderKeyMissing {
 		t.Fatalf("findings = %+v, want the missing key of the image model", unkeyed.Findings)
+	}
+}
+
+func TestEstimatedInputIsTheInputTheEstimatePrices(t *testing.T) {
+	t.Parallel()
+
+	const words = 300
+	cases := []struct {
+		name   string
+		price  run.Price
+		output int
+	}{
+		{name: "a step priced on its spec's words", output: llm.WordTokens(words)},
+		{name: "a step priced at its own ceiling", price: run.Price{OutputTokens: 512}, output: 512},
+		{name: "a step that reads a pack", output: llm.WordTokens(words), price: run.Price{
+			Input: func(context.Context, run.Target) (int, error) { return 1234, nil },
+		}},
+		{name: "a pack the read layer refuses", output: llm.WordTokens(words), price: run.Price{
+			Input: func(context.Context, run.Target) (int, error) { return 0, errors.New(errors.Invalid, "no page") },
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			harness := newHarness(t, 1)
+			harness.specs.spec = template.TemplateSpec{Sections: []template.Section{{Heading: "Intro", TargetWords: words}}}
+			def := pricedStep("generate_body", llm.RoleWriter, tc.price)
+			engine := harness.engine(t, mustRegister(t, def))
+
+			estimate, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil)
+			if err != nil {
+				t.Fatalf("EstimateRun: %v", err)
+			}
+			input, err := runtime.EstimatedInput(t.Context(), def, run.Target{Spec: harness.specs.spec})
+			if err != nil {
+				t.Fatalf("EstimatedInput: %v", err)
+			}
+			if estimate.Tokens != input+tc.output {
+				t.Errorf("the estimate prices %d tokens, want the input %d and the output %d", estimate.Tokens, input, tc.output)
+			}
+		})
+	}
+}
+
+func TestEstimatedInputPassesOnAReadLayersFailure(t *testing.T) {
+	t.Parallel()
+
+	busy := errors.New(errors.External, "the database is busy")
+	def := pricedStep("generate_body", llm.RoleWriter, run.Price{
+		Input: func(context.Context, run.Target) (int, error) { return 0, busy },
+	})
+	if _, err := runtime.EstimatedInput(t.Context(), def, run.Target{}); !errors.IsCode(err, errors.External) {
+		t.Errorf("EstimatedInput = %v, want the read layer's failure", err)
 	}
 }

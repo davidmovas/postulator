@@ -194,7 +194,7 @@ func (s *Service) siteContext(ctx context.Context, conversation domainagent.Conv
 		if i >= templatesInPrompt {
 			break
 		}
-		built.Templates = append(built.Templates, listed.Items[i].Name+" ("+listed.Items[i].PageKind+")")
+		built.Templates = append(built.Templates, listed.Items[i].Name)
 	}
 
 	if conversation.SiteID == nil {
@@ -205,7 +205,10 @@ func (s *Service) siteContext(ctx context.Context, conversation domainagent.Conv
 	if err != nil {
 		return SiteContext{}, err
 	}
-	built.SiteName = owner.Name
+	built.SiteID, built.SiteName = owner.ID, owner.Name
+	if built.Brief, err = s.brief(ctx, conversation); err != nil {
+		return SiteContext{}, err
+	}
 
 	overview, err := s.deps.Reports.SiteOverview(ctx, reports.SiteOverviewRequest{SiteID: *conversation.SiteID})
 	if err != nil {
@@ -216,6 +219,21 @@ func (s *Service) siteContext(ctx context.Context, conversation domainagent.Conv
 	built.Published = overview.Pages.ByStatus["published"]
 	built.Unmapped = overview.Pages.Unmapped
 	return built, nil
+}
+
+func (s *Service) brief(ctx context.Context, conversation domainagent.Conversation) (string, error) {
+	if conversation.Brief != "" {
+		return conversation.Brief, nil
+	}
+	built, err := s.deps.Briefs.Brief(ctx, *conversation.SiteID)
+	if err != nil {
+		return "", err
+	}
+	text := built.Text()
+	if setErr := s.deps.Conversations.SetBrief(ctx, conversation.ID, text); setErr != nil {
+		return "", setErr
+	}
+	return text, nil
 }
 
 func (s *Service) conversation(ctx context.Context, conversationID string) (domainagent.Conversation, error) {

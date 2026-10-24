@@ -9,10 +9,13 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	"github.com/davidmovas/postulator/internal/application/llm"
-	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -32,10 +35,11 @@ type pageStore interface {
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
+	UpdatePublished(ctx context.Context, page pagemap.Page) error
 }
 
 type linkStore interface {
-	ReplaceForPage(ctx context.Context, pageID string, links []pagemap.PageLink) error
+	ReplaceForPage(ctx context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error
 	ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 }
 
@@ -55,9 +59,22 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
-type templateReader interface {
-	GetEffectivePolicy(ctx context.Context, req templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error)
-	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
+type bodyRecorder interface {
+	Record(ctx context.Context, pageID, raw string, at time.Time) error
+	Observe(ctx context.Context, snapshot block.Snapshot) error
+	Get(ctx context.Context, pageID string) (current, base block.Snapshot, found bool, err error)
+	ReplaceWritten(ctx context.Context, pageID string, hashes []string, runID string, at time.Time) error
+	ListWritten(ctx context.Context, pageID string) ([]block.Written, error)
+}
+
+type fieldRecorder interface {
+	Record(ctx context.Context, pageID string, key field.Key, value, runID string, at time.Time) error
+	ListForPage(ctx context.Context, pageID string) ([]field.Value, error)
+	ListBySite(ctx context.Context, siteID string) (map[string][]field.Value, error)
+}
+
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
 type profileResolver interface {
@@ -94,13 +111,19 @@ type Deps struct {
 	Sites         siteReader
 	SiteWriter    siteWriter
 	WordPress     siteClients
-	Policies      templateReader
+	Types         typeSets
 	Profiles      profileResolver
+	Tuning        stepTuning
+	Models        modelInfo
+	Pictures      pictures
 	Content       judgeService
 	LLM           llm.Client
 	ImageProvider ImageProvider
 	ImageModel    *domainllm.ModelRef
 	ImageSources  map[template.ImageSource]ImageSource
+	Observe       *observe.Service
+	Bodies        bodyRecorder
+	Fields        fieldRecorder
 	UnitOfWork    unitOfWork
 	Publisher     application.Publisher
 	Clock         clock.Clock
@@ -112,6 +135,55 @@ func (d Deps) now() time.Time {
 		return time.Time{}
 	}
 	return d.Clock.Now().UTC().Truncate(time.Second)
+}
+
+func (d Deps) namedIndex(ctx context.Context, siteID string, pages []pagemap.Page) (pagemap.Index, error) {
+	if d.Fields == nil {
+		return pagemap.NewIndex(pages), nil
+	}
+	stored, err := d.Fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return pagemap.Index{}, err
+	}
+	return pagemap.NewIndexNamed(pages, pagemap.Names(stored)), nil
+}
+
+func (d Deps) drifted(ctx context.Context, page pagemap.Page) (bool, error) {
+	if d.Bodies == nil {
+		return false, nil
+	}
+	current, base, found, err := d.Bodies.Get(ctx, page.ID)
+	if err != nil {
+		return false, err
+	}
+	return found && current.Hash != base.Hash, nil
+}
+
+func (d Deps) baseHash(ctx context.Context, page pagemap.Page) (string, error) {
+	if d.Bodies == nil {
+		return "", nil
+	}
+	_, base, found, err := d.Bodies.Get(ctx, page.ID)
+	if err != nil || !found {
+		return "", err
+	}
+	return base.Hash, nil
+}
+
+func (d Deps) storeName(ctx context.Context, page pagemap.Page) (string, error) {
+	if d.Fields == nil || page.WPType != pagemap.WPProduct {
+		return "", nil
+	}
+	values, err := d.Fields.ListForPage(ctx, page.ID)
+	if err != nil {
+		return "", err
+	}
+	for i := range values {
+		if values[i].Key == field.Title {
+			return values[i].Current, nil
+		}
+	}
+	return "", nil
 }
 
 func (d Deps) inUnit(ctx context.Context, apply func(context.Context) error) error {

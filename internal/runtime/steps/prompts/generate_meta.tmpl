@@ -1,24 +1,31 @@
 {{define "generate_meta.system"}}
-You are an SEO editor writing the search snippet of a WordPress page that already exists as a draft.
-Write in English. Return one JSON object with the fields title, description, canonical, ogTitle and
+You are an SEO editor writing the search snippet of a WordPress page that already exists {{if .Standing}}on the site{{else}}as a draft{{end}}.
+Write in English. Return one JSON object with the fields title, description, ogTitle and
 ogDescription. Write plain text: no markup, no quotation marks around a field, no emoji.
 The title reads as a page title, not as a sentence. The description is one sentence that says what the page
 answers and why the reader should open it, and it never repeats the title verbatim.
-Never invent a fact that the draft does not carry.
+Never invent a fact that the {{if .Standing}}page{{else}}draft{{end}} or the picture does not carry.
 {{end}}
 
 {{define "generate_meta.user"}}
+THE FULL PICTURE
+What the site and its owner hold about the page, the most important first. The field's rules below are the SEO title's.
+
+{{if .Picture}}{{.Picture}}{{else}}Nothing is known of the page beyond what follows.
+{{end}}{{if .Description}}
+THE SEO DESCRIPTION'S RULES
+{{range .Description}}{{.}}
+{{end}}{{end}}
 PAGE
 Path: {{.Page.Path}}
 Site: {{.SiteName}}
-Canonical: {{.Canonical}}
 
 ENTITY
 Name: {{.Entity.Name}}
 Primary keyword: {{.Keywords.Main}}
 {{if .Keywords}}Keywords, the most searched first: {{range $index, $keyword := .Keywords}}{{if $index}}, {{end}}{{$keyword.Text}}{{end}}{{end}}
 
-DRAFT
+{{if .Standing}}THE PAGE AS IT STANDS{{else}}DRAFT{{end}}
 Title: {{.Draft.Title}}
 H1: {{.Draft.H1}}
 Summary: {{.Draft.Summary}}
@@ -30,6 +37,5 @@ META RULES
 {{if .Pattern}}The title follows this shape exactly: {{.Pattern}}
 {{end}}{{if .Spec.MetaRules.DescriptionMax}}The description is at most {{.Spec.MetaRules.DescriptionMax}} characters.
 {{end}}{{if .Spec.KeywordRules.PrimaryInTitle}}The title contains the primary keyword.
-{{end}}The canonical is {{.Canonical}}.
-The Open Graph title and description may be shorter and more conversational than the meta pair.
+{{end}}The Open Graph title and description may be shorter and more conversational than the meta pair.
 {{end}}

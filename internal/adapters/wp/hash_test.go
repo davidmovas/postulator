@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 )
 
 func TestContentHashIsPlainSHA256OfTheRawBytes(t *testing.T) {
@@ -35,6 +36,11 @@ func TestContentHashDoesNotNormalise(t *testing.T) {
 
 	if wp.ContentHash("<p>a</p>\n") == wp.ContentHash("<p>a</p>") {
 		t.Error("a trailing newline must change the hash; the hash is over the raw bytes")
+	}
+	for _, raw := range []string{"", "<p>a</p>", "\r\n<p>a</p>\r\n", "  <p>a</p>\n\n", "[products limit=\"4\"]"} {
+		if wp.ContentHash(raw) != block.BodyHash(raw) {
+			t.Errorf("ContentHash(%q) = %q, and the model's body hash is %q; the two must agree or our own write reads as a change", raw, wp.ContentHash(raw), block.BodyHash(raw))
+		}
 	}
 	if wp.ContentHash(" <p>a</p>") == wp.ContentHash("<p>a</p>") {
 		t.Error("leading whitespace must change the hash; the hash is over the raw bytes")

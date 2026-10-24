@@ -1,60 +1,49 @@
-import type { Page, PageTreeNode } from "../../data/types.js";
-import type { PickIndex, Tick } from "../pages/pick/model.js";
-import { branchOf as branchBelow, everyPage, indexTree, narrowTree as narrowBy, tick, toggled } from "../pages/pick/model.js";
-
-export type { PickIndex, Tick };
-export { indexTree, tick, toggled };
+import type { AddedPage, SiteMapNode } from "../../data/types.js";
+import type { Keep } from "../pages/pick/model.js";
+import { everyNode } from "../pages/pick/model.js";
 
 export type Scope = "all" | "missing" | "present";
 
 export const scopes: readonly Scope[] = ["all", "missing", "present"];
 
-export function onSite(page: Page): boolean {
-    return page.wpId !== null;
+const keySeparator = "\n";
+
+export function pickable(node: SiteMapNode): boolean {
+    return (node.entityId ?? "") !== "";
 }
 
-export function pickable(page: Page): boolean {
-    return page.entityId !== null && page.entityId !== "";
+const notOnSite: Keep = (node) => !node.page.onSite;
+
+const onSite: Keep = (node) => node.page.onSite;
+
+export function inScope(scope: Scope): Keep {
+    switch (scope) {
+        case "missing":
+            return notOnSite;
+        case "present":
+            return onSite;
+        default:
+            return everyNode;
+    }
 }
 
-export function requiredParents(selected: ReadonlySet<string>, index: PickIndex): ReadonlyMap<string, string> {
+export function requiredOf(added: readonly AddedPage[] | null | undefined, selected: ReadonlySet<string>): ReadonlyMap<string, string> {
     const required = new Map<string, string>();
-    for (const id of selected) {
-        const neededBy = index.byId.get(id)?.path ?? "";
-        let parentId = index.parentOf.get(id);
-        while (parentId !== undefined) {
-            const parent = index.byId.get(parentId);
-            if (parent === undefined || onSite(parent)) {
-                break;
-            }
-            if (!selected.has(parentId) && !required.has(parentId)) {
-                required.set(parentId, neededBy);
-            }
-            parentId = index.parentOf.get(parentId);
+    if (selected.size === 0) {
+        return required;
+    }
+    for (const parent of added ?? []) {
+        if (!selected.has(parent.pageId) && !required.has(parent.pageId)) {
+            required.set(parent.pageId, parent.neededBy);
         }
     }
     return required;
 }
 
-export function branchOf(id: string, index: PickIndex): string[] {
-    return branchBelow(id, index, pickable);
+export function selectionKey(selected: ReadonlySet<string>): string {
+    return [...selected].sort().join(keySeparator);
 }
 
-export function inScope(scope: Scope): (page: Page) => boolean {
-    switch (scope) {
-        case "missing":
-            return (page) => !onSite(page);
-        case "present":
-            return onSite;
-        default:
-            return everyPage;
-    }
-}
-
-export function narrowTree(
-    roots: readonly PageTreeNode[] | null | undefined,
-    query: string,
-    scope: Scope,
-): readonly PageTreeNode[] {
-    return narrowBy(roots, query, inScope(scope));
+export function idsOf(key: string): string[] {
+    return key === "" ? [] : key.split(keySeparator);
 }

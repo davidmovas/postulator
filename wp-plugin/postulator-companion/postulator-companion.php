@@ -1,31 +1,34 @@
 <?php
 /**
  * Plugin Name: Postulator Companion
- * Version: 1.2.0
- * Requires at least: 6.4
- * Requires PHP: 8.1
+ * Version: 1.5.2
+ * Requires at least: 5.7
+ * Requires PHP: 7.2
+ * Update URI: false
  */
 
 namespace Postulator\Companion;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION             = '1.2.0';
+const VERSION             = '1.5.2';
 const NAMESPACE_PATH      = 'postulator/v1';
-const CAPABILITIES        = array( 'bulk', 'seo_meta', 'seo_meta_read', 'content_hash', 'raw', 'preview' );
+const CAPABILITIES        = array( 'bulk', 'seo_meta', 'seo_meta_read', 'content_hash', 'raw', 'preview', 'rendered', 'meta', 'terms', 'settings', 'meta_write', 'guarded_write' );
 const TYPES               = array( 'page', 'post', 'product', 'product_cat' );
 const TERM_TYPES          = array( 'product_cat' );
 const DEFAULT_LIMIT       = 100;
 const MAX_LIMIT           = 500;
+const MAX_META_KEYS       = 50;
 const TERM_MODIFIED_KEY   = '_postulator_modified';
 const PREVIEW_TTL         = HOUR_IN_SECONDS;
-const PREVIEW_QUERY_VAR   = 'postulator_preview';
+const PREVIEW_QUERY_VAR   = 'preview_token';
 const PREVIEW_HASH_KEY    = '_postulator_preview_hash';
 const PREVIEW_EXPIRES_KEY = '_postulator_preview_expires';
 const PREVIEW_STATUSES    = array( 'draft', 'pending', 'future', 'private' );
 
 require_once __DIR__ . '/includes/http.php';
 require_once __DIR__ . '/includes/normalize.php';
+require_once __DIR__ . '/includes/meta.php';
 require_once __DIR__ . '/includes/seo.php';
 require_once __DIR__ . '/includes/content.php';
 require_once __DIR__ . '/includes/head.php';

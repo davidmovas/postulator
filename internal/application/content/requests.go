@@ -9,16 +9,17 @@ import (
 )
 
 type AssessRequest struct {
-	SiteID     string
-	Page       pagemap.Page
-	Entity     graph.Entity
-	Spec       template.TemplateSpec
-	Body       string
-	Snippet    Snippet
-	Product    *contentdomain.ProductDraft
-	Targets    []contentdomain.LinkTarget
-	Call       llm.CallMeta
-	HasSnippet bool
+	SiteID           string
+	Page             pagemap.Page
+	Entity           graph.Entity
+	Spec             template.TemplateSpec
+	Body             string
+	Snippet          Snippet
+	ShortDescription string
+	Targets          []contentdomain.LinkTarget
+	Picture          string
+	Call             llm.CallMeta
+	HasSnippet       bool
 }
 
 type AssessResponse struct {

@@ -36,7 +36,7 @@ func TestTrimKeepsTheNewestWholeTurns(t *testing.T) {
 		said(llm.RoleAssistant, strings.Repeat("b", 400)),
 		said(llm.RoleDeveloper, "the site holds four pages"),
 		said(llm.RoleUser, "the newest question"),
-		called("call-1", "pages_tree", `{}`),
+		called("call-1", "pages_list", `{}`),
 		answered("call-1", `{"ok":true}`),
 		said(llm.RoleAssistant, "the newest answer"),
 	}
@@ -80,12 +80,12 @@ func TestTrimNeverSeparatesACallFromItsResult(t *testing.T) {
 	items := []llm.Message{
 		said(llm.RoleDeveloper, "context one"),
 		said(llm.RoleUser, "first"),
-		called("call-1", "pages_tree", `{}`),
+		called("call-1", "pages_list", `{}`),
 		answered("call-1", `{"roots":["`+strings.Repeat("x", 300)+`"]}`),
 		said(llm.RoleAssistant, "one tree"),
 		said(llm.RoleDeveloper, "context two"),
 		said(llm.RoleUser, "second"),
-		called("call-2", "pages_tree", `{}`),
+		called("call-2", "pages_list", `{}`),
 		answered("call-2", `{"roots":[]}`),
 	}
 

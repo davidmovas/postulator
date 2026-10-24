@@ -84,7 +84,7 @@ func (e *Engine) execute(ctx context.Context, held *claim) (result run.Result, e
 	}()
 
 	sc := &run.StepContext{
-		Run: held.record, Item: held.item, Page: held.page, Spec: held.spec,
+		Run: held.record, Item: held.item, Page: held.page, Spec: held.spec, Type: held.kind, Links: held.links,
 		Params: held.params, Artifacts: held.artifacts, Check: held.item.Checkpoint.Clone(),
 	}
 	return held.step.Run(stepCtx, sc)

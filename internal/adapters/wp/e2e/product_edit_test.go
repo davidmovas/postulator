@@ -131,11 +131,11 @@ func TestAnApplicationPasswordEditsAProductThroughTheStoreAPI(t *testing.T) {
 	colorID := createGlobalAttribute(t, c, "Color "+suffix, "pc"+suffix, "Blue")
 	created := createStoreProduct(t, c, map[string]any{
 		"name":              "Spike & Co " + suffix,
-		"slug":              "postulator-spike-" + suffix,
+		"slug":              "spike-" + suffix,
 		"type":              "simple",
 		"status":            "publish",
 		"regular_price":     "19.90",
-		"sku":               "postulator-spike-" + suffix,
+		"sku":               "spike-" + suffix,
 		"description":       "<p>Original description.</p>",
 		"short_description": "<p>Original short.</p>",
 		"attributes": []map[string]any{

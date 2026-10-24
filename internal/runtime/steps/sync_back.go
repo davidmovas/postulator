@@ -6,7 +6,10 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/application/observe"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -23,15 +26,57 @@ const (
 )
 
 type SyncResult struct {
-	ModifiedAt  time.Time          `json:"modifiedAt"`
-	URL         string             `json:"url"`
-	Status      string             `json:"status"`
-	ContentHash string             `json:"contentHash"`
-	Source      string             `json:"source"`
-	Findings    []content.Finding  `json:"findings"`
-	Mismatches  []pagemap.Mismatch `json:"mismatches"`
-	WPID        int64              `json:"wpId"`
-	Links       int                `json:"links"`
+	ModifiedAt  time.Time         `json:"modifiedAt"`
+	URL         string            `json:"url"`
+	Status      string            `json:"status"`
+	ContentHash string            `json:"contentHash"`
+	Source      string            `json:"source"`
+	Findings    []content.Finding `json:"findings"`
+	Mismatches  []Mismatch        `json:"mismatches"`
+	WPID        int64             `json:"wpId"`
+	Links       int               `json:"links"`
+}
+
+func headingOne(doc *content.Document) string {
+	for _, heading := range doc.Headings() {
+		if heading.Data == "h1" {
+			return content.TextOf(heading)
+		}
+	}
+	return ""
+}
+
+func lastBody(ctx context.Context, deps Deps, pageID string) (string, error) {
+	if deps.Bodies == nil {
+		return "", nil
+	}
+	current, _, found, err := deps.Bodies.Get(ctx, pageID)
+	if err != nil || !found {
+		return "", err
+	}
+	return current.Raw, nil
+}
+
+func observeReadBack(ctx context.Context, deps Deps, page pagemap.Page, body string, at time.Time) (*content.Finding, error) {
+	if deps.Bodies == nil {
+		return nil, nil
+	}
+	if err := deps.Bodies.Observe(ctx, block.Snapshot{
+		PageID: page.ID, Side: block.Current, Raw: body, Hash: block.BodyHash(body), Kind: block.Parse(body).Kind, ObservedAt: at,
+	}); err != nil {
+		return nil, err
+	}
+	current, base, found, err := deps.Bodies.Get(ctx, page.ID)
+	if err != nil || !found || current.Hash == base.Hash {
+		return nil, err
+	}
+	return &content.Finding{
+		Severity: content.SeverityWarn,
+		Code:     string(finding.BodyChangedOnSite),
+		Message: "the body of " + page.Path + " read back from the site is not what the run wrote there: it was edited on " +
+			"the site since, and the edit is kept as the site's current body, never as the base of what the run wrote",
+		Details: map[string]any{"pageId": page.ID, "path": page.Path, "baseHash": base.Hash, "currentHash": current.Hash},
+	}, nil
 }
 
 func SyncBack(deps Deps) run.StepDef {
@@ -84,18 +129,30 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
+			written, err := deps.ourBlocks(ctx, sc.Page.ID)
+			if err != nil {
+				return run.Result{}, err
+			}
+			stored, err := deps.Links.ListForPage(ctx, sc.Page.ID)
+			if err != nil {
+				return run.Result{}, err
+			}
+			last, err := lastBody(ctx, deps, sc.Page.ID)
+			if err != nil {
+				return run.Result{}, err
+			}
 			now := deps.now()
 			index := pagemap.NewIndex(pages)
-			links := observedOn(sc.Page, index, pagemap.NewSite(owner.BaseURL), doc.Links(), now)
+			site := pagemap.NewSite(owner.BaseURL)
+			links := observe.ContentLinks(sc.Page, site, block.LinksOf(body, written),
+				block.HeldOurs(stored, block.LinksOf(last, written), observe.Resolver(site, sc.Page), nil), index.ByPath, now)
+			moved, err := observeReadBack(ctx, deps, sc.Page, body, now)
+			if err != nil {
+				return run.Result{}, err
+			}
 
 			next := sc.Page
 			next.WPID = &item.ID
-			next.ContentHash = wp.ContentHash(body)
-			next.Observed = pagemap.Observed{
-				Link: permalinkOf(item), Slug: item.Slug, Status: item.Status,
-				Title: item.Title, H1: headingOne(doc),
-			}
-			next.Drift = false
 			next.LastSyncedAt = &now
 			next.UpdatedAt = now
 			if !item.Modified.IsZero() {
@@ -107,11 +164,16 @@ func SyncBack(deps Deps) run.StepDef {
 				return run.Result{}, persistErr
 			}
 
-			mismatches := next.Mismatches()
+			differs := mismatches(next, answered{
+				link: permalinkOf(item), slug: item.Slug, status: item.Status, title: item.Title, h1: headingOne(doc),
+			})
 			result := SyncResult{
-				WPID: item.ID, URL: item.Link, Status: item.Status, ContentHash: next.ContentHash,
+				WPID: item.ID, URL: item.Link, Status: item.Status, ContentHash: wp.ContentHash(body),
 				Source: source, Links: len(links), ModifiedAt: item.Modified.UTC(),
-				Mismatches: mismatches, Findings: planFindings(next, mismatches),
+				Mismatches: differs, Findings: planFindings(next, differs),
+			}
+			if moved != nil {
+				result.Findings = append(result.Findings, *moved)
 			}
 			if seen := storefrontFinding(ctx, client, next, item, body); seen != nil {
 				result.Findings = append(result.Findings, *seen)
@@ -128,17 +190,17 @@ func SyncBack(deps Deps) run.StepDef {
 	}
 }
 
-func planFindings(page pagemap.Page, mismatches []pagemap.Mismatch) []content.Finding {
-	out := make([]content.Finding, 0, len(mismatches))
-	for i := range mismatches {
+func planFindings(page pagemap.Page, found []Mismatch) []content.Finding {
+	out := make([]content.Finding, 0, len(found))
+	for i := range found {
 		out = append(out, content.Finding{
 			Severity: content.SeverityWarn,
 			Code:     CodePlanNotKept,
-			Message: "the " + mismatches[i].Field + " of " + page.Path + " was planned as " +
-				mismatches[i].Planned + " and the site holds " + mismatches[i].Actual,
+			Message: "the " + found[i].Field + " of " + page.Path + " was planned as " +
+				found[i].Planned + " and the site holds " + found[i].Actual,
 			Details: map[string]any{
 				"class": ClassNeedsHuman, "pageId": page.ID, "path": page.Path,
-				"field": mismatches[i].Field, "planned": mismatches[i].Planned, "actual": mismatches[i].Actual,
+				"field": found[i].Field, "planned": found[i].Planned, "actual": found[i].Actual,
 			},
 		})
 	}

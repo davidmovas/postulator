@@ -2,11 +2,14 @@ package steps
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -19,8 +22,11 @@ const (
 	OutcomeRestored  = "restored"
 	OutcomeNeedsHand = "needs_human"
 
-	CodeRevertNeedsHuman = "revert_needs_human"
-	CodeRevertMetaKept   = "revert_meta_kept"
+	CodeRevertNeedsHuman  = "revert_needs_human"
+	CodeRevertMetaKept    = "revert_meta_kept"
+	CodeRevertExcerptKept = "revert_excerpt_kept"
+
+	ReasonRevertExcerptEdited = "the excerpt changed on the site since the run wrote it, so the owner's edit is kept"
 
 	ReasonRevertNoRecord = "the run kept no record of what it published to this page, " +
 		"so there is nothing to put back"
@@ -34,6 +40,9 @@ const (
 	ReasonRevertNoKind     = "nothing records whether the neighbor is a page, a post or a product, " +
 		"so the item that carries its number cannot be told apart from it"
 
+	ReasonRevertMetaEdited   = "the SEO meta was edited on the site since the run wrote it, so it was kept as it stands"
+	ReasonRevertBodyUnproven = "the run's body write was answered with a conflict after its answer was lost, so what the site " +
+		"holds may be the run's own write under the site's save filters or the client's edit; compare it and put it back by hand"
 	ReasonRevertNoMeta = "the run kept no copy of the SEO meta it replaced, which needs a companion " +
 		"plugin that can read it"
 	ReasonRevertNoMetaWriter = "the companion plugin on this site cannot put the SEO meta back"
@@ -56,6 +65,7 @@ type RevertResult struct {
 	Detail    string             `json:"detail"`
 	SourceRun string             `json:"sourceRunId"`
 	Neighbors []RevertedNeighbor `json:"neighbors"`
+	Fields    []RevertedField    `json:"fields,omitempty"`
 	Findings  []content.Finding  `json:"findings"`
 	WPID      int64              `json:"wpId"`
 	Created   bool               `json:"created"`
@@ -82,23 +92,27 @@ func Revert(deps Deps) run.StepDef {
 				Neighbors: make([]RevertedNeighbor, 0), Findings: make([]content.Finding, 0),
 			}
 
-			published, relinked, found, err := recordOf(ctx, deps, source, page.ID)
+			record, found, err := recordOf(ctx, deps, source, page.ID)
 			if err != nil {
 				return run.Result{}, err
 			}
 			if !found {
 				return handBack(result, ReasonRevertNoRecord)
 			}
+			published, relinked := record.published, record.relinked
 			result.WPID, result.Created = published.WPID, published.Created
 
 			client, err := clientFor(ctx, deps, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
 			}
-			work := revertWork{page: page, client: client, published: published}
+			work := revertWork{page: page, client: client, published: published, meta: record.meta}
 
 			if reason, undone := undoPage(ctx, deps, sc, &result, work); !undone {
 				return handBack(result, reason)
+			}
+			if published.Version >= publishRecordVersion && len(revertFields(sc)) > 0 {
+				return settleRevert(result)
 			}
 			for i := range relinked.Neighbors {
 				if reason, undone := undoNeighbor(ctx, deps, sc, &result, work, relinked.Neighbors[i]); !undone {
@@ -113,7 +127,14 @@ func Revert(deps Deps) run.StepDef {
 type revertWork struct {
 	page      pagemap.Page
 	client    *wp.Client
+	meta      writtenMeta
 	published PublishResult
+}
+
+type sourceRecord struct {
+	meta      writtenMeta
+	published PublishResult
+	relinked  RelinkResult
 }
 
 func sourceRun(sc *run.StepContext) (string, error) {
@@ -124,10 +145,30 @@ func sourceRun(sc *run.StepContext) (string, error) {
 	return *sc.Run.ParentRunID, nil
 }
 
-func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (PublishResult, RelinkResult, bool, error) {
+type writtenMeta struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Canonical   string `json:"canonical"`
+}
+
+func (m writtenMeta) expected(applied []string) map[string]string {
+	values := map[string]string{
+		"title": m.Title, "description": m.Description, "canonical": m.Canonical,
+		"ogTitle": m.Title, "ogDescription": m.Description,
+	}
+	out := make(map[string]string, len(applied))
+	for _, name := range applied {
+		if value, known := values[name]; known {
+			out[name] = block.BodyHash(value)
+		}
+	}
+	return out
+}
+
+func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (sourceRecord, bool, error) {
 	items, err := deps.Items.ByRun(ctx, sourceRunID)
 	if err != nil {
-		return PublishResult{}, RelinkResult{}, false, err
+		return sourceRecord{}, false, err
 	}
 
 	for i := range items {
@@ -136,27 +177,34 @@ func recordOf(ctx context.Context, deps Deps, sourceRunID, pageID string) (Publi
 		}
 		stored, listErr := deps.Artifacts.ByItem(ctx, items[i].ID)
 		if listErr != nil {
-			return PublishResult{}, RelinkResult{}, false, listErr
+			return sourceRecord{}, false, listErr
 		}
 
 		published, ok, decodeErr := blobOf[PublishResult](stored, run.ArtifactPublishResult)
 		if decodeErr != nil {
-			return PublishResult{}, RelinkResult{}, false, decodeErr
+			return sourceRecord{}, false, decodeErr
 		}
 		if !ok {
 			continue
 		}
 		relinked, _, decodeErr := blobOf[RelinkResult](stored, run.ArtifactRelinkResult)
 		if decodeErr != nil {
-			return PublishResult{}, RelinkResult{}, false, decodeErr
+			return sourceRecord{}, false, decodeErr
 		}
-		return published, relinked, true, nil
+		meta, _, decodeErr := blobOf[writtenMeta](stored, run.ArtifactMeta)
+		if decodeErr != nil {
+			return sourceRecord{}, false, decodeErr
+		}
+		return sourceRecord{published: published, relinked: relinked, meta: meta}, true, nil
 	}
-	return PublishResult{}, RelinkResult{}, false, nil
+	return sourceRecord{}, false, nil
 }
 
 func undoPage(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
 	work revertWork) (reason string, undone bool) {
+	if work.published.Version >= publishRecordVersion {
+		return revertByField(ctx, deps, sc, result, work)
+	}
 	if work.published.Created {
 		return takeOffTheSite(ctx, deps, result, work)
 	}
@@ -194,11 +242,11 @@ func putTheBodyBack(ctx context.Context, deps Deps, sc *run.StepContext, result 
 	if !ok {
 		return reason, false
 	}
-	hash, reason, ok := writeBodyBack(ctx, work, raw)
+	stored, reason, ok := writeBodyBack(ctx, work, raw)
 	if !ok {
 		return reason, false
 	}
-	return bodyRestored(ctx, deps, sc, result, work, hash, "the body the run replaced was written back")
+	return bodyRestored(ctx, deps, sc, result, work, raw.Content, stored, "the body the run replaced was written back")
 }
 
 func bodyToRestore(ctx context.Context, work revertWork) (wp.RawContent, string, bool) {
@@ -229,14 +277,14 @@ func readRawBack(ctx context.Context, work revertWork) (wp.RawContent, string, b
 	}
 }
 
-func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (hash, reason string, ok bool) {
+func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (stored, reason string, ok bool) {
 	if raw.ContentHash == work.published.PreviousContentHash {
-		return raw.ContentHash, "", true
+		return raw.Content, "", true
 	}
 	written, err := work.client.PutRaw(ctx, onSiteType(work.page), work.published.WPID, work.published.PreviousContent, raw.ContentHash)
 	switch {
 	case err == nil:
-		return written, "", true
+		return written.Content, "", true
 	case errors.IsCode(err, errors.Conflict):
 		return "", writtenUnderUs(raw.ContentHash), false
 	default:
@@ -245,14 +293,46 @@ func writeBodyBack(ctx context.Context, work revertWork, raw wp.RawContent) (has
 }
 
 func bodyRestored(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult, work revertWork,
-	hash, detail string) (string, bool) {
-	if adoptErr := readopt(ctx, deps, sc, work.page, work.published.PreviousContent, hash); adoptErr != nil {
+	last, stored, detail string) (string, bool) {
+	if adoptErr := readopt(ctx, deps, sc, work.page, last, stored, nil); adoptErr != nil {
 		return adoptErr.Error(), false
 	}
 	result.Outcome = OutcomeRestored
 	result.Detail = detail
 	if reason, back := putTheMetaBack(ctx, work); !back {
 		result.Findings = append(result.Findings, metaKept(work.page, work.published.SEOApplied, reason))
+	}
+	if reason, back := putTheExcerptBack(ctx, deps, sc, work); !back {
+		result.Findings = append(result.Findings, content.Finding{
+			Severity: content.SeverityWarn, Code: CodeRevertExcerptKept,
+			Message: "the excerpt of " + work.page.Path + " was not put back: " + reason,
+			Details: map[string]any{"pageId": work.page.ID, "path": work.page.Path, "reason": reason},
+		})
+	}
+	return "", true
+}
+
+func putTheExcerptBack(ctx context.Context, deps Deps, sc *run.StepContext, work revertWork) (string, bool) {
+	if work.published.PreviousExcerpt == nil {
+		return "", true
+	}
+	itemType, err := itemTypeOf(work.page)
+	if err != nil {
+		return err.Error(), false
+	}
+	held, err := work.client.GetItem(ctx, itemType, work.published.WPID)
+	if err != nil {
+		return err.Error(), false
+	}
+	if held.Excerpt != work.published.Excerpt {
+		return ReasonRevertExcerptEdited, false
+	}
+	previous := *work.published.PreviousExcerpt
+	if _, err = work.client.UpdateItem(ctx, itemType, work.published.WPID, wp.UpdateItem{Excerpt: &previous}); err != nil {
+		return err.Error(), false
+	}
+	if recordErr := recordField(ctx, deps, sc, work.page.ID, field.Excerpt, previous); recordErr != nil {
+		return recordErr.Error(), false
 	}
 	return "", true
 }
@@ -264,12 +344,18 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 	if work.published.PreviousMeta == nil {
 		return ReasonRevertNoMeta, false
 	}
+	applied, err := canonicalStillOurs(ctx, work)
+	if err != nil {
+		return err.Error(), false
+	}
 
-	_, err := work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
-		work.published.SEOApplied)
+	_, err = work.client.ReplaceSEOMeta(ctx, onSiteType(work.page), work.published.WPID, *work.published.PreviousMeta,
+		applied, work.meta.expected(applied))
 	switch {
 	case err == nil:
 		return "", true
+	case errors.IsCode(err, errors.Conflict):
+		return ReasonRevertMetaEdited, false
 	case wp.IsPluginMissing(err):
 		return ReasonRevertNoPlugin, false
 	case wp.IsPluginOutdated(err):
@@ -279,6 +365,43 @@ func putTheMetaBack(ctx context.Context, work revertWork) (string, bool) {
 	default:
 		return err.Error(), false
 	}
+}
+
+func canonicalStillOurs(ctx context.Context, work revertWork) ([]string, error) {
+	applied := slices.Clone(work.published.SEOApplied)
+	if !slices.Contains(applied, "canonical") {
+		return applied, nil
+	}
+	held, err := work.client.GetSEOMeta(ctx, onSiteType(work.page), work.published.WPID)
+	if err != nil {
+		return nil, err
+	}
+	if work.meta.Canonical == "" || held.Canonical != work.meta.Canonical {
+		applied = slices.DeleteFunc(applied, func(name string) bool { return name == "canonical" })
+	}
+	return applied, nil
+}
+
+func (d Deps) leftByRelink(ctx context.Context, sc *run.StepContext, page pagemap.Page, known bool,
+	neighbor NeighborResult) (string, error) {
+	if neighbor.After != "" {
+		return neighbor.After, nil
+	}
+	if !known || d.Bodies == nil {
+		return "", nil
+	}
+	runID, err := sourceRun(sc)
+	if err != nil {
+		return "", err
+	}
+	written, err := d.Bodies.ListWritten(ctx, page.ID)
+	if err != nil {
+		return "", err
+	}
+	if !slices.ContainsFunc(written, func(held block.Written) bool { return held.RunID == runID }) {
+		return "", nil
+	}
+	return d.baseHash(ctx, page)
 }
 
 func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *RevertResult,
@@ -309,13 +432,17 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 		return err.Error(), false
 	}
 
-	hash := raw.ContentHash
+	left, err := deps.leftByRelink(ctx, sc, stored, known, neighbor)
+	if err != nil {
+		return err.Error(), false
+	}
+	held := raw.Content
 	switch {
 	case raw.ContentHash == neighbor.Before.Hash:
-	case !known || stored.ContentHash == "":
+	case left == "":
 		return unknownSince(raw.ContentHash), false
-	case raw.ContentHash != stored.ContentHash:
-		return editedSince(stored.ContentHash, raw.ContentHash), false
+	case raw.ContentHash != left:
+		return editedSince(left, raw.ContentHash), false
 	default:
 		written, putErr := work.client.PutRaw(ctx, itemType, neighbor.WPID, neighbor.Before.HTML, raw.ContentHash)
 		if putErr != nil {
@@ -324,11 +451,11 @@ func undoNeighbor(ctx context.Context, deps Deps, sc *run.StepContext, result *R
 			}
 			return putErr.Error(), false
 		}
-		hash = written
+		held = written.Content
 	}
 
 	if known {
-		if adoptErr := readopt(ctx, deps, sc, stored, neighbor.Before.HTML, hash); adoptErr != nil {
+		if adoptErr := readopt(ctx, deps, sc, stored, raw.Content, held, nil); adoptErr != nil {
 			return adoptErr.Error(), false
 		}
 	}
@@ -367,16 +494,13 @@ func replan(ctx context.Context, deps Deps, page pagemap.Page) error {
 	next := page
 	next.WPID = nil
 	next.Status = pagemap.StatusPlanned
-	next.ContentHash = ""
-	next.Observed = pagemap.Observed{}
 	next.WPModifiedAt = nil
 	next.LastSyncedAt = nil
-	next.Drift = false
 	next.UpdatedAt = now
 	return persist(ctx, deps, next, []pagemap.PageLink{})
 }
 
-func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.Page, body, hash string) error {
+func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.Page, last, body string, uncovered []string) error {
 	owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 	if err != nil {
 		return err
@@ -385,11 +509,24 @@ func readopt(ctx context.Context, deps Deps, sc *run.StepContext, page pagemap.P
 	if err != nil {
 		return err
 	}
-	doc, err := content.Parse(body)
-	if err != nil {
+	if _, err = content.Parse(body); err != nil {
 		return errors.Wrap(err, errors.Internal, "read the body the revert wrote back")
 	}
-	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), doc, hash)
+	written, err := deps.ourBlocks(ctx, page.ID)
+	if err != nil {
+		return err
+	}
+	moved := block.Lineage(last, body, written)
+	if err := recordBody(ctx, deps, page.ID, body); err != nil {
+		return err
+	}
+	if deps.Bodies != nil {
+		if err := deps.Bodies.ReplaceWritten(ctx, page.ID, block.Restored(body, written, moved, uncovered), sc.Run.ID, deps.now()); err != nil {
+			return err
+		}
+	}
+	return adopt(ctx, deps, page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL),
+		adoption{raw: body, last: last, moved: moved})
 }
 
 func metaKept(page pagemap.Page, applied []string, reason string) content.Finding {

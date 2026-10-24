@@ -3,9 +3,11 @@ package run_test
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -291,5 +293,30 @@ func TestStepContextAccessors(t *testing.T) {
 	}
 	if _, ok := sc.Param("absent"); ok {
 		t.Error("Param of an absent key must report false")
+	}
+}
+
+func TestAStepReadsTheFieldsItsRunIsScopedTo(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		params map[string]any
+		want   []field.Key
+	}{
+		"as built by the start":    {params: map[string]any{run.ParamFields: []string{"excerpt", "seo_title"}}, want: []field.Key{field.Excerpt, field.SEOTitle}},
+		"as read back from json":   {params: map[string]any{run.ParamFields: []any{"seo_description"}}, want: []field.Key{field.SEODescription}},
+		"no scope":                 {params: map[string]any{}},
+		"a value that is no list":  {params: map[string]any{run.ParamFields: "excerpt"}},
+		"an entry that is no text": {params: map[string]any{run.ParamFields: []any{"title", 3}}, want: []field.Key{field.Title}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			sc := &run.StepContext{Params: tc.params}
+			if got := sc.Fields(); !slices.Equal(got, tc.want) {
+				t.Errorf("Fields() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

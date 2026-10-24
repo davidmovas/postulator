@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -61,6 +62,10 @@ type specResolver interface {
 	ResolveForPage(ctx context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error)
 }
 
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
+}
+
 type keyStore interface {
 	Has(ctx context.Context, ref string) (bool, error)
 }
@@ -88,4 +93,8 @@ type publisher interface {
 
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
+}
+
+type snapshotScope interface {
+	Remembering(ctx context.Context) context.Context
 }

@@ -7,7 +7,7 @@ import type { Layer } from "./patch.js";
 
 const spec = blankDraft();
 const opened: Stamp = { beneath: beneathOf(spec), overrideUpdatedAt: "2026-09-20T10:00:00Z" };
-const moved = beneathOf({ ...spec, maxLinks: 3 });
+const moved = beneathOf({ ...spec, descriptionMax: 120 });
 
 describe("beneathOf", () => {
     it("is the same string for the same spec and a different one when the spec moves", () => {

@@ -1,14 +1,9 @@
 export const templates = {
     title: "Templates",
     loading: "Loading templates",
-    tabs: {
-        templates: "Templates",
-        policies: "Link policies",
-    },
     columns: {
         name: "Name",
         scope: "Scope",
-        pageKind: "Page kind",
         version: "Version",
         default: "Default",
         updated: "Updated",
@@ -18,8 +13,6 @@ export const templates = {
     filters: {
         scope: "Scope",
         scopeAll: "All",
-        pageKind: "Page kind",
-        anyPageKind: "Any page kind",
         sort: "Sort",
     },
     sortOptions: {
@@ -31,13 +24,6 @@ export const templates = {
     scope: {
         global: "Every site",
         site: "This site",
-    },
-    pageKinds: {
-        hub: "Hub",
-        category: "Category",
-        guide: "Guide",
-        comparison: "Comparison",
-        product: "Product",
     },
     roles: {
         writer: "Body",
@@ -83,14 +69,12 @@ export const templates = {
         cancel: "Cancel",
         startFrom: "Start from",
         startBlank: "A blank template",
-        startBlankHint: "One introduction section, sensible length and link rules, no images. Every step but the image step is on.",
+        startBlankHint: "One introduction section, a sensible length, no images. Every step but the image step is on.",
         startCopy: "A copy of",
         copyFrom: "Copy from",
         copyFromHint: "Every section, rule, model and step is copied. Nothing ties the two together afterwards.",
         nothingToCopy: "There is no template to copy yet.",
         name: "Name",
-        pageKind: "Page kind",
-        pageKindHint: "A short label such as hub, product or guide. It is how a page asks for this template.",
         scope: "Available to",
         scopeHint: "Either every site in this workspace, or this site alone.",
     },
@@ -109,12 +93,9 @@ export const templates = {
         notFound: "This template no longer exists.",
         name: "Name",
         nameEdit: "Rename this template",
-        pageKind: "Page kind",
-        changeKind: "Rename it or change the page kind",
-        changeKindTitle: "Name and page kind",
-        changeKindBody: "Both belong to the template itself, so a change here reaches every site.",
-        changeKindConfirm: "Apply",
-        identityLocked: "The name and the page kind belong to the template. Switch to the template layer to change them.",
+        renameTitle: "Rename this template",
+        renameBody: "The name belongs to the template itself, so a change here reaches every site.",
+        renameConfirm: "Apply",
         openPage: "Preview page",
         openPageRefused: "Open this editor from a page to preview that page.",
         groups: {
@@ -148,16 +129,11 @@ export const templates = {
         words: (count: number) => `≈ ${count} words`,
         required: "required",
         optional: "optional",
-        parentLink: (paragraphs: number) =>
-            paragraphs === 1 ? "↑ parent link in the first paragraph" : `↑ parent link within the first ${paragraphs} paragraphs`,
-        noParentLink: "no early parent link",
-        children: "Links to the child pages",
         total: (count: number) => `≈ ${count} words in all`,
         range: (min: number, max: number) => `${min}–${max} allowed`,
         under: "The sections add up to less than the shortest page allowed.",
         over: "The sections add up to more than the longest page allowed.",
         unbounded: "no length limit",
-        links: (count: number) => `up to ${count} links`,
         images: (count: number) => (count === 0 ? "no images" : count === 1 ? "1 image" : `${count} images`),
         noSections: "Add a section to see the page take shape.",
         untitled: "Untitled section",
@@ -238,25 +214,6 @@ export const templates = {
                   : count === 1
                     ? "requires the first keyword of a page in its body"
                     : `requires the first ${count} keywords of a page in its body`,
-        upDepth: (levels: number) =>
-            levels === 0
-                ? "stops linking up to parent pages"
-                : levels === 1
-                  ? "links up one level to the parent page"
-                  : `links up ${levels} levels of parent pages`,
-        downLinks: (on: boolean) => (on ? "links down to child pages" : "stops linking down to child pages"),
-        siblingMinWeight: (weight: string) => `only links siblings scoring ${weight} or higher`,
-        maxLinks: (links: number) => `allows at most ${links} internal links`,
-        maxPerTarget: (links: number) =>
-            links === 1 ? "allows one link to any single page" : `allows up to ${links} links to the same page`,
-        parentLinkWithinParagraphs: (paragraphs: number) =>
-            paragraphs === 0
-                ? "stops insisting on an early parent link"
-                : paragraphs === 1
-                  ? "puts the parent link in the first paragraph"
-                  : `puts the parent link inside the first ${paragraphs} paragraphs`,
-        childrenSection: (on: boolean) =>
-            on ? "adds a section listing the child pages" : "drops the section listing the child pages",
         titlePattern: (pattern: string) => `uses the title pattern “${pattern}”`,
         titlePatternNone: "drops the title pattern",
         descriptionMax: (characters: number) => `caps the meta description at ${characters} characters`,
@@ -280,25 +237,15 @@ export const templates = {
         productNothing: "writes no product outputs beyond the description",
         productShort: "writes a short description",
         productShortWords: (words: number) => `writes a short description of about ${words} words`,
-        productFills: (names: string) => `fills ${names}`,
         other: (field: string) => `changes ${field}`,
     },
     product: {
         title: "Product",
         none: "No product outputs",
-        summary: (short: boolean, specifications: number) => {
-            const attributes = specifications === 1 ? "1 attribute" : `${specifications} attributes`;
-            if (short && specifications > 0) {
-                return `Short description and ${attributes}`;
-            }
-            if (short) {
-                return "Short description";
-            }
-            return specifications > 0 ? attributes : "The description alone";
-        },
-        body: "What a product written on this template gets beside its description. A page or a post on this template ignores it.",
+        summary: (short: boolean) => (short ? "Short description" : "The description alone"),
+        body: "What a product written on this template gets beside its description. A page or a post on this template ignores it. The name, price, stock, SKU, status and attributes of a product are never written.",
         emptyBody:
-            "A product written on this template gets its description and nothing else. Add product outputs to also write the short description the store shows beside the price, and to fill the attributes a product lacks.",
+            "A product written on this template gets its description and nothing else. Add product outputs to also write the short description the store shows beside the price.",
         add: "Add product outputs",
         remove: "Remove product outputs",
         short: "Short description",
@@ -306,15 +253,6 @@ export const templates = {
         shortIntent: "What the short description has to say",
         shortWords: "About how many words",
         shortKeyword: "The primary keyword must appear in it",
-        attributes: "Attributes",
-        attributesHint:
-            "Filled only where the product carries no attribute of that name, or an empty one. The name, price, stock, SKU and status of a product are never written.",
-        attributeName: "Attribute, such as Form or Size",
-        attributeIntent: "Where its value comes from",
-        addAttribute: "Add an attribute",
-        removeAttribute: "Remove this attribute",
-        unnamed: "an unnamed attribute",
-        attributesEmpty: "No attribute is filled in.",
     },
     sections: {
         title: "Sections",
@@ -360,22 +298,6 @@ export const templates = {
         requiredKeywords: "Keywords the body must use",
         requiredKeywordsHint: "Counted from the most searched. The rest are offered to the writer and not required.",
         requiredKeywordsEvery: "every one",
-    },
-    links: {
-        title: "Link rules",
-        body: "These decide which internal links a generated page carries and how many.",
-        fromTemplate:
-            "At run time these come from the template, not from the link policy. The policy decides only external links, self links and anchors.",
-        upDepth: "Levels up",
-        upDepthHint: "How far up the parent chain the page links.",
-        downLinks: "Link down to children",
-        siblingMinWeight: "Lowest sibling score",
-        siblingMinWeightHint: "Between 0 and 1. A related entity below this is not linked.",
-        maxLinks: "Most links on a page",
-        maxPerTarget: "Most links to one page",
-        parentLinkWithinParagraphs: "Parent link within",
-        parentLinkWithinParagraphsHint: "Paragraphs from the top. 0 turns the rule off.",
-        childrenSection: "Add a section listing the children",
     },
     meta: {
         title: "Meta",
@@ -430,6 +352,7 @@ export const templates = {
         resolve_context: "Work out what this page may link to",
         generate_body: "Write the body",
         generate_meta: "Write the title and description",
+        generate_fields: "Write the excerpt and the other short fields the page type enables",
         insert_links: "Insert the internal links",
         repair_links: "Repair the links the checks refused",
         generate_images: "Make the images",
@@ -440,59 +363,4 @@ export const templates = {
         sync_back: "Read the published page back",
         report: "Write the run report",
     },
-};
-
-export const policies = {
-    title: "Link policies",
-    loading: "Loading link policies",
-    columns: {
-        name: "Name",
-        scope: "Scope",
-        inForce: "In force",
-        forbids: "Forbids",
-        anchor: "Anchor rule",
-        maxLinks: "Max links",
-    },
-    inForce: "In force",
-    useHere: "Use it on this site",
-    alreadyInForce: "This policy is already the one in force on this site.",
-    empty: "No link policy of your own yet",
-    emptyBody: "Until you add one, the workspace default decides external links, self links and anchors.",
-    effective: "In force on this site",
-    effectiveFromSite: "Chosen on the site as its link policy.",
-    effectiveFallback: "No policy is chosen on the site, so the workspace default applies.",
-    effectiveMissing: "No link policy applies to this site.",
-    forbidExternal: "Forbid links off the site",
-    forbidSelf: "Forbid a page linking to itself",
-    anchorStrategy: "Anchor text",
-    anchorStrategyHint: "How the anchor for a link is chosen when an entity carries several.",
-    anchor: {
-        prefer_user: "Prefer the anchor you wrote",
-        rotate: "Rotate through every anchor",
-    },
-    forbidsBoth: "Links off the site, self links",
-    forbidsExternal: "Links off the site",
-    forbidsSelf: "Self links",
-    forbidsNone: "Nothing",
-    newPolicy: "New policy",
-    edit: "Edit",
-    create: {
-        title: "New link policy",
-        body: "A new policy starts from the one in force on this site.",
-        confirm: "Create it",
-        editTitle: "Edit this link policy",
-        editBody: "Saving changes it for every site that uses it.",
-        actions: "Actions",
-        save: "Save",
-        cancel: "Cancel",
-        name: "Name",
-        scope: "Available to",
-        scopeHint: "Either every site in this workspace, or this site alone.",
-    },
-    rulesTitle: "Link rules on this policy",
-    rulesTooltip: "A template with its own link rules replaces these; one without them inherits them.",
-    deleteTitle: "Delete this link policy?",
-    deleteBody: "Sites that point at it fall back to the workspace default.",
-    deleteConfirm: "Delete",
-    delete: "Delete",
 };

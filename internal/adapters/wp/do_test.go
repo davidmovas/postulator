@@ -53,7 +53,7 @@ func TestEveryRequestCarriesBasicAuthAndOurHeaders(t *testing.T) {
 		t.Errorf("Accept = %q", got)
 	}
 	if got := recorded.Header.Get("User-Agent"); got == "" {
-		t.Error("the request must identify Postulator")
+		t.Error("the request must carry a User-Agent")
 	}
 }
 

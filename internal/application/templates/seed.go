@@ -9,27 +9,6 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-const DefaultPolicyName = "Default"
-
-func defaultPolicy() template.LinkPolicy {
-	return template.LinkPolicy{
-		Scope: template.ScopeGlobal,
-		Name:  DefaultPolicyName,
-		Rules: template.LinkRules{
-			UpDepth:                    2,
-			DownLinks:                  true,
-			SiblingMinWeight:           0.5,
-			MaxLinks:                   12,
-			MaxPerTarget:               1,
-			ParentLinkWithinParagraphs: 2,
-			ChildrenSection:            true,
-		},
-		ForbidExternal: true,
-		ForbidSelf:     true,
-		AnchorStrategy: template.AnchorPreferUser,
-	}
-}
-
 func (s *Service) EnsureSeeded(ctx context.Context) error {
 	global := template.ScopeGlobal
 	return s.uow.Do(ctx, func(c context.Context) error {
@@ -57,23 +36,7 @@ func (s *Service) EnsureSeeded(ctx context.Context) error {
 				return insertErr
 			}
 		}
-
-		policies, err := s.policies.List(c, template.PolicyQuery{Scope: &global, Name: DefaultPolicyName, Sort: template.SortCreatedAt}, paging.Request{Limit: 1})
-		if err != nil {
-			return err
-		}
-		if len(policies.Items) > 0 {
-			return nil
-		}
-		policy := defaultPolicy()
-		now := s.now()
-		policy.ID = id.New()
-		policy.CreatedAt = now
-		policy.UpdatedAt = now
-		if validErr := policy.Validate(); validErr != nil {
-			return validErr
-		}
-		return s.policies.Insert(c, policy)
+		return nil
 	})
 }
 

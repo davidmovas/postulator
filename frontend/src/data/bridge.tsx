@@ -57,7 +57,16 @@ function fanOutSite(client: QueryClient, siteId: string | null): void {
     invalidateBySite(client, keys.pages.lists(), siteId);
     invalidateBySite(client, keys.graph.entityLists(), siteId);
     invalidateBySite(client, keys.graph.edgeLists(), siteId);
-    invalidateAll(client, keys.pages.tree(siteId), keys.graph.full(siteId), keys.reports.site(siteId));
+    invalidateAll(
+        client,
+        keys.pages.tree(siteId),
+        keys.pages.models(),
+        keys.pages.packs(),
+        keys.pages.summary(siteId),
+        keys.graph.full(siteId),
+        keys.graph.cards(siteId),
+        keys.reports.site(siteId),
+    );
 }
 
 function runLifecycle(client: QueryClient, envelope: Envelope<EventType>, ...extra: readonly (readonly unknown[])[]): void {
@@ -190,25 +199,43 @@ function handlersFor(client: QueryClient): Handlers {
                 invalidateBySite(client, keys.graph.entityLists(), siteId);
                 invalidateBySite(client, keys.graph.edgeLists(), siteId);
                 invalidateBySite(client, keys.pages.lists(), siteId);
-                invalidateAll(client, keys.graph.entityAll(), keys.graph.full(siteId), keys.reports.site(siteId));
+                invalidateAll(
+                    client,
+                    keys.graph.entityAll(),
+                    keys.graph.full(siteId),
+                    keys.graph.cards(siteId),
+                    keys.reports.site(siteId),
+                    keys.pages.packs(),
+                );
             });
         },
         "pages.changed": (envelope) => {
             const siteId = envelope.payload.siteId;
             coalesce(`pages:${siteId}`, () => {
                 invalidateBySite(client, keys.pages.lists(), siteId);
+                invalidateBySite(client, keys.pages.maps(), siteId);
+                invalidateBySite(client, keys.findings.lists(), siteId);
+                invalidateBySite(client, keys.runs.parentsAll(), siteId);
                 invalidateAll(
                     client,
                     keys.pages.details(),
                     keys.pages.tree(siteId),
+                    keys.pages.models(),
+                    keys.pages.packs(),
+                    keys.pages.summary(siteId),
+                    keys.findings.details(),
+                    keys.findings.explanations(),
+                    keys.findings.countsAll(),
                     keys.reports.site(siteId),
                     keys.graph.entityAll(),
+                    keys.graph.full(siteId),
+                    keys.sites.types(siteId),
                 );
             });
         },
         "templates.changed": () => {
             coalesce("templates", () => {
-                invalidateAll(client, keys.templates.root(), keys.policies.root());
+                invalidateAll(client, keys.templates.root(), keys.sites.typesAll(), keys.pages.packs());
             });
         },
         "sites.changed": (envelope) => {
@@ -219,7 +246,7 @@ function handlersFor(client: QueryClient): Handlers {
         },
         "settings.changed": () => {
             coalesce("settings", () => {
-                invalidateAll(client, keys.settings.values(), keys.models.root());
+                invalidateAll(client, keys.settings.values(), keys.models.root(), keys.pages.packs());
             });
         },
         "schedules.changed": () => {

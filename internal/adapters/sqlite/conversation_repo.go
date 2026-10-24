@@ -12,11 +12,12 @@ import (
 )
 
 const (
-	conversationColumns = `id, site_id, title, mode, title_settled, created_at, updated_at`
-	insertConversation  = `INSERT INTO conversations (` + conversationColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	updateConversation  = `UPDATE conversations SET title = ?, mode = ?, title_settled = ?, updated_at = ? WHERE id = ?`
-	selectConversation  = `SELECT ` + conversationColumns + ` FROM conversations WHERE id = ?`
-	deleteConversation  = `DELETE FROM conversations WHERE id = ?`
+	conversationColumns  = `id, site_id, title, mode, title_settled, brief, created_at, updated_at`
+	insertConversation   = `INSERT INTO conversations (` + conversationColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	updateConversation   = `UPDATE conversations SET title = ?, mode = ?, title_settled = ?, updated_at = ? WHERE id = ?`
+	setConversationBrief = `UPDATE conversations SET brief = ? WHERE id = ?`
+	selectConversation   = `SELECT ` + conversationColumns + ` FROM conversations WHERE id = ?`
+	deleteConversation   = `DELETE FROM conversations WHERE id = ?`
 )
 
 type ConversationRepo struct {
@@ -33,9 +34,14 @@ func conversationNotFound(id string) *errors.Error {
 
 func (r *ConversationRepo) Insert(ctx context.Context, c agent.Conversation) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertConversation, []any{
-		c.ID, nullString(c.SiteID), c.Title, string(c.Mode), c.TitleSettled, formatTime(c.CreatedAt), formatTime(c.UpdatedAt),
+		c.ID, nullString(c.SiteID), c.Title, string(c.Mode), c.TitleSettled, c.Brief, formatTime(c.CreatedAt), formatTime(c.UpdatedAt),
 	}, errors.New(errors.Conflict, "a conversation with this id already exists"), "insert the conversation")
 	return err
+}
+
+func (r *ConversationRepo) SetBrief(ctx context.Context, id, brief string) error {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), setConversationBrief, []any{brief, id}, nil, "keep the conversation's brief")
+	return requireAffected(affected, err, conversationNotFound(id))
 }
 
 func (r *ConversationRepo) Update(ctx context.Context, c agent.Conversation) error {
@@ -81,7 +87,7 @@ func scanConversation(rows *sql.Rows) (agent.Conversation, error) {
 		mode                 string
 		createdAt, updatedAt string
 	)
-	if err := rows.Scan(&c.ID, &siteID, &c.Title, &mode, &c.TitleSettled, &createdAt, &updatedAt); err != nil {
+	if err := rows.Scan(&c.ID, &siteID, &c.Title, &mode, &c.TitleSettled, &c.Brief, &createdAt, &updatedAt); err != nil {
 		return agent.Conversation{}, err
 	}
 

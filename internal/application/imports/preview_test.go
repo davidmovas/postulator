@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -109,7 +110,7 @@ func TestPreviewReadsTheGraphWithoutWriting(t *testing.T) {
 	}
 
 	hosting, found := entity(report, "Hosting")
-	if !found || hosting.Action != string(imports.ActionCreate) || hosting.Kind != "topic" {
+	if !found || hosting.Action != string(imports.ActionCreate) {
 		t.Fatalf("hosting = %+v", hosting)
 	}
 	if len(hosting.Keywords) != 2 || hosting.Keywords[0].Text != "hosting" || hosting.Keywords[1].Text != "servers" {
@@ -358,66 +359,194 @@ func TestPreviewFallsBackOnUnknownVocabulary(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	report := h.preview(t, h.file(t, "kinds.csv", "path,entity,entity type,post type,page type\n/a/,Alpha,widget,gadget,sprocket\n"),
+	report := h.preview(t, h.file(t, "kinds.csv", "path,title,entity,post type,page type\n/a/,,Alpha,gadget,sprocket\n,Beta,Beta,,widget\n"),
 		h.mapping(map[string]string{
-			string(importmap.FieldPath):       "path",
-			string(importmap.FieldEntity):     "entity",
-			string(importmap.FieldEntityKind): "entity type",
-			string(importmap.FieldWPType):     "post type",
-			string(importmap.FieldPageKind):   "page type",
+			string(importmap.FieldPath):     "path",
+			string(importmap.FieldTitle):    "title",
+			string(importmap.FieldEntity):   "entity",
+			string(importmap.FieldWPType):   "post type",
+			string(importmap.FieldPageType): "page type",
 		}))
 
-	for _, code := range []imports.FindingCode{imports.CodeUnknownEntityKind, imports.CodeUnknownWPType, imports.CodeUnknownPageKind} {
-		if len(findings(report.Warnings, code)) != 1 {
-			t.Fatalf("%s findings = %+v", code, report.Warnings)
+	for code, rows := range map[imports.FindingCode][]int{imports.CodeUnknownWPType: {2}, imports.CodeUnknownPageType: {2, 3}} {
+		got := findings(report.Warnings, code)
+		at := make([]int, 0, len(got))
+		for i := range got {
+			at = append(at, got[i].Row)
+		}
+		slices.Sort(at)
+		if !slices.Equal(at, rows) {
+			t.Fatalf("%s findings = %+v, want one on each of the rows %v", code, report.Warnings, rows)
 		}
 	}
-	if alpha, _ := entity(report, "Alpha"); alpha.Kind != "topic" {
-		t.Fatalf("kind = %q, want topic", alpha.Kind)
+	if beta, found := page(report, "/beta/"); !found || beta.PageType != "" {
+		t.Fatalf("the row without a URL = %+v, want an untyped page at the slug of its title", beta)
 	}
-	if found, _ := page(report, "/a/"); found.WPType != "page" {
-		t.Fatalf("wordpress type = %q, want page", found.WPType)
+	if found, _ := page(report, "/a/"); found.WPType != "page" || found.PageType != "" {
+		t.Fatalf("the page = %+v, want an untyped page", found)
+	}
+	if len(report.Errors) != 0 {
+		t.Fatalf("an unknown page type blocks the import: %+v", report.Errors)
 	}
 }
 
-func TestPreviewReadsTheEntityLevelsTheClientWrites(t *testing.T) {
+func TestACellNamesThePageTypeByTheSitesOwnNameFirst(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		cell string
-		want string
+		name   string
+		rename map[pagetype.Preset]string
+		cell   string
+		want   string
 	}{
-		{cell: "Category", want: "category"},
-		{cell: "Commercial Taxonomy", want: "category"},
-		{cell: "Compound/Product", want: "product"},
-		{cell: "compound", want: "product"},
-		{cell: "Product Owner", want: "product"},
-		{cell: "GEO", want: "custom"},
-		{cell: "Geographic Entity", want: "custom"},
-		{cell: "Root", want: "hub"},
-		{cell: "Pillar", want: "hub"},
-		{cell: "hub", want: "hub"},
-		{cell: "Topic", want: "topic"},
+		{name: "a type by its name", cell: "Hub", want: "Hub"},
+		{name: "a name in another case", cell: "PRODUCT", want: "Product"},
+		{name: "a category is a hub", cell: "Category", want: "Hub"},
+		{name: "a commercial taxonomy is a hub", cell: "Commercial Taxonomy", want: "Hub"},
+		{name: "a pillar is a hub", cell: "Pillar", want: "Hub"},
+		{name: "a root is a hub", cell: "Root", want: "Hub"},
+		{name: "a compound is a product", cell: "Compound", want: "Product"},
+		{name: "a compound product is a product", cell: "Compound/Product", want: "Product"},
+		{name: "a product owner is a product", cell: "Product Owner", want: "Product"},
+		{name: "a topic is an entity", cell: "Topic", want: "Entity"},
+		{name: "a guide is an entity", cell: "guide", want: "Entity"},
+		{name: "a geographic entity is an entity", cell: "Geographic Entity", want: "Entity"},
+		{name: "the store category on a page is a hub", cell: "Store category", want: "Hub"},
+		{name: "the hub renamed category", rename: map[pagetype.Preset]string{pagetype.Hub: "Category"}, cell: "Category", want: "Category"},
+		{name: "the entity renamed category wins the synonym", rename: map[pagetype.Preset]string{pagetype.Entity: "Category"}, cell: "category", want: "Category"},
+		{name: "the hub renamed keeps its synonyms", rename: map[pagetype.Preset]string{pagetype.Hub: "Collection"}, cell: "Pillar", want: "Collection"},
+		{name: "a renamed type answers its new name", rename: map[pagetype.Preset]string{pagetype.Product: "Goods"}, cell: "Goods", want: "Goods"},
+		{name: "a renamed type keeps its synonyms", rename: map[pagetype.Preset]string{pagetype.Product: "Goods"}, cell: "Compound", want: "Goods"},
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.cell, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
 			h := newHarness(t)
-			report := h.preview(t, h.file(t, "levels.csv", "url,entity name,entity level\n/a/,Alpha,"+tc.cell+"\n"),
-				h.mapping(map[string]string{
-					string(importmap.FieldPath):       "url",
-					string(importmap.FieldEntity):     "entity name",
-					string(importmap.FieldEntityKind): "entity level",
-				}))
-			if alpha, _ := entity(report, "Alpha"); alpha.Kind != tc.want {
-				t.Fatalf("kind = %q, want %q", alpha.Kind, tc.want)
+			for preset, name := range tc.rename {
+				h.rename(t, preset, name)
 			}
-			if len(findings(report.Warnings, imports.CodeUnknownEntityKind)) != 0 {
-				t.Fatalf("a level the client writes is reported unknown: %+v", report.Warnings)
+			path := h.file(t, "types.csv", "url,entity name,entity level\n/a/,Alpha,"+tc.cell+"\n")
+			mapping := h.mapping(map[string]string{
+				string(importmap.FieldPath): "url", string(importmap.FieldEntity): "entity name", string(importmap.FieldPageType): "entity level",
+			})
+			report := h.preview(t, path, mapping)
+			if found, _ := page(report, "/a/"); found.PageType != tc.want {
+				t.Fatalf("the page reads as %+v, want the type %s", found, tc.want)
+			}
+			if unknown := findings(report.Warnings, imports.CodeUnknownPageType); len(unknown) != 0 {
+				t.Fatalf("a type the site knows is reported unknown: %+v", unknown)
+			}
+			if typed := h.typeNames(t); len(typed) != 0 {
+				t.Fatalf("the preview typed %v", typed)
+			}
+			h.apply(t, path, mapping)
+			if typed := h.typeNames(t); typed["/a/"] != tc.want {
+				t.Fatalf("the stored page is typed %v, want %s", typed, tc.want)
 			}
 		})
+	}
+}
+
+func TestAStoreCategoryPageIsAStoreCategoryWhateverItsCell(t *testing.T) {
+	t.Parallel()
+
+	cases := []string{"Hub", "Product", "Pillar", "Store category"}
+
+	for _, cell := range cases {
+		t.Run(cell, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			wpID := int64(40)
+			term, err := pagemap.NewPage(pagemap.Page{
+				ID: id.New(), SiteID: h.siteID, Path: "/product-category/peptides/", WPType: pagemap.WPProductCategory, WPID: &wpID,
+				Title: "Peptides", Status: pagemap.StatusPublished, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+			})
+			if err != nil {
+				t.Fatalf("build the term page: %v", err)
+			}
+			if err = sqlite.NewPageRepo(h.store).Insert(t.Context(), term); err != nil {
+				t.Fatalf("insert the term page: %v", err)
+			}
+
+			path := h.file(t, "terms.csv", "url,page type\n/product-category/peptides/,"+cell+"\n")
+			mapping := h.mapping(map[string]string{string(importmap.FieldPath): "url", string(importmap.FieldPageType): "page type"})
+			report := h.preview(t, path, mapping)
+			if found, _ := page(report, term.Path); found.PageType != "Store category" {
+				t.Fatalf("the term page reads as %+v, want a store category", found)
+			}
+			h.apply(t, path, mapping)
+			if typed := h.typeNames(t); typed[term.Path] != "Store category" {
+				t.Fatalf("the stored term page is typed %v", typed)
+			}
+		})
+	}
+}
+
+func TestAnEntityLevelColumnWinsThePageTypeAndThePreviewNamesTheOneItDropped(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		sheet   string
+		column  string
+		dropped string
+		want    string
+	}{
+		{name: "the kind before the entity type", sheet: "URL,Kind,Entity type\n/a/,Hub,Product\n", column: "Entity type", dropped: "Kind", want: "Product"},
+		{name: "the entity type before the kind", sheet: "URL,Entity type,Kind\n/a/,Product,Hub\n", column: "Entity type", dropped: "Kind", want: "Product"},
+		{name: "the page type before the entity level", sheet: "URL,Page type,Entity level\n/a/,Hub,Topic\n", column: "Entity level", dropped: "Page type", want: "Entity"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			path := h.file(t, "both.csv", tc.sheet)
+			mapping := h.detected(t, path)
+			if got := mapping.Columns[string(importmap.FieldPageType)]; got != tc.column {
+				t.Fatalf("the page type is read from %q, want %q", got, tc.column)
+			}
+			report := h.preview(t, path, mapping)
+			if found, _ := page(report, "/a/"); found.PageType != tc.want {
+				t.Fatalf("the page reads as %+v, want %s", found, tc.want)
+			}
+			dropped := findings(report.Warnings, imports.CodePageTypeColumnDropped)
+			if len(dropped) != 1 || !strings.Contains(dropped[0].Message, tc.dropped) || !strings.Contains(dropped[0].Message, tc.column) ||
+				dropped[0].Field != string(importmap.FieldPageType) {
+				t.Fatalf("dropped findings = %+v, want one naming %s and %s", dropped, tc.dropped, tc.column)
+			}
+			if left := ignored(report); !slices.Equal(left, []string{tc.dropped}) {
+				t.Fatalf("ignored = %v, want %s", left, tc.dropped)
+			}
+			if len(report.Errors) != 0 {
+				t.Fatalf("errors = %+v", report.Errors)
+			}
+		})
+	}
+}
+
+func TestATemplateColumnIsReadAsNothing(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	path := h.file(t, "templates.csv", "URL,Template,Page template\n/a/,hub,guide\n")
+	mapping := h.detected(t, path)
+	if _, read := mapping.Columns[string(importmap.FieldPageType)]; read {
+		t.Fatalf("a template column was read as the page type: %v", mapping.Columns)
+	}
+	report := h.preview(t, path, mapping)
+	if left := ignored(report); !slices.Equal(left, []string{"Template", "Page template"}) {
+		t.Fatalf("ignored = %v, want both template columns", left)
+	}
+	if found, _ := page(report, "/a/"); found.PageType != "" {
+		t.Fatalf("the page reads as %+v, want it untyped", found)
+	}
+	if left := besidesPlanned(report.Warnings); len(left) != 0 {
+		t.Fatalf("warnings = %+v", left)
 	}
 }
 
@@ -453,7 +582,7 @@ func TestEveryFindingNamesItsSheet(t *testing.T) {
 	rows := map[imports.FindingCode]int{
 		imports.CodeIntermediatePath: 0,
 		imports.CodeUnknownWPType:    3,
-		imports.CodeUnknownPageKind:  4,
+		imports.CodeUnknownPageType:  4,
 		imports.CodeRootPageSkipped:  5,
 		imports.CodeTechnicalParent:  6,
 		imports.CodeCycle:            0,
@@ -480,9 +609,9 @@ func TestEveryFindingNamesItsSheet(t *testing.T) {
 	})
 	mapping := h.detected(t, products)
 	mapping.Options.RowType = importmap.RowProducts
-	waiting := findings(h.preview(t, products, mapping).Warnings, imports.CodeProductNotInStore)
+	waiting := findings(h.preview(t, products, mapping).Warnings, imports.CodeRowWithoutPage)
 	if len(waiting) != 1 || waiting[0].Sheet != "Sheet1" || waiting[0].Row != 2 {
-		t.Errorf("not-in-store findings = %+v, want row 2 of Sheet1", waiting)
+		t.Errorf("rows without a product = %+v, want row 2 of Sheet1", waiting)
 	}
 }
 
@@ -516,8 +645,9 @@ func TestTheFindingCodesDeclareWhichOnesBlockAnApply(t *testing.T) {
 		{code: imports.CodeSelfEdge, blocking: true},
 		{code: imports.CodeCycle, blocking: true},
 		{code: imports.CodeCannibalization, blocking: false},
-		{code: imports.CodeUnknownEntityKind, blocking: false},
-		{code: imports.CodeUnknownPageKind, blocking: false},
+		{code: imports.CodeUnknownPageType, blocking: false},
+		{code: imports.CodePageTypeKept, blocking: false},
+		{code: imports.CodePageTypeColumnDropped, blocking: false},
 		{code: imports.CodeUnknownWPType, blocking: false},
 		{code: imports.CodeBadVolume, blocking: false},
 		{code: imports.FindingCode("invented"), blocking: false},

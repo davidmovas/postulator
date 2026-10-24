@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
     createPage,
@@ -6,17 +6,43 @@ import {
     getPage,
     listPages,
     mapPageToEntity,
+    modelSummary,
+    pageModel,
     pageTree,
     previewLink,
     setCanonicalPage,
+    setPageType,
+    siteMap,
     unmapPage,
     updatePage,
+    writerPack,
 } from "../endpoints/pages.js";
-import { quietMeta } from "../client.js";
+import { infiniteGcTimeMs, quietMeta } from "../client.js";
 import { keys } from "../keys.js";
-import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
+import { useLockGate } from "../lock.js";
+import { useUnlockedInfinite, useUnlockedQueries, useUnlockedQuery } from "../query.js";
 import type { PageSort } from "../sorts.js";
-import type { Page, PageFilter } from "../types.js";
+import type { Page, PageFilter, SiteMapFilter, SiteMapView } from "../types.js";
+import type { Cursor } from "../../lib/paging.js";
+
+export const siteMapLimit = 100;
+
+export function useSiteMap(filter: SiteMapFilter, enabled = true) {
+    const gate = useLockGate();
+    return useInfiniteQuery({
+        queryKey: keys.pages.map(filter, siteMapLimit),
+        enabled: enabled && filter.siteId !== "" && gate.ready && !gate.locked,
+        initialPageParam: undefined as Cursor | undefined,
+        queryFn: ({ pageParam, signal }) =>
+            siteMap({ ...filter, limit: siteMapLimit, ...(pageParam === undefined ? {} : { cursor: pageParam }) }, signal),
+        getNextPageParam: (last: SiteMapView) =>
+            last.nodes.hasMore && last.nodes.nextCursor !== undefined ? last.nodes.nextCursor : undefined,
+        getPreviousPageParam: () => undefined,
+        refetchOnWindowFocus: false,
+        gcTime: infiniteGcTimeMs,
+        placeholderData: keepPreviousData,
+    });
+}
 
 export function usePages(filter: PageFilter, sort: PageSort | null = null, limit?: number) {
     return useUnlockedInfinite<PageFilter, Page>({
@@ -37,11 +63,55 @@ export function usePage(id: string | null) {
     });
 }
 
+export function usePagePaths(ids: readonly string[], enabled: boolean): ReadonlyMap<string, string> {
+    const answered = useUnlockedQueries(
+        ids.map((id) => ({
+            queryKey: keys.pages.detail(id),
+            queryFn: ({ signal }: { signal: AbortSignal }) => getPage({ id }, signal),
+            enabled: enabled && id !== "",
+        })),
+    );
+    const out = new Map<string, string>();
+    answered.forEach((held, at) => {
+        const id = ids[at];
+        const path = held.data?.page.path;
+        if (id !== undefined && path !== undefined) {
+            out.set(id, path);
+        }
+    });
+    return out;
+}
+
 export function usePageTree(siteId: string | null) {
     return useUnlockedQuery({
         queryKey: keys.pages.tree(siteId ?? ""),
         queryFn: ({ signal }) => pageTree({ siteId: siteId ?? "" }, signal),
         enabled: siteId !== null && siteId !== "",
+    });
+}
+
+export function usePageModel(pageId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.model(pageId ?? ""),
+        queryFn: ({ signal }) => pageModel({ pageId: pageId ?? "" }, signal),
+        enabled: pageId !== null && pageId !== "",
+    });
+}
+
+export function useModelSummary(siteId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.summary(siteId ?? ""),
+        queryFn: ({ signal }) => modelSummary({ siteId: siteId ?? "" }, signal),
+        enabled: siteId !== null && siteId !== "",
+    });
+}
+
+export function useWriterPack(pageId: string | null, field: string) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.pack(pageId ?? "", field),
+        queryFn: ({ signal }) => writerPack({ pageId: pageId ?? "", field, budget: 0 }, signal),
+        enabled: pageId !== null && pageId !== "",
+        quiet: ["INVALID"],
     });
 }
 
@@ -85,6 +155,21 @@ export function useSetCanonicalPage() {
             void client.invalidateQueries({ queryKey: keys.pages.detail(answered.page.id) });
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.graph.root() });
+        },
+    });
+}
+
+export function useSetPageType() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof setPageType>[0]) => setPageType(request),
+        onSuccess: (answered) => {
+            void client.invalidateQueries({ queryKey: keys.pages.detail(answered.page.id) });
+            void client.invalidateQueries({ queryKey: keys.pages.lists() });
+            void client.invalidateQueries({ queryKey: keys.pages.tree(answered.page.siteId) });
+            void client.invalidateQueries({ queryKey: keys.sites.types(answered.page.siteId) });
+            void client.invalidateQueries({ queryKey: keys.templates.resolved(answered.page.id) });
+            void client.invalidateQueries({ queryKey: keys.graph.full(answered.page.siteId) });
         },
     });
 }

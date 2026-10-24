@@ -7,12 +7,15 @@ import (
 
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
 	port "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
-	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -56,43 +59,45 @@ func (e edgeStub) ListBySite(context.Context, string) ([]graph.Edge, error) {
 	return e.items, e.err
 }
 
+type fieldStub struct {
+	values map[string][]field.Value
+}
+
+func (f fieldStub) ListBySite(context.Context, string) (map[string][]field.Value, error) {
+	return f.values, nil
+}
+
 type specStub struct {
-	rules *template.LinkRules
-	err   error
+	err error
 }
 
 func (s specStub) ResolveForPage(context.Context, templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
 	if s.err != nil {
 		return templates.ResolveForPageResponse{}, s.err
 	}
-	rules := template.LinkRules{UpDepth: 1, DownLinks: true, MaxLinks: 10, MaxPerTarget: 1}
-	if s.rules != nil {
-		rules = *s.rules
-	}
 	return templates.ResolveForPageResponse{
 		TemplateID: "t1", SiteID: "site", Version: 1,
-		Spec: template.TemplateSpec{
-			Tone:      "plain",
-			Length:    template.Length{Min: 200, Max: 900},
-			LinkRules: rules,
-		},
+		Spec: template.TemplateSpec{Tone: "plain", Length: template.Length{Min: 200, Max: 900}},
 	}, nil
 }
 
-type policyStub struct {
-	rules template.LinkRules
+type typesStub struct {
+	rules *field.LinkRules
 	err   error
 }
 
-func (p policyStub) GetEffectivePolicy(context.Context, templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error) {
-	if p.err != nil {
-		return templates.GetEffectivePolicyResponse{}, p.err
+func (s typesStub) Set(context.Context, string) (pagetype.Set, error) {
+	if s.err != nil {
+		return pagetype.Set{}, s.err
 	}
-	return templates.GetEffectivePolicyResponse{
-		Policy: templates.LinkPolicy{
-			Rules: p.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "prefer_user",
-		},
-	}, nil
+	rules := field.LinkRules{UpDepth: 1, DownLinks: true, MaxLinks: 10, MaxPerTarget: 1}
+	if s.rules != nil {
+		rules = *s.rules
+	}
+	entity := pagetype.Type{ID: "type-entity", SiteID: "site", Name: "Entity", Preset: pagetype.Entity}
+	body := pagetype.DefaultScope(pagetype.Entity, field.Body, entity.ID)
+	body.Links.Rules = rules
+	return pagetype.NewSet([]pagetype.Type{entity}, []field.Scope{body}), nil
 }
 
 type profileStub struct {
@@ -158,13 +163,11 @@ func pages() []pagemap.Page {
 func entities() []graph.Entity {
 	return []graph.Entity{
 		{
-			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"), Kind: graph.KindTopic,
-			Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
+			ID: "parent", SiteID: "site", Name: "Coffee", Keywords: keyword.Of("coffee"), Source: graph.SourceUser, CanonicalPageID: pointer("page-parent"),
 			Anchors: []graph.Anchor{{Text: "coffee", Source: graph.AnchorUser, Weight: 1}},
 		},
 		{
-			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"), Kind: graph.KindTopic,
-			Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
+			ID: "child", SiteID: "site", Name: "Espresso", Keywords: keyword.Of("espresso"), Source: graph.SourceUser, CanonicalPageID: pointer("page-child"),
 			Anchors: []graph.Anchor{{Text: "espresso", Source: graph.AnchorUser, Weight: 1}},
 		},
 	}
@@ -177,21 +180,63 @@ func edges() []graph.Edge {
 	}}
 }
 
+type pictureStub struct {
+	err error
+}
+
+func (p pictureStub) Picture(_ context.Context, req sitemodel.PackRequest) (sitemodel.Picture, error) {
+	if p.err != nil {
+		return sitemodel.Picture{}, p.err
+	}
+	return sitemodel.Picture{Fitted: contextpack.Fitted{Sections: []contextpack.Section{
+		{Name: contextpack.SectionPage, Heading: "The page", Priority: 1, Lines: []string{"Path: /coffee/espresso/ of " + req.PageID}},
+		{Name: contextpack.SectionCurrent, Heading: "The field's current value", Priority: 2, Lines: []string{"the body itself"}},
+		{Name: contextpack.SectionTrail, Heading: "The trail, nearest parent first", Priority: 3, Items: []string{"- Coffee (/coffee/)"}},
+	}}}, nil
+}
+
 func newService(model *llmStub, mutate func(*appcontent.Deps)) *appcontent.Service {
 	deps := appcontent.Deps{
 		Pages:    pageStub{items: pages()},
 		Entities: entityStub{items: entities()},
 		Edges:    edgeStub{items: edges()},
+		Fields:   fieldStub{},
 		Specs:    specStub{},
-		Policies: policyStub{},
+		Types:    typesStub{},
 		Profiles: profileStub{},
 		Raw:      rawStub{body: "<h1>Espresso</h1><p>Espresso is a way to make coffee.</p>"},
+		Pictures: pictureStub{},
 		LLM:      model,
 	}
 	if mutate != nil {
 		mutate(&deps)
 	}
 	return appcontent.New(deps)
+}
+
+func TestTheJudgeReadsThePictureButNotTheBodyTwice(t *testing.T) {
+	t.Parallel()
+
+	model := &llmStub{reply: `{"score":0.8,"issues":[],"suggestions":[]}`}
+	if _, err := newService(model, nil).Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); err != nil {
+		t.Fatalf("Judge: %v", err)
+	}
+	prompt := model.last.Messages[len(model.last.Messages)-1].Text
+	for _, want := range []string{"THE FULL PICTURE", "THE PAGE\nPath: /coffee/espresso/ of page-child", "THE TRAIL, NEAREST PARENT FIRST\n- Coffee (/coffee/)"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("the judge's prompt lacks %q:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "the body itself") {
+		t.Errorf("the judge's prompt carries the current value beside the body:\n%s", prompt)
+	}
+
+	failing := newService(model, func(deps *appcontent.Deps) {
+		deps.Pictures = pictureStub{err: errors.New(errors.NotFound, "no such page")}
+	})
+	if _, err := failing.Judge(t.Context(), appcontent.JudgeRequest{PageID: "page-child"}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("Judge without a picture = %v, want the read layer's refusal", err)
+	}
 }
 
 func TestJudgeAuditsTheLivePage(t *testing.T) {
@@ -277,8 +322,11 @@ func TestJudgeAuditsAProductUnderTheNameTheStoreShows(t *testing.T) {
 	service := newService(model, func(deps *appcontent.Deps) {
 		listed := pages()
 		listed[1].WPType = pagemap.WPProduct
-		listed[1].Observed.Title = "Espresso &amp; Crema"
+		listed[1].Title = "Buy Espresso"
 		deps.Pages = pageStub{items: listed}
+		deps.Fields = fieldStub{values: map[string][]field.Value{
+			listed[1].ID: {field.NewValue(listed[1].ID, field.Title, "Espresso &amp; Crema", listed[1].CreatedAt)},
+		}}
 		deps.Raw = rawStub{body: "<h2>About</h2><p>Espresso is a way to make coffee.</p>"}
 	})
 
@@ -302,19 +350,27 @@ func TestAssessShowsTheJudgeTheProductOutputs(t *testing.T) {
 	page.WPType = pagemap.WPProduct
 	_, err := newService(model, nil).Assess(t.Context(), appcontent.AssessRequest{
 		SiteID: "site", Page: page, Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
-		Product: &contentdomain.ProductDraft{
-			ShortDescription: "<p>A strong shot.</p>",
-			Specifications:   []contentdomain.Specification{{Name: "Form", Value: "Beans"}},
-		},
+		ShortDescription: "<p>A strong shot.</p>",
 	})
 	if err != nil {
 		t.Fatalf("Assess: %v", err)
 	}
 	prompt := model.last.Messages[len(model.last.Messages)-1].Text
-	for _, want := range []string{"PRODUCT\n", "Short description: <p>A strong shot.</p>", "- Form: Beans"} {
+	for _, want := range []string{"PRODUCT\n", "Short description: <p>A strong shot.</p>"} {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("the prompt lacks %q:\n%s", want, prompt)
 		}
+	}
+
+	_, err = newService(model, nil).Assess(t.Context(), appcontent.AssessRequest{
+		SiteID: "site", Page: page, Entity: entities()[1], Body: "<h1>Espresso</h1><p>Espresso.</p>",
+	})
+	if err != nil {
+		t.Fatalf("Assess: %v", err)
+	}
+	prompt = model.last.Messages[len(model.last.Messages)-1].Text
+	if !strings.Contains(prompt, "PRODUCT\n") || strings.Contains(prompt, "Short description:") {
+		t.Errorf("a product whose short description this run kept is still a product, with no short description shown:\n%s", prompt)
 	}
 }
 
@@ -339,11 +395,10 @@ func TestJudgePlansTheLinksOfThePageItAudits(t *testing.T) {
 			want:   "- /coffee/espresso/ (up",
 		},
 		{
-			name:   "a template with no link rules of its own takes the site policy's",
+			name:   "the page's type gives the rules its links are planned on",
 			pageID: "page-child",
 			mutate: func(d *appcontent.Deps) {
-				d.Specs = specStub{rules: &template.LinkRules{}}
-				d.Policies = policyStub{rules: template.LinkRules{UpDepth: 1, MaxPerTarget: 1}}
+				d.Types = typesStub{rules: &field.LinkRules{UpDepth: 1, MaxPerTarget: 1}}
 			},
 			want: "- /coffee/ (up",
 		},
@@ -414,7 +469,7 @@ func TestJudgeRefusesWhatItCannotAudit(t *testing.T) {
 		},
 		{
 			name: "the policy cannot be read", pageID: "page-child", want: errors.External,
-			mutate: func(d *appcontent.Deps) { d.Policies = policyStub{err: boom} },
+			mutate: func(d *appcontent.Deps) { d.Types = typesStub{err: boom} },
 		},
 		{
 			name: "the entity is gone", pageID: "page-child", want: errors.NotFound,
@@ -504,9 +559,9 @@ func TestTheJudgeNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 		shared := entities()
 		shared[1].ScopeID = pointer("parent")
 		shared = append(shared,
-			graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Kind: graph.KindTopic, Source: graph.SourceUser},
+			graph.Entity{ID: "tea", SiteID: "site", Name: "Tea", Source: graph.SourceUser},
 			graph.Entity{
-				ID: "tea-espresso", SiteID: "site", Name: "Espresso", Kind: graph.KindTopic, Source: graph.SourceUser,
+				ID: "tea-espresso", SiteID: "site", Name: "Espresso", Source: graph.SourceUser,
 				ScopeID: pointer("tea"),
 			},
 		)

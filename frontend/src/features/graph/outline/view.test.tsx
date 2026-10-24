@@ -2,13 +2,18 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../../copy/index.js";
-import { entity } from "../model/fixture.js";
+import { entity, pageType, typedPage } from "../model/fixture.js";
 import { expandAll, visibleRows } from "../model/fold.js";
 import { buildGraphIndex } from "../model/index.js";
 import { OutlineView } from "./view.js";
 
-function outline(kind: string) {
-    const index = buildGraphIndex([entity({ id: "mugs", name: "Ceramic Mugs", kind })], []);
+function outline(preset: string | null, name = "Hub") {
+    const index = buildGraphIndex(
+        [entity({ id: "mugs", name: "Ceramic Mugs" })],
+        [],
+        preset === null ? [] : [typedPage("mugs", preset)],
+        preset === null ? [] : [pageType(preset, name)],
+    );
     return render(
         <OutlineView
             siteId="s1"
@@ -24,19 +29,15 @@ function outline(kind: string) {
     );
 }
 
-describe("the outline's kind column", () => {
-    it.each([
-        ["hub", copy.graph.kinds.hub],
-        ["product", copy.graph.kinds.product],
-        ["category", copy.graph.kinds.category],
-    ])("names a %s in words", (kind, words) => {
-        outline(kind);
-        expect(screen.getByText(words)).toBeDefined();
-        expect(screen.queryByText(kind)).toBeNull();
+describe("the outline's type column", () => {
+    it("names the canonical page's type by the client's own name", () => {
+        outline("hub", "Category");
+        expect(screen.getByText("Category")).toBeDefined();
+        expect(screen.getByText(copy.graph.outline.columns.type)).toBeDefined();
     });
 
-    it("shows a kind this build does not know as it arrived", () => {
-        outline("galaxy");
-        expect(screen.getByText("galaxy")).toBeDefined();
+    it("says an entity without a typed page has no page type", () => {
+        outline(null);
+        expect(screen.getByText(copy.pageTypes.untyped)).toBeDefined();
     });
 });

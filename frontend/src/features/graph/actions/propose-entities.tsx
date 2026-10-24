@@ -4,86 +4,41 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { copy } from "../../../copy/index.js";
 import { errorMessageOf } from "../../../data/errors.js";
 import { useApplyProposals, usePreviewFromPages, useProposeFromKeywords } from "../../../data/hooks/graph.js";
-import type { ApplyProposalsResponse, Page, ProposedEntity } from "../../../data/types.js";
-import { keywordList, mainKeyword } from "../../../domain/keywords.js";
-import type { SegmentedOption, SelectOption } from "../../../ui/index.js";
-import {
-    Button,
-    Checkbox,
-    DenseTable,
-    Drawer,
-    Field,
-    Segmented,
-    Select,
-    Stars2Icon,
-    TableCell,
-    TableHead,
-    TableRow,
-    Textarea,
-    useElapsed,
-} from "../../../ui/index.js";
-import { everyPage } from "../../pages/pick/model.js";
-import { PageTree } from "../../pages/pick/tree.js";
-import { entityKindLabel } from "../labels.js";
+import { pushToast } from "../../../data/toasts.js";
+import type { ApplyProposalsResponse, PreviewFromPagesRequest, ProposedEntity } from "../../../data/types.js";
+import { Button, Drawer, Stars2Icon, cx, useElapsed } from "../../../ui/index.js";
 import type { GraphIndex } from "../model/index.js";
+import { chosenOf, everyTickable, keywordLines, writesOf } from "../model/proposals.js";
+import type { Pick, ProposalInput } from "./propose-pick.js";
+import { ProposalPick, freshPick, noParent } from "./propose-pick.js";
+import { ProposalConfirm, ProposalReview } from "./propose-review.js";
+
+export type { ProposalInput } from "./propose-pick.js";
+
+const said = copy.graph.ai;
 
 const drawerWidth = 688;
-const rootPath = "/";
-const noParent = "";
 
-export type ProposalSource = "pages" | "keywords";
+const siteSource = "site" as PreviewFromPagesRequest["source"];
 
-type Stage = "pick" | "review" | "done";
+export type ProposalStart =
+    | { kind: "pick"; source: ProposalInput; index: GraphIndex; onReview: () => void }
+    | { kind: "seed"; seed: PreviewFromPagesRequest };
 
-type PickScope = "unmapped" | "all";
-
-const scopeOptions: readonly SegmentedOption<PickScope>[] = [
-    { value: "unmapped", label: copy.graph.ai.pickScopes.unmapped },
-    { value: "all", label: copy.graph.ai.pickScopes.all },
-];
-
-export function unmapped(page: Page): boolean {
-    return (page.entityId === null || page.entityId === "") && page.path !== rootPath;
-}
-
-export function keywordLines(text: string): string[] {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const raw of text.split(/\r?\n/)) {
-        const line = raw.trim();
-        const key = line.toLowerCase();
-        if (line === "" || seen.has(key)) {
-            continue;
-        }
-        seen.add(key);
-        out.push(line);
-    }
-    return out;
-}
-
-function placeOf(proposal: ProposedEntity): string {
-    if (proposal.path !== undefined && proposal.path !== "") {
-        return proposal.path;
-    }
-    return proposal.parent ?? "";
-}
+type Stage = "pick" | "review" | "confirm" | "done";
 
 export interface ProposeEntitiesDrawerProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     siteId: string;
-    source: ProposalSource;
-    index: GraphIndex;
-    onReview: () => void;
+    start: ProposalStart;
 }
 
-export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: initialSource, index, onReview }: ProposeEntitiesDrawerProps): ReactElement | null {
-    const [source, setSource] = useState<ProposalSource>(initialSource);
-    const [stage, setStage] = useState<Stage>("pick");
-    const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-    const [scope, setScope] = useState<PickScope>("unmapped");
-    const [keywords, setKeywords] = useState("");
-    const [parentId, setParentId] = useState(noParent);
+export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: ProposeEntitiesDrawerProps): ReactElement | null {
+    const input = start.kind === "pick" ? start.source : null;
+    const seed = start.kind === "seed" ? start.seed : null;
+    const [stage, setStage] = useState<Stage>(seed === null ? "pick" : "review");
+    const [pick, setPick] = useState<Pick>(() => freshPick(input ?? "pages"));
     const [proposals, setProposals] = useState<readonly ProposedEntity[]>([]);
     const [kept, setKept] = useState<ReadonlySet<number>>(new Set());
     const [outcome, setOutcome] = useState<ApplyProposalsResponse | null>(null);
@@ -95,17 +50,20 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
     const apply = useApplyProposals();
     const previewing = previewPages.isPending || previewKeywords.isPending;
     const seconds = useElapsed(previewing || apply.isPending);
+    const lines = useMemo(() => keywordLines(pick.keywords), [pick.keywords]);
+
+    const received = (answered: readonly ProposedEntity[]): void => {
+        setProposals(answered);
+        setKept(everyTickable(answered));
+        setStage("review");
+    };
 
     useEffect(() => {
         if (!open) {
             return;
         }
-        setSource(initialSource);
-        setStage("pick");
-        setSelected(new Set());
-        setScope("unmapped");
-        setKeywords("");
-        setParentId(noParent);
+        setStage(seed === null ? "pick" : "review");
+        setPick(freshPick(input ?? "pages"));
         setProposals([]);
         setKept(new Set());
         setOutcome(null);
@@ -113,17 +71,16 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
         previewPages.reset();
         previewKeywords.reset();
         apply.reset();
-    }, [open, siteId, initialSource]);
-
-    const keep = useMemo(() => (scope === "unmapped" ? unmapped : everyPage), [scope]);
-    const lines = useMemo(() => keywordLines(keywords), [keywords]);
-    const parents: SelectOption<string>[] = useMemo(
-        () => [
-            { value: noParent, label: copy.graph.ai.parentNone },
-            ...[...index.byId.values()].map((entity) => ({ value: entity.id, label: entity.name })),
-        ],
-        [index],
-    );
+        if (seed === null) {
+            return;
+        }
+        const held = new AbortController();
+        controller.current = held;
+        previewPages.mutate({ request: { ...seed, source: siteSource }, signal: held.signal }, { onSuccess: (answered) => received(answered.entities ?? []) });
+        return () => {
+            held.abort();
+        };
+    }, [open, siteId, input, seed]);
 
     if (!open) {
         return null;
@@ -134,38 +91,45 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
         setStopped(true);
     };
 
-    const received = (answered: readonly ProposedEntity[]): void => {
-        setProposals(answered);
-        setKept(new Set(answered.map((_proposal, at) => at)));
-        setStage("review");
-    };
-
     const preview = (): void => {
         const held = new AbortController();
         controller.current = held;
         setStopped(false);
-        if (source === "pages") {
+        if (pick.input === "pages") {
             previewPages.mutate(
-                { request: { siteId, pageIds: [...selected] }, signal: held.signal },
+                { request: { siteId, pageIds: [...pick.selected] }, signal: held.signal },
                 { onSuccess: (answered) => received(answered.entities ?? []) },
             );
             return;
         }
         const request: Parameters<typeof previewKeywords.mutate>[0]["request"] = { siteId, keywords: lines };
-        if (parentId !== noParent) {
-            request.parentEntityId = parentId;
+        if (pick.parentId !== noParent) {
+            request.parentEntityId = pick.parentId;
         }
         previewKeywords.mutate({ request, signal: held.signal }, { onSuccess: (answered) => received(answered.entities ?? []) });
     };
 
+    const chosen = chosenOf(proposals, kept);
+
     const create = (): void => {
-        const chosen = proposals.filter((_proposal, at) => kept.has(at));
         apply.mutate(
             { request: { siteId, entities: chosen } },
             {
                 onSuccess: (answered) => {
                     setOutcome(answered);
                     setStage("done");
+                },
+            },
+        );
+    };
+
+    const write = (): void => {
+        apply.mutate(
+            { request: { siteId, entities: chosen, source: siteSource } },
+            {
+                onSuccess: (answered) => {
+                    pushToast("info", said.siteApplied(answered.entities?.length ?? 0, answered.mapped, answered.skipped));
+                    onOpenChange(false);
                 },
             },
         );
@@ -178,55 +142,71 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
         onOpenChange(next);
     };
 
-    const error =
-        errorMessageOf(previewPages.error) ?? errorMessageOf(previewKeywords.error) ?? errorMessageOf(apply.error);
-    const ready = source === "pages" ? selected.size : lines.length;
+    const error = errorMessageOf(previewPages.error) ?? errorMessageOf(previewKeywords.error) ?? errorMessageOf(apply.error);
+    const ready = pick.input === "pages" ? pick.selected.size : lines.length;
     const edges = outcome?.edges?.length ?? 0;
+    const writes = writesOf(chosen);
+    const working = (
+        <span aria-live="polite" className="mr-auto text-xs text-ink-soft">
+            {seed === null ? said.previewing : said.reading} <span className="font-mono text-2xs text-ink-faint">{said.elapsed(seconds)}</span>
+        </span>
+    );
 
     const footer =
         stage === "pick" ? (
             <div className="flex items-center justify-end gap-2">
-                {previewing ? (
-                    <span aria-live="polite" className="mr-auto text-xs text-ink-soft">
-                        {copy.graph.ai.previewing} <span className="font-mono text-2xs text-ink-faint">{copy.graph.ai.elapsed(seconds)}</span>
-                    </span>
-                ) : null}
+                {previewing ? working : null}
                 <Button variant="secondary" onClick={previewing ? stop : () => close(false)}>
-                    {previewing ? copy.graph.ai.stop : copy.graph.ai.cancel}
+                    {previewing ? said.stop : said.cancel}
                 </Button>
                 <Button variant="primary" icon={Stars2Icon} busy={previewing} disabled={ready === 0 || previewing} onClick={preview}>
-                    {copy.graph.ai.preview(ready)}
+                    {said.preview(ready)}
                 </Button>
             </div>
         ) : stage === "review" ? (
             <div className="flex items-center justify-end gap-2">
+                {previewing ? working : null}
+                {seed === null ? (
+                    <Button variant="ghost" disabled={apply.isPending} onClick={() => setStage("pick")}>
+                        {said.back}
+                    </Button>
+                ) : (
+                    <Button variant="secondary" onClick={() => close(false)}>
+                        {said.cancel}
+                    </Button>
+                )}
                 <Button
-                    variant="ghost"
-                    disabled={apply.isPending}
-                    onClick={() => {
-                        setStage("pick");
-                    }}
+                    variant="primary"
+                    busy={apply.isPending}
+                    disabled={chosen.length === 0 || apply.isPending || previewing}
+                    onClick={seed === null ? create : () => setStage("confirm")}
                 >
-                    {copy.graph.ai.back}
+                    {said.create(chosen.length)}
                 </Button>
-                <Button variant="primary" busy={apply.isPending} disabled={kept.size === 0 || apply.isPending} onClick={create}>
-                    {copy.graph.ai.create(kept.size)}
+            </div>
+        ) : stage === "confirm" ? (
+            <div className="flex items-center justify-end gap-2">
+                <Button variant="ghost" disabled={apply.isPending} onClick={() => setStage("review")}>
+                    {said.back}
+                </Button>
+                <Button variant="primary" busy={apply.isPending} disabled={apply.isPending} onClick={write}>
+                    {said.confirmApply}
                 </Button>
             </div>
         ) : (
             <div className="flex items-center justify-end gap-2">
                 <Button variant="secondary" onClick={() => close(false)}>
-                    {copy.graph.ai.close}
+                    {said.close}
                 </Button>
-                {edges > 0 ? (
+                {edges > 0 && start.kind === "pick" ? (
                     <Button
                         variant="primary"
                         onClick={() => {
                             onOpenChange(false);
-                            onReview();
+                            start.onReview();
                         }}
                     >
-                        {copy.graph.ai.reviewEdges}
+                        {said.reviewEdges}
                     </Button>
                 ) : null}
             </div>
@@ -236,156 +216,26 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, source: init
         <Drawer
             open={open}
             onOpenChange={close}
-            title={copy.graph.ai.entitiesTitle}
-            description={copy.graph.ai.entitiesBody}
-            closeLabel={copy.graph.ai.close}
+            title={said.entitiesTitle}
+            description={seed === null ? said.entitiesBody : said.siteBody}
+            closeLabel={said.close}
             width={drawerWidth}
             footer={footer}
         >
-            <div className="flex flex-col gap-3 p-3">
-                {stage === "pick" ? (
-                    <>
-                        <Segmented
-                            label={copy.graph.ai.entitiesTitle}
-                            value={source}
-                            options={[
-                                { value: "pages", label: copy.graph.ai.sourcePages },
-                                { value: "keywords", label: copy.graph.ai.sourceKeywords },
-                            ]}
-                            onValueChange={setSource}
-                        />
-                        {source === "pages" ? (
-                            <PageTree
-                                siteId={siteId}
-                                selected={selected}
-                                onChange={setSelected}
-                                pickable={unmapped}
-                                keep={keep}
-                                label={copy.graph.ai.pickPages}
-                                picked={copy.graph.ai.pickedPages(selected.size)}
-                                refusalOf={(page) => (page.path === rootPath ? copy.graph.ai.root : unmapped(page) ? null : copy.graph.ai.mapped)}
-                                filter={
-                                    <Segmented
-                                        label={copy.graph.ai.pickScope}
-                                        size="sm"
-                                        value={scope}
-                                        options={scopeOptions}
-                                        onValueChange={setScope}
-                                    />
-                                }
-                            />
-                        ) : (
-                            <>
-                                <Field label={copy.graph.ai.keywords} hint={copy.graph.ai.keywordsHint}>
-                                    {(control) => (
-                                        <Textarea
-                                            id={control.id}
-                                            aria-describedby={control["aria-describedby"]}
-                                            rows={10}
-                                            value={keywords}
-                                            onChange={(event) => {
-                                                setKeywords(event.target.value);
-                                            }}
-                                        />
-                                    )}
-                                </Field>
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="font-mono text-2xs text-ink-faint">{copy.graph.ai.keywordsCount(lines.length)}</span>
-                                    <div className="w-64">
-                                        <Field label={copy.graph.ai.parentLabel}>
-                                            {(control) => (
-                                                <Select
-                                                    id={control.id}
-                                                    aria-describedby={control["aria-describedby"]}
-                                                    value={parentId}
-                                                    options={parents}
-                                                    onValueChange={setParentId}
-                                                />
-                                            )}
-                                        </Field>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-                    </>
+            <div className={cx("flex flex-col gap-3 p-3", stage === "review" && "h-full")}>
+                {stage === "pick" && start.kind === "pick" ? (
+                    <ProposalPick siteId={siteId} index={start.index} pick={pick} onPick={setPick} />
                 ) : stage === "review" ? (
-                    <>
-                        <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs text-ink-soft">
-                                <span className="font-medium text-ink">{copy.graph.ai.reviewTitle(proposals.length)}</span> {copy.graph.ai.reviewBody}
-                            </p>
-                            <div className="flex shrink-0 gap-1">
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                        setKept(new Set(proposals.map((_proposal, at) => at)));
-                                    }}
-                                >
-                                    {copy.graph.ai.keepAll}
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                        setKept(new Set());
-                                    }}
-                                >
-                                    {copy.graph.ai.keepNone}
-                                </Button>
-                            </div>
-                        </div>
-                        <DenseTable columns="3rem minmax(0,1.6fr) 6rem minmax(0,1.4fr) minmax(0,1.4fr)" label={copy.graph.ai.reviewTitle(proposals.length)}>
-                            <TableHead>
-                                <span>{copy.graph.ai.columnKeep}</span>
-                                <span>{copy.graph.ai.columnName}</span>
-                                <span>{copy.graph.ai.columnKind}</span>
-                                <span>{copy.graph.ai.columnKeyword}</span>
-                                <span>{copy.graph.ai.columnPlace}</span>
-                            </TableHead>
-                            {proposals.map((proposal, at) => (
-                                <TableRow key={`${proposal.name}-${at}`} data-proposal={proposal.name}>
-                                    <TableCell>
-                                        <Checkbox
-                                            checked={kept.has(at)}
-                                            aria-label={proposal.name}
-                                            onChange={() => {
-                                                setKept((held) => {
-                                                    const next = new Set(held);
-                                                    if (next.has(at)) {
-                                                        next.delete(at);
-                                                    } else {
-                                                        next.add(at);
-                                                    }
-                                                    return next;
-                                                });
-                                            }}
-                                        />
-                                    </TableCell>
-                                    <TableCell title={proposal.name}>
-                                        {proposal.name}
-                                        {proposal.existingEntityId !== undefined && proposal.existingEntityId !== "" ? (
-                                            <span className="ml-1 text-2xs text-ink-faint">{copy.graph.ai.existing}</span>
-                                        ) : null}
-                                    </TableCell>
-                                    <TableCell muted={true}>{entityKindLabel(proposal.kind ?? "")}</TableCell>
-                                    <TableCell muted={true} title={mainKeyword(keywordList(proposal.keywords))}>
-                                        {mainKeyword(keywordList(proposal.keywords))}
-                                    </TableCell>
-                                    <TableCell mono={true} muted={true} title={placeOf(proposal)}>
-                                        {placeOf(proposal)}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </DenseTable>
-                    </>
+                    previewing ? null : <ProposalReview proposals={proposals} kept={kept} onKept={setKept} fromSite={seed !== null} />
+                ) : stage === "confirm" ? (
+                    <ProposalConfirm written={writes.written} joined={writes.joined} />
                 ) : (
                     <p className="text-xs text-ink-soft">
-                        {copy.graph.ai.applied(outcome?.entities?.length ?? 0, outcome?.mapped ?? 0, edges, outcome?.skipped ?? 0)}
+                        {said.applied(outcome?.entities?.length ?? 0, outcome?.mapped ?? 0, edges, outcome?.skipped ?? 0)}
                     </p>
                 )}
-                {stopped && !previewing ? <p className="text-xs text-ink-dim">{copy.graph.ai.cancelled}</p> : null}
-                {error === null ? null : <p className="text-xs text-danger">{error}</p>}
+                {stopped && !previewing ? <p className="shrink-0 text-xs text-ink-dim">{said.cancelled}</p> : null}
+                {error === null ? null : <p className="shrink-0 text-xs text-danger">{error}</p>}
             </div>
         </Drawer>
     );

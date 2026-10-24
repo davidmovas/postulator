@@ -3,15 +3,18 @@ package content
 import (
 	"context"
 	"html"
+	"slices"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	contentdomain "github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -20,6 +23,14 @@ const (
 
 	JudgeTokens = 1024
 )
+
+func JudgedPicture(fitted contextpack.Fitted) string {
+	kept := fitted
+	kept.Sections = slices.DeleteFunc(slices.Clone(fitted.Sections), func(section contextpack.Section) bool {
+		return section.Name == contextpack.SectionCurrent || section.Name == contextpack.SectionKeywords
+	})
+	return kept.Text()
+}
 
 type judgeAnswer struct {
 	Score       float64  `json:"score" description:"The overall quality of the page between 0 and 1"`
@@ -43,7 +54,7 @@ func (s *Service) Assess(ctx context.Context, req AssessRequest) (AssessResponse
 	system, user, err := render(NameJudge, judgePrompt{
 		Page: req.Page, Entity: req.Entity, Keywords: pagemap.Keywords(req.Page, req.Entity), Spec: req.Spec, Body: req.Body,
 		Meta: req.Snippet, HasMeta: req.HasSnippet, Targets: req.Targets,
-		Store: req.Page.WPType == pagemap.WPProduct, Product: req.Product,
+		Store: req.Page.WPType == pagemap.WPProduct, Short: req.ShortDescription, Picture: req.Picture,
 	})
 	if err != nil {
 		return AssessResponse{}, err
@@ -87,8 +98,12 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 	if err != nil {
 		return JudgeResponse{}, err
 	}
+	fields, err := s.deps.Fields.ListBySite(ctx, page.SiteID)
+	if err != nil {
+		return JudgeResponse{}, err
+	}
 	if page.WPType == pagemap.WPProduct {
-		raw = "<h1>" + html.EscapeString(contentdomain.StoreName(page)) + "</h1>" + raw
+		raw = "<h1>" + html.EscapeString(contentdomain.StoreName(siteTitle(fields[page.ID]))) + "</h1>" + raw
 	}
 	doc, err := contentdomain.Parse(raw)
 	if err != nil {
@@ -100,11 +115,16 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 		return JudgeResponse{}, err
 	}
 
-	entity, targets, err := s.context(ctx, page, resolved.Spec)
+	entity, targets, err := s.context(ctx, page, pagemap.Names(fields))
 	if err != nil {
 		return JudgeResponse{}, err
 	}
 	body, err := doc.Render()
+	if err != nil {
+		return JudgeResponse{}, err
+	}
+
+	seen, err := s.deps.Pictures.Picture(ctx, sitemodel.PackRequest{PageID: page.ID})
 	if err != nil {
 		return JudgeResponse{}, err
 	}
@@ -114,6 +134,7 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 		Snippet:    Snippet{Title: page.MetaTitle, Description: page.MetaDescription},
 		HasSnippet: page.MetaTitle != "" || page.MetaDescription != "",
 		Targets:    targets,
+		Picture:    JudgedPicture(seen.Fitted),
 		Call:       llm.CallMeta{Step: domainllm.StepJudge},
 	})
 	if err != nil {
@@ -122,8 +143,16 @@ func (s *Service) Judge(ctx context.Context, req JudgeRequest) (JudgeResponse, e
 	return JudgeResponse{PageID: page.ID, Path: page.Path, Report: assessed.Report, Tokens: assessed.Tokens}, nil
 }
 
-func (s *Service) context(ctx context.Context, page pagemap.Page,
-	spec template.TemplateSpec) (graph.Entity, []contentdomain.LinkTarget, error) {
+func siteTitle(values []field.Value) string {
+	for i := range values {
+		if values[i].Key == field.Title {
+			return values[i].Current
+		}
+	}
+	return ""
+}
+
+func (s *Service) context(ctx context.Context, page pagemap.Page, names map[string][]string) (graph.Entity, []contentdomain.LinkTarget, error) {
 	entities, err := s.deps.Entities.ListBySite(ctx, page.SiteID)
 	if err != nil {
 		return graph.Entity{}, nil, err
@@ -136,16 +165,11 @@ func (s *Service) context(ctx context.Context, page pagemap.Page,
 	if err != nil {
 		return graph.Entity{}, nil, err
 	}
-	effective, err := s.deps.Policies.GetEffectivePolicy(ctx, templates.GetEffectivePolicyRequest{SiteID: page.SiteID})
+	types, err := s.deps.Types.Set(ctx, page.SiteID)
 	if err != nil {
 		return graph.Entity{}, nil, err
 	}
-	policy := template.LinkPolicy{
-		Rules:          templates.EffectiveRules(effective.Policy.Rules, spec.LinkRules),
-		ForbidExternal: effective.Policy.ForbidExternal,
-		ForbidSelf:     effective.Policy.ForbidSelf,
-		AnchorStrategy: template.AnchorStrategy(effective.Policy.AnchorStrategy),
-	}
+	policy := types.Policy(page)
 
 	var entity graph.Entity
 	for i := range entities {
@@ -163,7 +187,7 @@ func (s *Service) context(ctx context.Context, page pagemap.Page,
 		return graph.Entity{}, nil, err
 	}
 
-	planned := contentdomain.PlanLinks(built, pagemap.NewIndex(pages), contentdomain.Subject{
+	planned := contentdomain.PlanLinks(built, pagemap.NewIndexNamed(pages, names), contentdomain.Subject{
 		PageID: page.ID, PagePath: page.Path, EntityID: entity.ID,
 	}, policy)
 	entity.Name = built.Label(entity.ID)

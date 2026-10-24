@@ -96,7 +96,7 @@ export function LinksScreen(): ReactElement {
                 )
             }
         >
-            {audit.data === undefined ? null : <AuditStrip totals={audit.data.totals} policy={audit.data.policy} />}
+            {audit.data === undefined ? null : <AuditStrip totals={audit.data.totals} />}
             {audit.isPending ? (
                 <div className="p-4">
                     <SkeletonRows rows={10} label={copy.links.loading} />

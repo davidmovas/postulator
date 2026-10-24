@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -31,6 +33,12 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 			if writeErr := s.write(c, &book.plans[i]); writeErr != nil {
 				return writeErr
 			}
+			if keepErr := s.keep(c, &book.plans[i]); keepErr != nil {
+				return keepErr
+			}
+			if mapErr := s.mapChosen(c, &book.plans[i]); mapErr != nil {
+				return mapErr
+			}
 		}
 		return s.remember(c, req, book.plans)
 	})
@@ -41,6 +49,16 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 		return ApplyResponse{}, err
 	}
 	return ApplyResponse{Report: book.report, Counts: book.counts()}, nil
+}
+
+func (s *Service) mapChosen(ctx context.Context, computed *plan) error {
+	now := s.now()
+	for _, row := range computed.chosen {
+		if err := s.deps.Pages.SetRowKey(ctx, computed.siteID, row.pageID, row.key, row.trail, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) write(ctx context.Context, computed *plan) error {
@@ -59,24 +77,38 @@ func (s *Service) write(ctx context.Context, computed *plan) error {
 			return err
 		}
 	}
+	now := s.now()
 	for i := range computed.pages {
-		planned := &computed.pages[i]
-		write := s.deps.Pages.Update
-		if planned.created {
-			write = s.deps.Pages.Insert
-		}
-		if err := write(ctx, planned.page); err != nil {
+		if err := s.writePage(ctx, &computed.pages[i], now); err != nil {
 			return err
 		}
 	}
 
-	now := s.now()
 	for _, owned := range computed.canonical {
 		if err := s.deps.Entities.SetCanonicalPage(ctx, owned.entityID, &owned.pageID, now); err != nil {
 			return err
 		}
 	}
 	return s.settleScopes(ctx, computed.siteID, now)
+}
+
+func (s *Service) writePage(ctx context.Context, planned *plannedPage, now time.Time) error {
+	if planned.created {
+		return s.deps.Pages.Insert(ctx, planned.page)
+	}
+	if err := s.deps.Pages.Update(ctx, planned.page); err != nil {
+		return err
+	}
+	if planned.page.EntityID != nil {
+		if err := s.deps.Findings.Clear(ctx, planned.page.SiteID, finding.PageWithoutEntity, finding.SubjectPage(planned.page.ID),
+			finding.ResolvedByModel, finding.ResolutionPageMapped, now); err != nil {
+			return err
+		}
+	}
+	if !planned.retyped {
+		return nil
+	}
+	return s.deps.Pages.SetType(ctx, planned.page.ID, *planned.page.PageTypeID, pagemap.TypeByImport, now)
 }
 
 func (s *Service) settleScopes(ctx context.Context, siteID string, now time.Time) error {

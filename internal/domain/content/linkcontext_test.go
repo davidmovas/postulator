@@ -5,15 +5,15 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 const siteID = "site-1"
 
-func plannedFor(fixture dag, entityID string, rules template.LinkRules) content.LinkContext {
+func plannedFor(fixture dag, entityID string, rules field.LinkRules) content.LinkContext {
 	return content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: entityID}, policy(rules)).Context
 }
 
@@ -33,7 +33,7 @@ func entity(id, name string, score float64, anchors []string, canonical string) 
 	}
 
 	record := graph.Entity{
-		ID: id, SiteID: siteID, Name: name, Kind: graph.KindTopic, Keywords: keyword.Of(name),
+		ID: id, SiteID: siteID, Name: name, Keywords: keyword.Of(name),
 		Anchors: list, Source: graph.SourceUser, Score: score,
 	}
 	if canonical != "" {
@@ -121,7 +121,7 @@ func TestPlanLinksOnAMultiParentDAG(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
-	rules := template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 10, MaxPerTarget: 1}
+	rules := field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 10, MaxPerTarget: 1}
 	lc := plannedFor(fixture, "coffee", rules)
 
 	if lc.PageID != "page-coffee" || lc.PageURL != "/drinks/hot/coffee/" || lc.EntityID != "coffee" {
@@ -183,24 +183,24 @@ func TestPlanLinksRespectsThePolicy(t *testing.T) {
 
 	cases := []struct {
 		name  string
-		rules template.LinkRules
+		rules field.LinkRules
 		want  []string
 	}{
 		{
 			name:  "no children and no siblings",
-			rules: template.LinkRules{UpDepth: 1, SiblingMinWeight: 2},
+			rules: field.LinkRules{UpDepth: 1, SiblingMinWeight: 2},
 			want:  []string{"/drinks/", "/drinks/hot/"},
 		},
 		{
 			name:  "no parents at all",
-			rules: template.LinkRules{DownLinks: true, SiblingMinWeight: 2},
+			rules: field.LinkRules{DownLinks: true, SiblingMinWeight: 2},
 			want: []string{
 				"/drinks/hot/coffee/beans/", "/drinks/hot/coffee/espresso/", "/drinks/hot/coffee/grinder/",
 			},
 		},
 		{
 			name:  "siblings below the threshold are dropped",
-			rules: template.LinkRules{SiblingMinWeight: 0.8},
+			rules: field.LinkRules{SiblingMinWeight: 0.8},
 			want:  []string{},
 		},
 	}
@@ -227,7 +227,7 @@ func TestPlanLinksSkipsWhatCannotBeLinked(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
-	rules := template.LinkRules{UpDepth: 3, DownLinks: true, SiblingMinWeight: 0.1}
+	rules := field.LinkRules{UpDepth: 3, DownLinks: true, SiblingMinWeight: 0.1}
 
 	lc := plannedFor(fixture, "coffee", rules)
 	for _, target := range lc.Targets {
@@ -277,25 +277,25 @@ func TestAParentWithNoPageIsPassedThrough(t *testing.T) {
 		name       string
 		groupPages []pagemap.Page
 		subject    string
-		rules      template.LinkRules
+		rules      field.LinkRules
 		targets    []string
 		blocked    content.BlockedReason
 		required   bool
 	}{
 		{
 			name:    "up past a group that has no page",
-			subject: "leaf", rules: template.LinkRules{UpDepth: 1},
+			subject: "leaf", rules: field.LinkRules{UpDepth: 1},
 			targets: []string{"/peptides/"}, blocked: content.BlockedNoPage,
 		},
 		{
 			name:    "down past a group that has no page",
-			subject: "root", rules: template.LinkRules{DownLinks: true},
+			subject: "root", rules: field.LinkRules{DownLinks: true},
 			targets: []string{"/peptides/bpc-157/liquid/"}, blocked: content.BlockedNoPage,
 		},
 		{
 			name:       "a group with a page that is not canonical still blocks",
 			groupPages: []pagemap.Page{page("page-group", "/peptides/bpc-157/", "group")},
-			subject:    "leaf", rules: template.LinkRules{UpDepth: 1},
+			subject:    "leaf", rules: field.LinkRules{UpDepth: 1},
 			targets: []string{}, blocked: content.BlockedNoCanonicalPage, required: true,
 		},
 	}
@@ -341,7 +341,7 @@ func TestATargetFallsBackToTheEntityName(t *testing.T) {
 		edges    []graph.Edge
 		pages    []pagemap.Page
 		subject  string
-		rules    template.LinkRules
+		rules    field.LinkRules
 		want     string
 	}{
 		{
@@ -353,7 +353,7 @@ func TestATargetFallsBackToTheEntityName(t *testing.T) {
 			edges:   []graph.Edge{parentEdge("e1", "child", "parent")},
 			pages:   []pagemap.Page{page("page-child", "/child/", "child"), page("page-parent", "/parent/", "parent")},
 			subject: "child",
-			rules:   template.LinkRules{UpDepth: 1},
+			rules:   field.LinkRules{UpDepth: 1},
 			want:    "Parent Topic",
 		},
 		{
@@ -370,7 +370,7 @@ func TestATargetFallsBackToTheEntityName(t *testing.T) {
 				page("page-bpc-liquid", "/bpc-157/liquid/", "bpc-liquid"), page("page-tb-liquid", "/tb-500/liquid/", "tb-liquid"),
 			},
 			subject: "bpc",
-			rules:   template.LinkRules{DownLinks: true},
+			rules:   field.LinkRules{DownLinks: true},
 			want:    "BPC-157 Liquid",
 		},
 	}

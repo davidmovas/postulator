@@ -21,6 +21,7 @@ func all(deps Deps) []run.StepDef {
 		ResolveContext(deps),
 		GenerateBody(deps),
 		GenerateMeta(deps),
+		GenerateFields(deps),
 		InsertLinks(deps),
 		RepairLinks(deps),
 		GenerateImages(deps),
@@ -30,10 +31,10 @@ func all(deps Deps) []run.StepDef {
 		RelinkNeighbors(deps),
 		SyncBack(deps),
 		Report(deps),
-		RepairHierarchy(deps),
 		SyncSite(deps),
 		RelinkPage(deps),
 		Revert(deps),
+		EditPage(deps),
 	}
 }
 

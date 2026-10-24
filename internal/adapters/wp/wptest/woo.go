@@ -1,19 +1,19 @@
 package wptest
 
 import (
-	"encoding/json"
-	"html"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 )
 
 const wooNamespace = "/wp-json/wc/v3"
 
 var (
-	scriptPattern    = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script>`)
-	breakPattern     = regexp.MustCompile(`(?i)<br\s*/?>`)
-	ampersandPattern = regexp.MustCompile(`&([^a-zA-Z#]|$)`)
+	scriptPattern     = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script>`)
+	breakPattern      = regexp.MustCompile(`(?i)<br\s*/?>`)
+	ampersandPattern  = regexp.MustCompile(`&([^a-zA-Z#]|$)`)
+	apostrophePattern = regexp.MustCompile(`(\pL)'(\pL)`)
 )
 
 func (s *Server) routeWoo(mux *http.ServeMux) {
@@ -23,58 +23,6 @@ func (s *Server) routeWoo(mux *http.ServeMux) {
 	mux.HandleFunc("PUT "+wooNamespace+"/products/{id}", s.withCommerce(s.handleProductUpdate))
 	mux.HandleFunc("GET "+wooNamespace+"/products/categories", s.withCommerce(s.handleProductCategoryList))
 	mux.HandleFunc("GET "+wooNamespace+"/products/categories/{id}", s.withCommerce(s.handleProductCategoryGet))
-}
-
-func (s *Server) routeStorefront(mux *http.ServeMux) {
-	mux.HandleFunc("GET /product/{slug}/", s.handleProductPage)
-}
-
-func (s *Server) handleProductPage(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-
-	s.mu.Lock()
-	var shown *Item
-	for _, id := range s.order {
-		stored := s.items[id]
-		if stored.Type == TypeProduct && stored.Slug == slug && stored.Status == "publish" {
-			shown = stored
-		}
-	}
-	builder, absent, down := s.builderLayout, s.noCommerce, s.storefrontOff
-	var name, description string
-	if shown != nil {
-		name, description = shown.Title, shown.Content
-	}
-	s.mu.Unlock()
-
-	if down {
-		http.Error(w, "the storefront is down", http.StatusServiceUnavailable)
-		return
-	}
-	if shown == nil || absent {
-		http.NotFound(w, r)
-		return
-	}
-
-	structured, err := json.Marshal(map[string]string{
-		"@type": "Product", "name": name, "description": tagPattern.ReplaceAllString(description, ""),
-	})
-	if err != nil {
-		s.t.Errorf("encode the structured data of %s: %v", slug, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	body := description
-	if builder {
-		body = `<div class="builder-layout"><button>Add to cart</button></div>`
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	page := "<!doctype html><html><head><title>" + html.EscapeString(name) + "</title>" +
-		`<script type="application/ld+json">` + string(structured) + "</script></head>" +
-		"<body><h1>" + html.EscapeString(name) + "</h1>" + body + "</body></html>"
-	if _, writeErr := w.Write([]byte(page)); writeErr != nil {
-		s.t.Logf("write the product page %s: %v", slug, writeErr)
-	}
 }
 
 func (s *Server) withCommerce(next http.HandlerFunc) http.HandlerFunc {
@@ -114,6 +62,9 @@ func (s *Server) handleWooList(w http.ResponseWriter, r *http.Request, itemType 
 
 	s.mu.Lock()
 	matched := s.filter(itemType, query)
+	if productType := query.Get("type"); itemType == TypeProduct && productType != "" {
+		matched = slices.DeleteFunc(matched, func(stored *Item) bool { return stored.ProductType != productType })
+	}
 	total := len(matched)
 	totalPages := (total + perPage - 1) / perPage
 
@@ -213,6 +164,21 @@ func (s *Server) handleProductUpdate(w http.ResponseWriter, r *http.Request) {
 	if _, present := body["images"]; present {
 		stored.Images = objectIDList(body, "images")
 	}
+	if _, present := body["upsell_ids"]; present {
+		stored.Upsells = numberList(body, "upsell_ids")
+	}
+	if _, present := body["cross_sell_ids"]; present {
+		stored.CrossSells = numberList(body, "cross_sell_ids")
+	}
+	if entries, present := body["meta_data"].([]any); present {
+		for _, raw := range entries {
+			entry, isObject := raw.(map[string]any)
+			key, named := entry["key"].(string)
+			if isObject && named && key != "" {
+				s.setMetaData(stored, key, entry["value"])
+			}
+		}
+	}
 	stored.Modified = s.tick()
 	payload := s.productPayload(stored, true)
 	s.mu.Unlock()
@@ -230,7 +196,16 @@ func (s *Server) productPayload(stored *Item, edit bool) map[string]any {
 		"status":            stored.Status,
 		"description":       rendered(stored.Content, edit),
 		"short_description": rendered(stored.Excerpt, edit),
+		"price":             priceOf(stored),
 		"regular_price":     stored.RegularPrice,
+		"sale_price":        stored.SalePrice,
+		"stock_status":      stockStatusOf(stored),
+		"manage_stock":      stored.ManageStock,
+		"stock_quantity":    stored.StockQuantity,
+		"meta_data":         metaDataPayload(stored.MetaData),
+		"variations":        s.variationIDs(stored.ID),
+		"upsell_ids":        append([]int64{}, stored.Upsells...),
+		"cross_sell_ids":    append([]int64{}, stored.CrossSells...),
 		"sku":               stored.SKU,
 		"menu_order":        stored.MenuOrder,
 		"date_modified_gmt": stored.Modified.UTC().Format(wpTimeLayout),
@@ -256,6 +231,21 @@ func rendered(value string, edit bool) string {
 		return value
 	}
 	return value + "\n"
+}
+
+func formatted(value string) string {
+	return rendered(apostrophePattern.ReplaceAllString(value, "$1&#8217;$2"), false)
+}
+
+func (s *Server) setMetaData(stored *Item, key string, value any) {
+	for i := range stored.MetaData {
+		if stored.MetaData[i].Key == key {
+			stored.MetaData[i].Value = value
+			return
+		}
+	}
+	s.nextID++
+	stored.MetaData = append(stored.MetaData, MetaEntry{ID: s.nextID, Key: key, Value: value})
 }
 
 func resavesPost(body map[string]any) bool {
@@ -342,10 +332,11 @@ func optionsField(object map[string]any) []string {
 func (s *Server) imagePayload(ids []int64) []map[string]any {
 	payload := make([]map[string]any, 0, len(ids))
 	for _, id := range ids {
-		image := map[string]any{"id": id, "src": "", "alt": ""}
+		image := map[string]any{"id": id, "src": "", "alt": "", "name": ""}
 		if stored, ok := s.uploads[id]; ok {
 			image["src"] = s.http.URL + "/wp-content/uploads/" + stored.Filename
 			image["alt"] = stored.Alt
+			image["name"] = stored.Title
 		}
 		payload = append(payload, image)
 	}
@@ -379,6 +370,20 @@ func (s *Server) countProducts(categoryID int64) int {
 		}
 	}
 	return count
+}
+
+func numberList(body map[string]any, key string) []int64 {
+	raw, ok := body[key].([]any)
+	if !ok {
+		return []int64{}
+	}
+	ids := make([]int64, 0, len(raw))
+	for _, entry := range raw {
+		if number, valid := entry.(float64); valid {
+			ids = append(ids, int64(number))
+		}
+	}
+	return ids
 }
 
 func objectIDList(body map[string]any, key string) []int64 {

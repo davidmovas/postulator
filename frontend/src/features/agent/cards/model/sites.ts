@@ -54,10 +54,6 @@ export const describeSites: Describer = (tool, args) => {
             if (template !== null) {
                 lines.push(line("target", [`${said.defaultTemplate} `, ref("template", template)]));
             }
-            const policy = text(args, "defaultLinkPolicyId");
-            if (policy !== null) {
-                lines.push(line("target", [`${said.defaultPolicy} `, ref("policy", policy)]));
-            }
             return view([`${said.update} `, ref("site", text(args, "id") ?? "")], lines);
         }
         case "sites_delete":

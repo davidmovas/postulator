@@ -26,11 +26,13 @@ export const pauseAwaitingConfirmation: PauseReason = "awaiting_confirmation";
 export const pauseNeedsHuman: PauseReason = "needs_human";
 export const pauseByUser: PauseReason = "user";
 export const pauseAwaitingParent: PauseReason = "awaiting_parent";
+export const pauseAwaitingReview: PauseReason = "awaiting_review";
 
 export const retryInputsExpired: RetryBlockedReason = "inputs_expired";
 
 export const kindGenerate: RunKind = "generate";
 export const kindRevert: RunKind = "revert";
+export const kindRepair: RunKind = "repair";
 
 export const stepPublish: StepName = "publish";
 export const stepValidate: StepName = "validate";
@@ -40,6 +42,7 @@ export const artifactLinkContext: ArtifactKind = "link_context";
 export const artifactDraft: ArtifactKind = "draft";
 export const artifactBodyHtml: ArtifactKind = "body_html";
 export const artifactMeta: ArtifactKind = "meta";
+export const artifactFields: ArtifactKind = "fields";
 export const artifactImages: ArtifactKind = "images";
 export const artifactValidationReport: ArtifactKind = "validation_report";
 export const artifactJudgeReport: ArtifactKind = "judge_report";
@@ -48,5 +51,6 @@ export const artifactRelinkResult: ArtifactKind = "relink_result";
 export const artifactSyncResult: ArtifactKind = "sync_result";
 export const artifactFinalReport: ArtifactKind = "final_report";
 export const artifactRevertResult: ArtifactKind = "revert_result";
+export const artifactEditPlan: ArtifactKind = "edit_plan";
 
 export const retentionDaysKey = "runs.artifactRetentionDays";

@@ -1,12 +1,16 @@
 package steps_test
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -64,13 +68,21 @@ func TestSyncSiteKeepsThePlanOfAPageItNeverPublished(t *testing.T) {
 		{name: "metaDescription", got: stored.MetaDescription, want: planned.MetaDescription},
 		{name: "status", got: string(stored.Status), want: string(pagemap.StatusPlanned)},
 	}
-	for _, field := range fields {
-		if field.got != field.want {
-			t.Errorf("%s = %q, want the plan %q", field.name, field.got, field.want)
+	for _, row := range fields {
+		if row.got != row.want {
+			t.Errorf("%s = %q, want the plan %q", row.name, row.got, row.want)
 		}
 	}
-	if stored.Observed.Title != "E-Bike Range" || stored.Observed.Slug != "e-bike-range" {
-		t.Fatalf("the mirror = %+v, want what the site holds", stored.Observed)
+	identity, err := h.identities.Get(t.Context(), planned.ID)
+	if err != nil || !strings.HasSuffix(identity.URL, "/e-bike-range/") {
+		t.Fatalf("the identity = %+v (%v), want the address the site holds", identity, err)
+	}
+	values, err := h.fields.ListForPage(t.Context(), planned.ID)
+	if err != nil {
+		t.Fatalf("read the fields: %v", err)
+	}
+	if !slices.ContainsFunc(values, func(value field.Value) bool { return value.Key == field.Title && value.Current == "E-Bike Range" }) {
+		t.Fatalf("the fields = %+v, want the title the site holds", values)
 	}
 	if stored.WPID == nil || *stored.WPID != wpID {
 		t.Fatalf("the page lost the id the site gave it: %+v", stored.WPID)
@@ -109,8 +121,14 @@ func TestSyncSiteAdoptsAKnownPageThatCarriesNoPlan(t *testing.T) {
 	if stored.Title != renamed {
 		t.Fatalf("title = %q, want the site's own %q: there was no plan to protect", stored.Title, renamed)
 	}
-	if found := stored.Mismatches(); len(found) != 0 {
-		t.Fatalf("mismatches = %+v, want none", found)
+	open, err := h.findings.ListForPage(t.Context(), adopted.ID)
+	if err != nil {
+		t.Fatalf("list the findings: %v", err)
+	}
+	for i := range open {
+		if open[i].Code == finding.PageTitleDiffers {
+			t.Fatalf("finding = %+v, want none: there was no plan to differ from", open[i])
+		}
 	}
 }
 
@@ -153,38 +171,37 @@ func TestSyncSiteKeepsTheLinksItGenerated(t *testing.T) {
 	espresso := h.byPath(t, "/coffee/espresso/")
 	coffee := h.byPath(t, "/coffee/")
 	gone := "/coffee/gone/"
-	if err := h.links.ReplaceForPage(t.Context(), espresso.ID, []pagemap.PageLink{
+	if err := h.links.ReplaceForPage(t.Context(), espresso.ID, pagemap.SourceRaw, []pagemap.PageLink{
 		{
 			ID: id.New(), SiteID: h.siteID, FromPageID: espresso.ID, ToPageID: &coffee.ID, ToURL: coffee.Path,
-			AnchorText: "coffee", Origin: pagemap.OriginGenerated, ObservedAt: sqlitetest.Stamp,
+			AnchorText: "coffee", Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+			Ours: true, ObservedAt: sqlitetest.Stamp,
 		},
 		{
 			ID: id.New(), SiteID: h.siteID, FromPageID: espresso.ID, ToURL: gone,
-			AnchorText: "gone", Origin: pagemap.OriginGenerated, ObservedAt: sqlitetest.Stamp,
+			AnchorText: "gone", Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+			Ours: true, ObservedAt: sqlitetest.Stamp,
 		},
 	}); err != nil {
 		t.Fatalf("record the generated links: %v", err)
 	}
 
 	h.restart(t)
-	h.all(t)
+	h.fullWalk(t)
 
-	stored, err := h.links.ListForPage(t.Context(), espresso.ID)
-	if err != nil {
-		t.Fatalf("list the links: %v", err)
-	}
+	stored := h.rawLinks(t, espresso.ID)
 	if len(stored) != 1 {
-		t.Fatalf("the page carries %d links, want only the one the site still holds: %+v", len(stored), stored)
+		t.Fatalf("the page carries %d raw links, want only the one the site still holds: %+v", len(stored), stored)
 	}
 	if stored[0].ToURL != coffee.Path {
 		t.Fatalf("the kept link points at %q", stored[0].ToURL)
 	}
-	if stored[0].Origin != pagemap.OriginGenerated {
-		t.Fatalf("origin = %q, want the run's own %q", stored[0].Origin, pagemap.OriginGenerated)
+	if !stored[0].Ours {
+		t.Fatalf("the kept link = %+v, want it still the run's own", stored[0])
 	}
 }
 
-func TestSyncSiteResolvesARelativeHrefAgainstTheInstallBase(t *testing.T) {
+func TestSyncSiteResolvesARelativeHrefAgainstTheDocument(t *testing.T) {
 	t.Parallel()
 
 	h := newSyncHarness(t, 0, wptest.WithoutPlugin())
@@ -197,14 +214,11 @@ func TestSyncSiteResolvesARelativeHrefAgainstTheInstallBase(t *testing.T) {
 	h.all(t)
 
 	coffee := h.byPath(t, "/coffee/")
-	stored, err := h.links.ListForPage(t.Context(), coffee.ID)
-	if err != nil {
-		t.Fatalf("list the links: %v", err)
-	}
+	stored := h.rawLinks(t, coffee.ID)
 	if len(stored) != 1 {
-		t.Fatalf("the page carries %d links, want the one relative href: %+v", len(stored), stored)
+		t.Fatalf("the page carries %d raw links, want the one relative href: %+v", len(stored), stored)
 	}
-	if stored[0].ToURL != "/blog/espresso/" {
-		t.Fatalf("the relative href resolved to %q, want it joined to the install base", stored[0].ToURL)
+	if stored[0].ToURL != "/coffee/espresso/" {
+		t.Fatalf("the relative href resolved to %q, want it under the page as a browser reads it", stored[0].ToURL)
 	}
 }

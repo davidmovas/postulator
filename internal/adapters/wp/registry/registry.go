@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	stderrors "errors"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,15 @@ type entry struct {
 	client  *wp.Client
 	stamp   time.Time
 	baseURL string
+	agent   string
+}
+
+func entryOf(client *wp.Client, record *site.Site) entry {
+	return entry{client: client, stamp: record.UpdatedAt, baseURL: record.BaseURL, agent: record.Settings.UserAgent}
+}
+
+func (e *entry) serves(record *site.Site) bool {
+	return e.stamp.Equal(record.UpdatedAt) && e.baseURL == record.BaseURL && e.agent == record.Settings.UserAgent
 }
 
 type Registry struct {
@@ -47,7 +57,7 @@ func (r *Registry) Client(ctx context.Context, siteID string) (*wp.Client, error
 	r.mu.Lock()
 	held, ok := r.cached[siteID]
 	r.mu.Unlock()
-	if ok && held.stamp.Equal(record.UpdatedAt) && held.baseURL == record.BaseURL {
+	if ok && held.serves(&record) {
 		return held.client, nil
 	}
 
@@ -65,13 +75,13 @@ func (r *Registry) Client(ctx context.Context, siteID string) (*wp.Client, error
 		Username:      record.Username,
 		AppPassword:   password,
 		AllowInsecure: record.AllowInsecure,
-	}, r.options...)
+	}, append(slices.Clone(r.options), wp.WithUserAgent(record.Settings.UserAgent))...)
 	if err != nil {
 		return nil, err
 	}
 
 	r.mu.Lock()
-	r.cached[siteID] = entry{client: client, stamp: record.UpdatedAt, baseURL: record.BaseURL}
+	r.cached[siteID] = entryOf(client, &record)
 	r.mu.Unlock()
 	return client, nil
 }
@@ -91,12 +101,16 @@ func (r *Registry) TestConnection(ctx context.Context, candidate site.Candidate)
 		return site.Reachability{Reach: site.ReachUnauthorized, Message: messageNoPassword}, nil
 	}
 
+	options, err := r.optionsFor(ctx, candidate)
+	if err != nil {
+		return site.Reachability{}, err
+	}
 	client, err := wp.New(wp.Config{
 		BaseURL:       candidate.BaseURL,
 		Username:      candidate.Username,
 		AppPassword:   password,
 		AllowInsecure: candidate.AllowInsecure,
-	}, r.options...)
+	}, options...)
 	if err != nil {
 		return site.Reachability{}, err
 	}
@@ -106,6 +120,20 @@ func (r *Registry) TestConnection(ctx context.Context, candidate site.Candidate)
 		return classifyProbeFailure(err)
 	}
 	return reachabilityOf(result), nil
+}
+
+func (r *Registry) optionsFor(ctx context.Context, candidate site.Candidate) ([]wp.Option, error) {
+	if candidate.SiteID == "" {
+		return r.options, nil
+	}
+	record, err := r.sites.Get(ctx, candidate.SiteID)
+	if err != nil {
+		if errors.IsCode(err, errors.NotFound) {
+			return r.options, nil
+		}
+		return nil, err
+	}
+	return append(slices.Clone(r.options), wp.WithUserAgent(record.Settings.UserAgent)), nil
 }
 
 func (r *Registry) credential(ctx context.Context, candidate site.Candidate) (password string, held bool, err error) {
@@ -170,7 +198,7 @@ func (r *Registry) Probe(ctx context.Context, record site.Site) (site.Extensions
 
 	client.InvalidateManifest()
 
-	plugin, err := pluginOf(ctx, client)
+	plugin, outdated, err := pluginOf(ctx, client)
 	if err != nil {
 		return site.Extensions{}, err
 	}
@@ -178,16 +206,21 @@ func (r *Registry) Probe(ctx context.Context, record site.Site) (site.Extensions
 	if err != nil {
 		return site.Extensions{}, err
 	}
-	return site.Extensions{Plugin: plugin, Commerce: site.Commerce(commerce)}, nil
+	return site.Extensions{
+		Plugin:         plugin,
+		Commerce:       site.Commerce(commerce),
+		PluginRequired: wp.PluginVersion,
+		PluginOutdated: outdated,
+	}, nil
 }
 
-func pluginOf(ctx context.Context, client *wp.Client) (site.PluginState, error) {
+func pluginOf(ctx context.Context, client *wp.Client) (state site.PluginState, outdated bool, err error) {
 	capabilities, err := client.Capabilities(ctx)
 	if err != nil {
 		if wp.IsPluginMissing(err) {
-			return site.PluginState{Capabilities: []string{}}, nil
+			return site.PluginState{Capabilities: []string{}}, false, nil
 		}
-		return site.PluginState{}, err
+		return site.PluginState{}, false, err
 	}
 
 	return site.PluginState{
@@ -195,5 +228,5 @@ func pluginOf(ctx context.Context, client *wp.Client) (site.PluginState, error) 
 		Version:      capabilities.Version,
 		Capabilities: capabilities.Names,
 		SEOPlugin:    capabilities.SEOPlugin,
-	}, nil
+	}, capabilities.Outdated(), nil
 }

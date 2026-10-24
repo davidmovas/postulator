@@ -7,6 +7,7 @@ require (
 	github.com/ncruces/go-sqlite3 v0.30.1
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/tiktoken-go/tokenizer v0.8.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23
 	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.0
@@ -20,6 +21,7 @@ require (
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
+	github.com/dlclark/regexp2/v2 v2.5.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect

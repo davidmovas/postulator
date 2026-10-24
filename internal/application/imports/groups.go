@@ -22,7 +22,11 @@ func (n *groupNode) namedBy(row *rowDraft) bool {
 }
 
 func (n *groupNode) sluggedBy(row *rowDraft) bool {
-	return strings.EqualFold(pagemap.Slug(row.path), slugOf(n.name))
+	return sameSlug(pagemap.Slug(row.sheetPath()), n.name)
+}
+
+func sameSlug(slug, name string) bool {
+	return slug != "" && strings.EqualFold(slug, slugOf(name))
 }
 
 type groups struct {
@@ -67,14 +71,14 @@ func ancestorOf(ancestor, path string) bool {
 	return ancestor != path && strings.HasPrefix(path, ancestor)
 }
 
-func distinctPaths(rows []rowDraft, picked []int) []string {
+func distinctPaths(rows []rowDraft, picked []int, pathOf func(*rowDraft) string) []string {
 	out := make([]string, 0, len(picked))
 	seen := make(map[string]struct{}, len(picked))
 	for _, at := range picked {
-		path := rows[at].path
-		if path == "" {
+		if rows[at].path == "" {
 			continue
 		}
+		path := pathOf(&rows[at])
 		if _, dup := seen[path]; dup {
 			continue
 		}
@@ -82,6 +86,14 @@ func distinctPaths(rows []rowDraft, picked []int) []string {
 		out = append(out, path)
 	}
 	return out
+}
+
+func addressOf(row *rowDraft) string {
+	return row.path
+}
+
+func sheetPathOf(row *rowDraft) string {
+	return row.sheetPath()
 }
 
 func (g *groups) adopt(rows []rowDraft, sheet *drafts, state siteState) map[string]int {
@@ -103,7 +115,7 @@ func (g *groups) adopt(rows []rowDraft, sheet *drafts, state siteState) map[stri
 func (g *groups) ownRow(node *groupNode, rows []rowDraft, sheet *drafts, adopted map[string]int) (string, bool) {
 	eligible := g.eligible(node, rows, sheet, adopted)
 	for _, evidence := range []func(*rowDraft) bool{node.namedBy, node.sluggedBy} {
-		switch paths := distinctPaths(rows, picked(eligible, rows, evidence)); len(paths) {
+		switch paths := distinctPaths(rows, picked(eligible, rows, evidence), addressOf); len(paths) {
 		case 0:
 		case 1:
 			return paths[0], true
@@ -111,7 +123,7 @@ func (g *groups) ownRow(node *groupNode, rows []rowDraft, sheet *drafts, adopted
 			return "", false
 		}
 	}
-	return aboveTheRest(distinctPaths(rows, eligible), distinctPaths(rows, node.rows))
+	return aboveTheRest(rows, eligible, distinctPaths(rows, node.rows, sheetPathOf))
 }
 
 func (g *groups) eligible(node *groupNode, rows []rowDraft, sheet *drafts, adopted map[string]int) []int {
@@ -141,13 +153,13 @@ func picked(candidates []int, rows []rowDraft, evidence func(*rowDraft) bool) []
 	return out
 }
 
-func aboveTheRest(candidates, all []string) (string, bool) {
+func aboveTheRest(rows []rowDraft, candidates []int, all []string) (string, bool) {
 	if len(all) < 2 {
 		return "", false
 	}
-	for _, candidate := range candidates {
-		if aboveAll(candidate, all) {
-			return candidate, true
+	for _, at := range candidates {
+		if aboveAll(rows[at].sheetPath(), all) {
+			return rows[at].path, true
 		}
 	}
 	return "", false
@@ -163,31 +175,31 @@ func aboveAll(candidate string, paths []string) bool {
 }
 
 func (g *groups) freePage(node *groupNode, rows []rowDraft, sheet *drafts, state siteState, adopted map[string]int) (string, bool) {
-	under := distinctPaths(rows, node.under)
+	under := distinctPaths(rows, node.under, sheetPathOf)
 	if len(under) == 0 {
 		return "", false
 	}
 
 	candidates := make([]string, 0)
-	consider := func(path string) {
-		if _, taken := adopted[path]; taken || !strings.EqualFold(pagemap.Slug(path), slugOf(node.name)) {
+	consider := func(key, at string) {
+		if _, taken := adopted[key]; taken || !strings.EqualFold(pagemap.Slug(at), slugOf(node.name)) {
 			return
 		}
 		for _, below := range under {
-			if !ancestorOf(path, below) {
+			if !ancestorOf(at, below) {
 				return
 			}
 		}
-		candidates = append(candidates, path)
+		candidates = append(candidates, key)
 	}
 	for _, path := range sheet.sortedPaths() {
 		if draft := sheet.pages[path]; draft.generated || g.freeRows(draft, rows) {
-			consider(path)
+			consider(path, draft.sheetPath())
 		}
 	}
 	for path := range state.byPath {
 		if _, planned := sheet.pages[path]; !planned && state.byPath[path].EntityID == nil {
-			consider(path)
+			consider(path, path)
 		}
 	}
 	if len(candidates) != 1 {

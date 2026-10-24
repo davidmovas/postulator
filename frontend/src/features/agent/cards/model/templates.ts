@@ -84,10 +84,6 @@ function identityLines(args: Args): Line[] {
     if (name !== null) {
         lines.push(line("field", said.renamed(name)));
     }
-    const kind = text(args, "pageKind");
-    if (kind !== null) {
-        lines.push(line("field", said.pageKind(kind)));
-    }
     return lines;
 }
 
@@ -95,10 +91,6 @@ export const describeTemplates: Describer = (tool, args, context) => {
     switch (tool) {
         case "templates_create": {
             const lines: Line[] = [];
-            const kind = text(args, "pageKind");
-            if (kind !== null) {
-                lines.push(line("field", said.pageKind(kind)));
-            }
             const site = text(args, "siteId");
             lines.push(text(args, "scope") === "site" && site !== null ? line("target", [`${said.scopeSite} `, ref("site", site)]) : line("target", said.scopeGlobal));
             const spec = parsed(object(args, "spec"));

@@ -9,7 +9,7 @@ import (
 )
 
 func entityWith(id, phrase string, canonical *string) graph.Entity {
-	return graph.Entity{ID: id, SiteID: siteA, Name: id, Kind: graph.KindTopic, Keywords: keyword.Of(phrase), CanonicalPageID: canonical, Source: graph.SourceUser, CreatedAt: stamp, UpdatedAt: stamp}
+	return graph.Entity{ID: id, SiteID: siteA, Name: id, Keywords: keyword.Of(phrase), CanonicalPageID: canonical, Source: graph.SourceUser, CreatedAt: stamp, UpdatedAt: stamp}
 }
 
 func withKeywords(p pagemap.Page, phrases ...string) pagemap.Page {

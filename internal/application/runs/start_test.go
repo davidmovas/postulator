@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/runs"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
+	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -33,6 +35,185 @@ func startedWith(t *testing.T, fixture *fixture, req runs.StartRequest) []string
 	return enabledNames(fixture.engine.queued.Recipe)
 }
 
+func TestARunSwitchesRewritesOnForChosenPages(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+	fixture.specs.spec = template.TemplateSpec{Recipe: []template.StepSpec{
+		{Name: "generate_body", Enabled: true}, {Name: "generate_meta", Enabled: true},
+		{Name: "repair_links", Enabled: true}, {Name: "publish", Enabled: true},
+	}}
+	chosen := fixture.pages[0]
+	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{chosen}, Rewrite: []string{chosen},
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	for _, step := range []run.StepName{run.StepGenerateBody, run.StepGenerateMeta, run.StepRepairLinks, run.StepPublish} {
+		params := run.ParamsFor(fixture.engine.queued.Recipe, string(step))
+		if listed, held := params["rewrite"].([]string); !held || !slices.Equal(listed, []string{chosen}) {
+			t.Errorf("%s's params = %v, want the page whose client text may be rewritten, as every step of the run reads it", step, params)
+		}
+	}
+
+	cases := []struct {
+		name string
+		req  runs.StartRequest
+	}{
+		{name: "a page the run does not write", req: runs.StartRequest{PageIDs: []string{chosen}, Rewrite: []string{"elsewhere"}}},
+		{name: "a run that writes no body", req: runs.StartRequest{
+			PageIDs: []string{chosen}, Rewrite: []string{chosen}, Kind: string(run.KindRelink),
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			refused := newFixture(t)
+			refused.specs.siteID = refused.siteID
+			tc.req.SiteID = refused.siteID
+			if tc.req.PageIDs[0] == chosen {
+				tc.req.PageIDs = []string{refused.pages[0]}
+				if tc.req.Rewrite[0] == chosen {
+					tc.req.Rewrite = []string{refused.pages[0]}
+				}
+			}
+			_, err := refused.service.Start(t.Context(), tc.req)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Start(%+v) = %v, want Invalid", tc.req, err)
+			}
+			if kernel, typed := stderrors.AsType[*errors.Error](err); !typed || kernel.Details["field"] != "rewrite" {
+				t.Errorf("the refusal %v does not name the rewrite field", err)
+			}
+		})
+	}
+}
+
+func onTheSite(fixture *fixture, pageIDs ...string) {
+	fixture.mapping.known = map[string]pagemap.Page{}
+	for i, pageID := range pageIDs {
+		wpID, entityID := int64(100+i), "entity-"+pageID
+		fixture.mapping.known[pageID] = pagemap.Page{
+			ID: pageID, SiteID: fixture.siteID, Path: "/" + pageID + "/", WPID: &wpID, EntityID: &entityID,
+		}
+	}
+}
+
+func TestAnEditRunStartsFromOneConfirmedChangeAndNeverFromStart(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	onTheSite(fixture, fixture.pages[0])
+	change := run.Edit{Op: run.EditSetField, Field: "excerpt", Value: "Pull a balanced shot."}
+	started, err := fixture.service.StartEdit(kctx.WithActor(t.Context(), kctx.ActorAgent), runs.EditRequest{
+		SiteID: fixture.siteID, PageID: fixture.pages[0], Edit: change,
+	})
+	if err != nil || started.RunID == "" {
+		t.Fatalf("StartEdit = %+v, %v", started, err)
+	}
+	queued := fixture.engine.queued
+	if queued.Kind != run.KindEdit || !slices.Equal(queued.Targets, []string{fixture.pages[0]}) ||
+		queued.PublishMode != run.PublishLive || queued.CreatedBy != kctx.ActorAgent {
+		t.Fatalf("the queued run = %+v, want one live edit of the page by the agent", queued)
+	}
+	if got, err := run.EditOf(run.ParamsFor(queued.Recipe, "edit_page")); err != nil || got != change {
+		t.Fatalf("the run carries %+v, %v, want the change it was given", got, err)
+	}
+
+	fixture.mapping.known[fixture.pages[1]] = pagemap.Page{ID: fixture.pages[1], SiteID: fixture.siteID, Path: "/planned/"}
+	refusals := []struct {
+		name string
+		req  runs.EditRequest
+		code errors.Code
+	}{
+		{name: "a field the run may not write", req: runs.EditRequest{PageID: fixture.pages[0], Edit: run.Edit{Op: run.EditSetField, Field: "sku", Value: "X"}}, code: errors.Invalid},
+		{name: "a page not on the site", req: runs.EditRequest{PageID: fixture.pages[1], Edit: change}, code: errors.Invalid},
+		{name: "another site's page", req: runs.EditRequest{SiteID: "elsewhere", PageID: fixture.pages[0], Edit: change}, code: errors.NotFound},
+	}
+	for _, tc := range refusals {
+		if tc.req.SiteID == "" {
+			tc.req.SiteID = fixture.siteID
+		}
+		if _, err := fixture.service.StartEdit(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
+			t.Errorf("%s: StartEdit = %v, want %s", tc.name, err, tc.code)
+		}
+	}
+	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{fixture.pages[0]}, Kind: string(run.KindEdit),
+	}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("Start of an edit run = %v, want it refused: an edit starts from the change a person confirmed", err)
+	}
+}
+
+func TestARunScopedToFieldsKeepsOnlyTheStepsItsFieldsNeed(t *testing.T) {
+	t.Parallel()
+
+	recipe := []template.StepSpec{
+		{Name: "generate_body", Enabled: true}, {Name: "generate_meta", Enabled: true},
+		{Name: "generate_fields", Enabled: true}, {Name: "publish", Enabled: true},
+	}
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+	fixture.specs.spec = template.TemplateSpec{Recipe: recipe}
+	onTheSite(fixture, fixture.pages...)
+	if _, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{fixture.pages[0]}, Fields: []string{"seo_description", "excerpt", "excerpt"},
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	queued := fixture.engine.queued
+	if got := enabledNames(queued.Recipe); !slices.Equal(got, []string{"generate_meta", "generate_fields", "publish"}) {
+		t.Errorf("the scoped run keeps %v, want the meta, the fields and publish", got)
+	}
+	for _, step := range []string{"generate_meta", "generate_fields", "publish"} {
+		if listed, held := run.ParamsFor(queued.Recipe, step)[run.ParamFields].([]string); !held || !slices.Equal(listed, []string{"excerpt", "seo_description"}) {
+			t.Errorf("%s's params = %v, want the two fields, sorted once each", step, run.ParamsFor(queued.Recipe, step))
+		}
+	}
+	if !slices.Equal(queued.Targets, []string{fixture.pages[0]}) {
+		t.Errorf("the scoped run targets %v, want the page it was given and no ancestor", queued.Targets)
+	}
+
+	withoutMeta := slices.Clone(recipe)
+	withoutMeta[1].Enabled = false
+	cases := []struct {
+		name    string
+		req     runs.StartRequest
+		recipe  []template.StepSpec
+		planned bool
+	}{
+		{name: "a field nobody knows", req: runs.StartRequest{Fields: []string{"flavor"}}},
+		{name: "a field the store owns", req: runs.StartRequest{Fields: []string{"price"}}},
+		{name: "a run that publishes nothing", req: runs.StartRequest{Fields: []string{"excerpt"}, Kind: string(run.KindRelink)}},
+		{name: "a field no step of the recipe writes", req: runs.StartRequest{Fields: []string{"seo_description"}}, recipe: withoutMeta},
+		{name: "a page not on the site", req: runs.StartRequest{Fields: []string{"seo_description"}}, planned: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			refused := newFixture(t)
+			refused.specs.siteID = refused.siteID
+			refused.specs.spec = template.TemplateSpec{Recipe: recipe}
+			if tc.recipe != nil {
+				refused.specs.spec.Recipe = tc.recipe
+			}
+			if !tc.planned {
+				onTheSite(refused, refused.pages...)
+			}
+			tc.req.SiteID, tc.req.PageIDs = refused.siteID, []string{refused.pages[0]}
+			_, err := refused.service.Start(t.Context(), tc.req)
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Start(%+v) = %v, want Invalid", tc.req, err)
+			}
+			if kernel, typed := stderrors.AsType[*errors.Error](err); !typed || kernel.Details["field"] != "fields" {
+				t.Errorf("the refusal %v does not name the fields", err)
+			}
+		})
+	}
+}
+
 func TestAKindWithARecipeOfItsOwnNeverTakesTheTemplates(t *testing.T) {
 	t.Parallel()
 
@@ -45,7 +226,6 @@ func TestAKindWithARecipeOfItsOwnNeverTakesTheTemplates(t *testing.T) {
 			name: "relink", kind: run.KindRelink,
 			want: []string{"resolve_context", "relink_page", "sync_back", "report"},
 		},
-		{name: "repair", kind: run.KindRepair, want: []string{"repair_hierarchy", "sync_back", "report"}},
 		{name: "sync", kind: run.KindSync, want: []string{"sync_site"}},
 	}
 
@@ -89,6 +269,26 @@ func TestARecipeThatDisagreesWithTheKindIsRefused(t *testing.T) {
 	})
 	if !slices.Equal(got, enabledNames(run.RelinkRecipe())) {
 		t.Fatalf("the kind's own recipe was refused: %v", got)
+	}
+}
+
+func TestARepairRunCanNoLongerBeStarted(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+
+	_, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: []string{fixture.pages[0]}, Kind: string(run.KindRepair),
+	})
+	if !errors.IsCode(err, errors.Invalid) {
+		t.Fatalf("Start of a repair = %v, want invalid", err)
+	}
+	if !strings.Contains(err.Error(), "never written") || !strings.Contains(err.Error(), "relink") {
+		t.Fatalf("the refusal does not say why and what to start instead: %v", err)
+	}
+	if fixture.engine.queued.SiteID != "" {
+		t.Fatalf("a repair reached the engine: %+v", fixture.engine.queued)
 	}
 }
 
@@ -147,7 +347,7 @@ func TestAStepThatBelongsToAKindIsRefusedInAPageRecipe(t *testing.T) {
 			fixture.specs.siteID = fixture.siteID
 			fixture.specs.spec = template.TemplateSpec{Recipe: []template.StepSpec{
 				{Name: "resolve_context", Enabled: true},
-				{Name: "repair_hierarchy", Enabled: true},
+				{Name: "relink_page", Enabled: true},
 				{Name: "generate_body", Enabled: true},
 			}}
 
@@ -163,7 +363,7 @@ func TestAStepThatBelongsToAKindIsRefusedInAPageRecipe(t *testing.T) {
 			if !errors.IsCode(err, errors.Invalid) {
 				t.Fatalf("Start = %v, want invalid", err)
 			}
-			if !strings.Contains(err.Error(), "repair_hierarchy") || !strings.Contains(err.Error(), "repair") {
+			if !strings.Contains(err.Error(), "relink_page") || !strings.Contains(err.Error(), "relink") {
 				t.Fatalf("the refusal does not name the step and the kind that owns it: %v", err)
 			}
 		})
@@ -207,7 +407,6 @@ func TestARunOverAPageMappedToNothingIsRefusedBeforeItIsQueued(t *testing.T) {
 	}{
 		{name: "generate", kind: run.KindGenerate},
 		{name: "relink", kind: run.KindRelink},
-		{name: "repair", kind: run.KindRepair},
 		{name: "audit", kind: run.KindAudit},
 		{name: "custom", kind: run.KindCustom},
 	}

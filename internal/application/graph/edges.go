@@ -2,9 +2,12 @@ package graph
 
 import (
 	"context"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -87,22 +90,62 @@ func (s *Service) pageStates(ctx context.Context, siteID string) ([]EntityPage, 
 	if err != nil {
 		return nil, err
 	}
+	identities, err := s.identities.ListBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]pagemap.Identity, len(identities))
+	for i := range identities {
+		seen[identities[i].PageID] = identities[i]
+	}
+	fields, err := s.fields.ListBySite(ctx, siteID)
+	if err != nil {
+		return nil, err
+	}
 
 	states := make([]EntityPage, 0, len(pages))
 	for i := range pages {
 		if pages[i].EntityID == nil {
 			continue
 		}
+		identity, observed := seen[pages[i].ID]
 		states = append(states, EntityPage{
-			EntityID: *pages[i].EntityID,
-			PageID:   pages[i].ID,
-			Path:     pages[i].Path,
-			Status:   string(pages[i].Status),
-			Work:     working[pages[i].ID],
-			Mismatch: len(pages[i].Mismatches()) > 0,
+			EntityID:   *pages[i].EntityID,
+			PageID:     pages[i].ID,
+			Path:       pages[i].Path,
+			Status:     string(pages[i].Status),
+			PageTypeID: pages[i].PageTypeID,
+			Work:       working[pages[i].ID],
+			Mismatch:   observed && differsFromSite(pages[i], identity, fields[pages[i].ID]),
 		})
 	}
 	return states, nil
+}
+
+func differsFromSite(page pagemap.Page, identity pagemap.Identity, values []field.Value) bool {
+	asked := page.Status == pagemap.StatusPublished || page.Status == pagemap.StatusExists
+	if asked && identity.Status != "" && pagemap.StatusFromWordPress(identity.Status) != page.Status {
+		return true
+	}
+	if page.WPType.StoreAddressed() {
+		return false
+	}
+	if path, err := pagemap.NormalizePath(identity.URL); err == nil && !strings.Contains(identity.URL, "?") && path != page.Path {
+		return true
+	}
+	for i := range values {
+		switch values[i].Key {
+		case field.Title:
+			if page.Title != "" && values[i].Current != "" && page.Title != values[i].Current {
+				return true
+			}
+		case field.H1:
+			if page.H1 != "" && values[i].Current != "" && page.H1 != values[i].Current {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *Service) inFlight(ctx context.Context, siteID string) (map[string]string, error) {

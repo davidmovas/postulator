@@ -1,0 +1,55 @@
+THE PAGE
+Path: /peptides/
+Title: Peptides
+Page type: Hub, a hub: it introduces its topic and links down to its children and sideways to related pages
+WordPress type: page; on the site, published
+
+THE FIELD'S RULES
+Field: Body
+Instruction: Introduce the category and send the reader to its products.
+Length: between 1200 and 6000 characters
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+
+THE ENTITY
+Entity: Peptides
+Definition: Short chains of amino acids sold for laboratory research.
+- Storage: Frozen, sealed under nitrogen
+
+THE FIELD'S CURRENT VALUE
+The field is empty.
+
+KEYWORDS, BY VOLUME
+Anchors others link here with: research peptides
+1. peptides (12000 a month)
+2. research peptides (3000 a month)
+
+THE TRAIL, NEAREST PARENT FIRST
+The parent comes from the page's JSON-LD breadcrumb.
+- Home (/, Entity): Entity for Home; its children are Lab Guides, Peptides
+
+NOTES
+- Tone: Plain and factual, for laboratory buyers.
+
+PAGES THIS FIELD LINKS TO
+- /bpc-157/ (BPC-157, below it). Anchors: BPC-157. About it: BPC-157 is a peptide studied for tissue repair.
+- /healing-peptides/ (Healing Peptides, below it). Anchors: healing peptides. About it: Hub for Healing Peptides under Peptides; lists BPC-157 5 mg, TB-500
+
+PRODUCTS OF ITS STORE CATEGORY PEPTIDES
+- BPC-157 10 mg (/product/bpc-157-10mg/): price 80.00, SKU BPC-10, in stock
+- BPC-157 5 mg (/product/bpc-157-5mg/): price 45.00, SKU BPC-5, in stock; Five milligrams of BPC-157, lyophilised.
+- GHK-Cu (/product/ghk-cu/): price 30.00, SKU GHK-50
+- TB-500 (/product/tb-500/): price 60.00, SKU TB-5, out of stock
+
+SIBLINGS, THE PAGES BESIDE IT
+- Lab Guides (/lab-guides/, Entity): Guides for handling research peptides.
+
+CHILDREN, THE PAGES BELOW IT
+- Healing Peptides (/healing-peptides/, Hub): Hub for Healing Peptides under Peptides; lists BPC-157 5 mg, TB-500
+- BPC-157 (/bpc-157/, Entity): BPC-157 is a peptide studied for tissue repair.
+
+ITS OTHER FIELDS
+- Title: Peptides
+- SEO title: Research peptides | Lab
+
+WHAT THE SITE ADDS AROUND THE FIELD
+a breadcrumb inside the content area; a product listing of 3 links inside the content area; 48 words the site generates inside the content area

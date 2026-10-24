@@ -6,9 +6,12 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
@@ -63,6 +66,10 @@ func (p *pageMap) Update(_ context.Context, page pagemap.Page) error {
 	return nil
 }
 
+func (p *pageMap) UpdatePublished(ctx context.Context, page pagemap.Page) error {
+	return p.Update(ctx, page)
+}
+
 type sourceRecord struct {
 	items     []run.Item
 	artifacts map[string][]run.Artifact
@@ -105,6 +112,7 @@ type revertStand struct {
 	server *wptest.Server
 	pages  *pageMap
 	links  *linkRecorder
+	bodies *bodyLog
 	source *sourceRecord
 	wpIDs  map[string]int64
 }
@@ -124,7 +132,6 @@ func newRevertStand(t *testing.T, opts ...wptest.Option) *revertStand {
 		pagemap.Page{
 			ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
 			Status: pagemap.StatusPublished, EntityID: pointer("parent"), WPID: &neighbor,
-			ContentHash: wp.ContentHash(neighborBefore),
 		},
 		pagemap.Page{
 			ID: "page-filter", SiteID: "site", Path: "/filter/", Slug: "filter", WPType: pagemap.WPPage,
@@ -141,14 +148,16 @@ func newRevertStand(t *testing.T, opts ...wptest.Option) *revertStand {
 	)
 
 	links := &linkRecorder{}
+	bodies := &bodyLog{bodies: map[string]string{"page-parent": neighborBefore}}
 	deps.Pages = pages
 	deps.Links = links
+	deps.Bodies = bodies
 	source := newSourceRecord()
 	deps.Items = source
 	deps.Artifacts = source
 
 	return &revertStand{
-		deps: deps, server: server, pages: pages, links: links, source: source,
+		deps: deps, server: server, pages: pages, links: links, bodies: bodies, source: source,
 		wpIDs: map[string]int64{
 			"page-parent": neighbor, "page-filter": updated,
 			"page-child": espresso, "page-ristretto": ristretto,
@@ -171,9 +180,9 @@ func (s *revertStand) created(t *testing.T, pageID string) {
 	}
 	page := s.pages.items[pageID]
 	page.WPID = &wpID
-	page.ContentHash = wp.ContentHash(body)
 	s.pages.items[pageID] = page
 	s.wpIDs[pageID] = wpID
+	s.recorded(t, pageID, body)
 
 	s.source.record(t, pageID, map[run.ArtifactKind]any{
 		run.ArtifactPublishResult: steps.PublishResult{
@@ -198,27 +207,30 @@ func (s *revertStand) updatedOverMeta(t *testing.T, pageID, body string, previou
 		t.Fatalf("write the run body to %s: %v", pageID, err)
 	}
 
-	page.ContentHash = wp.ContentHash(body)
-	s.pages.items[pageID] = page
+	s.recorded(t, pageID, body)
 
 	applied := []string{"title"}
 	if previous != nil {
 		applied = []string{"title", "description"}
 		if _, err := client.SetSEOMeta(t.Context(), itemType, wpID, wp.SEOMeta{
 			Title: "written by the run", Description: "written by the run",
-		}); err != nil {
+		}, nil); err != nil {
 			t.Fatalf("write the run meta to %s: %v", pageID, err)
 		}
 	}
 
-	s.source.record(t, pageID, map[run.ArtifactKind]any{
+	artifacts := map[run.ArtifactKind]any{
 		run.ArtifactPublishResult: steps.PublishResult{
 			WPID: wpID, Created: false, ContentHash: wp.ContentHash(body),
 			PreviousContent: updatedBefore, PreviousContentHash: wp.ContentHash(updatedBefore),
 			PreviousMeta: previous,
 			SEOApplied:   applied, Skipped: []string{},
 		},
-	})
+	}
+	if previous != nil {
+		artifacts[run.ArtifactMeta] = map[string]string{"title": "written by the run", "description": "written by the run"}
+	}
+	s.source.record(t, pageID, artifacts)
 }
 
 func findingOf(reverted steps.RevertResult, code string) (content.Finding, bool) {
@@ -282,10 +294,11 @@ func TestRevertKeepsTheSEOMetaItHasNoCopyOf(t *testing.T) {
 
 func (s *revertStand) relinked(t *testing.T, pageID, neighborID, body string) {
 	t.Helper()
-	s.relinkedOver(t, pageID, neighborID, steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore}, body)
+	s.relinkedOver(t, pageID, neighborID, steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore}, body,
+		wp.ContentHash(body))
 }
 
-func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, before steps.NeighborBefore, body string) {
+func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, before steps.NeighborBefore, body, after string) {
 	t.Helper()
 
 	wpID := s.wpIDs[neighborID]
@@ -295,15 +308,14 @@ func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, befo
 		t.Fatalf("write the relinked body to %s: %v", neighborID, err)
 	}
 
-	neighbor.ContentHash = wp.ContentHash(body)
-	s.pages.items[neighborID] = neighbor
+	s.recorded(t, neighborID, body)
 
 	itemID := "item-" + pageID
 	encoded, err := json.Marshal(steps.RelinkResult{
 		Linked: 1,
 		Neighbors: []steps.NeighborResult{{
 			PageID: neighborID, Path: s.pages.items[neighborID].Path, WPID: wpID,
-			Outcome: steps.OutcomeLinked, Anchor: "espresso", Before: before,
+			Outcome: steps.OutcomeLinked, Anchor: "espresso", Before: before, After: after,
 		}},
 	})
 	if err != nil {
@@ -313,6 +325,13 @@ func (s *revertStand) relinkedOver(t *testing.T, pageID, neighborID string, befo
 		ID: itemID + "-relink", RunID: sourceRunID, ItemID: itemID, Step: "relink_neighbors",
 		Kind: run.ArtifactRelinkResult, Blob: encoded,
 	})
+}
+
+func (s *revertStand) recorded(t *testing.T, pageID, body string) {
+	t.Helper()
+	if err := s.bodies.Record(t.Context(), pageID, body, time.Time{}); err != nil {
+		t.Fatalf("record the body the run left on %s: %v", pageID, err)
+	}
 }
 
 func (s *revertStand) revert(t *testing.T, pageID string) (steps.RevertResult, run.Result) {
@@ -379,7 +398,8 @@ func TestRevertAdoptsTheContentItPutBack(t *testing.T) {
 	linked := `<h1>Coffee</h1><p>We roast for <a href="/filter/">filter</a> too.</p>`
 	stand := newRevertStand(t)
 	stand.updated(t, "page-filter", runBody)
-	stand.relinkedOver(t, "page-filter", "page-parent", steps.NeighborBefore{Hash: wp.ContentHash(linked), HTML: linked}, relinkedBody())
+	stand.relinkedOver(t, "page-filter", "page-parent", steps.NeighborBefore{Hash: wp.ContentHash(linked), HTML: linked}, relinkedBody(),
+		wp.ContentHash(relinkedBody()))
 
 	if _, result := stand.revert(t, "page-filter"); result.Next == run.TransitionPause {
 		t.Fatalf("the revert paused: %s", result.Message)
@@ -398,8 +418,9 @@ func TestRevertAdoptsTheContentItPutBack(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			page := stand.pages.items[tc.pageID]
-			if page.ContentHash != wp.ContentHash(tc.body) || page.Drift || page.LastSyncedAt == nil {
-				t.Fatalf("the local row of %s reads %+v, want it on the content put back", tc.pageID, page)
+			current, base, found, err := stand.bodies.Get(t.Context(), tc.pageID)
+			if err != nil || !found || current.Raw != tc.body || current.Hash != base.Hash || page.LastSyncedAt == nil {
+				t.Fatalf("the local row of %s reads %+v over the body %+v, want it on the content put back", tc.pageID, page, current)
 			}
 			links, replaced := stand.links.byPage[tc.pageID]
 			if !replaced {
@@ -447,7 +468,7 @@ func TestRevertTellsAnEmptyNeighborFromOneItKeptNoCopyOf(t *testing.T) {
 
 			stand := newRevertStand(t)
 			stand.updated(t, "page-filter", runBody)
-			stand.relinkedOver(t, "page-filter", "page-parent", tc.before, sentence)
+			stand.relinkedOver(t, "page-filter", "page-parent", tc.before, sentence, wp.ContentHash(sentence))
 
 			reverted, result := stand.revert(t, "page-filter")
 			if paused := result.Next == run.TransitionPause; paused != tc.paused {
@@ -460,6 +481,207 @@ func TestRevertTellsAnEmptyNeighborFromOneItKeptNoCopyOf(t *testing.T) {
 				t.Fatalf("the neighbor holds %q, want %q", got, tc.body)
 			}
 		})
+	}
+}
+
+func TestRevertHandsBackANeighborWhoseBodyIsNotWhatTheRelinkLeft(t *testing.T) {
+	t.Parallel()
+
+	sentence := `<p>Read about <a href="/coffee/espresso/">espresso</a>.</p>`
+	edited := `<p>The client rewrote the coffee page after the relink.</p>`
+	cases := []struct {
+		name    string
+		prepare func(t *testing.T, s *revertStand)
+		detail  string
+		holds   string
+		older   bool
+	}{
+		{
+			name:    "an older relink whose run left no record of the body it wrote",
+			prepare: func(*testing.T, *revertStand) {},
+			detail:  "nothing here records what the relink left",
+			holds:   sentence,
+			older:   true,
+		},
+		{
+			name: "a neighbor the client edited since",
+			prepare: func(t *testing.T, s *revertStand) {
+				t.Helper()
+				if _, err := syncClient(t, s.server).PutRaw(t.Context(), wp.TypePage, s.wpIDs["page-parent"], edited, ""); err != nil {
+					t.Fatalf("edit the neighbor on the site: %v", err)
+				}
+			},
+			detail: "edited on the site since the run wrote it",
+			holds:  edited,
+		},
+		{
+			name: "a neighbor with no record of its body",
+			prepare: func(_ *testing.T, s *revertStand) {
+				delete(s.bodies.bodies, "page-parent")
+			},
+			detail: "nothing here records what the relink left",
+			holds:  sentence,
+			older:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stand := newRevertStand(t)
+			stand.updated(t, "page-filter", runBody)
+			after := wp.ContentHash(sentence)
+			if tc.older {
+				after = ""
+			}
+			stand.relinkedOver(t, "page-filter", "page-parent",
+				steps.NeighborBefore{Hash: wp.ContentHash(neighborBefore), HTML: neighborBefore}, sentence, after)
+			tc.prepare(t, stand)
+
+			reverted, result := stand.revert(t, "page-filter")
+			if result.Next != run.TransitionPause || !strings.Contains(reverted.Detail, tc.detail) {
+				t.Fatalf("result = %s, detail %q, want a hand-back saying %q", result.Next, reverted.Detail, tc.detail)
+			}
+			if got := stand.body(t, stand.wpIDs["page-parent"]); got != tc.holds {
+				t.Fatalf("the neighbor holds %q, want it untouched", got)
+			}
+		})
+	}
+}
+
+func TestARevertRecordsWhatTheSiteStored(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a neighbor", func(t *testing.T) {
+		t.Parallel()
+
+		before := `<h1>Coffee</h1><p>We roast<br>every espresso blend we sell.</p>`
+		sentence := `<h1>Coffee</h1><p>We roast every espresso blend we sell.</p><p>Read about <a href="/coffee/espresso/">espresso</a>.</p>`
+		stand := newRevertStand(t, wptest.WithFilteredHTML())
+		stand.updated(t, "page-filter", runBody)
+		stand.relinkedOver(t, "page-filter", "page-parent",
+			steps.NeighborBefore{Hash: wp.ContentHash(before), HTML: before}, sentence, wp.ContentHash(sentence))
+
+		reverted, _ := stand.revert(t, "page-filter")
+		if len(reverted.Neighbors) != 1 || reverted.Neighbors[0].Outcome != steps.OutcomeRestored {
+			t.Fatalf("neighbors = %+v, want the neighbor restored", reverted.Neighbors)
+		}
+		held := stand.body(t, stand.wpIDs["page-parent"])
+		if held == before || !strings.Contains(held, "<br />") {
+			t.Fatalf("the neighbor holds %q, want the site's own form of the content put back", held)
+		}
+		if recorded := stand.bodies.bodies["page-parent"]; recorded != held {
+			t.Errorf("the body recorded is %q, want what the site stored %q", recorded, held)
+		}
+	})
+
+	t.Run("the page itself", func(t *testing.T) {
+		t.Parallel()
+
+		before := `<h1>Filter</h1><p>What a human wrote<br>about filter coffee.</p>`
+		stand := newRevertStand(t, wptest.WithFilteredHTML())
+		wpID := stand.wpIDs["page-filter"]
+		if _, err := syncClient(t, stand.server).PutRaw(t.Context(), wp.TypePage, wpID, runBody, ""); err != nil {
+			t.Fatalf("write the run body: %v", err)
+		}
+		stand.recorded(t, "page-filter", runBody)
+		stand.source.record(t, "page-filter", map[run.ArtifactKind]any{
+			run.ArtifactPublishResult: steps.PublishResult{
+				WPID: wpID, ContentHash: wp.ContentHash(runBody),
+				PreviousContent: before, PreviousContentHash: wp.ContentHash(before),
+				SEOApplied: []string{}, Skipped: []string{},
+			},
+		})
+
+		reverted, _ := stand.revert(t, "page-filter")
+		if reverted.Outcome != steps.OutcomeRestored {
+			t.Fatalf("reverted = %+v, want the page restored", reverted)
+		}
+		held := stand.body(t, wpID)
+		if held == before || !strings.Contains(held, "<br />") {
+			t.Fatalf("the page holds %q, want the site's own form of the content put back", held)
+		}
+		if recorded := stand.bodies.bodies["page-filter"]; recorded != held {
+			t.Errorf("the body recorded is %q, want what the site stored %q", recorded, held)
+		}
+	})
+}
+
+func TestARevertKeepsTheMarksOfTheLinksItLeavesInPlace(t *testing.T) {
+	t.Parallel()
+
+	onceLinked := `<h1>Coffee</h1><p>We roast every <a href="/coffee/espresso/">espresso</a> and ristretto blend we sell.</p>`
+	twiceLinked := `<h1>Coffee</h1><p>We roast every <a href="/coffee/espresso/">espresso</a> and <a href="/coffee/ristretto/">ristretto</a> blend we sell.</p>`
+	stand := newRevertStand(t)
+	stand.updated(t, "page-filter", runBody)
+	stand.relinkedOver(t, "page-filter", "page-parent",
+		steps.NeighborBefore{Hash: wp.ContentHash(onceLinked), HTML: onceLinked}, twiceLinked, wp.ContentHash(twiceLinked))
+	paragraph := block.Parse(twiceLinked).Blocks[1].Hash
+	stand.bodies.written = map[string][]string{"page-parent": {paragraph}}
+	stand.links.byPage = map[string][]pagemap.PageLink{"page-parent": {
+		{
+			ID: "l-espresso", SiteID: "site", FromPageID: "page-parent", ToURL: "/coffee/espresso/", AnchorText: "espresso",
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, BlockHash: paragraph, ObservedAt: sqlitetest.Stamp,
+		},
+		{
+			ID: "l-ristretto", SiteID: "site", FromPageID: "page-parent", ToURL: "/coffee/ristretto/", AnchorText: "ristretto",
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw, Ours: true, BlockHash: paragraph, ObservedAt: sqlitetest.Stamp,
+		},
+	}}
+
+	reverted, _ := stand.revert(t, "page-filter")
+	if len(reverted.Neighbors) != 1 || reverted.Neighbors[0].Outcome != steps.OutcomeRestored {
+		t.Fatalf("neighbors = %+v, want the neighbor restored", reverted.Neighbors)
+	}
+	if got := stand.body(t, stand.wpIDs["page-parent"]); got != onceLinked {
+		t.Fatalf("the neighbor holds %q, want the body before the relink", got)
+	}
+	rows := stand.links.byPage["page-parent"]
+	if len(rows) != 1 || rows[0].ToURL != "/coffee/espresso/" || !rows[0].Ours || rows[0].BlockHash != block.Parse(onceLinked).Blocks[1].Hash {
+		t.Fatalf("the links after the revert are %+v, want the earlier run's espresso link still ours, keyed to the paragraph as put back", rows)
+	}
+	if written := stand.bodies.ours("page-parent"); len(written) != 1 || written[0] != block.Parse(onceLinked).Blocks[1].Hash {
+		t.Errorf("ours after the revert = %v, want the paragraph as put back, which was ours before the relink", written)
+	}
+}
+
+func TestARevertGivesBackTheBlocksOfTheRunItUncovers(t *testing.T) {
+	t.Parallel()
+
+	const (
+		earlier = "<p>What the earlier run wrote about filter coffee.</p>"
+		rewrite = "<p>What the reverted run wrote over it.</p>"
+	)
+	before := updatedBefore + "\n\n" + earlier
+	after := updatedBefore + "\n\n" + rewrite
+	stand := newRevertStand(t)
+	wpID := stand.wpIDs["page-filter"]
+	if _, err := syncClient(t, stand.server).PutRaw(t.Context(), wp.TypePage, wpID, after, ""); err != nil {
+		t.Fatalf("write the reverted run's body: %v", err)
+	}
+	stand.recorded(t, "page-filter", after)
+	stand.bodies.written = map[string][]string{"page-filter": {block.Hash(rewrite)}}
+	stand.source.record(t, "page-filter", map[run.ArtifactKind]any{
+		run.ArtifactPublishResult: steps.PublishResult{
+			WPID: wpID, Version: 3, ContentHash: wp.ContentHash(after),
+			PreviousContent: before, PreviousContentHash: wp.ContentHash(before),
+			SEOApplied: []string{}, Skipped: []string{},
+			Blocks: []block.Change{
+				{Kind: block.Paragraph, Hash: block.Hash(earlier), Raw: earlier, Owner: block.OwnerOurs, Change: block.ChangeRemoved},
+				{Kind: block.Paragraph, Hash: block.Hash(rewrite), Raw: rewrite, Owner: block.OwnerOurs, Change: block.ChangeAdded},
+			},
+		},
+	})
+
+	reverted, _ := stand.revert(t, "page-filter")
+	if reverted.Outcome != steps.OutcomeRestored {
+		t.Fatalf("reverted = %+v, want the page restored", reverted)
+	}
+	if got := stand.body(t, wpID); got != before {
+		t.Fatalf("the page holds %q, want the earlier run's body back", got)
+	}
+	if written := stand.bodies.ours("page-filter"); len(written) != 1 || written[0] != block.Hash(earlier) {
+		t.Errorf("ours after the revert = %v, want the earlier run's article alone, uncovered by the revert", written)
 	}
 }
 
@@ -511,10 +733,10 @@ func TestRevertPutsBackWhatTheRunWroteToTheSite(t *testing.T) {
 			t.Fatalf("the page the run created is %q on the site, want it in the trash", got)
 		}
 		page := stand.pages.items[pageID]
-		if page.WPID != nil || page.Status != pagemap.StatusPlanned || page.ContentHash != "" {
+		if page.WPID != nil || page.Status != pagemap.StatusPlanned {
 			t.Fatalf("the local row of %s reads %+v, want it planned again", pageID, page)
 		}
-		if page.Observed != (pagemap.Observed{}) || page.LastSyncedAt != nil || page.Drift {
+		if page.LastSyncedAt != nil || page.WPModifiedAt != nil {
 			t.Fatalf("the local row of %s still mirrors the site: %+v", pageID, page)
 		}
 		if len(stand.links.byPage[pageID]) != 0 {

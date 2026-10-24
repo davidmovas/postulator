@@ -12,10 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/pages"
-	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sites"
-	"github.com/davidmovas/postulator/internal/domain/content"
-	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
@@ -76,14 +73,17 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 	if err != nil {
 		return err
 	}
-	bodies, err := generatedBodies(ctx, core, siteID)
-	if err != nil {
-		return err
-	}
 
 	sort.SliceStable(mapped, func(a, b int) bool {
 		return depthOf(mapped[a].Path) < depthOf(mapped[b].Path)
 	})
+
+	titles := make(map[string]string, len(mapped))
+	for index := range mapped {
+		if mapped[index].Status != statusArchived && mapped[index].Status != statusPlanned {
+			titles[mapped[index].Path] = mapped[index].Title
+		}
+	}
 
 	wpByPath := make(map[string]int64, len(mapped))
 	for index := range mapped {
@@ -92,14 +92,15 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 			continue
 		}
 
-		body, bodyErr := restoredContent(page, bodies[page.ID])
+		body, bodyErr := heldBody(ctx, core, page)
 		if bodyErr != nil {
 			return bodyErr
 		}
 		item := wptest.Item{
 			Type: page.WPType, Title: page.Title, H1: page.H1, Slug: slugOf(page.Path),
 			Content: body, Status: wpStatus(page.Status), Modified: time.Now().UTC(),
-			Parent: wpByPath[parentOf(page.Path)],
+			Parent: wpByPath[parentOf(page.Path)], Crumbs: crumbsOf(page.Path, page.Title, titles),
+			Meta: customMetaOf(page.Path), Terms: storeTermsOf(page.Path),
 		}
 		if page.WPID != nil {
 			item.ID = *page.WPID
@@ -109,15 +110,37 @@ func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteI
 	return nil
 }
 
-func restoredContent(page *pages.Page, body string) (string, error) {
-	if page.WPType != wptest.TypeProduct || body == "" {
-		return body, nil
+func customMetaOf(path string) map[string]string {
+	subtitle, held := seedSubtitles()[path]
+	if !held {
+		return nil
 	}
-	doc, err := content.Parse(body)
+	return map[string]string{subtitleKey: subtitle}
+}
+
+func crumbsOf(path, title string, titles map[string]string) []wptest.Crumb {
+	if _, nested := titles[parentOf(path)]; !nested {
+		return nil
+	}
+	ancestors := make([]wptest.Crumb, 0)
+	for ancestor := parentOf(path); ancestor != "" && ancestor != "/"; ancestor = parentOf(ancestor) {
+		if name, known := titles[ancestor]; known {
+			ancestors = append([]wptest.Crumb{{Name: name, Path: ancestor}}, ancestors...)
+		}
+	}
+	crumbs := append([]wptest.Crumb{{Name: "Home", Path: "/"}}, ancestors...)
+	return append(crumbs, wptest.Crumb{Name: title, Path: path})
+}
+
+func heldBody(ctx context.Context, core *app.Core, page *pages.Page) (string, error) {
+	model, err := core.Observe.Page(ctx, page.ID)
 	if err != nil {
 		return "", err
 	}
-	return doc.RenderWithoutHeadingOne()
+	if model.Body != nil {
+		return model.Body.Raw, nil
+	}
+	return seedBodies()[page.Path], nil
 }
 
 func depthOf(path string) int {
@@ -150,39 +173,6 @@ func allPages(ctx context.Context, core *app.Core, siteID string) ([]pages.Page,
 		}
 		cursor = string(page.Next)
 	}
-}
-
-func generatedBodies(ctx context.Context, core *app.Core, siteID string) (map[string]string, error) {
-	bodies := make(map[string]string, len(completedRun))
-
-	listed, err := core.Runs.List(ctx, runs.ListRequest{
-		SiteID: siteID, ListRequest: dto.ListRequest{Limit: 20},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	for index := range listed.Items {
-		items, itemsErr := core.Runs.ListItems(ctx, runs.ListItemsRequest{
-			RunID: listed.Items[index].ID, ListRequest: dto.ListRequest{Limit: 50},
-		})
-		if itemsErr != nil {
-			return nil, itemsErr
-		}
-		for item := range items.Items {
-			target := items.Items[item]
-			held, getErr := core.Runs.GetArtifact(ctx, runs.GetArtifactRequest{
-				ItemID: target.ID, Kind: string(run.ArtifactBodyHTML),
-			})
-			if getErr != nil {
-				continue
-			}
-			if held.Artifact.Content != "" {
-				bodies[target.TargetID] = held.Artifact.Content
-			}
-		}
-	}
-	return bodies, nil
 }
 
 func slugOf(path string) string {

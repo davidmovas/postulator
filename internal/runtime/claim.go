@@ -6,7 +6,9 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -17,6 +19,8 @@ type claim struct {
 	record    run.Run
 	page      pagemap.Page
 	spec      template.TemplateSpec
+	kind      pagetype.Type
+	links     field.LinkPolicy
 	def       run.Definition
 	step      run.StepDef
 	artifacts map[run.ArtifactKind]run.Artifact
@@ -112,7 +116,11 @@ func (e *Engine) locate(ctx context.Context, held *claim) *run.Fault {
 		if err != nil {
 			return classified(err)
 		}
-		held.page = page
+		types, err := e.deps.Types.Set(ctx, page.SiteID)
+		if err != nil {
+			return classified(err)
+		}
+		held.page, held.kind, held.links = page, types.TypeOf(page), types.Policy(page)
 	}
 	return nil
 }
@@ -149,7 +157,7 @@ func (e *Engine) gather(ctx context.Context, held *claim) error {
 
 	held.artifacts = artifactsByKind(held.def, held.index, stored)
 	held.params = run.ParamsFor(held.record.Recipe, held.step.Name)
-	held.inputHash, err = run.InputHash(held.step.Name, held.params, required(held.step, held.artifacts),
+	held.inputHash, err = run.InputHash(held.step.Name, held.params, required(held.step, held.params, held.artifacts),
 		held.version, held.item.Checkpoint)
 	return err
 }
@@ -187,9 +195,10 @@ func (e *Engine) startsFresh(ctx context.Context, held *claim) (bool, error) {
 	return ran == 0, err
 }
 
-func required(step run.StepDef, available map[run.ArtifactKind]run.Artifact) []run.Artifact {
-	out := make([]run.Artifact, 0, len(step.Requires))
-	for _, kind := range step.Requires {
+func required(step run.StepDef, params map[string]any, available map[run.ArtifactKind]run.Artifact) []run.Artifact {
+	kinds := step.RequiresFor(params)
+	out := make([]run.Artifact, 0, len(kinds))
+	for _, kind := range kinds {
 		if artifact, ok := available[kind]; ok {
 			out = append(out, artifact)
 		}

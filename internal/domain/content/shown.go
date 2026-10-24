@@ -55,6 +55,10 @@ func visibleText(node *html.Node) string {
 	return builder.String()
 }
 
+func WordsOf(text string) []string {
+	return wordsOf(text)
+}
+
 func wordsOf(text string) []string {
 	return strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)

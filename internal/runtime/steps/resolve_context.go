@@ -38,10 +38,7 @@ func ResolveContext(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
+			policy := sc.Links
 			owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
@@ -60,11 +57,20 @@ func ResolveContext(deps Deps) run.StepDef {
 					WithDetail("entityId", entity.ID)
 			}
 
-			plan := content.PlanLinks(g, pagemap.NewIndex(pages), content.Subject{
+			absolute, err := deps.Pictures.Absolute(ctx, sc.Run.SiteID)
+			if err != nil {
+				return run.Result{}, err
+			}
+			index, err := deps.namedIndex(ctx, sc.Run.SiteID, pages)
+			if err != nil {
+				return run.Result{}, err
+			}
+			plan := content.PlanLinks(g, index, content.Subject{
 				Site:     pagemap.NewSite(owner.BaseURL),
 				PageID:   sc.Page.ID,
 				PagePath: sc.Page.Path,
 				EntityID: entity.ID,
+				Absolute: absolute,
 			}, policy)
 			blob, err := encode(plan.Context, "link context")
 			if err != nil {

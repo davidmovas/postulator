@@ -18,12 +18,22 @@ const (
 	KindImport   Kind = "import"
 	KindRepair   Kind = "repair"
 	KindRevert   Kind = "revert"
+	KindEdit     Kind = "edit"
 	KindCustom   Kind = "custom"
 )
 
 func (k Kind) Valid() bool {
 	switch k {
-	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindRepair, KindRevert, KindCustom:
+	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindRepair, KindRevert, KindEdit, KindCustom:
+		return true
+	default:
+		return false
+	}
+}
+
+func (k Kind) Startable() bool {
+	switch k {
+	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindCustom:
 		return true
 	default:
 		return false

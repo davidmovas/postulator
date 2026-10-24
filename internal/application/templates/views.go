@@ -12,7 +12,6 @@ type Template struct {
 	Scope     string                `json:"scope"`
 	SiteID    *string               `json:"siteId"`
 	Name      string                `json:"name"`
-	PageKind  string                `json:"pageKind"`
 	Version   int                   `json:"version"`
 	Spec      template.TemplateSpec `json:"spec"`
 	CreatedAt dto.Time              `json:"createdAt"`
@@ -29,26 +28,12 @@ type Override struct {
 	UpdatedAt  dto.Time        `json:"updatedAt"`
 }
 
-type LinkPolicy struct {
-	ID             string             `json:"id"`
-	Scope          string             `json:"scope"`
-	SiteID         *string            `json:"siteId"`
-	Name           string             `json:"name"`
-	Rules          template.LinkRules `json:"rules"`
-	ForbidExternal bool               `json:"forbidExternal"`
-	ForbidSelf     bool               `json:"forbidSelf"`
-	AnchorStrategy string             `json:"anchorStrategy"`
-	CreatedAt      dto.Time           `json:"createdAt"`
-	UpdatedAt      dto.Time           `json:"updatedAt"`
-}
-
 func templateView(t template.Template) Template {
 	return Template{
 		ID:        t.ID,
 		Scope:     string(t.Scope),
 		SiteID:    t.SiteID,
 		Name:      t.Name,
-		PageKind:  t.PageKind,
 		Version:   t.Version,
 		Spec:      t.Spec,
 		CreatedAt: dto.NewTime(t.CreatedAt),

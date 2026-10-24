@@ -6,7 +6,10 @@ import (
 	"strings"
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -22,9 +25,10 @@ const (
 
 	CodePhraseTemplated = "phrase_templated"
 
-	defaultIterations = 2
-	maxIterations     = 4
-	repairTokens      = 256
+	defaultIterations  = 2
+	maxIterations      = 4
+	repairTokens       = 256
+	linkerPromptTokens = 290
 
 	leadWhy = "The template asks the first paragraph of the page to carry the primary keyword, and it does not yet."
 )
@@ -35,6 +39,8 @@ type repairPrompt struct {
 	Phrase    string
 	Why       string
 	Paragraph string
+	Identity  string
+	About     string
 }
 
 type owedPhrase struct {
@@ -55,9 +61,13 @@ func RepairLinks(deps Deps) run.StepDef {
 		Timeout:  editorTimeout,
 		Price: run.Price{
 			OutputTokens: repairTokens,
-			Calls: func(spec template.TemplateSpec, params map[string]any) int {
-				phrases := spec.LinkRules.UpDepth
-				if spec.KeywordRules.PrimaryInFirstParagraph {
+			Overhead:     linkerPromptTokens,
+			Calls: func(target run.Target, params map[string]any) int {
+				phrases := 0
+				if target.Links.Links {
+					phrases = target.Links.Rules.UpDepth
+				}
+				if target.Spec.KeywordRules.PrimaryInFirstParagraph {
 					phrases++
 				}
 				return iterations(params) * phrases
@@ -72,10 +82,11 @@ func RepairLinks(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
+			open, err := unlinkedByClient(sc, lc)
 			if err != nil {
 				return run.Result{}, err
 			}
+			policy := sc.Links
 			entity, err := entityOf(ctx, deps, sc)
 			if err != nil {
 				return run.Result{}, err
@@ -85,12 +96,12 @@ func RepairLinks(deps Deps) run.StepDef {
 				return run.Result{}, err
 			}
 
-			linker := sentenceWriter{deps: deps, sc: sc, entity: entity, call: call, tries: iterationsOf(sc)}
+			linker := &sentenceWriter{deps: deps, sc: sc, entity: entity, call: call, links: lc, tries: iterationsOf(sc)}
 			findings := make([]content.Finding, 0)
 			settled := make(map[string]struct{})
 			tokens, written := 0, 0
 
-			result := content.InsertLinks(doc, lc, policy)
+			result := content.InsertLinks(doc, open, policy)
 			for {
 				owed, ok := nextOwed(doc, result, policy, sc.Spec, pagemap.Keywords(sc.Page, entity).Main(), settled)
 				if !ok {
@@ -111,7 +122,7 @@ func RepairLinks(deps Deps) run.StepDef {
 					return run.Result{}, placeErr
 				}
 				written++
-				result = content.InsertLinks(doc, lc, policy)
+				result = content.InsertLinks(doc, open, policy)
 			}
 
 			body, err := doc.Render()
@@ -154,7 +165,7 @@ func iterations(params map[string]any) int {
 	return min(max(int(count), 1), maxIterations)
 }
 
-func nextOwed(doc *content.Document, result content.InsertResult, policy template.LinkPolicy,
+func nextOwed(doc *content.Document, result content.InsertResult, policy field.LinkPolicy,
 	spec template.TemplateSpec, primary string, settled map[string]struct{}) (owedPhrase, bool) {
 	if spec.KeywordRules.PrimaryInFirstParagraph && primary != "" {
 		if _, done := settled[primary]; !done && !leadCarries(doc, primary) {
@@ -184,7 +195,7 @@ func nextOwed(doc *content.Document, result content.InsertResult, policy templat
 	return owedPhrase{}, false
 }
 
-func placeFor(doc *content.Document, policy template.LinkPolicy, target content.LinkTarget) int {
+func placeFor(doc *content.Document, policy field.LinkPolicy, target content.LinkTarget) int {
 	if target.Relation == content.RelationUp {
 		return insertionPoint(doc, policy)
 	}
@@ -214,7 +225,7 @@ func leadCarries(doc *content.Document, phrase string) bool {
 	return found
 }
 
-func insertionPoint(doc *content.Document, policy template.LinkPolicy) int {
+func insertionPoint(doc *content.Document, policy field.LinkPolicy) int {
 	paragraphs := doc.Paragraphs()
 	if len(paragraphs) == 0 {
 		return 0
@@ -238,10 +249,49 @@ type sentenceWriter struct {
 	sc     *run.StepContext
 	entity graph.Entity
 	call   modelCall
+	links  content.LinkContext
 	tries  int
+	seen   *sitemodel.Picture
 }
 
-func (w sentenceWriter) write(ctx context.Context, doc *content.Document, owed owedPhrase) (sentence string, used int, err error) {
+func (w *sentenceWriter) picture(ctx context.Context) (sitemodel.Picture, error) {
+	if w.seen != nil {
+		return *w.seen, nil
+	}
+	seen, err := w.deps.pictureOf(ctx, w.sc, bodyField(w.sc), &w.links, w.deps.inputBudget(ctx, w.call, repairTokens))
+	if err != nil {
+		return sitemodel.Picture{}, err
+	}
+	w.seen = &seen
+	return seen, nil
+}
+
+func identityOf(facts contextpack.Facts) string {
+	identity := facts.Page.Title + " (" + facts.Page.Path
+	if facts.Page.Type != "" {
+		identity += ", " + facts.Page.Type
+	}
+	return identity + ")"
+}
+
+func aboutOf(facts contextpack.Facts, path string) string {
+	for i := range facts.Targets {
+		if target := &facts.Targets[i]; target.Path == path {
+			about := target.Title + " (" + target.Path + ")"
+			if target.Summary.Text != "" {
+				about += ": " + target.Summary.Text
+			}
+			return about
+		}
+	}
+	return ""
+}
+
+func (w *sentenceWriter) write(ctx context.Context, doc *content.Document, owed owedPhrase) (sentence string, used int, err error) {
+	seen, err := w.picture(ctx)
+	if err != nil {
+		return "", used, err
+	}
 	for range w.tries {
 		if err := ctx.Err(); err != nil {
 			return "", used, stoppedWhileWriting(err, owed)
@@ -249,6 +299,7 @@ func (w sentenceWriter) write(ctx context.Context, doc *content.Document, owed o
 
 		request, renderErr := stepRequest(w.sc, w.call, repairPrompt{
 			Page: w.sc.Page, Entity: w.entity, Phrase: owed.text, Why: owed.why, Paragraph: contextParagraph(doc, owed.index),
+			Identity: identityOf(seen.Facts), About: aboutOf(seen.Facts, owed.url),
 		}, repairTokens)
 		if renderErr != nil {
 			return "", used, renderErr

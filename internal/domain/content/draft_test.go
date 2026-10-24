@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -46,7 +47,7 @@ func guideBrief(page pagemap.Page) content.Brief {
 		{URL: "/coffee/", Anchors: []string{"coffee"}, Relation: content.RelationUp, Required: true},
 		{URL: "/coffee/filter/", Anchors: []string{"filter coffee"}, Relation: content.RelationSibling},
 	}}
-	return content.NewBrief(spec, template.LinkRules{ParentLinkWithinParagraphs: 2}, page, entity, lc)
+	return content.NewBrief(spec, field.LinkRules{ParentLinkWithinParagraphs: 2}, page, "", entity, lc)
 }
 
 func reasonOf(t *testing.T, err error) string {
@@ -105,7 +106,7 @@ func TestNewBriefListsTheKeywordsOfThePageMostImportantFirst(t *testing.T) {
 	spec := template.TemplateSpec{KeywordRules: template.KeywordRules{PrimaryInFirstParagraph: true}}
 	entity := graph.Entity{Name: "BPC-157", Keywords: keyword.Of("bpc 157", "bpc dosage")}
 	brief := func(page pagemap.Page, owner graph.Entity) content.Brief {
-		return content.NewBrief(spec, template.LinkRules{}, page, owner, content.LinkContext{})
+		return content.NewBrief(spec, field.LinkRules{}, page, "", owner, content.LinkContext{})
 	}
 
 	own := brief(pagemap.Page{Keywords: keyword.New([]keyword.Keyword{
@@ -160,7 +161,7 @@ func TestNewBriefMarksTheKeywordsTheTemplateRequires(t *testing.T) {
 			t.Parallel()
 
 			spec := template.TemplateSpec{KeywordRules: template.KeywordRules{RequiredKeywords: tc.required}}
-			brief := content.NewBrief(spec, template.LinkRules{}, page, graph.Entity{}, content.LinkContext{})
+			brief := content.NewBrief(spec, field.LinkRules{}, page, "", graph.Entity{}, content.LinkContext{})
 			got := make([]bool, 0, len(brief.Keywords))
 			for _, item := range brief.Keywords {
 				got = append(got, item.Required)
@@ -185,24 +186,24 @@ func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
 
 	cases := []struct {
 		name     string
-		rules    template.LinkRules
+		rules    field.LinkRules
 		phrases  []string
 		children []string
 	}{
 		{
 			name:    "every target in running text",
-			rules:   template.LinkRules{ParentLinkWithinParagraphs: 2},
+			rules:   field.LinkRules{ParentLinkWithinParagraphs: 2},
 			phrases: []string{"coffee", "ristretto", "filter coffee"},
 		},
 		{
 			name:     "the children in a section of their own",
-			rules:    template.LinkRules{ParentLinkWithinParagraphs: 2, ChildrenSection: true},
+			rules:    field.LinkRules{ParentLinkWithinParagraphs: 2, ChildrenSection: true},
 			phrases:  []string{"coffee", "filter coffee"},
 			children: []string{"ristretto"},
 		},
 		{
 			name:    "a budget that ends before the sibling",
-			rules:   template.LinkRules{ParentLinkWithinParagraphs: 2, MaxLinks: 3},
+			rules:   field.LinkRules{ParentLinkWithinParagraphs: 2, MaxLinks: 3},
 			phrases: []string{"coffee", "ristretto"},
 		},
 	}
@@ -211,7 +212,7 @@ func TestNewBriefOwesEveryLinkTheBudgetAllows(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			brief := content.NewBrief(template.TemplateSpec{}, tc.rules, pagemap.Page{}, entity, lc)
+			brief := content.NewBrief(template.TemplateSpec{}, tc.rules, pagemap.Page{}, "", entity, lc)
 			if got := phraseTexts(brief); !slices.Equal(got, tc.phrases) {
 				t.Fatalf("phrases = %v, want %v", got, tc.phrases)
 			}

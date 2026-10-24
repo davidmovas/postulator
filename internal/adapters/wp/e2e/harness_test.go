@@ -4,6 +4,7 @@ package e2e_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,11 +23,15 @@ import (
 )
 
 type environment struct {
-	baseURL string
-	user    string
-	pass    string
-	seo     string
-	woo     bool
+	baseURL  string
+	user     string
+	pass     string
+	seo      string
+	stand    string
+	project  string
+	cliImage string
+	woo      bool
+	plugin   bool
 }
 
 type link struct {
@@ -40,18 +46,20 @@ type itemMeta struct {
 }
 
 type contentItem struct {
-	ID          int      `json:"id"`
-	Type        string   `json:"type"`
-	Slug        string   `json:"slug"`
-	Path        string   `json:"path"`
-	Parent      int      `json:"parent"`
-	Status      string   `json:"status"`
-	Modified    string   `json:"modified"`
-	ContentHash string   `json:"contentHash"`
-	Title       string   `json:"title"`
-	H1          string   `json:"h1"`
-	Meta        itemMeta `json:"meta"`
-	Links       []link   `json:"links"`
+	ID          int         `json:"id"`
+	Type        string      `json:"type"`
+	Slug        string      `json:"slug"`
+	Path        string      `json:"path"`
+	Parent      int         `json:"parent"`
+	Status      string      `json:"status"`
+	Modified    string      `json:"modified"`
+	ContentHash string      `json:"contentHash"`
+	Title       string      `json:"title"`
+	H1          string      `json:"h1"`
+	Excerpt     string      `json:"excerpt"`
+	Meta        itemMeta    `json:"meta"`
+	Links       []link      `json:"links"`
+	Terms       []termEntry `json:"terms"`
 }
 
 type contentPage struct {
@@ -86,13 +94,23 @@ func repoRoot(t *testing.T) string {
 	}
 }
 
+const (
+	sandboxPort    = "8089"
+	sandboxProject = "postulator-e2e"
+	defaultStand   = "vanilla"
+)
+
 func envPath(t *testing.T) string {
 	t.Helper()
 
 	if override := os.Getenv("POSTULATOR_E2E_ENV"); override != "" {
 		return override
 	}
-	return filepath.Join(repoRoot(t), "docker", "e2e", ".env.generated")
+	stand := os.Getenv("E2E_STAND")
+	if stand == "" {
+		stand = defaultStand
+	}
+	return filepath.Join(repoRoot(t), "docker", "e2e", ".env."+stand)
 }
 
 func loadEnvironment(t *testing.T) environment {
@@ -101,7 +119,7 @@ func loadEnvironment(t *testing.T) environment {
 	path := envPath(t)
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("%s is missing; run `task e2e:up` first: %v", path, err)
+		t.Fatalf("%s is missing; run `task e2e:up STAND=<vanilla|replica|legacy>` first: %v", path, err)
 	}
 
 	values := make(map[string]string)
@@ -118,44 +136,70 @@ func loadEnvironment(t *testing.T) environment {
 	}
 
 	env := environment{
-		baseURL: strings.TrimSuffix(values["E2E_WP_URL"], "/"),
-		user:    values["E2E_WP_USER"],
-		pass:    values["E2E_WP_APP_PASSWORD"],
-		seo:     values["E2E_SEO"],
-		woo:     values["E2E_WOO"] == "1",
+		baseURL:  strings.TrimSuffix(values["E2E_WP_URL"], "/"),
+		user:     values["E2E_WP_USER"],
+		pass:     values["E2E_WP_APP_PASSWORD"],
+		seo:      values["E2E_SEO"],
+		stand:    values["E2E_STAND"],
+		project:  values["E2E_PROJECT"],
+		cliImage: values["E2E_WP_CLI_IMAGE"],
+		woo:      values["E2E_WOO"] == "1",
+		plugin:   values["E2E_PLUGIN"] == "1",
 	}
 	for name, value := range map[string]string{
+		"E2E_STAND":           env.stand,
+		"E2E_PROJECT":         env.project,
 		"E2E_WP_URL":          env.baseURL,
 		"E2E_WP_USER":         env.user,
 		"E2E_WP_APP_PASSWORD": env.pass,
 		"E2E_SEO":             env.seo,
+		"E2E_PLUGIN":          values["E2E_PLUGIN"],
 	} {
 		if value == "" {
 			t.Fatalf("%s does not set %s", path, name)
 		}
 	}
-	refuseTheSandbox(t, path, env.baseURL)
+	if asked := os.Getenv("E2E_STAND"); asked != "" && asked != env.stand {
+		t.Fatalf("E2E_STAND asks for the %s stand and %s describes the %s stand", asked, path, env.stand)
+	}
+	refuseTheSandbox(t, path, env)
 	return env
 }
 
-const (
-	sandboxPort = "8089"
-	testStack   = "http://localhost:8088"
-	testProject = "postulator-test"
-)
-
-func refuseTheSandbox(t *testing.T, path, baseURL string) {
+func refuseTheSandbox(t *testing.T, path string, env environment) {
 	t.Helper()
 
-	parsed, err := url.Parse(baseURL)
+	parsed, err := url.Parse(env.baseURL)
 	if err != nil {
-		t.Fatalf("%s names %q, which is not an address: %v", path, baseURL, err)
+		t.Fatalf("%s names %q, which is not an address: %v", path, env.baseURL, err)
 	}
-	if parsed.Port() == sandboxPort {
-		t.Fatalf("%s points at %s, the sandbox people test the app against; these suites write and delete "+
-			"content on the site they run on, so they run only on the stack `task e2e:up` starts on port 8088",
-			path, baseURL)
+	if parsed.Port() == sandboxPort || env.project == sandboxProject {
+		t.Fatalf("%s points at %s (project %s), the sandbox people test the app against; these suites write and "+
+			"delete content on the site they run on, so they run only on a stand `task e2e:up` starts, "+
+			"vanilla on 8088, replica on 8087 or legacy on 8086", path, env.baseURL, env.project)
 	}
+}
+
+func wpCLI(t *testing.T, env environment, args ...string) string {
+	t.Helper()
+
+	parsed, err := url.Parse(env.baseURL)
+	if err != nil {
+		t.Fatalf("%s is not an address: %v", env.baseURL, err)
+	}
+	compose := filepath.Join(repoRoot(t), "docker", "e2e", "compose.yaml")
+	command := exec.CommandContext(context.WithoutCancel(t.Context()), "docker", append([]string{
+		"compose", "-p", env.project, "-f", compose,
+		"run", "--rm", "--no-deps", "-T", "--entrypoint", "wp", "bootstrap",
+	}, args...)...)
+	command.Env = append(os.Environ(), "WP_PORT="+parsed.Port(), "WP_CLI_IMAGE="+env.cliImage)
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	output, err := command.Output()
+	if err != nil {
+		t.Fatalf("wp %s on the %s stand: %v: %s", strings.Join(args, " "), env.stand, err, stderr.String())
+	}
+	return strings.TrimSpace(string(output))
 }
 
 type client struct {
@@ -212,10 +256,15 @@ func skipWithoutPlugin(t *testing.T, env environment) {
 	if err != nil {
 		t.Fatalf("ask %s for the companion manifest: %v", env.baseURL, err)
 	}
-	if !present {
-		t.Skipf("the companion plugin is not active on %s, and this suite is its contract; "+
-			"provision the stack with E2E_PLUGIN=1 (the default) to run it", env.baseURL)
+	if present {
+		return
 	}
+	if env.plugin {
+		t.Fatalf("the %s stand was provisioned with the companion plugin and %s answers no manifest; "+
+			"run `task plugin:deploy STAND=%s` or `task e2e:up STAND=%s`", env.stand, env.baseURL, env.stand, env.stand)
+	}
+	t.Skipf("the companion plugin is not active on %s, and this suite is its contract; "+
+		"provision the stand with E2E_PLUGIN=1 (the default) to run it", env.baseURL)
 }
 
 func (c *client) request(t *testing.T, method, path string, payload any) (status int, body []byte) {

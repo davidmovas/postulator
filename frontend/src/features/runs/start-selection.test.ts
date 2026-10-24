@@ -1,102 +1,53 @@
 import { describe, expect, it } from "vitest";
 
-import type { Page, PageTreeNode } from "../../data/types.js";
-import { branchOf, indexTree, narrowTree, requiredParents, tick } from "./start-selection.js";
+import type { SiteMapNode } from "../../data/types.js";
+import { aNode, aRef } from "../map/model/fixture.js";
+import { idsOf, inScope, pickable, requiredOf, selectionKey } from "./start-selection.js";
 
-function aPage(id: string, path: string, overrides: Partial<Page> = {}): Page {
-    return {
-        id,
-        siteId: "s1",
-        path,
-        plannedPath: "",
-        slug: "",
-        parentPageId: null,
-        wpType: "page",
-        wpId: null,
-        title: path,
-        h1: "",
-        metaTitle: "",
-        metaDescription: "",
-        canonical: "",
-        keywords: [],
-        notes: [],
-        status: "planned",
-        entityId: `entity-${id}`,
-        templateId: null,
-        contentHash: "",
-        observed: { link: "", slug: "", status: "", title: "", h1: "" },
-        mismatches: null,
-        wpModifiedAt: null,
-        lastSyncedAt: null,
-        drift: false,
-        createdAt: "2026-09-23T10:00:00Z",
-        updatedAt: "2026-09-23T10:00:00Z",
-        ...overrides,
-    };
-}
+const live = aNode("bikes", "/bikes/", { entityId: "e1" });
+const planned = aNode("cargo", "/bikes/cargo/", {
+    entityId: "e2",
+    status: "planned" as SiteMapNode["status"],
+    page: aRef("cargo", "/bikes/cargo/", { onSite: false }),
+});
+const unmapped = aNode("mini", "/bikes/cargo/mini/");
 
-function node(page: Page, children: PageTreeNode[] = []): PageTreeNode {
-    return { page, children };
-}
+describe("pickable", () => {
+    it("takes a page an entity carries and refuses one nothing is mapped to", () => {
+        expect(pickable(live)).toBe(true);
+        expect(pickable(unmapped)).toBe(false);
+        expect(pickable(aNode("blank", "/blank/", { entityId: "" }))).toBe(false);
+    });
+});
 
-const bikes = aPage("bikes", "/bikes/", { wpId: 10, status: "published" });
-const cargo = aPage("cargo", "/bikes/cargo/");
-const max = aPage("max", "/bikes/cargo/max/");
-const mini = aPage("mini", "/bikes/cargo/mini/", { entityId: null });
-const guides = aPage("guides", "/guides/", { title: "Riding guides" });
+describe("inScope", () => {
+    it("shows every page, only those not on the site, or only those that are", () => {
+        expect(inScope("all")(live)).toBe(true);
+        expect(inScope("missing")(live)).toBe(false);
+        expect(inScope("missing")(planned)).toBe(true);
+        expect(inScope("present")(live)).toBe(true);
+        expect(inScope("present")(planned)).toBe(false);
+    });
+});
 
-const roots: PageTreeNode[] = [node(bikes, [node(cargo, [node(max), node(mini)])]), node(guides)];
-const index = indexTree(roots);
-
-describe("requiredParents", () => {
-    it("adds every parent between a chosen page and the first one on the site", () => {
-        const required = requiredParents(new Set(["max"]), index);
+describe("requiredOf", () => {
+    it("names each parent the run writes first, with the page that needs it", () => {
+        const required = requiredOf([{ pageId: "cargo", path: "/bikes/cargo/", neededBy: "/bikes/cargo/max/" }], new Set(["max"]));
         expect([...required.entries()]).toStrictEqual([["cargo", "/bikes/cargo/max/"]]);
     });
 
-    it("adds nothing for a parent already chosen or already on the site", () => {
-        expect(requiredParents(new Set(["max", "cargo"]), index).size).toBe(0);
-        expect(requiredParents(new Set(["cargo"]), index).size).toBe(0);
+    it("names no parent that is picked itself, and none for an empty pick", () => {
+        const added = [{ pageId: "cargo", path: "/bikes/cargo/", neededBy: "/bikes/cargo/max/" }];
+        expect(requiredOf(added, new Set(["max", "cargo"])).size).toBe(0);
+        expect(requiredOf(added, new Set()).size).toBe(0);
+        expect(requiredOf(null, new Set(["max"])).size).toBe(0);
     });
 });
 
-describe("branchOf", () => {
-    it("takes a page and everything below it that can be written", () => {
-        expect(branchOf("cargo", index)).toStrictEqual(["cargo", "max"]);
-    });
-});
-
-describe("tick", () => {
-    it("reads chosen, required, partly chosen and untouched", () => {
-        const selected = new Set(["max"]);
-        const required = requiredParents(selected, index);
-        expect(tick("max", selected, required, index)).toBe("on");
-        expect(tick("cargo", selected, required, index)).toBe("on");
-        expect(tick("bikes", selected, required, index)).toBe("some");
-        expect(tick("guides", selected, required, index)).toBe("off");
-    });
-});
-
-describe("narrowTree", () => {
-    it("keeps a match with the parents that lead to it", () => {
-        const kept = narrowTree(roots, "max", "all");
-        expect(kept.map((root) => root.page.id)).toStrictEqual(["bikes"]);
-        expect(kept[0]?.children?.[0]?.children?.map((child) => child.page.id)).toStrictEqual(["max"]);
-    });
-
-    it("finds a page by its title as well as its path", () => {
-        expect(narrowTree(roots, "riding", "all").map((root) => root.page.id)).toStrictEqual(["guides"]);
-    });
-
-    it("shows only the pages not on the site, or only those that are", () => {
-        const missing = narrowTree(roots, "", "missing");
-        expect(missing.map((root) => root.page.id)).toStrictEqual(["bikes", "guides"]);
-        expect(missing[0]?.children?.map((child) => child.page.id)).toStrictEqual(["cargo"]);
-        expect(narrowTree(roots, "", "present").map((root) => root.page.id)).toStrictEqual(["bikes"]);
-        expect(narrowTree(roots, "", "present")[0]?.children).toStrictEqual([]);
-    });
-
-    it("answers the whole tree when nothing narrows it", () => {
-        expect(narrowTree(roots, "  ", "all")).toBe(roots);
+describe("the selection the parents are asked for", () => {
+    it("is the same key whatever order the pages were picked in, and gives the ids back", () => {
+        expect(selectionKey(new Set(["b", "a"]))).toBe(selectionKey(new Set(["a", "b"])));
+        expect(idsOf(selectionKey(new Set(["b", "a"])))).toStrictEqual(["a", "b"]);
+        expect(idsOf(selectionKey(new Set()))).toStrictEqual([]);
     });
 });

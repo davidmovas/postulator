@@ -35,7 +35,8 @@ func newHarness(t *testing.T) harness {
 	return harness{
 		service: graph.New(graph.Deps{
 			Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store),
-			Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store),
+			Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store), Findings: sqlite.NewFindingRepo(store),
+			Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 			UnitOfWork: store, Publisher: recorder, Clock: clk,
 		}),
 		store:    store,
@@ -65,9 +66,9 @@ func texts(keywords []dto.Keyword) []string {
 	return out
 }
 
-func (h harness) entity(t *testing.T, name, kind string) graph.Entity {
+func (h harness) entity(t *testing.T, name string) graph.Entity {
 	t.Helper()
-	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: name, Kind: kind, Keywords: phrases(name)})
+	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: name, Keywords: phrases(name)})
 	if err != nil {
 		t.Fatalf("CreateEntity %s: %v", name, err)
 	}
@@ -105,7 +106,7 @@ func TestCreateEntity(t *testing.T) {
 
 	h := newHarness(t)
 	created, err := h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{
-		SiteID: h.siteID, Name: " Running Shoes ", Kind: "hub", Intent: "commercial",
+		SiteID: h.siteID, Name: " Running Shoes ", Intent: "commercial",
 		Keywords: []dto.Keyword{{Text: "trail shoes"}, {Text: "running shoes", Volume: ptr(9000)}, {Text: "Trail Shoes"}},
 		Anchors:  []graph.Anchor{{Text: "running shoes", Source: "user", Weight: 1}},
 	})
@@ -113,7 +114,7 @@ func TestCreateEntity(t *testing.T) {
 		t.Fatalf("CreateEntity: %v", err)
 	}
 	got := created.Entity
-	if got.ID == "" || got.Name != "Running Shoes" || got.Kind != "hub" || got.Source != "user" || len(got.Keywords) != 2 || len(got.Anchors) != 1 || got.Score != 0 {
+	if got.ID == "" || got.Name != "Running Shoes" || got.Source != "user" || len(got.Keywords) != 2 || len(got.Anchors) != 1 || got.Score != 0 {
 		t.Errorf("CreateEntity = %+v", got)
 	}
 	h.wantEvents(t, events.GraphChanged)
@@ -128,16 +129,13 @@ func TestCreateEntity(t *testing.T) {
 		}
 	}
 
-	if _, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: "running shoes", Kind: "topic"}); !errors.IsCode(err, errors.Conflict) {
+	if _, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: "running shoes"}); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("duplicate name code = %q, want CONFLICT", errors.CodeOf(err))
 	}
-	if _, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: "missing", Name: "x", Kind: "topic"}); !errors.IsCode(err, errors.NotFound) {
+	if _, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: "missing", Name: "x"}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("unknown site code = %q, want NOT_FOUND", errors.CodeOf(err))
 	}
-	if _, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: h.siteID, Name: "x", Kind: "planet"}); !errors.IsCode(err, errors.Invalid) {
-		t.Errorf("unknown kind code = %q, want INVALID", errors.CodeOf(err))
-	}
-	if _, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{Name: "x", Kind: "topic"}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.CreateEntity(t.Context(), graph.CreateEntityRequest{Name: "x"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("missing site code = %q, want INVALID", errors.CodeOf(err))
 	}
 	if len(h.recorder.Events()) != 0 {
@@ -149,7 +147,7 @@ func TestUpdateSetAnchorsAndGet(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	entity := h.entity(t, "Shoes", "hub")
+	entity := h.entity(t, "Shoes")
 	h.recorder.Reset()
 	h.clock.Advance(time.Minute)
 
@@ -157,7 +155,7 @@ func TestUpdateSetAnchorsAndGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateEntity: %v", err)
 	}
-	if renamed.Entity.Name != "Footwear" || renamed.Entity.Kind != "hub" || !slices.Equal(texts(renamed.Entity.Keywords), []string{"Shoes"}) ||
+	if renamed.Entity.Name != "Footwear" || !slices.Equal(texts(renamed.Entity.Keywords), []string{"Shoes"}) ||
 		renamed.Entity.Intent != "informational" || renamed.Entity.UpdatedAt.String() != "2026-09-18T09:01:00Z" {
 		t.Errorf("an update that leaves the keywords out must keep them: %+v", renamed.Entity)
 	}
@@ -183,8 +181,31 @@ func TestUpdateSetAnchorsAndGet(t *testing.T) {
 	}
 	h.wantEvents(t, events.GraphChanged)
 
+	carded, err := h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{
+		ID: entity.ID, Definition: ptr(" Shoes worn for running. "),
+		Facts: ptr([]graph.Fact{{Label: " Drop ", Value: "8 mm"}}),
+		Notes: ptr([]graph.Note{{Label: "Entity notes", Text: "Sold in pairs"}}),
+	})
+	if err != nil {
+		t.Fatalf("UpdateEntity card: %v", err)
+	}
+	for name, req := range map[string]graph.UpdateEntityRequest{
+		"a fact without its label": {ID: entity.ID, Facts: ptr([]graph.Fact{{Label: " ", Value: "8 mm"}})},
+		"a fact without its value": {ID: entity.ID, Facts: ptr([]graph.Fact{{Label: "Drop"}})},
+		"a note without its text":  {ID: entity.ID, Notes: ptr([]graph.Note{{Label: "Entity notes"}})},
+	} {
+		if _, refused := h.service.UpdateEntity(t.Context(), req); !errors.IsCode(refused, errors.Invalid) {
+			t.Errorf("%s = %v, want INVALID", name, refused)
+		}
+	}
+	if carded.Entity.Definition != "Shoes worn for running." || !slices.Equal(carded.Entity.Facts, []graph.Fact{{Label: "Drop", Value: "8 mm"}}) ||
+		!slices.Equal(carded.Entity.Notes, []graph.Note{{Label: "Entity notes", Text: "Sold in pairs"}}) {
+		t.Errorf("the card = %q %+v %+v, want it cleaned and kept", carded.Entity.Definition, carded.Entity.Facts, carded.Entity.Notes)
+	}
+	h.wantEvents(t, events.GraphChanged)
+
 	got, err := h.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: entity.ID})
-	if err != nil || got.Entity.Name != "Footwear" || len(got.Entity.Anchors) != 2 {
+	if err != nil || got.Entity.Name != "Footwear" || len(got.Entity.Anchors) != 2 || got.Entity.Definition != "Shoes worn for running." || len(got.Entity.Facts) != 1 {
 		t.Errorf("GetEntity = %+v, %v", got.Entity, err)
 	}
 
@@ -193,9 +214,6 @@ func TestUpdateSetAnchorsAndGet(t *testing.T) {
 	}
 	if _, err = h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: "missing", Name: ptr("x")}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("missing entity code = %q, want NOT_FOUND", errors.CodeOf(err))
-	}
-	if _, err = h.service.UpdateEntity(t.Context(), graph.UpdateEntityRequest{ID: entity.ID, Kind: ptr("planet")}); !errors.IsCode(err, errors.Invalid) {
-		t.Errorf("bad kind code = %q, want INVALID", errors.CodeOf(err))
 	}
 	if _, err = h.service.GetEntity(t.Context(), graph.GetEntityRequest{ID: "missing"}); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("GetEntity missing code = %q, want NOT_FOUND", errors.CodeOf(err))
@@ -206,7 +224,7 @@ func TestDeleteEntityPublishesGraphAndPages(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	entity := h.entity(t, "Shoes", "hub")
+	entity := h.entity(t, "Shoes")
 	page := sqlitetest.Page(t, h.store, h.siteID, "/shoes/")
 	page.EntityID = &entity.ID
 	if err := sqlite.NewPageRepo(h.store).Update(t.Context(), page); err != nil {
@@ -233,10 +251,10 @@ func TestListEntities(t *testing.T) {
 
 	h := newHarness(t)
 	for _, name := range []string{"Boots", "Sandals", "Shoes"} {
-		h.entity(t, name, "product")
+		h.entity(t, name)
 		h.clock.Advance(time.Minute)
 	}
-	h.entity(t, "Footwear", "hub")
+	h.entity(t, "Footwear")
 
 	page, err := h.service.ListEntities(t.Context(), graph.ListEntitiesRequest{ListRequest: dto.ListRequest{Limit: 2}, SiteID: h.siteID})
 	if err != nil || len(page.Items) != 2 || page.Items[0].Name != "Boots" || !page.HasMore {
@@ -246,10 +264,6 @@ func TestListEntities(t *testing.T) {
 	if err != nil || len(rest.Items) != 2 || rest.Items[0].Name != "Shoes" || rest.Items[1].Name != "Footwear" {
 		t.Errorf("ListEntities after = %+v, %v", rest, err)
 	}
-	hubs, err := h.service.ListEntities(t.Context(), graph.ListEntitiesRequest{SiteID: h.siteID, Kind: "hub"})
-	if err != nil || len(hubs.Items) != 1 || hubs.Items[0].Name != "Footwear" {
-		t.Errorf("hubs = %+v, %v", hubs, err)
-	}
 	prefixed, err := h.service.ListEntities(t.Context(), graph.ListEntitiesRequest{ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: "name"}}, SiteID: h.siteID, NamePrefix: "s"})
 	if err != nil || len(prefixed.Items) != 2 || prefixed.Items[0].Name != "Sandals" {
 		t.Errorf("prefixed = %+v, %v", prefixed, err)
@@ -257,9 +271,6 @@ func TestListEntities(t *testing.T) {
 	mapped, err := h.service.ListEntities(t.Context(), graph.ListEntitiesRequest{SiteID: h.siteID, HasCanonicalPage: ptr(true)})
 	if err != nil || len(mapped.Items) != 0 {
 		t.Errorf("mapped = %+v, %v", mapped, err)
-	}
-	if _, err = h.service.ListEntities(t.Context(), graph.ListEntitiesRequest{SiteID: h.siteID, Kind: "planet"}); !errors.IsCode(err, errors.Invalid) {
-		t.Errorf("bad kind code = %q, want INVALID", errors.CodeOf(err))
 	}
 	if _, err = h.service.ListEntities(t.Context(), graph.ListEntitiesRequest{ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: "score"}}, SiteID: h.siteID}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("bad sort code = %q, want INVALID", errors.CodeOf(err))

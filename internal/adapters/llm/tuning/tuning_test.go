@@ -142,6 +142,37 @@ func TestThePolicyReadsWhatTheSettingsHoldNow(t *testing.T) {
 	}
 }
 
+func TestTheInputBudgetIsARoleSettingThatDefaultsToTheModelsRoom(t *testing.T) {
+	t.Parallel()
+
+	values := settings.Default().NewValues()
+	policy := tuning.NewPolicy(values)
+	for _, role := range []llm.Role{llm.RoleWriter, llm.RoleEditor, llm.RoleLinker, llm.RoleJudge, llm.RoleChat, ""} {
+		if got := policy.InputBudget(role); got != 0 {
+			t.Errorf("InputBudget(%q) = %d by default, want 0, the model's room", role, got)
+		}
+	}
+
+	if _, err := settings.Default().Apply(values, map[string]json.RawMessage{
+		"llm.inputBudget.writer": json.RawMessage(`12000`),
+		"llm.inputBudget.judge":  json.RawMessage(`6000`),
+	}); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got := policy.InputBudget(llm.RoleWriter); got != 12000 {
+		t.Errorf("the writer's budget = %d, want 12000", got)
+	}
+	if got := policy.InputBudget(llm.RoleJudge); got != 6000 {
+		t.Errorf("the judge's budget = %d, want 6000", got)
+	}
+	if _, err := settings.Default().Apply(values, map[string]json.RawMessage{"llm.inputBudget.editor": json.RawMessage(`-1`)}); err == nil {
+		t.Error("a negative budget was accepted")
+	}
+	if got := tuning.NewPolicy(nil).InputBudget(llm.RoleWriter); got != 0 {
+		t.Errorf("a policy without values answers %d, want 0", got)
+	}
+}
+
 func TestAPolicyWithoutValuesAnswersTheDefaults(t *testing.T) {
 	t.Parallel()
 

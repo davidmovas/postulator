@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { flatten } from "../call.js";
 import {
     cancelRun,
     estimateRun,
+    runParents,
     getArtifact,
     getRun,
     listArtifacts,
@@ -120,6 +121,16 @@ export function useStartRun() {
             void catchUpNow(answered.runId);
             void client.invalidateQueries({ queryKey: keys.runs.lists() });
         },
+    });
+}
+
+export function useRunParents(siteId: string, pageIds: readonly string[]) {
+    return useUnlockedQuery({
+        queryKey: keys.runs.parents(siteId, pageIds),
+        queryFn: ({ signal }) => runParents({ siteId, pageIds: [...pageIds] }, signal),
+        enabled: siteId !== "" && pageIds.length > 0,
+        placeholderData: keepPreviousData,
+        quiet: ["INVALID"],
     });
 }
 

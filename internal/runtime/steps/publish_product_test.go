@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -24,8 +25,11 @@ const (
 	productShort       = `<p>A compact machine for the counter.</p>`
 	productDraft       = `{"title":"Espresso guide","h1":"Espresso Machine","sections":[` +
 		`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"}` +
-		`],"summary":"A short guide to espresso.","product":{"shortDescription":"<p>A compact machine for the counter.</p>",` +
-		`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Origin","value":"Spain"},{"name":"Size","value":"Large"}]}}`
+		`],"summary":"A short guide to espresso."}`
+	olderProductDraft = `{"title":"Espresso guide","h1":"Espresso Machine","sections":[` +
+		`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"}` +
+		`],"summary":"A short guide to espresso.","product":{"shortDescription":"<p>An older run's short description.</p>",` +
+		`"specifications":[{"name":"Form","value":"Countertop"}]}}`
 )
 
 type siteKeeper struct {
@@ -97,12 +101,33 @@ func storeContext(t *testing.T, wpID int64) *run.StepContext {
 	sc.Page.WPType = pagemap.WPProduct
 	sc.Page.WPID = &wpID
 	sc.Page.Status = pagemap.StatusPublished
-	sc.Page.Observed = pagemap.Observed{Title: "Espresso Machine", Slug: "espresso-machine", Status: "publish"}
+	rewritten(sc)
 	sc.Spec.Product = &template.Product{
 		ShortDescription: template.ProductShortDescription{Enabled: true, Intent: "Say what it is for", TargetWords: 30},
-		Specifications:   []template.ProductSpecification{{Name: "Form"}, {Name: "Origin"}, {Name: "Size"}},
 	}
+	withFields(t, sc, steps.FieldValue{Key: string(field.ProductShortDescription), Value: productShort})
 	return sc
+}
+
+func TestTheShortDescriptionComesFromTheFieldsNotTheDraft(t *testing.T) {
+	t.Parallel()
+
+	h := newProductHarness(t, storeProduct())
+	sc := storeContext(t, h.held.ID)
+	sc.Artifacts[run.ArtifactDraft] = run.Artifact{Kind: run.ArtifactDraft, Blob: []byte(olderProductDraft)}
+	delete(sc.Artifacts, run.ArtifactFields)
+
+	published := runPublish(t, h.deps, sc)
+	stored, _ := h.server.Lookup(h.held.ID)
+	if stored.Excerpt != "<p>old short</p>" {
+		t.Errorf("short description = %q, want the store's own: no field was written this run", stored.Excerpt)
+	}
+	if stored.Content != productDescription {
+		t.Errorf("description = %q, want the run's", stored.Content)
+	}
+	if snapshot := published.PreviousProduct; snapshot == nil || snapshot.ShortWritten {
+		t.Errorf("snapshot = %+v, want no short description recorded as written", snapshot)
+	}
 }
 
 func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
@@ -125,13 +150,8 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 		stored.RegularPrice != "120" || stored.SKU != "EM-1" {
 		t.Errorf("the store's own fields moved: %+v", stored)
 	}
-	want := []wptest.Attribute{
-		{Name: "Origin", Options: []string{"Italy"}, Visible: true},
-		{Name: "form", Options: []string{"Countertop"}, Position: 1},
-		{ID: 3, Name: "Size", Options: []string{}, Position: 2, Visible: true},
-	}
-	if !reflect.DeepEqual(stored.Attributes, want) {
-		t.Errorf("attributes = %+v, want %+v", stored.Attributes, want)
+	if !reflect.DeepEqual(stored.Attributes, storeProduct().Attributes) {
+		t.Errorf("attributes = %+v, want the store's own %+v", stored.Attributes, storeProduct().Attributes)
 	}
 	if stored.Meta["_yoast_wpseo_title"] != "Espresso Machine | Shop" {
 		t.Errorf("the run did not write its meta: %v", stored.Meta)
@@ -151,15 +171,11 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 	if snapshot == nil {
 		t.Fatal("the publish kept no snapshot of the product")
 	}
-	if snapshot.ShortDescription != "<p>old short</p>" || !snapshot.ShortWritten || !snapshot.AttributesSent || snapshot.ImageID != 0 {
+	if snapshot.ShortDescription != "<p>old short</p>" || !snapshot.ShortWritten || snapshot.AttributesSent || snapshot.ImageID != 0 {
 		t.Errorf("snapshot = %+v", snapshot)
 	}
-	if snapshot.WrittenShort != productShort || len(snapshot.Written) != 1 || snapshot.Written[0].Name != "form" ||
-		!slices.Equal(snapshot.Written[0].Options, []string{"Countertop"}) {
-		t.Errorf("the snapshot records it wrote %q and %+v", snapshot.WrittenShort, snapshot.Written)
-	}
-	if !slices.Equal(snapshot.Added, []string{"Form"}) {
-		t.Errorf("added = %v, want only the empty attribute the template filled", snapshot.Added)
+	if snapshot.WrittenShort != productShort || len(snapshot.Written) != 0 || len(snapshot.Added) != 0 {
+		t.Errorf("the snapshot records it wrote %q and %+v, want the short description alone", snapshot.WrittenShort, snapshot.Written)
 	}
 	if len(snapshot.StoreAttributes()) != 3 || len(snapshot.StoreAttributes()[1].Options) != 0 {
 		t.Errorf("the snapshot holds %+v, want the attributes as they were", snapshot.StoreAttributes())
@@ -168,8 +184,7 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 		t.Error("the publish kept no previous meta")
 	}
 
-	if h.recorded.ContentHash != published.ContentHash || h.recorded.Status != pagemap.StatusPublished ||
-		h.recorded.Observed.Title != "Espresso Machine" || h.recorded.Drift {
+	if h.recorded.WPID == nil || *h.recorded.WPID != published.WPID || h.recorded.Status != pagemap.StatusPublished {
 		t.Errorf("the page records %+v", h.recorded)
 	}
 	if len(h.sites.updates) != 0 {
@@ -180,23 +195,26 @@ func TestPublishEditsAProductAndLeavesTheStoreItsOwn(t *testing.T) {
 func TestPublishWritesTheDescriptionAfterTheStoreResavesTheProduct(t *testing.T) {
 	t.Parallel()
 
-	const lines = `<p>Pull a shot.<br/>Steam the milk.</p>`
+	const (
+		lines  = `<p>Pull a shot.<br/>Steam the milk.</p>`
+		stored = `<p>Pull a shot.<br />Steam the milk.</p>`
+	)
 	item := storeProduct()
-	item.Content = "<p>old<br>description</p>"
+	item.Content = "<p>old<br />description</p>"
 	h := newProductHarness(t, item, wptest.WithFilteredHTML())
 	sc := storeContext(t, h.held.ID)
 	sc.Artifacts[run.ArtifactBodyHTML] = run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte(`<h1>Espresso Machine</h1>` + lines)}
 	published := runPublish(t, h.deps, sc)
 
-	stored, _ := h.server.Lookup(h.held.ID)
-	if stored.Content != lines || published.ContentHash != wp.ContentHash(lines) {
-		t.Errorf("description = %q under %q, want %q byte for byte after the store saved the short description",
-			stored.Content, published.ContentHash, lines)
+	held, _ := h.server.Lookup(h.held.ID)
+	if held.Content != stored || published.ContentHash != wp.ContentHash(stored) {
+		t.Errorf("description = %q under %q, want %q as the raw write stored it, after the store saved the short description",
+			held.Content, published.ContentHash, stored)
 	}
-	if stored.Excerpt != productShort {
-		t.Errorf("short description = %q", stored.Excerpt)
+	if held.Excerpt != productShort {
+		t.Errorf("short description = %q", held.Excerpt)
 	}
-	if published.PreviousContent != "<p>old<br>description</p>" {
+	if published.PreviousContent != "<p>old<br />description</p>" {
 		t.Errorf("previous content = %q, want the description the client had", published.PreviousContent)
 	}
 }
@@ -207,20 +225,21 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 	cases := []struct {
 		name     string
 		options  []wptest.Option
-		prepare  func(*testing.T, productHarness, *run.StepContext)
+		prepare  func(*testing.T, *productHarness, *run.StepContext)
 		commerce site.Commerce
 		message  string
+		written  bool
 	}{
 		{
 			name: "a row with no product",
-			prepare: func(_ *testing.T, _ productHarness, sc *run.StepContext) {
+			prepare: func(_ *testing.T, _ *productHarness, sc *run.StepContext) {
 				sc.Page.WPID = nil
 			},
 			message: "create it in WooCommerce",
 		},
 		{
 			name: "a product the store no longer holds",
-			prepare: func(t *testing.T, h productHarness, _ *run.StepContext) {
+			prepare: func(t *testing.T, h *productHarness, _ *run.StepContext) {
 				if !h.server.Delete(h.held.ID) {
 					t.Fatal("the seeded product could not be removed")
 				}
@@ -231,15 +250,16 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 		{name: "a user who may not edit products", options: []wptest.Option{wptest.WithoutProductEdit()}, commerce: site.CommerceForbidden, message: "may not edit products"},
 		{
 			name: "a description a human changed while it was written",
-			prepare: func(_ *testing.T, h productHarness, _ *run.StepContext) {
+			prepare: func(_ *testing.T, h *productHarness, _ *run.StepContext) {
 				h.server.EditBeforeNextRawWrite(h.held.ID, "<p>a human was here</p>")
 			},
 			message: "changed in the store",
+			written: true,
 		},
 		{
 			name: "a drifted product the recipe refuses",
-			prepare: func(_ *testing.T, _ productHarness, sc *run.StepContext) {
-				sc.Page.Drift = true
+			prepare: func(_ *testing.T, h *productHarness, sc *run.StepContext) {
+				h.deps.Bodies = driftedBodies(sc.Page.ID)
 				sc.Params[steps.ParamRefuseDrift] = true
 			},
 			message: "edited",
@@ -253,15 +273,22 @@ func TestPublishPausesAProductItCannotWrite(t *testing.T) {
 			h := newProductHarness(t, storeProduct(), tc.options...)
 			sc := storeContext(t, h.held.ID)
 			if tc.prepare != nil {
-				tc.prepare(t, h, sc)
+				tc.prepare(t, &h, sc)
 			}
 
-			result, err := steps.Publish(h.deps).Run(t.Context(), sc)
+			result, err := drive(t, steps.Publish(h.deps), sc)
 			if err != nil {
 				t.Fatalf("Publish: %v", err)
 			}
-			if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman || len(result.Artifacts) != 0 {
-				t.Fatalf("Publish = %+v, want a pause for a human with nothing kept", result)
+			if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
+				t.Fatalf("Publish = %+v, want a pause for a human", result)
+			}
+			published, kept := publishedIn(t, result)
+			if kept != tc.written {
+				t.Fatalf("the pause kept a publish result %t, want %t: only a write that reached the store is recorded", kept, tc.written)
+			}
+			if kept && (published.PreviousProduct == nil || !published.PreviousProduct.ShortWritten) {
+				t.Errorf("the record = %+v, want the store fields written before the pause, so a revert puts them back", published)
 			}
 			if !strings.Contains(result.Message, tc.message) {
 				t.Errorf("message = %q, want it to say %q", result.Message, tc.message)
@@ -314,7 +341,7 @@ func TestPublishWritesOverDriftAndSaysSoForAPageAndAProductAlike(t *testing.T) {
 			t.Parallel()
 
 			deps, sc := tc.setup(t)
-			sc.Page.Drift = true
+			deps.Bodies = driftedBodies(sc.Page.ID)
 
 			published := runPublish(t, deps, sc)
 			if published.WPID == 0 {
@@ -331,55 +358,18 @@ func TestPublishWritesOverDriftAndSaysSoForAPageAndAProductAlike(t *testing.T) {
 	}
 }
 
-func TestPublishFillsOnlyTheAttributesAProductLacks(t *testing.T) {
+func TestNoPublishPathSendsAttributes(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name     string
-		kind     string
-		held     []wptest.Attribute
-		want     []wptest.Attribute
-		added    []string
-		findings []string
+		name string
+		kind string
+		held []wptest.Attribute
 	}{
-		{
-			name: "a product with no attributes",
-			held: []wptest.Attribute{},
-			want: []wptest.Attribute{
-				{Name: "Form", Options: []string{"Countertop"}, Visible: true},
-				{Name: "Origin", Options: []string{"Spain"}, Position: 1, Visible: true},
-				{Name: "Size", Options: []string{"Large"}, Position: 2, Visible: true},
-			},
-			added: []string{"Form", "Origin", "Size"},
-		},
-		{
-			name: "a product that carries every attribute",
-			held: []wptest.Attribute{
-				{Name: "FORM", Options: []string{"Wall"}},
-				{Name: " origin ", Options: []string{"Italy"}, Position: 1},
-				{Name: "Size", Options: []string{"Small"}, Position: 2},
-			},
-			want: []wptest.Attribute{
-				{Name: "FORM", Options: []string{"Wall"}},
-				{Name: " origin ", Options: []string{"Italy"}, Position: 1},
-				{Name: "Size", Options: []string{"Small"}, Position: 2},
-			},
-			added: []string{},
-		},
-		{
-			name:  "a variation attribute with no options",
-			held:  []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}, {Name: "Origin", Options: []string{"Italy"}, Position: 1}, {Name: "Size", Options: []string{"Small"}, Position: 2}},
-			want:  []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}, {Name: "Origin", Options: []string{"Italy"}, Position: 1}, {Name: "Size", Options: []string{"Small"}, Position: 2}},
-			added: []string{},
-		},
-		{
-			name:     "a variable product",
-			kind:     "variable",
-			held:     []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}},
-			want:     []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}},
-			added:    []string{},
-			findings: []string{steps.CodeProductTypeKept},
-		},
+		{name: "a product with no attributes", held: []wptest.Attribute{}},
+		{name: "a product with an attribute it left empty", held: []wptest.Attribute{{Name: "Form", Options: []string{}}}},
+		{name: "a variation attribute with no options", held: []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}}},
+		{name: "a variable product", kind: "variable", held: []wptest.Attribute{{Name: "Form", Options: []string{}, Variation: true}}},
 	}
 
 	for _, tc := range cases {
@@ -393,22 +383,45 @@ func TestPublishFillsOnlyTheAttributesAProductLacks(t *testing.T) {
 			published := runPublish(t, h.deps, storeContext(t, h.held.ID))
 
 			stored, _ := h.server.Lookup(h.held.ID)
-			if !reflect.DeepEqual(stored.Attributes, tc.want) {
-				t.Errorf("attributes = %+v, want %+v", stored.Attributes, tc.want)
+			if !reflect.DeepEqual(stored.Attributes, tc.held) {
+				t.Errorf("attributes = %+v, want the store's own %+v", stored.Attributes, tc.held)
 			}
-			if !slices.Equal(published.PreviousProduct.Added, tc.added) {
-				t.Errorf("added = %v, want %v", published.PreviousProduct.Added, tc.added)
+			if published.PreviousProduct.AttributesSent || len(published.PreviousProduct.Added) != 0 {
+				t.Errorf("the record says attributes were written: %+v", published.PreviousProduct)
 			}
-			if published.PreviousProduct.AttributesSent != (len(tc.added) > 0) {
-				t.Errorf("attributesSent = %t with %v added", published.PreviousProduct.AttributesSent, tc.added)
-			}
-			if got := findingCodes(published.Findings); !slices.Equal(got, orNone(tc.findings)) {
-				t.Errorf("findings = %v, want %v", got, tc.findings)
+			for _, request := range h.server.Requests() {
+				if request.Method != http.MethodGet && bytes.Contains(request.Body, []byte(`"attributes"`)) {
+					t.Errorf("%s %s sent the attributes, which the store owns", request.Method, request.Path)
+				}
 			}
 			if stored.Excerpt != productShort {
 				t.Errorf("short description = %q, want it written whatever the attributes", stored.Excerpt)
 			}
 		})
+	}
+}
+
+func TestAProductWritesTheStoreFirstAndTheDescriptionLast(t *testing.T) {
+	t.Parallel()
+
+	h := newProductHarness(t, storeProduct())
+	h.server.ResetRequests()
+	runPublish(t, h.deps, storeContext(t, h.held.ID))
+
+	order := make([]string, 0, 3)
+	for _, request := range h.server.Requests() {
+		switch {
+		case request.Method == http.MethodGet:
+		case strings.HasPrefix(request.Path, "/wp-json/wc/v3/products"):
+			order = append(order, "store")
+		case strings.Contains(request.Path, "/seo-meta/"):
+			order = append(order, "seo")
+		case strings.HasSuffix(request.Path, "/raw"):
+			order = append(order, "description")
+		}
+	}
+	if want := []string{"store", "seo", "description"}; !slices.Equal(order, want) {
+		t.Errorf("the writes went %v, want %v: the store's fields first and the description last", order, want)
 	}
 }
 
@@ -489,15 +502,28 @@ func TestPublishPreflightRefusesAProductBeforeItSpends(t *testing.T) {
 	}
 	outputs := &template.Product{ShortDescription: template.ProductShortDescription{Enabled: true, TargetWords: 30}}
 
+	withoutFields := make([]template.StepSpec, 0)
+	for _, spec := range run.GenerateRecipe() {
+		if spec.Name != steps.NameGenerateFields {
+			withoutFields = append(withoutFields, spec)
+		}
+	}
+
 	cases := []struct {
 		name    string
 		page    pagemap.Page
 		owner   func(*site.Site)
 		mode    run.PublishMode
 		outputs *template.Product
+		recipe  []template.StepSpec
 		errors  []string
 		warns   []string
 	}{
+		{
+			name: "a recipe that leaves out the step writing the short description", page: product, outputs: outputs,
+			recipe: withoutFields, warns: []string{steps.CodeShortDescriptionUnwritten},
+		},
+		{name: "a recipe without it under a template that writes none", page: product, recipe: withoutFields, warns: []string{steps.CodeProductOutputsMissing}},
 		{name: "a product the store can take", page: product, outputs: outputs},
 		{name: "a store never checked", page: product, outputs: outputs, owner: func(s *site.Site) { s.Commerce = site.CommerceUnknown }, errors: []string{steps.CodeCommerceUnknown}},
 		{name: "a site with no store", page: product, outputs: outputs, owner: func(s *site.Site) { s.Commerce = site.CommerceAbsent }, errors: []string{steps.CodeCommerceAbsent}},
@@ -517,7 +543,7 @@ func TestPublishPreflightRefusesAProductBeforeItSpends(t *testing.T) {
 			page:   pagemap.Page{ID: "page-product", SiteID: "site", Path: "/espresso-machine/", WPType: pagemap.WPProduct},
 			errors: []string{steps.CodeProductNotInStore},
 		},
-		{name: "a draft run", page: product, outputs: outputs, mode: run.PublishDraft, errors: []string{steps.CodeProductEditedLive}},
+		{name: "a draft run, which waits for a person to review it", page: product, outputs: outputs, mode: run.PublishDraft},
 		{name: "a template with no product outputs", page: product, warns: []string{steps.CodeProductOutputsMissing}},
 		{
 			name: "a product category", outputs: outputs,
@@ -541,7 +567,11 @@ func TestPublishPreflightRefusesAProductBeforeItSpends(t *testing.T) {
 			}
 			deps := unitDeps()
 			deps.Sites = siteStub{record: owner}
-			record, targets := preflightRun(run.GenerateRecipe(), tc.page)
+			recipe := run.GenerateRecipe()
+			if tc.recipe != nil {
+				recipe = tc.recipe
+			}
+			record, targets := preflightRun(recipe, tc.page)
 			record.PublishMode = run.PublishLive
 			if tc.mode != "" {
 				record.PublishMode = tc.mode

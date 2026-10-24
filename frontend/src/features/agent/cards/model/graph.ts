@@ -19,10 +19,6 @@ function entityFields(args: Args, renaming: boolean): Line[] {
     if (renaming && name !== null) {
         lines.push(line("field", said.renamed(name)));
     }
-    const kind = text(args, "kind");
-    if (kind !== null) {
-        lines.push(line("field", said.kind(kind)));
-    }
     const intent = text(args, "intent");
     if (intent !== null) {
         lines.push(line("field", said.intent(intent)));
@@ -30,6 +26,26 @@ function entityFields(args: Args, renaming: boolean): Line[] {
     const keywords = keywordsOf(args);
     if (keywords.length > 0) {
         lines.push(line("target", said.keywords(keywordsLine(keywords))));
+    }
+    lines.push(...cardLines(args));
+    return lines;
+}
+
+function cardLines(args: Args): Line[] {
+    const lines: Line[] = [];
+    if (typeof args["definition"] === "string") {
+        const definition = text(args, "definition");
+        lines.push(line("note", definition === null ? said.noDefinition : said.definition(definition)));
+    }
+    if (Array.isArray(args["facts"])) {
+        const facts = records(args, "facts");
+        lines.push(line("list", said.factsCount(facts.length)));
+        lines.push(...facts.map((fact) => line("field", said.fact(text(fact, "label") ?? "", text(fact, "value") ?? ""))));
+    }
+    if (Array.isArray(args["notes"])) {
+        const notes = records(args, "notes");
+        lines.push(line("list", said.notesCount(notes.length)));
+        lines.push(...notes.map((note) => line("note", said.note(text(note, "label") ?? ""))));
     }
     return lines;
 }
@@ -111,6 +127,27 @@ export const describeGraph: Describer = (tool, args) => {
                 lines.unshift(line("target", listed(names)));
             }
             return view(said.applyProposals(proposals.length), lines);
+        }
+        case "graph_propose_cards": {
+            const cards = records(args, "cards");
+            const lines: Line[] = [line("note", said.proposeCardsBody)];
+            for (const card of cards) {
+                lines.push(line("target", [ref("entity", text(card, "entityId") ?? "")]));
+                const definition = text(card, "definition");
+                if (definition !== null) {
+                    lines.push(line("note", said.definition(definition)));
+                }
+                if (Array.isArray(card["facts"])) {
+                    const facts = records(card, "facts");
+                    lines.push(line("list", said.factsCount(facts.length)));
+                    lines.push(...facts.map((fact) => line("field", said.fact(text(fact, "label") ?? "", text(fact, "value") ?? ""))));
+                }
+                const reason = text(card, "reason");
+                if (reason !== null) {
+                    lines.push(line("note", said.proposeCardsReason(reason)));
+                }
+            }
+            return view(said.proposeCards(cards.length), lines);
         }
         case "graph_propose_related": {
             const entity = text(args, "entityId");

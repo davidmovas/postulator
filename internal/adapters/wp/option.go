@@ -12,6 +12,7 @@ const (
 	DefaultTimeout            = 30 * time.Second
 	DefaultRetries            = 4
 	DefaultRateLimitPerSecond = 4
+	DefaultUserAgent          = "Mozilla/5.0"
 
 	backoffBase     = 500 * time.Millisecond
 	backoffCap      = 8 * time.Second
@@ -24,12 +25,13 @@ type Logger interface {
 }
 
 type options struct {
-	backoff  func(int) time.Duration
-	logger   Logger
-	proxyURL string
-	timeout  time.Duration
-	rate     float64
-	retries  int
+	backoff   func(int) time.Duration
+	logger    Logger
+	proxyURL  string
+	userAgent string
+	timeout   time.Duration
+	rate      float64
+	retries   int
 }
 
 type Option func(*options)
@@ -56,6 +58,14 @@ func WithBackoff(backoff func(attempt int) time.Duration) Option {
 
 func WithRateLimit(perSecond float64) Option {
 	return func(o *options) { o.rate = perSecond }
+}
+
+func WithUserAgent(agent string) Option {
+	return func(o *options) {
+		if agent != "" {
+			o.userAgent = agent
+		}
+	}
 }
 
 func WithLogger(logger Logger) Option {

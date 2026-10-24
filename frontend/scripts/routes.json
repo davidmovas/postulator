@@ -4,14 +4,66 @@
     "route": "#/sites"
   },
   {
+    "name": "sites-settings",
+    "route": "#/sites",
+    "height": 1400,
+    "wait": 1000
+  },
+  {
     "name": "overview",
     "route": "#/s/:siteId/overview",
+    "wait": 1500
+  },
+  {
+    "name": "overview-observation",
+    "route": "#/s/:siteId/overview",
+    "height": 1400,
     "wait": 1500
   },
   {
     "name": "graph",
     "route": "#/s/:siteId/graph",
     "wait": 1400
+  },
+  {
+    "name": "graph-entity-card",
+    "route": "#/s/:siteId/graph?view=outline",
+    "height": 1600,
+    "wait": 1400,
+    "steps": [
+      {
+        "click": "[data-entity-row=hub]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "graph-card-proposals",
+    "route": "#/s/:siteId/graph?view=outline",
+    "height": 1200,
+    "wait": 1400,
+    "steps": [
+      {
+        "click": "[data-card-proposals-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[data-card-proposal] button[title]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[data-card-proposal-waiting] button"
+      },
+      {
+        "wait": 900
+      }
+    ]
   },
   {
     "name": "pages",
@@ -51,11 +103,6 @@
     "route": "#/s/:siteId/templates",
     "width": 960,
     "height": 600,
-    "wait": 1200
-  },
-  {
-    "name": "templates-policies",
-    "route": "#/s/:siteId/templates/policies",
     "wait": 1200
   },
   {
@@ -274,8 +321,23 @@
     ]
   },
   {
-    "name": "pages-tree",
-    "route": "#/s/:siteId/pages?view=tree",
+    "name": "site-map",
+    "route": "#/s/:siteId/map",
+    "wait": 1600
+  },
+  {
+    "name": "site-map-search",
+    "route": "#/s/:siteId/map?q=espresso",
+    "wait": 1600
+  },
+  {
+    "name": "findings-inbox",
+    "route": "#/s/:siteId/findings",
+    "wait": 1600
+  },
+  {
+    "name": "findings-settled",
+    "route": "#/s/:siteId/findings?status=dismissed",
     "wait": 1600
   },
   {
@@ -304,6 +366,84 @@
       },
       {
         "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-model",
+    "route": "#/s/:siteId/pages?status=exists",
+    "wait": 1200,
+    "height": 1400,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Model\")"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-model-edited",
+    "route": "#/s/:siteId/pages?prefix=/brewing/extraction-ratios/&sort=path:asc",
+    "wait": 1200,
+    "height": 1400,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Model\")"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "pages-drawer-writer",
+    "route": "#/s/:siteId/pages?status=exists&prefix=/espresso-machines/&sort=path:asc",
+    "wait": 1200,
+    "height": 1400,
+    "steps": [
+      {
+        "click": "[data-page-row]"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "click": "[data-page-open]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[role=tab]:has-text(\"Writer\")"
       },
       {
         "wait": 900
@@ -441,7 +581,7 @@
         "wait": 900
       },
       {
-        "click": "[data-run-target] label"
+        "click": "[data-page-pick] label"
       },
       {
         "wait": 300
@@ -563,6 +703,58 @@
     ]
   },
   {
+    "name": "review-publish-edit",
+    "route": "#/s/:siteId/runs",
+    "height": 1400,
+    "wait": 1200,
+    "steps": [
+      {
+        "click": ":nth-match([data-run-kind=generate][data-run-status=completed], 4)"
+      },
+      {
+        "wait": 1800
+      },
+      {
+        "click": "[data-item-status=completed]"
+      },
+      {
+        "wait": 1400
+      },
+      {
+        "click": "[role=tab]:has-text(\"Publish\")"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "review-changes",
+    "route": "#/s/:siteId/runs",
+    "height": 1400,
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-run-kind=generate][data-run-pause=needs_human]"
+      },
+      {
+        "wait": 1800
+      },
+      {
+        "click": "[data-item-status=paused]"
+      },
+      {
+        "wait": 1400
+      },
+      {
+        "click": "[role=tab]:has-text(\"Changes to review\")"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
     "name": "run-revert",
     "route": "#/s/:siteId/runs",
     "wait": 1200,
@@ -572,6 +764,31 @@
       },
       {
         "wait": 1800
+      }
+    ]
+  },
+  {
+    "name": "run-revert-field",
+    "route": "#/s/:siteId/runs",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": ":nth-match([data-run-kind=revert][data-run-status=completed], 2)"
+      },
+      {
+        "wait": 1800
+      },
+      {
+        "click": "[data-item-status=completed]"
+      },
+      {
+        "wait": 1400
+      },
+      {
+        "click": "[role=tab]:has-text(\"Revert\")"
+      },
+      {
+        "wait": 900
       }
     ]
   },
@@ -619,6 +836,57 @@
   {
     "name": "settings-models",
     "route": "#/settings/models"
+  },
+  {
+    "name": "settings-types",
+    "route": "#/settings/types?site=:siteId",
+    "wait": 1200
+  },
+  {
+    "name": "settings-types-scopes",
+    "route": "#/settings/types?site=:siteId",
+    "height": 1400,
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-type-row=hub]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "click": "[data-scope-field=body] button[aria-expanded]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "settings-types-read-only",
+    "route": "#/settings/types?site=:siteId",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-type-row=store_category]"
+      },
+      {
+        "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "settings-types-new",
+    "route": "#/settings/types?site=:siteId",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[data-page-type-new]"
+      },
+      {
+        "wait": 600
+      }
+    ]
   },
   {
     "name": "settings-runs",
@@ -728,6 +996,54 @@
       },
       {
         "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "site-map-dock-wide-960",
+    "route": "#/s/:siteId/map",
+    "width": 960,
+    "height": 600,
+    "wait": 1600,
+    "steps": [
+      {
+        "click": "[aria-label=\"Dock width\"] [role=radio]:last-of-type"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "fits": "[data-map-table]"
+      }
+    ]
+  },
+  {
+    "name": "site-map-dock-960",
+    "route": "#/s/:siteId/map?q=espresso",
+    "width": 960,
+    "height": 600,
+    "wait": 1600,
+    "steps": [
+      {
+        "click": "[aria-label=\"Dock width\"] [role=radio]:first-of-type"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "fits": "[data-map-table]"
+      }
+    ]
+  },
+  {
+    "name": "site-map-tree-dock-960",
+    "route": "#/s/:siteId/map",
+    "width": 960,
+    "height": 600,
+    "wait": 1600,
+    "steps": [
+      {
+        "fits": "[data-map-table]"
       }
     ]
   },

@@ -14,10 +14,14 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	appcontent "github.com/davidmovas/postulator/internal/application/content"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -66,6 +70,7 @@ type pipeline struct {
 	recipe  []template.StepSpec
 	llm     *fake.Scripted
 	current *clock.Fake
+	types   *pagetypes.Service
 }
 
 func guideSpec(t *testing.T) template.Template {
@@ -73,7 +78,7 @@ func guideSpec(t *testing.T) template.Template {
 
 	seeds := template.Seed()
 	for i := range seeds {
-		if seeds[i].PageKind == "guide" {
+		if seeds[i].Name == "Guide" {
 			guide := seeds[i]
 			guide.Spec.Images = template.Images{Featured: true, Inline: 2, Source: template.ImagesAI}
 			return guide
@@ -97,20 +102,11 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 		t.Fatalf("insert the guide template: %v", err)
 	}
 
-	policy := template.LinkPolicy{
-		ID: id.New(), Scope: template.ScopeGlobal, Name: templates.DefaultPolicyName,
-		Rules: guide.Spec.LinkRules, ForbidExternal: true, ForbidSelf: true,
-		AnchorStrategy: template.AnchorPreferUser, CreatedAt: at, UpdatedAt: at,
-	}
-	if err := sqlite.NewLinkPolicyRepo(store).Insert(t.Context(), policy); err != nil {
-		t.Fatalf("insert the link policy: %v", err)
-	}
-
 	owner := site.Site{
 		ID: id.New(), Name: "Shop", BaseURL: server.URL(), Username: wptest.DefaultUser,
 		Status: site.StatusActive, AllowInsecure: true, Plugin: site.PluginState{Installed: true, Capabilities: []string{}},
 		Defaults: site.Defaults{
-			TemplateID: &guide.ID, LinkPolicyID: &policy.ID,
+			TemplateID:    &guide.ID,
 			ModelProfiles: map[domainllm.Role]domainllm.ModelRef{},
 		},
 		CreatedAt: at, UpdatedAt: at,
@@ -170,6 +166,7 @@ func newPipeline(t *testing.T, opts ...wptest.Option) *pipeline {
 	return &pipeline{
 		store: store, server: server, siteID: owner.ID, pageID: childPage.ID,
 		parent: nested[0].ID, recipe: guide.Spec.Recipe,
+		types: typedSite(t, store, owner.ID, pagetype.DefaultScope(pagetype.Entity, field.Body, "").Links.Rules),
 		runs:  sqlite.NewRunRepo(store),
 		items: sqlite.NewRunItemRepo(store),
 		blobs: sqlite.NewArtifactRepo(store),
@@ -202,8 +199,8 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 	t.Helper()
 
 	specs := templates.New(
-		sqlite.NewTemplateRepo(p.store), sqlite.NewLinkPolicyRepo(p.store), p.pages, sqlite.NewEntityRepo(p.store),
-		sqlite.NewSiteRepo(p.store), p.store, silentPublisher{}, clock.System{},
+		sqlite.NewTemplateRepo(p.store), p.pages, sqlite.NewEntityRepo(p.store), sqlite.NewSiteRepo(p.store),
+		sqlite.NewPageTypeRepo(p.store), p.store, silentPublisher{}, clock.System{},
 	)
 
 	registry := run.NewRegistry()
@@ -215,8 +212,12 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 		Sites:         sqlite.NewSiteRepo(p.store),
 		SiteWriter:    sqlite.NewSiteRepo(p.store),
 		WordPress:     oneClient{client: syncClient(t, p.server)},
-		Policies:      specs,
+		Types:         p.types,
 		Profiles:      stubProfiles{},
+		Tuning:        stubTuning{},
+		Models:        stubCatalog{},
+		Pictures:      siteModelOf(p.store, p.types),
+		Bodies:        sqlite.NewPageBodyRepo(p.store),
 		Content:       appcontent.New(appcontent.Deps{Profiles: stubProfiles{}, LLM: p.llm}),
 		LLM:           p.llm,
 		ImageProvider: &drawing{},
@@ -229,7 +230,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 
 	engine := runtime.New(runtime.Deps{
 		Runs: p.runs, Items: p.items, Artifacts: p.blobs, Execs: sqlite.NewStepExecRepo(p.store),
-		Events: sqlite.NewRunEventRepo(p.store), Pages: p.pages, Specs: specs,
+		Events: sqlite.NewRunEventRepo(p.store), Pages: p.pages, Specs: specs, Types: p.types,
 		Keys: stubKeys{}, Spend: sqlite.NewLLMCallRepo(p.store), Catalog: stubCatalog{}, Profiles: stubProfiles{},
 		Tuning: stubTuning{}, UnitOfWork: p.store, Publisher: &recorder{},
 	}, registry, runtime.Config{
@@ -256,7 +257,7 @@ func (p *pipeline) generate(t *testing.T) run.Item {
 		t.Fatalf("Enqueue: %v", err)
 	}
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		items, listErr := p.items.ByRun(t.Context(), queued.ID)
 		if listErr == nil && len(items) == 1 && items[0].Status.Terminal() {
@@ -265,10 +266,24 @@ func (p *pipeline) generate(t *testing.T) run.Item {
 			}
 			return items[0]
 		}
+		if listErr == nil && len(items) == 1 {
+			p.acceptAReview(t, items[0])
+		}
 		time.Sleep(pollInterval)
 	}
 	t.Fatal("timed out waiting for the pipeline to finish")
 	return run.Item{}
+}
+
+func (p *pipeline) acceptAReview(t *testing.T, item run.Item) {
+	t.Helper()
+
+	if item.Status != run.StatusPaused || item.PauseReason != run.PauseAwaitingReview {
+		return
+	}
+	if err := p.engine.Accept(t.Context(), item.ID, nil); err != nil {
+		t.Fatalf("accept the review of %s: %v", item.CurrentStep, err)
+	}
 }
 
 func (p *pipeline) artifactOf(t *testing.T, itemID string, kind run.ArtifactKind, out any) {
@@ -341,8 +356,13 @@ func TestTheWholeRecipeReachesWordPress(t *testing.T) {
 	}
 
 	parent, ok := p.server.Lookup(p.parent)
-	if !ok || !strings.Contains(parent.Content, `<a href="/drinks/coffee/espresso/">espresso</a>`) {
-		t.Fatalf("the parent did not gain a link to the child:\n%s", parent.Content)
+	if !ok || strings.Contains(parent.Content, `/drinks/coffee/espresso/`) {
+		t.Fatalf("the parent gained a link to a child that is still a draft, which leads a visitor nowhere:\n%s", parent.Content)
+	}
+	var relinked steps.RelinkResult
+	p.artifactOf(t, item.ID, run.ArtifactRelinkResult, &relinked)
+	if relinked.Linked != 0 || len(relinked.Findings) != 1 || relinked.Findings[0].Code != content.CodeTargetNotPublished {
+		t.Fatalf("the relink = %+v, want it to say the neighbors wait for the child to be published", relinked)
 	}
 
 	stored, err := p.pages.Get(t.Context(), p.pageID)
@@ -352,8 +372,12 @@ func TestTheWholeRecipeReachesWordPress(t *testing.T) {
 	if stored.WPID == nil || *stored.WPID != published.WPID || stored.Status != pagemap.StatusExists {
 		t.Fatalf("the page row is %+v", stored)
 	}
-	if stored.ContentHash == "" || stored.LastSyncedAt == nil || stored.Drift {
+	if stored.LastSyncedAt == nil {
 		t.Fatalf("the page row is %+v", stored)
+	}
+	current, base, found, err := sqlite.NewPageBodyRepo(p.store).Get(t.Context(), p.pageID)
+	if err != nil || !found || current.Hash == "" || current.Hash != base.Hash {
+		t.Fatalf("the body = %+v over %+v (%t, %v), want what was written on both sides", current, base, found, err)
 	}
 
 	links, err := p.links.ListForPage(t.Context(), p.pageID)
@@ -410,7 +434,7 @@ func (p *pipeline) runKind(t *testing.T, kind run.Kind) run.Item {
 		t.Fatalf("Enqueue a %s run: %v", kind, err)
 	}
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		items, listErr := p.items.ByRun(t.Context(), queued.ID)
 		if listErr == nil && len(items) == 1 && items[0].Status.Terminal() {
@@ -418,6 +442,9 @@ func (p *pipeline) runKind(t *testing.T, kind run.Kind) run.Item {
 				t.Fatalf("the %s item reached %q: %s", kind, items[0].Status, items[0].Error)
 			}
 			return items[0]
+		}
+		if listErr == nil && len(items) == 1 {
+			p.acceptAReview(t, items[0])
 		}
 		time.Sleep(pollInterval)
 	}
@@ -441,7 +468,7 @@ func TestAWriterOutOfRoomTwicePausesThePageForAPerson(t *testing.T) {
 	}
 
 	var paused run.Item
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) && paused.ID == "" {
 		items, listErr := p.items.ByRun(t.Context(), queued.ID)
 		if listErr == nil && len(items) == 1 && (items[0].Status == run.StatusPaused || items[0].Status.Terminal()) {
@@ -470,7 +497,7 @@ func TestEveryKindRecipeIsRunnableByTheRealRegistry(t *testing.T) {
 		t.Fatalf("register the steps: %v", err)
 	}
 
-	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync, run.KindRevert} {
+	for _, kind := range []run.Kind{run.KindRelink, run.KindSync, run.KindRevert, run.KindEdit} {
 		recipe, owns := kind.Recipe()
 		if !owns {
 			t.Fatalf("%s owns no recipe", kind)
@@ -530,13 +557,13 @@ func TestARelinkRunPlacesTheLinksWithoutWritingThePageAgain(t *testing.T) {
 	}
 }
 
-func TestARelinkRunAndARepairRunCostNothing(t *testing.T) {
+func TestARelinkRunAndASyncRunCostNothing(t *testing.T) {
 	t.Parallel()
 
 	p := newPipeline(t)
 	engine := p.start(t)
 
-	for _, kind := range []run.Kind{run.KindRelink, run.KindRepair, run.KindSync} {
+	for _, kind := range []run.Kind{run.KindRelink, run.KindSync} {
 		recipe, _ := kind.Recipe()
 		estimate, err := engine.EstimateRun(t.Context(), run.Run{
 			SiteID: p.siteID, Kind: kind, Targets: []string{p.pageID}, Recipe: recipe,

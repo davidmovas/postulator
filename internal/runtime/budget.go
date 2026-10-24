@@ -15,10 +15,8 @@ import (
 )
 
 const (
-	tokensPerWord       = 2.2
 	promptOverhead      = 800
 	fallbackTargetWords = 800
-	inputShareOfOutput  = 0.5
 
 	reasoningShareOfAllowance = 0.5
 
@@ -31,6 +29,10 @@ const (
 	CodeProviderKeyMissing   = "provider_key_missing"
 	CodeImagesStepOff        = "images_step_off"
 )
+
+func scoped(recipe []template.StepSpec) bool {
+	return len(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish)))) > 0
+}
 
 type pricing struct {
 	findings []run.EstimateFinding
@@ -50,6 +52,9 @@ func (p *pricing) add(finding run.EstimateFinding) {
 }
 
 func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[string]string) (run.Estimate, error) {
+	if e.deps.Snapshots != nil {
+		ctx = e.deps.Snapshots.Remembering(ctx)
+	}
 	defs, err := e.enabledDefs(record.Recipe)
 	if err != nil {
 		return run.Estimate{}, err
@@ -60,7 +65,6 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[s
 	if err != nil {
 		return run.Estimate{}, err
 	}
-
 	for i := range defs {
 		if defs[i].Preflight == nil {
 			continue
@@ -107,10 +111,15 @@ func (e *Engine) planTargets(ctx context.Context, record run.Run, assigned map[s
 	}
 
 	_, ownsRecipe := record.Kind.Recipe()
+	ownsRecipe = ownsRecipe || scoped(record.Recipe)
 	undrawn := writesWithoutImages(record.Recipe)
 	pages := e.targetPages(ctx, record.Targets)
+	types, err := e.deps.Types.Set(ctx, record.SiteID)
+	if err != nil {
+		return nil, err
+	}
 	for _, targetID := range record.Targets {
-		target := run.Target{Page: pages[targetID]}
+		target := run.Target{Page: pages[targetID], Links: types.Policy(pages[targetID])}
 		resolved, err := e.deps.Specs.ResolveForPage(ctx, templates.ResolveForPageRequest{
 			PageID: targetID, TemplateID: assigned[targetID],
 		})
@@ -163,9 +172,19 @@ func pricedTargets(record run.Run, targets map[string]run.Target) []run.Target {
 }
 
 func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, target *run.Target, priced *pricing) error {
-	calls := callsOf(def, target.Spec, run.ParamsFor(record.Recipe, def.Name))
+	params := run.ParamsFor(record.Recipe, def.Name)
+	calls := callsOf(def, *target, params)
 	if calls == 0 {
 		return nil
+	}
+	if def.Price.Applies != nil {
+		applies, appliesErr := def.Price.Applies(ctx, *target, params)
+		if appliesErr != nil {
+			return appliesErr
+		}
+		if !applies {
+			return nil
+		}
 	}
 	if def.Price.Unpriced {
 		priced.add(run.EstimateFinding{
@@ -204,10 +223,11 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 		return nil
 	}
 
-	usage := usageOf(
-		outputOf(def, int(float64(targetWords(target.Spec, target.Page.WPType))*tokensPerWord)),
-		reasoningOf(info, e.deps.Tuning.Effort(def.Role)),
-	)
+	input, err := EstimatedInput(ctx, def, *target)
+	if err != nil {
+		return err
+	}
+	usage := usageOf(input, outputOf(def, *target), reasoningOf(info, e.deps.Tuning.Effort(def.Role)))
 	priced.tokens += usage.Total * calls
 	priced.usd += llm.Cost(usage, info, e.deps.Tuning.Tier(def.Role)) * float64(calls)
 	return nil
@@ -259,8 +279,25 @@ func stepNames(recipe []template.StepSpec) []string {
 	return out
 }
 
-func usageOf(output, reasoning int) llm.Usage {
-	input := promptOverhead + int(float64(output)*inputShareOfOutput)
+func EstimatedInput(ctx context.Context, def run.StepDef, target run.Target) (int, error) {
+	input := def.Price.Overhead
+	if input <= 0 {
+		input = promptOverhead
+	}
+	if def.Price.ReadsBody {
+		input += llm.ReadTokens(TargetWords(target.Spec))
+	}
+	if def.Price.Input == nil {
+		return input, nil
+	}
+	pack, err := def.Price.Input(ctx, target)
+	if err != nil && !errors.IsCode(err, errors.Invalid) {
+		return 0, err
+	}
+	return input + pack, nil
+}
+
+func usageOf(input, output, reasoning int) llm.Usage {
 	return llm.Usage{Input: input, Output: output + reasoning, Reasoning: reasoning, Total: input + output + reasoning}
 }
 
@@ -271,21 +308,21 @@ func reasoningOf(info llm.ModelInfo, effort llm.ReasoningEffort) int {
 	return int(float64(llm.Allowance(effort)) * reasoningShareOfAllowance)
 }
 
-func outputOf(def run.StepDef, body int) int {
+func outputOf(def run.StepDef, target run.Target) int {
 	if def.Price.OutputTokens > 0 {
 		return def.Price.OutputTokens
 	}
-	return body
+	return llm.WordTokens(TargetWords(target.Spec))
 }
 
-func callsOf(def run.StepDef, spec template.TemplateSpec, params map[string]any) int {
+func callsOf(def run.StepDef, target run.Target, params map[string]any) int {
 	if def.Price.Calls == nil {
 		return 1
 	}
-	return max(def.Price.Calls(spec, params), 0)
+	return max(def.Price.Calls(target, params), 0)
 }
 
-func targetWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
+func TargetWords(spec template.TemplateSpec) int {
 	words := 0
 	for i := range spec.Sections {
 		words += spec.Sections[i].TargetWords
@@ -295,9 +332,6 @@ func targetWords(spec template.TemplateSpec, wpType pagemap.WPType) int {
 	}
 	if words == 0 {
 		words = fallbackTargetWords
-	}
-	if wpType == pagemap.WPProduct {
-		words += spec.Product.Words()
 	}
 	return words
 }

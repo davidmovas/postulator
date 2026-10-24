@@ -6,10 +6,9 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
-	"github.com/davidmovas/postulator/internal/domain/template"
-	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
@@ -53,16 +52,20 @@ func RelinkPage(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
+			policy := sc.Links
 			if reason, held := offLimits(sc.Page); held {
 				return needsHuman("the page " + sc.Page.Path + " " + reason), nil
 			}
 			client, err := clientFor(ctx, deps, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
+			}
+			state, err := relinkStateOf(sc, deps.now(), checkpointRelinkPage, run.ArtifactLinkContext)
+			if err != nil {
+				return run.Result{}, err
+			}
+			if state.Planned {
+				return landRelinkedPage(ctx, deps, client, sc, &state)
 			}
 
 			work := newPageRelink(sc.Page, len(lc.Targets))
@@ -73,17 +76,26 @@ func RelinkPage(deps Deps) run.StepDef {
 			if reason != "" {
 				return standDown(work, sc, reason)
 			}
+			if !body.raw.SaveStable {
+				return needsHuman(sc.Page.Path + ": " + ReasonSaveAltersClient), nil
+			}
 
 			pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
 			if err != nil {
 				return run.Result{}, err
 			}
+			writer, err := body.writer(ctx, deps, sc.Page)
+			if err != nil {
+				return run.Result{}, err
+			}
 			work.read(body.raw)
-			work.place(body.doc, lc, policy, sc.Page, onTheSite(pages))
+			if placeErr := work.place(writer, lc, policy, sc.Page, onTheSite(pages)); placeErr != nil {
+				return standDown(work, sc, ReasonPageUnreadable)
+			}
 			if work.result.Linked == 0 {
 				return settleRelinkPage(work)
 			}
-			return writeRelinkedPage(ctx, deps, client, sc, work, body, pages)
+			return planRelinkedPage(ctx, deps, sc, &state, work, body, writer.result())
 		},
 	}
 }
@@ -111,10 +123,9 @@ func newPageRelink(page pagemap.Page, targets int) pageRelink {
 			Placed: make([]PlacedLink, 0, targets), Findings: make([]content.Finding, 0),
 		},
 		published: PublishResult{
-			WPID: *page.WPID, URL: page.Observed.Link, Status: string(page.Status),
-			ContentHash: page.ContentHash, SEOApplied: make([]string, 0),
+			WPID: *page.WPID, URL: page.Path, Status: string(page.Status), SEOApplied: make([]string, 0),
 			Skipped: make([]string, 0), Findings: make([]content.Finding, 0),
-			Mismatches: make([]pagemap.Mismatch, 0),
+			Mismatches: make([]Mismatch, 0),
 		},
 	}
 }
@@ -125,28 +136,41 @@ func (w *pageRelink) read(raw wp.RawContent) {
 	w.published.PreviousContentHash = raw.ContentHash
 }
 
-func (w *pageRelink) place(doc *content.Document, lc content.LinkContext,
-	policy template.LinkPolicy, page pagemap.Page, live map[string]bool) {
+func (w *pageRelink) place(writer *linkWriter, lc content.LinkContext,
+	policy field.LinkPolicy, page pagemap.Page, live map[string]bool) error {
 	for i := range lc.Targets {
 		target := lc.Targets[i]
 		if target.PageID == page.ID || target.PageID == "" {
 			continue
 		}
-		w.result.Placed = append(w.result.Placed, w.placeTarget(doc, lc, policy, page, target, live[target.PageID]))
+		row, err := w.placeTarget(writer, lc, policy, page, target, live[target.PageID])
+		if err != nil {
+			return err
+		}
+		w.result.Placed = append(w.result.Placed, row)
+	}
+	doc, err := writer.document()
+	if err != nil {
+		return err
 	}
 	w.result.Findings = append(w.result.Findings, content.Unpublished(doc, lc, live, page.ID)...)
+	return nil
 }
 
-func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, policy template.LinkPolicy,
-	page pagemap.Page, target content.LinkTarget, live bool) PlacedLink {
+func (w *pageRelink) placeTarget(writer *linkWriter, lc content.LinkContext, policy field.LinkPolicy,
+	page pagemap.Page, target content.LinkTarget, live bool) (PlacedLink, error) {
 	var (
 		placement content.InsertResult
 		sentence  string
+		err       error
 	)
 	if live {
-		placement, sentence = backfill(doc, lc, policy, target)
+		placement, sentence, err = writer.backfill(lc, policy, target)
 	} else {
-		placement = content.InsertTarget(doc, lc, policy, target)
+		placement, err = writer.insert(lc, policy, target)
+	}
+	if err != nil {
+		return PlacedLink{}, err
 	}
 
 	row := PlacedLink{PageID: target.PageID, Path: target.URL}
@@ -156,7 +180,7 @@ func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, 
 		if sentence != "" {
 			w.result.Findings = append(w.result.Findings, templatedPageFinding(page, target, sentence))
 		}
-		return row
+		return row, nil
 	}
 
 	row.Outcome, row.Detail = OutcomeUnchanged, firstDetail(placement)
@@ -165,34 +189,72 @@ func (w *pageRelink) placeTarget(doc *content.Document, lc content.LinkContext, 
 	} else if !live && !alreadyLinked(placement) {
 		row.Detail = "it is linked once " + target.URL + " is published"
 	}
-	return row
+	return row, nil
 }
 
-func writeRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run.StepContext, work pageRelink,
-	body siteBody, pages []pagemap.Page) (run.Result, error) {
-	linked, err := body.doc.Render()
+func planRelinkedPage(ctx context.Context, deps Deps, sc *run.StepContext, state *relinkState, work pageRelink,
+	body siteBody, linked splicedBody) (run.Result, error) {
+	state.Page, state.Publish, state.Planned = work.result, work.published, true
+	state.Writes = []relinkWrite{{
+		Outcome: NeighborResult{
+			PageID: sc.Page.ID, Path: sc.Page.Path, WPID: *sc.Page.WPID,
+			Before: NeighborBefore{Hash: body.raw.ContentHash, HTML: body.raw.Content},
+		},
+		After: linked.raw, Ours: linked.ours, Placed: linked.placed,
+	}}
+	held, err := deps.reviewRelinks(ctx, sc, checkpointRelinkPageReviewed, "the new links of "+sc.Page.Path,
+		[]relinkedBody{{page: sc.Page, before: body.raw.Content, after: linked.raw}})
+	if err != nil || held.held != nil {
+		return orHeld(held, err)
+	}
+	waiting, err := state.wait(checkpointRelinkPage, "planned the new links of "+sc.Page.Path)
 	if err != nil {
 		return run.Result{}, err
 	}
-	hash, err := body.put(ctx, client, sc.Page, linked)
-	if err != nil {
-		if errors.IsCode(err, errors.Conflict) {
-			return needsHuman("the page " + sc.Page.Path + " changed on the site while it was being relinked: " +
-				"it held " + body.raw.ContentHash + " and now holds " + currentHashOf(err)), nil
-		}
-		return run.Result{}, err
-	}
-	work.published.ContentHash = hash
+	return withChecks(waiting, held.check), nil
+}
 
+func landRelinkedPage(ctx context.Context, deps Deps, client *wp.Client, sc *run.StepContext, state *relinkState) (run.Result, error) {
+	write := state.Writes[0]
+	landed, err := landRelinkedBody(ctx, client, sc.Page, write.After, write.Outcome.Before.Hash)
+	if err != nil {
+		check, checkErr := state.checkpoint(checkpointRelinkPage)
+		if checkErr != nil {
+			return run.Result{}, checkErr
+		}
+		return run.Result{Checkpoint: check}, err
+	}
+	if !landed.written {
+		return needsHuman("the page " + sc.Page.Path + " changed on the site while it was being relinked: it held " +
+			write.Outcome.Before.Hash + " and now holds " + landed.held + "; sync the site and relink it again"), nil
+	}
+	state.Publish.ContentHash = landed.hash
+	record, held := write.landed(landed.content)
+	if recordErr := recordSpliced(ctx, deps, sc.Page.ID, sc.Run.ID, record); recordErr != nil {
+		return run.Result{}, recordErr
+	}
 	owner, err := deps.Sites.Get(ctx, sc.Run.SiteID)
 	if err != nil {
 		return run.Result{}, err
 	}
-	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages),
-		pagemap.NewSite(owner.BaseURL), body.doc, hash); adoptErr != nil {
+	pages, err := deps.Pages.ListBySite(ctx, sc.Run.SiteID)
+	if err != nil {
+		return run.Result{}, err
+	}
+	if adoptErr := adopt(ctx, deps, sc.Page, pagemap.NewIndex(pages), pagemap.NewSite(owner.BaseURL), held); adoptErr != nil {
 		return run.Result{}, adoptErr
 	}
-	return settleRelinkPage(work)
+	state.Finished = true
+	check, err := state.checkpoint(checkpointRelinkPage)
+	if err != nil {
+		return run.Result{}, err
+	}
+	settled, err := settleRelinkPage(pageRelink{result: state.Page, published: state.Publish})
+	if err != nil {
+		return run.Result{}, err
+	}
+	settled.Checkpoint = check
+	return settled, nil
 }
 
 func unplaced(placement content.InsertResult, target content.LinkTarget, live bool,

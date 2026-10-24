@@ -1,13 +1,14 @@
 package content
 
 import (
+	"regexp"
 	"slices"
 	"unicode"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
-	"github.com/davidmovas/postulator/internal/domain/template"
+	"github.com/davidmovas/postulator/internal/domain/field"
 )
 
 type Outcome string
@@ -40,20 +41,22 @@ type InsertResult struct {
 	Decisions []Decision   `json:"decisions"`
 }
 
+var shortcodeTag = regexp.MustCompile(`\[(/)?([a-zA-Z_][\w-]*)(?:\s[^\]]*)?/?\]`)
+
 var forbiddenZones = []string{
 	"a", "h1", "h2", "h3", "h4", "h5", "h6", "code", "pre",
 	"script", "style", "textarea", "noscript", "template", "iframe", "svg", "math",
 }
 
-func InsertLinks(doc *Document, lc LinkContext, policy template.LinkPolicy) InsertResult {
+func InsertLinks(doc *Document, lc LinkContext, policy field.LinkPolicy) InsertResult {
 	return insert(doc, lc, policy, lc.Targets)
 }
 
-func InsertTarget(doc *Document, lc LinkContext, policy template.LinkPolicy, only LinkTarget) InsertResult {
+func InsertTarget(doc *Document, lc LinkContext, policy field.LinkPolicy, only LinkTarget) InsertResult {
 	return insert(doc, lc, policy, []LinkTarget{only})
 }
 
-func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []LinkTarget) InsertResult {
+func insert(doc *Document, lc LinkContext, policy field.LinkPolicy, wanted []LinkTarget) InsertResult {
 	result := InsertResult{
 		Placed:    make([]Placement, 0, len(wanted)),
 		Missing:   make([]LinkTarget, 0),
@@ -93,7 +96,7 @@ func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []
 			if maxLinks > 0 && placed >= maxLinks {
 				break
 			}
-			placement, outcome, detail := insertOne(doc, target, policy, inserted)
+			placement, outcome, detail := insertOne(doc, lc, target, policy, inserted)
 			if outcome != OutcomeInserted {
 				if inserted == 0 {
 					result.Decisions = append(result.Decisions, Decision{
@@ -118,9 +121,9 @@ func insert(doc *Document, lc LinkContext, policy template.LinkPolicy, wanted []
 	return result
 }
 
-func anchorOrder(target LinkTarget, strategy template.AnchorStrategy, placed int) []string {
+func anchorOrder(target LinkTarget, strategy field.AnchorStrategy, placed int) []string {
 	shift := 0
-	if strategy == template.AnchorRotate && len(target.Anchors) > 1 {
+	if strategy == field.AnchorRotate && len(target.Anchors) > 1 {
 		shift = placed % len(target.Anchors)
 	}
 	if shift == 0 {
@@ -129,7 +132,7 @@ func anchorOrder(target LinkTarget, strategy template.AnchorStrategy, placed int
 	return append(slices.Clone(target.Anchors[shift:]), target.Anchors[:shift]...)
 }
 
-func insertOne(doc *Document, target LinkTarget, policy template.LinkPolicy, placed int) (Placement, Outcome, string) {
+func insertOne(doc *Document, lc LinkContext, target LinkTarget, policy field.LinkPolicy, placed int) (Placement, Outcome, string) {
 	limit := policy.Rules.ParentLinkWithinParagraphs
 	restricted := target.Relation == RelationUp && limit > 0
 
@@ -149,11 +152,11 @@ func insertOne(doc *Document, target LinkTarget, policy template.LinkPolicy, pla
 		}
 
 		for _, anchor := range anchors {
-			start, end, matched := findFold(node.Data, anchor)
+			start, end, matched := FindAnchor(node.Data, anchor)
 			if !matched {
 				continue
 			}
-			splice(node, start, end, target.URL)
+			splice(node, start, end, lc.Href(target))
 			return Placement{Target: target, Anchor: node.Data[start:end], ParagraphIndex: index},
 				OutcomeInserted, ""
 		}
@@ -194,6 +197,58 @@ func splice(node *html.Node, start, end int, href string) {
 
 func FindFold(haystack, needle string) (start, end int, found bool) {
 	return findFold(haystack, needle)
+}
+
+func FindAnchor(text, anchor string) (start, end int, found bool) {
+	held := shortcodeSpans(text)
+	for offset := 0; offset < len(text); {
+		start, end, found = findFold(text[offset:], anchor)
+		if !found {
+			return 0, 0, false
+		}
+		start, end = start+offset, end+offset
+		if !overlaps(held, start, end) {
+			return start, end, true
+		}
+		offset = end
+	}
+	return 0, 0, false
+}
+
+func ForbiddenZone(tag string) bool {
+	return slices.Contains(forbiddenZones, tag)
+}
+
+type textSpan struct {
+	start, end int
+}
+
+func shortcodeSpans(text string) []textSpan {
+	tags := shortcodeTag.FindAllStringSubmatchIndex(text, -1)
+	out := make([]textSpan, 0, len(tags))
+	for i, tag := range tags {
+		span := textSpan{start: tag[0], end: tag[1]}
+		if tag[2] < 0 {
+			name := text[tag[4]:tag[5]]
+			for _, closing := range tags[i+1:] {
+				if closing[2] >= 0 && text[closing[4]:closing[5]] == name {
+					span.end = closing[1]
+					break
+				}
+			}
+		}
+		out = append(out, span)
+	}
+	return out
+}
+
+func overlaps(spans []textSpan, start, end int) bool {
+	for _, span := range spans {
+		if start < span.end && span.start < end {
+			return true
+		}
+	}
+	return false
 }
 
 func findFold(haystack, needle string) (start, end int, found bool) {
@@ -260,6 +315,20 @@ func paragraphIndexOf(paragraphs []*html.Node, node *html.Node) int {
 
 func paragraphOf(doc *Document, node *html.Node) int {
 	return paragraphIndexOf(doc.Paragraphs(), node)
+}
+
+func (c LinkContext) Unlinked(linked *Document) LinkContext {
+	if linked == nil {
+		return c
+	}
+	out := c
+	out.Targets = make([]LinkTarget, 0, len(c.Targets))
+	for i := range c.Targets {
+		if len(existingFor(linked, c, c.Targets[i])) == 0 {
+			out.Targets = append(out.Targets, c.Targets[i])
+		}
+	}
+	return out
 }
 
 func existingFor(doc *Document, lc LinkContext, target LinkTarget) []*html.Node {

@@ -3,8 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { cx, SearchIcon, toneClasses } from "../../ui/index.js";
-import { entityIcon, kindTone } from "./labels.js";
+import { presetIcon, presetTone } from "../settings/types/labels.js";
 import type { GraphIndex } from "./model/index.js";
+import { presetOf } from "./model/index.js";
 import { rank } from "./model/search.js";
 
 const hitLimit = 8;
@@ -87,7 +88,8 @@ export function SearchBox({ index, onPick, focusKey }: SearchBoxProps): ReactEle
                     ) : (
                         hits.map((hit, position) => {
                             const held = index.byId.get(hit.id);
-                            const Icon = entityIcon(held?.kind ?? "");
+                            const preset = presetOf(index, hit.id);
+                            const Icon = presetIcon(preset);
                             return (
                                 <li
                                     key={hit.id}
@@ -105,7 +107,7 @@ export function SearchBox({ index, onPick, focusKey }: SearchBoxProps): ReactEle
                                         setActive(position);
                                     }}
                                 >
-                                    <Icon size={14} className={toneClasses[kindTone(held?.kind ?? "")].ink} />
+                                    <Icon size={14} className={toneClasses[presetTone(preset)].ink} />
                                     <span className="flex-1 truncate">{index.labels.get(hit.id) ?? held?.name ?? hit.id}</span>
                                     <span className="text-2xs text-ink-faint">{copy.graph.search.field[hit.field]}</span>
                                 </li>

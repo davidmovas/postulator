@@ -42,8 +42,14 @@ type ContentDraft struct {
 	H1       string         `json:"h1"`
 	Sections []DraftSection `json:"sections"`
 	Summary  string         `json:"summary"`
-	Product  *ProductDraft  `json:"product,omitempty"`
+	Kept     *KeptBody      `json:"kept,omitempty"`
 	Findings []Finding      `json:"findings,omitempty"`
+}
+
+type KeptBody struct {
+	Raw     string   `json:"raw"`
+	Hash    string   `json:"hash"`
+	Written []string `json:"written"`
 }
 
 type RepairRequest struct {
@@ -154,7 +160,7 @@ func placeSections(answer DraftAnswer, brief Brief) ([]DraftSection, []Finding, 
 			}
 			continue
 		}
-		html, stripped := Sanitize(placed[i].answer.HTML)
+		html, stripped := Sanitize(placed[i].answer.HTML, brief.Links)
 		findings = append(findings, strippedFindings(section.Heading, stripped)...)
 		if strings.TrimSpace(html) == "" {
 			if section.Required {
@@ -177,7 +183,7 @@ func placeSections(answer DraftAnswer, brief Brief) ([]DraftSection, []Finding, 
 		if taken[at] {
 			continue
 		}
-		html, stripped := Sanitize(answer.Sections[at].HTML)
+		html, stripped := Sanitize(answer.Sections[at].HTML, brief.Links)
 		heading := strings.TrimSpace(answer.Sections[at].Heading)
 		findings = append(findings, strippedFindings(heading, stripped)...)
 		if strings.TrimSpace(html) == "" {

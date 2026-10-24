@@ -10,8 +10,8 @@ code path.
 ```
 cmd/postulator        Wails bootstrap only
 internal/kernel       errors, paging, id, clock, log, ctx, dto, settings, middleware
-internal/domain       pure logic: site graph pagemap keyword importmap template content run schedule settings llm
-internal/application  use cases, UnitOfWork, tool registry, event registry
+internal/domain       pure logic: site graph pagemap block render field finding pagetype contextpack keyword note importmap template content run schedule agent llm
+internal/application  use cases (observe, sitemodel, findings, edit, runs, imports and the rest), UnitOfWork, tool registry, event registry
 internal/adapters     sqlite, wp, llm (openai, tuning, retry, limiter, ledger, recordreplay, catalog, profiles, fake), images, secrets, importer
 internal/runtime      the run engine and its step catalog
 internal/transport    wails services and event bridge, agent runner and tools
@@ -73,10 +73,20 @@ The shared vocabulary every layer is allowed to speak.
 Value types and pure functions. `site`, `graph` (a DAG on `parent` edges plus weighted
 undirected `related` edges, an entity's name unique under the parent it is scoped to, and the
 labels that tell a shared name apart), `pagemap` (paths, tree, index, a page's keywords and
-notes), `keyword` (the ordered list with volumes and the one cell grammar), `importmap` (the
+notes, its identity and terms, the typed links and `DeriveParent`, which reads the parent from
+the JSON-LD trails, the breadcrumb nav, the WordPress parent and the URL in that order, each
+with its reason), `block` (the body as addressable blocks, classic or block editor, serialised
+byte for byte), `render` (the extraction of a public render: the content root found by the
+content's words, the regions, the trails, the typed links, the JSON-LD facts, the headings and
+word counts, the builder and the robots meta), `field` (the catalog with its deny list and a
+field's current and base values), `finding` (the persistent findings with their codes, severities
+and options), `keyword` (the ordered list with volumes and the one cell grammar), `importmap` (the
 mapping of a sheet's headers, its level and note columns, and what each column became),
 `template` (spec plus link policy, resolved global → site → page by JSON merge patch),
 `content` (an HTML document, link context, link insertion, compliance and structure reports),
+`contextpack` (the read functions over a snapshot of the model, the writer's pack and its fit, the
+folded site map and the entity proposals named from it), `pagetype` (the client's types over six
+presets and their field scopes),
 `run`, `schedule`, `settings`, and the `llm` model catalog types with the service tiers, the
 reasoning allowance per effort, `Cost` and the purpose rules the spend report groups by.
 
@@ -88,23 +98,95 @@ canonical page, so a run's validation and the Linking screen bind "self" to the 
 
 There is one answer to where an href points, and it is `pagemap.Site{Scheme, Host, Base}`,
 built once per site from its `BaseURL`. `Site.Resolve` answers a normalised site path and a
-kind (`path`, `same_document`, `external`, `unresolved`) by mirroring the companion plugin's
-`internal_href_to_path` rule by rule, so what the plugin records and what the domain judges
-cannot drift. `content.LinkContext` carries that site and every classifier — insertion,
+kind (`path`, `same_document`, `external`, `unresolved`), and the companion plugin's
+`internal_href_to_path` follows it: the host with its port, the path escaped as `EscapedPath` and
+lowercased, a dot segment or an invalid escape dropped. One table, `wp-plugin/testdata/hrefs.json`,
+is answered by both and by the fake, so what the plugin records and what the domain judges
+cannot drift; since 2026-10-18 a relative href resolves against the document on every side,
+`Site.ResolveAt(document, href)` taking the page's path up to its last slash as a browser does.
+`content.LinkContext` carries that site and every classifier — insertion,
 compliance, the audit and the link counter — resolves through it.
+
+Since stage 2b one layer reads the site model for everyone who writes or advises. `contextpack`
+holds the pure read functions over a `Snapshot` (the index, the types, the graph, terms, fields,
+bodies, the blocks we wrote, renders, links and findings): `Facts` for one page (its type, card,
+trail, children and siblings, listed products or its twin's, terms, keywords, targets, typed links
+in and out, fields with their scopes, regions, notes, findings), `Summary`, `LinkForm`,
+`Overview`, `Gaps` and `Nodes`; `Build` and `Fit` turn a page's facts into the writer's pack under
+a budget, and `Brief` renders the overview with the link audit's totals for the agent.
+`application/sitemodel` alone loads snapshots: a page's neighbourhood by ids inside one read-only
+`Store.Read` for a pack, the whole site once for the brief, the tree and the gaps, and the link
+audit through `reports` rather than a second computation. The writer's steps, the judge, the Pages
+drawer's "What the writer will see", the agent's brief and `sites_explore` all ask it, so none of
+them computes a fact differently.
+
+Since stage 4 the workbook and the site are reconciled through **findings** that last. Every
+workbook row finds its page through `pagemap.MatchRow` (mapped, URL, slug, entity, title, H1, SKU);
+the import and the observation raise and clear findings once per subject, and
+`application/findings` is the one use case a person and the agent settle them through: `List`,
+`Counts`, `Explain` (the one sentence of what an option does), `Resolve` and `ResolveMany`. An
+option either changes the model inside one unit, written through `PageRepo` so `pages.changed` is
+published after the commit, or answers what it asks for and settles nothing: a `StartRequest`, a
+rescan, or a site preview of entity proposals. A writable page no entity carries is
+`page_without_entity`, raised and cleared by the derive stage and cleared by every writer that maps a
+page; `contextpack.Map.EntityProposals` names its entity from the H1 or the title and scopes it
+under the nearest ancestor's entity or the twin hub of its store category, with no model call.
+
+There is **one tree**, `contextpack.Map`: the site by derived parent, a store category folded into
+the hub of its name, a loop cut at its first path. The Site map, the findings' subtree and the run
+start's picker read it. Since phase 15 it is materialized as `page_map` (migration 0074): one row per
+page with its folded parent, depth, a root-first trail of ids, children, descendants, twin, type and
+search keys. Triggers bump `page_map_sites.generation` whenever a page, its parent, status, path,
+title, H1, type or technical reason moves, a read that finds the map stale refreshes it once
+(`sitemodel.Refresh`, reading outside the unit and writing only the rows that moved), and the derive
+stage refreshes it at the end of every walk. So a map page, the picker and the findings list run the
+same statements at 2,000 and at 5,000 pages, which `internal/app/scale` proves on a real store.
+
+The whole-site reads that stay are named, not hidden: the writer's pack (a snapshot once per pack and
+once per estimate), the graph preflight, a map search or type filter, the observation's content and
+store stages, the brief, the link audit and `Pages.Tree`, which the Overview and the Reports still
+read.
 
 ## Run engine
 
 A run is a recipe of named steps over a set of target pages, and a run kind may own that
-recipe. `relink` (`resolve_context relink_page sync_back report`), `repair`
-(`repair_hierarchy sync_back report`), `sync` (`sync_site`) and `revert` (`revert`) hand out
-their own steps and refuse a recipe that disagrees; `generate` takes the template's, or
-`run.GenerateRecipe()` when neither the request nor the template names one; `custom` is the
-one kind exempt from every step rule. The four steps a kind owns — `repair_hierarchy`,
-`sync_site`, `relink_page` and `revert` — are `PerKindStepName` values, a type of their own,
-because `StepName` is the vocabulary a *template* recipe may draw from and it is rendered into
-`vocab.ts`, into the blank template's recipe and into three tool enums. Sixteen steps are
-registered; twelve of them a template may name.
+recipe. `relink` (`resolve_context relink_page sync_back report`), `sync` (`sync_site`),
+`revert` (`revert`) and `edit` (`edit_page`, the agent's one field change or block operation on
+one page, started only by `runs.StartEdit` and waiting for the person) hand out their own steps and
+refuse a recipe that disagrees; `generate`
+takes the template's, or `run.GenerateRecipe()` when neither the request nor the template names
+one; `custom` is the one kind exempt from every step rule; `repair` owns nothing since
+2026-10-18 and cannot be started, the hierarchy being read-only, while its word stays for old
+rows. The four steps a kind owns — `sync_site`, `relink_page`, `revert` and `edit_page` — are
+`PerKindStepName` values, a type of their own, because `StepName` is the vocabulary a
+*template* recipe may draw from and it is rendered into `vocab.ts`, into the blank template's
+recipe and into three tool enums. Seventeen steps are registered; thirteen of them a template may
+name. A run scoped to chosen fields (`StartRequest.fields`) disables the steps those fields do not
+need, and its estimate prices only the steps it keeps.
+
+`sync_site` is the observation. Each execution runs one batch of one stage of
+`application/observe` — inventory (the plugin's manifest and outdated verdict, the post types,
+the technical page ids), content (the plugin's `/content` with `since` and the types named, or
+core's items type by type), store (the products and their variations), render (a few renders at
+once, `settings.observe.renderConcurrency` of them, for the pages that changed or every page on a
+full walk or a `renderRescan`; a page whose visit lands on another keeps only its body's state and
+the landing, and every crumb whose internal link names no modelled page is looked up once with
+`wp.Client.Resolve`, its final path and status kept on the crumb, before the write unit), derive
+(offline: technical and read-only reasons, the parent with its reason and method through
+`pagemap.DeriveParent`, a parent loop broken, the findings, the archive after a full walk, the
+site's observation state; it writes only the derived page columns and the settings' observation
+keys) — and keeps the `observe.State` in its checkpoint, so a crash resumes at the
+batch. The first observation, one asked for with `full`, every Nth (`fullWalkEvery`) and every
+one without the plugin walk the whole site; the others pass `since`. The step's adapters in
+`observe_readers.go` are the only place `*wp.Client` meets the observation's reader
+interfaces, which the use case declares over its own item types. Writes go the other way through
+`application/edit`, the field registry, which declares a core, a store and a plugin writer over
+its own types; `edit_writers.go` adapts `*wp.Client` to them as `observe_readers.go` does for the
+readers, and a run builds the service per site client. `publish`, `relink_page`,
+`relink_neighbors` and `revert` record the body **the site stored** as the page's current and
+base, with the blocks of ours carried onto it (`block.Landed`, `block.Align`), so the next
+observation raises no finding over our own write; `sync_back` records its read-back as the
+current body only and reports a difference from the base.
 
 `relink_page` places the links a page's own rules ask for against the page's own cap and
 writes the body back under a hash compare-and-swap. It calls no model, so a relink, a repair
@@ -153,7 +235,12 @@ template the start is about to assign to it, runs the preflight each step declar
 model role it will call (profile, API key, catalog entry) and prices every page on its own spec,
 each step at its role's service tier and, on a model that reasons, with half the allowance of the
 role's effort as output, both read from the same tuning policy the calls are sent with;
-a finding graded `error` stops `Start`. The step that completes an item may return a notice, which
+a finding graded `error` stops `Start`. The input side is measured, not guessed: `llm.Tokens` reads
+1.7 tokens a word or 3.7 runes a token, each step adds its own measured prompt overhead, and a step
+that reads the body adds the template's words; `go run ./cmd/tokenreport` holds every measured input
+within ±25% of its real `o200k_base` count, and `Fit` keeps a twentieth of its budget as headroom.
+The output side stays conservative on purpose (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) until
+a funded key's ledger can be compared. The step that completes an item may return a notice, which
 the engine keeps as the item's note and sends on `item.done`; the report step words what the
 page lacks there. A page
 whose validation finds an error is held as `needs_human`, and `Engine.Accept` requeues the step
@@ -218,21 +305,36 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` **1.2.0** (PHP ≥ 8.1, WP ≥ 6.4, no dependencies) serves
-`/wp-json/postulator/v1` and advertises `bulk seo_meta seo_meta_read content_hash raw
-preview`; every permission callback requires `edit_posts`, and the password must belong to an
+`wp-plugin/postulator-companion` **1.5.2** (PHP ≥ 7.2, WP ≥ 5.7 since phase 15, proven by a function
+scan on PHP 7.2 and the contract suite on WordPress 5.7.2; no dependencies, `Update URI`
+so wordpress.org never offers a plugin of the same slug) serves `/wp-json/postulator/v1` and
+advertises `bulk seo_meta seo_meta_read content_hash raw preview rendered meta terms settings
+meta_write guarded_write`; a client below 1.5.1 (`wp.PluginMinimum`; the bundled zip is
+`wp.PluginVersion`, 1.5.2, with the 1.5.1 contract) or missing one of them writes nothing through it;
+every permission callback requires `edit_posts`, and the password must belong to an
 **administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not
-name is refused from the cached manifest before any request, so a site still on 1.1.0 answers
-`plugin_outdated` for the SEO read rather than a 404.
+name is refused from the cached manifest before any request, so a site on an older plugin answers
+`plugin_outdated` rather than a 404, and `wp.Capabilities.Outdated` names a plugin below 1.4.1 or
+missing a capability for the Sites panel; 1.4.1 resolves a relative href in `/content` against
+the page's URL as a browser does, where 1.4.0 used the page's parent. The post routes answer a content post only, a post of
+a public post type other than an attachment; a variation, a reusable block, a navigation menu or
+a template answers 404. `uninstall.php` deletes the term clock and the preview tokens and keeps
+the `_postulator_seo_*` values; there is no activation hook, an upload over the installed plugin
+never firing one.
 
 | Route | Purpose |
 |---|---|
-| `GET /manifest` | version, capabilities, detected SEO plugin, WP version, site URL |
-| `GET /content` | keyset page over posts then `product_cat` terms: hash, links, h1, meta |
-| `PUT /seo-meta/{id}` | writes the SEO fields present in the body, deleting a key given an empty value; posts only |
+| `GET /manifest` | version, capabilities, detected SEO plugin, WP version, site URL, the content post types and public taxonomies (since 1.4.0) |
+| `GET /content` | keyset page over posts then terms: hash, links, h1, meta, excerpt and terms; `types` takes any listed post type or taxonomy and defaults to the four it always listed |
+| `GET /content/{id}/rendered` | `the_content` over the raw inside a singular main query, theme-free, and its hash (since 1.4.0) |
+| `GET /meta/{id}?keys=` | at most 50 keys asked, `is_protected_meta` keys refused with `meta_key_denied` (since 1.4.0) |
+| `GET /terms/{id}` | every term of every taxonomy the post's type carries, custom and internal ones included (since 1.4.0) |
+| `GET /settings` | the front, posts and privacy pages and the store's shop, cart, checkout, account and terms pages (since 1.4.0) |
+| `PUT /seo-meta/{id}` | writes the SEO fields present in the body under an `expected` hash each, answering `409 hash_mismatch` naming what moved, and the hashes of what the SEO plugin stored; posts only |
+| `PUT /meta/{id}` | writes post meta by key under an expected hash each, refusing the deny set, protected keys and keys the user may not edit, and answers each key's stored value and hash (since 1.5.0) |
 | `GET /seo-meta/{id}` | the five SEO fields the post holds and the detected SEO plugin, behind the `seo_meta_read` capability; posts only (since 1.2.0) |
-| `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256; the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash |
-| `POST /content/{id}/preview` | an hour-long link that renders a draft through the theme; the token is kept only as its sha256, and `posts_results` flips that one post to `publish` for that request, uncached and noindex (since 1.1.0) |
+| `GET`/`PUT /content/{id}/raw` | raw `post_content` and its sha256, and `saveStable` (whether this user's whole-post save leaves the content, title and excerpt as stored; the title and excerpt since 1.5.1); the write is a compare-and-swap returning `409 hash_mismatch` on a stale hash and answers the content WordPress stored |
+| `POST /content/{id}/preview` | an hour-long link that renders a draft through the theme; the token is kept only as its sha256 and carried in `preview_token` (since 1.4.0), and `posts_results` flips that one post to `publish` for that request, uncached and noindex under core, Rank Math and Yoast alike (since 1.1.0) |
 
 | Field | Yoast | Rank Math | none |
 |---|---|---|---|

@@ -1,6 +1,6 @@
 import { copy } from "../../copy/index.js";
 import type { JsonObject, JsonValue } from "../../domain/merge-patch.js";
-import { decimal, imageSourceLabel, percent, stepLabel } from "./labels.js";
+import { imageSourceLabel, percent, stepLabel } from "./labels.js";
 import { layered } from "./patch.js";
 import type { SpecDraft } from "./spec.js";
 import { isJsonObject } from "./spec.js";
@@ -54,36 +54,6 @@ function keywordSentences(after: SpecDraft, held: JsonValue | undefined): string
             out.push(said.requiredKeywords(after.requiredKeywords));
         } else {
             out.push(said.maxDensity(percent(after.maxDensity)));
-        }
-    }
-    return out;
-}
-
-function linkSentences(after: SpecDraft, held: JsonValue | undefined): string[] {
-    const out: string[] = [];
-    for (const key of keysOf(held, [
-        "upDepth",
-        "downLinks",
-        "siblingMinWeight",
-        "maxLinks",
-        "maxPerTarget",
-        "parentLinkWithinParagraphs",
-        "childrenSection",
-    ])) {
-        if (key === "upDepth") {
-            out.push(said.upDepth(after.upDepth));
-        } else if (key === "downLinks") {
-            out.push(said.downLinks(after.downLinks));
-        } else if (key === "siblingMinWeight") {
-            out.push(said.siblingMinWeight(decimal(after.siblingMinWeight)));
-        } else if (key === "maxLinks") {
-            out.push(said.maxLinks(after.maxLinks));
-        } else if (key === "maxPerTarget") {
-            out.push(said.maxPerTarget(after.maxPerTarget));
-        } else if (key === "parentLinkWithinParagraphs") {
-            out.push(said.parentLinkWithinParagraphs(after.parentLinkWithinParagraphs));
-        } else {
-            out.push(said.childrenSection(after.childrenSection));
         }
     }
     return out;
@@ -173,15 +143,10 @@ function productSentences(after: SpecDraft): string[] {
     if (product === null) {
         return [said.productNone];
     }
-    const parts: string[] = [];
-    if (product.shortEnabled) {
-        parts.push(product.shortWords > 0 ? said.productShortWords(product.shortWords) : said.productShort);
+    if (!product.shortEnabled) {
+        return [said.productNothing];
     }
-    const names = product.specifications.map((row) => (row.name === "" ? copy.templates.product.unnamed : row.name));
-    if (names.length > 0) {
-        parts.push(said.productFills(joined(names)));
-    }
-    return parts.length === 0 ? [said.productNothing] : [parts.join(" and ")];
+    return [product.shortWords > 0 ? said.productShortWords(product.shortWords) : said.productShort];
 }
 
 function sectionSentences(after: SpecDraft): string[] {
@@ -210,8 +175,6 @@ export function sentencesOf(base: SpecDraft, patch: JsonObject | null): string[]
             out.push(...lengthSentences(base, after, held));
         } else if (key === "keywordRules") {
             out.push(...keywordSentences(after, held));
-        } else if (key === "linkRules") {
-            out.push(...linkSentences(after, held));
         } else if (key === "metaRules") {
             out.push(...metaSentences(after, held));
         } else if (key === "images") {

@@ -29,10 +29,11 @@ the composition root binds the two.
 |---|---|
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
-| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity` |
-| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical ReplaceLinks PreviewLink` |
-| `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage CreatePolicy UpdatePolicy DeletePolicy GetPolicy ListPolicies GetEffectivePolicy` |
-| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
+| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical PreviewLink SetType Model ModelSummary WriterPack SiteMap` |
+| `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope` |
+| `RunsService` | `Start Estimate Parents Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
+| `FindingsService` | `List Get Counts Explain Resolve ResolveMany` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
@@ -43,21 +44,84 @@ the composition root binds the two.
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and twenty-four methods. Where a use case answers with bytes the service writes them
+A hundred and thirty-seven methods in sixteen services since phase 15; the stage 4 and phase 15
+methods are described after this paragraph. Stage 2a took the six policy methods out and put five page-type
+methods and `PagesService.SetType` in, and 2b adds `PagesService.WriterPack{pageId, field?, budget?}`,
+exactly what the writer would be sent for a page and field (`application/sitemodel`'s pack: its
+sections in priority order with their token counts, as `Fit` left them under the role's input
+budget, and what it dropped), resolved through the service's third source, and the three card
+proposal methods: `GraphService.CardProposals{siteId, cursor?, limit?}` pages the open
+`entity_card_proposed` findings (each with the card as it is, the card proposed, the reason and
+`changed` when the card moved since, and the `proposalHash` it was shown with),
+`AcceptCard{findingId, proposalHash}` writes the proposed card and settles the finding, refusing
+with `Conflict` and the reason `card_changed` a card that moved since it was proposed and with
+`proposal_changed` a proposal filed again since it was shown, and `DismissCard{findingId}` settles it dismissed, so the same proposal never reopens. `TemplatesService.ListPageTypes{siteId}` answers the site's
+types with every scope (stored or the preset's default) and the field catalog;
+`CreatePageType{siteId, name, preset, templateId?}`, `SavePageType{id, name?, templateId?}`,
+`DeletePageType{id, reassignTo}` (the last type of a preset is refused) and
+`SetScope{pageTypeId, field, …}` change them, resolving `application/pagetypes` through the
+service's second source; `PagesService.SetType{pageId, pageTypeId}` types a page as the user's.
+`GraphService.LoadGraph` names each mapped page's `pageTypeId`. `PagesService.Model{pageId}` answers a page as the model
+(`observe.ModelView`: identity, the parent with its reason and method, the render's root, regions
+and trails with each crumb's link, redirect and page, typed links, the blocks read-only, the open
+findings, and since 2026-10-22 `fields`, each field row a run wrote as `{key, writtenRunId,
+writtenAt, ours}`, `ours` false once the site's value moved from what the run wrote) and
+`ModelSummary{siteId}` the site's (`observe.Summary`); both resolve
+`application/observe` through the service's second source. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
 
+`FindingsService` (stage 4.3b) reads and settles the findings through `application/findings`, the
+one use case a person and the agent share. `List{siteId, status?, code?, pageId?, pageTypeId?,
+under?, cursor?, limit?}` pages them with their pages named (`under` is a node of the Site map, its
+whole subtree); `Counts{siteId, status?, pageTypeId?, under?}` answers each code's count and
+severity; `Get{findingId}` one finding; `Explain{siteId, findingIds, option, pageId?, pageTypeId?}`
+the one sentence of what an option does (`findings.Explain`, the agent's words too) and its kind.
+`Resolve{findingId, option, pageId?, pageTypeId?, proposalHash?}` settles one finding; a `run`
+option settles nothing and answers the `StartRequest` or the `SyncSiteRequest` it asks for, and a
+`proposal` option (`propose_entity`) answers `proposals`, the site preview's
+`PreviewFromPagesRequest`. `ResolveMany{siteId, code, option, findingIds, pageTypeId?}` takes only
+`finding.BulkOptions()` (`ignore accept_site accept_workbook set_type propose_entity`) over at most
+1,000 findings of one code in one unit; the inbox sends a larger set in batches and says what a
+refused batch left unsettled. `By` is `json:"-"` on both: a bound call is the person's.
+
+`PagesService.SiteMap{siteId, parentId?, search?, pageTypeId?, cursor?, limit?}` (stage 4.3b, over
+`page_map` since phase 15) answers a node's children a page at a time, a store category folded into
+the hub of its name (`twin`), with each node's type, parent reason and method, body state, links in
+and out, open findings, children and descendants; a search or a type answers flat matches with their
+trails. `RunsService.Parents{siteId, pageIds}` (phase 15) answers the planned ancestors a selection
+writes first, which the run start's picker adds. `GraphService.PreviewFromPages` takes `source`
+(`model`, the default, or `site`): a site preview names each page's entity from its H1 or title,
+scopes it under its nearest ancestor's entity or the twin hub of its store category, makes no model
+call, and marks a name clash (`no_name`, `name_in_batch`, `name_carried`) unticked rather than
+refusing the batch; `ApplyProposals` takes the preview's `source` and writes a site proposal's
+parent edge approved. `ProposeFromPages` stays the model's. `RunsService.Start` takes `fields` (the field keys a run is scoped to; the
+steps they do not need are disabled) and `rewrite` (the pages whose client text a person confirmed
+may be rewritten).
+
+`SitesService.Update{…, settings?}` takes a site's settings since 2026-10-18 (`userAgent`, the
+`observe` block's `renderConcurrency` 1–16 and `fullWalkEvery` ≥ 1, `linkUrlForm`), keeping the
+observation's own bookkeeping, and `Get` answers them normalized as `settings`; every request the
+registry sends for that site carries its `userAgent`, the connection test of a saved site
+included. `SyncService.SyncSite{siteId, full?, renderRescan?}` walks the whole site or fetches
+every published render again; without either the walk is incremental and reads only what changed
+since the previous one.
+
 `GraphService.MoveEntity{entityId, newParentId, keepBoth?}` adds the parent edge, checks the
 graph is still acyclic and drops the approved parent edges it replaces inside one unit of
-work, and answers `removedEdgeIds`; running it again is quiet. `RunsService.RevertRun{runId}`
-enqueues the revert of a finished run and answers `{runId}`; it refuses a revert of a revert,
-a run that has not finished ("cancel it first"), a second revert while one is `completed` or
-still active, and a run that wrote nothing to the site.
+work, and answers `removedEdgeIds`; running it again is quiet. `RunsService.RevertRun{runId,
+pageId?, fields?}` enqueues the revert of a finished run and answers `{runId}`; it refuses a revert
+of a revert, a run that has not finished ("cancel it first"), a second revert while another is
+under way, and a run that wrote nothing to the site. `pageId` names one page the run wrote and
+`fields` the keys to put back on it (each known to the catalog and off the deny list; `body` or
+`product_description` for the body); a field the client changed since is handed back, never
+written over. The agent's `runs_revert` takes `{runId}` alone.
 
 `ReportsService.JudgePage{pageId}` is synchronous: it pulls the live page, runs the shared
 judge rubric against it and answers with the report, one model call inside the request.
 `PageReport` and `RunReport` read what a run already recorded, and a page report carries, as
-`product`, the short description and attributes of the newest draft and nothing else of it; `SiteOverview`,
+`product`, the short description and attributes of the newest draft (a run before 2026-10-20), else
+`{shortDescription}` from the newest `fields` artifact, and nothing else of either; `SiteOverview`,
 `LinkAudit{siteId}` and `LinkAuditPage{pageId}` read the graph and the page map. The audit
 plans every mapped page's link targets with the rules of the page's resolved template and the
 site's effective policy, exactly as `resolve_context` does, and answers one summary row per
@@ -144,7 +208,8 @@ composes the core again from what it restored. A wrong password or a truncated f
   (`internal/application/<context>`) and passed through unchanged; only `HealthService`,
   `ToolsService` and `SettingsService`, which have no use case behind them, declare theirs
   in `internal/transport/wails`. Domain types carry no JSON tags, except
-  `template.TemplateSpec` and the `llm` catalog types, whose persisted form is JSON.
+  `template.TemplateSpec`, the `llm` catalog types, `site.Settings`, the `render` extraction's
+  parts and `pagemap`'s trail and identity, whose persisted form is JSON.
 - Generics are allowed in exported signatures: `paging.List[T]` generates `List<T>`. A Go
   type with a custom `MarshalJSON` generates as `any`, which is why `Slice<T>` and
   `dto.Time` lose their shape; `frontend/src/lib/paging.ts` restores it with `List<T>` and
@@ -206,18 +271,19 @@ enables a step another kind owns, for every kind but `custom`.
 |---|---|
 | `generate` | the template's, or `run.GenerateRecipe()` (which carries `generate_images`) when neither the request nor the template names one |
 | `relink` | `resolve_context relink_page sync_back report` |
-| `repair` | `repair_hierarchy sync_back report` |
-| `sync` | `sync_site` |
+| `repair` | none since 2026-10-18: the hierarchy is read from the site and never written, so `runs.Start` refuses the kind and names `relink` instead; the word stays in `runs.kind` and `runKinds` so old rows decode |
+| `sync` | `sync_site`, which takes the params `full` (walk the whole site) and `renderRescan` (fetch every published render again) |
 | `revert` | `revert`, and `runs.Start` refuses the kind: only `RunsService.RevertRun` can set `parentRunId` |
+| `edit` | `edit_page` over one page, carrying one field change or one block operation; only `runs.StartEdit` starts it (the agent's `pages_fields` and `pages_blocks`), and its write waits for the person in either mode; `CHECK` rebuilt by 0073 |
 | `audit`, `import` | none of its own |
 | `custom` | none of its own, and the one kind exempt from every step rule |
 
-`repair_hierarchy`, `sync_site`, `relink_page` and `revert` are `run.PerKindStepName` values,
+`sync_site`, `relink_page`, `revert` and `edit_page` are `run.PerKindStepName` values,
 a type of their own, so none of them reaches `vocab.ts`, the blank template's recipe or the
 three tool step enums; `run.PerKindStep(name)` is the domain predicate and
 `run.StepNames()` is what a template recipe may draw from.
 
-`RunsService.Estimate` answers zero for `relink`, `repair` and `sync`, because none of their
+`RunsService.Estimate` answers zero for `relink` and `sync`, because none of their
 steps declares a model role. It prices every target on the template that resolves for it and
 carries `findings []{severity, code, message, pageId?, path?}`: `unpriced_step` names an
 enabled step that declares no ceiling and no model, `template_unresolved`, `entity_missing`,
@@ -228,8 +294,7 @@ are warnings, as is `images_step_off`, raised per page whose template asks for i
 recipe will not draw. Over a product, `commerce_unknown`, `commerce_absent`, `commerce_forbidden`,
 `product_needs_plugin`, `product_not_in_store`, `product_edited_live` and
 `product_category_unwritable` are errors and `product_outputs_missing` and
-`product_outputs_ignored` warnings; a repair over a product or a product category is refused with
-`store_placed`, and one over a post, which WordPress keeps flat, with `post_unnested`.
+`product_outputs_ignored` warnings.
 `model_provider_removed` warns of a template that pins a model of a provider Postulator no longer
 works with and names the model the role uses instead. Each step is priced at its role's service tier and, on a model that
 reasons, with half the allowance of the role's effort added to its output. `Budget` carries
@@ -244,8 +309,15 @@ a schedule's `templateId` does the same on every firing. `ResolveForPageRequest.
 resolves that template in place of the page's own and refuses one of another site with
 `INVALID`.
 
-`RunsService.RetryStep{itemId, acceptFindings?}` requeues the current step; with
-`acceptFindings` a page held at `validate` goes on with its findings as they are. An item
+`RunsService.RetryStep{itemId, acceptFindings?, fields?}` requeues the current step; with
+`acceptFindings` a page held at `validate` goes on with its findings as they are, and an item
+paused `awaiting_review` writes the plan it showed. Only a person accepts a review; the agent's
+call is refused with `CONFLICT`. `fields` (since 2026-10-22) narrows a review's acceptance to the
+keys a person ticked, each among the item's newest `edit_plan` (its field changes and its page's
+`body` key); the rest are not written and the publish result names them in `declined`. An empty
+list, `fields` without `acceptFindings`, on an item no review holds, or on a review that changes
+bodies only (a relink's) is refused with `INVALID`. The agent's `runs_retry_step` takes `{itemId,
+acceptFindings?}` alone. An item
 carries `seq`, its place in the run, and `blockedBy`, the item of the parent it is queued
 behind, and `waitingFor` names that parent's page whenever the item has a blocker.
 
@@ -264,6 +336,17 @@ the write replaced, kept only for an update and only where the site can answer �
 `RelinkPageResult` under the same `relink_result` kind, with `placed[]` rather than
 `neighbors`, so a revert does not try to restore a page nothing wrote to. `revert_result` is
 the artifact kind a revert produces. `ImagesResult` no longer carries `skipped`.
+
+Since stage 3 (2026-10-20 to 22) `publish_result` carries `version` (3) and the diff of what it
+wrote: `fields [{key, before, beforeHash, after, afterHash}]`, each `after` being what the site
+answered it stored, and `blocks [{kind, hash, raw, owner, change}]`, the body's blocks **as the
+site stored them** (`owner` one of `blockOwners`: `ours`, `client`, or `site` for a block the
+site's own save added; `change` one of `blockChanges`: `kept`, `added`, `removed`), with
+`writtenMeta` (the SEO meta the plugin stored) and `declined` (the keys a person left unticked in
+a review). A result without `version` is reverted whole. A draft run's item paused
+`awaiting_review` carries `edit_plan` `{pages: [{pageId, path, body?, fields, blocks, wpId}],
+hash}`, `body` naming the key the body is written under when its blocks change. `revert_result`
+carries `fields [{key, outcome, detail?}]`, a field `kept` with a reason being one handed back.
 
 New warning findings, each carrying `details.pageId` and `details.path`: `judge_unavailable`
 (`reason`), `artifact_purged` (`kind`), `image_not_placed` (`reason`), `meta_not_written`
@@ -359,7 +442,15 @@ null, and no site call is made; it is `preview` for any other page on the site, 
 hour-long signed link the companion plugin issued and rotates on every call. A page without a
 WordPress id answers `INVALID` with `details.field = wpId`, an archived one with `details.field =
 status`. A site that cannot issue a link answers `INVALID` with `details.code` set to
-`plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`.
+`plugin_missing` or, for a plugin older than 1.1.0, `plugin_outdated` with `details.capability`,
+`details.version` (the installed one) and `details.required` (what the client needs).
+
+`SyncService.CheckPlugin{siteId}` answers `{plugin, commerce}`; `plugin` is `{installed, version,
+requiredVersion, outdated, capabilities, seoPlugin}`. `outdated` is true when the manifest's
+version is below `wp.PluginMinimum` (1.5.1 since 2026-10-22, 1.5.0 since 2026-10-20, 1.4.1 since 2026-10-18) or a capability the client needs is
+missing; `requiredVersion` names the bundled zip, `wp.PluginVersion` (1.5.2 since 2026-10-24, the
+1.5.1 contract on PHP 7.2 and WordPress 5.7), and the Sites panel then says to upload it over the old one, which WordPress
+offers as "Replace current with uploaded". The verdict is the probe's and is never stored.
 
 ## Products
 
@@ -373,10 +464,19 @@ address the store decides, empty when the two agree. `ImportOptions.rowType` is 
 `product_not_in_store`, `product_row_left`, `wp_type_kept` and `intermediate_level` are warnings.
 
 A publish over a product writes the description through the plugin's raw route and the short
-description, the filled attributes and an image through WooCommerce's REST API, and its result
-carries `previousProduct {shortDescription, writtenShort, attributes, written, images, added,
-imageId, shortWritten, attributesSent}`, what the product held and what the run wrote, which the
-revert reads. A sync result may carry `product_description_hidden` or `product_page_unread`, both
+description, a first image where it has none and each variation's description (one
+`POST products/{id}/variations/{vid}` carrying `description` alone) through WooCommerce's REST API,
+and its result carries `previousProduct {shortDescription, writtenShort, attributes, written,
+images, added, imageId, shortWritten, attributesSent, lists}` (`lists` holds `upsells` and
+`cross_sells` as `{key, before, written}`, each a comma-joined list of product ids), `previousVariations [{key, before,
+written}]` (the key is `variation_description:<variation id>`) and `previousMedia [{key, before,
+written}]` (`image_alt:<media id>` or `image_title:<media id>`, written through `POST
+wp/v2/media/{id}` with `alt_text` and `title` alone, only for an attachment whose parent is the
+product), what the product held and what the run wrote, which the revert reads; an image attached
+elsewhere is named in `skipped`; a page's or a product's custom fields are `previousFields [{key,
+before, written, provider}]` (`meta:<key>`, written through the plugin's `PUT /meta` or, for a
+product whose scope names the store, `meta_data` by key, never a key the deny list names); `attributes`, `written`, `added` and `attributesSent` are an
+older run's, since no run writes an attribute now. A sync result may carry `product_description_hidden` or `product_page_unread`, both
 warnings. `PagesService.Delete{onSite: true}` refuses a product or a product category with
 `details.field = onSite`. The name, price, stock, SKU, status, slug and categories of a product
 are never written.
@@ -407,11 +507,46 @@ model, tier, tokens (`input cachedInput cacheWrite output reasoning total`), `us
 
 ## The companion plugin's version
 
-The shipped plugin is **1.2.0** and advertises `bulk seo_meta seo_meta_read content_hash raw
-preview`. A capability the manifest does not name is refused from the cached manifest, before
-any request: `GET /seo-meta/{id}` needs `seo_meta_read`, so a site still running 1.1.0 answers
-`plugin_outdated` with `details.capability` and a revert keeps its `revert_meta_kept` warning
-instead of restoring the search snippet. Everything else works against 1.1.0 unchanged.
+The shipped plugin is **1.5.2** (the 1.5.1 contract, declaring PHP 7.2 and WordPress 5.7; 1.5.1 is
+still accepted) and advertises `bulk seo_meta seo_meta_read content_hash raw
+preview rendered meta terms settings meta_write guarded_write`, every one of which the client
+requires (`wp.requiredCapabilities`, the fake's defaults, the PHP `CAPABILITIES`, `openapi.yaml`
+and three pinned test lists move together). A capability the manifest does not name is refused
+from the cached manifest, before any request, and **an outdated plugin writes nothing**: `PutRaw`,
+`SetSEOMeta`, `ReplaceSEOMeta` and `PutMeta` answer `plugin_outdated`, since an older SEO route
+ignores the expected hashes and an older raw write answers no content.
+
+The floors are proven, not declared: `wp-plugin/tests/functions.php` requires every function the
+plugin calls to be its own, on `testdata/wordpress.json` with its `@since`, or in the PHP running the
+scan, and the list's newest core `@since` to be the header's `Requires at least` (5.7.0, `wp_robots`);
+the lint and the tests run under `E_ALL` on PHP 7.2.34, 7.4.33 and 8.5.12, and the contract suite
+ran on WordPress 5.7.2 with PHP 7.3, WooCommerce 6.5.2 and Rank Math 1.0.98.1 (`STAND=legacy`).
+On a WordPress below 6.0 or a WooCommerce below 6.9, core's REST names neither the front page nor
+the store's cart, checkout and account pages; only the plugin's `/settings` answers them.
+
+Stage 3's routes, every write under the hash it was read with (`wp-plugin/openapi.yaml` is the
+contract):
+- `PUT /meta/{id}` takes each key with the hash of the value it was read with (null for one the
+  post did not carry), refuses the deny set (`x-denied-meta`: the store's keys behind the denied
+  fields, the `_`, `attribute_` and `rank_math_` prefixes, `total_sales`), a protected key, a key
+  the user may not `edit_post_meta` and a stored value that is not one plain text, answers `409
+  hash_mismatch` with `moved` naming each key that moved and then writes nothing, deletes on a
+  null, and answers each key's stored value and hash.
+- `PUT /seo-meta/{id}` takes `expected` per field and answers the hashes of what the SEO plugin
+  stored after its own sanitizer.
+- The raw `PUT /content/{id}/raw` answers the content WordPress stored beside its hash, which is
+  what `page_blocks_written` records.
+- The raw `GET` answers `saveStable`: whether a whole-post save by this user would leave the
+  stored content, **title and excerpt** unchanged (since 1.5.1; 1.5.0 probed the content alone),
+  each run through its own `pre_post_*` and `*_save_pre` filters, which is how kses reaches a user
+  without `unfiltered_html`. Over a page that is not save-stable nothing that re-saves the post
+  is sent: meta and SEO writes still go, and the item pauses `save_alters_client`.
+- The manifest answers `unfilteredHtml`.
+
+A link the model records as ours carries the hash of the block that holds it
+(`page_links.block_hash`, migration 0070): the mark moves only with our own changes to that block,
+so a link the client adds with our target and anchor is never ours, and a client's edit to a block
+holding our link hands that link to him.
 
 ## Agent chat
 
@@ -467,22 +602,26 @@ sites, starts a run, follows the events and the catch-up, and sends an agent mes
 
 A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Run}`,
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
-every call. Ninety-three tools, `runs_revert` (`dangerous`), `graph_move_entity` (`write`),
-`graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`) and
-`graph_apply_proposals` (`write`) among them, measuring 63,183 bytes of schema — about 15,800
-tokens resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds
-against `schemaCeilingBytes` (63,200) and logs with the eight widest. A description names what a
+every call. Ninety-two tools since phase 15, `runs_revert` (`dangerous`), `graph_move_entity`
+(`write`), `graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`),
+`graph_apply_proposals` (`write`), and stage 4's `pages_fields`, `pages_blocks` and `findings`, each
+with an `op` enum, among them, measuring 66,394 bytes and 14,779 `o200k_base` tokens of schema
+resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds against
+`schemaCeilingBytes` (66,407) and `schemaCeilingTokens` (14,782) and logs with the eight widest.
+Every agent write to a page is a one-item `edit` run that waits for the person in either mode, and
+so do `graph_apply_proposals` and `graph_propose_from_pages`; resolving a finding and starting a run
+follow the conversation's mode. A description names what a
 field takes, its default, its limits and the tool an id comes from, and no more; the chat
 instructions say once that an id is used as a read tool returned it and that a field left out
 keeps its value. `imports_preview` and `imports_apply` take `sheets: [{sheet, mappingId?,
 rowType?}]`.
 
 With `agent.toolLoading` set to `deferred`, a round sends ten orienting reads whole (`sites_list
-sites_get reports_site_overview graph_list_entities pages_list pages_get pages_tree runs_list
+sites_get sites_explore reports_site_overview graph_list_entities pages_list pages_get runs_list
 runs_get templates_list`) and every other tool inside its group, the prefix of its name, as a
-namespace of `defer_loading` functions beside one `tool_search` tool: 6,506 bytes before any
-search, which a test in `registry_test.go` logs without a ceiling. It is experimental until it has
-been tried with a funded key.
+namespace of `defer_loading` functions beside one `tool_search` tool, which a test in
+`registry_test.go` logs without a ceiling (`go run ./cmd/tokenreport` prints it). It stays off
+until it has been tried with a funded key.
 
 The guard chain runs in this order and the order matters: `fence` wraps tool output as
 untrusted data so a result cannot inject instructions into the model, `audit` writes the
@@ -514,8 +653,8 @@ list items included: the rule is that a field is required only when the use case
 absence, because the runner checks the arguments against the whole tree before the tool runs
 (`transport/agent/arguments.go`, the check gollem used to make) and its refusal teaches the model
 nothing. `dto.Sort.desc`, `graph.Anchor.weight` and `.source`,
-`graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`,
-`pages.ReplaceLinksRequest.links` and the eight prices and three capability flags of
+`graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`
+and the eight prices and three capability flags of
 `models.UpsertModelRequest` are all optional. Where a tool's input reaches into
 `internal/domain/template` it takes a tool-owned argument struct instead of the window's DTO,
 so `templates_create` asks for a name, a page kind and one section with a heading rather than

@@ -15,9 +15,14 @@ describe("changedGroups", () => {
             want: ["rules", "overrides"],
         },
         {
-            name: "a link rule marks rules",
-            patch: { linkRules: { maxLinks: 4 } },
+            name: "a meta rule marks rules",
+            patch: { metaRules: { descriptionMax: 140 } },
             want: ["rules", "overrides"],
+        },
+        {
+            name: "link rules a stored patch still carries belong to no group",
+            patch: { linkRules: { maxLinks: 4 } },
+            want: [],
         },
         { name: "the tone marks rules", patch: { tone: "plain" }, want: ["rules", "overrides"] },
         {
@@ -48,10 +53,6 @@ describe("changedGroups", () => {
             expect([...changedGroups(held.patch)].sort()).toEqual([...held.want].sort());
         });
     }
-
-    it("never marks the policies group, which this layer cannot change", () => {
-        expect(changedGroups({ sections: [], recipe: [] }).has("policies")).toBe(false);
-    });
 });
 
 describe("groupKeys", () => {

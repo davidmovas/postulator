@@ -29,17 +29,13 @@ describe("skeletonOf", () => {
         expect(skeletonOf(draft({ sections, lengthMin: 0, lengthMax: 0 })).lengthState).toBe("unbounded");
     });
 
-    it("carries the link, keyword, image and meta rules the page will follow", () => {
+    it("carries the keyword, image and meta rules the page will follow", () => {
         const skeleton = skeletonOf(
             draft({
                 sections,
                 featuredImage: true,
                 inlineImages: 2,
                 imageSource: "ai",
-                parentLinkWithinParagraphs: 2,
-                childrenSection: true,
-                maxLinks: 8,
-                upDepth: 1,
                 titlePattern: "{primaryKeyword} | {siteName}",
                 descriptionMax: 155,
                 primaryInH1: true,
@@ -47,9 +43,6 @@ describe("skeletonOf", () => {
         );
         expect(skeleton.featured).toBe(true);
         expect(skeleton.inlineImages).toBe(2);
-        expect(skeleton.parentLinkWithin).toBe(2);
-        expect(skeleton.childrenSection).toBe(true);
-        expect(skeleton.maxLinks).toBe(8);
         expect(skeleton.titleParts).toStrictEqual([
             { kind: "placeholder", text: "primaryKeyword" },
             { kind: "text", text: " | " },

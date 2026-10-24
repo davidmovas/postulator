@@ -87,7 +87,7 @@ export type CoverageReason = typeof noPage | string;
 export interface CoverageRow {
     entityId: string;
     name: string;
-    kind: string;
+    type: string;
     path: string;
     reason: CoverageReason;
     links: number;
@@ -109,6 +109,7 @@ export function coverageRows(
     entities: readonly Entity[],
     pages: readonly Page[],
     audits: readonly PageAudit[],
+    typeNames: ReadonlyMap<string, string> = new Map(),
 ): CoverageRow[] {
     const byId = new Map<string, Page>();
     for (const page of pages) {
@@ -123,7 +124,7 @@ export function coverageRows(
         return {
             entityId: entity.id,
             name: entity.name,
-            kind: entity.kind,
+            type: page?.pageTypeId === null || page?.pageTypeId === undefined ? "" : (typeNames.get(page.pageTypeId) ?? ""),
             path: page?.path ?? "",
             reason: page === undefined ? noPage : page.status,
             links: page === undefined ? 0 : (satisfied.get(page.id) ?? 0),

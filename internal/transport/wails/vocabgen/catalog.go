@@ -4,6 +4,8 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -27,15 +29,53 @@ func catalog() []vocabulary {
 		{export: "siteStatuses", tsType: "SiteStatus", pkg: "internal/domain/site", typeName: "Status"},
 		{export: "siteReaches", tsType: "SiteReach", pkg: "internal/domain/site", typeName: "Reach"},
 		{export: "siteCommerces", tsType: "SiteCommerce", pkg: "internal/domain/site", typeName: "Commerce"},
+		{export: "urlForms", tsType: "UrlForm", pkg: "internal/domain/site", typeName: "URLForm"},
 		{export: "pageStatuses", tsType: "PageStatus", pkg: "internal/domain/pagemap", typeName: "Status"},
 		{export: "pageWpTypes", tsType: "PageWpType", pkg: "internal/domain/pagemap", typeName: "WPType"},
-		{export: "linkOrigins", tsType: "LinkOrigin", pkg: "internal/domain/pagemap", typeName: "LinkOrigin"},
+		{export: "linkTypes", tsType: "LinkType", pkg: "internal/domain/pagemap", typeName: "LinkType"},
+		{export: "linkSources", tsType: "LinkSource", pkg: "internal/domain/pagemap", typeName: "LinkSource"},
+		{export: "parentReasons", tsType: "ParentReason", pkg: "internal/domain/pagemap", typeName: "ParentReason"},
+		{export: "parentMethods", tsType: "ParentMethod", pkg: "internal/domain/pagemap", typeName: "ParentMethod"},
+		{export: "trailSources", tsType: "TrailSource", pkg: "internal/domain/pagemap", typeName: "TrailSource"},
+		{export: "technicalReasons", tsType: "TechnicalReason", pkg: "internal/domain/pagemap", typeName: "TechnicalReason"},
+		{export: "contentRootStates", tsType: "ContentRootState", pkg: "internal/domain/render", typeName: "RootState"},
+		{export: "regionKinds", tsType: "RegionKind", pkg: "internal/domain/render", typeName: "RegionKind"},
+		{export: "findingCodes", tsType: "FindingCode", pkg: "internal/domain/finding", typeName: "Code"},
+		{export: "findingSeverities", tsType: "FindingSeverity", pkg: "internal/domain/finding", typeName: "Severity"},
+		{export: "findingStatuses", tsType: "FindingStatus", pkg: "internal/domain/finding", typeName: "Status"},
+		{
+			export: "findingOptions", tsType: "FindingOption", pkg: "internal/domain/finding", typeName: "Option",
+			derived: []derivation{
+				{export: "findingBulkOptions", keep: func(value string) bool { return finding.Option(value).Bulk() }},
+			},
+		},
+		{export: "findingOptionKinds", tsType: "FindingOptionKind", pkg: "internal/domain/finding", typeName: "OptionKind"},
+		{export: "matchRules", tsType: "MatchRule", pkg: "internal/domain/pagemap", typeName: "MatchRule"},
+		{export: "bodyStates", tsType: "BodyState", pkg: "internal/domain/contextpack", typeName: "BodyState"},
+		{export: "proposalClashes", tsType: "ProposalClash", pkg: "internal/domain/contextpack", typeName: "ProposalClash"},
+		{export: "proposalSources", tsType: "ProposalSource", pkg: "internal/application/graph", typeName: "ProposalSource"},
+		{export: "blockKinds", tsType: "BlockKind", pkg: "internal/domain/block", typeName: "BlockKind"},
+		{export: "bodyKinds", tsType: "BodyKind", pkg: "internal/domain/block", typeName: "Kind"},
+		{export: "blockOwners", tsType: "BlockOwner", pkg: "internal/domain/block", typeName: "Owner"},
+		{export: "blockChanges", tsType: "BlockChange", pkg: "internal/domain/block", typeName: "ChangeKind"},
 		{export: "previewKinds", tsType: "PreviewKind", pkg: "internal/application/pages", typeName: "PreviewKind"},
 		{
 			export: "cannibalizationReasons", tsType: "CannibalizationReason", pkg: "internal/domain/pagemap",
 			typeName: "Reason",
 		},
-		{export: "entityKinds", tsType: "EntityKind", pkg: "internal/domain/graph", typeName: "Kind"},
+		{export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset"},
+		{export: "pageTypeSources", tsType: "PageTypeSource", pkg: "internal/domain/pagemap", typeName: "TypeSource"},
+		{export: "pageTypeReasons", tsType: "PageTypeReason", pkg: "internal/domain/pagemap", typeName: "TypeReason"},
+		{
+			export: "fieldKeys", tsType: "FieldKey", pkg: "internal/domain/field", typeName: "Key",
+			derived: []derivation{
+				{export: "scopableFieldKeys", keep: func(value string) bool { return field.CheckScope(field.Key(value)) == nil }},
+				{export: "packFieldKeys", keep: packable},
+			},
+		},
+		{export: "exploreViews", tsType: "ExploreView", pkg: "internal/application/sitemodel", typeName: "View"},
+		{export: "siteGaps", tsType: "SiteGap", pkg: "internal/domain/contextpack", typeName: "Gap"},
+		{export: "fieldProviders", tsType: "FieldProvider", pkg: "internal/domain/field", typeName: "Provider"},
 		{export: "edgeKinds", tsType: "EdgeKind", pkg: "internal/domain/graph", typeName: "EdgeKind"},
 		{export: "edgeStatuses", tsType: "EdgeStatus", pkg: "internal/domain/graph", typeName: "EdgeStatus"},
 		{export: "sources", tsType: "Source", pkg: "internal/domain/graph", typeName: "Source"},
@@ -66,6 +106,7 @@ func catalog() []vocabulary {
 						return owns
 					},
 				},
+				{export: "startableRunKinds", keep: func(value string) bool { return run.Kind(value).Startable() }},
 			},
 		},
 		{
@@ -100,7 +141,7 @@ func catalog() []vocabulary {
 		{export: "templateScopes", tsType: "TemplateScope", pkg: "internal/domain/template", typeName: "Scope"},
 		{export: "overrideScopes", tsType: "OverrideScope", pkg: "internal/domain/template", typeName: "OverrideScope"},
 		{
-			export: "anchorStrategies", tsType: "AnchorStrategy", pkg: "internal/domain/template",
+			export: "anchorStrategies", tsType: "AnchorStrategy", pkg: "internal/domain/field",
 			typeName: "AnchorStrategy",
 		},
 		{export: "imageSources", tsType: "ImageSource", pkg: "internal/domain/template", typeName: "ImageSource"},
@@ -150,4 +191,9 @@ func catalog() []vocabulary {
 		{export: "siteSortFields", tsType: "SiteSortField", pkg: "internal/domain/site", typeName: "Sort"},
 		{export: "templateSortFields", tsType: "TemplateSortField", pkg: "internal/domain/template", typeName: "Sort"},
 	}
+}
+
+func packable(value string) bool {
+	spec, known := field.Lookup(field.Key(value))
+	return known && spec.Text && spec.AIWritable() && field.CheckScope(field.Key(value)) == nil
 }

@@ -51,6 +51,7 @@ type Server struct {
 	uploadOrder   []int64
 	requests      []Request
 	faults        []fault
+	updateFaults  []int
 	clock         time.Time
 	now           func() time.Time
 	user          string
@@ -58,8 +59,14 @@ type Server struct {
 	address       string
 	seoPlugin     string
 	redirect      Redirect
+	redirects     map[string]string
 	pendingEdit   *edit
+	pluginVersion string
 	capabilities  []string
+	postTypes     []PostType
+	taxonomies    []Taxonomy
+	reading       reading
+	storePages    StorePages
 	nextID        int64
 	nextTermID    int64
 	previewSeq    int64
@@ -72,7 +79,13 @@ type Server struct {
 	brokenHash    bool
 	brokenExpiry  bool
 	noNamespaces  bool
-	mu            sync.Mutex
+	noSettings    bool
+
+	noStoreSettings bool
+	rawAnswerFaults []int
+	saveFilter      func(string) string
+	seoSanitized    bool
+	mu              sync.Mutex
 }
 
 type Option func(*Server)
@@ -101,7 +114,18 @@ func WithoutProductEdit() Option {
 }
 
 func WithFilteredHTML() Option {
-	return func(s *Server) { s.filteredHTML = true }
+	return func(s *Server) {
+		s.filteredHTML = true
+		s.saveFilter = kses
+	}
+}
+
+func WithSaveFilter(filter func(string) string) Option {
+	return func(s *Server) { s.saveFilter = filter }
+}
+
+func WithSEOSanitized() Option {
+	return func(s *Server) { s.seoSanitized = true }
 }
 
 func WithBuilderLayout() Option {
@@ -116,12 +140,25 @@ func WithCapabilities(names ...string) Option {
 	return func(s *Server) { s.capabilities = slices.Clone(names) }
 }
 
+func WithPluginVersion(version string) Option {
+	return func(s *Server) { s.pluginVersion = version }
+}
+
 func WithoutNamespaces() Option {
 	return func(s *Server) { s.noNamespaces = true }
 }
 
 func WithRedirect(mode Redirect) Option {
 	return func(s *Server) { s.redirect = mode }
+}
+
+func WithPublicRedirect(from, to string) Option {
+	return func(s *Server) {
+		if s.redirects == nil {
+			s.redirects = make(map[string]string)
+		}
+		s.redirects[normalisePath(from)] = to
+	}
 }
 
 func WithAddress(address string) Option {
@@ -136,16 +173,20 @@ func New(t TB, opts ...Option) *Server {
 	t.Helper()
 
 	server := &Server{
-		t:            t,
-		items:        make(map[int64]*Item),
-		terms:        make(map[int64]*Item),
-		categories:   make(map[int64]*Category),
-		uploads:      make(map[int64]*upload),
-		clock:        startInstant.Add(-time.Second),
-		user:         DefaultUser,
-		password:     DefaultPassword,
-		seoPlugin:    "yoast",
-		capabilities: []string{"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview"},
+		t:             t,
+		items:         make(map[int64]*Item),
+		terms:         make(map[int64]*Item),
+		categories:    make(map[int64]*Category),
+		uploads:       make(map[int64]*upload),
+		clock:         startInstant.Add(-time.Second),
+		user:          DefaultUser,
+		password:      DefaultPassword,
+		seoPlugin:     "yoast",
+		pluginVersion: "1.5.2",
+		capabilities: []string{
+			"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms", "settings",
+			"meta_write", "guarded_write",
+		},
 	}
 	for _, opt := range opts {
 		opt(server)
@@ -177,15 +218,17 @@ func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+rootPath, s.handleRoot)
 	s.routeCore(mux)
+	s.routeTypes(mux)
 	s.routeCategories(mux)
 	s.routeMedia(mux)
 	s.routeWoo(mux)
+	s.routeStore(mux)
 	s.routePlugin(mux)
 
 	public := http.NewServeMux()
 	s.routeStorefront(public)
-	public.Handle("/", s.redirectRoot(s.injectFaults(s.authenticate(mux))))
-	return s.record(public)
+	public.Handle("/", s.publicOr(s.redirectRoot(s.injectFaults(s.authenticate(mux)))))
+	return s.record(s.redirectPublic(public))
 }
 
 func (s *Server) record(next http.Handler) http.Handler {

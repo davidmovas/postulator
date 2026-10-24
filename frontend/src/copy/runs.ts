@@ -9,6 +9,7 @@ export const runs = {
         resolve_context: "Resolve context",
         generate_body: "Write the body",
         generate_meta: "Write the meta",
+        generate_fields: "Write the other fields",
         insert_links: "Insert links",
         repair_links: "Repair links",
         generate_images: "Make images",
@@ -20,10 +21,10 @@ export const runs = {
         report: "Report",
     },
     perKindSteps: {
-        repair_hierarchy: "Move under the parent",
         sync_site: "Sync the site",
         relink_page: "Place the links",
         revert: "Put it back",
+        edit_page: "Make the confirmed change",
     },
     kinds: {
         generate: "Generate",
@@ -33,6 +34,7 @@ export const runs = {
         import: "Import",
         repair: "Repair",
         revert: "Revert",
+        edit: "Agent edit",
         custom: "Custom",
     },
     status: {
@@ -50,6 +52,8 @@ export const runs = {
         needs_human: "Paused for a human decision.",
         user: "Paused by you.",
         awaiting_parent: "Waiting for a parent page to reach the site; it goes on by itself once the parent is there.",
+        awaiting_review:
+            "This is a draft run, and the page is already on the site, so nothing was written yet. Review the changes and accept them to write them as shown.",
     },
     pauseReasonShort: {
         budget_exceeded: "budget cap",
@@ -57,6 +61,7 @@ export const runs = {
         needs_human: "needs human",
         user: "paused by you",
         awaiting_parent: "waiting for parent",
+        awaiting_review: "awaiting review",
     },
     unknownPauseReason: "Paused for a reason this build does not recognise.",
     hold: {
@@ -105,10 +110,23 @@ export const runs = {
         "Every page this run created goes to the WordPress trash and its row here goes back to planned. Every page it updated gets the body it replaced, and every neighbour it relinked gets the content it replaced. A page a human has edited since is left alone and held for you. Images it uploaded stay in the media library, and the SEO meta it wrote stays as it is.",
     revertConfirm: "Revert the run",
     revertKeep: "Leave it as it is",
+    revertFields: {
+        action: (count: number) => (count === 0 ? "Revert fields" : count === 1 ? "Revert 1 field" : `Revert ${count} fields`),
+        none: "Tick the fields to put back first.",
+        created: "This run created the page, so only a revert of the whole run takes it down.",
+        title: "Put these fields back",
+        body: (labels: string) =>
+            `${labels}: each gets the value it had before this run, and one changed on the site since keeps the client's value and is handed back.`,
+        confirm: "Put them back",
+        started: "A revert run started.",
+        open: "Open the revert",
+    },
     retryStep: "Retry this step",
     retryBusy: "The item has not stopped, so there is nothing to retry.",
     accept: "Accept as it is",
     acceptHint: "The findings stay in the report and the page goes on to its next step as it is.",
+    acceptReview: "Accept and write",
+    acceptReviewHint: "Writes the ticked changes to the site, and an unticked one leaves the site's value as it is.",
     decisionTitle: (count: number) =>
         count === 1 ? "1 page waits for your decision" : `${count} pages wait for your decision`,
     decisionBody: "Open each held page to accept it as it is or to regenerate it.",
@@ -265,14 +283,31 @@ export const runs = {
         tokenCap: "Token cap",
         tokenCapHint: "The run pauses itself once it has used this many tokens. Zero means no cap at all.",
         tokenCapZero: "With no cap this run will not stop itself on tokens.",
+        rewrite: "Rewrite the owner's own text",
+        rewriteHint:
+            "Off, the owner's own paragraphs are kept byte for byte and the run's sections are added after them.",
+        rewriteOn: (paths: readonly string[]) =>
+            `The owner's own paragraphs will be replaced on ${paths.join(", ")}.`,
+        rewriteTitle: "Rewrite the owner's own text?",
+        rewriteBody:
+            "On every page ticked here, the run replaces the owner's own paragraphs with text it writes, instead of keeping them and adding after them. Untick a page to keep its text.",
+        rewriteConfirm: (count: number) =>
+            count === 0 ? "Replace none" : count === 1 ? "Replace the text of 1 page" : `Replace the text of ${count} pages`,
+        rewriteCancel: "Keep their text",
+        scopeTitle: "Fields this run writes",
+        fieldScope: (fields: readonly string[]) =>
+            `Only ${fields.join(", ")} ${fields.length === 1 ? "is" : "are"} written; nothing else on the page changes.`,
+        rewriteField: (fields: readonly string[], paths: readonly string[]) =>
+            `The client's value of ${fields.join(", ")} is rewritten on ${paths.join(", ")}.`,
         kindDoes: {
             generate: "Writes each page from its template and publishes it, then links the pages around it.",
             relink: "Reads each page from WordPress and places the links its rules ask for. The body is left as it is and no model is called.",
             audit: "Runs the page steps you choose without a recipe of its own.",
             sync: "Reads the whole site back into the page map. The pages it names are ignored.",
             import: "Runs the page steps you choose without a recipe of its own.",
-            repair: "Moves each page under the parent its path asks for, without rewriting it. No model is called.",
+            repair: "No model is called. The hierarchy is read from the site and never written, so a repair can no longer be started; a relink fixes the links.",
             revert: "A revert is started from the run it undoes, on that run's page.",
+            edit: "An agent edit makes the one change to a field or a block that a person confirmed, and no model is called.",
             custom: "Runs exactly the steps of the template, whatever they are.",
         },
         estimate: "Price this run",
@@ -307,12 +342,45 @@ export const runs = {
             `Bodies, drafts and images are dropped ${days} days after the page publishes. The row stays, and the compliance findings and the judge score below are untouched.`,
         purgedBodyUnknown:
             "Bodies, drafts and images are dropped once the retention window passes on a published page. The row stays, and the compliance findings and the judge score below are untouched.",
-        noDiff: "There is no comparison with the live page — raw WordPress content is not exposed by any binding.",
+        noDiff: "Each field and block is set against what the site held before this write.",
+        diff: {
+            fields: "Fields",
+            noFields: "No field was written.",
+            before: "Before",
+            after: "After",
+            empty: "empty",
+            hashes: (before: string, after: string) =>
+                `Hash before ${before === "" ? "none" : before}, after ${after === "" ? "none" : after}.`,
+            body: "Body",
+            noBlocks: "The body was not written.",
+            noText: "no text",
+            owners: {
+                ours: "ours",
+                client: "the client's",
+                site: "the site's",
+            },
+            changes: {
+                kept: "Kept",
+                added: "Added",
+                removed: "Removed",
+            },
+            state: (change: string, owner: string) => `${change}: ${owner}`,
+            rendered: "Rendered by the site",
+            renderedHint: "A shortcode, so what shows in its place is rendered by the site.",
+            declined: "Left unticked, not written",
+            regions: "What the site adds around the body",
+        },
+        plan: {
+            none: "This review holds no change.",
+            noImages: "A draft run draws and uploads no image for a page already on the site.",
+            nothingTicked: "Tick at least one change to accept, or cancel the run to leave the page as it is.",
+        },
         kinds: {
             link_context: "Targets",
             draft: "Draft",
             body_html: "Body",
             meta: "Meta",
+            fields: "Fields",
             images: "Images",
             validation_report: "Links & compliance",
             judge_report: "Judge",
@@ -321,6 +389,7 @@ export const runs = {
             sync_result: "Sync",
             final_report: "Report",
             revert_result: "Revert",
+            edit_plan: "Changes to review",
         },
         body: {
             preview: "Sandboxed preview",
@@ -394,6 +463,11 @@ export const runs = {
             } as Readonly<Record<string, string>>,
             neighbours: "Neighbouring pages",
             none: "No neighbouring page was touched.",
+            fields: "Fields",
+            fieldOutcomes: {
+                restored: "Put back",
+                kept: "Handed back",
+            } as Readonly<Record<string, string>>,
         },
         draft: {
             sections: "Sections",
@@ -401,6 +475,12 @@ export const runs = {
             short: "Short description",
             specifications: "Attributes",
             unstated: "not stated",
+        },
+        fields: {
+            written: "Written",
+            skipped: "Not asked for",
+            none: "No field was asked for: no enabled field this step writes is set to be written by the model.",
+            empty: "empty",
         },
         images: {
             featured: "Featured image",

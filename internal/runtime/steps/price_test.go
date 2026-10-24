@@ -3,6 +3,7 @@ package steps_test
 import (
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/domain/field"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -17,7 +18,7 @@ func TestEveryStepSaysWhatOneItemOfItCosts(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	spec := template.TemplateSpec{LinkRules: template.LinkRules{UpDepth: 2}}
+	links := linksOf(field.LinkRules{UpDepth: 2})
 	cases := []struct {
 		name     string
 		params   map[string]any
@@ -54,9 +55,9 @@ func TestEveryStepSaysWhatOneItemOfItCosts(t *testing.T) {
 				t.Errorf("unpriced = %t, want %t", def.Price.Unpriced, tc.unpriced)
 			}
 
-			priced := spec
-			priced.KeywordRules.PrimaryInFirstParagraph = tc.lead
-			priced.Images = tc.images
+			priced := run.Target{Links: links}
+			priced.Spec.KeywordRules.PrimaryInFirstParagraph = tc.lead
+			priced.Spec.Images = tc.images
 			calls := 1
 			if def.Price.Calls != nil {
 				calls = def.Price.Calls(priced, tc.params)

@@ -17,15 +17,6 @@ func (s Sort) Valid() bool {
 }
 
 type Query struct {
-	Scope    *Scope
-	SiteID   *string
-	PageKind string
-	Name     string
-	Sort     Sort
-	Desc     bool
-}
-
-type PolicyQuery struct {
 	Scope  *Scope
 	SiteID *string
 	Name   string

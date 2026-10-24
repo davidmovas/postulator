@@ -104,7 +104,7 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request, itemType str
 	end := min(start+perPage, total)
 	payload := make([]map[string]any, 0, end-start)
 	for _, stored := range matched[start:end] {
-		payload = append(payload, narrowFields(s.itemPayload(stored), query.Get("_fields")))
+		payload = append(payload, narrowFields(s.withEmbed(s.itemPayload(stored), stored, query), query.Get("_fields")))
 	}
 	s.mu.Unlock()
 
@@ -124,7 +124,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request, itemType stri
 	stored, found := s.items[id]
 	var payload map[string]any
 	if found && stored.Type == itemType {
-		payload = s.itemPayload(stored)
+		payload = s.withEmbed(s.itemPayload(stored), stored, r.URL.Query())
 	}
 	s.mu.Unlock()
 
@@ -144,9 +144,9 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request, itemType s
 	s.mu.Lock()
 	created := s.add(Item{
 		Type:          itemType,
-		Title:         stringField(body, "title"),
-		Content:       stringField(body, "content"),
-		Excerpt:       stringField(body, "excerpt"),
+		Title:         s.saved(stringField(body, "title")),
+		Content:       s.saved(stringField(body, "content")),
+		Excerpt:       s.saved(stringField(body, "excerpt")),
 		Slug:          stringField(body, "slug"),
 		Status:        stringField(body, "status"),
 		Template:      stringField(body, "template"),
@@ -169,6 +169,10 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request, itemType s
 		s.fail(w, http.StatusNotFound, "rest_post_invalid_id", "Invalid post ID.")
 		return
 	}
+	if status, failed := s.takeUpdateFault(); failed {
+		s.fail(w, status, faultCode(status), "the injected fault fired")
+		return
+	}
 
 	body, ok := s.decodeBody(w, r)
 	if !ok {
@@ -184,6 +188,8 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request, itemType s
 	}
 
 	applyUpdate(stored, body)
+	stored.Content = s.saved(stored.Content)
+	stored.Title, stored.Excerpt = s.saved(stored.Title), s.saved(stored.Excerpt)
 	if slug := stringField(body, "slug"); slug != "" {
 		stored.Slug = s.uniqueSlug(slug, stored.Type, stored.Parent, stored.ID)
 	}

@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 	"github.com/davidmovas/postulator/internal/transport/wails"
@@ -45,38 +46,40 @@ func (f templatesFake) ResolveForPage(context.Context, templates.ResolveForPageR
 	return answer[templates.ResolveForPageResponse](f.mode)
 }
 
-func (f templatesFake) CreatePolicy(context.Context, templates.CreatePolicyRequest) (templates.CreatePolicyResponse, error) {
-	return answer[templates.CreatePolicyResponse](f.mode)
+type pageTypesFake struct{ mode failure }
+
+func (f pageTypesFake) List(context.Context, pagetypes.ListRequest) (pagetypes.ListResponse, error) {
+	return answer[pagetypes.ListResponse](f.mode)
 }
 
-func (f templatesFake) UpdatePolicy(context.Context, templates.UpdatePolicyRequest) (templates.UpdatePolicyResponse, error) {
-	return answer[templates.UpdatePolicyResponse](f.mode)
+func (f pageTypesFake) Create(context.Context, pagetypes.CreateRequest) (pagetypes.Type, error) {
+	return answer[pagetypes.Type](f.mode)
 }
 
-func (f templatesFake) DeletePolicy(context.Context, templates.DeletePolicyRequest) (templates.DeletePolicyResponse, error) {
-	return answer[templates.DeletePolicyResponse](f.mode)
+func (f pageTypesFake) Save(context.Context, pagetypes.SaveRequest) (pagetypes.Type, error) {
+	return answer[pagetypes.Type](f.mode)
 }
 
-func (f templatesFake) GetPolicy(context.Context, templates.GetPolicyRequest) (templates.GetPolicyResponse, error) {
-	return answer[templates.GetPolicyResponse](f.mode)
+func (f pageTypesFake) Delete(context.Context, pagetypes.DeleteRequest) (pagetypes.DeleteResponse, error) {
+	return answer[pagetypes.DeleteResponse](f.mode)
 }
 
-func (f templatesFake) ListPolicies(context.Context, templates.ListPoliciesRequest) (paging.List[templates.LinkPolicy], error) {
-	return answer[paging.List[templates.LinkPolicy]](f.mode)
+func (f pageTypesFake) SetScope(context.Context, pagetypes.SetScopeRequest) (pagetypes.Scope, error) {
+	return answer[pagetypes.Scope](f.mode)
 }
 
-func (f templatesFake) GetEffectivePolicy(context.Context, templates.GetEffectivePolicyRequest) (templates.GetEffectivePolicyResponse, error) {
-	return answer[templates.GetEffectivePolicyResponse](f.mode)
+func templatesService(mode failure) *wails.TemplatesService {
+	return wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{mode: mode}),
+		ready[wails.PageTypesUseCase](pageTypesFake{mode: mode}))
 }
 
 func TestTemplatesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
-	assertMethodNames(t, wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{})), []string{
-		"CreatePolicy", "CreateTemplate", "DeleteOverride", "DeletePolicy", "DeleteTemplate",
-		"GetEffectivePolicy", "GetPolicy", "GetTemplate", "ListPolicies", "ListTemplates",
-		"ResolveForPage", "SetOverride", "UpdatePolicy", "UpdateTemplate",
+	assertMethodNames(t, templatesService(missing), []string{
+		"CreatePageType", "CreateTemplate", "DeleteOverride", "DeletePageType", "DeleteTemplate", "GetTemplate",
+		"ListPageTypes", "ListTemplates", "ResolveForPage", "SavePageType", "SetOverride", "SetScope", "UpdateTemplate",
 	})
-	assertEveryMethodConverts(t, wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{mode: missing})), missingBody)
-	assertEveryMethodConverts(t, wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{mode: panicking})), panicBody)
+	assertEveryMethodConverts(t, templatesService(missing), missingBody)
+	assertEveryMethodConverts(t, templatesService(panicking), panicBody)
 }

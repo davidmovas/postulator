@@ -5,7 +5,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/kernel/middleware"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
@@ -20,8 +22,18 @@ type PagesUseCase interface {
 	MapToEntity(ctx context.Context, req pages.MapToEntityRequest) (pages.MapToEntityResponse, error)
 	Unmap(ctx context.Context, req pages.UnmapRequest) (pages.UnmapResponse, error)
 	SetCanonical(ctx context.Context, req pages.SetCanonicalRequest) (pages.SetCanonicalResponse, error)
-	ReplaceLinks(ctx context.Context, req pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error)
 	PreviewLink(ctx context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error)
+	SetType(ctx context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error)
+}
+
+type ModelUseCase interface {
+	Model(ctx context.Context, req observe.ModelRequest) (observe.ModelView, error)
+	SummaryOf(ctx context.Context, req observe.SummaryRequest) (observe.Summary, error)
+}
+
+type SiteModelUseCase interface {
+	Pack(ctx context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error)
+	SiteMap(ctx context.Context, req sitemodel.MapRequest) (sitemodel.MapView, error)
 }
 
 type PagesService struct {
@@ -34,11 +46,17 @@ type PagesService struct {
 	mapToEntity  middleware.Handler[pages.MapToEntityRequest, pages.MapToEntityResponse]
 	unmap        middleware.Handler[pages.UnmapRequest, pages.UnmapResponse]
 	setCanonical middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
-	replaceLinks middleware.Handler[pages.ReplaceLinksRequest, pages.ReplaceLinksResponse]
 	previewLink  middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
+	setType      middleware.Handler[pages.SetTypeRequest, pages.SetTypeResponse]
+	model        middleware.Handler[observe.ModelRequest, observe.ModelView]
+	modelSummary middleware.Handler[observe.SummaryRequest, observe.Summary]
+	writerPack   middleware.Handler[sitemodel.PackRequest, sitemodel.PackView]
+	siteMap      middleware.Handler[sitemodel.MapRequest, sitemodel.MapView]
 }
 
-func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesService {
+func NewPagesService(
+	logger *zap.Logger, useCase Source[PagesUseCase], models Source[ModelUseCase], siteModel Source[SiteModelUseCase],
+) *PagesService {
 	return &PagesService{
 		create:       Wrap(logger, "pages.create", call(useCase, PagesUseCase.Create)),
 		update:       Wrap(logger, "pages.update", call(useCase, PagesUseCase.Update)),
@@ -49,9 +67,29 @@ func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase]) *PagesSer
 		mapToEntity:  Wrap(logger, "pages.mapToEntity", call(useCase, PagesUseCase.MapToEntity)),
 		unmap:        Wrap(logger, "pages.unmap", call(useCase, PagesUseCase.Unmap)),
 		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
-		replaceLinks: Wrap(logger, "pages.replaceLinks", call(useCase, PagesUseCase.ReplaceLinks)),
 		previewLink:  Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
+		setType:      Wrap(logger, "pages.setType", call(useCase, PagesUseCase.SetType)),
+		model:        Wrap(logger, "pages.model", call(models, ModelUseCase.Model)),
+		modelSummary: Wrap(logger, "pages.modelSummary", call(models, ModelUseCase.SummaryOf)),
+		writerPack:   Wrap(logger, "pages.writerPack", call(siteModel, SiteModelUseCase.Pack)),
+		siteMap:      Wrap(logger, "pages.siteMap", call(siteModel, SiteModelUseCase.SiteMap)),
 	}
+}
+
+func (s *PagesService) SiteMap(c context.Context, req sitemodel.MapRequest) (sitemodel.MapView, error) {
+	return s.siteMap(c, req)
+}
+
+func (s *PagesService) WriterPack(c context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error) {
+	return s.writerPack(c, req)
+}
+
+func (s *PagesService) Model(c context.Context, req observe.ModelRequest) (observe.ModelView, error) {
+	return s.model(c, req)
+}
+
+func (s *PagesService) ModelSummary(c context.Context, req observe.SummaryRequest) (observe.Summary, error) {
+	return s.modelSummary(c, req)
 }
 
 func (s *PagesService) Create(c context.Context, req pages.CreateRequest) (pages.CreateResponse, error) {
@@ -90,10 +128,10 @@ func (s *PagesService) SetCanonical(c context.Context, req pages.SetCanonicalReq
 	return s.setCanonical(c, req)
 }
 
-func (s *PagesService) ReplaceLinks(c context.Context, req pages.ReplaceLinksRequest) (pages.ReplaceLinksResponse, error) {
-	return s.replaceLinks(c, req)
-}
-
 func (s *PagesService) PreviewLink(c context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error) {
 	return s.previewLink(c, req)
+}
+
+func (s *PagesService) SetType(c context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error) {
+	return s.setType(c, req)
 }

@@ -89,13 +89,26 @@ func (f graphFake) ApplyProposals(context.Context, graph.ApplyProposalsRequest) 
 	return answer[graph.ApplyProposalsResponse](f.mode)
 }
 
+func (f graphFake) CardProposals(context.Context, graph.CardProposalsRequest) (paging.List[graph.CardProposal], error) {
+	return answer[paging.List[graph.CardProposal]](f.mode)
+}
+
+func (f graphFake) AcceptCard(context.Context, graph.AcceptCardRequest) (graph.AcceptCardResponse, error) {
+	return answer[graph.AcceptCardResponse](f.mode)
+}
+
+func (f graphFake) DismissCard(context.Context, graph.DismissCardRequest) (graph.DismissCardResponse, error) {
+	return answer[graph.DismissCardResponse](f.mode)
+}
+
 func TestGraphServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{})), []string{
-		"AddEdge", "ApplyProposals", "ApproveEdge", "CreateEntity", "DeleteEdge", "DeleteEntity", "GetEntity",
-		"ListEdges", "ListEntities", "LoadGraph", "MoveEntity", "PreviewFromPages", "ProposeFromKeywords",
-		"ProposeFromPages", "ProposeRelated", "RecomputeScores", "RejectEdge", "SetAnchors", "UpdateEntity",
+		"AcceptCard", "AddEdge", "ApplyProposals", "ApproveEdge", "CardProposals", "CreateEntity", "DeleteEdge",
+		"DeleteEntity", "DismissCard", "GetEntity", "ListEdges", "ListEntities", "LoadGraph", "MoveEntity",
+		"PreviewFromPages", "ProposeFromKeywords", "ProposeFromPages", "ProposeRelated", "RecomputeScores", "RejectEdge",
+		"SetAnchors", "UpdateEntity",
 	})
 	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{mode: panicking})), panicBody)

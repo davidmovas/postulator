@@ -11,7 +11,6 @@ import { AddIcon, Banner, Button, CountBadge, Screen } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
 import { CreateTemplateDrawer } from "./create.js";
 import { TemplateDetail } from "./detail.js";
-import { tabPath, TemplateTabs } from "./header.js";
 import { copyName } from "./naming.js";
 import type { TemplatesQuery } from "./params.js";
 import { defaultQuery, narrowed, readQuery, writeQuery } from "./params.js";
@@ -62,7 +61,6 @@ export function TemplatesScreen(): ReactElement {
                 scope: "site",
                 siteId,
                 name: copyName(selected.name, namesIn(rows.loaded, "site")),
-                pageKind: selected.pageKind,
                 spec: selected.spec,
             },
             {
@@ -86,29 +84,19 @@ export function TemplatesScreen(): ReactElement {
             title={copy.templates.title}
             badge={rows.pending ? undefined : <CountBadge tone="muted" count={rows.shown.length} />}
             variant="split"
-            tabs={<TemplateTabs siteId={siteId} tab="templates" />}
             actions={
-                <>
-                    <Button
-                        onClick={() => {
-                            void navigate(`${tabPath(siteId, "policies")}?action=new`);
-                        }}
-                    >
-                        {copy.policies.newPolicy}
-                    </Button>
-                    <Button
-                        variant="primary"
-                        icon={AddIcon}
-                        data-template-new={true}
-                        onClick={() => {
-                            setCreating(true);
-                        }}
-                    >
-                        {copy.templates.newTemplate}
-                    </Button>
-                </>
+                <Button
+                    variant="primary"
+                    icon={AddIcon}
+                    data-template-new={true}
+                    onClick={() => {
+                        setCreating(true);
+                    }}
+                >
+                    {copy.templates.newTemplate}
+                </Button>
             }
-            toolbar={<TemplateToolbar query={query} kinds={rows.kinds} onChange={change} />}
+            toolbar={<TemplateToolbar query={query} onChange={change} />}
             right={
                 selected === null || rows.pending ? null : (
                     <TemplateDetail

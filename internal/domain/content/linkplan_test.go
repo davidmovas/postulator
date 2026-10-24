@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
-	"github.com/davidmovas/postulator/internal/domain/template"
 )
 
 func pagelessParent(t *testing.T) dag {
@@ -31,14 +31,14 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 		name     string
 		fixture  func(*testing.T) dag
 		entityID string
-		rules    template.LinkRules
+		rules    field.LinkRules
 		want     []content.BlockedTarget
 	}{
 		{
 			name:     "a child without a page is blocked once even when it is also related",
 			fixture:  multiParentDAG,
 			entityID: "coffee",
-			rules:    template.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5},
+			rules:    field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5},
 			want: []content.BlockedTarget{{
 				EntityID: "orphan", Relation: content.RelationDown, Weight: 0.1, Depth: 1,
 				Reason: content.BlockedNoPage,
@@ -48,7 +48,7 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 			name:     "with down links off the same entity is blocked as a sibling",
 			fixture:  multiParentDAG,
 			entityID: "coffee",
-			rules:    template.LinkRules{UpDepth: 1, SiblingMinWeight: 0.5},
+			rules:    field.LinkRules{UpDepth: 1, SiblingMinWeight: 0.5},
 			want: []content.BlockedTarget{{
 				EntityID: "orphan", Relation: content.RelationSibling, Weight: 0.9, Depth: 1,
 				Reason: content.BlockedNoCanonicalPage,
@@ -58,7 +58,7 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 			name:     "a parent without any page is passed over and owed nothing",
 			fixture:  pagelessParent,
 			entityID: "child",
-			rules:    template.LinkRules{UpDepth: 1},
+			rules:    field.LinkRules{UpDepth: 1},
 			want: []content.BlockedTarget{{
 				EntityID: "parent", Relation: content.RelationUp, Weight: 1, Depth: 1,
 				Reason: content.BlockedNoPage,
@@ -68,14 +68,14 @@ func TestPlanLinksReportsWhatItCannotLink(t *testing.T) {
 			name:     "siblings below the threshold block nothing",
 			fixture:  multiParentDAG,
 			entityID: "coffee",
-			rules:    template.LinkRules{SiblingMinWeight: 0.95},
+			rules:    field.LinkRules{SiblingMinWeight: 0.95},
 			want:     []content.BlockedTarget{},
 		},
 		{
 			name:     "an unknown entity plans nothing",
 			fixture:  multiParentDAG,
 			entityID: "absent",
-			rules:    template.LinkRules{UpDepth: 3, DownLinks: true},
+			rules:    field.LinkRules{UpDepth: 3, DownLinks: true},
 			want:     []content.BlockedTarget{},
 		},
 	}
@@ -112,7 +112,7 @@ func TestPlanLinksBindsSelfToThePageBeingWritten(t *testing.T) {
 	t.Parallel()
 
 	fixture := secondaryPageDAG(t)
-	rules := template.LinkRules{UpDepth: 1, SiblingMinWeight: 0.95}
+	rules := field.LinkRules{UpDepth: 1, SiblingMinWeight: 0.95}
 
 	cases := []struct {
 		name      string
@@ -173,11 +173,26 @@ func TestPlanLinksBindsSelfToThePageBeingWritten(t *testing.T) {
 	}
 }
 
+func TestAPolicyWithoutLinksOwesNothingAndStillBindsThePage(t *testing.T) {
+	t.Parallel()
+
+	fixture := multiParentDAG(t)
+	none := field.NoLinks()
+	none.Rules = field.LinkRules{UpDepth: 3, DownLinks: true, SiblingMinWeight: 0.1, MaxLinks: 20}
+	plan := content.PlanLinks(fixture.g, fixture.index, content.Subject{EntityID: "coffee"}, none)
+	if len(plan.Context.Targets) != 0 || len(plan.Blocked) != 0 {
+		t.Errorf("a policy without links planned %v and blocked %v, want nothing owed", urls(plan.Context.Targets), plan.Blocked)
+	}
+	if plan.Context.PageID != "page-coffee" || plan.Context.PageURL != "/drinks/hot/coffee/" {
+		t.Errorf("the context binds %s %s, want the entity's canonical page", plan.Context.PageID, plan.Context.PageURL)
+	}
+}
+
 func TestByPageID(t *testing.T) {
 	t.Parallel()
 
 	fixture := multiParentDAG(t)
-	lc := plannedFor(fixture, "coffee", template.LinkRules{UpDepth: 1})
+	lc := plannedFor(fixture, "coffee", field.LinkRules{UpDepth: 1})
 
 	target, ok := lc.ByPageID("page-root")
 	if !ok || target.URL != "/drinks/" {

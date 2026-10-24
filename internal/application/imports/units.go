@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
@@ -29,7 +30,7 @@ type parentRef struct {
 
 type unit struct {
 	name     string
-	kind     string
+	notes    []note.Note
 	keywords keyword.List
 	anchors  []string
 	related  []string
@@ -41,13 +42,6 @@ type unit struct {
 	alias    int
 	matched  string
 	id       string
-}
-
-func (u *unit) defaultKind() graph.Kind {
-	if u.group < 0 {
-		return graph.KindTopic
-	}
-	return graph.KindHub
 }
 
 type builder struct {
@@ -113,7 +107,7 @@ func (b *builder) root(at int) int {
 
 func (b *builder) absorbRow(at int, row *rowDraft) {
 	u := &b.units[at]
-	u.kind = fill(u.kind, row.kind)
+	u.notes = note.Merge(u.notes, row.cardNotes())
 	u.keywords = u.keywords.Merge(row.keywords)
 	u.anchors = graph.Distinct(u.anchors, row.anchors)
 	u.related = graph.Distinct(u.related, row.related)
@@ -177,7 +171,7 @@ func (b *builder) addPageUnits() {
 func (b *builder) adoptPage(draft *pageDraft, node int) {
 	draft.unit = b.groups.nodes[node].unit
 	if b.units[draft.unit].parent.kind == refNone {
-		b.units[draft.unit].parent = b.urlParent(draft.path)
+		b.units[draft.unit].parent = b.urlParent(draft.sheetPath())
 	}
 	b.absorbRows(draft)
 }
@@ -192,7 +186,7 @@ func (b *builder) explicitName(draft *pageDraft) string {
 
 func (b *builder) addRowUnit(draft *pageDraft) {
 	explicit := b.explicitName(draft)
-	existing, onSite := b.state.held(draft.path)
+	existing, onSite := draft.page()
 	if draft.path == pagemap.RootPath && explicit == "" && !onSite {
 		return
 	}
@@ -204,7 +198,7 @@ func (b *builder) addRowUnit(draft *pageDraft) {
 			u.name, u.pinned = pinned.Name, pinned.ID
 		}
 	}
-	u.parent = b.rowParent(draft.path, u.context)
+	u.parent = b.rowParent(draft.sheetPath(), u.context)
 	draft.unit = b.add(u)
 	b.absorbRows(draft)
 }
@@ -237,7 +231,7 @@ func (b *builder) addEntityRows() {
 
 func (b *builder) urlParent(path string) parentRef {
 	for parent := pagemap.ParentPath(path); parent != "" && parent != pagemap.RootPath; parent = pagemap.ParentPath(parent) {
-		if draft, planned := b.sheet.pages[parent]; planned {
+		if draft, planned := b.sheet.at(parent); planned {
 			if draft.technical() {
 				b.warnTechnical(draft)
 				continue
@@ -247,7 +241,7 @@ func (b *builder) urlParent(path string) parentRef {
 			}
 			continue
 		}
-		page, onSite := b.state.held(parent)
+		page, onSite := b.state.pageAt(parent)
 		switch {
 		case !onSite:
 		case page.EntityID != nil:
@@ -273,7 +267,7 @@ func (b *builder) warnTechnical(draft *pageDraft) {
 		return
 	}
 	b.warned[draft.path] = struct{}{}
-	if existing, onSite := b.state.held(draft.path); onSite && existing.WPID != nil {
+	if existing, onSite := draft.page(); onSite && existing.WPID != nil {
 		return
 	}
 	b.p.noteAt(draft.at, string(importmap.FieldOwnEntity), CodeTechnicalParent,

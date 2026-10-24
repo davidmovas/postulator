@@ -1,12 +1,18 @@
+import type { QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ReactElement } from "react";
+import { useLocation } from "react-router";
 
+import { readLastSite } from "../../../app/site-memory.js";
 import { copy } from "../../../copy/index.js";
 import { useEntity } from "../../../data/hooks/graph.js";
 import { usePage } from "../../../data/hooks/pages.js";
 import { useRun } from "../../../data/hooks/runs.js";
 import { useSchedule } from "../../../data/hooks/schedules.js";
 import { useSite } from "../../../data/hooks/sites.js";
-import { usePolicy, useTemplate } from "../../../data/hooks/templates.js";
+import { usePageTypes, useTemplate } from "../../../data/hooks/templates.js";
+import { keys } from "../../../data/keys.js";
+import type { PageType, PageTypeList } from "../../../data/types.js";
 import { cx, Skeleton } from "../../../ui/index.js";
 import type { Ref } from "./model/card.js";
 
@@ -57,9 +63,25 @@ function SiteRef({ id }: { id: string }): ReactElement {
     return <Resolved label={detail.data?.site.name ?? null} pending={detail.isPending} id={id} />;
 }
 
-function PolicyRef({ id }: { id: string }): ReactElement {
-    const detail = usePolicy(id);
-    return <Resolved label={detail.data?.policy.name ?? null} pending={detail.isPending} id={id} />;
+const sitePath = /^\/s\/([^/]+)/;
+
+function cachedType(client: QueryClient, id: string): PageType | null {
+    for (const [, held] of client.getQueriesData<PageTypeList>({ queryKey: keys.sites.typesAll() })) {
+        const found = held?.types?.find((type) => type.id === id);
+        if (found !== undefined) {
+            return found;
+        }
+    }
+    return null;
+}
+
+function PageTypeRef({ id }: { id: string }): ReactElement {
+    const location = useLocation();
+    const client = useQueryClient();
+    const site = sitePath.exec(location.pathname)?.[1] ?? readLastSite();
+    const listed = usePageTypes(site);
+    const found = listed.data?.types?.find((type) => type.id === id) ?? cachedType(client, id);
+    return <Resolved label={found?.name ?? null} pending={found === null && listed.isPending && site !== null} id={id} />;
 }
 
 function ScheduleRef({ id }: { id: string }): ReactElement {
@@ -83,8 +105,8 @@ export function RefLabel({ kind, id }: Ref): ReactElement {
             return <TemplateRef id={id} />;
         case "site":
             return <SiteRef id={id} />;
-        case "policy":
-            return <PolicyRef id={id} />;
+        case "pagetype":
+            return <PageTypeRef id={id} />;
         case "schedule":
             return <ScheduleRef id={id} />;
         case "run":

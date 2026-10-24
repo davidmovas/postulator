@@ -6,6 +6,8 @@ import (
 
 	port "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -17,26 +19,36 @@ import (
 const (
 	NameGenerateBody = string(run.StepGenerateBody)
 
+	writerPromptTokens = 1040
+
 	ReasonWriterOutOfRoom = "the model ran out of room before it finished, even with twice the room it is first given; " +
 		"lower the word counts of the template or choose a model that writes longer answers, then retry the step"
 )
 
 type bodyPrompt struct {
 	Page    pagemap.Page
+	Type    string
 	Entity  graph.Entity
 	Spec    template.TemplateSpec
 	Brief   content.Brief
 	Product bool
+	Picture string
+}
+
+func bodyField(sc *run.StepContext) field.Key {
+	return pageKey(sc.Page)
 }
 
 func GenerateBody(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:     NameGenerateBody,
-		Role:     domainllm.RoleWriter,
-		Requires: []run.ArtifactKind{run.ArtifactLinkContext},
-		Produces: []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
-		Retry:    run.RetryPolicy{Max: 3},
-		Timeout:  writerTimeout,
+		Name:      NameGenerateBody,
+		Role:      domainllm.RoleWriter,
+		Requires:  []run.ArtifactKind{run.ArtifactLinkContext},
+		Produces:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
+		Retry:     run.RetryPolicy{Max: 3},
+		Timeout:   writerTimeout,
+		Price:     run.Price{Overhead: writerPromptTokens, Input: packInput(deps, domainllm.RoleWriter, pageKey)},
+		Preflight: inputPreflight(deps, domainllm.RoleWriter, pageKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)
 			if err != nil {
@@ -46,20 +58,29 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
-			policy, err := effectivePolicy(ctx, deps, sc.Run.SiteID, sc.Spec)
-			if err != nil {
-				return run.Result{}, err
-			}
-
 			call, err := modelFor(ctx, deps, sc, NameGenerateBody, domainllm.RoleWriter)
 			if err != nil {
 				return run.Result{}, err
 			}
 
-			brief := content.NewBrief(sc.Spec, policy.Rules, sc.Page, entity, lc)
-			request, err := stepRequest(sc, call, bodyPrompt{
-				Page: sc.Page, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
-			}, writerCeiling(sc.Spec, sc.Page.WPType, sc.Item.Attempts))
+			named, err := deps.storeName(ctx, sc.Page)
+			if err != nil {
+				return run.Result{}, err
+			}
+			brief := content.NewBrief(sc.Spec, sc.Links.Rules, sc.Page, named, entity, lc)
+			brief.Links = content.NewLinkAllowance(lc, sc.Links)
+			prompt := bodyPrompt{
+				Page: sc.Page, Type: sc.Type.Name, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
+			}
+			ceiling := writerCeiling(sc.Spec, sc.Item.Attempts)
+			seen, err := deps.fitted(ctx, sc, call, bodyField(sc), &lc, ceiling, func() (string, string, error) {
+				return prompts.Render(NameGenerateBody, prompt)
+			}, schemaText[content.DraftAnswer]())
+			if err != nil {
+				return run.Result{}, err
+			}
+			prompt.Picture = picture(seen.Fitted, contextpack.SectionKeywords)
+			request, err := stepRequest(sc, call, prompt, ceiling)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -71,6 +92,7 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			draft.Kept = keptBody(sc, seen)
 			encoded, err := encode(draft, "content draft")
 			if err != nil {
 				return run.Result{}, err
@@ -109,19 +131,10 @@ func outOfRoom(sc *run.StepContext, usage domainllm.Usage) run.Result {
 
 func write(ctx context.Context, deps Deps, request port.Request,
 	brief content.Brief) (content.ContentDraft, *content.Document, domainllm.Usage, error) {
-	if brief.Product == nil {
-		answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, request)
-		if err != nil {
-			return content.ContentDraft{}, nil, usage, err
-		}
-		draft, doc, err := content.Assemble(answer, brief)
-		return draft, doc, usage, err
-	}
-
-	answer, usage, err := port.Structured[content.ProductAnswer](ctx, deps.LLM, request)
+	answer, usage, err := port.Structured[content.DraftAnswer](ctx, deps.LLM, request)
 	if err != nil {
 		return content.ContentDraft{}, nil, usage, err
 	}
-	draft, doc, err := content.AssembleProduct(answer, brief)
+	draft, doc, err := content.Assemble(answer, brief)
 	return draft, doc, usage, err
 }

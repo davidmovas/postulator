@@ -18,12 +18,15 @@ import (
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/schedules"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -75,6 +78,7 @@ func harnessRecipe() []template.StepSpec {
 		{Name: steps.NameResolveContext, Enabled: true},
 		{Name: steps.NameGenerateBody, Enabled: true},
 		{Name: steps.NameGenerateMeta, Enabled: true},
+		{Name: steps.NameGenerateFields, Enabled: true},
 		{Name: steps.NameInsertLinks, Enabled: true},
 		{Name: steps.NameRepairLinks, Enabled: true},
 		{Name: steps.NameValidate, Enabled: true},
@@ -96,7 +100,14 @@ func harnessReplies() []fake.Reply {
 	targets = append(targets, revertedRun...)
 	targets = append(targets, heldChildPath, heldParentPath)
 
-	out := make([]fake.Reply, 0, 2*len(targets)+2)
+	out := make([]fake.Reply, 0, 2*len(targets)+6)
+	for _, path := range []string{editedPath, reviewedPath} {
+		subject := subjectOf(path)
+		out = append(out,
+			fake.Reply{Step: steps.NameGenerateBody, Match: "Path: " + path + "\n", Text: draftOf(subject)},
+			fake.Reply{Step: steps.NameGenerateMeta, Match: "Path: " + path + "\n", Text: metaOf(subject)},
+		)
+	}
 	for _, path := range targets {
 		subject := subjectOf(path)
 		out = append(out,
@@ -107,6 +118,7 @@ func harnessReplies() []fake.Reply {
 	out = append(out,
 		fake.Reply{Step: steps.NameGenerateBody, Match: productPath, Text: productDraftOf()},
 		fake.Reply{Step: steps.NameGenerateMeta, Match: productPath, Text: metaOf(productKeyword)},
+		fake.Reply{Step: steps.NameGenerateFields, Match: productPath, Text: productFieldsOf()},
 	)
 	out = append(out, repairReplies()...)
 	out = append(out, proposeReplies()...)
@@ -181,22 +193,49 @@ func productDraftOf() string {
 		`and not the one who wants milk drinks for four in a row.</p>"},` +
 		`{"heading":"Frequently Asked Questions","html":"<p>Yes, it takes a bottomless portafilter, and no, ` +
 		`it does not steam and brew at the same time.</p>"}],` +
-		`"summary":"What the ` + productKeyword + ` is and who should buy it.",` +
-		`"shortDescription":"<p>The ` + productKeyword + ` is a single boiler machine that rewards a good grinder.</p>",` +
-		`"specifications":[{"name":"Form","value":"Countertop"},{"name":"Size","value":""}]}`
+		`"summary":"What the ` + productKeyword + ` is and who should buy it."}`
+}
+
+func productFieldsOf() string {
+	return `{"fields":[{"key":"product_short_description",` +
+		`"value":"The ` + productKeyword + ` is a single boiler machine that rewards a good grinder."}]}`
 }
 
 func stockTheStore(site *wptest.Server) {
+	site.Restore(wptest.Item{
+		Type: wptest.TypeProductCategory, ID: storeCategoryID, Title: storeCategoryName, Slug: storeCategorySlug,
+		Status: "publish", Content: "Every espresso machine the bench sells.",
+	})
 	site.Seed(wptest.Item{
 		Type: wptest.TypeProduct, Title: productName, Slug: productSlug, Status: "publish",
 		Content:      "<p>A single boiler machine with a commercial portafilter.</p>",
-		Excerpt:      "<p>Single boiler, 58 mm.</p>",
 		RegularPrice: "449", SKU: "GCP-2024",
+		Categories: []int64{storeCategoryID}, Terms: storeTermsOf(productPath),
 		Attributes: []wptest.Attribute{
 			{Name: "Boiler", Options: []string{"Single"}, Visible: true},
 			{Name: "Form", Options: []string{}, Position: 1},
 		},
 	})
+}
+
+func storeTermsOf(path string) []wptest.Term {
+	if path != productPath {
+		return nil
+	}
+	return []wptest.Term{{Taxonomy: wptest.TypeProductCategory, Name: storeCategoryName, Slug: storeCategorySlug, ID: storeCategoryID}}
+}
+
+func seedCardProposal(ctx context.Context, core *app.Core, siteID string, entities map[string]string) error {
+	proposed, err := core.Graph.ProposeCards(ctx, graph.ProposeCardsRequest{SiteID: siteID, Cards: []graph.CardInput{{
+		EntityID: entities[productHub], Definition: proposedDefinition, Facts: proposedFacts(), Reason: proposedReason,
+	}}})
+	if err != nil {
+		return err
+	}
+	if len(proposed.Proposals) != 1 {
+		return errors.New(errors.Conflict, "the card proposal for "+productHub+" was not filed").WithDetail("skipped", proposed.Skipped)
+	}
+	return nil
 }
 
 func seedProduct(ctx context.Context, core *app.Core, siteID string, entities map[string]string,
@@ -216,7 +255,7 @@ func seedProduct(ctx context.Context, core *app.Core, siteID string, entities ma
 	}
 
 	created, err := core.Graph.CreateEntity(ctx, graph.CreateEntityRequest{
-		SiteID: siteID, Name: productName, Kind: "product", Intent: "commercial",
+		SiteID: siteID, Name: productName, Intent: "commercial",
 		Keywords: []dto.Keyword{{Text: productKeyword}},
 		Anchors:  []graph.Anchor{{Text: "the " + productName, Source: "user", Weight: 1}},
 		ParentID: entities[productHub], Source: "user",
@@ -243,7 +282,7 @@ func seedProductRun(ctx context.Context, core *app.Core, siteID string, byPath m
 	}
 	product := ""
 	for index := range listed.Items {
-		if listed.Items[index].PageKind == "product" {
+		if listed.Items[index].Name == "Product" {
 			product = listed.Items[index].ID
 		}
 	}
@@ -308,7 +347,7 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 	case strings.Contains(lowered, "open the page"):
 		return fake.Turn{
 			Tool: "pages_get",
-			Args: json.RawMessage(`{"id":"` + absentPageID + `"}`),
+			Args: json.RawMessage(`{"pageId":"` + absentPageID + `"}`),
 			Text: "There is no page with that id on this site. Give me the path instead and I will " +
 				"look it up in the map.",
 		}
@@ -339,7 +378,7 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 }
 
 func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pacedProvider,
-	script *assistantScript, key string) error {
+	script *assistantScript, key, home string) error {
 	created, err := core.Sites.Create(ctx, sites.CreateRequest{
 		Name: siteName, BaseURL: site.URL(), Username: harnessUser, Password: harnessPassword, AllowInsecure: true,
 	})
@@ -357,15 +396,18 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if err != nil {
 		return err
 	}
+	if typeErr := seedPageTypes(ctx, core, siteID, pagesByPath); typeErr != nil {
+		return typeErr
+	}
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
 	script.onSite(siteID)
 
-	guide, policy, err := seedTemplates(ctx, core, siteID)
+	guide, err := seedTemplates(ctx, core, siteID)
 	if err != nil {
 		return err
 	}
 	if _, err = core.Sites.Update(ctx, sites.UpdateRequest{
-		ID: siteID, Defaults: &sites.Defaults{TemplateID: &guide, LinkPolicyID: &policy},
+		ID: siteID, Defaults: &sites.Defaults{TemplateID: &guide},
 	}); err != nil {
 		return err
 	}
@@ -378,6 +420,12 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	}
 	if productErr := seedProduct(ctx, core, siteID, entities, pagesByPath); productErr != nil {
 		return productErr
+	}
+	if cardErr := seedCardProposal(ctx, core, siteID, entities); cardErr != nil {
+		return cardErr
+	}
+	if workbookErr := seedWorkbook(ctx, core, siteID, home); workbookErr != nil {
+		return workbookErr
 	}
 	if key != "" {
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})
@@ -558,7 +606,7 @@ func seedGraph(ctx context.Context, core *app.Core, siteID string) (map[string]s
 	for index := range declared {
 		entity := &declared[index]
 		created, err := core.Graph.CreateEntity(ctx, graph.CreateEntityRequest{
-			SiteID: siteID, Name: entity.Name, Kind: entity.Kind, Intent: entity.Intent,
+			SiteID: siteID, Name: entity.Name, Intent: entity.Intent,
 			Keywords: []dto.Keyword{{Text: entity.Keyword}, {Text: entity.Anchor}},
 			Anchors:  []graph.Anchor{{Text: entity.Anchor, Source: "user", Weight: 1}},
 			Source:   "user",
@@ -602,7 +650,7 @@ func seedPages(ctx context.Context, core *app.Core, siteID string, entities map[
 		entity := &declared[index]
 		owner := entities[entity.Name]
 		created, err := core.Pages.Create(ctx, pages.CreateRequest{
-			SiteID: siteID, Path: entity.Path, WPType: "page", Title: entity.Title, H1: entity.Title,
+			SiteID: siteID, Path: entity.Path, WPType: "page", Title: entity.Title, H1: entity.heading(),
 			MetaTitle:       entity.Title + " | " + siteName,
 			MetaDescription: "What we know about " + entity.Keyword + " after a few hundred shots on the bench.",
 			Status:          entity.Status, EntityID: &owner,
@@ -648,42 +696,85 @@ func seedPages(ctx context.Context, core *app.Core, siteID string, entities map[
 	return byPath, nil
 }
 
-func seedTemplates(ctx context.Context, core *app.Core, siteID string) (guide, policy string, err error) {
+func seedPageTypes(ctx context.Context, core *app.Core, siteID string, byPath map[string]string) error {
+	listed, err := core.PageTypes.List(ctx, pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		return err
+	}
+	byPreset := make(map[pagetype.Preset]pagetypes.Type, len(listed.Types))
+	for index := range listed.Types {
+		preset := pagetype.Preset(listed.Types[index].Preset)
+		if _, held := byPreset[preset]; !held {
+			byPreset[preset] = listed.Types[index]
+		}
+	}
+
+	for _, declared := range seedTypes() {
+		kind, seeded := byPreset[declared.Preset]
+		if !seeded {
+			return errors.New(errors.NotFound, "the site was created without a "+declared.Preset.DefaultName()+" type")
+		}
+		pageID, known := byPath[declared.Path]
+		if !known {
+			return errors.New(errors.NotFound, "the harness seeded no page at "+declared.Path)
+		}
+		if _, setErr := core.Pages.SetType(ctx, pages.SetTypeRequest{PageID: pageID, PageTypeID: kind.ID}); setErr != nil {
+			return setErr
+		}
+	}
+
+	hub := byPreset[pagetype.Hub]
+	body, found := scopeOf(hub, field.Body)
+	if !found {
+		return errors.New(errors.NotFound, "the Hub type carries no body scope")
+	}
+	if _, err = core.PageTypes.SetScope(ctx, pagetypes.SetScopeRequest{
+		PageTypeID: hub.ID, Field: body.Field, Enabled: body.Enabled, AIWrites: body.AIWrites, Instruction: body.Instruction,
+		MinLength: body.MinLength, MaxLength: body.MaxLength, Rewrites: body.Rewrites, Links: harnessLinks(),
+	}); err != nil {
+		return err
+	}
+	_, err = core.PageTypes.SetScope(ctx, pagetypes.SetScopeRequest{
+		PageTypeID: hub.ID, Field: string(field.Instance(field.Meta, subtitleKey)), Enabled: true,
+		Links: field.NoLinks(), Label: subtitleLabel, Provider: string(field.ProviderPlugin),
+	})
+	return err
+}
+
+func scopeOf(kind pagetypes.Type, key field.Key) (pagetypes.Scope, bool) {
+	for index := range kind.Scopes {
+		if kind.Scopes[index].Field == string(key) {
+			return kind.Scopes[index], true
+		}
+	}
+	return pagetypes.Scope{}, false
+}
+
+func seedTemplates(ctx context.Context, core *app.Core, siteID string) (string, error) {
 	listed, err := core.Templates.ListTemplates(ctx, templates.ListTemplatesRequest{
 		Scope: "global", ListRequest: dto.ListRequest{Limit: 20},
 	})
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 
+	guide := ""
 	for index := range listed.Items {
-		if listed.Items[index].PageKind == "guide" {
+		if listed.Items[index].Name == "Guide" {
 			guide = listed.Items[index].ID
 		}
 	}
 	if guide == "" {
-		return "", "", errors.New(errors.NotFound, "the shipped guide template is missing")
+		return "", errors.New(errors.NotFound, "the shipped guide template is missing")
 	}
 
 	if _, err = core.Templates.SetOverride(ctx, templates.SetOverrideRequest{
 		TemplateID: guide, Scope: "site", TargetID: siteID,
 		Patch: json.RawMessage(`{"tone":"Plain and practical; write as a barista talking across the bench, never as a brochure","length":{"min":1200,"max":1800}}`),
 	}); err != nil {
-		return "", "", err
+		return "", err
 	}
-
-	created, err := core.Templates.CreatePolicy(ctx, templates.CreatePolicyRequest{
-		Scope: "site", SiteID: &siteID, Name: "Crema Bench linking",
-		Rules: template.LinkRules{
-			UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.6, MaxLinks: 10, MaxPerTarget: 1,
-			ParentLinkWithinParagraphs: 2, ChildrenSection: true,
-		},
-		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: "rotate",
-	})
-	if err != nil {
-		return "", "", err
-	}
-	return guide, created.Policy.ID, nil
+	return guide, nil
 }
 
 func seedSchedule(ctx context.Context, core *app.Core, siteID, guide string) error {
@@ -740,7 +831,7 @@ func exchange(ctx context.Context, core *app.Core, conversation, text string) er
 }
 
 func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, provider *pacedProvider) error {
-	completed, err := startRun(ctx, core, siteID, guide, byPath, completedRun)
+	completed, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, completedRun)
 	if err != nil {
 		return err
 	}
@@ -752,7 +843,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	}
 
 	provider.failOn(failingPath)
-	failed, err := startRun(ctx, core, siteID, guide, byPath, failedRun)
+	failed, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, failedRun)
 	if err != nil {
 		return err
 	}
@@ -767,9 +858,12 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	if revertErr := seedRevertRun(ctx, core, siteID, guide, byPath); revertErr != nil {
 		return revertErr
 	}
+	if editErr := seedEditRuns(ctx, core, siteID, guide, byPath); editErr != nil {
+		return editErr
+	}
 
 	provider.failOn("Path: " + heldParentPath + "\n")
-	held, err := startRun(ctx, core, siteID, guide, byPath, heldRun)
+	held, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, heldRun)
 	if err != nil {
 		return err
 	}
@@ -779,7 +873,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 	provider.failOn("")
 
 	provider.hold()
-	running, err := startRun(ctx, core, siteID, guide, byPath, runningRun)
+	running, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, runningRun)
 	if err != nil {
 		return err
 	}
@@ -787,7 +881,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 		return waitErr
 	}
 
-	paused, err := startRun(ctx, core, siteID, guide, byPath, pausedRun)
+	paused, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, pausedRun)
 	if err != nil {
 		return err
 	}
@@ -795,7 +889,7 @@ func seedRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 		return err
 	}
 
-	cancelled, err := startRun(ctx, core, siteID, guide, byPath, cancelledRun)
+	cancelled, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, cancelledRun)
 	if err != nil {
 		return err
 	}
@@ -819,7 +913,7 @@ func seedRelinkRun(ctx context.Context, core *app.Core, siteID string, byPath ma
 }
 
 func seedRevertRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string) error {
-	source, err := startRun(ctx, core, siteID, guide, byPath, revertedRun)
+	source, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, revertedRun)
 	if err != nil {
 		return err
 	}
@@ -834,7 +928,51 @@ func seedRevertRun(ctx context.Context, core *app.Core, siteID, guide string, by
 	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
 }
 
-func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, paths []string) (string, error) {
+func seedEditRuns(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string) error {
+	edited, err := startRun(ctx, core, siteID, guide, byPath, run.PublishLive, []string{editedPath})
+	if err != nil {
+		return err
+	}
+	if waitErr := waitForRun(ctx, core, edited, run.StatusCompleted); waitErr != nil {
+		return waitErr
+	}
+
+	reviewed, err := startRun(ctx, core, siteID, guide, byPath, run.PublishDraft, []string{reviewedPath})
+	if err != nil {
+		return err
+	}
+	if waitErr := waitForReview(ctx, core, reviewed); waitErr != nil {
+		return waitErr
+	}
+
+	started, err := core.Runs.Revert(ctx, runs.RevertRequest{
+		RunID: edited, PageID: byPath[editedPath], Fields: []string{string(revertedField)},
+	})
+	if err != nil {
+		return err
+	}
+	return waitForRun(ctx, core, started.RunID, run.StatusCompleted)
+}
+
+func waitForReview(ctx context.Context, core *app.Core, runID string) error {
+	if err := waitForRun(ctx, core, runID, run.StatusPaused); err != nil {
+		return err
+	}
+	listed, err := core.Runs.ListItems(ctx, runs.ListItemsRequest{RunID: runID, ListRequest: dto.ListRequest{Limit: 20}})
+	if err != nil {
+		return err
+	}
+	for index := range listed.Items {
+		if listed.Items[index].PauseReason != string(run.PauseAwaitingReview) {
+			return errors.New(errors.Conflict, "the draft run paused for something other than a review"+
+				itemStates(ctx, core, runID)).WithDetail("runId", runID)
+		}
+	}
+	return nil
+}
+
+func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath map[string]string, mode run.PublishMode,
+	paths []string) (string, error) {
 	targets := make([]string, 0, len(paths))
 	for _, path := range paths {
 		pageID, known := byPath[path]
@@ -846,7 +984,7 @@ func startRun(ctx context.Context, core *app.Core, siteID, guide string, byPath 
 
 	started, err := core.Runs.Start(ctx, runs.StartRequest{
 		SiteID: siteID, PageIDs: targets, TemplateID: guide,
-		PublishMode: string(run.PublishDraft), Recipe: harnessRecipe(),
+		PublishMode: string(mode), Recipe: harnessRecipe(),
 	})
 	if err != nil {
 		return "", err

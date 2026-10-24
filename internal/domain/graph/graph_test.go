@@ -14,7 +14,7 @@ import (
 var stamp = time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
 
 func entity(id, name string) graph.Entity {
-	return graph.Entity{ID: id, SiteID: siteA, Name: name, Kind: graph.KindTopic, Source: graph.SourceUser, CreatedAt: stamp, UpdatedAt: stamp}
+	return graph.Entity{ID: id, SiteID: siteA, Name: name, Source: graph.SourceUser, CreatedAt: stamp, UpdatedAt: stamp}
 }
 
 func parent(id, child, parentID string, status graph.EdgeStatus) graph.Edge {

@@ -31,6 +31,11 @@ func publishContext(t *testing.T) *run.StepContext {
 	return sc
 }
 
+func rewritten(sc *run.StepContext) *run.StepContext {
+	sc.Params[run.ParamRewrite] = []any{sc.Page.ID}
+	return sc
+}
+
 func nestedContext(t *testing.T) *run.StepContext {
 	t.Helper()
 
@@ -41,10 +46,44 @@ func nestedContext(t *testing.T) *run.StepContext {
 	return sc
 }
 
+func settle(def run.StepDef, sc *run.StepContext, result run.Result) {
+	sc.Check = sc.Check.MergedWith(result.Checkpoint)
+	for _, kind := range def.Produces {
+		delete(sc.Artifacts, kind)
+	}
+	for i := range result.Artifacts {
+		artifact := result.Artifacts[i]
+		artifact.Size, artifact.Hash = len(artifact.Blob), run.HashBlob(artifact.Blob)
+		sc.Artifacts[artifact.Kind] = artifact
+	}
+}
+
+func driveLosing(t *testing.T, def run.StepDef, sc *run.StepContext, lost func(execution int) bool) (run.Result, error) {
+	t.Helper()
+
+	for execution := range 64 {
+		result, err := def.Run(t.Context(), sc)
+		if lost != nil && lost(execution) {
+			continue
+		}
+		settle(def, sc, result)
+		if err != nil || result.Next != run.TransitionWait {
+			return result, err
+		}
+	}
+	t.Fatalf("step %s never settled", def.Name)
+	return run.Result{}, nil
+}
+
+func drive(t *testing.T, def run.StepDef, sc *run.StepContext) (run.Result, error) {
+	t.Helper()
+	return driveLosing(t, def, sc, nil)
+}
+
 func runPublish(t *testing.T, deps steps.Deps, sc *run.StepContext) steps.PublishResult {
 	t.Helper()
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -71,7 +110,7 @@ func TestPublishWritesAPostWithoutAParent(t *testing.T) {
 		t.Fatalf("a post under a parent that is not on the site = %+v, want it written without waiting", published)
 	}
 
-	held, err := steps.Publish(deps).Run(t.Context(), nestedContext(t))
+	held, err := drive(t, steps.Publish(deps), nestedContext(t))
 	if err != nil || held.Next != run.TransitionPause || held.Reason != run.PauseAwaitingParent {
 		t.Fatalf("the same path as a page = %+v, %v; want it held for its parent", held, err)
 	}
@@ -95,8 +134,8 @@ func TestPublishCreatesThenUpdates(t *testing.T) {
 	}
 
 	stored, ok := server.Lookup(first.WPID)
-	if !ok || stored.Slug != "espresso" || stored.Content != publishBody {
-		t.Fatalf("the site holds %+v", stored)
+	if !ok || stored.Slug != "espresso" || stored.Content != publishedWithoutH1 {
+		t.Fatalf("the site holds %+v, want our body without the H1 no observation owes", stored)
 	}
 	if stored.Title != "Espresso guide" {
 		t.Errorf("title = %q, want the draft title", stored.Title)
@@ -116,7 +155,7 @@ func TestPublishFindsAnExistingPageBySlugAndParent(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
-	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft"})
+	seeded := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Status: "draft", Content: publishBody})
 
 	published := runPublish(t, deps, publishContext(t))
 	if published.Created || published.WPID != seeded[0].ID {
@@ -155,14 +194,14 @@ func TestPublishKeepsTheSEOMetaItReplaced(t *testing.T) {
 
 	deps, server := imageDepsWith(t, wptest.WithSEOPlugin("yoast"))
 	seeded := server.Seed(wptest.Item{
-		Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft",
+		Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft", Content: publishBody,
 		Meta: map[string]string{
 			"_yoast_wpseo_title":    "what a human wrote",
 			"_yoast_wpseo_metadesc": "and the description with it",
 		},
 	})
 
-	published := runPublish(t, deps, publishContext(t))
+	published := runPublish(t, deps, rewritten(publishContext(t)))
 	if published.Created || published.WPID != seeded[0].ID {
 		t.Fatalf("publish = %+v, want an update of the seeded page", published)
 	}
@@ -194,13 +233,6 @@ func TestPublishKeepsNoPreviousMetaItCouldNotRead(t *testing.T) {
 		seed    bool
 	}{
 		{name: "a page it created", seed: false},
-		{
-			name: "a plugin too old to answer",
-			seed: true,
-			options: []wptest.Option{wptest.WithCapabilities(
-				"bulk", "seo_meta", "content_hash", "raw", "preview",
-			)},
-		},
 		{name: "a site without the plugin", seed: true, options: []wptest.Option{wptest.WithoutPlugin()}},
 	}
 
@@ -210,7 +242,7 @@ func TestPublishKeepsNoPreviousMetaItCouldNotRead(t *testing.T) {
 
 			deps, server := imageDepsWith(t, tc.options...)
 			if tc.seed {
-				server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft"})
+				server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft", Content: publishBody})
 			}
 
 			published := runPublish(t, deps, publishContext(t))
@@ -319,7 +351,7 @@ func TestPublishReportsWhatItCannotDo(t *testing.T) {
 			if tc.with != nil {
 				tc.with(sc)
 			}
-			if _, err := steps.Publish(deps).Run(t.Context(), sc); !errors.IsCode(err, tc.want) {
+			if _, err := drive(t, steps.Publish(deps), sc); !errors.IsCode(err, tc.want) {
 				t.Fatalf("code = %q, want %q (err %v)", errors.CodeOf(err), tc.want, err)
 			}
 		})
@@ -371,7 +403,7 @@ func TestPublishHoldsTheItemForAParentThatIsNotOnTheSite(t *testing.T) {
 	deps, server := imageDeps(t)
 	sc := nestedContext(t)
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -422,7 +454,7 @@ func TestPublishRefusesAnIncompleteAncestorChain(t *testing.T) {
 	sc.Page.Slug = pagemap.Slug(sc.Page.Path)
 	sc.Page.ParentPageID = nil
 
-	_, err := steps.Publish(deps).Run(t.Context(), sc)
+	_, err := drive(t, steps.Publish(deps), sc)
 	if !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Publish of a page whose parent path has no page = %v, want an invalid error", err)
 	}
@@ -441,7 +473,7 @@ func TestPublishRefusesADanglingParent(t *testing.T) {
 	sc := nestedContext(t)
 	sc.Page.ParentPageID = pointer("page-ghost")
 
-	if _, err := steps.Publish(deps).Run(t.Context(), sc); !errors.IsCode(err, errors.Invalid) {
+	if _, err := drive(t, steps.Publish(deps), sc); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Publish under a parent that is not in the map = %v, want an invalid error", err)
 	}
 	if len(server.Items()) != 0 {
@@ -449,13 +481,13 @@ func TestPublishRefusesADanglingParent(t *testing.T) {
 	}
 }
 
-func TestPublishMovesAFlatPageRatherThanDuplicatingIt(t *testing.T) {
+func TestPublishUpdatesAFlatPageWhereItStands(t *testing.T) {
 	t.Parallel()
 
 	deps, server := imageDeps(t)
 	parent := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Coffee", Slug: "coffee"})
 	wpID := parent[0].ID
-	flat := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft"})
+	flat := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "draft", Content: publishBody})
 
 	deps.Pages = pageList{items: []pagemap.Page{{
 		ID: "page-parent", SiteID: "site", Path: "/coffee/", Slug: "coffee", WPType: pagemap.WPPage,
@@ -466,15 +498,50 @@ func TestPublishMovesAFlatPageRatherThanDuplicatingIt(t *testing.T) {
 
 	published := runPublish(t, deps, sc)
 	if published.Created || published.WPID != flat[0].ID {
-		t.Fatalf("publish = %+v, want the flat page %d moved rather than a second one made",
+		t.Fatalf("publish = %+v, want the flat page %d written rather than a second one made",
 			published, flat[0].ID)
 	}
 	if len(server.Items()) != 2 {
 		t.Fatalf("the site holds %d items, want the parent and the one page", len(server.Items()))
 	}
 	stored, ok := server.Lookup(published.WPID)
-	if !ok || stored.Parent != wpID {
-		t.Fatalf("the moved page is %+v, want it under %d", stored, wpID)
+	if !ok || stored.Parent != 0 || stored.Slug != "espresso" {
+		t.Fatalf("the updated page is %+v, want it left where it stands: the parent and the slug are never written to an existing page", stored)
+	}
+	if len(published.Mismatches) != 0 {
+		t.Errorf("mismatches = %+v, want none: an update asks for no address", published.Mismatches)
+	}
+}
+
+func TestPublishSendsNeitherSlugNorParentToAnExistingPage(t *testing.T) {
+	t.Parallel()
+
+	deps, server := imageDeps(t)
+	ours := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Old", Slug: "other", Status: "publish"})
+
+	sc := publishContext(t)
+	sc.Page.WPID = &ours[0].ID
+
+	published := runPublish(t, deps, sc)
+	if published.Created || published.WPID != ours[0].ID {
+		t.Fatalf("publish = %+v, want the existing page updated", published)
+	}
+	for _, request := range server.Requests() {
+		if request.Method != http.MethodPost || !strings.Contains(request.Path, "/wp-json/wp/v2/pages/") {
+			continue
+		}
+		var body map[string]any
+		if err := json.Unmarshal(request.Body, &body); err != nil {
+			t.Fatalf("decode the update: %v", err)
+		}
+		for _, denied := range []string{"slug", "parent"} {
+			if _, sent := body[denied]; sent {
+				t.Errorf("the update sent %q: %s", denied, request.Body)
+			}
+		}
+	}
+	if stored, ok := server.Lookup(ours[0].ID); !ok || stored.Slug != "other" {
+		t.Fatalf("the page's slug changed: %+v", stored)
 	}
 }
 
@@ -489,40 +556,14 @@ func TestPublishRecordsWhatTheSiteReportedBack(t *testing.T) {
 	sc.Run.PublishMode = run.PublishLive
 	published := runPublish(t, deps, sc)
 
-	if written.last.Observed.Link != published.URL {
-		t.Fatalf("the stored link = %q, want the address WordPress answered with (%q)",
-			written.last.Observed.Link, published.URL)
+	if written.last.WPID == nil || *written.last.WPID != published.WPID || written.last.Status != pagemap.StatusPublished {
+		t.Fatalf("the stored page = %+v, want the id and the status WordPress answered with", written.last)
 	}
-	if written.last.Observed.Slug != "espresso" || written.last.Observed.Status != "publish" {
-		t.Fatalf("the stored mirror = %+v", written.last.Observed)
-	}
-	if written.last.Observed.Title != "Espresso guide" {
-		t.Errorf("the stored title = %q, want the title the site holds", written.last.Observed.Title)
+	if !strings.HasSuffix(published.URL, "/espresso/") || published.Status != "publish" {
+		t.Fatalf("the publish result = %+v, want the address and the status WordPress answered with", published)
 	}
 	if len(published.Mismatches) != 0 {
 		t.Errorf("mismatches = %+v, want none: the site agreed", published.Mismatches)
-	}
-}
-
-func TestPublishStopsWhenWordPressRenamesATakenSlug(t *testing.T) {
-	t.Parallel()
-
-	deps, server := imageDeps(t)
-	server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "espresso", Status: "publish"})
-	ours := server.Seed(wptest.Item{Type: wptest.TypePage, Title: "Espresso", Slug: "other", Status: "publish"})
-
-	sc := publishContext(t)
-	sc.Page.WPID = &ours[0].ID
-
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
-	if err != nil {
-		t.Fatalf("Publish: %v", err)
-	}
-	if result.Next != run.TransitionPause || result.Reason != run.PauseNeedsHuman {
-		t.Fatalf("Publish onto a taken slug = %q / %q, want a pause for a human", result.Next, result.Reason)
-	}
-	if !strings.Contains(result.Message, "espresso-2") {
-		t.Errorf("the pause message %q does not name the slug the site chose", result.Message)
 	}
 }
 
@@ -541,7 +582,7 @@ func TestPublishStopsWhenTheAddressIsNotTheOneAskedFor(t *testing.T) {
 	sc := nestedContext(t)
 	sc.Run.PublishMode = run.PublishLive
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -587,7 +628,7 @@ func TestPublishWarnsOverADriftedPage(t *testing.T) {
 
 	deps, _ := imageDeps(t)
 	sc := publishContext(t)
-	sc.Page.Drift = true
+	deps.Bodies = driftedBodies(sc.Page.ID)
 
 	published := runPublish(t, deps, sc)
 	if published.WPID == 0 {
@@ -607,10 +648,10 @@ func TestPublishRefusesADriftedPage(t *testing.T) {
 
 	deps, server := imageDeps(t)
 	sc := publishContext(t)
-	sc.Page.Drift = true
+	deps.Bodies = driftedBodies(sc.Page.ID)
 	sc.Params[steps.ParamRefuseDrift] = true
 
-	result, err := steps.Publish(deps).Run(t.Context(), sc)
+	result, err := drive(t, steps.Publish(deps), sc)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
