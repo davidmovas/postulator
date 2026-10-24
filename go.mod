@@ -7,6 +7,7 @@ require (
 	github.com/ncruces/go-sqlite3 v0.30.1
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/tiktoken-go/tokenizer v0.8.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23
 	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.0
@@ -34,7 +35,6 @@ require (
 	github.com/sethvargo/go-retry v0.4.0 // indirect
 	github.com/tetratelabs/wazero v1.10.0 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
-	github.com/tiktoken-go/tokenizer v0.8.1 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
