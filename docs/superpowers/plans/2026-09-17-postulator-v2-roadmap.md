@@ -23,7 +23,8 @@ current as work lands.
 | 11 ✅ | Wails services + events + TS generation | **Fable** | 7, 8, 9, 10 | all services, event bridge, generator, CONTRACTS.md final |
 | 12 ✅ | Hardening + release | Opus ×1 | 11 | e2e runs, coverage, export/backup, master password, retention job, v2.0.0 |
 | 13 ✅ | The product frontend on one screen contract | Opus ×8, two at a time | 12 | `docs/superpowers/plans/2026-09-20-phase-13-frontend.md` |
-| 14 | The site model, in four stages (2026-10-17) | per stage, at most two agents at once | 13 | part 16 of the spec; `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`: stages 0 to 4 ✅, closed on 2026-10-24 with the whole gate green on both stands |
+| 14 ✅ | The site model, in four stages (2026-10-17) | per stage, at most two agents at once | 13 | part 16 of the spec; `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`: stages 0 to 4 ✅, closed on 2026-10-24 with the whole gate green on both stands |
+| 15 | The release, in two sessions (2026-10-24) | at most two agents at once | 14 | `docs/superpowers/plans/2026-10-24-phase-15-release.md`: session 1 the plugin's floors, pages without an entity, the input estimate, scale on a real store, the prompts; session 2 polish, docs, the build and the PR |
 
 Phases 7, 8, 10 may interleave after 6 depending on token limits. Each phase's detailed plan is written at its start (see header). Phase 14's stages are sized by what they touch, never by time, and each stage writes its task plan at its start.
 
