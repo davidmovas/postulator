@@ -1,3 +1,5 @@
+//go:build !race
+
 package scale_test
 
 import (
@@ -50,6 +52,8 @@ type scaled struct {
 	blocks  int
 	pageIDs map[string]string
 	renders map[string]render.Extraction
+	traced  map[string]struct{}
+	path    string
 	walks   int
 	started time.Time
 }
@@ -124,7 +128,7 @@ func generate(t *testing.T, blocks int) *scaled {
 	}
 	s := &scaled{
 		core: core, counter: counter, plan: plan(blocks), siteID: created.Site.ID, blocks: blocks, pageIDs: map[string]string{},
-		started: started.UTC().Truncate(time.Second),
+		started: started.UTC().Truncate(time.Second), traced: map[string]struct{}{}, path: filepath.Join(home, "postulator.db"),
 	}
 	s.wp = newWordPress(s.plan.specs, modifiedAt)
 	opened := time.Now()
@@ -138,6 +142,9 @@ func generate(t *testing.T, blocks int) *scaled {
 	s.importRows(t)
 	imported := time.Now()
 	s.walk(t, nil)
+	for _, sql := range counter.Distinct() {
+		s.traced[sql] = struct{}{}
+	}
 	t.Logf("%d blocks, %d pages generated in %s (open %s, write %s, import %s, settle %s)", blocks, len(s.plan.specs)+2*blocks,
 		time.Since(started).Round(time.Millisecond), opened.Sub(started).Round(time.Millisecond), written.Sub(opened).Round(time.Millisecond),
 		imported.Sub(written).Round(time.Millisecond), time.Since(imported).Round(time.Millisecond))

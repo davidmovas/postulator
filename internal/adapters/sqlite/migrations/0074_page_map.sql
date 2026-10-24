@@ -33,6 +33,8 @@ CREATE INDEX page_map_children ON page_map (site_id, parent_id, node, path, page
 CREATE INDEX page_map_trail ON page_map (site_id, trail);
 CREATE INDEX page_map_nodes ON page_map (site_id, node, path, page_id);
 
+CREATE INDEX findings_site_code ON findings (site_id, code, created_at, id);
+
 -- +goose StatementBegin
 CREATE TRIGGER page_map_site_added AFTER INSERT ON sites
 BEGIN
@@ -121,6 +123,7 @@ DROP TRIGGER page_map_page_moved;
 DROP TRIGGER page_map_page_removed;
 DROP TRIGGER page_map_page_added;
 DROP TRIGGER page_map_site_added;
+DROP INDEX findings_site_code;
 DROP INDEX page_map_nodes;
 DROP INDEX page_map_trail;
 DROP INDEX page_map_children;

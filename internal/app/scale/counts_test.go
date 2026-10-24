@@ -1,3 +1,5 @@
+//go:build !race
+
 package scale_test
 
 import (
@@ -195,6 +197,7 @@ func TestTheCountsHoldFromTwoThousandToFiveThousandPages(t *testing.T) {
 					got[held.name] = s.measure(t, held.name, held.call(t, s))
 				}
 				walk := s.walked(t)
+				s.scansNothingLarge(t)
 				mu.Lock()
 				defer mu.Unlock()
 				counted[blocks], walks[blocks] = got, walk

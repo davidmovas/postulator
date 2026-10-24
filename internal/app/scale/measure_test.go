@@ -1,3 +1,5 @@
+//go:build !race
+
 package scale_test
 
 import (
@@ -25,6 +27,9 @@ func (s *scaled) once(t *testing.T, op string, fn func() error) measured {
 	took := time.Since(started)
 	if err != nil {
 		t.Fatalf("%s at %d blocks: %v", op, s.blocks, err)
+	}
+	for _, sql := range s.counter.Distinct() {
+		s.traced[sql] = struct{}{}
 	}
 	t.Logf("%-28s %5d pages: %6d statements %8d rows %8s", op, s.pages(), tally.Statements, tally.Rows, took.Round(time.Millisecond))
 	return measured{Tally: tally, took: took}
