@@ -3,9 +3,10 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
 import type { SiteMapFilter } from "../../data/types.js";
-import { Banner, Button, DenseTable, EmptyState, FilterAltIcon, SkeletonRows, VirtualRows } from "../../ui/index.js";
+import { Banner, Button, EmptyState, FilterAltIcon, SkeletonRows, VirtualRows } from "../../ui/index.js";
+import { MapTable } from "./layout.js";
 import { useBranch } from "./loader.js";
-import { NodeRow, mapColumns, mapRowHeight } from "./row.js";
+import { NodeRow, mapRowHeight } from "./row.js";
 import { MapHead } from "./tree.js";
 
 const said = copy.map;
@@ -49,7 +50,7 @@ export function FlatList({ siteId, filter, onOpen, onUnder, onReset }: FlatListP
         );
     }
     return (
-        <DenseTable columns={mapColumns} label={said.title} className="min-h-0 flex-1">
+        <MapTable label={said.title}>
             <MapHead />
             <VirtualRows
                 count={nodes.length}
@@ -70,6 +71,6 @@ export function FlatList({ siteId, filter, onOpen, onUnder, onReset }: FlatListP
                     );
                 }}
             />
-        </DenseTable>
+        </MapTable>
     );
 }

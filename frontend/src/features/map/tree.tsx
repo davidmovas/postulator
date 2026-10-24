@@ -3,26 +3,25 @@ import { useCallback, useMemo, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
-import { Banner, Button, DenseTable, Skeleton, SkeletonRows, TableHead, TableRow, VirtualRows } from "../../ui/index.js";
+import { Banner, Button, Skeleton, SkeletonRows, TableHead, TableRow, VirtualRows } from "../../ui/index.js";
+import { MapTable, useMapColumns } from "./layout.js";
 import type { Loaded } from "./loader.js";
 import { BranchLoader } from "./loader.js";
 import { flattenTree, openBranches, toggled } from "./model/tree.js";
 import type { Branches, TreeRow } from "./model/tree.js";
-import { indentStep, mapColumns, mapRowHeight, NodeRow } from "./row.js";
+import { indentStep, mapRowHeight, NodeRow } from "./row.js";
 
 const said = copy.map;
 
 export function MapHead(): ReactElement {
+    const columns = useMapColumns();
     return (
         <TableHead>
-            <div>{said.columns.page}</div>
-            <div>{said.columns.type}</div>
-            <div>{said.columns.parent}</div>
-            <div>{said.columns.body}</div>
-            <div>{said.columns.links}</div>
-            <div>{said.columns.findings}</div>
-            <div>{said.columns.children}</div>
-            <div />
+            {columns.map((column) => (
+                <div key={column} className="truncate">
+                    {column === "under" ? null : said.columns[column]}
+                </div>
+            ))}
         </TableHead>
     );
 }
@@ -120,7 +119,7 @@ export function MapTree({ siteId, root, empty, onOpen, onUnder }: MapTreeProps):
     };
 
     return (
-        <DenseTable columns={mapColumns} label={said.title} className="min-h-0 flex-1">
+        <MapTable label={said.title}>
             {loaders}
             <MapHead />
             <VirtualRows
@@ -132,6 +131,6 @@ export function MapTree({ siteId, root, empty, onOpen, onUnder }: MapTreeProps):
                     return row === undefined ? null : renderRow(row);
                 }}
             />
-        </DenseTable>
+        </MapTable>
     );
 }

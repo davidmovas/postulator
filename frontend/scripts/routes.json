@@ -1000,6 +1000,54 @@
     ]
   },
   {
+    "name": "site-map-dock-wide-960",
+    "route": "#/s/:siteId/map",
+    "width": 960,
+    "height": 600,
+    "wait": 1600,
+    "steps": [
+      {
+        "click": "[aria-label=\"Dock width\"] [role=radio]:last-of-type"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "fits": "[data-map-table]"
+      }
+    ]
+  },
+  {
+    "name": "site-map-dock-960",
+    "route": "#/s/:siteId/map?q=espresso",
+    "width": 960,
+    "height": 600,
+    "wait": 1600,
+    "steps": [
+      {
+        "click": "[aria-label=\"Dock width\"] [role=radio]:first-of-type"
+      },
+      {
+        "wait": 1200
+      },
+      {
+        "fits": "[data-map-table]"
+      }
+    ]
+  },
+  {
+    "name": "site-map-tree-dock-960",
+    "route": "#/s/:siteId/map",
+    "width": 960,
+    "height": 600,
+    "wait": 1600,
+    "steps": [
+      {
+        "fits": "[data-map-table]"
+      }
+    ]
+  },
+  {
     "name": "agent-inbox-960",
     "route": "#/agent/inbox",
     "width": 960,
