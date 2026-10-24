@@ -76,7 +76,7 @@ func findingsTool(deps Deps) Tool {
 	})
 	tool.RiskOf = func(args json.RawMessage) Risk {
 		var in findingsArgs
-		if err := json.Unmarshal(args, &in); err == nil && in.Op == opResolve && finding.Option(in.Option).Kind() != finding.Run {
+		if err := json.Unmarshal(args, &in); err == nil && in.Op == opResolve && finding.Option(in.Option).Kind() == finding.ModelChange {
 			return RiskWrite
 		}
 		return RiskRead

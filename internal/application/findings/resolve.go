@@ -65,6 +65,13 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 		answer.Finding = placed(held, places)
 		return answer, nil
 	}
+	if option.Kind() == finding.Proposal {
+		proposals, proposeErr := proposed([]finding.Finding{held})
+		if proposeErr != nil {
+			return ResolveResponse{}, proposeErr
+		}
+		return ResolveResponse{Finding: placed(held, places), Proposals: proposals}, nil
+	}
 
 	chosen := choice{option: option, pageID: req.PageID, pageTypeID: req.PageTypeID, proposalHash: req.ProposalHash, by: by}
 	if refused := applicable(chosen, places); refused != nil {
@@ -203,6 +210,17 @@ func (s *Service) planSite(ctx context.Context, pageID string, code finding.Code
 	}
 	page.UpdatedAt = s.now()
 	return s.deps.Pages.Update(ctx, page)
+}
+
+func proposed(held []finding.Finding) (*graph.PreviewFromPagesRequest, error) {
+	pageIDs := make([]string, 0, len(held))
+	for i := range held {
+		if held[i].PageID == nil {
+			return nil, invalid("the finding names no page", "findingIds")
+		}
+		pageIDs = append(pageIDs, *held[i].PageID)
+	}
+	return &graph.PreviewFromPagesRequest{SiteID: held[0].SiteID, PageIDs: pageIDs, Source: graph.SourceSite}, nil
 }
 
 func prepared(held finding.Finding, option finding.Option) (ResolveResponse, error) {

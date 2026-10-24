@@ -27,32 +27,8 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	if _, err := s.sites.Get(ctx, siteID); err != nil {
 		return ApplyProposalsResponse{}, err
 	}
-	if !req.Source.valid() {
-		return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a proposal comes from the model or from the site").
-			WithDetail("field", "source")
-	}
-	if len(req.Entities) == 0 {
-		return ApplyProposalsResponse{}, errors.New(errors.Invalid, "there is no proposal to write").
-			WithDetail("field", "entities")
-	}
-	for i := range req.Entities {
-		field := "entities[" + strconv.Itoa(i) + "]"
-		if strings.TrimSpace(req.Entities[i].Name) == "" {
-			return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a proposal needs a name").
-				WithDetail("field", field+".name")
-		}
-		if _, keywordsErr := application.KeywordList(req.Entities[i].Keywords, field+".keywords"); keywordsErr != nil {
-			return ApplyProposalsResponse{}, keywordsErr
-		}
-		for j, fact := range req.Entities[i].Facts {
-			at := field + ".facts[" + strconv.Itoa(j) + "]"
-			if strings.TrimSpace(fact.Label) == "" {
-				return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a fact needs a label").WithDetail("field", at+".label")
-			}
-			if strings.TrimSpace(fact.Value) == "" {
-				return ApplyProposalsResponse{}, errors.New(errors.Invalid, "a fact needs a value").WithDetail("field", at+".value")
-			}
-		}
+	if err := req.Validate(); err != nil {
+		return ApplyProposalsResponse{}, err
 	}
 
 	state, err := s.snapshot(ctx, siteID)
@@ -95,6 +71,34 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 		}
 	}
 	return response, nil
+}
+
+func (r ApplyProposalsRequest) Validate() error {
+	if !r.Source.valid() {
+		return errors.New(errors.Invalid, "a proposal comes from the model or from the site").WithDetail("field", "source")
+	}
+	if len(r.Entities) == 0 {
+		return errors.New(errors.Invalid, "there is no proposal to write").WithDetail("field", "entities")
+	}
+	for i := range r.Entities {
+		field := "entities[" + strconv.Itoa(i) + "]"
+		if strings.TrimSpace(r.Entities[i].Name) == "" {
+			return errors.New(errors.Invalid, "a proposal needs a name").WithDetail("field", field+".name")
+		}
+		if _, err := application.KeywordList(r.Entities[i].Keywords, field+".keywords"); err != nil {
+			return err
+		}
+		for j, fact := range r.Entities[i].Facts {
+			at := field + ".facts[" + strconv.Itoa(j) + "]"
+			if strings.TrimSpace(fact.Label) == "" {
+				return errors.New(errors.Invalid, "a fact needs a label").WithDetail("field", at+".label")
+			}
+			if strings.TrimSpace(fact.Value) == "" {
+				return errors.New(errors.Invalid, "a fact needs a value").WithDetail("field", at+".value")
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Service) adopt(ctx context.Context, siteID string, proposed *ProposedEntity, state *siteGraph,

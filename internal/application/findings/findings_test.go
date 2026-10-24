@@ -698,3 +698,40 @@ func TestAFindingOfAnotherSiteIsNeitherReadNorResolved(t *testing.T) {
 		t.Errorf("a resolution from another site changed %+v, %v", s.held["f-technical_detected"], s.calls)
 	}
 }
+
+func TestProposingEntitiesOnlyPreparesTheSitePreview(t *testing.T) {
+	t.Parallel()
+
+	ids := []string{"f-page_without_entity-page-1", "f-page_without_entity-page-2", "f-page_without_entity-page-3"}
+	service, s, published := newCounted(t,
+		onPage(finding.PageWithoutEntity, pageID), onPage(finding.PageWithoutEntity, "page-2"), onPage(finding.PageWithoutEntity, "page-3"))
+
+	one, err := service.Resolve(t.Context(), findings.ResolveRequest{FindingID: ids[0], Option: "propose_entity"})
+	want := graph.PreviewFromPagesRequest{SiteID: siteID, PageIDs: []string{pageID}, Source: graph.SourceSite}
+	if err != nil || one.Proposals == nil || one.Proposals.SiteID != want.SiteID || !slices.Equal(one.Proposals.PageIDs, want.PageIDs) ||
+		one.Proposals.Source != want.Source || one.Finding.PagePath != "/a/" {
+		t.Errorf("propose_entity = %+v %v, want the site preview of its page", one, err)
+	}
+
+	many, err := service.ResolveMany(t.Context(), findings.ResolveManyRequest{
+		SiteID: siteID, Code: "page_without_entity", Option: "propose_entity", FindingIDs: ids,
+	})
+	if err != nil || many.Proposals == nil || !slices.Equal(many.Proposals.PageIDs, []string{pageID, "page-2", "page-3"}) ||
+		many.Proposals.Source != graph.SourceSite || len(many.Findings) != 3 {
+		t.Errorf("propose_entity in bulk = %+v %v, want one site preview of every page", many, err)
+	}
+	for _, id := range ids {
+		if s.held[id].Status != finding.Open {
+			t.Errorf("%s is %s after a proposal, want it open until an entity carries its page", id, s.held[id].Status)
+		}
+	}
+	if len(s.calls) != 0 || len(published.published) != 0 {
+		t.Errorf("a proposal changed the model %v and published %v, want neither", s.calls, published.published)
+	}
+
+	said, err := service.Explain(t.Context(), findings.ExplainRequest{FindingIDs: ids, Option: "propose_entity"})
+	if err != nil || said.Kind != string(finding.Proposal) || !strings.Contains(said.Sentence, "entity proposals") ||
+		!strings.HasSuffix(said.Sentence, "nothing is written to the site") {
+		t.Errorf("Explain(propose_entity) = %+v %v", said, err)
+	}
+}

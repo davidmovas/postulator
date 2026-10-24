@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 )
 
@@ -19,7 +20,8 @@ type ResolveManyRequest struct {
 }
 
 type ResolveManyResponse struct {
-	Findings []Finding `json:"findings"`
+	Findings  []Finding                      `json:"findings"`
+	Proposals *graph.PreviewFromPagesRequest `json:"proposals,omitempty"`
 }
 
 func (s *Service) ResolveMany(ctx context.Context, req ResolveManyRequest) (ResolveManyResponse, error) {
@@ -51,6 +53,17 @@ func (s *Service) ResolveMany(ctx context.Context, req ResolveManyRequest) (Reso
 	places, err := s.deps.Places.Map(ctx, req.SiteID)
 	if err != nil {
 		return ResolveManyResponse{}, err
+	}
+	if option.Kind() == finding.Proposal {
+		proposals, proposeErr := proposed(held)
+		if proposeErr != nil {
+			return ResolveManyResponse{}, proposeErr
+		}
+		out := ResolveManyResponse{Findings: make([]Finding, 0, len(held)), Proposals: proposals}
+		for i := range held {
+			out.Findings = append(out.Findings, placed(held[i], places))
+		}
+		return out, nil
 	}
 	chosen := choice{option: option, pageTypeID: req.PageTypeID, by: by}
 	if refused := applicable(chosen, places); refused != nil {

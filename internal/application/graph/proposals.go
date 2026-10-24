@@ -37,7 +37,7 @@ type ProposedEntity struct {
 	PageID           string        `json:"pageId,omitempty" description:"Page id as previewed; empty for a keyword"`
 	Path             string        `json:"path,omitempty" description:"That page's path"`
 	Name             string        `json:"name" description:"Name, 2-4 words"`
-	Label            string        `json:"label,omitempty"`
+	Label            string        `json:"label,omitempty" description:"Name as shown"`
 	Intent           string        `json:"intent,omitempty" description:"Reader's goal"`
 	Keywords         []dto.Keyword `json:"keywords,omitempty" description:"Search phrases, main first"`
 	Anchors          []string      `json:"anchors,omitempty" description:"Link texts other pages may use"`
@@ -46,7 +46,7 @@ type ProposedEntity struct {
 	Related          []string      `json:"related,omitempty" description:"Sibling paths or entity names"`
 	ExistingEntityID string        `json:"existingEntityId,omitempty" description:"Existing entity of that name"`
 	Facts            []Fact        `json:"facts,omitempty" description:"Card facts"`
-	Clash            string        `json:"clash,omitempty"`
+	Clash            string        `json:"clash,omitempty" description:"Why it is not written"`
 }
 
 type PreviewFromPagesResponse struct {

@@ -212,6 +212,61 @@ func TestTrashingAPageOnTheSiteWaitsForAPerson(t *testing.T) {
 	}
 }
 
+func TestAnEntityProposalWaitsForAPersonInEitherMode(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range everyMode() {
+		t.Run(string(mode), func(t *testing.T) {
+			t.Parallel()
+
+			registry, binding, seeded := wired(t)
+			binding.Mode = mode
+			apply := json.RawMessage(`{"source":"site","entities":[{"pageId":"` + seeded.page + `","path":"/coffee/","name":"Coffee Beans","parentEntityId":"` + seeded.entity + `"}]}`)
+			out, err := registry.Call(t.Context(), binding, "graph_apply_proposals", apply)
+			if err != nil {
+				t.Fatalf("graph_apply_proposals: %v", err)
+			}
+			asked := waitsForAPerson(t, out)
+			for _, said := range []string{"Coffee Beans", "/coffee/", "approved"} {
+				if !strings.Contains(asked.Summary, said) {
+					t.Errorf("the confirmation says %q, want it to name %q", asked.Summary, said)
+				}
+			}
+			held, err := seeded.pages.Get(t.Context(), pages.GetRequest{ID: seeded.page})
+			if err != nil || held.Page.EntityID != nil {
+				t.Fatalf("the page was mapped before a person confirmed: %+v %v", held.Page.EntityID, err)
+			}
+
+			proposed, err := registry.Call(t.Context(), binding, "graph_propose_from_pages", json.RawMessage(`{"pathPrefix":"/coffee/"}`))
+			if err != nil {
+				t.Fatalf("graph_propose_from_pages: %v", err)
+			}
+			if asked := waitsForAPerson(t, proposed); !strings.Contains(asked.Summary, "/coffee/") {
+				t.Errorf("the confirmation says %q, want it to name the pages it proposes for", asked.Summary)
+			}
+		})
+	}
+}
+
+func TestResolvingAFindingWithAProposalReadsAndWritesNothing(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, _ := wired(t)
+	for _, tool := range registry.Build(binding) {
+		if tool.Def.Name != "findings" {
+			continue
+		}
+		if risk := tool.RiskOf(json.RawMessage(`{"op":"resolve","findingId":"f","option":"propose_entity"}`)); risk != tools.RiskRead {
+			t.Errorf("a proposal option is %s, want read: it only answers the preview to show", risk)
+		}
+		if risk := tool.RiskOf(json.RawMessage(`{"op":"resolve","findingId":"f","option":"ignore"}`)); risk != tools.RiskWrite {
+			t.Errorf("a model change is %s, want write", risk)
+		}
+		return
+	}
+	t.Fatal("no findings tool")
+}
+
 func TestTheConfirmationSaysThePagesOwnTextWillBeRewritten(t *testing.T) {
 	t.Parallel()
 

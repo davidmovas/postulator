@@ -3,6 +3,7 @@ package findings
 import (
 	"encoding/json"
 
+	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	syncsite "github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
@@ -79,9 +80,10 @@ type ResolveRequest struct {
 }
 
 type ResolveResponse struct {
-	Finding Finding                   `json:"finding"`
-	Start   *runs.StartRequest        `json:"start,omitempty"`
-	Sync    *syncsite.SyncSiteRequest `json:"sync,omitempty"`
+	Finding   Finding                        `json:"finding"`
+	Start     *runs.StartRequest             `json:"start,omitempty"`
+	Sync      *syncsite.SyncSiteRequest      `json:"sync,omitempty"`
+	Proposals *graph.PreviewFromPagesRequest `json:"proposals,omitempty"`
 }
 
 func placed(f finding.Finding, places contextpack.Map) Finding {

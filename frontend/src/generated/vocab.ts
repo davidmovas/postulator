@@ -128,6 +128,12 @@ export type MatchRule = (typeof matchRules)[number];
 export const bodyStates = ["empty", "client", "ours", "mixed", "dynamic"] as const;
 export type BodyState = (typeof bodyStates)[number];
 
+export const proposalClashes = ["", "no_name", "name_in_batch", "name_carried"] as const;
+export type ProposalClash = (typeof proposalClashes)[number];
+
+export const proposalSources = ["model", "site"] as const;
+export type ProposalSource = (typeof proposalSources)[number];
+
 export const blockKinds = [
     "paragraph",
     "heading",

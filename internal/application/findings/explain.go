@@ -119,6 +119,10 @@ func sentence(held []finding.Finding, option finding.Option, req ExplainRequest,
 	case finding.RelinkPage:
 		return "Open a relink run start for " + where +
 			": the start shows the estimate first, and the finding closes itself once the run has placed the links", nil
+	case finding.ProposeEntity:
+		return "Open the entity proposals named from the site for " + where +
+			": the model takes only the ones a person accepts, and each finding closes itself once an entity carries its page" +
+			unwritten, nil
 	default:
 		return "Start a full sync of the site that renders every page again: the finding closes itself once its cause is gone", nil
 	}

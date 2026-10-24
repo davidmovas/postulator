@@ -52,6 +52,8 @@ func catalog() []vocabulary {
 		{export: "findingOptionKinds", tsType: "FindingOptionKind", pkg: "internal/domain/finding", typeName: "OptionKind"},
 		{export: "matchRules", tsType: "MatchRule", pkg: "internal/domain/pagemap", typeName: "MatchRule"},
 		{export: "bodyStates", tsType: "BodyState", pkg: "internal/domain/contextpack", typeName: "BodyState"},
+		{export: "proposalClashes", tsType: "ProposalClash", pkg: "internal/domain/contextpack", typeName: "ProposalClash"},
+		{export: "proposalSources", tsType: "ProposalSource", pkg: "internal/application/graph", typeName: "ProposalSource"},
 		{export: "blockKinds", tsType: "BlockKind", pkg: "internal/domain/block", typeName: "BlockKind"},
 		{export: "bodyKinds", tsType: "BodyKind", pkg: "internal/domain/block", typeName: "Kind"},
 		{export: "blockOwners", tsType: "BlockOwner", pkg: "internal/domain/block", typeName: "Owner"},
