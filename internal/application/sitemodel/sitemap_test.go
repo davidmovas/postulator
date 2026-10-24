@@ -175,6 +175,27 @@ func TestAMapNodeCarriesWhatTheRunStartPicksBy(t *testing.T) {
 	}
 }
 
+func TestAStaleMapIsRebuiltOnceBeforeItIsRead(t *testing.T) {
+	t.Parallel()
+
+	m := wide()
+	m.MarkStale()
+	root := siteMap(t, m, sitemodel.MapRequest{})
+	if got := nodePaths(root.Nodes.Items); !slices.Equal(got, []string{"/"}) {
+		t.Fatalf("the roots after a rebuild = %v", got)
+	}
+	if m.Rebuilt() != 1 || m.Reads() != 3 {
+		t.Errorf("a stale map was rebuilt %d times over %d reads, want once: the stale look, the rebuild, the map", m.Rebuilt(), m.Reads())
+	}
+	siteMap(t, m, sitemodel.MapRequest{})
+	if m.Rebuilt() != 1 || m.Reads() != 4 {
+		t.Errorf("a fresh map was rebuilt %d times over %d reads, want no rebuild and one read", m.Rebuilt(), m.Reads())
+	}
+	if err := m.Service().Refresh(t.Context(), siteID); err != nil || m.Rebuilt() != 1 {
+		t.Errorf("refreshing a fresh map = %v and %d rebuilds", err, m.Rebuilt())
+	}
+}
+
 func TestTheMapPlacesPagesAndScopesTheirSubtrees(t *testing.T) {
 	t.Parallel()
 

@@ -38,10 +38,24 @@ type Memory struct {
 	Budgets  map[domainllm.Role]int
 	Audit    reports.LinkAuditResponse
 
-	mu    sync.Mutex
-	reads int
-	sites int
-	asked [][]string
+	mu      sync.Mutex
+	reads   int
+	sites   int
+	stale   bool
+	written int
+	asked   [][]string
+}
+
+func (m *Memory) MarkStale() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.stale = true
+}
+
+func (m *Memory) Rebuilt() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.written
 }
 
 func (m *Memory) SiteReads() int {
@@ -83,7 +97,12 @@ func (m *Memory) rows() []contextpack.MapRow {
 
 type mapReader struct{ m *Memory }
 
-func (mapReader) State(context.Context, string) (generation, built int64, err error) {
+func (r mapReader) State(context.Context, string) (generation, built int64, err error) {
+	r.m.mu.Lock()
+	defer r.m.mu.Unlock()
+	if r.m.stale {
+		return 2, 1, nil
+	}
 	return 1, 1, nil
 }
 
@@ -92,7 +111,11 @@ func (r mapReader) ListBySite(_ context.Context, siteID string) ([]contextpack.M
 	return slices.DeleteFunc(rows, func(row contextpack.MapRow) bool { return row.SiteID != siteID }), nil
 }
 
-func (mapReader) Write(context.Context, string, []contextpack.MapRow, []string, int64) error {
+func (r mapReader) Write(context.Context, string, []contextpack.MapRow, []string, int64) error {
+	r.m.mu.Lock()
+	defer r.m.mu.Unlock()
+	r.m.stale = false
+	r.m.written++
 	return nil
 }
 
