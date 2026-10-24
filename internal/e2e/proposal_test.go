@@ -141,6 +141,15 @@ func TestAProductWithoutAnEntityIsWrittenThroughAProposal(t *testing.T) {
 		}
 	}
 
+	hubBefore := ""
+	hubItem, hubHeld := contentItem{}, false
+	if stand.productHub != "" {
+		if hubItem, hubHeld = live.byPath(t, stand.productHub); !hubHeld {
+			t.Fatalf("the stand holds no %s", stand.productHub)
+		}
+		hubBefore = live.storedContent(t, "pages", hubItem.ID)
+	}
+
 	started, err := core.Runs.Start(t.Context(), runs.StartRequest{
 		SiteID: siteID, PageIDs: []string{page.ID}, Rewrite: []string{page.ID},
 		TemplateID: productTemplate(t, core), PublishMode: string(run.PublishLive), Recipe: recipe(),
@@ -177,4 +186,15 @@ func TestAProductWithoutAnEntityIsWrittenThroughAProposal(t *testing.T) {
 	}
 	t.Logf("%s got the entity %q under %q from the site's proposal, and its run wrote the description; the wire's store writes: %s",
 		productPath, entity.Name, proposal.Parent, strings.Join(wireKeys, " | "))
+
+	reverted, err := core.Runs.Revert(t.Context(), runs.RevertRequest{RunID: started.RunID})
+	if err != nil {
+		t.Fatalf("revert the product's run: %v", err)
+	}
+	awaitRun(t, core.Runs, reverted.RunID)
+	if hubHeld {
+		if after := live.storedContent(t, "pages", hubItem.ID); after != hubBefore {
+			t.Errorf("after the revert %s holds %q, want the client's body the run's relink replaced, byte for byte", stand.productHub, after)
+		}
+	}
 }
