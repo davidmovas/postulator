@@ -8,7 +8,8 @@ import type { FindingFilter } from "../../data/types.js";
 import { Banner, Dialog, Skeleton, TaskAltIcon } from "../../ui/index.js";
 import { findingCodeLabel } from "../pages/model/labels.js";
 import { optionLabel } from "./labels.js";
-import { batches } from "./model/bulk.js";
+import { refusalOf, settleInBatches } from "./model/bulk.js";
+import type { BulkOutcome } from "./model/bulk.js";
 import { TypePick } from "./pickers.js";
 import { pickRefusal, picksOf } from "./resolve-dialog.js";
 
@@ -29,6 +30,7 @@ export function BulkDialog({ siteId, code, filter, option, onClose, onGone }: Bu
     const [pageTypeId, setPageTypeId] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [thrown, setThrown] = useState<unknown>(null);
+    const [partial, setPartial] = useState<BulkOutcome | null>(null);
     const ids = useFindingIds(filter, option !== null);
     const resolveMany = useResolveFindings();
     const chosen = option ?? "";
@@ -37,6 +39,7 @@ export function BulkDialog({ siteId, code, filter, option, onClose, onGone }: Bu
     useEffect(() => {
         setPageTypeId(null);
         setThrown(null);
+        setPartial(null);
     }, [option]);
 
     const picks = picksOf(chosen, null, pageTypeId);
@@ -55,18 +58,22 @@ export function BulkDialog({ siteId, code, filter, option, onClose, onGone }: Bu
         }
         setBusy(true);
         setThrown(null);
-        try {
-            for (const batch of batches(collected)) {
-                await resolveMany.mutateAsync({ siteId, code, option, findingIds: batch, ...picks });
-            }
+        setPartial(null);
+        const outcome = await settleInBatches(collected, (batch) =>
+            resolveMany.mutateAsync({ siteId, code, option, findingIds: batch, ...picks }),
+        );
+        setBusy(false);
+        if (outcome.refusal === null) {
             onClose();
-        } catch (error) {
-            setThrown(error);
-            if (failure(error).code === conflict) {
-                onGone();
-            }
-        } finally {
-            setBusy(false);
+            return;
+        }
+        if (outcome.settled > 0) {
+            setPartial(outcome);
+        } else {
+            setThrown(outcome.refusal);
+        }
+        if (failure(outcome.refusal).code === conflict) {
+            onGone();
         }
     };
 
@@ -98,7 +105,10 @@ export function BulkDialog({ siteId, code, filter, option, onClose, onGone }: Bu
                     <p className="border-l-2 border-hairline pl-2.5 text-xs leading-snug text-ink-soft">{explanation.data.sentence}</p>
                 )}
             </div>
-            {problem === null ? null : <Banner tone={gone ? "warn" : "danger"} title={problem} />}
+            {partial === null ? null : (
+                <Banner tone="warn" title={said.bulk.partial(partial.settled, partial.total, refusalOf(partial.refusal))} />
+            )}
+            {problem === null || partial !== null ? null : <Banner tone={gone ? "warn" : "danger"} title={problem} />}
         </Dialog>
     );
 }

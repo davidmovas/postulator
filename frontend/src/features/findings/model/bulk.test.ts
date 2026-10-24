@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { messages } from "../../../data/errors.js";
 import { aFinding } from "../../../testing/findings.js";
-import { batches, bulkLimit, bulkOptions } from "./bulk.js";
+import { batches, bulkLimit, bulkOptions, refusalOf, settleInBatches } from "./bulk.js";
 
 const differs = aFinding({
     id: "f1",
@@ -73,5 +74,52 @@ describe("the batches a bulk action sends", () => {
 
     it("sends nothing for no ids", () => {
         expect(batches([])).toStrictEqual([]);
+    });
+});
+
+const refused = (code: string, message: string): Error => new Error(message, { cause: { code, message } });
+
+describe("what a bulk action settled, batch by batch", () => {
+    const ids = Array.from({ length: bulkLimit * 2 + 500 }, (_, at) => `f${at}`);
+
+    it("settles every batch in turn and reports all of them settled", async () => {
+        const sent: number[] = [];
+        const outcome = await settleInBatches(ids, (batch) => {
+            sent.push(batch.length);
+            return Promise.resolve();
+        });
+        expect(sent).toStrictEqual([bulkLimit, bulkLimit, 500]);
+        expect(outcome).toStrictEqual({ settled: ids.length, total: ids.length, refusal: null });
+    });
+
+    it("stops at the first refused batch, the earlier ones staying settled and the later ones never sent", async () => {
+        const conflict = refused("CONFLICT", "the finding is no longer open");
+        const sent: string[] = [];
+        const outcome = await settleInBatches(ids, (batch) => {
+            sent.push(batch[0]);
+            return sent.length === 2 ? Promise.reject(conflict) : Promise.resolve();
+        });
+        expect(sent).toStrictEqual(["f0", `f${bulkLimit}`]);
+        expect(outcome).toStrictEqual({ settled: bulkLimit, total: ids.length, refusal: conflict });
+    });
+
+    it("reports nothing settled when the first batch is refused", async () => {
+        const invalid = refused("INVALID", "the page has no observed value for this field");
+        const outcome = await settleInBatches(ids, () => Promise.reject(invalid));
+        expect(outcome).toStrictEqual({ settled: 0, total: ids.length, refusal: invalid });
+    });
+});
+
+describe("why a batch was refused, in plain words", () => {
+    it("says what the site's model refused", () => {
+        expect(refusalOf(refused("CONFLICT", "the finding is no longer open"))).toBe("the finding is no longer open");
+        expect(refusalOf(refused("INVALID", "the page has no observed value for this field"))).toBe(
+            "the page has no observed value for this field",
+        );
+    });
+
+    it("keeps an internal failure's own words out of the sentence", () => {
+        expect(refusalOf(refused("INTERNAL", "database is locked"))).toBe(messages.INTERNAL);
+        expect(refusalOf(new Error("lost"))).toBe(messages.INTERNAL);
     });
 });

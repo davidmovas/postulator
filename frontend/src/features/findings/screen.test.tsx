@@ -17,6 +17,7 @@ interface Held {
     ids: string[] | null;
     collected: FindingFilter[];
     resolvedMany: ResolveFindingsRequest[];
+    refusedCall: number | null;
 }
 
 const fresh = (): Held => ({
@@ -28,7 +29,10 @@ const fresh = (): Held => ({
     ids: null,
     collected: [],
     resolvedMany: [],
+    refusedCall: null,
 });
+
+const goneMessage = "the finding is no longer open";
 
 const held: Held = fresh();
 
@@ -77,6 +81,9 @@ vi.mock("../../data/hooks/findings.js", () => ({
     useResolveFindings: () => ({
         mutateAsync: (request: ResolveFindingsRequest) => {
             held.resolvedMany.push(request);
+            if (held.refusedCall === held.resolvedMany.length) {
+                return Promise.reject(new Error(goneMessage, { cause: { code: "CONFLICT", message: goneMessage } }));
+            }
             const proposals: PreviewFromPagesRequest | null =
                 request.option === "propose_entity"
                     ? { siteId: "s1", pageIds: (request.findingIds ?? []).map(pageOfFinding), source: siteSource }
@@ -230,6 +237,24 @@ describe("the findings inbox", () => {
         const dialog = within(screen.getByRole("dialog", { name: said.bulk.title(said.options.ignore) }));
         expect(dialog.getByText(sentence)).toBeDefined();
         expect(dialog.getByRole("button", { name: said.bulk.confirm(3) })).toBeDefined();
+    });
+
+    it("settles a code of more than a thousand findings in batches and says what a refused batch left unsettled", async () => {
+        held.findings = [differs("f1"), differs("f2")];
+        held.ids = Array.from({ length: 2500 }, (_, at) => `f${at}`);
+        held.counts = { codes: [{ code: "parent_differs", severity: "warning", count: 2500 }], total: 2500 };
+        held.refusedCall = 2;
+        inbox("/s/s1/findings?code=parent_differs");
+
+        fireEvent.click(screen.getByRole("button", { name: said.bulk.all(said.options.ignore, 2500) }));
+        const dialog = within(screen.getByRole("dialog", { name: said.bulk.title(said.options.ignore) }));
+        fireEvent.click(dialog.getByRole("button", { name: said.bulk.confirm(2500) }));
+
+        await waitFor(() => {
+            expect(dialog.getByText(said.bulk.partial(1000, 2500, goneMessage))).toBeDefined();
+        });
+        expect(held.resolvedMany.map((request) => (request.findingIds ?? []).length)).toStrictEqual([1000, 1000]);
+        expect(screen.getByRole("dialog", { name: said.bulk.title(said.options.ignore) })).toBeDefined();
     });
 
     it("opens the entity proposals a proposal option answers, at their preview, instead of settling it", () => {

@@ -77,6 +77,8 @@ export const findings = {
             count === 1 ? "Confirming settles 1 finding as yours." : `Confirming settles ${count} findings as yours.`,
         collecting: "Gathering every finding of this code",
         confirm: (count: number) => (count === 1 ? "Settle 1 finding" : `Settle ${count} findings`),
+        partial: (settled: number, total: number, reason: string) =>
+            `${settled} of ${total} findings were settled; the other ${total - settled} were not: ${reason}${/[.!?]$/.test(reason) ? "" : "."} Confirm again to settle the ones still open.`,
         propose: (count: number) => (count === 1 ? "Propose an entity for 1 page" : `Propose entities for all ${count}`),
         proposeTooltip:
             "Opens entity proposals named from the site for every page of this code the filters show; nothing is settled.",
