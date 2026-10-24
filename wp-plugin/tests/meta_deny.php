@@ -1,5 +1,7 @@
 <?php
 
+require __DIR__ . '/strict.php';
+
 define( 'ABSPATH', __DIR__ . '/' );
 
 require __DIR__ . '/../postulator-companion/includes/meta.php';

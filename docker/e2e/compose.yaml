@@ -1,5 +1,12 @@
 name: postulator-test-vanilla
 
+x-php: &php
+  profiles:
+    - tools
+  entrypoint: ["/bin/sh"]
+  volumes:
+    - ../../wp-plugin:/plugin:ro
+
 services:
   db:
     image: mariadb:11.4.12
@@ -71,13 +78,17 @@ services:
       - ./:/e2e
       - ../../bin:/dist:ro
 
-  phplint:
+  php72:
+    <<: *php
+    image: php:7.2.34-cli
+
+  php74:
+    <<: *php
     image: php:7.4.33-cli
-    profiles:
-      - tools
-    entrypoint: ["/bin/sh"]
-    volumes:
-      - ../../wp-plugin:/plugin:ro
+
+  php85:
+    <<: *php
+    image: php:8.5.12-cli
 
 volumes:
   db:

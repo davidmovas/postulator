@@ -1,0 +1,100 @@
+{
+  "wordpress": {
+    "functions": {
+      "__return_false": "3.0.0",
+      "add_action": "1.2.0",
+      "add_filter": "0.71",
+      "add_query_arg": "1.5.0",
+      "apply_filters": "0.71",
+      "current_user_can": "2.0.0",
+      "delete_metadata": "2.9.0",
+      "delete_post_meta": "1.5.0",
+      "esc_attr": "2.8.0",
+      "esc_html": "2.8.0",
+      "esc_url_raw": "2.8.0",
+      "get_bloginfo": "0.71",
+      "get_object_taxonomies": "2.3.0",
+      "get_option": "1.5.0",
+      "get_permalink": "1.0.0",
+      "get_post": "1.5.1",
+      "get_post_field": "2.3.0",
+      "get_post_meta": "1.5.0",
+      "get_post_types": "2.9.0",
+      "get_queried_object_id": "3.1.0",
+      "get_taxonomies": "3.0.0",
+      "get_term": "4.4.0",
+      "get_term_link": "2.5.0",
+      "get_term_meta": "4.4.0",
+      "get_the_terms": "2.5.0",
+      "home_url": "3.0.0",
+      "is_admin": "1.5.1",
+      "is_protected_meta": "3.1.3",
+      "is_singular": "1.5.0",
+      "is_wp_error": "2.1.0",
+      "metadata_exists": "3.3.0",
+      "nocache_headers": "2.0.0",
+      "register_rest_route": "4.4.0",
+      "remove_filter": "1.2.0",
+      "rest_authorization_required_code": "4.7.0",
+      "sanitize_title": "1.0.0",
+      "setup_postdata": "1.5.0",
+      "update_object_term_cache": "2.3.0",
+      "update_post_meta": "1.5.0",
+      "update_term_meta": "4.4.0",
+      "wp_json_encode": "4.1.0",
+      "wp_parse_url": "4.7.0",
+      "wp_reset_postdata": "3.0.0",
+      "wp_robots_no_robots": "5.7.0",
+      "wp_slash": "3.6.0",
+      "wp_strip_all_tags": "2.9.0",
+      "wp_unique_post_slug": "2.8.0",
+      "wp_unslash": "3.6.0",
+      "wp_update_post": "3.5.0"
+    },
+    "hooks": {
+      "comments_open": "2.5.0",
+      "content_save_pre": "2.3.0",
+      "created_term": "2.3.0",
+      "edited_term": "2.3.0",
+      "excerpt_save_pre": "2.3.0",
+      "get_canonical_url": "4.6.0",
+      "init": "1.5.0",
+      "pings_open": "2.5.0",
+      "posts_results": "2.3.0",
+      "pre_get_document_title": "4.4.0",
+      "pre_get_posts": "2.0.0",
+      "pre_post_content": "2.3.0",
+      "pre_post_excerpt": "2.3.0",
+      "pre_post_title": "2.3.0",
+      "query_vars": "1.5.0",
+      "redirect_canonical": "2.3.0",
+      "rest_api_init": "4.4.0",
+      "the_content": "0.71",
+      "title_save_pre": "2.3.0",
+      "wp_head": "1.5.0",
+      "wp_robots": "5.7.0"
+    },
+    "classes": {
+      "WP_Error": "2.1.0",
+      "WP_Post": "3.5.0",
+      "WP_Query": "1.5.0",
+      "WP_REST_Request": "4.4.0",
+      "WP_REST_Response": "4.4.0",
+      "WP_REST_Server": "4.4.0",
+      "WP_Term": "4.4.0"
+    },
+    "constants": {
+      "ARRAY_A": "0.71",
+      "HOUR_IN_SECONDS": "3.5.0"
+    }
+  },
+  "thirdParty": {
+    "functions": {
+      "wc_get_page_id": "WooCommerce"
+    },
+    "hooks": {
+      "rank_math/frontend/robots": "Rank Math",
+      "wpseo_robots": "Yoast SEO"
+    }
+  }
+}

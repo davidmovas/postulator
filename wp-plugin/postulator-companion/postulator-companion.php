@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Postulator Companion
  * Version: 1.5.1
- * Requires at least: 6.4
- * Requires PHP: 7.4
+ * Requires at least: 5.7
+ * Requires PHP: 7.2
  * Update URI: false
  */
 

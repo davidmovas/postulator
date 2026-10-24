@@ -12,6 +12,7 @@ vars:
   COMMIT:
     sh: git rev-parse --short HEAD
   BUILD_DATE: '{{now | date "2006-01-02T15:04:05Z"}}'
+  PHP_SERVICES: php72 php74 php85
 
 includes:
   common: ./build/Taskfile.yml
@@ -311,19 +312,31 @@ tasks:
       - docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T --entrypoint wp bootstrap plugin install /dist/postulator-companion.zip --force --activate
 
   plugin:lint:
-    summary: Runs php -l over every companion plugin source file
+    summary: Runs php -l over every companion plugin PHP file on PHP 7.2, 7.4 and 8.5, failing on anything but a clean parse; PHP_MATRIX=0 keeps a Linux or macOS run to the local php
     cmds:
-      - cmd: docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T phplint -c 'find /plugin -name "*.php" -print0 | xargs -0 -n1 php -l'
-        platforms: [windows]
-      - cmd: find wp-plugin -name "*.php" -print0 | xargs -0 -n1 php -l
-        platforms: [linux, darwin]
+      - task: plugin:php
+        vars:
+          SCRIPT: lint.sh
 
   plugin:test:
-    summary: Runs the companion plugin's PHP tests on PHP 7.4, the plugin's floor
+    summary: Runs the companion plugin's PHP tests, the function scan among them, under E_ALL on PHP 7.2, 7.4 and 8.5; PHP_MATRIX=0 keeps a Linux or macOS run to the local php
     cmds:
-      - cmd: docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T phplint -c 'php /plugin/tests/normalize.php && php /plugin/tests/meta_deny.php'
+      - task: plugin:php
+        vars:
+          SCRIPT: test.sh
+
+  plugin:php:
+    internal: true
+    vars:
+      PHP_MATRIX: '{{.PHP_MATRIX | default "1"}}'
+    cmds:
+      - for: { var: PHP_SERVICES }
+        cmd: docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T {{.ITEM}} /plugin/tests/{{.SCRIPT}} /plugin
         platforms: [windows]
-      - cmd: php wp-plugin/tests/normalize.php && php wp-plugin/tests/meta_deny.php
+      - cmd: sh wp-plugin/tests/{{.SCRIPT}} wp-plugin
+        platforms: [linux, darwin]
+      - for: { var: PHP_SERVICES }
+        cmd: if [ "{{.PHP_MATRIX}}" != "0" ] && command -v docker >/dev/null 2>&1; then docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T {{.ITEM}} /plugin/tests/{{.SCRIPT}} /plugin; fi
         platforms: [linux, darwin]
 
   plugin:zip:
