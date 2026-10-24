@@ -178,6 +178,12 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 	if summary.Pages == 0 || summary.Observed != summary.Pages {
 		t.Fatalf("summary = %+v, want every page observed", summary)
 	}
+	brief, err := core.SiteModel.Brief(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("read the brief: %v", err)
+	}
+	t.Logf("the census of %s: pages by type %+v, by WordPress type %v, trails by reason %v and by method %v, links by type %v, open findings %v",
+		live.env.stand, brief.Overview.Types, summary.ByType, summary.TrailsByReason, summary.TrailsByMethod, summary.LinksByType, summary.Findings)
 	if summary.Rendered == 0 || summary.LinksByType[string(pagemap.LinkBreadcrumb)] == 0 || summary.LinksByType[string(pagemap.LinkNavigation)] == 0 {
 		t.Errorf("summary = %+v, want renders with breadcrumb and navigation links", summary)
 	}
