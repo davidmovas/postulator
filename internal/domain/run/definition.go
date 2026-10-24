@@ -104,6 +104,8 @@ type Price struct {
 	Applies      func(ctx context.Context, target Target, params map[string]any) (bool, error)
 	Ref          *llm.ModelRef
 	OutputTokens int
+	Overhead     int
+	ReadsBody    bool
 	Unpriced     bool
 }
 

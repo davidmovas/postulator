@@ -59,6 +59,7 @@ type pageRow struct {
 	Writer  *prompt    `json:"writer,omitempty"`
 	Linker  *linkerRow `json:"linker,omitempty"`
 	Judge   *prompt    `json:"judge,omitempty"`
+	Meta    *prompt    `json:"meta,omitempty"`
 }
 
 type harness struct {
@@ -66,16 +67,17 @@ type harness struct {
 	specs    *templates.Service
 	client   *recordingClient
 	pictures *recordedPictures
+	prose    []passage
 	deps     steps.Deps
 }
 
-func newHarness(model *sitemodeltest.Memory, models *catalog.Catalog) *harness {
+func newHarness(model *sitemodeltest.Memory, models *catalog.Catalog, prose []passage) *harness {
 	client := &recordingClient{}
 	pictures := &recordedPictures{service: model.Service()}
 	profiles := catalogProfiles{models: models}
 	pages, entities, site, types := capturedPages{model}, capturedEntities{model}, capturedSite{model}, capturedTypes{model}
 	return &harness{
-		model: model, client: client, pictures: pictures,
+		model: model, client: client, pictures: pictures, prose: prose,
 		specs: templates.New(seededTemplates(), pages, entities, site, types, readOnly{}, readOnly{}, clock.System{}),
 		deps: steps.Deps{
 			Entities: entities, Edges: capturedEdges{model}, Pages: pages, Sites: site, Types: types, Fields: capturedFields{model},
@@ -86,13 +88,17 @@ func newHarness(model *sitemodeltest.Memory, models *catalog.Catalog) *harness {
 }
 
 func measurePages(ctx context.Context, c *counters, models *catalog.Catalog) ([]pageRow, error) {
+	prose, err := capturedProse()
+	if err != nil {
+		return nil, err
+	}
 	rows := make([]pageRow, 0)
 	for _, name := range sitemodeltest.Stands() {
 		model, err := typedStand(name)
 		if err != nil {
 			return nil, err
 		}
-		h := newHarness(model, models)
+		h := newHarness(model, models, prose)
 		pages := slices.DeleteFunc(slices.Clone(model.Pages), func(page pagemap.Page) bool { return page.Status == pagemap.StatusArchived })
 		slices.SortFunc(pages, func(a, b pagemap.Page) int { return cmp.Compare(a.Path, b.Path) })
 		for i := range pages {
@@ -145,7 +151,18 @@ func (h *harness) measure(ctx context.Context, c *counters, stand string, page p
 	if row.Linker, err = h.linker(ctx, c, sc); err != nil {
 		return pageRow{}, err
 	}
+
+	hold(sc, run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte(standInBody(h.prose, runtime.TargetWords(sc.Spec)))})
 	if row.Judge, err = h.asked(ctx, c, steps.Judge(h.deps), sc, contextpack.SectionCurrent, contextpack.SectionKeywords); err != nil {
+		return pageRow{}, err
+	}
+
+	draft, err := standInDraft(page, sc.Spec, h.prose)
+	if err != nil {
+		return pageRow{}, err
+	}
+	hold(sc, run.Artifact{Kind: run.ArtifactDraft, Blob: draft})
+	if row.Meta, err = h.asked(ctx, c, steps.GenerateMeta(h.deps), sc, contextpack.SectionTargets); err != nil {
 		return pageRow{}, err
 	}
 	return row, nil
@@ -325,6 +342,7 @@ func writePages(out io.Writer, rows []pageRow) error {
 				s.prompt("", "linker", row.Linker.Call, owed)
 			}
 			s.prompt("", "judge", row.Judge, "1")
+			s.prompt("", "meta", row.Meta, "1")
 		}
 	}, func(s *sheet) {
 		s.heading("NOT MEASURED", "why")

@@ -32,23 +32,27 @@ const (
 	stepLinker     = "linker call"
 	stepJudge      = "judge"
 	stepJudgePack  = "judge's pack"
+	stepMeta       = "meta"
 
 	spreadWriter   = "writer input, real ÷ the run estimate"
 	spreadLinker   = "linker call, real ÷ the run estimate"
 	spreadJudge    = "judge input, real ÷ the run estimate"
+	spreadMeta     = "meta input, real ÷ the run estimate"
 	spreadPack     = "pack of the writer, real ÷ llm.Tokens"
 	spreadEscaped  = "body as JSON-escaped HTML, tokens per word"
 	spreadSections = "section of a writer's pack, real ÷ llm.Tokens"
 
 	minProseWords     = 50
 	ceilingWords      = 3.0
-	packRunesPerToken = 3.0
+	packRunesPerToken = 3.7
 	tolerance         = 0.1
+	estimateTolerance = 0.25
 	reportedDecimal   = 100
+	wholeBudget       = 1 << 20
 )
 
 func fitBudgets() []int {
-	return []int{4096, 3000, 1500}
+	return []int{4096, 3000, 1500, 1000, 750, 500, 300}
 }
 
 type estimateReport struct {
@@ -76,6 +80,7 @@ type fitRow struct {
 	Budget    int    `json:"budget"`
 	Estimated int    `json:"estimated"`
 	Real      int    `json:"real"`
+	Whole     int    `json:"whole"`
 	Dropped   int    `json:"dropped"`
 	Over      bool   `json:"over"`
 	Refused   string `json:"refused,omitempty"`
@@ -170,8 +175,9 @@ func inputsOf(rows []pageRow) []inputRow {
 		if row.Linker.Call != nil {
 			add(stepLinker, row.Linker.Call.Estimated, row.Linker.Call.Total.Tokens, !row.NoBody)
 		}
-		add(stepJudge, row.Judge.Estimated, row.Judge.Total.Tokens, !row.NoBody)
+		add(stepJudge, row.Judge.Estimated, row.Judge.Total.Tokens, true)
 		add(stepJudgePack, row.Judge.Pack.Estimated, row.Judge.Pack.Tokens, true)
+		add(stepMeta, row.Meta.Estimated, row.Meta.Total.Tokens, true)
 	}
 	return out
 }
@@ -187,11 +193,16 @@ func fitsOf(ctx context.Context, c counter) ([]fitRow, error) {
 		pages := slices.DeleteFunc(slices.Clone(model.Pages), func(page pagemap.Page) bool { return page.Status == pagemap.StatusArchived })
 		slices.SortFunc(pages, func(a, b pagemap.Page) int { return cmp.Compare(a.Path, b.Path) })
 		for i := range pages {
+			whole, err := fitOf(ctx, c, service, name, pages[i], wholeBudget)
+			if err != nil {
+				return nil, err
+			}
 			for _, budget := range fitBudgets() {
 				row, err := fitOf(ctx, c, service, name, pages[i], budget)
 				if err != nil {
 					return nil, err
 				}
+				row.Whole = whole.Real
 				out = append(out, row)
 			}
 		}
@@ -314,6 +325,7 @@ func spreadsOf(built estimateReport, rows []pageRow) []spread {
 		{stepWriter, spreadWriter},
 		{stepLinker, spreadLinker},
 		{stepJudge, spreadJudge},
+		{stepMeta, spreadMeta},
 		{stepWriterPack, spreadPack},
 		{stepJudgePack, "pack of the judge, real ÷ llm.Tokens"},
 	}
@@ -402,7 +414,8 @@ func proposalOf(built estimateReport, rows []pageRow) []string {
 		out = append(out, "no captured body is long enough to say anything about tokens per word")
 	case math.Abs(escaped.Pooled-answer) > answer*tolerance:
 		out = append(out, fmt.Sprintf("llm.WordTokens prices an answer at %.1f tokens per word: the captured prose, as a writer answers it (JSON-escaped HTML), "+
-			"runs %.2f (%s); propose %.1f", answer, escaped.Pooled, sample, rounded(escaped.Pooled*10)/10))
+			"runs %.2f (%s); it stays at %.1f on purpose, the output side, until a funded key's ledger shows how long the model's answers run",
+			answer, escaped.Pooled, sample, answer))
 	default:
 		out = append(out, fmt.Sprintf("llm.WordTokens' %.1f tokens per word holds: the captured prose answers at %.2f (%s)", answer, escaped.Pooled, sample))
 	}
@@ -421,39 +434,45 @@ func proposalOf(built estimateReport, rows []pageRow) []string {
 		}
 	}
 	perWord, perToken := float64(packTokens)/float64(max(packWords, 1)), float64(packRunes)/float64(max(packTokens, 1))
+	read := float64(llm.ReadTokens(reportedDecimal)) / reportedDecimal
 	if math.Abs(pack.Pooled-1) > tolerance {
-		out = append(out, fmt.Sprintf("llm.Tokens prices a pack at %.1f tokens per word or %.0f runes per token, line by line, whichever is larger: the real count is %.2f of it; "+
-			"the packs run %.2f tokens per word and %.2f runes per token, so propose %.1f and %.1f. Both proposals move tokensPerTenWords, "+
-			"the one constant llm.WordTokens and llm.Tokens read", answer, packRunesPerToken, pack.Pooled, perWord, perToken,
+		out = append(out, fmt.Sprintf("llm.Tokens prices a pack at %.1f tokens per word or %.1f runes per token, line by line, whichever is larger: the real count is %.2f of it; "+
+			"the packs run %.2f tokens per word and %.2f runes per token, so propose %.1f and %.1f", read, packRunesPerToken, pack.Pooled, perWord, perToken,
 			rounded(perWord*10)/10, rounded(perToken*10)/10))
 	} else {
-		out = append(out, fmt.Sprintf("llm.Tokens holds within %.0f%%: the packs run %.2f tokens per word and %.2f runes per token", tolerance*100, perWord, perToken))
+		out = append(out, fmt.Sprintf("llm.Tokens' %.1f tokens per word and %.1f runes per token hold within %.0f%%: the packs run %.2f and %.2f",
+			read, packRunesPerToken, tolerance*100, perWord, perToken))
 	}
 
 	for _, step := range []struct{ name, said string }{
 		{spreadWriter, "the writer's input"},
 		{spreadLinker, "a linker call"},
 		{spreadJudge, "the judge's input"},
+		{spreadMeta, "the meta writer's input"},
 	} {
 		priced := named(built.Spreads, step.name)
 		if priced.Count == 0 {
 			continue
 		}
-		out = append(out, fmt.Sprintf("the run estimate prices %s at %.2f times the real count, pooled (%.2f to %.2f)", step.said, 1/priced.Pooled, 1/priced.Max, 1/priced.Min))
+		verdict := "within"
+		if math.Abs(1/priced.Min-1) > estimateTolerance || math.Abs(1/priced.Max-1) > estimateTolerance {
+			verdict = "OUTSIDE"
+		}
+		out = append(out, fmt.Sprintf("the run estimate prices %s at %.2f times the real count, pooled (%.2f to %.2f), %s the ±%.0f%% the tests hold",
+			step.said, 1/priced.Pooled, 1/priced.Max, 1/priced.Min, verdict, estimateTolerance*100))
 	}
 	return append(out,
-		"the overestimate of every input comes from the estimate's 800 tokens and half the answer, which stand for the instructions, "+
-			"the rest and the schema and come to more than they do; those are promptOverhead and inputShareOfOutput, not a tokens-per-word constant, and the judge's estimate "+
-			"also leaves out the body it reads (note 3)",
-		"these are proposals; the constants stay as they are until the owner decides")
+		"the input side was adopted on 2026-10-24 from these measurements: llm.Tokens' own rates, each step's own prompt overhead, "+
+			"no share of the answer, and the judge's body at llm.ReadTokens; the output side stays conservative until a funded key's ledger settles it")
 }
 
 func notes() []string {
 	return []string{
 		"OpenAI renders a function definition and a structured answer's schema in its own internal format before the model reads it, so the JSON tokens counted here approximate a schema's real cost: close, not exact",
 		"the ledger already records the real input_tokens of every call: when a funded key has run, compare it with these counts",
-		"the judge's estimate has no body term: it prices 800 tokens, half its 1,024-token answer and the pack, while its real input carries the body it judges, read here from the page's current body in the capture",
-		"a judge or linker call over a page with no body is listed and left out of its spread; the writer reads no body and is always counted",
+		"the judge reads a stand-in body, the captured prose cut to the template's target words, because a run judges the body its writer has just written, " +
+			"not the page's current one; its estimate prices that body at llm.ReadTokens, and the meta writer reads a stand-in draft of the template's headings",
+		"a linker call over a page with no body is listed and left out of its spread; the writer, the judge and the meta writer are always counted",
 		"no product is measured: every product in both captures is unmapped, and the steps refuse a page with no entity",
 		"the briefs carry no link totals, because a capture holds no link audit",
 		"bodies under " + strconv.Itoa(minProseWords) + " words are left out of the tokens-per-word sample, and a body both stands carry is counted once; " +

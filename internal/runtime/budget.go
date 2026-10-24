@@ -17,7 +17,6 @@ import (
 const (
 	promptOverhead      = 800
 	fallbackTargetWords = 800
-	inputShareOfOutput  = 0.5
 
 	reasoningShareOfAllowance = 0.5
 
@@ -278,7 +277,13 @@ func stepNames(recipe []template.StepSpec) []string {
 }
 
 func EstimatedInput(ctx context.Context, def run.StepDef, target run.Target) (int, error) {
-	input := promptOverhead + int(float64(outputOf(def, target))*inputShareOfOutput)
+	input := def.Price.Overhead
+	if input <= 0 {
+		input = promptOverhead
+	}
+	if def.Price.ReadsBody {
+		input += llm.ReadTokens(TargetWords(target.Spec))
+	}
 	if def.Price.Input == nil {
 		return input, nil
 	}
@@ -304,7 +309,7 @@ func outputOf(def run.StepDef, target run.Target) int {
 	if def.Price.OutputTokens > 0 {
 		return def.Price.OutputTokens
 	}
-	return llm.WordTokens(targetWords(target.Spec))
+	return llm.WordTokens(TargetWords(target.Spec))
 }
 
 func callsOf(def run.StepDef, target run.Target, params map[string]any) int {
@@ -314,7 +319,7 @@ func callsOf(def run.StepDef, target run.Target, params map[string]any) int {
 	return max(def.Price.Calls(target, params), 0)
 }
 
-func targetWords(spec template.TemplateSpec) int {
+func TargetWords(spec template.TemplateSpec) int {
 	words := 0
 	for i := range spec.Sections {
 		words += spec.Sections[i].TargetWords

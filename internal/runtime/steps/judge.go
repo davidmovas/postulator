@@ -15,18 +15,23 @@ const (
 	NameJudge = appcontent.NameJudge
 
 	CodeJudgeUnavailable = "judge_unavailable"
+
+	judgePromptTokens = 510
 )
 
 type JudgeReport = appcontent.JudgeReport
 
 func Judge(deps Deps) run.StepDef {
 	return run.StepDef{
-		Name:      NameJudge,
-		Role:      domainllm.RoleJudge,
-		Requires:  []run.ArtifactKind{run.ArtifactBodyHTML},
-		Produces:  []run.ArtifactKind{run.ArtifactJudgeReport},
-		Retry:     run.RetryPolicy{Max: 2},
-		Price:     run.Price{OutputTokens: appcontent.JudgeTokens, Input: packInput(deps, domainllm.RoleJudge, pageKey)},
+		Name:     NameJudge,
+		Role:     domainllm.RoleJudge,
+		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
+		Produces: []run.ArtifactKind{run.ArtifactJudgeReport},
+		Retry:    run.RetryPolicy{Max: 2},
+		Price: run.Price{
+			OutputTokens: appcontent.JudgeTokens, Overhead: judgePromptTokens, ReadsBody: true,
+			Input: packInput(deps, domainllm.RoleJudge, pageKey),
+		},
 		Preflight: inputPreflight(deps, domainllm.RoleJudge, pageKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			report, tokens, err := judgement(ctx, deps, sc)

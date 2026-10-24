@@ -21,3 +21,7 @@ func Tokens(text string) int {
 func WordTokens(words int) int {
 	return words * tokensPerTenWords / 10
 }
+
+func ReadTokens(words int) int {
+	return (words*readTokensPerTenWords + 9) / 10
+}

@@ -25,9 +25,10 @@ const (
 
 	CodePhraseTemplated = "phrase_templated"
 
-	defaultIterations = 2
-	maxIterations     = 4
-	repairTokens      = 256
+	defaultIterations  = 2
+	maxIterations      = 4
+	repairTokens       = 256
+	linkerPromptTokens = 260
 
 	leadWhy = "The template asks the first paragraph of the page to carry the primary keyword, and it does not yet."
 )
@@ -60,6 +61,7 @@ func RepairLinks(deps Deps) run.StepDef {
 		Timeout:  editorTimeout,
 		Price: run.Price{
 			OutputTokens: repairTokens,
+			Overhead:     linkerPromptTokens,
 			Calls: func(target run.Target, params map[string]any) int {
 				phrases := 0
 				if target.Links.Links {

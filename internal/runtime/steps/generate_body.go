@@ -19,6 +19,8 @@ import (
 const (
 	NameGenerateBody = string(run.StepGenerateBody)
 
+	writerPromptTokens = 1040
+
 	ReasonWriterOutOfRoom = "the model ran out of room before it finished, even with twice the room it is first given; " +
 		"lower the word counts of the template or choose a model that writes longer answers, then retry the step"
 )
@@ -45,7 +47,7 @@ func GenerateBody(deps Deps) run.StepDef {
 		Produces:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   writerTimeout,
-		Price:     run.Price{Input: packInput(deps, domainllm.RoleWriter, pageKey)},
+		Price:     run.Price{Overhead: writerPromptTokens, Input: packInput(deps, domainllm.RoleWriter, pageKey)},
 		Preflight: inputPreflight(deps, domainllm.RoleWriter, pageKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			lc, err := linkContextOf(sc)

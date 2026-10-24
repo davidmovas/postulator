@@ -177,33 +177,33 @@ func TestFitDropsTheLowestPriorityFirst(t *testing.T) {
 		trimmed contextpack.SectionName
 	}{
 		{
-			name: "everything fits", budget: pack.Tokens,
+			name: "everything fits", budget: budgetFor(pack.Tokens),
 			kept: names(pack.Sections),
 		},
 		{
 			name:    "a list is trimmed from its tail before it goes",
-			budget:  pack.Tokens - tokens(contextpack.SectionGenerated, contextpack.SectionFields) - 1,
+			budget:  budgetFor(pack.Tokens - tokens(contextpack.SectionGenerated, contextpack.SectionFields) - 1),
 			gone:    []contextpack.SectionName{contextpack.SectionGenerated, contextpack.SectionFields},
 			kept:    []contextpack.SectionName{contextpack.SectionChildren, contextpack.SectionSiblings, contextpack.SectionTrail},
 			trimmed: contextpack.SectionChildren,
 		},
 		{
 			name: "siblings drop before the trail",
-			budget: pack.Tokens - tokens(contextpack.SectionGenerated, contextpack.SectionFields,
-				contextpack.SectionChildren, contextpack.SectionSiblings),
+			budget: budgetFor(pack.Tokens - tokens(contextpack.SectionGenerated, contextpack.SectionFields,
+				contextpack.SectionChildren, contextpack.SectionSiblings)),
 			gone: []contextpack.SectionName{contextpack.SectionSiblings, contextpack.SectionChildren},
 			kept: []contextpack.SectionName{contextpack.SectionTrail, contextpack.SectionProducts, contextpack.SectionTargets},
 		},
 		{
 			name: "products drop before the keywords",
-			budget: pack.Tokens - tokens(contextpack.SectionGenerated, contextpack.SectionFields,
-				contextpack.SectionChildren, contextpack.SectionSiblings, contextpack.SectionProducts),
+			budget: budgetFor(pack.Tokens - tokens(contextpack.SectionGenerated, contextpack.SectionFields,
+				contextpack.SectionChildren, contextpack.SectionSiblings, contextpack.SectionProducts)),
 			gone: []contextpack.SectionName{contextpack.SectionProducts},
 			kept: []contextpack.SectionName{contextpack.SectionKeywords, contextpack.SectionTargets, contextpack.SectionTrail},
 		},
 		{
 			name:   "only what every call carries is left",
-			budget: tokens(contextpack.SectionPage, contextpack.SectionRules),
+			budget: budgetFor(tokens(contextpack.SectionPage, contextpack.SectionRules)),
 			gone:   []contextpack.SectionName{contextpack.SectionCard, contextpack.SectionCurrent, contextpack.SectionKeywords},
 			kept:   []contextpack.SectionName{contextpack.SectionPage, contextpack.SectionRules},
 		},
@@ -220,8 +220,8 @@ func TestFitDropsTheLowestPriorityFirst(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Fit(%d): %v", tc.budget, err)
 			}
-			if tc.budget > 0 && fitted.Tokens > tc.budget {
-				t.Errorf("fitted %d tokens into a budget of %d", fitted.Tokens, tc.budget)
+			if tc.budget > 0 && fitted.Tokens > roomOf(tc.budget) {
+				t.Errorf("fitted %d tokens into a budget of %d, whose room is %d", fitted.Tokens, tc.budget, roomOf(tc.budget))
 			}
 			held := names(fitted.Sections)
 			for _, name := range tc.gone {
@@ -251,6 +251,36 @@ func TestFitDropsTheLowestPriorityFirst(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func roomOf(budget int) int {
+	return budget - budget/20
+}
+
+func budgetFor(room int) int {
+	budget := room
+	for roomOf(budget) < room {
+		budget++
+	}
+	return budget
+}
+
+func TestFitKeepsATwentiethOfTheBudgetAsHeadroom(t *testing.T) {
+	t.Parallel()
+
+	pack := hubPack(t)
+	fitted, err := contextpack.Fit(pack, pack.Tokens)
+	if err != nil {
+		t.Fatalf("Fit(%d): %v", pack.Tokens, err)
+	}
+	if fitted.Tokens > roomOf(pack.Tokens) || len(fitted.Dropped) == 0 {
+		t.Errorf("a pack of exactly its budget kept %d tokens and dropped %v, want it under %d, a twentieth kept for what the counter misses",
+			fitted.Tokens, fitted.Dropped, roomOf(pack.Tokens))
+	}
+	whole, err := contextpack.Fit(pack, budgetFor(pack.Tokens))
+	if err != nil || len(whole.Dropped) != 0 || whole.Budget != budgetFor(pack.Tokens) {
+		t.Errorf("Fit(%d) = %d dropped, budget %d, %v; want the whole pack within its room", budgetFor(pack.Tokens), len(whole.Dropped), whole.Budget, err)
 	}
 }
 

@@ -34,6 +34,19 @@ func TestTokensCountsWordsAndLongRuns(t *testing.T) {
 	}
 }
 
+func TestReadTokensPricesWordsAModelReadsAtThePacksRate(t *testing.T) {
+	t.Parallel()
+
+	for words, want := range map[int]int{0: 0, 1: 2, 800: 1360} {
+		if got := llm.ReadTokens(words); got != want {
+			t.Errorf("ReadTokens(%d) = %d, want %d", words, got, want)
+		}
+	}
+	if llm.ReadTokens(800) >= llm.WordTokens(800) {
+		t.Error("a body read is priced at the answer's rate; the input side reads at the measured one")
+	}
+}
+
 func TestWordTokensIsTheEstimatesRate(t *testing.T) {
 	t.Parallel()
 

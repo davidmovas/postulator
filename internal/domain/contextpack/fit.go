@@ -14,6 +14,7 @@ import (
 const (
 	ReasonBudgetTooSmall = "budget_too_small"
 	keptPriority         = 1
+	headroomDivisor      = 20
 )
 
 type Drop struct {
@@ -41,17 +42,18 @@ func Fit(pack Pack, budget int) (Fitted, error) {
 	}
 	fitted := Fitted{Field: pack.Field, Dropped: make([]Drop, 0), Tokens: pack.Tokens, Budget: budget}
 	if budget > 0 {
+		room := budget - budget/headroomDivisor
 		for _, at := range trimOrder(sections) {
-			if fitted.Tokens <= budget {
+			if fitted.Tokens <= room {
 				break
 			}
 			if sections[at].Priority <= keptPriority {
 				return Fitted{}, errors.New(errors.Invalid, "the input budget is smaller than what every call must carry").
 					WithDetail("reason", ReasonBudgetTooSmall).WithDetail("budget", budget).WithDetail("needed", kept(sections))
 			}
-			fitted.Tokens -= trim(&sections[at], budget, fitted.Tokens, &fitted.Dropped)
+			fitted.Tokens -= trim(&sections[at], room, fitted.Tokens, &fitted.Dropped)
 		}
-		if fitted.Tokens > budget {
+		if fitted.Tokens > room {
 			return Fitted{}, errors.New(errors.Invalid, "the input budget is smaller than what every call must carry").
 				WithDetail("reason", ReasonBudgetTooSmall).WithDetail("budget", budget).WithDetail("needed", kept(sections))
 		}

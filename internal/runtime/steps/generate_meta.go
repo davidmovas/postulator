@@ -21,8 +21,9 @@ const (
 
 	CodeMetaNotWritten = "meta_not_written"
 
-	metaTokens = 512
-	ellipsis   = "…"
+	metaTokens       = 512
+	metaPromptTokens = 440
+	ellipsis         = "…"
 )
 
 type metaAnswer struct {
@@ -98,7 +99,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 		Produces:  []run.ArtifactKind{run.ArtifactMeta},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   editorTimeout,
-		Price:     run.Price{OutputTokens: metaTokens, Input: packInput(deps, domainllm.RoleEditor, seoTitleKey)},
+		Price:     run.Price{OutputTokens: metaTokens, Overhead: metaPromptTokens, Input: packInput(deps, domainllm.RoleEditor, seoTitleKey)},
 		Preflight: inputPreflight(deps, domainllm.RoleEditor, seoTitleKey),
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
 			standing := keepsBody(sc)
