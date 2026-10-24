@@ -13,6 +13,9 @@ vars:
     sh: git rev-parse --short HEAD
   BUILD_DATE: '{{now | date "2006-01-02T15:04:05Z"}}'
   PHP_SERVICES: php72 php74 php85
+  STANDS_MESSAGE: STAND must be vanilla, replica or legacy
+  LEGACY_WP_IMAGE: wordpress:5.7.2-php7.3-apache
+  LEGACY_WP_CLI_IMAGE: wordpress:cli-2.6.0-php7.3
 
 includes:
   common: ./build/Taskfile.yml
@@ -140,11 +143,11 @@ tasks:
       - go run ./cmd/covergate -profile coverage.out
 
   e2e:up:
-    summary: Starts a stand the e2e suites own, STAND=vanilla on 8088 or STAND=replica on 8087, provisions it and writes docker/e2e/.env.<stand>
+    summary: Starts a stand the e2e suites own, STAND=vanilla on 8088, STAND=replica on 8087 or STAND=legacy on 8086 (the oldest WordPress the plugin declares, the contract suite only), provisions it and writes docker/e2e/.env.<stand>
     dir: docker/e2e
     vars:
       STAND: '{{.STAND | default "vanilla"}}'
-      WP_PORT: '{{if eq .STAND "vanilla"}}8088{{else if eq .STAND "replica"}}8087{{else}}{{fail "STAND must be vanilla or replica"}}{{end}}'
+      WP_PORT: '{{if eq .STAND "vanilla"}}8088{{else if eq .STAND "replica"}}8087{{else if eq .STAND "legacy"}}8086{{else}}{{fail .STANDS_MESSAGE}}{{end}}'
     cmds:
       - task: plugin:zip
       - docker compose up -d --wait db wordpress
@@ -153,6 +156,8 @@ tasks:
       COMPOSE_PROJECT_NAME: 'postulator-test-{{.STAND}}'
       E2E_PROJECT: 'postulator-test-{{.STAND}}'
       WP_PORT: '{{.WP_PORT}}'
+      WP_IMAGE: '{{if eq .STAND "legacy"}}{{.LEGACY_WP_IMAGE}}{{end}}'
+      WP_CLI_IMAGE: '{{if eq .STAND "legacy"}}{{.LEGACY_WP_CLI_IMAGE}}{{end}}'
       STAND: '{{.STAND}}'
       E2E_MODE: test
       E2E_SEO: '{{.E2E_SEO | default ""}}'
@@ -164,10 +169,12 @@ tasks:
     dir: docker/e2e
     vars:
       STAND: '{{.STAND | default "vanilla"}}'
-      WP_PORT: '{{if eq .STAND "vanilla"}}8088{{else if eq .STAND "replica"}}8087{{else}}{{fail "STAND must be vanilla or replica"}}{{end}}'
+      WP_PORT: '{{if eq .STAND "vanilla"}}8088{{else if eq .STAND "replica"}}8087{{else if eq .STAND "legacy"}}8086{{else}}{{fail .STANDS_MESSAGE}}{{end}}'
     env:
       COMPOSE_PROJECT_NAME: 'postulator-test-{{.STAND}}'
       WP_PORT: '{{.WP_PORT}}'
+      WP_IMAGE: '{{if eq .STAND "legacy"}}{{.LEGACY_WP_IMAGE}}{{end}}'
+      WP_CLI_IMAGE: '{{if eq .STAND "legacy"}}{{.LEGACY_WP_CLI_IMAGE}}{{end}}'
     cmds:
       - docker compose down -v --remove-orphans
       - cmd: powershell -NoProfile -Command "if (Test-Path .env.{{.STAND}}) { Remove-Item -Force .env.{{.STAND}} }"
@@ -244,10 +251,10 @@ tasks:
           STAND: '{{.STAND}}'
 
   e2e:test:
-    summary: Runs the plugin contract suite against a stand (STAND=); arguments after -- reach go test
+    summary: Runs the plugin contract suite against a stand (STAND=vanilla, replica or legacy); arguments after -- reach go test
     vars:
       STAND: '{{.STAND | default "vanilla"}}'
-      CHECKED: '{{if or (eq .STAND "vanilla") (eq .STAND "replica")}}{{.STAND}}{{else}}{{fail "STAND must be vanilla or replica"}}{{end}}'
+      CHECKED: '{{if or (eq .STAND "vanilla") (eq .STAND "replica") (eq .STAND "legacy")}}{{.STAND}}{{else}}{{fail .STANDS_MESSAGE}}{{end}}'
     env:
       E2E_STAND: '{{.CHECKED}}'
       POSTULATOR_E2E_ENV: '{{.ROOT_DIR}}/docker/e2e/.env.{{.CHECKED}}'
@@ -303,10 +310,12 @@ tasks:
     summary: Packages the companion plugin and installs it over the one on a running stand (STAND=), keeping the site
     vars:
       STAND: '{{.STAND | default "vanilla"}}'
-      WP_PORT: '{{if eq .STAND "vanilla"}}8088{{else if eq .STAND "replica"}}8087{{else}}{{fail "STAND must be vanilla or replica"}}{{end}}'
+      WP_PORT: '{{if eq .STAND "vanilla"}}8088{{else if eq .STAND "replica"}}8087{{else if eq .STAND "legacy"}}8086{{else}}{{fail .STANDS_MESSAGE}}{{end}}'
     env:
       COMPOSE_PROJECT_NAME: 'postulator-test-{{.STAND}}'
       WP_PORT: '{{.WP_PORT}}'
+      WP_IMAGE: '{{if eq .STAND "legacy"}}{{.LEGACY_WP_IMAGE}}{{end}}'
+      WP_CLI_IMAGE: '{{if eq .STAND "legacy"}}{{.LEGACY_WP_CLI_IMAGE}}{{end}}'
     cmds:
       - task: plugin:zip
       - docker compose -f docker/e2e/compose.yaml run --rm --no-deps -T --entrypoint wp bootstrap plugin install /dist/postulator-companion.zip --force --activate

@@ -50,19 +50,23 @@ func TestCoreReadsTypesSettingsAndEmbeddedTerms(t *testing.T) {
 		}
 	}
 
-	settings, err := site.SiteSettings(ctx)
-	if err != nil {
-		t.Fatalf("SiteSettings: %v", err)
-	}
-	if settings.ShowOnFront != stand.frontPage {
-		t.Errorf("show_on_front = %q, want %q", settings.ShowOnFront, stand.frontPage)
-	}
-	if stand.frontPage == "page" {
-		front, frontErr := site.GetItem(ctx, wp.TypePage, settings.FrontPageID)
-		if frontErr != nil || front.Slug != stand.frontPageSlug {
-			t.Errorf("the front page = %+v (%v), want the slug %s", front, frontErr, stand.frontPageSlug)
+	t.Run("site settings", func(t *testing.T) {
+		stand.skipWhereLacking(t, lackCoreFrontPage)
+
+		settings, settingsErr := site.SiteSettings(ctx)
+		if settingsErr != nil {
+			t.Fatalf("SiteSettings: %v", settingsErr)
 		}
-	}
+		if settings.ShowOnFront != stand.frontPage {
+			t.Errorf("show_on_front = %q, want %q", settings.ShowOnFront, stand.frontPage)
+		}
+		if stand.frontPage == "page" {
+			front, frontErr := site.GetItem(ctx, wp.TypePage, settings.FrontPageID)
+			if frontErr != nil || front.Slug != stand.frontPageSlug {
+				t.Errorf("the front page = %+v (%v), want the slug %s", front, frontErr, stand.frontPageSlug)
+			}
+		}
+	})
 
 	slug := uniqueSlug("embedded")
 	var created struct {
@@ -133,7 +137,7 @@ func TestProductsListWithVariationsAndSKU(t *testing.T) {
 	skus := make([]string, 0, len(variations.Items))
 	for _, variation := range variations.Items {
 		skus = append(skus, variation.SKU)
-		if variation.ParentID != variable.ID || variation.RegularPrice == "" || len(variation.Attributes) == 0 || variation.StockStatus == "" {
+		if variation.RegularPrice == "" || len(variation.Attributes) == 0 || variation.StockStatus == "" {
 			t.Errorf("variation = %+v", variation)
 		}
 	}
@@ -142,6 +146,15 @@ func TestProductsListWithVariationsAndSKU(t *testing.T) {
 	if !slices.Equal(skus, want) {
 		t.Errorf("variation SKUs = %v, want %v", skus, want)
 	}
+	t.Run("each variation names its parent", func(t *testing.T) {
+		stand.skipWhereLacking(t, lackVariationParent)
+
+		for _, variation := range variations.Items {
+			if variation.ParentID != variable.ID {
+				t.Errorf("variation %d names the parent %d, want %d", variation.ID, variation.ParentID, variable.ID)
+			}
+		}
+	})
 
 	simple := findProduct(t, site, "simple", stand.simpleProduct)
 	if simple.Name != stand.simpleProductTitle || len(simple.VariationIDs) != 0 {
@@ -169,8 +182,9 @@ func findProduct(t *testing.T, site *wp.Client, productType, slug string) wp.Pro
 }
 
 func TestStoreSettingsNameTheShopPages(t *testing.T) {
-	_, site, env, _ := newWPClient(t)
+	_, site, env, stand := newWPClient(t)
 	requireWoo(t, env)
+	stand.skipWhereLacking(t, lackStorePageSettings)
 	ctx := t.Context()
 
 	pages, err := site.StoreSettings(ctx)

@@ -23,14 +23,15 @@ import (
 )
 
 type environment struct {
-	baseURL string
-	user    string
-	pass    string
-	seo     string
-	stand   string
-	project string
-	woo     bool
-	plugin  bool
+	baseURL  string
+	user     string
+	pass     string
+	seo      string
+	stand    string
+	project  string
+	cliImage string
+	woo      bool
+	plugin   bool
 }
 
 type link struct {
@@ -118,7 +119,7 @@ func loadEnvironment(t *testing.T) environment {
 	path := envPath(t)
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("%s is missing; run `task e2e:up STAND=<vanilla|replica>` first: %v", path, err)
+		t.Fatalf("%s is missing; run `task e2e:up STAND=<vanilla|replica|legacy>` first: %v", path, err)
 	}
 
 	values := make(map[string]string)
@@ -135,14 +136,15 @@ func loadEnvironment(t *testing.T) environment {
 	}
 
 	env := environment{
-		baseURL: strings.TrimSuffix(values["E2E_WP_URL"], "/"),
-		user:    values["E2E_WP_USER"],
-		pass:    values["E2E_WP_APP_PASSWORD"],
-		seo:     values["E2E_SEO"],
-		stand:   values["E2E_STAND"],
-		project: values["E2E_PROJECT"],
-		woo:     values["E2E_WOO"] == "1",
-		plugin:  values["E2E_PLUGIN"] == "1",
+		baseURL:  strings.TrimSuffix(values["E2E_WP_URL"], "/"),
+		user:     values["E2E_WP_USER"],
+		pass:     values["E2E_WP_APP_PASSWORD"],
+		seo:      values["E2E_SEO"],
+		stand:    values["E2E_STAND"],
+		project:  values["E2E_PROJECT"],
+		cliImage: values["E2E_WP_CLI_IMAGE"],
+		woo:      values["E2E_WOO"] == "1",
+		plugin:   values["E2E_PLUGIN"] == "1",
 	}
 	for name, value := range map[string]string{
 		"E2E_STAND":           env.stand,
@@ -174,7 +176,7 @@ func refuseTheSandbox(t *testing.T, path string, env environment) {
 	if parsed.Port() == sandboxPort || env.project == sandboxProject {
 		t.Fatalf("%s points at %s (project %s), the sandbox people test the app against; these suites write and "+
 			"delete content on the site they run on, so they run only on a stand `task e2e:up` starts, "+
-			"vanilla on 8088 or replica on 8087", path, env.baseURL, env.project)
+			"vanilla on 8088, replica on 8087 or legacy on 8086", path, env.baseURL, env.project)
 	}
 }
 
@@ -190,7 +192,7 @@ func wpCLI(t *testing.T, env environment, args ...string) string {
 		"compose", "-p", env.project, "-f", compose,
 		"run", "--rm", "--no-deps", "-T", "--entrypoint", "wp", "bootstrap",
 	}, args...)...)
-	command.Env = append(os.Environ(), "WP_PORT="+parsed.Port())
+	command.Env = append(os.Environ(), "WP_PORT="+parsed.Port(), "WP_CLI_IMAGE="+env.cliImage)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	output, err := command.Output()

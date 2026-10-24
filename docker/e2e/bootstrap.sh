@@ -10,21 +10,33 @@ WOO="${E2E_WOO:-1}"
 PLUGIN_ZIP="/dist/postulator-companion.zip"
 STAND_DIR="/e2e/stands/$STAND"
 WP_ROOT="/var/www/html"
-WOOCOMMERCE_VERSION="11.1.2"
-YOAST_VERSION="28.7"
-RANKMATH_VERSION="1.0.280"
+WP_IMAGE="${E2E_WP_IMAGE:-}"
+WP_CLI_IMAGE="${E2E_WP_CLI_IMAGE:-}"
 
 case "$STAND" in
 	vanilla)
 		TITLE="Vanilla Store"
 		STAND_SEO="none"
+		WOOCOMMERCE_VERSION="11.1.2"
+		YOAST_VERSION="28.7"
+		RANKMATH_VERSION="1.0.280"
 		;;
 	replica)
 		TITLE="Peptide Store"
 		STAND_SEO="rankmath"
+		WOOCOMMERCE_VERSION="11.1.2"
+		YOAST_VERSION="28.7"
+		RANKMATH_VERSION="1.0.280"
+		;;
+	legacy)
+		TITLE="Legacy Store"
+		STAND_SEO="rankmath"
+		WOOCOMMERCE_VERSION="6.5.2"
+		YOAST_VERSION="18.3"
+		RANKMATH_VERSION="1.0.98.1"
 		;;
 	*)
-		echo "STAND must be vanilla or replica" >&2
+		echo "STAND must be vanilla, replica or legacy" >&2
 		exit 1
 		;;
 esac
@@ -83,6 +95,10 @@ if [ "$STAND" = "replica" ] && [ "$SEO" != "rankmath" ]; then
 fi
 if [ "$STAND" = "replica" ] && [ "$PROVISION" = "1" ] && [ "$WOO" != "1" ]; then
 	echo "the replica stand is a store, so E2E_WOO must be 1" >&2
+	exit 1
+fi
+if [ "$STAND" = "legacy" ] && [ "$MODE" != "test" ]; then
+	echo "the legacy stand pins plugins for the oldest WordPress the companion declares, so it runs only as a test stand" >&2
 	exit 1
 fi
 
@@ -280,10 +296,13 @@ fi
 	echo "E2E_SEO=$SEO"
 	echo "E2E_WOO=$WOO"
 	echo "E2E_PLUGIN=$PLUGIN"
+	echo "E2E_WP_IMAGE=$WP_IMAGE"
+	echo "E2E_WP_CLI_IMAGE=$WP_CLI_IMAGE"
 	if [ -n "$RESTRICTED_PASSWORD" ]; then
 		echo "E2E_RESTRICTED_USER=$RESTRICTED_USER"
 		echo "E2E_RESTRICTED_APP_PASSWORD=$RESTRICTED_PASSWORD"
 	fi
 } > "$OUT"
 
-echo "the $STAND stand is provisioned at $SITE_URL"
+echo "the $STAND stand is provisioned at $SITE_URL on WordPress $(wp core version), $WP_IMAGE and $WP_CLI_IMAGE, with the active plugins:"
+wp plugin list --status=active --fields=name,version --format=csv

@@ -84,12 +84,5 @@ if ( ! empty( $result['failed'] ) ) {
 	WP_CLI::error( count( $result['failed'] ) . ' rows of ' . $sheet . ' failed to import' );
 }
 
-WP_CLI::success(
-	sprintf(
-		'%d products and %d variations imported from %s, %d rows already in the store',
-		count( $result['imported'] ),
-		count( $result['imported_variations'] ),
-		$sheet,
-		count( $result['skipped'] )
-	)
-);
+$imported = count( $result['imported'] ) + ( isset( $result['imported_variations'] ) ? count( $result['imported_variations'] ) : 0 );
+WP_CLI::success( sprintf( '%d rows imported from %s, %d rows already in the store', $imported, $sheet, count( $result['skipped'] ) ) );

@@ -39,15 +39,40 @@ type standFacts struct {
 	entityTaxonomy      bool
 	entityEmbedded      bool
 	nestedPages         bool
+	lacks               map[string]string
+}
+
+const (
+	lackCoreFrontPage     = "core front page settings"
+	lackVariationParent   = "variation parents"
+	lackStorePageSettings = "store page settings"
+)
+
+var legacyLacks = map[string]string{
+	lackCoreFrontPage:     "WordPress 5.7's core REST settings carry no show_on_front or page_on_front, which WordPress 6.0 added",
+	lackVariationParent:   "WooCommerce 6.5's wc/v3 variations carry no parent_id, which WooCommerce 8.3 added",
+	lackStorePageSettings: "WooCommerce 6.5's wc/v3 settings leave out the cart, checkout and account pages, which WooCommerce 6.9 serves",
+}
+
+func (f standFacts) skipWhereLacking(t *testing.T, feature string) {
+	t.Helper()
+
+	if reason, lacking := f.lacks[feature]; lacking {
+		t.Skipf("the %s stand lacks %s: %s", f.name, feature, reason)
+	}
 }
 
 func standOf(t *testing.T, env environment) standFacts {
 	t.Helper()
 
 	switch env.stand {
-	case "vanilla":
+	case "vanilla", "legacy":
+		var lacks map[string]string
+		if env.stand == "legacy" {
+			lacks = legacyLacks
+		}
 		return standFacts{
-			name:                "vanilla",
+			name:                env.stand,
 			seoPlugin:           env.seo,
 			frontPage:           "posts",
 			simpleProduct:       "powder",
@@ -61,6 +86,7 @@ func standOf(t *testing.T, env environment) standFacts {
 			categoryDescription: "Caffeine products.",
 			categoryChain:       []string{"koffein"},
 			nestedPages:         true,
+			lacks:               lacks,
 		}
 	case "replica":
 		if env.seo != "rankmath" {
@@ -92,7 +118,7 @@ func standOf(t *testing.T, env environment) standFacts {
 			entityTaxonomy:      true,
 		}
 	}
-	t.Fatalf("E2E_STAND is %q, and the suites know the vanilla and the replica stands", env.stand)
+	t.Fatalf("E2E_STAND is %q, and the suites know the vanilla, the replica and the legacy stands", env.stand)
 	return standFacts{}
 }
 
@@ -142,6 +168,8 @@ func TestTheStandHoldsItsFixture(t *testing.T) {
 	c := &client{base: env.baseURL, user: env.user, pass: env.pass, http: &http.Client{Timeout: 60 * time.Second}}
 
 	t.Run("front page", func(t *testing.T) {
+		facts.skipWhereLacking(t, lackCoreFrontPage)
+
 		var settings struct {
 			ShowOnFront string `json:"show_on_front"`
 			PageOnFront int    `json:"page_on_front"`
