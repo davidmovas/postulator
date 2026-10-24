@@ -17,11 +17,11 @@ func TestTokensCountsWordsAndLongRuns(t *testing.T) {
 	}{
 		{name: "nothing", text: "", want: 0},
 		{name: "blank", text: " \n\t ", want: 2},
-		{name: "prose by its words", text: "one two three", want: 7},
-		{name: "a url by its length", text: "https://shop.example.com/peptides/bpc-157/", want: 14},
-		{name: "json by its length", text: `{"price":"12.50","sku":"BPC-5MG"}`, want: 11},
-		{name: "cyrillic by its length", text: "пептиды для лаборатории", want: 8},
-		{name: "a long paragraph", text: strings.Repeat("word ", 100), want: 220},
+		{name: "prose by its words", text: "one two three", want: 6},
+		{name: "a url by its length", text: "https://shop.example.com/peptides/bpc-157/", want: 12},
+		{name: "json by its length", text: `{"price":"12.50","sku":"BPC-5MG"}`, want: 9},
+		{name: "cyrillic by its length", text: "пептиды для лаборатории", want: 7},
+		{name: "a long paragraph", text: strings.Repeat("word ", 100), want: 170},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -6,13 +6,15 @@ import (
 )
 
 const (
-	tokensPerTenWords = 22
-	runesPerToken     = 3
+	tokensPerTenWords      = 22
+	readTokensPerTenWords  = 17
+	readRunesPerTenTokens  = 37
+	readRunesRoundingSlack = readRunesPerTenTokens - 1
 )
 
 func Tokens(text string) int {
-	byWords := (len(strings.Fields(text))*tokensPerTenWords + 9) / 10
-	byRunes := (utf8.RuneCountInString(text) + runesPerToken - 1) / runesPerToken
+	byWords := (len(strings.Fields(text))*readTokensPerTenWords + 9) / 10
+	byRunes := (utf8.RuneCountInString(text)*10 + readRunesRoundingSlack) / readRunesPerTenTokens
 	return max(byWords, byRunes)
 }
 

@@ -1,4 +1,4 @@
-=== /cart/ · Technical · body · 330 tokens
+=== /cart/ · Technical · body · 261 tokens
 THE PAGE
 Path: /cart/
 Title: Cart
@@ -25,7 +25,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a product listing of 3 links inside the content area; content a shortcode or a dynamic block renders; 29 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /checkout/ · Technical · body · 177 tokens
+=== /checkout/ · Technical · body · 142 tokens
 THE PAGE
 Path: /checkout/
 Title: Checkout
@@ -45,7 +45,7 @@ ITS OTHER FIELDS
 - Title: Checkout
 --- fits in 3000 tokens
 
-=== /guide/ · Entity · body · 392 tokens
+=== /guide/ · Entity · body · 310 tokens
 THE PAGE
 Path: /guide/
 Title: Guide
@@ -77,7 +77,7 @@ ITS OTHER FIELDS
 - Title: Guide
 --- fits in 3000 tokens
 
-=== /guide/setup/ · Entity · body · 449 tokens
+=== /guide/setup/ · Entity · body · 353 tokens
 THE PAGE
 Path: /guide/setup/
 Title: Setup
@@ -110,7 +110,7 @@ ITS OTHER FIELDS
 - Title: Setup
 --- fits in 3000 tokens
 
-=== /hello-world/ · Entity · body · 302 tokens
+=== /hello-world/ · Entity · body · 237 tokens
 THE PAGE
 Path: /hello-world/
 Title: Hello world!
@@ -130,7 +130,7 @@ ITS OTHER FIELDS
 - Title: Hello world!
 --- fits in 3000 tokens
 
-=== /my-account/ · Technical · body · 236 tokens
+=== /my-account/ · Technical · body · 186 tokens
 THE PAGE
 Path: /my-account/
 Title: My account
@@ -153,7 +153,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 content a shortcode or a dynamic block renders; 17 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /privacy-policy/ · Technical · body · 1524 tokens
+=== /privacy-policy/ · Technical · body · 1191 tokens
 THE PAGE
 Path: /privacy-policy/
 Title: Privacy Policy
@@ -196,7 +196,7 @@ ITS OTHER FIELDS
 - Title: Privacy Policy
 --- fits in 3000 tokens
 
-=== /product-category/koffein/ · Store category · body · 429 tokens
+=== /product-category/koffein/ · Store category · body · 342 tokens
 THE PAGE
 Path: /product-category/koffein/
 Title: Koffein
@@ -226,7 +226,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb inside the content area; a product listing of 6 links inside the content area; 55 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product-category/uncategorized/ · Store category · body · 287 tokens
+=== /product-category/uncategorized/ · Store category · body · 227 tokens
 THE PAGE
 Path: /product-category/uncategorized/
 Title: Uncategorized
@@ -248,7 +248,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb inside the content area; 19 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product/coffee-beans/ · Product · product_description · 434 tokens
+=== /product/coffee-beans/ · Product · product_description · 347 tokens
 THE PAGE
 Path: /product/coffee-beans/
 Title: Coffee Beans
@@ -279,7 +279,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content
 --- fits in 3000 tokens
 
-=== /product/powder/ · Product · product_description · 411 tokens
+=== /product/powder/ · Product · product_description · 328 tokens
 THE PAGE
 Path: /product/powder/
 Title: Powder
@@ -309,7 +309,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content
 --- fits in 3000 tokens
 
-=== /refund_returns/ · Technical · body · 1466 tokens
+=== /refund_returns/ · Technical · body · 1146 tokens
 THE PAGE
 Path: /refund_returns/
 Title: Refund and Returns Policy
@@ -361,7 +361,7 @@ ITS OTHER FIELDS
 - Title: Refund and Returns Policy
 --- fits in 3000 tokens
 
-=== /sample-page/ · Entity · body · 601 tokens
+=== /sample-page/ · Entity · body · 470 tokens
 THE PAGE
 Path: /sample-page/
 Title: Sample Page
@@ -384,7 +384,7 @@ ITS OTHER FIELDS
 - Title: Sample Page
 --- fits in 3000 tokens
 
-=== /shop/ · Catalog · body · 348 tokens
+=== /shop/ · Catalog · body · 276 tokens
 THE PAGE
 Path: /shop/
 Title: Shop
