@@ -294,6 +294,11 @@ export const runs = {
         rewriteConfirm: (count: number) =>
             count === 0 ? "Replace none" : count === 1 ? "Replace the text of 1 page" : `Replace the text of ${count} pages`,
         rewriteCancel: "Keep their text",
+        scopeTitle: "Fields this run writes",
+        fieldScope: (fields: readonly string[]) =>
+            `Only ${fields.join(", ")} ${fields.length === 1 ? "is" : "are"} written; nothing else on the page changes.`,
+        rewriteField: (fields: readonly string[], paths: readonly string[]) =>
+            `The client's value of ${fields.join(", ")} is rewritten on ${paths.join(", ")}.`,
         kindDoes: {
             generate: "Writes each page from its template and publishes it, then links the pages around it.",
             relink: "Reads each page from WordPress and places the links its rules ask for. The body is left as it is and no model is called.",

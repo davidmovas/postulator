@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { runKinds, runKindsWithTheirOwnRecipe } from "../../generated/vocab.js";
 import type { TransportError } from "../../data/errors.js";
-import { blockingFindings, kindDoes, startableKinds, startRefusal, takesATemplate, tokenCapOf } from "./start.js";
+import { blockingFindings, kindDoes, startableKinds, startRefusal, takesATemplate, tokenCapOf } from "./start-model.js";
 
 function refused(cause: TransportError): Error {
     return Object.assign(new Error(cause.message), { cause });

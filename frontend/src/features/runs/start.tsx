@@ -3,87 +3,39 @@ import { useEffect, useMemo, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
-import { react } from "../../data/errors.js";
 import { usePageTree } from "../../data/hooks/pages.js";
 import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
 import { useResolvedTemplate, useTemplates } from "../../data/hooks/templates.js";
 import type { AddedPage, Estimate } from "../../data/types.js";
-import { publishModes, runKindsWithTheirOwnRecipe, startableRunKinds } from "../../generated/vocab.js";
+import { publishModes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../../ui/index.js";
 import { publishModeLabel, runKindLabel } from "./labels.js";
+import {
+    blockingFindings,
+    capOf,
+    kindDoes,
+    startableKinds,
+    startRefusal,
+    startRequestOf,
+    takesATemplate,
+    templateAuto,
+    tokenCapOf,
+} from "./start-model.js";
 import { StartCaps, StartPrice } from "./start-price.js";
 import { RewriteSwitch, rewriteOf, writesBody } from "./start-rewrite.js";
+import { StartScope } from "./start-scope.js";
+import type { StartSeed } from "./start-seed.js";
+import { seededFields, seededRewrite } from "./start-seed.js";
 import { indexTree } from "./start-selection.js";
 import { TargetTree } from "./start-tree.js";
 import { kindGenerate } from "./statuses.js";
 
 const drawerWidth = 688;
-const templateAuto = "";
 const templateAutoValue = "auto";
 const listSize = 100;
 const defaultCap = "5.00";
 const defaultTokenCap = "0";
-
-function capOf(raw: string): number {
-    const parsed = Number.parseFloat(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
-export function tokenCapOf(raw: string): number {
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
-export function kindDoes(kind: string): string {
-    const said: Record<string, string> = copy.runs.start.kindDoes;
-    return said[kind] ?? "";
-}
-
-export function takesATemplate(kind: string): boolean {
-    return !(runKindsWithTheirOwnRecipe as readonly string[]).includes(kind);
-}
-
-export interface GradedFinding {
-    severity: string;
-    code?: string;
-    message?: string;
-    pageId?: string;
-    path?: string;
-}
-
-export interface GradedFindings {
-    findings?: readonly GradedFinding[] | null;
-}
-
-export function blockingFindings(estimate: GradedFindings | null): number {
-    if (estimate === null) {
-        return 0;
-    }
-    return (estimate.findings ?? []).filter((finding) => finding.severity === "error").length;
-}
-
-export const startableKinds: readonly string[] = startableRunKinds;
-
-export interface StartRefusal {
-    targets: string | null;
-    banner: string | null;
-}
-
-export function startRefusal(thrown: unknown): StartRefusal {
-    if (thrown === null || thrown === undefined) {
-        return { targets: null, banner: null };
-    }
-    const reaction = react(thrown);
-    if (reaction.kind === "silent" || reaction.kind === "unlock") {
-        return { targets: null, banner: null };
-    }
-    if (reaction.kind === "field" && reaction.field === "pageIds") {
-        return { targets: reaction.message, banner: null };
-    }
-    return { targets: null, banner: reaction.message };
-}
-
 
 export interface StartRunDrawerProps {
     open: boolean;
@@ -91,6 +43,7 @@ export interface StartRunDrawerProps {
     siteId: string;
     preselect?: readonly string[];
     initialKind?: string;
+    seed?: StartSeed | null;
     onStarted: (runId: string) => void;
 }
 
@@ -100,6 +53,7 @@ export function StartRunDrawer({
     siteId,
     preselect,
     initialKind,
+    seed = null,
     onStarted,
 }: StartRunDrawerProps): ReactElement | null {
     const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -120,25 +74,29 @@ export function StartRunDrawer({
     const index = useMemo(() => indexTree(tree.data?.roots ?? null), [tree.data]);
     const first = [...selected][0] ?? null;
     const resolved = useResolvedTemplate(open && takesATemplate(kind) ? first : null, templateId);
-    const offersRewrite = takesATemplate(kind) && resolved.data !== undefined && writesBody(resolved.data.spec.recipe);
+    const fields = seededFields(seed, kind);
+    const seededPages = seededRewrite(seed, kind);
+    const offersRewrite =
+        takesATemplate(kind) && (seededPages.length > 0 || (resolved.data !== undefined && writesBody(resolved.data.spec.recipe)));
     const rewritten = offersRewrite ? rewriteOf(rewrite, selected) : [];
+    const pathOf = (id: string): string => index.byId.get(id)?.path ?? id;
 
     useEffect(() => {
         if (!open) {
             return;
         }
-        setSelected(new Set(preselect ?? []));
+        setSelected(new Set(seed?.pageIds ?? preselect ?? []));
         setPublishMode(publishModes[0]);
-        setKind(initialKind ?? kindGenerate);
+        setKind(seed?.kind ?? initialKind ?? kindGenerate);
         setTemplateId(templateAuto);
         setCap(defaultCap);
         setTokenCap(defaultTokenCap);
         setEstimate(null);
         setAdded([]);
-        setRewrite(new Set());
+        setRewrite(new Set(seed?.rewrite ?? []));
         priced.reset();
         start.reset();
-    }, [open, siteId]);
+    }, [open, siteId, seed]);
 
     if (!open) {
         return null;
@@ -156,29 +114,14 @@ export function StartRunDrawer({
         ...flatten(globalTemplates.data?.pages).map((template) => ({ value: template.id, label: template.name })),
     ];
 
-    const request = (): Parameters<typeof start.mutate>[0] => {
-        const built: Parameters<typeof start.mutate>[0] = {
-            siteId,
-            pageIds: [...selected],
-            publishMode,
-            kind,
-            budget: { maxUsd: capOf(cap), maxTokens: tokenCapOf(tokenCap) },
-        };
-        if (templateId !== templateAuto) {
-            built.templateId = templateId;
-        }
-        if (rewritten.length > 0) {
-            built.rewrite = rewritten;
-        }
-        return built;
-    };
+    const request = () =>
+        startRequestOf({ siteId, pageIds: [...selected], publishMode, kind, templateId, cap, tokenCap, rewrite: rewritten, fields });
 
     const capValue = capOf(cap);
     const ready = selected.size > 0;
     const over = estimate !== null && capValue > 0 && estimate.usd > capValue;
     const blocked = blockingFindings(estimate);
-    const thrown = start.error ?? priced.error;
-    const refusal = startRefusal(thrown);
+    const refusal = startRefusal(start.error ?? priced.error);
 
     return (
         <Drawer
@@ -296,9 +239,11 @@ export function StartRunDrawer({
                     </Field>
                 ) : null}
 
+                {fields.length === 0 ? null : <StartScope fields={fields} rewritten={rewritten.map(pathOf)} />}
+
                 {offersRewrite && selected.size > 0 ? (
                     <RewriteSwitch
-                        pages={[...selected].map((id) => ({ id, path: index.byId.get(id)?.path ?? id }))}
+                        pages={[...selected].map((id) => ({ id, path: pathOf(id) }))}
                         rewrite={rewrite}
                         onChange={(next) => {
                             setRewrite(next);
@@ -327,4 +272,3 @@ export function StartRunDrawer({
         </Drawer>
     );
 }
-

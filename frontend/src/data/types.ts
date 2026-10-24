@@ -119,6 +119,7 @@ export type RunArtifact = Wire<RunsModels.Artifact>;
 export type RunEventRow = Wire<RunsModels.Event>;
 export type RunFilter = ListFilter<RunsModels.ListRequest>;
 export type RunItemFilter = ListFilter<RunsModels.ListItemsRequest>;
+export type RunStartRequest = RunsModels.StartRequest;
 export type Budget = Wire<RunDomainModels.Budget>;
 export type Estimate = Wire<RunDomainModels.Estimate>;
 export type RunTotals = Wire<RunDomainModels.Stats>;
@@ -181,6 +182,7 @@ export type JudgeResult = Wire<ContentModels.JudgeResponse>;
 export type JudgeReport = Wire<ContentModels.JudgeReport>;
 
 export type PluginState = Wire<SyncModels.Plugin>;
+export type SyncSiteRequest = SyncModels.SyncSiteRequest;
 
 export type SettingDescriptor = Wire<SettingsModels.Descriptor>;
 export type SettingValue = Wire<TransportModels.GetSettingResponse>;

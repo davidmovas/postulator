@@ -121,6 +121,9 @@ export const sites = {
         rescan: "Render every page again",
         rescanTooltip: "Fetch every public page again, even one whose render is current.",
         start: "Sync now",
+        againTitle: "Sync the site again",
+        againBody: "The walk reads the site back into the model; nothing on WordPress changes.",
+        cancel: "Cancel",
     },
     store: {
         readyTitle: "The WooCommerce store can be edited",
