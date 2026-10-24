@@ -94,3 +94,7 @@ type publisher interface {
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
+
+type snapshotScope interface {
+	Remembering(ctx context.Context) context.Context
+}

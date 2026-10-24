@@ -139,6 +139,45 @@ func TestAPackReadsOnlyThePagesNeighborhood(t *testing.T) {
 	}
 }
 
+func TestAnEstimateReadsTheSiteOnceForEveryPack(t *testing.T) {
+	t.Parallel()
+
+	m := site1()
+	service := m.Service()
+	alone, err := service.Picture(t.Context(), sitemodel.PackRequest{PageID: "bpc", Budget: 4000})
+	if err != nil {
+		t.Fatalf("Picture: %v", err)
+	}
+	listed := m.SiteReads()
+
+	ctx := service.Remembering(t.Context())
+	requests := []sitemodel.PackRequest{
+		{PageID: "bpc", Budget: 4000}, {PageID: "bpc", Budget: 4000}, {PageID: "hub", Budget: 4000},
+		{PageID: "bpc", Field: string(field.SEOTitle), Budget: 4000},
+	}
+	pictures := make([]sitemodel.Picture, 0, len(requests))
+	for _, req := range requests {
+		picture, pictureErr := service.Picture(ctx, req)
+		if pictureErr != nil {
+			t.Fatalf("Picture(%+v): %v", req, pictureErr)
+		}
+		pictures = append(pictures, picture)
+	}
+	if got := m.SiteReads() - listed; got != 1 {
+		t.Errorf("four packs read the site's pages %d times, want once", got)
+	}
+	if pictures[0].Fitted.Text() != alone.Fitted.Text() || pictures[1].Fitted.Text() != alone.Fitted.Text() {
+		t.Error("a remembered pack differs from the pack built alone")
+	}
+	if pictures[2].Facts.Page.PageID != "hub" || pictures[3].Fitted.Field != field.SEOTitle {
+		t.Errorf("the other packs = %s and %s", pictures[2].Facts.Page.PageID, pictures[3].Fitted.Field)
+	}
+	if again, againErr := service.Picture(t.Context(), sitemodel.PackRequest{PageID: "hub", Budget: 4000}); againErr != nil ||
+		again.Fitted.Text() != pictures[2].Fitted.Text() {
+		t.Errorf("the hub's pack alone = %v, want what the remembered one held", againErr)
+	}
+}
+
 func TestAPackFollowsTheSitesLinkForm(t *testing.T) {
 	t.Parallel()
 

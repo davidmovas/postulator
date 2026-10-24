@@ -43,6 +43,10 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 	if req.PageID == "" {
 		return Picture{}, errors.New(errors.Invalid, "a pack is built for a page").WithDetail("field", "pageId")
 	}
+	remembering := memoOf(ctx)
+	if held, found := remembering.picture(req); found {
+		return held.picture, held.err
+	}
 	var picture Picture
 	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
 		facts, scope, plan, err := s.read(c, req.PageID, req.Field, req.Claim)
@@ -57,6 +61,7 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 		picture = Picture{Facts: facts, Pack: pack, Fitted: fitted, Links: plan, Scope: scope}
 		return nil
 	})
+	remembering.keep(req, picture, err)
 	return picture, err
 }
 
@@ -157,6 +162,18 @@ func (s *Service) around(ctx context.Context, pageID string) (contextpack.Snapsh
 }
 
 func (s *Service) base(ctx context.Context, siteID string) (contextpack.Snapshot, error) {
+	remembering := memoOf(ctx)
+	if held, found := remembering.base(siteID); found {
+		return held, nil
+	}
+	snapshot, err := s.readBase(ctx, siteID)
+	if err == nil {
+		remembering.keepBase(siteID, snapshot)
+	}
+	return fresh(snapshot), err
+}
+
+func (s *Service) readBase(ctx context.Context, siteID string) (contextpack.Snapshot, error) {
 	owner, err := s.deps.Sites.Get(ctx, siteID)
 	if err != nil {
 		return contextpack.Snapshot{}, err

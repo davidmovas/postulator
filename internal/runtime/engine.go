@@ -29,6 +29,7 @@ type Deps struct {
 	Catalog    modelCatalog
 	Profiles   profileResolver
 	Tuning     modelTuning
+	Snapshots  snapshotScope
 	UnitOfWork unitOfWork
 	Publisher  publisher
 }

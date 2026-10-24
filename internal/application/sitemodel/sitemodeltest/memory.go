@@ -40,7 +40,14 @@ type Memory struct {
 
 	mu    sync.Mutex
 	reads int
+	sites int
 	asked [][]string
+}
+
+func (m *Memory) SiteReads() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.sites
 }
 
 func (m *Memory) Service() *sitemodel.Service {
@@ -159,6 +166,9 @@ func (r pageReader) Get(_ context.Context, id string) (pagemap.Page, error) {
 }
 
 func (r pageReader) ListBySite(_ context.Context, siteID string) ([]pagemap.Page, error) {
+	r.m.mu.Lock()
+	r.m.sites++
+	r.m.mu.Unlock()
 	out := make([]pagemap.Page, 0, len(r.m.Pages))
 	for i := range r.m.Pages {
 		if r.m.Pages[i].SiteID == siteID {

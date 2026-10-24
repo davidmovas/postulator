@@ -52,6 +52,9 @@ func (p *pricing) add(finding run.EstimateFinding) {
 }
 
 func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[string]string) (run.Estimate, error) {
+	if e.deps.Snapshots != nil {
+		ctx = e.deps.Snapshots.Remembering(ctx)
+	}
 	defs, err := e.enabledDefs(record.Recipe)
 	if err != nil {
 		return run.Estimate{}, err

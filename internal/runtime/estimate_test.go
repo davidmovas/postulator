@@ -57,6 +57,34 @@ func TestEstimatePricesAStepAtTheCeilingItDeclares(t *testing.T) {
 	}
 }
 
+func TestAnEstimateRemembersTheSiteAcrossItsPreflightsAndPrices(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 3)
+	var preflights, inputs int
+	body := pricedStep("generate_body", llm.RoleWriter, run.Price{Input: func(ctx context.Context, _ run.Target) (int, error) {
+		if remembered, ok := ctx.Value(rememberedKey{}).(bool); ok && remembered {
+			inputs++
+		}
+		return 100, nil
+	}})
+	body.Preflight = func(ctx context.Context, _ run.Run, _ map[string]run.Target) ([]run.EstimateFinding, error) {
+		if remembered, ok := ctx.Value(rememberedKey{}).(bool); ok && remembered {
+			preflights++
+		}
+		return nil, nil
+	}
+	engine := harness.engine(t, mustRegister(t, body))
+
+	if _, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("generate_body")), nil); err != nil {
+		t.Fatalf("EstimateRun: %v", err)
+	}
+	if harness.snapshots.calls != 1 || preflights != 1 || inputs != 3 {
+		t.Errorf("one estimate remembered %d times, over %d preflights and %d priced inputs, want once over all of them",
+			harness.snapshots.calls, preflights, inputs)
+	}
+}
+
 func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 	t.Parallel()
 

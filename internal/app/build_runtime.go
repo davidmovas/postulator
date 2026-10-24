@@ -50,6 +50,7 @@ func (c *Core) buildRuntime(stores repos, llm llmParts, writing authoring) (runt
 			Catalog:    llm.catalog,
 			Profiles:   llm.profiles,
 			Tuning:     llm.tuning,
+			Snapshots:  writing.siteModel,
 			UnitOfWork: stores.store,
 			Publisher:  c.Events,
 		}, stepRegistry, runtime.Settings(stores.values), stores.now, c.logger),

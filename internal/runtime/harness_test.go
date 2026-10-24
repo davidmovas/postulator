@@ -85,6 +85,17 @@ func (k *stubKeys) Has(_ context.Context, ref string) (bool, error) {
 	return ref != k.missing, nil
 }
 
+type rememberedKey struct{}
+
+type stubSnapshots struct {
+	calls int
+}
+
+func (s *stubSnapshots) Remembering(ctx context.Context) context.Context {
+	s.calls++
+	return context.WithValue(ctx, rememberedKey{}, true)
+}
+
 type stubSpend struct {
 	mu    sync.Mutex
 	spend llm.Spend
@@ -223,6 +234,7 @@ type harness struct {
 	profiles    *stubProfiles
 	tuning      *stubTuning
 	spend       *stubSpend
+	snapshots   *stubSnapshots
 	bus         *recorder
 	pages       []string
 	siteID      string
@@ -259,18 +271,19 @@ func newHarness(t *testing.T, targets int) *harness {
 				Length:   template.Length{Min: 200, Max: 900},
 			},
 		},
-		types:    &stubTypes{},
-		keys:     &stubKeys{},
-		catalog:  &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
-		profiles: &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
-		tuning:   newStubTuning(),
-		spend:    &stubSpend{},
-		bus:      &recorder{},
-		pages:    pages,
-		siteID:   site.ID,
-		logger:   zaptest.NewLogger(t),
-		clock:    clock.System{},
-		deadline: time.Hour,
+		types:     &stubTypes{},
+		keys:      &stubKeys{},
+		catalog:   &stubCatalog{info: llm.ModelInfo{InputUSDPerM: 1, OutputUSDPerM: 2}},
+		profiles:  &stubProfiles{ref: llm.ModelRef{Provider: "openai", Model: "test"}},
+		tuning:    newStubTuning(),
+		spend:     &stubSpend{},
+		snapshots: &stubSnapshots{},
+		bus:       &recorder{},
+		pages:     pages,
+		siteID:    site.ID,
+		logger:    zaptest.NewLogger(t),
+		clock:     clock.System{},
+		deadline:  time.Hour,
 	}
 }
 
@@ -302,6 +315,7 @@ func (h *harness) idle(t *testing.T, registry *run.Registry) *runtime.Engine {
 		Catalog:    h.catalog,
 		Profiles:   h.profiles,
 		Tuning:     h.tuning,
+		Snapshots:  h.snapshots,
 		UnitOfWork: h.store,
 		Publisher:  h.bus,
 	}, registry, runtime.Config{
