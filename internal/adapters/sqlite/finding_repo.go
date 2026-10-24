@@ -7,8 +7,11 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/Masterminds/squirrel"
+
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const (
@@ -28,6 +31,9 @@ const (
 	selectOfPage    = selectFindings + ` WHERE page_id = ?` + findingOrder
 	countOpenOf     = `SELECT page_id, count(*) FROM findings WHERE status = 'open' AND page_id IN `
 	groupOpenOf     = ` GROUP BY page_id`
+
+	qualifiedFindingColumns = `f.id, f.site_id, f.page_id, f.entity_id, f.code, f.severity, f.subject_key, f.subject, f.options, f.status,
+		f.resolution, f.resolved_by, f.created_at, f.updated_at`
 )
 
 type FindingRepo struct {
@@ -130,6 +136,60 @@ func (r *FindingRepo) ListBySite(ctx context.Context, siteID string, status find
 		return nil, errors.New(errors.Invalid, "finding status is not recognized").WithDetail("status", string(status))
 	}
 	return selectAll(ctx, r.store.execFrom(ctx), selectOfStatus, []any{siteID, string(status)}, scanFinding, "list the site findings")
+}
+
+func findingKeyset() paging.Keyset[finding.Finding] {
+	return paging.Keyset[finding.Finding]{
+		IDColumn: "f.id",
+		ID:       func(f finding.Finding) string { return f.ID },
+		Keys: []paging.SortKey[finding.Finding]{
+			paging.TimeKey[finding.Finding]("createdAt", "f.created_at", func(f finding.Finding) any { return f.CreatedAt }),
+		},
+	}
+}
+
+func findingFilter(builder squirrel.SelectBuilder, q finding.Query) squirrel.SelectBuilder {
+	builder = builder.From("findings AS f").Where(squirrel.Eq{"f.site_id": q.SiteID})
+	if q.Placed() {
+		builder = builder.Join("page_map AS m ON m.page_id = f.page_id")
+	}
+	if q.Status != "" {
+		builder = builder.Where(squirrel.Eq{"f.status": string(q.Status)})
+	}
+	if q.Code != "" {
+		builder = builder.Where(squirrel.Eq{"f.code": string(q.Code)})
+	}
+	if q.PageID != "" {
+		builder = builder.Where(squirrel.Eq{"f.page_id": q.PageID})
+	}
+	if q.PageTypeID != "" {
+		builder = builder.Where(squirrel.Eq{"m.type_id": q.PageTypeID})
+	}
+	if q.Under != "" {
+		builder = builder.Where("m.trail >= ? AND m.trail < ?", q.Under, q.Under[:len(q.Under)-1]+trailCeiling)
+	}
+	return builder
+}
+
+func (r *FindingRepo) List(ctx context.Context, q finding.Query, page paging.Request) (paging.List[finding.Finding], error) {
+	builder := findingFilter(squirrel.Select(qualifiedFindingColumns), q)
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, findingKeyset(), page, scanFinding, "findings")
+}
+
+func (r *FindingRepo) CountByCode(ctx context.Context, q finding.Query) (map[finding.Code]int, error) {
+	query, args, err := buildQuery(findingFilter(squirrel.Select("f.code", "count(*)"), q).GroupBy("f.code"), "finding counts")
+	if err != nil {
+		return nil, err
+	}
+	listed, err := selectAll(ctx, r.store.execFrom(ctx), query, args, scanCounted, "count the findings")
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[finding.Code]int, len(listed))
+	for i := range listed {
+		out[finding.Code(listed[i].id)] = listed[i].count
+	}
+	return out, nil
 }
 
 func (r *FindingRepo) CountOpen(ctx context.Context, pageIDs []string) (map[string]int, error) {

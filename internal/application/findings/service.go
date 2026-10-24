@@ -12,13 +12,16 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type findingStore interface {
 	Get(ctx context.Context, id string) (finding.Finding, error)
 	Settle(ctx context.Context, id string, status finding.Status, resolution, resolvedBy string, at time.Time) error
-	ListBySite(ctx context.Context, siteID string, status finding.Status) ([]finding.Finding, error)
+	List(ctx context.Context, q finding.Query, page paging.Request) (paging.List[finding.Finding], error)
+	CountByCode(ctx context.Context, q finding.Query) (map[finding.Code]int, error)
 }
 
 type fieldAcceptor interface {
@@ -48,8 +51,11 @@ type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
 
-type siteMaps interface {
-	Map(ctx context.Context, siteID string) (contextpack.Map, error)
+type sitePlaces interface {
+	Refresh(ctx context.Context, siteID string) error
+	Scope(ctx context.Context, siteID, pageID string) (string, error)
+	Places(ctx context.Context, siteID string, pageIDs []string) (map[string]contextpack.Place, error)
+	PageType(ctx context.Context, siteID, typeID string) (pagetype.Type, bool, error)
 }
 
 type Deps struct {
@@ -59,7 +65,7 @@ type Deps struct {
 	Pages      pageStore
 	Cards      cardAcceptor
 	Rows       rowMapper
-	Places     siteMaps
+	Places     sitePlaces
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

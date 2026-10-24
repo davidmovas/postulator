@@ -9,10 +9,10 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	syncsite "github.com/davidmovas/postulator/internal/application/sync"
-	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -53,7 +53,7 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	if err != nil {
 		return ResolveResponse{}, err
 	}
-	places, err := s.deps.Places.Map(ctx, held.SiteID)
+	places, err := s.placesOf(ctx, held.SiteID, held)
 	if err != nil {
 		return ResolveResponse{}, err
 	}
@@ -74,7 +74,7 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	}
 
 	chosen := choice{option: option, pageID: req.PageID, pageTypeID: req.PageTypeID, proposalHash: req.ProposalHash, by: by}
-	if refused := applicable(chosen, places); refused != nil {
+	if refused := s.applicable(ctx, held.SiteID, chosen); refused != nil {
 		return ResolveResponse{}, refused
 	}
 	err = s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
@@ -97,17 +97,26 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	return ResolveResponse{Finding: placed(settled, places)}, nil
 }
 
-func applicable(chosen choice, places contextpack.Map) error {
+func (s *Service) applicable(ctx context.Context, siteID string, chosen choice) error {
 	if chosen.option != finding.SetType {
 		return nil
 	}
 	if chosen.pageTypeID == "" {
 		return invalid("name the page type to set", "pageTypeId")
 	}
-	if _, found := places.Type(chosen.pageTypeID); !found {
-		return errors.New(errors.NotFound, "the site has no such page type").WithDetail("pageTypeId", chosen.pageTypeID)
+	_, err := s.typeOf(ctx, siteID, chosen.pageTypeID)
+	return err
+}
+
+func (s *Service) typeOf(ctx context.Context, siteID, typeID string) (pagetype.Type, error) {
+	kind, found, err := s.deps.Places.PageType(ctx, siteID, typeID)
+	if err != nil {
+		return pagetype.Type{}, err
 	}
-	return nil
+	if !found {
+		return pagetype.Type{}, errors.New(errors.NotFound, "the site has no such page type").WithDetail("pageTypeId", typeID)
+	}
+	return kind, nil
 }
 
 func (s *Service) open(ctx context.Context, siteID, findingID string, option finding.Option) (finding.Finding, error) {

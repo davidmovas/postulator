@@ -86,12 +86,12 @@ type ResolveResponse struct {
 	Proposals *graph.PreviewFromPagesRequest `json:"proposals,omitempty"`
 }
 
-func placed(f finding.Finding, places contextpack.Map) Finding {
+func placed(f finding.Finding, places map[string]contextpack.Place) Finding {
 	shown := view(f)
 	if f.PageID == nil {
 		return shown
 	}
-	if place, found := places.Place(*f.PageID); found {
+	if place, found := places[*f.PageID]; found {
 		shown.PagePath, shown.PageTitle = place.Ref.Path, place.Ref.Title
 	}
 	return shown

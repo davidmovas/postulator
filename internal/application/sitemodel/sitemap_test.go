@@ -3,6 +3,7 @@ package sitemodel_test
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
@@ -147,6 +148,40 @@ func TestTheSiteMapSearchesWithEachMatchsTrail(t *testing.T) {
 	}
 	if len(inside.Nodes.Items) != childrenOf || inside.Nodes.HasMore {
 		t.Errorf("the subtree search found %d, want the hub's %d children on one default page", len(inside.Nodes.Items), childrenOf)
+	}
+}
+
+func TestTheMapPlacesPagesAndScopesTheirSubtrees(t *testing.T) {
+	t.Parallel()
+
+	m := wide()
+	service := m.Service()
+	hub, err := service.Scope(t.Context(), siteID, "hub-07")
+	if err != nil || !strings.HasSuffix(hub, "hub-07/") || !strings.HasPrefix(hub, "home/") {
+		t.Fatalf("the scope of a hub = %q, %v; want its root-first trail", hub, err)
+	}
+	if _, err = service.Scope(t.Context(), siteID, "nobody"); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("the scope of a page the map lacks = %v, want NotFound", err)
+	}
+	places, err := service.Places(t.Context(), siteID, []string{"page-07-00", "nobody"})
+	if err != nil || len(places) != 1 {
+		t.Fatalf("Places = %+v, %v; want the one page the site holds", places, err)
+	}
+	if place := places["page-07-00"]; place.Ref.Path != "/hub-07/page-00/" || place.TypeID != typeOf(pagetype.Entity) || !place.Ref.OnSite {
+		t.Errorf("the place of a page = %+v", place)
+	}
+	if none, noneErr := service.Places(t.Context(), siteID, nil); noneErr != nil || len(none) != 0 {
+		t.Errorf("the places of no page = %+v, %v", none, noneErr)
+	}
+	kind, found, err := service.PageType(t.Context(), siteID, typeOf(pagetype.Hub))
+	if err != nil || !found || kind.Preset != pagetype.Hub {
+		t.Errorf("PageType = %+v, %v, %v", kind, found, err)
+	}
+	if _, found, err = service.PageType(t.Context(), siteID, "type-nobody"); err != nil || found {
+		t.Errorf("a type the site lacks = %v, %v", found, err)
+	}
+	if err = service.Refresh(t.Context(), siteID); err != nil {
+		t.Errorf("refreshing a fresh map = %v", err)
 	}
 }
 

@@ -1,6 +1,7 @@
 package findings_test
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"slices"
@@ -21,6 +22,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const (
@@ -53,14 +55,51 @@ func (s *store) Settle(_ context.Context, id string, status finding.Status, reso
 	return nil
 }
 
-func (s *store) ListBySite(_ context.Context, site string, status finding.Status) ([]finding.Finding, error) {
+func (s *store) matching(q finding.Query) []finding.Finding {
+	rows := rowsByID()
 	out := make([]finding.Finding, 0, len(s.held))
 	for id := range s.held {
-		if held := s.held[id]; held.SiteID == site && (status == "" || held.Status == status) {
-			out = append(out, held)
+		held := s.held[id]
+		switch {
+		case held.SiteID != q.SiteID, q.Status != "" && held.Status != q.Status, q.Code != "" && held.Code != q.Code:
+			continue
+		case q.PageID != "" && (held.PageID == nil || *held.PageID != q.PageID):
+			continue
 		}
+		if q.Placed() {
+			if held.PageID == nil {
+				continue
+			}
+			row, known := rows[*held.PageID]
+			if !known || (q.PageTypeID != "" && row.TypeID != q.PageTypeID) || (q.Under != "" && !strings.HasPrefix(row.Trail, q.Under)) {
+				continue
+			}
+		}
+		out = append(out, held)
 	}
-	slices.SortFunc(out, func(a, b finding.Finding) int { return a.CreatedAt.Compare(b.CreatedAt) })
+	slices.SortFunc(out, func(a, b finding.Finding) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), cmp.Compare(a.ID, b.ID))
+	})
+	return out
+}
+
+func (s *store) List(_ context.Context, q finding.Query, page paging.Request) (paging.List[finding.Finding], error) {
+	keyset := paging.Keyset[finding.Finding]{
+		IDColumn: "id",
+		ID:       func(f finding.Finding) string { return f.ID },
+		Keys: []paging.SortKey[finding.Finding]{
+			paging.TimeKey("createdAt", "created_at", func(f finding.Finding) any { return f.CreatedAt }),
+		},
+	}
+	return keyset.Page(s.matching(q), page)
+}
+
+func (s *store) CountByCode(_ context.Context, q finding.Query) (map[finding.Code]int, error) {
+	out := map[finding.Code]int{}
+	matched := s.matching(q)
+	for i := range matched {
+		out[matched[i].Code]++
+	}
 	return out, nil
 }
 
@@ -146,10 +185,7 @@ func sitePage(id, path, title, parent, typeID string) pagemap.Page {
 	return page
 }
 
-func (places) Map(_ context.Context, site string) (contextpack.Map, error) {
-	if site != siteID {
-		return contextpack.Map{}, errors.New(errors.NotFound, "site not found")
-	}
+func siteTree() contextpack.Map {
 	kinds := []pagetype.Type{
 		{ID: "type-hub", SiteID: siteID, Name: "Hub", Preset: pagetype.Hub},
 		{ID: "type-entity", SiteID: siteID, Name: "Guide", Preset: pagetype.Entity},
@@ -162,7 +198,53 @@ func (places) Map(_ context.Context, site string) (contextpack.Map, error) {
 		sitePage("page-4", "/a/x/", "Kettles", "page-5", "type-entity"),
 		sitePage("page-5", "/z/", "Tools", "page-root", "type-hub"),
 	}
-	return contextpack.Snapshot{Index: pagemap.NewIndex(held), Types: pagetype.NewSet(kinds, nil)}.Map(nil), nil
+	return contextpack.Snapshot{Index: pagemap.NewIndex(held), Types: pagetype.NewSet(kinds, nil)}.Map(nil)
+}
+
+func rowsByID() map[string]contextpack.MapRow {
+	rows := siteTree().Rows()
+	out := make(map[string]contextpack.MapRow, len(rows))
+	for i := range rows {
+		out[rows[i].PageID] = rows[i]
+	}
+	return out
+}
+
+func (places) Refresh(_ context.Context, site string) error {
+	if site != siteID {
+		return errors.New(errors.NotFound, "site not found")
+	}
+	return nil
+}
+
+func (places) Scope(_ context.Context, site, page string) (string, error) {
+	row, known := rowsByID()[page]
+	if site != siteID || !known || !row.Row {
+		return "", errors.New(errors.NotFound, "the site's map holds no such page").WithDetail("under", page)
+	}
+	return row.Trail, nil
+}
+
+func (places) Places(_ context.Context, site string, pageIDs []string) (map[string]contextpack.Place, error) {
+	if site != siteID {
+		return nil, errors.New(errors.NotFound, "site not found")
+	}
+	tree := siteTree()
+	out := make(map[string]contextpack.Place, len(pageIDs))
+	for _, id := range pageIDs {
+		if place, found := tree.Place(id); found {
+			out[id] = place
+		}
+	}
+	return out, nil
+}
+
+func (places) PageType(_ context.Context, site, typeID string) (pagetype.Type, bool, error) {
+	if site != siteID {
+		return pagetype.Type{}, false, errors.New(errors.NotFound, "site not found")
+	}
+	kind, found := siteTree().Type(typeID)
+	return kind, found, nil
 }
 
 func newService(t *testing.T, held ...finding.Finding) (*findings.Service, *store) {

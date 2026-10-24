@@ -2,12 +2,14 @@ package findings
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -38,11 +40,23 @@ func (s *Service) Explain(ctx context.Context, req ExplainRequest) (Explanation,
 	if err != nil {
 		return Explanation{}, err
 	}
-	places, err := s.deps.Places.Map(ctx, held[0].SiteID)
+	siteID := held[0].SiteID
+	named := slices.Clone(held)
+	if option == finding.MapToPage && req.PageID != "" {
+		target := req.PageID
+		named = append(named, finding.Finding{PageID: &target})
+	}
+	places, err := s.placesOf(ctx, siteID, named...)
 	if err != nil {
 		return Explanation{}, err
 	}
-	said, err := sentence(held, option, req, places)
+	var kind pagetype.Type
+	if option == finding.SetType && req.PageTypeID != "" {
+		if kind, err = s.typeOf(ctx, siteID, req.PageTypeID); err != nil {
+			return Explanation{}, err
+		}
+	}
+	said, err := sentence(held, option, req, places, kind)
 	if err != nil {
 		return Explanation{}, err
 	}
@@ -75,7 +89,7 @@ func (s *Service) gathered(ctx context.Context, siteID string, ids []string, opt
 	return held, nil
 }
 
-func sentence(held []finding.Finding, option finding.Option, req ExplainRequest, places contextpack.Map) (string, error) {
+func sentence(held []finding.Finding, option finding.Option, req ExplainRequest, places map[string]contextpack.Place, kind pagetype.Type) (string, error) {
 	where := pagesOf(held, places)
 	about := "the finding " + string(held[0].Code) + " on " + where
 	stays := ": it stays dismissed while what it names stands"
@@ -94,7 +108,7 @@ func sentence(held []finding.Finding, option finding.Option, req ExplainRequest,
 		return "Pin the parent of " + where + " to the workbook's: the model's parent follows the sheet from the next sync" +
 			unwritten, nil
 	case finding.MapToPage:
-		target, found := places.Place(req.PageID)
+		target, found := places[req.PageID]
 		if !found {
 			return "", errors.New(errors.NotFound, "the site's map holds no such page").WithDetail("pageId", req.PageID)
 		}
@@ -103,10 +117,6 @@ func sentence(held []finding.Finding, option finding.Option, req ExplainRequest,
 	case finding.SetType:
 		if req.PageTypeID == "" {
 			return "", invalid("name the page type to set", "pageTypeId")
-		}
-		kind, found := places.Type(req.PageTypeID)
-		if !found {
-			return "", errors.New(errors.NotFound, "the site has no such page type").WithDetail("pageTypeId", req.PageTypeID)
 		}
 		return "Type " + where + " as " + kind.Name + ", which settles " + about + unwritten, nil
 	case finding.RewriteField:
@@ -139,13 +149,13 @@ func rewritten(held finding.Finding) (field.Key, error) {
 	return field.Key(values.Key), nil
 }
 
-func pagesOf(held []finding.Finding, places contextpack.Map) string {
+func pagesOf(held []finding.Finding, places map[string]contextpack.Place) string {
 	paths := make([]string, 0, len(held))
 	for i := range held {
 		if held[i].PageID == nil {
 			continue
 		}
-		if place, found := places.Place(*held[i].PageID); found {
+		if place, found := places[*held[i].PageID]; found {
 			paths = append(paths, place.Ref.Path)
 		}
 	}

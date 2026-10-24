@@ -50,7 +50,7 @@ func (s *Service) ResolveMany(ctx context.Context, req ResolveManyRequest) (Reso
 	if held[0].Code != code {
 		return ResolveManyResponse{}, invalid("the findings are not of the code "+req.Code, "code")
 	}
-	places, err := s.deps.Places.Map(ctx, req.SiteID)
+	places, err := s.placesOf(ctx, req.SiteID, held...)
 	if err != nil {
 		return ResolveManyResponse{}, err
 	}
@@ -66,7 +66,7 @@ func (s *Service) ResolveMany(ctx context.Context, req ResolveManyRequest) (Reso
 		return out, nil
 	}
 	chosen := choice{option: option, pageTypeID: req.PageTypeID, by: by}
-	if refused := applicable(chosen, places); refused != nil {
+	if refused := s.applicable(ctx, req.SiteID, chosen); refused != nil {
 		return ResolveManyResponse{}, refused
 	}
 	err = s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
