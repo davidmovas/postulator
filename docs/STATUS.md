@@ -5,8 +5,9 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
 **Released:** `v2.4.0` on 2026-10-04 (PR #30: the client's workbooks, the WooCommerce products,
-OpenAI only and the spend in view, the categories taken out again). **2.5.0 is built and waits in the
-pull request from `dev` to `master`**, neither merged nor tagged: the site-model redesign (phase 14,
+OpenAI only and the spend in view, the categories taken out again). **2.5.0 is built and waits in
+pull request #31 from `dev` to `master`** (https://github.com/davidmovas/postulator/pull/31), neither
+merged nor tagged: the site-model redesign (phase 14,
 2026-10-17 to 24) and the release work (phase 15, 2026-10-24), its notes under **Release 2.5.0**
 below and in the pull request's body. Its gate is under **The gate**.
 
