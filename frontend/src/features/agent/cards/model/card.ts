@@ -1,4 +1,4 @@
-import type { TemplateSpec } from "../../../../data/types.js";
+import type { Finding, TemplateSpec } from "../../../../data/types.js";
 
 export type RefKind = "site" | "entity" | "page" | "template" | "pagetype" | "schedule" | "run" | "edge" | "mapping" | "item" | "override";
 
@@ -27,6 +27,7 @@ export interface CardView {
 
 export interface DescribeContext {
     currentTemplate: TemplateSpec | null;
+    finding: Finding | null;
 }
 
 export type Args = Readonly<Record<string, unknown>>;
@@ -86,6 +87,12 @@ export function records(args: Args, key: string): Args[] {
 export function record(args: Args, key: string): Args | null {
     const held = args[key];
     return isArgs(held) ? held : null;
+}
+
+export const maxTextShown = 240;
+
+export function clipped(value: string): string {
+    return value.length > maxTextShown ? `${value.slice(0, maxTextShown - 1)}…` : value;
 }
 
 export function masked(value: string): boolean {

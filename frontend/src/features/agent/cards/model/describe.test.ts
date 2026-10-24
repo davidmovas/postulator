@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import { copy } from "../../../../copy/index.js";
 import type { TemplateSpec, ToolSchema } from "../../../../data/types.js";
+import { aFinding } from "../../../../testing/findings.js";
+import { findingCodeLabel } from "../../../pages/model/labels.js";
+import { findingSentence } from "../../../pages/model/subject.js";
+import { optionDoes, optionLabel } from "../../../findings/labels.js";
 import { stepLabel } from "../../../templates/labels.js";
 import type { Part } from "./card.js";
 import { describeAction } from "./describe.js";
-import { confirmableArgs } from "./fixture.js";
+import { confirmableArgs, confirmableOps } from "./fixture.js";
 
-const none = { currentTemplate: null };
+const none = { currentTemplate: null, finding: null };
 
 function texts(parts: readonly Part[]): string[] {
     return parts.filter((part): part is string => typeof part === "string");
@@ -18,8 +22,9 @@ function refs(parts: readonly Part[]): string[] {
 }
 
 describe("every confirmable tool has a describer of its own", () => {
-    for (const [tool, args] of Object.entries(confirmableArgs)) {
-        it(`${tool} is described without JSON`, () => {
+    const cases = [...Object.entries(confirmableArgs), ...confirmableOps];
+    for (const [at, [tool, args]] of cases.entries()) {
+        it(`${tool} ${typeof args["op"] === "string" ? args["op"] : ""} #${at} is described without JSON`, () => {
             const view = describeAction(tool, args, null, none);
             expect(view.generic).toBe(false);
             expect(view.title.length).toBeGreaterThan(0);
@@ -101,7 +106,7 @@ describe("the template cards", () => {
         const sent = confirmableArgs["templates_create"]?.["spec"] as Record<string, unknown>;
         const stored = { ...sent, modelProfiles: { writer: { provider: "openai", model: "gpt-5" } } } as unknown as TemplateSpec;
         const changed = { ...sent, tone: "brisk", length: { min: 400, max: 800 } };
-        const view = describeAction("templates_update", { id: "t1", spec: changed }, null, { currentTemplate: stored });
+        const view = describeAction("templates_update", { id: "t1", spec: changed }, null, { currentTemplate: stored, finding: null });
         const joined = view.lines.map((line) => texts(line.parts).join("")).join("\n");
         expect(joined).toContain("brisk");
         expect(joined).toContain("400");
@@ -179,6 +184,93 @@ describe("the page type cards", () => {
         expect(joined).toContain("Definition: Mugs thrown and fired from stoneware clay.");
         expect(joined).toContain("Capacity: 350 ml");
         expect(joined).toContain('Note "Tone"');
+    });
+});
+
+describe("the agent's edits to a page", () => {
+    const linesOf = (tool: string, args: Record<string, unknown>): string[] =>
+        describeAction(tool, args, null, none).lines.map((line) => texts(line.parts).join(""));
+    const said = copy.agent.describe;
+
+    it("names the field it sets, the page and the new value", () => {
+        const view = describeAction("pages_fields", confirmableArgs["pages_fields"] ?? {}, null, none);
+        expect(texts(view.title).join("")).toBe("Set the SEO description of ");
+        expect(refs(view.title)).toStrictEqual(["page:p1"]);
+        expect(linesOf("pages_fields", confirmableArgs["pages_fields"] ?? {})).toContain(
+            said.fields.value("Hand-thrown mugs that keep coffee hot."),
+        );
+    });
+
+    it("names a page by its path when the call gave no id, and says an empty value clears the field", () => {
+        const args = { op: "set", path: "/mugs/", key: "title", value: "", hash: "" };
+        const view = describeAction("pages_fields", args, null, none);
+        expect(texts(view.title).join("")).toBe("Set the title of /mugs/");
+        expect(view.lines.map((line) => [line.tone, texts(line.parts).join("")])).toContainEqual(["warn", said.fields.clears]);
+    });
+
+    it("shows a replaced block's new html as its text, never as markup", () => {
+        const view = describeAction("pages_blocks", confirmableArgs["pages_blocks"] ?? {}, null, none);
+        expect(texts(view.title).join("")).toBe("Replace block 11 of ");
+        expect(refs(view.title)).toStrictEqual(["page:p1"]);
+        const written = linesOf("pages_blocks", confirmableArgs["pages_blocks"] ?? {});
+        expect(written).toContain(said.blocks.text("Fired at 1240 °C & glazed."));
+        expect(written.join("\n")).not.toMatch(/[<>]/);
+    });
+
+    it("inserts at the start of the body or after a block", () => {
+        expect(texts(describeAction("pages_blocks", { op: "insert_after", pageId: "p1", index: -1, html: "<p>A</p>" }, null, none).title).join("")).toBe(
+            "Insert a block at the start of ",
+        );
+        expect(texts(describeAction("pages_blocks", { op: "insert_after", pageId: "p1", index: 3, html: "<p>A</p>" }, null, none).title).join("")).toBe(
+            "Insert a block after block 3 of ",
+        );
+    });
+
+    it("reads a deleted block as a danger line", () => {
+        const view = describeAction("pages_blocks", { op: "delete", path: "/mugs/", index: 4, hash: "b1" }, null, none);
+        expect(texts(view.title).join("")).toBe("Delete block 4 of /mugs/");
+        expect(view.lines.map((line) => [line.tone, texts(line.parts).join("")])).toContainEqual(["danger", said.blocks.deleteBody]);
+    });
+
+    it("names the anchor a placed link takes and the page it points to", () => {
+        const args = { op: "place_link", pageId: "p1", index: 2, hash: "b1", targetId: "p2", anchor: "travel mugs" };
+        const view = describeAction("pages_blocks", args, null, none);
+        expect(texts(view.title).join("")).toBe(said.blocks.placeLink("travel mugs", 2));
+        expect(refs(view.title)).toStrictEqual(["page:p1"]);
+        expect(view.lines.flatMap((line) => refs(line.parts))).toStrictEqual(["page:p2"]);
+    });
+
+    it("keeps no card of its own for a read", () => {
+        expect(describeAction("pages_blocks", { op: "list", pageId: "p1" }, null, none).generic).toBe(true);
+        expect(describeAction("pages_fields", { op: "get", pageId: "p1" }, null, none).generic).toBe(true);
+        expect(describeAction("findings", { op: "list" }, null, none).generic).toBe(true);
+    });
+});
+
+describe("the finding card", () => {
+    const finding = aFinding();
+    const context = { currentTemplate: null, finding };
+
+    it("names the code, the page and the subject in words, then what the option does", () => {
+        const view = describeAction("findings", confirmableArgs["findings"] ?? {}, null, context);
+        expect(texts(view.title).join("")).toBe(copy.agent.describe.findings.resolve(findingCodeLabel(finding.code)));
+        expect(refs(view.title)).toStrictEqual(["page:p1"]);
+        const written = view.lines.map((line) => texts(line.parts).join(""));
+        expect(written).toContain(findingSentence(finding.code, finding.subject));
+        expect(written).toContain(copy.agent.describe.findings.option(optionLabel("accept_site"), optionDoes("accept_site")));
+    });
+
+    it("says only the option while the finding is not read yet", () => {
+        const view = describeAction("findings", confirmableArgs["findings"] ?? {}, null, none);
+        expect(texts(view.title).join("")).toBe(copy.agent.describe.findings.resolveAny);
+        expect(view.lines).toHaveLength(1);
+    });
+
+    it("names the page a row maps to and the type a page is given", () => {
+        const mapped = describeAction("findings", { op: "resolve", findingId: "f2", option: "map_to_page", pageId: "p3" }, null, none);
+        expect(mapped.lines.flatMap((line) => refs(line.parts))).toStrictEqual(["page:p3"]);
+        const typed = describeAction("findings", { op: "resolve", findingId: "f3", option: "set_type", pageTypeId: "pt-hub" }, null, none);
+        expect(typed.lines.flatMap((line) => refs(line.parts))).toStrictEqual(["pagetype:pt-hub"]);
     });
 });
 

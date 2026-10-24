@@ -90,6 +90,9 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
     pages_map_to_entity: { pageId: "p1", entityId: "e2" },
     pages_unmap: { pageId: "p1" },
     pages_set_canonical: { entityId: "e2", pageId: "p1" },
+    pages_fields: { op: "set", pageId: "p1", key: "seo_description", value: "Hand-thrown mugs that keep coffee hot.", hash: "h1" },
+    pages_blocks: { op: "replace", pageId: "p1", index: 11, hash: "b1", html: "<p>Fired at <strong>1240 °C</strong> &amp; glazed.</p>" },
+    findings: { op: "resolve", findingId: "f1", option: "accept_site" },
     templates_create: { scope: "site", siteId: "s1", name: "Product page", spec },
     templates_update: { id: "t1", name: "Product page v2", spec },
     templates_delete: { id: "t1" },
@@ -120,3 +123,13 @@ export const confirmableArgs: Readonly<Record<string, Record<string, unknown>>> 
     schedules_disable: { id: "c1" },
     schedules_run_now: { id: "c1" },
 };
+
+export const confirmableOps: readonly (readonly [string, Record<string, unknown>])[] = [
+    ["pages_fields", { op: "set", path: "/mugs/", key: "title", value: "", hash: "" }],
+    ["pages_blocks", { op: "insert_after", pageId: "p1", index: -1, hash: "b1", html: "<h2>Care</h2>" }],
+    ["pages_blocks", { op: "insert_after", pageId: "p1", index: 3, hash: "b1", html: "<p>Rinse by hand.</p>" }],
+    ["pages_blocks", { op: "delete", path: "/mugs/", index: 4, hash: "b1" }],
+    ["pages_blocks", { op: "place_link", pageId: "p1", index: 2, hash: "b1", targetId: "p2", anchor: "travel mugs" }],
+    ["findings", { op: "resolve", findingId: "f2", option: "map_to_page", pageId: "p3" }],
+    ["findings", { op: "resolve", findingId: "f3", option: "set_type", pageTypeId: "pt-hub" }],
+];

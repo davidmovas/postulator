@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { useMemo } from "react";
 
+import { useFinding } from "../../../data/hooks/findings.js";
 import { useTemplate } from "../../../data/hooks/templates.js";
 import { useTools } from "../../../data/hooks/tools.js";
 import type { Timestamp } from "../../../data/wire.js";
@@ -10,6 +11,12 @@ import { Lines, Parts } from "./lines.js";
 import { isArgs, text } from "./model/card.js";
 import { describeAction } from "./model/describe.js";
 import { ownSummary } from "./model/summary.js";
+
+const findingsTool = "findings";
+
+function findingIdOf(tool: string, args: unknown): string | null {
+    return tool === findingsTool && isArgs(args) ? text(args, "findingId") : null;
+}
 
 function templateIdOf(tool: string, args: unknown): string | null {
     if (!isArgs(args)) {
@@ -58,12 +65,14 @@ export function ActionCard({
 }: ActionCardProps): ReactElement {
     const tools = useTools();
     const current = useTemplate(templateIdOf(tool, args));
+    const read = useFinding(findingIdOf(tool, args));
     const listed = tools.data?.tools ?? [];
     const registered = listed.find((held) => held.name === tool) ?? null;
     const currentTemplate = current.data?.template.spec ?? null;
+    const finding = read.data ?? null;
     const view = useMemo(
-        () => describeAction(tool, args, registered?.schema ?? null, { currentTemplate }),
-        [tool, args, registered, currentTemplate],
+        () => describeAction(tool, args, registered?.schema ?? null, { currentTemplate, finding }),
+        [tool, args, registered, currentTemplate, finding],
     );
 
     return (

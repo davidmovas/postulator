@@ -1,6 +1,7 @@
 import { agent } from "./agent.js";
 import { app, empty, lock, nav, shell, toasts } from "./app.js";
 import { errorMessages } from "./errors.js";
+import { findings } from "./findings.js";
 import { graph } from "./graph.js";
 import { imports } from "./imports.js";
 import { links } from "./links.js";
@@ -35,6 +36,7 @@ export const copy = {
     pages,
     graph,
     links,
+    findings,
     imports,
     templates,
     pageTypes,
