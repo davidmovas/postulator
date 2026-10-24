@@ -24,12 +24,15 @@ earns its place by serving that loop.
 
 ## Who uses it
 
-- **The client**, through a desktop UI: the site as a model, a canvas over the graph, page types
-  and field scopes he names and configures, findings, run monitors, quality reports.
+- **The client**, through a desktop UI: the site as a model and as a map by its derived hierarchy,
+  a canvas over the graph, page types and field scopes he names and configures, an inbox of
+  findings he settles one at a time or a whole code at once, the import preview that names how
+  each row found its page, run monitors, quality reports.
 - **The in-app agent**, through the same use cases exposed as tools: read and explain his data,
-  observe a site, resolve findings, edit the graph, the types and the scopes, start and watch
-  pipelines, create schedules. The agent can do everything the UI can do, because both call the
-  same application layer, and the client does very little by hand.
+  observe a site, resolve findings, edit a page field by field and block by block, edit the graph,
+  the types and the scopes, start and watch pipelines, create schedules. The agent can do
+  everything the UI can do, because both call the same application layer, and the client does very
+  little by hand; every write it makes to a page waits for his confirmation.
 
 ## What it is
 

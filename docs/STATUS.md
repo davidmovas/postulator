@@ -6,21 +6,54 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
 **Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02,
 2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
-run is under **The gate**. **The site-model redesign is underway**: stage 0 and the owner's
-answers landed on 2026-10-17, stage 1a (the plugin's reads, its client and the two stands) the
-same day, stage 1b (the page model, its storage and the observation) and **stage 1c (1b's gaps
-closed and the screens) on 2026-10-18, which closes stage 1**; **stage 2 (2a, page types and
-their scopes, and 2b, the read layer with the writer's pack and the agent's view) on 2026-10-19,
-its stand legs green on both stands on 2026-10-20**; **stage 3, the field writers and the editable
-body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1, then the stored
-diff, per-field acceptance and the screens; its gate is green on both stands (2026-10-23). Stage 4
-is re-planned as 4.1 (the matcher and the findings), 4.2 (the agent works the loop) and 4.3 (the
-screens, the gate and the report); 4.1 and 4.2 are done (2026-10-23), green on both stands, with the
-race and covergate legs owed. 4.3 is split: 4.3a (real token counts beside bytes, and 4.2's two loose
-ends) is done (2026-10-24) but for the flake fix; 4.3b (the screens, the full gate and phase 14's
-report) is next.**
+run is under **The gate**. **The site-model redesign (phase 14) is done**: stage 0 and the owner's
+answers on 2026-10-17, stage 1 (the plugin's reads, the two stands, the page model, the observation
+and its screens) on 2026-10-17 and 18, stage 2 (page types and their scopes, the read layer, the
+writer's pack and the agent's view) on 2026-10-19 and 20, stage 3 (the field writers and the
+editable body, plugin 1.5.1) from 2026-10-20 to 23, and stage 4 (4.1 the matcher and the findings,
+4.2 the agent works the loop, 4.3a token counts beside bytes, 4.3b the screens) from 2026-10-23 to
+24. **Phase 14 closed on 2026-10-24 with the whole gate green on the final code on both stands.**
+None of it is released yet.
+
+## Next, in order
+
+1. **A smoke test with a funded OpenAI key** on the owner's sandbox (8089), provisioned as the
+   replica (`task sandbox:provision STAND=replica E2E_PLUGIN=1`): connect it, sync, import the
+   client's workbook, run one hub and one product, one agent turn; judge the text by eye; compare
+   the ledger's real `input_tokens` with `go run ./cmd/tokenreport`, and only then decide the
+   proposed constants (`llm.WordTokens` 1.8, `llm.Tokens` 1.7 and 3.7) and whether tools load on
+   demand (`agent.toolLoading: deferred`).
+2. **Plugin 1.5.1 on the client's sites**, uploaded over 1.2.0 ("Replace current with uploaded");
+   a released app refuses to write through an older one.
+3. **The release**, only when the owner asks: a PR from `dev` to `master` and a tag.
 
 ## Where we are
+
+**2026-10-24, stage 4.3b: the screens, the full gate, and phase 14 closed.** The reasoning is under
+"stage 4.3b" in `DECISIONS.md`; the task list and the checkpoint are under 4.3b in the phase plan.
+
+- **The owner's answers**: the Site map is its own screen and the Pages screen's Tree toggle is gone;
+  the flake is fixed (`66517ed`): a harness waits until its test's deadline, and the two scoped sweeps
+  took 25.7 to 72.9 s at one CPU, past the old fixed 20 s.
+- **Go** (`71de2ee` to `edffadf`): `contextpack.Map`, the site by derived parent with a store
+  category folded into its twin hub, read by the findings' subtree and the Site map; findings listed
+  and counted by page type and subtree with their pages named; `findings.Explain`, the one sentence
+  of a resolution; `findings.ResolveMany` for a code in one unit; `sitemodel.SiteMap`, a node's
+  children at a time; the import preview's pick of an ambiguous row's page (`choices`); a
+  `FindingsService` and `PagesService.SiteMap` (16 services); `vocab.ts` gains the match rules, the
+  bulk options, the option kinds and the body states.
+- **The screens** (one agent, `c45cfba` to `8d5fa5e`): the Findings inbox (codes with counts,
+  filters in the address, each option with its sentence and kind, who settled what, the agent card's
+  body in its confirmation, bulk by code); a run option opens the seeded run start or the rescan
+  dialog; the Site map (lazy branches, a hundred children a page, search and type as flat matches with
+  trails, twins, the page drawer); the import preview's "Found by" column and its pick; a card per op
+  for `pages_fields`, `pages_blocks` and `findings`.
+- **The harness** (`074b20c`, `993ad8a`): a client workbook it keeps in its home seeds an ambiguous
+  row, a row without a page and a differing trail; shots of the map and the inbox.
+- **The gate found one red**: `TestTheClientLoopFromTheSamples` had failed since 4.1 on a sample row
+  that named something after all; the sample is fixed (`b75063c`).
+- Schemas unchanged: 65,722 bytes and 14,623 tokens (92 tools); migrations to 0073; plugin 1.5.1;
+  bound services 16 (`FindingsService` with six methods, `PagesService.SiteMap`).
 
 **2026-10-24, stage 4.3a: real token counts beside bytes, and 4.2's two loose ends.** The reasoning is
 under "stage 4.3a" in `DECISIONS.md`; the task list and the checkpoint are under 4.3a in the phase plan.
@@ -527,6 +560,31 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 `go run ./cmd/tokenreport` (`-json` for JSON) belongs to every gate as a report, not a gate: it prints
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
+
+**2026-10-24, on Windows, at the close of stage 4.3b and phase 14. Green on the final code, every
+leg.**
+- `go build ./...`; `go vet ./...`, `-tags e2e` and `-tags uiharness`; `gofmt -l .` silent; the
+  comment check; `golangci-lint run ./...`, `--build-tags uiharness` and `task lint:e2e` (alone), 0
+  issues each.
+- `go test -race -count=1` in five groups: kernel and domain (28 packages), application (22),
+  runtime at `-p 1` (3; `runtime` 187 s, `steps` 71 s), adapters at `-p 1 -timeout 30m` (sqlite 258 s,
+  `TestMigrationsRoundTrip` to 0073 within it), app, transport, cmd and frontend (11);
+  `go run ./cmd/covergate`: domain and application 88.43% of 17,008 statements (gate 80%), total
+  87.81% of 34,463 (gate 70%).
+- The flake's check: `go test -race -count=3 -cpu 1 -timeout 60m ./internal/runtime/steps/`, 839 s.
+- `task plugin:lint` and `task plugin:test` on PHP 7.4 (53 href cases, 35 meta-key cases).
+- `task build` with no generated drift; `npm run typecheck`; `npm run test:run -- --maxWorkers=2`,
+  1,934 tests in 185 files; `task ui:lint` (the harness tests in 115 s); the harness window seen on the
+  inbox and the map.
+- `go run ./cmd/tokenreport`: the schemas did not move.
+- **The replica**, after `task e2e:reset` and `task plugin:deploy`: stage 4's exit tests
+  (`TestTheWorkbookReconcilesWithTheSite`, `TestTheAgentEditsABlock`, `TestTheAgentSeesTheSite`,
+  `TestTheWholeLoopReachesTheDockerSite`, 152 s); then from a fresh reset `TestTheSiteIsObservedIntoTheModel`
+  alone for the census, and `task e2e:full` (13 passed, 2 skipped by design, 754 s with the reset). The
+  first `e2e:full` failed `TestTheClientLoopFromTheSamples`, fixed in `b75063c` and run again in full.
+- **Vanilla**, the same: the exit tests (`TestTheAgentSeesTheSite` skips there), the census,
+  `task e2e:full` (10 passed, 5 skipped by design), `task e2e:full:noplugin`, the plugin restored, 656 s
+  in all. Both stands were taken down.
 
 **2026-10-24, on Windows, at the close of stage 4.3a. Green, with the flake owed.**
 - **Run and green:**

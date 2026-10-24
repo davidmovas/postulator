@@ -4739,3 +4739,92 @@ folded in).
   brief are missing.
 - **The per-turn context message** is a line of the agent's round and of its sum, beside what the
   request named.
+
+## 2026-10-24 — stage 4.3b: the screens, the full gate, and phase 14 closed
+
+4.3b puts the loop on screen (the Findings inbox, the Site map, the import preview's match rule and
+pick, a card per op for the agent's edits and resolutions), fixes 4.3a's flake, and runs the whole
+gate on the final code. The task list and the checkpoint are under 4.3b in the phase plan; a Fable
+critic read the plan (no blocking, five serious and six minor findings, all folded in), and one Opus
+agent built the screens once the bindings had landed.
+
+### The owner's answers at the plan
+
+- **The Site map is its own screen**, after Pages in the rail; the Pages screen's Tree toggle and the
+  files only it used are gone, and `Pages.Tree` stays only for the run start's page picker.
+- **The flake is fixed**, checked once. A harness waited a fixed 20 s for a run; it now waits until
+  the test binary's deadline less 30 s (`66517ed`). `go test -race -count=3 -cpu 1 -timeout 60m
+  ./internal/runtime/steps/` passed in 839 s, and the two scoped sweeps that failed in 4.3a took
+  25.7 to 72.9 s over their six runs, five of them past the old 20 s: starvation it was. A first
+  check without `-timeout` ran into the binary's own ten minutes on its third count, which is the
+  deadline-bound wait giving up as designed.
+
+### Decided while building
+
+- **One map for two screens** (`71de2ee`, `7600f02`). `contextpack.Map` is the site by derived
+  parent, a store category folded into the hub of its name: the hub is the row and names its twin,
+  the term is no row, its children join the hub's and its findings and links are counted with it;
+  a loop the folding makes is cut at its first path. `sitemodel.Map` loads it for the findings
+  (which declare a reader of it, so `under` is the map's subtree), and `sitemodel.SiteMap` answers
+  the screen a node's children at a time, a search or a type as flat matches with their trails.
+- **A body's state follows the domain's own blocks**: text blocks `page_blocks_written` holds are
+  ours, the others the client's, a shortcode or a block the parser marks dynamic (a textless figure
+  is one) nobody's text: `empty`, `client`, `ours`, `mixed`, `dynamic` (`contextpack.BodyOf`).
+- **One sentence explains a resolution** (`67d3a7f`): the agent's `resolution` moved into
+  `findings.Explain` word for word, which also explains a run option and a set; a set is phrased
+  "the N findings … on /a/, /b/, /c/ and N more".
+- **A resolution writes through the page store** (`d3a46f9`): the title and H1 a plan takes from
+  the site, a type and the parent source are written by `PageRepo`, the type checked against the
+  site's own set before the unit, so `Resolve` and `ResolveMany` publish once, after the commit;
+  `findings` no longer depends on `pages.Service`. A card's acceptance and a row's mapping keep
+  their services, and publish as they did, never being bulk.
+- **The bulk set is `finding.BulkOptions()`**, exported to `vocab.ts` as `findingBulkOptions`
+  beside `findingOptionKinds`, `matchRules` and `bodyStates`, so the screens read the rule from Go.
+- **The preview's pick** (`3942ff4`): an ambiguous row was only a warning; it is now a page of the
+  preview with its candidates, and the pick happens where the row is matched (`address`), checked
+  against the candidates that matching found. Apply sets the page's row key on the page it writes
+  and calls `SetRowKey` last in the unit, which also takes the key off any other page.
+- **The bindings**: a `FindingsService` with six methods before Settings, and `PagesService.SiteMap`
+  through the renamed `SiteModelUseCase` (it was `PackUseCase`); 16 services.
+- **The harness** seeds a duplicated review page and imports a small client workbook it keeps in
+  its home (`074b20c`), so the inbox opens on a row two pages answer, a row no page answers and a
+  sheet trail the site disagrees with; the seed's pins move by what it adds (45 entities, 49 edges,
+  68 pages, 48 mapped).
+- **`go mod tidy` names the tokenizer a direct requirement** (`d6e49e1`): `task build` tidies, and
+  4.3a had left it marked indirect.
+
+### What the agent decided (the screens)
+
+- Block indexes are shown 0-based, as the Go summary says them; an HTML block is shown as its text.
+- A seeded rewrite shows the drawer's rewrite switch on and ticked rather than opening its dialog,
+  and the fields and the rewrite are sent only while the run's kind stays the seeded one.
+- A code of more than 1,000 findings is resolved in batches of 1,000, one unit each; the Explain
+  sentence names all of them, and the dialog confirms the count it collected.
+- The import's picks are dropped when the file, the sheets or the columns change, since their row
+  keys may not exist any more.
+- `Dialog` gained a `refusal` (the confirm disabled with its reason); `useDebounced` moved to
+  `ui/clock.ts`; Findings sits after Linking in the rail; `entity_card_proposed`'s accept opens the
+  Graph screen's proposals for that entity, since the subject carries no proposal hash.
+
+### What the gate found
+
+- **`TestTheClientLoopFromTheSamples` had gone red with 4.1**, unseen because no stand ran the whole
+  suite between stage 3 and now: the Broken sample sheet's "row that names nothing" carried a title,
+  which since 4.1 plans a page at its slug and raises `row_without_page` instead of `no_target`. The
+  row now carries a keyword alone (`b75063c`); the rule stands.
+- **Everything else ran green on the first try**: the five race groups and `covergate`, the lint
+  legs, the plugin on 7.4, the build with no drift, vitest and the harness, stage 4's exit tests and
+  `e2e:full` on both stands from fresh resets, and `e2e:full:noplugin` on vanilla.
+- **The census of the untouched stands**: the replica's 23 pages are typed Entity 5, Product 5,
+  Technical 5, Hub 4, Store category 3, Catalog 1; 19 parents come from a trail (18 JSON-LD, 1
+  ARIA), resolved by link 17, by redirect 1 and by name 1; its 703 links are navigation 580, listing
+  92, breadcrumb 23, contextual 6 and unknown 2. Vanilla's 14 pages: Technical 5, Entity 4, Product 2,
+  Store category 2, Catalog 1; 2 trails, by link; 148 links.
+
+### Deviations from the request
+
+- **A bulk over 1,000 findings is not one transaction**: each batch of 1,000 is.
+- **The import preview's pick has no screen shot**: the harness keeps the workbook and its test
+  previews and picks it, but a shot would need the file dialog.
+- **`features/graph/screen.tsx` (551 lines before, 556 now) and `features/palette/palette.tsx` (344
+  before, 332 now)** were over the 300-line limit before this stage and took small edits only.

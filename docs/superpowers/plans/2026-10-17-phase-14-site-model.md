@@ -1,5 +1,7 @@
 # Postulator v2 — Phase 14: the site model, stages 1 to 4
 
+**Closed on 2026-10-24**: every stage landed and the whole gate ran green on the final code on both stands; the last checkpoint is under 4.3b.
+
 > **For agentic workers:** each stage is planned at its start as a task plan in the writing-plans format (`docs/superpowers/plans/2026-MM-DD-phase-14-stage-N-<name>.md` is not allowed by section 10; the stage's task list goes into this file under its stage when the stage opens), then executed task by task with TDD under `superpowers:executing-plans` or `superpowers:subagent-driven-development`, at most two agents at once, one accountable owner.
 
 **Goal:** Postulator observes a client's site into one structured page model, lets the client name his page types and the fields each may carry, gives the writer the full picture of a page, edits the site's content as blocks and fields through a field registry, and reconciles the site with his workbooks through findings.
@@ -1345,22 +1347,22 @@ go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/
 7. **A run option opens the normal start**: `StartRunDrawer` takes the answered `StartRequest`, shows its `fields` scope and, for `rewrite_field`, a line the person confirms; `relink_page` seeds a relink; `rescan` opens a dialog with the sync panel's two options ticked.
 8. **One Opus agent builds the frontend** (T7 to T11) once T6 has landed; one writer per Go package.
 
-- [ ] **0.0 — the plan.** This list. Commit `docs(plan): stage 4.3b's task list`.
-- [ ] **T0 — the flake.** The `runtime/steps`, `runtime` and `sync` harnesses wait until the test's deadline less a margin; `go test -race -count=3 -cpu 1 -v ./internal/runtime/steps/` once. Commit `test(runtime): a harness waits as long as its test may run`.
-- [ ] **T1 — findings by page type and subtree.** Decision 4. Tests: a grandchild in, a path neighbour under another parent out, the effective type, the counts. Commit `feat(findings): list and count findings by page type and subtree`.
-- [ ] **T2 — `findings.Explain`.** Decision 2; the tool's `Confirm` calls it; run options and a bulk set have sentences. Commit `refactor(findings): one sentence explains a resolution`.
-- [ ] **T3 — `findings.ResolveMany`.** Decision 3, each refusal failing first, a publisher counting one event for three findings. Commit `feat(findings): resolve every finding of a code in one confirmed action`.
-- [ ] **T4 — `sitemodel.Map`.** Decision 5. Tests: the node table, cursor pages, search and type with trails, a twin as one row with stable paging, a 3,000-page store reading bodies for its page of nodes only, each capture's root and a hub. Commit `feat(sitemodel): the site map, a node at a time`.
-- [ ] **T5 — the import's choices.** Decision 6: a two-candidate row listed, picked, previewed `mapped`, applied, matched `mapped` by a second import; an earlier apply's `row_ambiguous` closes as `row_matched`. Commit `feat(imports): a person picks an ambiguous row's page in the preview`.
-- [ ] **T6 — the bindings.** `FindingsService` (`List`, `Get`, `Counts`, `Explain`, `Resolve`, `ResolveMany`) before Settings and `PagesService.SiteMap`; the contract, service, wiring and harness pins; `task build`; the frontend's api, endpoints, hooks, keys and `pages.changed` invalidation. Commit `feat(wails): bind the findings and the site map`.
-- [ ] **T7 — the Findings inbox.** Codes with counts, filters in the URL, rows in words, options with their sentence and kind, who resolved, the confirmation, the bulk bar. Commit `feat(findings): the findings inbox`.
-- [ ] **T8 — the seeded run start and the rescan dialog.** Decision 7. Commit `feat(runs): a finding's run option opens the run start it answers`.
-- [ ] **T9 — the Site map.** Lazy rows, "show more" per cursor, the filters, the marks, the twins, the drawer; the Pages screen's Tree toggle and the files only it uses go. Commit `feat(map): the site map by derived parent`.
-- [ ] **T10 — the import preview.** The rule per row, the ambiguous rows' pick. Commit `feat(imports): the preview names each row's rule and lets a person pick`.
-- [ ] **T11 — the cards.** `pages_fields set`, each `pages_blocks` write, `findings resolve` over the finding; the card body shared with the inbox; `confirmableArgs`. Commit `feat(agent): a card per op says exactly what changes`.
-- [ ] **T12 — the harness.** A small CSV import seeds an ambiguous row, a row without a page and a differing trail; tests for the inbox's list, a bulk ignore and the map's paging; shots of the three screens. Commit `test(harness): the findings, the map and the preview's pick`.
-- [ ] **T13 — the census.** The observe e2e logs pages by type, trails by method and links by type. Commit `test(e2e): the observation logs the site's census`.
-- [ ] **G — the gate**, one leg at a time on the final code:
+- [x] **0.0 — the plan** (`c030425`). This list. Commit `docs(plan): stage 4.3b's task list`.
+- [x] **T0 — the flake** (`66517ed`). The `runtime/steps`, `runtime` and `sync` harnesses wait until the test's deadline less a margin; `go test -race -count=3 -cpu 1 -v ./internal/runtime/steps/` once. Commit `test(runtime): a harness waits as long as its test may run`.
+- [x] **T1 — findings by page type and subtree** (`71de2ee`). Decision 4. Tests: a grandchild in, a path neighbour under another parent out, the effective type, the counts. Commit `feat(findings): list and count findings by page type and subtree`.
+- [x] **T2 — `findings.Explain`** (`67d3a7f`). Decision 2; the tool's `Confirm` calls it; run options and a bulk set have sentences. Commit `refactor(findings): one sentence explains a resolution`.
+- [x] **T3 — `findings.ResolveMany`** (`d3a46f9`). Decision 3, each refusal failing first, a publisher counting one event for three findings. Commit `feat(findings): resolve every finding of a code in one confirmed action`.
+- [x] **T4 — `sitemodel.Map`** (`7600f02`). Decision 5. Tests: the node table, cursor pages, search and type with trails, a twin as one row with stable paging, a 3,000-page store reading bodies for its page of nodes only, each capture's root and a hub. Commit `feat(sitemodel): the site map, a node at a time`.
+- [x] **T5 — the import's choices** (`3942ff4`). Decision 6: a two-candidate row listed, picked, previewed `mapped`, applied, matched `mapped` by a second import; an earlier apply's `row_ambiguous` closes as `row_matched`. Commit `feat(imports): a person picks an ambiguous row's page in the preview`.
+- [x] **T6 — the bindings** (`edffadf`; the tidy `go.mod`, `d6e49e1`). `FindingsService` (`List`, `Get`, `Counts`, `Explain`, `Resolve`, `ResolveMany`) before Settings and `PagesService.SiteMap`; the contract, service, wiring and harness pins; `task build`; the frontend's api, endpoints, hooks, keys and `pages.changed` invalidation. Commit `feat(wails): bind the findings and the site map`.
+- [x] **T7 — the Findings inbox** (`c6dac31`, agent). Codes with counts, filters in the URL, rows in words, options with their sentence and kind, who resolved, the confirmation, the bulk bar. Commit `feat(findings): the findings inbox`.
+- [x] **T8 — the seeded run start and the rescan dialog** (`cec2f48`, agent). Decision 7. Commit `feat(runs): a finding's run option opens the run start it answers`.
+- [x] **T9 — the Site map** (`bd5f0f8`, agent). Lazy rows, "show more" per cursor, the filters, the marks, the twins, the drawer; the Pages screen's Tree toggle and the files only it uses go. Commit `feat(map): the site map by derived parent`.
+- [x] **T10 — the import preview** (`5a8ff82`, agent). The rule per row, the ambiguous rows' pick. Commit `feat(imports): the preview names each row's rule and lets a person pick`.
+- [x] **T11 — the cards** (`c45cfba`, `8d5fa5e`, agent). `pages_fields set`, each `pages_blocks` write, `findings resolve` over the finding; the card body shared with the inbox; `confirmableArgs`. Commit `feat(agent): a card per op says exactly what changes`.
+- [x] **T12 — the harness** (`074b20c`, the shots `993ad8a`). A small CSV import seeds an ambiguous row, a row without a page and a differing trail; tests for the inbox's list, a bulk ignore and the map's paging; shots of the three screens. Commit `test(harness): the findings, the map and the preview's pick`.
+- [x] **T13 — the census** (`c1a5413`). The observe e2e logs pages by type, trails by method and links by type. Commit `test(e2e): the observation logs the site's census`.
+- [x] **G — the gate**, one leg at a time on the final code (the record in `STATUS.md`):
   ```
   task build ; git status --short
   gofmt -l . ; task check:go:comments ; go vet ./... ; go vet -tags e2e ./... ; go vet -tags uiharness ./cmd/postulator/...
@@ -1379,7 +1381,17 @@ go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/
   task e2e:reset STAND=replica ; task e2e:full STAND=replica -- -v ; task e2e:down STAND=replica
   (the same on STAND=vanilla) ; task e2e:full:noplugin STAND=vanilla ; task e2e:up STAND=vanilla ; task e2e:down STAND=vanilla
   ```
-- [ ] **D — the docs and the checkpoint.** `STATUS.md`, `VISION.md`, spec 16, `CLAUDE.md`, `DECISIONS.md`, this plan closed. Commit `docs: stage 4.3b and phase 14 closed`.
+- [x] **D — the docs and the checkpoint.** `STATUS.md`, `VISION.md`, spec 16, `CLAUDE.md`, `DECISIONS.md`, this plan closed. Commit `docs: stage 4.3b and phase 14 closed`.
+
+#### Checkpoint, 2026-10-24 (4.3b closed; stage 4 and phase 14 closed)
+
+**Landed on `dev`**, the reasoning under "stage 4.3b" in `DECISIONS.md`: the plan `c030425`; the flake `66517ed`; findings by page type and subtree `71de2ee`; `findings.Explain` `67d3a7f`; `findings.ResolveMany` `d3a46f9`; the site map `7600f02`; the import's choices `3942ff4`; the tidy `go.mod` `d6e49e1`; the bindings `edffadf`; the census `c1a5413`; the harness `074b20c` and its shots `993ad8a`; the agent's screens `c45cfba`, `cec2f48`, `c6dac31`, `bd5f0f8`, `5a8ff82`, `8d5fa5e`; the sample the gate found red `b75063c`.
+
+**The gate**, every leg green on the final code, one at a time, both stands from fresh resets: the record is under "The gate" in `STATUS.md`. Nothing is owed.
+
+**Stage 4 by session**: 4.1 `cb76bc3` to `1ade303` (29 commits), 4.2 `3cccef4` to `0603f14` (17), 4.3a `d7fe063` to `c36c593` (16), 4.3b `c030425` to this checkpoint's commit (20).
+
+**Phase 14 is closed.** What follows it is in `STATUS.md` under "Next, in order": the smoke test with a funded key on the owner's sandbox provisioned as the replica, plugin 1.5.1 on the client's sites, and the release when the owner asks.
 
 ## Out of scope
 
