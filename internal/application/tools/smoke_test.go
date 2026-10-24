@@ -181,7 +181,8 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Publisher: bus, Clock: now,
 	})
 	siteModel := sitemodel.New(sitemodel.Deps{
-		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, Sites: siteRepo, Pages: pageRepo,
+		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
+		Sites: siteRepo, Pages: pageRepo,
 		Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
 		Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
 		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),

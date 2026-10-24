@@ -162,7 +162,8 @@ func briefsOver(store *sqlite.Store, publisher application.Publisher, now clock.
 		Specs: templates.New(templateRepo, pageRepo, entityRepo, siteRepo, sqlite.NewPageTypeRepo(store), store, publisher, now), Types: types,
 	})
 	return sitemodel.New(sitemodel.Deps{
-		Budgets: wholeWindow{}, Audits: audits, Reader: store, Sites: siteRepo, Pages: pageRepo, Entities: entityRepo,
+		Budgets: wholeWindow{}, Audits: audits, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
+		Sites: siteRepo, Pages: pageRepo, Entities: entityRepo,
 		Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo,
 		Findings: sqlite.NewFindingRepo(store),
