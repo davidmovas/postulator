@@ -317,6 +317,10 @@ profile and the default lint never sees it, so use `task lint:e2e` and `gofmt -l
 `task lint:e2e` refuses to start while another golangci-lint runs ("parallel golangci-lint is
 running"): run it alone, or run its line from `Taskfile.yml` by hand with
 `--allow-parallel-runners`.
-`task plugin:lint` runs `php -l` and `task plugin:test` runs `wp-plugin/tests/normalize.php` on
-PHP 7.4, the plugin's floor: the compose `phplint` service's `php:7.4.33-cli` on Windows and
-`setup-php` 7.4 on CI, which also packages the plugin and never starts a stand.
+`task plugin:lint` runs `php -l` and `task plugin:test` runs every script under `wp-plugin/tests`
+(the href table, the meta deny list and the function scan) under `E_ALL`, on PHP 7.2, the plugin's
+floor, on 7.4 and on 8.5: the compose services `php72`, `php74` and `php85` on Windows, the local
+`php` plus that matrix elsewhere, and a `setup-php` matrix on CI, whose separate job packages the
+plugin and never starts a stand. A function or hook the plugin newly calls joins
+`wp-plugin/testdata/wordpress.json` with its `@since`, and the header's `Requires at least` follows
+the newest.

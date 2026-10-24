@@ -2467,6 +2467,9 @@ None of it had been released.
 
 ## 2026-10-12 — the companion plugin runs on PHP 7.4
 
+**Amended on 2026-10-24** (phase 15, session 1): the plugin targets PHP 7.2 and WordPress 5.7, its
+lint and tests run on 7.2, 7.4 and 8.5, and a function scan proves no newer function is called.
+
 The client's host runs PHP 7.4.33, and WordPress refused to install the plugin because its header
 asked for 8.1. The sources used nothing newer than PHP 7.1 (scalar and nullable types, `void`,
 namespaced array constants, `random_bytes`), so the 8.1 was a declared floor and not a used one,
@@ -4828,3 +4831,174 @@ agent built the screens once the bindings had landed.
   previews and picks it, but a shot would need the file dialog.
 - **`features/graph/screen.tsx` (551 lines before, 556 now) and `features/palette/palette.tsx` (344
   before, 332 now)** were over the 300-line limit before this stage and took small edits only.
+
+## 2026-10-24 — phase 15, session 1: what must hold before the client gets it
+
+The owner has no funded OpenAI key, so the release goes out without the smoke test `STATUS.md` had
+first in line. This session closes what would hurt the client on day one. The plan is
+`docs/superpowers/plans/2026-10-24-phase-15-release.md`, the first file of a phase allowed by spec
+§10. A Fable critic read it before the owner (one blocking, seven serious and five minor findings, all
+folded in). Agent P built Part 1, agent F the screens, agent S Part 4.
+
+### The owner's answers at the plan
+
+- **The run start's picker reads the Site map's tree**, the one tree of the 4.3b ruling.
+- **Accepting a site proposal approves its parent edge**, and the entity is scoped under that
+  parent at once, so "Liquid" under two hubs is two entities rather than a refused clash.
+- **The old-WordPress stand stays** as `STAND=legacy` (8086, the contract suite only, never part of
+  `e2e:full`).
+
+### Part 1: the plugin's floors (it amends 2026-10-12)
+
+- **PHP 7.2, with nothing rewritten**: the sources use nothing newer than 7.1 (`void`, nullable
+  types) and declare no class, so no dynamic property can exist. `php -l` cannot see a newer
+  *function*, so `wp-plugin/tests/functions.php` tokenizes every plugin file: each called function
+  is the plugin's own, on the kept list `wp-plugin/testdata/wordpress.json` (WordPress, WooCommerce
+  and SEO names with their `@since`), or present in the PHP running it. Every hook and every
+  callback named by a string is on the list too, and a stale entry fails. The scan asserts that the
+  list's newest core `@since` is the header's `Requires at least`. The test scripts run under
+  `E_ALL`, and any notice, warning or deprecation fails them.
+- **`task plugin:lint` and `plugin:test` run on `php:7.2.34-cli`, `7.4.33-cli` and `8.5.12-cli`**
+  (compose services `php72`, `php74`, `php85`; `phplint` is gone). The brief named "a current 8.x",
+  and the plan's 8.4 became 8.5, released in November 2025. CI runs a setup-php matrix over the
+  three, and a separate job zips the plugin once.
+- **WordPress 5.7.0** is the floor, set by the `wp_robots` filter and `wp_robots_no_robots` (both
+  5.7.0 on developer.wordpress.org). The application's login needs core application passwords
+  (5.6). No shim was added to go lower. Two kept `@since` values were corrected against the source:
+  `wp_head` 1.5.0, and `wp_update_post` with `$wp_error` 3.5.0.
+- **Version 1.5.2, with 1.5.1 still accepted**: the header, `VERSION`, `openapi.yaml`,
+  `wp.PluginVersion` and the fake's default are 1.5.2. `Outdated` compares the new
+  `wp.PluginMinimum` 1.5.1, so no site on 1.5.1 is told to upgrade. No route or contract moved, and
+  `TestTheBundledPluginIsPluginVersion` ties the PHP header to the Go constant.
+- **The legacy stand ran the contract suite once.** WordPress 5.7.2 runs on PHP 7.3, the oldest
+  image that exists for it (no php7.2 tag exists past 5.6.0), with WP-CLI 2.6.0, MariaDB 11.4.12,
+  WooCommerce 6.5.2, Rank Math 1.0.98.1 (Yoast 18.3 under `E2E_SEO=yoast`) and the companion 1.5.2.
+  The research was wrong three times: WP-CLI 2.5.0 has no `application-password` command, old Rank
+  Math zips are still served, and 18.3 is Yoast's last release for 5.6 and 5.7.
+  - **The result:** `internal/adapters/wp/e2e`, 62 tests, 60 passed and none failed.
+  - **The skips**, each naming what the stand lacks: core REST has no `show_on_front` before
+    WordPress 6.0; a variation names no `parent_id` before WooCommerce 8.3; wc/v3 leaves out the
+    cart, checkout and account pages before WooCommerce 6.9; and the existing Rank Math skip of the
+    escaped-head test.
+  - **What that means without the plugin:** on such a site the application cannot learn the front
+    page or the store's pages; with the plugin, its `/settings` route answers both
+    (`TestSettingsNameTheTechnicalPages` passed). Nothing reads a variation's parent today.
+  - **Found and fixed:** `docker/e2e/import-products.php` counted a value WooCommerce 6.5 does not
+    return, a warning on PHP 7.3 and a TypeError on PHP 8.
+  - **Not exercised:** Yoast 18.3; the run used Rank Math. The log is in the session's scratchpad,
+    `legacy-contract.log`.
+- **The 2026-10-12 ruling is amended**: the plugin targets PHP 7.2 and WordPress 5.7, and its
+  lint runs on the floor and on a current 8.x.
+
+### Part 2: pages without an entity become writable through proposals
+
+- **`page_without_entity`** is a warning per page. Its subject is the path alone, so a retitle
+  leaves a dismissed one dismissed. It offers `propose_entity`, of a new option kind `proposal` that
+  is taken in bulk, and `ignore`.
+  - **Raised** by the derive stage, after `untyped()` has typed the walk, for every live,
+    unarchived, non-technical page but the root whose effective type's preset is writable
+    (`pagetype.Set.NeedsEntity`).
+  - **Cleared** by the derive stage once an entity carries the page, and in the same unit by
+    every writer that maps one (`ApplyProposals`, `pages.MapToEntity`, `SetCanonical`, the import's
+    apply), resolved by the new resolver `model` with the resolution `page_mapped`. Settled counts
+    only a person and the agent, so an unmap opens it again at the next walk.
+- **The site proposal**: `contextpack.Map.EntityProposals` is pure, over the folded map and the
+  graph.
+  - **Name**: the H1, else the title.
+  - **Parent**: the nearest ancestor that carries an entity or is proposed in the same batch. A
+    product's category is folded into its twin hub, so it finds the hub.
+  - **Facts**: a product's store attributes become its card's facts.
+  - **Order**: by depth.
+  - **Clashes** are `no_name`, `name_in_batch` and `name_carried`. Each is marked, left unticked
+    and skipped, never refusing the batch.
+  - **Shared names** are labelled through `graph.Labels` over the graph and the batch together.
+  - **The API**: `PreviewFromPages` takes `source: site` (no model call; the default stays `model`).
+- **Apply, for a site proposal**:
+  - it runs in parent order;
+  - it inserts the entity scoped under its parent with the parent edge approved, and the entity is
+    the person's (`SourceUser`);
+  - it reuses an entity of the same name under the same parent (by `graph.Key`), never one matched
+    by a bare label;
+  - it writes the card's facts, refusing a fact without a label or a value;
+  - it maps the page and sets the canonical page.
+
+  Model proposals keep their proposed edges.
+- **The person's path**: `Resolve` and `ResolveMany` with `propose_entity` answer `proposals`, the
+  site preview's request, before any unit, and settle nothing, as a run option answers a
+  `StartRequest`. The inbox opens the Graph screen's proposal drawer at its preview, in place (a seed
+  can hold thousands of pages). The person ticks all or some and confirms once.
+- **The agent**: the `findings` tool reads a proposal option, writing nothing. `graph_apply_proposals`
+  and `graph_propose_from_pages` gain a summary, so both wait for the person in either mode. The
+  summary is built from `ApplyProposalsRequest.Validate`, which the use case calls too, so the
+  summary refuses exactly what the use case refuses. The schemas grow from 65,722 bytes and 14,623
+  tokens to 66,394 and 14,779 (ceilings 66,407 and 14,782). `vocab.ts` gains `proposalSources` and
+  `proposalClashes`.
+- **The proof on the replica** (`TestAProductWithoutAnEntityIsWrittenThroughAProposal`, green on its
+  first run):
+  - A product planted in the Healing Peptides category is refused by the estimate.
+  - Its finding's proposal is named after it, carries its Size attribute as a fact, and is scoped
+    under the category's twin hub `/healing-peptides/`.
+  - Its run writes the description through the plugin.
+  - The only store write is `POST /wc/v3/products/{id}` with `short_description`.
+  - The store's facts are unchanged.
+
+### Part 3: the input side of the estimate, adopted
+
+- **The counter**: `llm.Tokens` reads 1.7 tokens a word or 3.7 runes a token (it read 2.2 and 3);
+  `llm.ReadTokens` prices words a model reads at the same rate. The output side is kept
+  conservative on purpose: `llm.WordTokens` 2.2 and `steps.tokensPerWord` 3, since how long an
+  answer runs cannot be counted offline.
+- **Each step's own overhead**, measured: the writer 1,040 beside its pack, the meta writer 440, a
+  linker call 290, and the judge 510 beside its pack and the body it reads, which it now prices at
+  `llm.ReadTokens` over the template's words. `inputShareOfOutput` is gone: the "rest" of a prompt is
+  a near-constant 474 to 546 tokens, not a share of the answer. An unmeasured step keeps the 800
+  default.
+- **`Fit` keeps a twentieth of its budget as headroom**, so the counter, now near the real count,
+  never lets a kept pack run over: before the headroom one pack came 2 tokens over a budget of 500.
+- **The report's judge reads a stand-in body**, the captured bodies' own HTML blocks cut to the
+  template's target words, because a run judges the body its writer has just written. A plain-text
+  stand-in priced the judge 27% high, against HTML at 1.59 tokens a word. The meta writer is measured
+  over a stand-in draft of the template's headings.
+- **The proofs** in `cmd/tokenreport`, over nine pages of both captures:
+  - every measured input is within ±25% of its real count;
+  - at budgets of 4,096, 3,000, 1,500, 1,000, 750, 500 and 300, `Fit` refuses no pack whose whole
+    real count fits and keeps none over its budget.
+
+| step | estimate ÷ real before (pooled, range) | estimate ÷ real after |
+|---|---|---|
+| writer | 2.28 (2.08 to 2.52) | 1.04 (0.97 to 1.08) |
+| linker call | 3.57 (3.49 to 3.64) | 1.11 for the hubs; 0.84 for the product's |
+| judge | 2.07 over the captured body, with no body term | 1.07 (1.05 to 1.09) over a body of the template's length |
+| meta writer | not measured | 1.07 (1.01 to 1.13) |
+
+- **What stays uncertain**: the sample is WordPress's own boilerplate and nine pages, not the
+  client's copy. The real input has not been compared with an OpenAI bill: the ledger's
+  `input_tokens` from a funded key settles both sides. OpenAI renders a schema in its own format
+  before the model reads it.
+
+### Part 5: the prompts, for the owner to read
+
+- `go run ./cmd/tokenreport -prompts out/prompts` writes ten plain-text files; `out/` is ignored.
+  - **Nine step files**: the body writer, the meta writer and the judge on the replica's
+    `/peptides/`, `/tb-500/` and `/product/bpc-157-peptide/`. Each holds the system and user
+    messages and the strict answer schema.
+  - **`agent-first-round.txt`**: the instructions with the replica's brief, the developer message,
+    a question, and every tool as sent.
+- **Headers**: each file opens with its page, step, role, model, effort, tier, the most output
+  tokens and the commit, read from `.git`, so a rerun on one commit writes the same bytes. The meta
+  writer's and the judge's files say they read a stand-in.
+
+### The replica recaptured
+
+- **Why**: the brief asks for the product Part 2 gave an entity, and every e2e test opens a database
+  of its own. So the capture accepts the site proposal for `/product/bpc-157-peptide/` itself
+  (`writerStand.product`), from a fresh stand.
+- **The format of the rows moved** with migrations 0068 to 0072, since the last capture was 2b's.
+- **The content moved by three things**: one entity (BPC-157 Peptide, under Healing Peptides, with
+  its Strength fact), its edge, and the open `page_without_entity` findings.
+- **The packs golden moved by that product alone**: its entity and its link up to
+  `/healing-peptides/`, and the hub's link down to it.
+- **Two things followed from the new capture**:
+  - its types carry their templates (migration 0066), which the report now maps to the preset's
+    built-in;
+  - the replica's brief grew, so `instructionsCeilingTokens` is 1,932 for 1,929.

@@ -268,10 +268,12 @@ again from what it read.
 
 ## WordPress companion plugin
 
-`wp-plugin/postulator-companion` **1.5.1** (PHP ≥ 7.4, WP ≥ 6.4, no dependencies, `Update URI`
+`wp-plugin/postulator-companion` **1.5.2** (PHP ≥ 7.2, WP ≥ 5.7 since phase 15, proven by a function
+scan on PHP 7.2 and the contract suite on WordPress 5.7.2; no dependencies, `Update URI`
 so wordpress.org never offers a plugin of the same slug) serves `/wp-json/postulator/v1` and
 advertises `bulk seo_meta seo_meta_read content_hash raw preview rendered meta terms settings
-meta_write guarded_write`; a client below 1.5.1 or missing one of them writes nothing through it;
+meta_write guarded_write`; a client below 1.5.1 (`wp.PluginMinimum`; the bundled zip is
+`wp.PluginVersion`, 1.5.2, with the 1.5.1 contract) or missing one of them writes nothing through it;
 every permission callback requires `edit_posts`, and the password must belong to an
 **administrator**, so **multisite is unsupported in v2.0**. A capability the manifest does not
 name is refused from the cached manifest before any request, so a site on an older plugin answers

@@ -416,8 +416,9 @@ status`. A site that cannot issue a link answers `INVALID` with `details.code` s
 
 `SyncService.CheckPlugin{siteId}` answers `{plugin, commerce}`; `plugin` is `{installed, version,
 requiredVersion, outdated, capabilities, seoPlugin}`. `outdated` is true when the manifest's
-version is below `requiredVersion` (1.5.1 since 2026-10-22, 1.5.0 since 2026-10-20, 1.4.1 since 2026-10-18) or a capability the client needs is
-missing, and the Sites panel then says to upload the new zip over the old one, which WordPress
+version is below `wp.PluginMinimum` (1.5.1 since 2026-10-22, 1.5.0 since 2026-10-20, 1.4.1 since 2026-10-18) or a capability the client needs is
+missing; `requiredVersion` names the bundled zip, `wp.PluginVersion` (1.5.2 since 2026-10-24, the
+1.5.1 contract on PHP 7.2 and WordPress 5.7), and the Sites panel then says to upload it over the old one, which WordPress
 offers as "Replace current with uploaded". The verdict is the probe's and is never stored.
 
 ## Products
@@ -475,7 +476,8 @@ model, tier, tokens (`input cachedInput cacheWrite output reasoning total`), `us
 
 ## The companion plugin's version
 
-The shipped plugin is **1.5.1** and advertises `bulk seo_meta seo_meta_read content_hash raw
+The shipped plugin is **1.5.2** (the 1.5.1 contract, declaring PHP 7.2 and WordPress 5.7; 1.5.1 is
+still accepted) and advertises `bulk seo_meta seo_meta_read content_hash raw
 preview rendered meta terms settings meta_write guarded_write`, every one of which the client
 requires (`wp.requiredCapabilities`, the fake's defaults, the PHP `CAPABILITIES`, `openapi.yaml`
 and three pinned test lists move together). A capability the manifest does not name is refused
