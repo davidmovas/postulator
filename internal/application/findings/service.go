@@ -8,7 +8,6 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
-	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
@@ -30,13 +29,11 @@ type bodyAcceptor interface {
 	AcceptSite(ctx context.Context, pageID string, at time.Time) error
 }
 
-type parentSources interface {
+type pageStore interface {
+	Get(ctx context.Context, id string) (pagemap.Page, error)
+	Update(ctx context.Context, p pagemap.Page) error
+	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
 	SetParentSource(ctx context.Context, pageID string, source pagemap.ParentSource, at time.Time) error
-}
-
-type pageEditor interface {
-	Update(ctx context.Context, req pages.UpdateRequest) (pages.UpdateResponse, error)
-	SetType(ctx context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error)
 }
 
 type cardAcceptor interface {
@@ -59,8 +56,7 @@ type Deps struct {
 	Findings   findingStore
 	Fields     fieldAcceptor
 	Bodies     bodyAcceptor
-	Parents    parentSources
-	Pages      pageEditor
+	Pages      pageStore
 	Cards      cardAcceptor
 	Rows       rowMapper
 	Places     siteMaps

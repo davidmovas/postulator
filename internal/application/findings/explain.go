@@ -57,7 +57,12 @@ func (s *Service) gathered(ctx context.Context, siteID string, ids []string, opt
 		return nil, invalid("the option "+string(option)+" is chosen one finding at a time", "option")
 	}
 	held := make([]finding.Finding, 0, len(ids))
+	named := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
+		if _, twice := named[id]; twice {
+			return nil, invalid("the finding "+id+" is named twice", "findingIds")
+		}
+		named[id] = struct{}{}
 		one, err := s.open(ctx, siteID, id, option)
 		if err != nil {
 			return nil, err

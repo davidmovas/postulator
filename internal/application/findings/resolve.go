@@ -7,9 +7,9 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
-	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	syncsite "github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -22,38 +22,60 @@ type siteValues struct {
 	Site string `json:"site"`
 }
 
-func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveResponse, error) {
-	by := req.By
+type choice struct {
+	option       finding.Option
+	pageID       string
+	pageTypeID   string
+	proposalHash string
+	by           string
+}
+
+func chooser(by string) (string, error) {
 	if by == "" {
-		by = finding.ResolvedByPerson
+		return finding.ResolvedByPerson, nil
 	}
 	if by != finding.ResolvedByPerson && by != finding.ResolvedByAgent {
-		return ResolveResponse{}, invalid("a finding is resolved by a person or the agent", "by")
+		return "", invalid("a finding is resolved by a person or the agent", "by")
+	}
+	return by, nil
+}
+
+func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveResponse, error) {
+	by, err := chooser(req.By)
+	if err != nil {
+		return ResolveResponse{}, err
 	}
 	option := finding.Option(req.Option)
 	if option.Kind() == "" {
 		return ResolveResponse{}, invalid("the option is not recognized", "option")
 	}
+	held, err := s.open(ctx, req.SiteID, req.FindingID, option)
+	if err != nil {
+		return ResolveResponse{}, err
+	}
+	places, err := s.deps.Places.Map(ctx, held.SiteID)
+	if err != nil {
+		return ResolveResponse{}, err
+	}
 	if option.Kind() == finding.Run {
-		held, err := s.open(ctx, req.SiteID, req.FindingID, option)
-		if err != nil {
-			return ResolveResponse{}, err
+		answer, prepareErr := prepared(held, option)
+		if prepareErr != nil {
+			return ResolveResponse{}, prepareErr
 		}
-		answer, err := prepared(held, option)
-		if err != nil {
-			return ResolveResponse{}, err
-		}
-		answer.Finding, err = s.shown(ctx, held)
-		return answer, err
+		answer.Finding = placed(held, places)
+		return answer, nil
 	}
 
-	var held finding.Finding
-	err := s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
-		var openErr error
-		if held, openErr = s.open(c, req.SiteID, req.FindingID, option); openErr != nil {
+	chosen := choice{option: option, pageID: req.PageID, pageTypeID: req.PageTypeID, proposalHash: req.ProposalHash, by: by}
+	if refused := applicable(chosen, places); refused != nil {
+		return ResolveResponse{}, refused
+	}
+	err = s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
+		current, openErr := s.open(c, held.SiteID, held.ID, option)
+		if openErr != nil {
 			return openErr
 		}
-		return s.change(c, held, option, req, by)
+		return s.change(c, current, chosen)
 	})
 	if err != nil {
 		return ResolveResponse{}, err
@@ -65,8 +87,20 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	if err := s.changed(held.SiteID); err != nil {
 		return ResolveResponse{}, err
 	}
-	shown, err := s.shown(ctx, settled)
-	return ResolveResponse{Finding: shown}, err
+	return ResolveResponse{Finding: placed(settled, places)}, nil
+}
+
+func applicable(chosen choice, places contextpack.Map) error {
+	if chosen.option != finding.SetType {
+		return nil
+	}
+	if chosen.pageTypeID == "" {
+		return invalid("name the page type to set", "pageTypeId")
+	}
+	if _, found := places.Type(chosen.pageTypeID); !found {
+		return errors.New(errors.NotFound, "the site has no such page type").WithDetail("pageTypeId", chosen.pageTypeID)
+	}
+	return nil
 }
 
 func (s *Service) open(ctx context.Context, siteID, findingID string, option finding.Option) (finding.Finding, error) {
@@ -83,18 +117,18 @@ func (s *Service) open(ctx context.Context, siteID, findingID string, option fin
 	return held, nil
 }
 
-func (s *Service) change(ctx context.Context, held finding.Finding, option finding.Option, req ResolveRequest, by string) error {
-	switch option {
+func (s *Service) change(ctx context.Context, held finding.Finding, chosen choice) error {
+	switch chosen.option {
 	case finding.Ignore:
-		return s.deps.Findings.Settle(ctx, held.ID, finding.Dismissed, string(option), by, s.now())
+		return s.deps.Findings.Settle(ctx, held.ID, finding.Dismissed, string(chosen.option), chosen.by, s.now())
 	case finding.Accept:
-		_, err := s.deps.Cards.AcceptCard(ctx, graph.AcceptCardRequest{FindingID: held.ID, ProposalHash: req.ProposalHash, By: by})
+		_, err := s.deps.Cards.AcceptCard(ctx, graph.AcceptCardRequest{FindingID: held.ID, ProposalHash: chosen.proposalHash, By: chosen.by})
 		return err
 	case finding.MapToPage:
-		if req.PageID == "" {
+		if chosen.pageID == "" {
 			return invalid("name the page the row maps to", "pageId")
 		}
-		_, err := s.deps.Rows.MapRow(ctx, imports.MapRowRequest{FindingID: held.ID, PageID: req.PageID, By: by})
+		_, err := s.deps.Rows.MapRow(ctx, imports.MapRowRequest{FindingID: held.ID, PageID: chosen.pageID, By: chosen.by})
 		return err
 	}
 	if held.PageID == nil {
@@ -102,20 +136,27 @@ func (s *Service) change(ctx context.Context, held finding.Finding, option findi
 	}
 	pageID := *held.PageID
 	var err error
-	switch option {
+	switch chosen.option {
 	case finding.AcceptSite:
 		err = s.acceptSite(ctx, held, pageID)
 	case finding.AcceptWorkbook:
-		err = s.deps.Parents.SetParentSource(ctx, pageID, pagemap.ParentFromWorkbook, s.now())
+		err = s.deps.Pages.SetParentSource(ctx, pageID, pagemap.ParentFromWorkbook, s.now())
 	case finding.SetType:
-		err = s.setType(ctx, pageID, req.PageTypeID, by)
+		err = s.deps.Pages.SetType(ctx, pageID, chosen.pageTypeID, typedBy(chosen.by), s.now())
 	default:
 		err = invalid("the option is not recognized", "option")
 	}
 	if err != nil {
 		return err
 	}
-	return s.deps.Findings.Settle(ctx, held.ID, finding.Resolved, string(option), by, s.now())
+	return s.deps.Findings.Settle(ctx, held.ID, finding.Resolved, string(chosen.option), chosen.by, s.now())
+}
+
+func typedBy(by string) pagemap.TypeReason {
+	if by == finding.ResolvedByAgent {
+		return pagemap.TypeByAI
+	}
+	return pagemap.TypeByUser
 }
 
 func valuesOf(held finding.Finding) (siteValues, error) {
@@ -131,7 +172,7 @@ func (s *Service) acceptSite(ctx context.Context, held finding.Finding, pageID s
 	case finding.BodyChangedOnSite:
 		return s.deps.Bodies.AcceptSite(ctx, pageID, s.now())
 	case finding.ParentDiffers:
-		return s.deps.Parents.SetParentSource(ctx, pageID, pagemap.ParentFromSite, s.now())
+		return s.deps.Pages.SetParentSource(ctx, pageID, pagemap.ParentFromSite, s.now())
 	}
 	values, err := valuesOf(held)
 	if err != nil {
@@ -143,26 +184,25 @@ func (s *Service) acceptSite(ctx context.Context, held finding.Finding, pageID s
 			return invalid("the finding names no field", "findingId")
 		}
 		return s.deps.Fields.AcceptSite(ctx, pageID, field.Key(values.Key), s.now())
-	case finding.PageTitleDiffers:
-		_, err = s.deps.Pages.Update(ctx, pages.UpdateRequest{ID: pageID, Title: &values.Site})
-	case finding.PageH1Differs:
-		_, err = s.deps.Pages.Update(ctx, pages.UpdateRequest{ID: pageID, H1: &values.Site})
+	case finding.PageTitleDiffers, finding.PageH1Differs:
+		return s.planSite(ctx, pageID, held.Code, values.Site)
 	default:
-		err = invalid("the finding does not offer accept_site", "option")
+		return invalid("the finding does not offer accept_site", "option")
 	}
-	return err
 }
 
-func (s *Service) setType(ctx context.Context, pageID, pageTypeID, by string) error {
-	if pageTypeID == "" {
-		return invalid("name the page type to set", "pageTypeId")
+func (s *Service) planSite(ctx context.Context, pageID string, code finding.Code, value string) error {
+	page, err := s.deps.Pages.Get(ctx, pageID)
+	if err != nil {
+		return err
 	}
-	reason := pagemap.TypeByUser
-	if by == finding.ResolvedByAgent {
-		reason = pagemap.TypeByAI
+	if code == finding.PageTitleDiffers {
+		page.Title = value
+	} else {
+		page.H1 = value
 	}
-	_, err := s.deps.Pages.SetType(ctx, pages.SetTypeRequest{PageID: pageID, PageTypeID: pageTypeID, By: reason})
-	return err
+	page.UpdatedAt = s.now()
+	return s.deps.Pages.Update(ctx, page)
 }
 
 func prepared(held finding.Finding, option finding.Option) (ResolveResponse, error) {

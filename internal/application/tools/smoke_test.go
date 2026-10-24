@@ -198,7 +198,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Imports:   importsService,
 		Findings: findings.New(findings.Deps{
 			Findings: sqlite.NewFindingRepo(store), Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
-			Parents: pageRepo, Pages: pagesService, Cards: graphService, Rows: importsService, Places: siteModel,
+			Pages: pageRepo, Cards: graphService, Rows: importsService, Places: siteModel,
 			UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Models: models.New(built, modelRepo, modelProfiles, book,

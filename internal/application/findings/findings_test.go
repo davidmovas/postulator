@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/imports"
-	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
@@ -75,24 +76,42 @@ func (b bodies) AcceptSite(_ context.Context, page string, _ time.Time) error {
 	return nil
 }
 
-func (s *store) SetParentSource(_ context.Context, page string, source pagemap.ParentSource, _ time.Time) error {
-	s.calls = append(s.calls, "parent:"+page+":"+string(source))
+type pageRows struct{ s *store }
+
+func (p pageRows) SetParentSource(_ context.Context, page string, source pagemap.ParentSource, _ time.Time) error {
+	p.s.calls = append(p.s.calls, "parent:"+page+":"+string(source))
 	return nil
 }
 
-func (s *store) Update(_ context.Context, req pages.UpdateRequest) (pages.UpdateResponse, error) {
-	switch {
-	case req.Title != nil:
-		s.calls = append(s.calls, "title:"+req.ID+":"+*req.Title)
-	case req.H1 != nil:
-		s.calls = append(s.calls, "h1:"+req.ID+":"+*req.H1)
-	}
-	return pages.UpdateResponse{}, nil
+func (pageRows) Get(_ context.Context, id string) (pagemap.Page, error) {
+	return pagemap.Page{ID: id, SiteID: siteID, Path: "/" + id + "/"}, nil
 }
 
-func (s *store) SetType(_ context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error) {
-	s.calls = append(s.calls, "type:"+req.PageID+":"+req.PageTypeID+":"+string(req.By))
-	return pages.SetTypeResponse{}, nil
+func (p pageRows) Update(_ context.Context, page pagemap.Page) error {
+	switch {
+	case page.Title != "":
+		p.s.calls = append(p.s.calls, "title:"+page.ID+":"+page.Title)
+	case page.H1 != "":
+		p.s.calls = append(p.s.calls, "h1:"+page.ID+":"+page.H1)
+	}
+	return nil
+}
+
+func (p pageRows) SetType(_ context.Context, pageID, typeID string, reason pagemap.TypeReason, _ time.Time) error {
+	p.s.calls = append(p.s.calls, "type:"+pageID+":"+typeID+":"+string(reason))
+	return nil
+}
+
+type counter struct {
+	mu        sync.Mutex
+	published []events.Type
+}
+
+func (c *counter) Publish(eventType events.Type, _ any) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.published = append(c.published, eventType)
+	return nil
 }
 
 func (s *store) AcceptCard(_ context.Context, req graph.AcceptCardRequest) (graph.AcceptCardResponse, error) {
@@ -148,6 +167,12 @@ func (places) Map(_ context.Context, site string) (contextpack.Map, error) {
 
 func newService(t *testing.T, held ...finding.Finding) (*findings.Service, *store) {
 	t.Helper()
+	service, s, _ := newCounted(t, held...)
+	return service, s
+}
+
+func newCounted(t *testing.T, held ...finding.Finding) (*findings.Service, *store, *counter) {
+	t.Helper()
 	s := &store{held: make(map[string]finding.Finding)}
 	for i := range held {
 		record, err := finding.New(held[i])
@@ -156,10 +181,11 @@ func newService(t *testing.T, held ...finding.Finding) (*findings.Service, *stor
 		}
 		s.held[record.ID] = record
 	}
+	published := &counter{}
 	return findings.New(findings.Deps{
-		Findings: s, Fields: s, Bodies: bodies{s}, Parents: s, Pages: s, Cards: s, Rows: s, Places: places{},
-		UnitOfWork: unit{}, Clock: clock.NewFake(at),
-	}), s
+		Findings: s, Fields: s, Bodies: bodies{s}, Pages: pageRows{s}, Cards: s, Rows: s, Places: places{},
+		UnitOfWork: unit{}, Publisher: published, Clock: clock.NewFake(at),
+	}), s, published
 }
 
 func raised(code finding.Code, subject string) finding.Finding {
@@ -553,6 +579,99 @@ func TestOneSentenceExplainsWhatAResolutionDoes(t *testing.T) {
 			tc.req.SiteID = siteID
 			if _, err := service.Explain(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
 				t.Errorf("Explain(%+v) = %v, want %s", tc.req, err, tc.code)
+			}
+		})
+	}
+}
+
+func TestEveryFindingOfACodeIsResolvedInOneConfirmedAction(t *testing.T) {
+	t.Parallel()
+
+	ids := []string{"f-technical_detected-page-1", "f-technical_detected-page-2", "f-technical_detected-page-3"}
+	held := []finding.Finding{
+		onPage(finding.TechnicalDetected, pageID), onPage(finding.TechnicalDetected, "page-2"), onPage(finding.TechnicalDetected, "page-3"),
+	}
+
+	t.Run("each is typed and the window hears once", func(t *testing.T) {
+		t.Parallel()
+
+		service, s, published := newCounted(t, held...)
+		resolved, err := service.ResolveMany(t.Context(), findings.ResolveManyRequest{
+			SiteID: siteID, Code: "technical_detected", Option: "set_type", PageTypeID: "type-entity", FindingIDs: ids,
+		})
+		if err != nil {
+			t.Fatalf("ResolveMany: %v", err)
+		}
+		want := []string{"type:page-1:type-entity:user", "type:page-2:type-entity:user", "type:page-3:type-entity:user"}
+		if !slices.Equal(s.calls, want) {
+			t.Errorf("model changes = %v, want %v", s.calls, want)
+		}
+		if len(resolved.Findings) != 3 {
+			t.Fatalf("answered %d findings, want 3", len(resolved.Findings))
+		}
+		for _, shown := range resolved.Findings {
+			if shown.Status != string(finding.Resolved) || shown.ResolvedBy != finding.ResolvedByPerson || shown.PagePath == "" {
+				t.Errorf("%s = %+v, want it resolved by the person and named by its page", shown.ID, shown)
+			}
+		}
+		if !slices.Equal(published.published, []events.Type{events.PagesChanged}) {
+			t.Errorf("published %v, want one pages.changed after the unit", published.published)
+		}
+	})
+
+	t.Run("each is dismissed", func(t *testing.T) {
+		t.Parallel()
+
+		service, s, _ := newCounted(t, held...)
+		if _, err := service.ResolveMany(t.Context(), findings.ResolveManyRequest{
+			SiteID: siteID, Code: "technical_detected", Option: "ignore", FindingIDs: ids,
+		}); err != nil {
+			t.Fatalf("ResolveMany: %v", err)
+		}
+		for _, id := range ids {
+			if s.held[id].Status != finding.Dismissed {
+				t.Errorf("%s is %s, want dismissed", id, s.held[id].Status)
+			}
+		}
+	})
+
+	settled := onPage(finding.TechnicalDetected, "page-4")
+	settled.Status = finding.Dismissed
+	product := onPage(finding.ParentDiffers, "page-5")
+	product.Options = pagemap.TrailOptions(pagemap.WPProduct)
+	refused := []struct {
+		name string
+		req  findings.ResolveManyRequest
+		code errors.Code
+	}{
+		{name: "a run option", req: findings.ResolveManyRequest{Code: "field_changed_on_site", Option: "rewrite_field", FindingIDs: []string{"f-field_changed_on_site-page-1"}}, code: errors.Invalid},
+		{name: "a mapping, which names a page per row", req: findings.ResolveManyRequest{Code: "row_ambiguous", Option: "map_to_page", FindingIDs: []string{"f-row_ambiguous-page-2"}}, code: errors.Invalid},
+		{name: "a card, read one by one", req: findings.ResolveManyRequest{Code: "entity_card_proposed", Option: "accept", FindingIDs: []string{"f-entity_card_proposed"}}, code: errors.Invalid},
+		{name: "a finding settled since", req: findings.ResolveManyRequest{Code: "technical_detected", Option: "ignore", FindingIDs: append(slices.Clone(ids), "f-technical_detected-page-4")}, code: errors.Conflict},
+		{name: "another code among them", req: findings.ResolveManyRequest{Code: "technical_detected", Option: "ignore", FindingIDs: append(slices.Clone(ids), "f-row_ambiguous-page-2")}, code: errors.Invalid},
+		{name: "a code that is not theirs", req: findings.ResolveManyRequest{Code: "builder_detected", Option: "ignore", FindingIDs: ids}, code: errors.Invalid},
+		{name: "a finding named twice", req: findings.ResolveManyRequest{Code: "technical_detected", Option: "ignore", FindingIDs: append(slices.Clone(ids), ids[0])}, code: errors.Invalid},
+		{name: "an option one of them does not offer", req: findings.ResolveManyRequest{Code: "parent_differs", Option: "accept_workbook", FindingIDs: []string{"f-parent_differs-page-2", "f-parent_differs-page-5"}}, code: errors.Invalid},
+		{name: "a type the site lacks", req: findings.ResolveManyRequest{Code: "technical_detected", Option: "set_type", PageTypeID: "type-nobody", FindingIDs: ids}, code: errors.NotFound},
+		{name: "nothing named", req: findings.ResolveManyRequest{Code: "technical_detected", Option: "ignore"}, code: errors.Invalid},
+	}
+	for _, tc := range refused {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			service, s, published := newCounted(t, append(slices.Clone(held), settled, product, onPage(finding.ParentDiffers, "page-2"),
+				onPage(finding.FieldChangedOnSite, pageID), onPage(finding.RowAmbiguous, "page-2"), raised(finding.EntityCardProposed, `{}`))...)
+			tc.req.SiteID = siteID
+			if _, err := service.ResolveMany(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
+				t.Errorf("ResolveMany(%+v) = %v, want %s", tc.req, err, tc.code)
+			}
+			if len(s.calls) != 0 || len(published.published) != 0 {
+				t.Errorf("a refused bulk changed %v and published %v", s.calls, published.published)
+			}
+			for _, id := range ids {
+				if s.held[id].Status != finding.Open {
+					t.Errorf("a refused bulk settled %s", id)
+				}
 			}
 		})
 	}

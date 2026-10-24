@@ -117,7 +117,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		pages:   pagesService,
 		imports: importsService,
 		findings: findings.New(findings.Deps{
-			Findings: stores.findings, Fields: stores.fields, Bodies: stores.bodies, Parents: stores.pages, Pages: pagesService,
+			Findings: stores.findings, Fields: stores.fields, Bodies: stores.bodies, Pages: stores.pages,
 			Cards: graphService, Rows: importsService, Places: writing.siteModel, UnitOfWork: stores.store, Publisher: c.Events,
 			Clock: stores.now,
 		}),
