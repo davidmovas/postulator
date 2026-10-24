@@ -20,6 +20,8 @@ const (
 	selectBodies       = `SELECT ` + bodyColumns + ` FROM page_bodies WHERE page_id = ?`
 	selectBodiesBySite = `SELECT b.page_id, b.side, b.raw, b.hash, b.kind, b.observed_at
 		FROM page_bodies AS b JOIN pages AS p ON p.id = b.page_id WHERE p.site_id = ? ORDER BY b.page_id, b.side`
+	selectObservedBySite = `SELECT b.page_id, b.observed_at FROM page_bodies AS b JOIN pages AS p ON p.id = b.page_id
+		WHERE p.site_id = ? AND b.side = 'current' ORDER BY b.page_id`
 	selectCurrentBodies = `SELECT ` + bodyColumns + ` FROM page_bodies WHERE side = 'current' AND page_id IN `
 	orderBodies         = ` ORDER BY page_id`
 	selectDrifted       = `SELECT c.page_id FROM page_bodies AS c
@@ -97,6 +99,34 @@ func (r *PageBodyRepo) ListBySite(ctx context.Context, siteID string) ([]block.S
 
 func (r *PageBodyRepo) ListCurrent(ctx context.Context, pageIDs []string) ([]block.Snapshot, error) {
 	return selectByIDs(ctx, r.store.execFrom(ctx), selectCurrentBodies, orderBodies, pageIDs, scanSnapshot, "list the current bodies of the pages")
+}
+
+type observedBody struct {
+	pageID string
+	at     time.Time
+}
+
+func (r *PageBodyRepo) ObservedBySite(ctx context.Context, siteID string) (map[string]time.Time, error) {
+	listed, err := selectAll(ctx, r.store.execFrom(ctx), selectObservedBySite, []any{siteID}, func(rows *sql.Rows) (observedBody, error) {
+		var (
+			held observedBody
+			at   string
+		)
+		if err := rows.Scan(&held.pageID, &at); err != nil {
+			return observedBody{}, err
+		}
+		parsed, err := parseTime(at)
+		held.at = parsed
+		return held, err
+	}, "list when the site's bodies were observed")
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]time.Time, len(listed))
+	for i := range listed {
+		out[listed[i].pageID] = listed[i].at
+	}
+	return out, nil
 }
 
 func (r *PageBodyRepo) Drifted(ctx context.Context, siteID string) ([]string, error) {

@@ -469,6 +469,39 @@ func TestTheObservationReadsTheSiteOutsideItsWriteUnit(t *testing.T) {
 	}
 }
 
+func TestAWalkReadsTheModelOncePerStage(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	walk := func() observe.State {
+		t.Helper()
+		state, err := s.service.Run(context.Background(), siteID, s.readers, observe.Options{}, 1)
+		if err != nil || state.Stage != observe.StageDone {
+			t.Fatalf("walk: %v at %s", err, state.Stage)
+		}
+		return state
+	}
+
+	walk()
+	renders, identities, _ := s.stores.modelReads()
+	if renders != 3 || identities != 3 {
+		t.Errorf("a walk of one-page batches listed the renders %d times and the identities %d times, "+
+			"want once for the render stage, once for derive and once for the fields stage", renders, identities)
+	}
+	s.clock.Set(start.Add(time.Hour))
+	for i := range s.plugin.items {
+		s.plugin.items[i].Modified = earlier.Add(-24 * time.Hour)
+	}
+	for i := range s.store.products {
+		s.store.products[i].Modified = earlier.Add(-24 * time.Hour)
+	}
+	_, _, before := s.stores.modelReads()
+	state := walk()
+	if _, _, after := s.stores.modelReads(); state.Counts.Pulled != 0 || after != before {
+		t.Errorf("a walk that pulled %d items read %d bodies one page at a time, want none", state.Counts.Pulled, after-before)
+	}
+}
+
 func TestAWalkRebuildsTheSiteMapOnceItHasWritten(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

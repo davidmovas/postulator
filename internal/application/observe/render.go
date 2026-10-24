@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/finding"
@@ -93,22 +94,38 @@ func (s *Service) currentBodies(ctx context.Context, siteID string) (map[string]
 	return current, nil
 }
 
-func (s *Service) render(ctx context.Context, state *State, readers Readers, batch int) (bool, error) {
+func (s *Service) render(ctx context.Context, state *State, readers Readers, batch int) (exhausted bool, err error) {
 	if readers.Render == nil {
 		return true, nil
 	}
+	defer func() {
+		if exhausted || err != nil {
+			s.unstage(state)
+		}
+	}()
 	owner, err := s.deps.Sites.Get(ctx, state.SiteID)
 	if err != nil {
 		return false, err
 	}
 	settings := owner.Settings.Normalized()
-	m, err := s.model(ctx, state.SiteID)
+	held, err := s.staged(ctx, state, func(c context.Context) (*staged, error) {
+		m, modelErr := s.model(c, state.SiteID)
+		if modelErr != nil {
+			return nil, modelErr
+		}
+		observed, observedErr := s.deps.Bodies.ObservedBySite(c, state.SiteID)
+		if observedErr != nil {
+			return nil, observedErr
+		}
+		return &staged{model: m, observed: observed}, nil
+	})
 	if err != nil {
 		return false, err
 	}
+	m := held.model
 
 	targets := make([]renderTarget, 0, batch)
-	exhausted := true
+	exhausted = true
 	for i := range m.pages {
 		page := m.pages[i]
 		if page.ID <= state.RenderAfter || page.WPID == nil || page.Status == pagemap.StatusArchived {
@@ -123,42 +140,72 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 		if !observed || (state.Full && archive(page, identity, state, readers)) {
 			continue
 		}
-		raw, stale, err := s.candidate(ctx, state, page, identity, m)
-		if err != nil {
-			return false, err
-		}
-		if !stale {
+		if !stale(state, page, identity, m, held.observed) {
 			continue
 		}
 		url, ok := s.renderURL(ctx, readers, page, identity)
 		if !ok {
 			continue
 		}
-		targets = append(targets, renderTarget{page: page, identity: identity, url: url, raw: raw})
+		targets = append(targets, renderTarget{page: page, identity: identity, url: url})
 	}
 	if len(targets) == 0 {
 		return exhausted, nil
 	}
+	if targets, err = s.current(ctx, targets); err != nil || len(targets) == 0 {
+		return exhausted, err
+	}
 
 	outcomes := s.fetch(ctx, readers, owner, settings, state.Technical, m, targets)
 	lookUpCrumbs(ctx, readers, pagemap.NewSite(owner.BaseURL), m.index, outcomes)
-	if err := s.keepRenders(ctx, state, m, outcomes); err != nil {
-		return false, err
+	if keepErr := s.keepRenders(ctx, state, m, outcomes); keepErr != nil {
+		return false, keepErr
 	}
 	return exhausted, nil
 }
 
-func (s *Service) candidate(ctx context.Context, state *State, page pagemap.Page, identity pagemap.Identity, m siteModel) (raw string, stale bool, err error) {
+func stale(state *State, page pagemap.Page, identity pagemap.Identity, m siteModel, observed map[string]time.Time) bool {
 	record, rendered := m.renders[page.ID]
-	stale = state.Full || state.Rescan || !rendered || (identity.ModifiedGMT != nil && identity.ModifiedGMT.After(record.ExtractedAt))
-	current, _, hasBody, err := s.deps.Bodies.Get(ctx, page.ID)
+	if state.Full || state.Rescan || !rendered || (identity.ModifiedGMT != nil && identity.ModifiedGMT.After(record.ExtractedAt)) {
+		return true
+	}
+	at, hasBody := observed[page.ID]
+	return hasBody && at.After(record.ExtractedAt)
+}
+
+func (s *Service) current(ctx context.Context, targets []renderTarget) ([]renderTarget, error) {
+	ids := make([]string, 0, len(targets))
+	for i := range targets {
+		ids = append(ids, targets[i].page.ID)
+	}
+	pages, err := s.deps.Pages.ListByIDs(ctx, ids)
 	if err != nil {
-		return "", false, err
+		return nil, err
 	}
-	if !stale && hasBody && current.ObservedAt.After(record.ExtractedAt) {
-		stale = true
+	bodies, err := s.deps.Bodies.ListCurrent(ctx, ids)
+	if err != nil {
+		return nil, err
 	}
-	return current.Raw, stale, nil
+	live := make(map[string]pagemap.Page, len(pages))
+	for i := range pages {
+		if pages[i].Status != pagemap.StatusArchived && pages[i].WPID != nil {
+			live[pages[i].ID] = pages[i]
+		}
+	}
+	raw := make(map[string]string, len(bodies))
+	for i := range bodies {
+		raw[bodies[i].PageID] = bodies[i].Raw
+	}
+	out := make([]renderTarget, 0, len(targets))
+	for i := range targets {
+		page, held := live[targets[i].page.ID]
+		if !held {
+			continue
+		}
+		targets[i].page, targets[i].raw = page, raw[page.ID]
+		out = append(out, targets[i])
+	}
+	return out, nil
 }
 
 func (s *Service) renderURL(ctx context.Context, readers Readers, page pagemap.Page, identity pagemap.Identity) (address string, ok bool) {

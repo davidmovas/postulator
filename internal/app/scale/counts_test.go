@@ -154,11 +154,35 @@ func operations() []operation {
 	}
 }
 
+type walked struct {
+	fixed   float64
+	perPage float64
+}
+
+func (s *scaled) walked(t *testing.T) walked {
+	t.Helper()
+
+	five := s.once(t, "walk: 5% touched", func() error {
+		s.walk(t, s.plan.touched(false))
+		return nil
+	})
+	ten := s.once(t, "walk: 10% touched", func() error {
+		s.walk(t, s.plan.touched(true))
+		return nil
+	})
+	touchedFive, touchedTen := len(s.plan.touched(false)), len(s.plan.touched(true))
+	out := walked{perPage: float64(ten.Statements-five.Statements) / float64(touchedTen-touchedFive)}
+	out.fixed = float64(five.Statements) - out.perPage*float64(touchedFive)
+	t.Logf("walk at %d pages: %.1f fixed statements, %.2f per touched page", s.pages(), out.fixed, out.perPage)
+	return out
+}
+
 func TestTheCountsHoldFromTwoThousandToFiveThousandPages(t *testing.T) {
 	sizes := []int{smallBlocks, largeBlocks}
 	var (
 		mu      sync.Mutex
 		counted = map[int]map[string]measured{}
+		walks   = map[int]walked{}
 	)
 	t.Run("sizes", func(t *testing.T) {
 		for _, blocks := range sizes {
@@ -170,9 +194,10 @@ func TestTheCountsHoldFromTwoThousandToFiveThousandPages(t *testing.T) {
 				for _, held := range operations() {
 					got[held.name] = s.measure(t, held.name, held.call(t, s))
 				}
+				walk := s.walked(t)
 				mu.Lock()
 				defer mu.Unlock()
-				counted[blocks] = got
+				counted[blocks], walks[blocks] = got, walk
 			})
 		}
 	})
@@ -181,5 +206,9 @@ func TestTheCountsHoldFromTwoThousandToFiveThousandPages(t *testing.T) {
 	}
 	for _, held := range operations() {
 		flat(t, held.name, counted[smallBlocks][held.name], counted[largeBlocks][held.name], held.rows)
+	}
+	if small, large := walks[smallBlocks], walks[largeBlocks]; small != large {
+		t.Errorf("a walk runs %.1f + %.2f statements per touched page at %d pages and %.1f + %.2f at %d",
+			small.fixed, small.perPage, smallBlocks*blockPages, large.fixed, large.perPage, largeBlocks*blockPages)
 	}
 }

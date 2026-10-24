@@ -22,6 +22,7 @@ type siteStore interface {
 
 type pageStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	ListByIDs(ctx context.Context, ids []string) ([]pagemap.Page, error)
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
@@ -38,6 +39,7 @@ type identityStore interface {
 	Put(ctx context.Context, identity pagemap.Identity) error
 	Get(ctx context.Context, pageID string) (pagemap.Identity, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error)
+	ListForPages(ctx context.Context, pageIDs []string) ([]pagemap.Identity, error)
 	ReplaceTerms(ctx context.Context, pageID string, terms []pagemap.Term) error
 	ListTerms(ctx context.Context, pageID string) ([]pagemap.Term, error)
 	ListTermsBySite(ctx context.Context, siteID string) (map[string][]pagemap.Term, error)
@@ -55,6 +57,8 @@ type bodyStore interface {
 	Observe(ctx context.Context, snapshot block.Snapshot) error
 	Get(ctx context.Context, pageID string) (current, base block.Snapshot, found bool, err error)
 	ListBySite(ctx context.Context, siteID string) ([]block.Snapshot, error)
+	ListCurrent(ctx context.Context, pageIDs []string) ([]block.Snapshot, error)
+	ObservedBySite(ctx context.Context, siteID string) (map[string]time.Time, error)
 	ListWritten(ctx context.Context, pageID string) ([]block.Written, error)
 	ListWrittenFor(ctx context.Context, pageIDs []string) ([]block.Written, error)
 }
@@ -104,11 +108,12 @@ type Deps struct {
 }
 
 type Service struct {
-	deps Deps
+	deps   Deps
+	stages *stages
 }
 
 func New(deps Deps) *Service {
-	return &Service{deps: deps}
+	return &Service{deps: deps, stages: &stages{held: map[stageKey]*staged{}}}
 }
 
 func (s *Service) now() time.Time {

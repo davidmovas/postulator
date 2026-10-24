@@ -62,23 +62,26 @@ func (g *unitGuard) inUnit() int {
 }
 
 type stores struct {
-	mu         sync.Mutex
-	guard      *unitGuard
-	sites      map[string]site.Site
-	pages      map[string]pagemap.Page
-	identities map[string]pagemap.Identity
-	terms      map[string][]pagemap.Term
-	fields     map[string]map[field.Key]field.Value
-	bodies     map[string]map[block.Side]block.Snapshot
-	written    map[string][]block.Written
-	renders    map[string]render.Record
-	links      map[string]map[pagemap.LinkSource][]pagemap.PageLink
-	findings   map[string]finding.Finding
-	published  []events.Type
-	bodyLists  int
-	interleave func()
-	types      *typesFake
-	maps       mapRefresher
+	mu            sync.Mutex
+	guard         *unitGuard
+	sites         map[string]site.Site
+	pages         map[string]pagemap.Page
+	identities    map[string]pagemap.Identity
+	terms         map[string][]pagemap.Term
+	fields        map[string]map[field.Key]field.Value
+	bodies        map[string]map[block.Side]block.Snapshot
+	written       map[string][]block.Written
+	renders       map[string]render.Record
+	links         map[string]map[pagemap.LinkSource][]pagemap.PageLink
+	findings      map[string]finding.Finding
+	published     []events.Type
+	bodyLists     int
+	bodyGets      int
+	renderLists   int
+	identityLists int
+	interleave    func()
+	types         *typesFake
+	maps          mapRefresher
 }
 
 func (s *stores) interleaved() {
@@ -95,6 +98,12 @@ func (s *stores) bodyListings() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.bodyLists
+}
+
+func (s *stores) modelReads() (renders, identities, bodies int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.renderLists, s.identityLists, s.bodyGets
 }
 
 func newStores(owner site.Site) *stores {
@@ -150,6 +159,18 @@ func (p pageStore) ListBySite(_ context.Context, siteID string) ([]pagemap.Page,
 	for id := range p.s.pages {
 		if p.s.pages[id].SiteID == siteID {
 			out = append(out, p.s.pages[id])
+		}
+	}
+	return out, nil
+}
+
+func (p pageStore) ListByIDs(_ context.Context, ids []string) ([]pagemap.Page, error) {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	out := make([]pagemap.Page, 0, len(ids))
+	for _, id := range ids {
+		if page, ok := p.s.pages[id]; ok {
+			out = append(out, page)
 		}
 	}
 	return out, nil
@@ -282,10 +303,23 @@ func (i identityStore) Get(_ context.Context, pageID string) (pagemap.Identity, 
 func (i identityStore) ListBySite(_ context.Context, siteID string) ([]pagemap.Identity, error) {
 	i.s.mu.Lock()
 	defer i.s.mu.Unlock()
+	i.s.identityLists++
 	out := make([]pagemap.Identity, 0)
 	for pageID := range i.s.identities {
 		if i.s.pages[pageID].SiteID == siteID {
 			out = append(out, i.s.identities[pageID])
+		}
+	}
+	return out, nil
+}
+
+func (i identityStore) ListForPages(_ context.Context, pageIDs []string) ([]pagemap.Identity, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	out := make([]pagemap.Identity, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		if identity, ok := i.s.identities[pageID]; ok {
+			out = append(out, identity)
 		}
 	}
 	return out, nil
@@ -406,11 +440,36 @@ func (b bodyStore) Observe(_ context.Context, snapshot block.Snapshot) error {
 func (b bodyStore) Get(_ context.Context, pageID string) (current, base block.Snapshot, found bool, err error) {
 	b.s.mu.Lock()
 	defer b.s.mu.Unlock()
+	b.s.bodyGets++
 	sides, ok := b.s.bodies[pageID]
 	if !ok {
 		return block.Snapshot{}, block.Snapshot{}, false, nil
 	}
 	return sides[block.Current], sides[block.Base], true, nil
+}
+
+func (b bodyStore) ListCurrent(_ context.Context, pageIDs []string) ([]block.Snapshot, error) {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	out := make([]block.Snapshot, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		if current, ok := b.s.bodies[pageID][block.Current]; ok {
+			out = append(out, current)
+		}
+	}
+	return out, nil
+}
+
+func (b bodyStore) ObservedBySite(_ context.Context, siteID string) (map[string]time.Time, error) {
+	b.s.mu.Lock()
+	defer b.s.mu.Unlock()
+	out := make(map[string]time.Time)
+	for pageID, sides := range b.s.bodies {
+		if current, ok := sides[block.Current]; ok && b.s.pages[pageID].SiteID == siteID {
+			out[pageID] = current.ObservedAt
+		}
+	}
+	return out, nil
 }
 
 func (b bodyStore) ListBySite(_ context.Context, siteID string) ([]block.Snapshot, error) {
@@ -467,6 +526,7 @@ func (r renderStore) Get(_ context.Context, pageID string) (render.Record, error
 func (r renderStore) ListBySite(_ context.Context, siteID string) ([]render.Record, error) {
 	r.s.mu.Lock()
 	defer r.s.mu.Unlock()
+	r.s.renderLists++
 	out := make([]render.Record, 0)
 	for pageID := range r.s.renders {
 		if r.s.pages[pageID].SiteID == siteID {

@@ -16,6 +16,8 @@ const (
 	selectIdentity         = `SELECT ` + identityColumns + ` FROM page_identity WHERE page_id = ?`
 	selectIdentitiesBySite = `SELECT i.page_id, i.url, i.status, i.wp_type, i.wp_parent_id, i.modified_gmt, i.observed_at
 		FROM page_identity AS i JOIN pages AS p ON p.id = i.page_id WHERE p.site_id = ? ORDER BY i.page_id`
+	selectIdentitiesFor = `SELECT ` + identityColumns + ` FROM page_identity WHERE page_id IN `
+	orderIdentities     = ` ORDER BY page_id`
 
 	termColumns        = `taxonomy, term_id, name, slug, parent_term_id`
 	deleteTermsForPage = `DELETE FROM page_terms WHERE page_id = ?`
@@ -51,6 +53,10 @@ func (r *PageIdentityRepo) Get(ctx context.Context, pageID string) (pagemap.Iden
 
 func (r *PageIdentityRepo) ListBySite(ctx context.Context, siteID string) ([]pagemap.Identity, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectIdentitiesBySite, []any{siteID}, scanIdentity, "list the page identities")
+}
+
+func (r *PageIdentityRepo) ListForPages(ctx context.Context, pageIDs []string) ([]pagemap.Identity, error) {
+	return selectByIDs(ctx, r.store.execFrom(ctx), selectIdentitiesFor, orderIdentities, pageIDs, scanIdentity, "list the identities of the pages")
 }
 
 func (r *PageIdentityRepo) ReplaceTerms(ctx context.Context, pageID string, terms []pagemap.Term) error {

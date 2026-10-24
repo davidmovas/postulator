@@ -113,7 +113,7 @@ func (a *absorber) lastSeen(ctx context.Context, items []item) (map[string]lastS
 	if len(ids) == 0 {
 		return seen, nil
 	}
-	identities, err := a.service.deps.Identity.ListBySite(ctx, a.state.SiteID)
+	identities, err := a.service.deps.Identity.ListForPages(ctx, ids)
 	if err != nil {
 		return nil, err
 	}

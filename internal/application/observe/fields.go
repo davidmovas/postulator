@@ -16,25 +16,37 @@ type customRead struct {
 	values map[string]string
 }
 
-func (s *Service) fields(ctx context.Context, state *State, readers Readers, batch int) (bool, error) {
+func (s *Service) fields(ctx context.Context, state *State, readers Readers, batch int) (exhausted bool, err error) {
 	if !readers.plugin(capabilityMeta) {
 		return true, nil
 	}
+	defer func() {
+		if exhausted || err != nil {
+			s.unstage(state)
+		}
+	}()
 	set, err := s.deps.Types.Set(ctx, state.SiteID)
 	if err != nil {
 		return false, err
 	}
-	m, err := s.model(ctx, state.SiteID)
+	held, err := s.staged(ctx, state, func(c context.Context) (*staged, error) {
+		m, modelErr := s.model(c, state.SiteID)
+		if modelErr != nil {
+			return nil, modelErr
+		}
+		stored, storedErr := s.deps.Fields.ListBySite(c, state.SiteID)
+		if storedErr != nil {
+			return nil, storedErr
+		}
+		return &staged{model: m, stored: stored}, nil
+	})
 	if err != nil {
 		return false, err
 	}
-	stored, err := s.deps.Fields.ListBySite(ctx, state.SiteID)
-	if err != nil {
-		return false, err
-	}
+	m, stored := held.model, held.stored
 
 	reads := make([]customRead, 0, batch)
-	exhausted := true
+	exhausted = true
 	for i := range m.pages {
 		page := m.pages[i]
 		if page.ID <= state.FieldsAfter || page.WPID == nil || page.Status == pagemap.StatusArchived || page.WPType.Term() {
