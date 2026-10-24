@@ -66,27 +66,6 @@ export function branchIds(roots: readonly PageTreeNode[] | null | undefined): st
     return ids;
 }
 
-export function pathTo(roots: readonly PageTreeNode[] | null | undefined, pageId: string): string[] {
-    const trail: string[] = [];
-    function descend(nodes: readonly PageTreeNode[]): boolean {
-        for (const node of nodes) {
-            if (node.page.id === pageId) {
-                return true;
-            }
-            trail.push(node.page.id);
-            if (descend(nodesOf(node))) {
-                return true;
-            }
-            trail.pop();
-        }
-        return false;
-    }
-    if (roots === null || roots === undefined) {
-        return [];
-    }
-    return descend(roots) ? trail : [];
-}
-
 function walk(
     nodes: readonly PageTreeNode[],
     parentId: string,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Page, PageTreeNode } from "../../data/types.js";
-import { branchIds, countNodes, flattenTree, pathTo } from "./tree-model.js";
+import { branchIds, countNodes, flattenTree } from "./tree-model.js";
 
 function page(id: string, path: string): Page {
     return {
@@ -58,17 +58,6 @@ describe("countNodes", () => {
 describe("branchIds", () => {
     it("lists only the nodes that have children", () => {
         expect([...branchIds(sample)].sort()).toStrictEqual(["a", "a1"]);
-    });
-});
-
-describe("pathTo", () => {
-    it("returns the ancestors of a node, deepest last", () => {
-        expect(pathTo(sample, "a1x")).toStrictEqual(["a", "a1"]);
-    });
-
-    it("returns nothing for a root or an unknown id", () => {
-        expect(pathTo(sample, "b")).toStrictEqual([]);
-        expect(pathTo(sample, "missing")).toStrictEqual([]);
     });
 });
 

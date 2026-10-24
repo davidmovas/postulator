@@ -3,12 +3,7 @@ import type { PageSort } from "../../data/sorts.js";
 import type { PageFilter } from "../../data/types.js";
 import { pageSortFields, pageStatuses } from "../../generated/vocab.js";
 
-const pagesViews = ["table", "tree"] as const;
-
-export type PagesView = (typeof pagesViews)[number];
-
 export interface PagesQuery {
-    view: PagesView;
     status: string;
     entityId: string;
     descendants: boolean;
@@ -18,7 +13,6 @@ export interface PagesQuery {
 }
 
 const codec = queryCodec<PagesQuery>({
-    view: choiceParam("view", pagesViews, "table"),
     status: choiceParam("status", pageStatuses, ""),
     entityId: textParam("entity"),
     descendants: flagParam("under"),

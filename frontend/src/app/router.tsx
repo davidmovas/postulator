@@ -5,6 +5,7 @@ import { FindingsScreen } from "../features/findings/index.js";
 import { GraphScreen } from "../features/graph/index.js";
 import { ImportScreen } from "../features/imports/index.js";
 import { LinksScreen } from "../features/links/index.js";
+import { SiteMapScreen } from "../features/map/index.js";
 import { OverviewScreen } from "../features/overview/index.js";
 import { PagesScreen } from "../features/pages/index.js";
 import { ReportsScreen } from "../features/reports/index.js";
@@ -41,6 +42,8 @@ export const router = createHashRouter([
                     { path: "graph/:entityId", element: <GraphScreen /> },
                     { path: "pages", element: <PagesScreen /> },
                     { path: "pages/:pageId", element: <PagesScreen /> },
+                    { path: "map", element: <SiteMapScreen /> },
+                    { path: "map/:pageId", element: <SiteMapScreen /> },
                     { path: "links", element: <LinksScreen /> },
                     { path: "links/:pageId", element: <LinksScreen /> },
                     { path: "findings", element: <FindingsScreen /> },

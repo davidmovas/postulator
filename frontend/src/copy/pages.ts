@@ -9,7 +9,6 @@ export const pages = {
         archived: "Archived",
     },
     title: "Pages",
-    views: { table: "Table", tree: "Tree" },
     newPage: "New page",
     openOnSite: "Open in Tor Browser",
     tabs: {
@@ -29,7 +28,6 @@ export const pages = {
         newest: "Newest first",
         oldest: "Oldest first",
     },
-    tableOnly: "The tree reads the whole site at once, so filtering and sorting belong to the table.",
     summary: {
         open: "Open the editor",
         notOnSite: "This page is not on the site yet.",
@@ -112,20 +110,6 @@ export const pages = {
         collapse: "Collapse",
         branch: "Select the whole branch",
         unavailable: "This page cannot be picked here.",
-    },
-    tree: {
-        title: "Page tree",
-        unbounded:
-            "The tree call returns every page on the site in one uncursored response. There is no limit and no cursor.",
-        guard: (total: number) =>
-            `This site has ${total} pages, and loading them all in one response would block the window.`,
-        unknownSize: "The size of this site is not known, so the tree was not fetched automatically.",
-        loadAnyway: "Load the whole tree anyway",
-        load: "Load the tree",
-        nodes: (count: number) => `${count} pages in the tree`,
-        children: (count: number) => `${count} below`,
-        expandAll: "Expand all",
-        collapseAll: "Collapse all",
         showMore: (hidden: number) => `Show ${hidden} more`,
     },
     detail: {

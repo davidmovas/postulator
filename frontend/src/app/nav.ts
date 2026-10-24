@@ -14,6 +14,7 @@ import {
     SettingsIcon,
     SmartToyIcon,
     SpaceDashboardIcon,
+    TableRowsIcon,
     UploadFileIcon,
 } from "../ui/icons/index.js";
 
@@ -35,7 +36,8 @@ export function siteEntries(siteId: string): readonly NavEntry[] {
     return [
         { key: "overview", label: copy.nav.overview, to: `/s/${siteId}/overview`, Icon: SpaceDashboardIcon },
         { key: "graph", label: copy.nav.graph, to: `/s/${siteId}/graph`, Icon: HubIcon },
-        { key: "pages", label: copy.nav.pages, to: `/s/${siteId}/pages`, Icon: AccountTreeIcon },
+        { key: "pages", label: copy.nav.pages, to: `/s/${siteId}/pages`, Icon: TableRowsIcon },
+        { key: "map", label: copy.nav.map, to: `/s/${siteId}/map`, Icon: AccountTreeIcon },
         { key: "links", label: copy.nav.links, to: `/s/${siteId}/links`, Icon: LinkIcon },
         { key: "findings", label: copy.nav.findings, to: `/s/${siteId}/findings`, Icon: InboxIcon },
         { key: "runs", label: copy.nav.runs, to: `/s/${siteId}/runs`, Icon: PlayCircleIcon },

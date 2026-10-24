@@ -16,21 +16,18 @@ interface CountedRowProps {
     label: string;
     count: number | undefined;
     active: boolean;
-    disabled: boolean;
     onSelect: () => void;
 }
 
-function CountedRow({ label, count, active, disabled, onSelect }: CountedRowProps): ReactElement {
+function CountedRow({ label, count, active, onSelect }: CountedRowProps): ReactElement {
     return (
         <button
             type="button"
             aria-pressed={active}
-            disabled={disabled}
             onClick={onSelect}
             className={cx(
                 "flex h-6 w-full items-center justify-between gap-2 rounded-sm px-1.5 text-xs transition-colors duration-100",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-                active ? "bg-accent-soft text-ink" : "text-ink-dim enabled:hover:bg-inset enabled:hover:text-ink",
+                active ? "bg-accent-soft text-ink" : "text-ink-dim hover:bg-inset hover:text-ink",
             )}
         >
             <span className="truncate">{label}</span>
@@ -43,11 +40,10 @@ export interface PageRailProps {
     siteId: string;
     query: PagesQuery;
     index: EntityIndex;
-    disabled: boolean;
     onChange: (next: PagesQuery) => void;
 }
 
-export function PageRail({ siteId, query, index, disabled, onChange }: PageRailProps): ReactElement {
+export function PageRail({ siteId, query, index, onChange }: PageRailProps): ReactElement {
     const overview = useSiteOverview(siteId);
     const totals = overview.data?.pages;
 
@@ -57,19 +53,15 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
     ];
 
     return (
-        <div
-            aria-label={copy.pages.filters.title}
-            title={disabled ? copy.pages.tableOnly : undefined}
-            className="flex flex-col gap-3 p-3"
-        >
+        <div aria-label={copy.pages.filters.title} className="flex flex-col gap-3 p-3">
             <div className="flex items-center justify-between gap-2">
                 <SectionLabel>{copy.pages.filters.title}</SectionLabel>
                 <Button
                     size="sm"
                     variant="ghost"
-                    disabled={disabled || !narrowed(query)}
+                    disabled={!narrowed(query)}
                     onClick={() => {
-                        onChange({ ...defaultQuery, view: query.view, sort: query.sort });
+                        onChange({ ...defaultQuery, sort: query.sort });
                     }}
                 >
                     {copy.pages.filters.reset}
@@ -82,7 +74,6 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                     label={copy.pages.filters.anyStatus}
                     count={totals?.total}
                     active={query.status === ""}
-                    disabled={disabled}
                     onSelect={() => {
                         onChange({ ...query, status: "" });
                     }}
@@ -93,7 +84,6 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                         label={pageStatusLabel(status)}
                         count={totals?.byStatus?.[status]}
                         active={query.status === status}
-                        disabled={disabled}
                         onSelect={() => {
                             onChange({ ...query, status: query.status === status ? "" : status });
                         }}
@@ -108,7 +98,7 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                         value={query.entityId === "" ? anyEntity : query.entityId}
                         options={entityOptions}
                         aria-label={copy.pages.filters.entity}
-                        disabled={disabled || index.entities.length === 0}
+                        disabled={index.entities.length === 0}
                         onValueChange={(next) => {
                             onChange({
                                 ...query,
@@ -121,7 +111,7 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                 </div>
                 <Checkbox
                     checked={query.descendants}
-                    disabled={disabled || query.entityId === ""}
+                    disabled={query.entityId === ""}
                     label={copy.pages.filters.descendants}
                     onChange={(event) => {
                         onChange({ ...query, descendants: event.target.checked });
@@ -130,7 +120,6 @@ export function PageRail({ siteId, query, index, disabled, onChange }: PageRailP
                 <div className="flex items-center justify-between gap-2">
                     <Checkbox
                         checked={query.unmapped}
-                        disabled={disabled}
                         label={copy.pages.filters.unmapped}
                         onChange={(event) => {
                             onChange({

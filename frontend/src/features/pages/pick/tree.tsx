@@ -101,7 +101,7 @@ export function PageTree({
                                         setLifted((held) => new Set([...held, row.parentId]));
                                     }}
                                 >
-                                    {copy.pages.tree.showMore(row.hidden)}
+                                    {copy.pages.pick.showMore(row.hidden)}
                                 </Button>
                             </div>
                         ) : (

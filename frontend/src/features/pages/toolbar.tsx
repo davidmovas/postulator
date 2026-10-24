@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { copy } from "../../copy/index.js";
 import type { PageSort } from "../../data/sorts.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Button, Input, Select, Toolbar, UnfoldLessIcon, UnfoldMoreIcon } from "../../ui/index.js";
+import { Input, Select, Toolbar } from "../../ui/index.js";
 import type { PagesQuery } from "./params.js";
 
 type SortChoice = "pathAsc" | "pathDesc" | "newest" | "oldest";
@@ -33,20 +33,12 @@ export function sortChoice(sort: PageSort | null): SortChoice {
     return sort.desc ? "pathDesc" : "pathAsc";
 }
 
-export interface TreeControls {
-    nodes: number;
-    onExpandAll: () => void;
-    onCollapseAll: () => void;
-}
-
 export interface PageToolbarProps {
     query: PagesQuery;
-    disabled: boolean;
-    tree: TreeControls | null;
     onChange: (next: PagesQuery) => void;
 }
 
-export function PageToolbar({ query, disabled, tree, onChange }: PageToolbarProps): ReactElement {
+export function PageToolbar({ query, onChange }: PageToolbarProps): ReactElement {
     const [prefix, setPrefix] = useState(query.pathPrefix);
 
     useEffect(() => {
@@ -62,13 +54,12 @@ export function PageToolbar({ query, disabled, tree, onChange }: PageToolbarProp
 
     return (
         <Toolbar label={copy.pages.title}>
-            <div className="w-64" title={disabled ? copy.pages.tableOnly : undefined}>
+            <div className="w-64">
                 <Input
                     type="search"
                     mono={true}
                     value={prefix}
                     placeholder="/"
-                    disabled={disabled}
                     aria-label={copy.pages.search}
                     onChange={(event) => {
                         setPrefix(event.target.value);
@@ -81,28 +72,16 @@ export function PageToolbar({ query, disabled, tree, onChange }: PageToolbarProp
                     }}
                 />
             </div>
-            <div className="w-40" title={disabled ? copy.pages.tableOnly : undefined}>
+            <div className="w-40">
                 <Select
                     value={sortChoice(query.sort)}
                     options={sortOptions}
-                    disabled={disabled}
                     aria-label={copy.pages.sort}
                     onValueChange={(next) => {
                         onChange({ ...query, sort: sorts[next] });
                     }}
                 />
             </div>
-            {tree === null ? null : (
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <span className="font-mono text-2xs text-ink-faint">{copy.pages.tree.nodes(tree.nodes)}</span>
-                    <Button size="sm" variant="ghost" icon={UnfoldMoreIcon} onClick={tree.onExpandAll}>
-                        {copy.pages.tree.expandAll}
-                    </Button>
-                    <Button size="sm" variant="ghost" icon={UnfoldLessIcon} onClick={tree.onCollapseAll}>
-                        {copy.pages.tree.collapseAll}
-                    </Button>
-                </div>
-            )}
         </Toolbar>
     );
 }

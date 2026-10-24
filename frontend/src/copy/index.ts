@@ -5,6 +5,7 @@ import { findings } from "./findings.js";
 import { graph } from "./graph.js";
 import { imports } from "./imports.js";
 import { links } from "./links.js";
+import { map } from "./map.js";
 import { overview, readiness } from "./overview.js";
 import { pages } from "./pages.js";
 import { palette } from "./palette.js";
@@ -36,6 +37,7 @@ export const copy = {
     pages,
     graph,
     links,
+    map,
     findings,
     imports,
     templates,

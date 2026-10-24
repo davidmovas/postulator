@@ -114,7 +114,7 @@ export function PageTable({
                         actions={
                             <Button
                                 onClick={() => {
-                                    onQueryChange({ ...defaultQuery, view: query.view, sort: query.sort });
+                                    onQueryChange({ ...defaultQuery, sort: query.sort });
                                 }}
                             >
                                 {copy.pages.filters.reset}
