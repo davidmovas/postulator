@@ -1276,19 +1276,56 @@ go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov5.out ./internal/
 6. **The replica's proof uses `/tb-500/`** (the owner), a typed hub that already holds two paragraphs and a link of the client's: `writerStand.clientHub`, the client's blocks asserted after the run and after the agent's edit. The stand, its pins and the captures do not move.
 7. **The flake is hunted with whole logs** under `set -o pipefail`: `-count=10 -p 1`, then `-cpu 1,4`, then once beside `application/runs` with `-p 2` (the original condition, an addition to the request).
 
-- [ ] **0.0 — the plan.** This list. Commit `docs(plan): stage 4.3a's task list`.
-- [ ] **T1 — the tokenizer.** `go get`; the command's `count` and `encodingFor`; the vectors table; the catalog map; the deps rule, proven red once by a scratch import. Commit `build(tokenreport): count o200k tokens offline, in tests and one command`.
-- [ ] **T2 — `sitemodeltest`.** The captures move and embed; the `sitemodel` tests and the e2e capture writer load and write through it; both packs goldens unchanged. Commit `refactor(sitemodel): the stand captures load through sitemodeltest`.
-- [ ] **T3 — the schemas in tokens.** `schemaCeilingTokens`, red at 0, then set. Commit `test(tools): the tool schemas carry a token ceiling`.
-- [ ] **T4 — the instructions in tokens.** The chat prompts move into `application/agent`; then `instructionsCeilingTokens`. Commits `refactor(agent): the chat prompts belong to the agent's use case`, `test(agent): the instructions and the replica's brief carry a token ceiling`.
-- [ ] **T5 — one input estimate.** `runtime.EstimatedInput`; a one-step estimate equals it plus the output and the reasoning. Commit `refactor(runtime): one function prices a step's input`.
-- [ ] **T6 — the agent per round.** The instructions in both modes, the context message, every schema sorted, all of them, the deferred round, each stand's brief, the sum. Commit `feat(tokenreport): what every agent round costs`.
-- [ ] **T7 — the steps per page.** The writer, the linker (per call, and the calls the estimate prices) and the judge, split into instructions, the pack by section, the rest and the schema. Commit `feat(tokenreport): the writer's, linker's and judge's prompts per stand page`.
-- [ ] **T8 — the estimate against reality.** Input estimated against real; `llm.Tokens` against real per pack and section; `Fit` at 4096, 3000 and 1500; tokens per word of the bodies against 2.2 and 3; the spread; the proposal; `-json`; the footnotes. Commit `feat(tokenreport): the estimate against the real count`.
-- [ ] **T9 — the run.** `go run ./cmd/tokenreport` and the v0.10.0 cross-check, recorded in `DECISIONS.md`; no constant changes.
-- [ ] **P2.1 — the replica's client hub.** `clientHub`, the assertion after the run; `TestTheAgentEditsABlock` on the replica, then vanilla. Commit `test(e2e): the agent's edit and a run keep a hub's client paragraph`.
-- [ ] **P2.2 — the runtime flake.** Decision 7; found, a test that shows it and a fix; not found, the attempts in `DECISIONS.md`.
-- [ ] **D — the docs and the checkpoint.** `CONVENTIONS.md`, `STATUS.md`, `CLAUDE.md`, `DECISIONS.md`, this checkpoint. Commit `docs: stage 4.3a, tokens beside bytes`.
+- [x] **0.0 — the plan** (`d7fe063`). This list. Commit `docs(plan): stage 4.3a's task list`.
+- [x] **T1 — the tokenizer** (`c2b277a`). `go get`; the command's `count` and `encodingFor`; the vectors table; the catalog map; the deps rule, proven red once by a scratch import. Commit `build(tokenreport): count o200k tokens offline, in tests and one command`.
+- [x] **T2 — `sitemodeltest`** (`6ac52a2`). The captures move and embed; the `sitemodel` tests and the e2e capture writer load and write through it; both packs goldens unchanged. Commit `refactor(sitemodel): the stand captures load through sitemodeltest`.
+- [x] **T3 — the schemas in tokens** (`60344bb`). `schemaCeilingTokens`, red at 0, then set. Commit `test(tools): the tool schemas carry a token ceiling`.
+- [x] **T4 — the instructions in tokens** (`f994786`, `4bd0b17`). The chat prompts move into `application/agent`; then `instructionsCeilingTokens`. Commits `refactor(agent): the chat prompts belong to the agent's use case`, `test(agent): the instructions and the replica's brief carry a token ceiling`.
+- [x] **T5 — one input estimate** (`0fe8dbe`). `runtime.EstimatedInput`; a one-step estimate equals it plus the output and the reasoning. Commit `refactor(runtime): one function prices a step's input`.
+- [x] **T6 — the agent per round** (`6058376`). The instructions in both modes, the context message, every schema sorted, all of them, the deferred round, each stand's brief, the sum. Commit `feat(tokenreport): what every agent round costs`.
+- [x] **T7 — the steps per page** (`0d2cc0c`, `85d3889`). The writer, the linker (per call, and the calls the estimate prices) and the judge, split into instructions, the pack by section, the rest and the schema. Commit `feat(tokenreport): the writer's, linker's and judge's prompts per stand page`.
+- [x] **T8 — the estimate against reality** (`304eb41`). Input estimated against real; `llm.Tokens` against real per pack and section; `Fit` at 4096, 3000 and 1500; tokens per word of the bodies against 2.2 and 3; the spread; the proposal; `-json`; the footnotes. Commit `feat(tokenreport): the estimate against the real count`.
+- [x] **T9 — the run.** `go run ./cmd/tokenreport` and the v0.10.0 cross-check, recorded in `DECISIONS.md`; no constant changes.
+- [x] **P2.1 — the replica's client hub** (`7caa03d`; the link fix it found, `1c7bf8d` and `3207739`). `clientHub`, the assertion after the run; `TestTheAgentEditsABlock` on the replica, then vanilla. Commit `test(e2e): the agent's edit and a run keep a hub's client paragraph`.
+- [~] **P2.2 — the runtime flake.** Found, not fixed: the owner stopped the hunt after two runs; the timeout names each item's state (`97671c1`). Decision 7; the record in `DECISIONS.md`.
+- [x] **D — the docs and the checkpoint.** `CONVENTIONS.md`, `STATUS.md`, `CLAUDE.md`, `DECISIONS.md`, this checkpoint. Commit `docs: stage 4.3a, tokens beside bytes`.
+
+#### Checkpoint, 2026-10-24 (4.3a closed but for the flake; 4.3b is next)
+
+**Landed on `dev`**, the reasoning under "stage 4.3a" in `DECISIONS.md`:
+- **The tokenizer.** `tiktoken-go/tokenizer` v0.8.1 is used in tests and `cmd/tokenreport` only, and kept out of the binary by `TestTheTokenizerStaysOutOfTheBinary` (`c2b277a`).
+- **The captures** moved into `sitemodeltest` (`6ac52a2`).
+- **The two token ceilings:**
+  - the schemas: 14,623 tokens, ceiling 14,626 (`60344bb`);
+  - the instructions with the replica's brief: 1,921 tokens, ceiling 1,924.
+  
+  To make the second measurable, the chat prompts moved into `application/agent` (`f994786`, `4bd0b17`).
+- **`runtime.EstimatedInput`** (`0fe8dbe`).
+- **The report** (`6058376`, `0d2cc0c`, `304eb41`, `85d3889`). Every one of its counts was cross-checked against tokenizer v0.10.0: byte-identical.
+- **The replica's proof** over `/tb-500/` (`7caa03d`). It found that six steps recorded a body's links with no region, resolved against the site's root. Fixed in `1c7bf8d` and `3207739`.
+- **The flake record** (`97671c1`).
+
+**Run and green:**
+- `go build ./...`; `go vet` plain, `-tags e2e` and `-tags uiharness`.
+- `gofmt -l .` silent; the comment check; `golangci-lint run ./...` 0 issues; `task lint:e2e` 0 issues.
+- `go run ./cmd/tokenreport`, plain and `-json`.
+- The touched packages without race, every one green.
+- The stands, one at a time after `task plugin:deploy`:
+  - on the replica: `TestTheAgentEditsABlock`, `TestTheWholeLoopReachesTheDockerSite` and `TestAnExistingPageIsEditedBlockByBlock`;
+  - on vanilla: the same three.
+
+  Both stands were taken down and Docker Desktop stopped.
+- `go test -race -count=1 -p 2` over the touched packages: see `STATUS.md`.
+
+**Owed:**
+- The flake fix. Reproduce first, with output that survives a stopped run:
+  ```
+  go test -race -count=10 -cpu 1 -v ./internal/runtime/steps/
+  ```
+- 4.3b's full gate: race in five groups, covergate, vitest, `ui:lint` and both stands in full.
+- The owner's call on the proposed constants.
+
+**What 4.3b starts with:** the Findings inbox, the Site map, the import preview's match rule, the agent's cards for the 4.2 tools, the harness, the full gate and phase 14's report.
 
 ### 4.3b — the screens, the gate and the phase report (planned at its start)
 

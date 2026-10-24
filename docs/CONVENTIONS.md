@@ -14,6 +14,7 @@
 | ncruces/go-sqlite3 | `v0.30.1` | `go.mod` |
 | goose | `v3.28.0` | `go.mod` |
 | golang.org/x/sys | `v0.47.0` | `go.mod` |
+| tiktoken-go/tokenizer | `v0.8.1`, tests and `cmd/tokenreport` only | `go.mod` |
 
 `wails3 doctor` must pass before any Wails work. It verified WebView2 `153.0.4234.32`
 and NSIS `v3.12` on the development machine. golangci-lint has to be built by the same
@@ -172,13 +173,47 @@ closure test is what catches that transitive case.
   in a `MemoryRouter` for the components that carry links. `npm run test:run` runs both.
 - **The tool schema ceiling is a tripwire, not a wall.** Everything in the tool registry
   is resent to the model on every round of every turn, so
-  `TestTheToolSchemasFitTheirCeiling` measures the wire bytes and fails over
-  `schemaCeilingBytes` in `internal/application/tools/registry_test.go`. A new tool raises
-  that constant deliberately, in the same commit, and a change that shrinks the schemas
-  lowers it again. The test logs the eight widest schemas, and a second test logs what a
-  round sends with `agent.toolLoading` set to `deferred`, without a ceiling. A field's
-  description says what it takes, its default, its limits and the tool an id comes from;
-  what every field would repeat belongs once in the chat instructions.
+  `TestTheToolSchemasFitTheirCeiling` measures the wire JSON in bytes and in `o200k_base`
+  tokens and fails over `schemaCeilingBytes` or `schemaCeilingTokens` in
+  `internal/application/tools/registry_test.go`. A new tool raises both constants
+  deliberately, in the same commit, and a change that shrinks the schemas lowers them again.
+  The test logs the eight widest schemas by tokens, and a second test logs what a round
+  sends with `agent.toolLoading` set to `deferred`, in bytes and tokens, without a ceiling.
+  `TestTheInstructionsAndTheReplicasBriefFitTheirCeiling` in `internal/application/agent`
+  does the same for the instructions over the replica's captured brief, the wider of the two
+  modes, under `instructionsCeilingTokens`. A field's description says what it takes, its
+  default, its limits and the tool an id comes from; what every field would repeat belongs
+  once in the chat instructions.
+
+## Sizes in bytes and tokens
+
+- **A size is measured in bytes and in tokens.** Bytes are what the wire and SQLite hold;
+  tokens, in the `o200k_base` encoding of the catalog's models, are what a call costs. The
+  application's own estimates stay word-based and run without a tokenizer: `llm.Tokens` for a
+  pack and `Fit`, `llm.WordTokens` and `runtime.EstimatedInput` for the run estimate,
+  `steps.tokensPerWord` for the writer's ceiling.
+- **The tokenizer never reaches the binary.** `github.com/tiktoken-go/tokenizer` carries
+  `o200k_base` compiled in and fetches nothing. It is imported only from `_test.go` files and
+  from `cmd/tokenreport`. `TestTheTokenizerStaysOutOfTheBinary` in `internal/app/deps_test.go`
+  proves that `cmd/postulator`'s build, plain and `uiharness`, holds none of it, and that no
+  other non-test package imports it. Its vocabulary is about 16 MB of generated Go: a cold
+  build takes about a minute, the compiler peaks near 400 MB, and a test binary that loads it
+  stays under 30 MB.
+- **`go run ./cmd/tokenreport` is a report, not a gate** (`-json` prints every row as JSON). It
+  runs the code as it is over the stand captures, with no stand and no model call, and
+  measures:
+  - the agent's round: the instructions, every tool schema, the deferred round, each stand's
+    brief and the turn's context message;
+  - the writer's, linker's and judge's prompts per captured page, the pack section by section,
+    each prompt counted in the encoding of the model its role resolves to;
+  - the run estimate, `llm.Tokens` and `Fit` against the real count, and the captured prose's
+    tokens per word against the constants, with the spread and a proposal. The proposal moves
+    no constant: the owner decides.
+
+  The tripwires are the gate.
+- **The stand captures** live in `internal/application/sitemodel/sitemodeltest/testdata/<stand>/site.json`,
+  embedded and loaded by `sitemodeltest.Stand`; `E2E_CAPTURE=1` writes them there, and the
+  `packs.golden` files stay in `internal/application/sitemodel/testdata`.
 
 ## Commits
 

@@ -16,9 +16,49 @@ body, is done (2026-10-20 to 23): Part 0 to C, G's safety work and plugin 1.5.1,
 diff, per-field acceptance and the screens; its gate is green on both stands (2026-10-23). Stage 4
 is re-planned as 4.1 (the matcher and the findings), 4.2 (the agent works the loop) and 4.3 (the
 screens, the gate and the report); 4.1 and 4.2 are done (2026-10-23), green on both stands, with the
-race and covergate legs owed; 4.3 is next.**
+race and covergate legs owed. 4.3 is split: 4.3a (real token counts beside bytes, and 4.2's two loose
+ends) is done (2026-10-24) but for the flake fix; 4.3b (the screens, the full gate and phase 14's
+report) is next.**
 
 ## Where we are
+
+**2026-10-24, stage 4.3a: real token counts beside bytes, and 4.2's two loose ends.** The reasoning is
+under "stage 4.3a" in `DECISIONS.md`; the task list and the checkpoint are under 4.3a in the phase plan.
+
+- **The tokenizer** (`c2b277a`): `tiktoken-go/tokenizer` v0.8.1. It counts `o200k_base` offline and is
+  imported only from `_test.go` files and `cmd/tokenreport`. `TestTheTokenizerStaysOutOfTheBinary`
+  proves `cmd/postulator` carries none of it. It is verified against the library's own vectors, and
+  every count the report makes is byte-identical under v0.10.0.
+- **Tokens beside bytes:**
+  - `schemaCeilingTokens` 14,626 for the schemas' 14,623 tokens (65,722 bytes) (`60344bb`).
+  - `instructionsCeilingTokens` 1,924 for the instructions with the replica's brief, 1,921 tokens
+    (`4bd0b17`). To make this measurable, the chat prompts moved into `application/agent`
+    (`f994786`).
+  - The stand captures load through `sitemodeltest` (`6ac52a2`).
+  - `runtime.EstimatedInput` is the estimate's input for one step (`0fe8dbe`).
+- **`go run ./cmd/tokenreport`** (`6058376`, `0d2cc0c`, `304eb41`, `85d3889`) is a report, not a gate.
+  - Every agent round sends 16,587 tokens on the replica before the conversation (3,668 with tools on
+    demand).
+  - The writer's prompt is 1,258 to 1,825 tokens on the eight measurable stand pages.
+  - The run estimate prices inputs at 2 to 3.6 times their real count.
+  - `llm.Tokens` counts a pack at 136% of its real tokens.
+  - The captured prose runs 1.77 tokens per word as a writer answers it.
+  - Proposed, not changed: 1.8 for `llm.WordTokens`, 1.7 tokens per word and 3.7 runes per token for
+    `llm.Tokens`; the writer's ceiling of 3 holds.
+- **The replica's client blocks** (`7caa03d`): `TestTheAgentEditsABlock` proves on `/tb-500/`, a hub
+  holding the client's two paragraphs and his link, that a run and the agent's edit keep them byte for
+  byte. Its first run found that six steps recorded a body's links with no region, resolved against
+  the site's root, while the observation records them in the content, resolved against the page. One
+  `observe.ContentLinks` now does both (`1c7bf8d`, plus `3207739`, the file that commit left out).
+  Green on both stands with the whole loop and the block-by-block edit.
+- **The runtime flake**, found and not fixed. The owner stopped the hunt after two runs.
+  - `TestATitleSweepIsAnsweredByTheFieldsStepAlone` and `TestAMetaSweepIsNotHeldOnAPageASaveWouldChange`
+    in `runtime/steps` time out under `-race` at one CPU.
+  - The working cause is starvation against the harness's fixed 20 s wait.
+  - Their timeout now names each item's state (`97671c1`).
+  - To reproduce: `go test -race -count=10 -cpu 1 -v ./internal/runtime/steps/`.
+- Schemas 65,722 bytes and 14,623 tokens (92 tools); migrations to 0073; plugin 1.5.1; no bound
+  method moved.
 
 **2026-10-23, stage 4.2: the agent works the loop.** The reasoning is under "The owner's answers at
 4.2's plan" and "4.2, decided while building" in `DECISIONS.md`; the task list, the checkpoint and the
@@ -483,6 +523,29 @@ docker, and `TestAChildWaitsForItsParentAndGoesOnOnceTheParentIsRegenerated` now
 by exhausting the writer, because an incomplete draft is tried again instead of failing at validate.
 
 ## The gate
+
+`go run ./cmd/tokenreport` (`-json` for JSON) belongs to every gate as a report, not a gate: it prints
+what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
+tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
+
+**2026-10-24, on Windows, at the close of stage 4.3a. Green, with the flake owed.**
+- **Run and green:**
+  - `go build ./...`; `go vet ./...` and its `-tags e2e` and `-tags uiharness` builds.
+  - `gofmt -l .` silent; the comment check; `golangci-lint run ./...` 0 issues; `task lint:e2e` 0
+    issues.
+  - `go test -race -count=1 -p 2` over the packages 4.3a touched, ten packages in 494 s: `cmd/tokenreport`,
+    `tools`, `sitemodel`, `application/agent`, `observe`, `transport/agent`, `runtime`, `runtime/steps`
+    and `app`, with `sitemodeltest` holding no tests.
+  - `go run ./cmd/tokenreport`, plain and `-json`.
+  - On the replica, then vanilla, each after `task plugin:deploy`: `TestTheAgentEditsABlock`,
+    `TestTheWholeLoopReachesTheDockerSite` and `TestAnExistingPageIsEditedBlockByBlock`. Both stands
+    were taken down and Docker Desktop stopped.
+- **The flake hunt**:
+  - `-race -count=10 -p 1 ./internal/runtime/...` was green in 3,219 s.
+  - The same with `-cpu 1,4` failed two scoped sweeps in `runtime/steps` at one CPU (8,484 s).
+  - The owner stopped the hunt there; the fix is owed.
+- **Not run, 4.3b's:** race in five groups, `covergate`, the whole vitest, `ui:lint`, the stands' full
+  suites.
 
 **2026-10-23, on Windows, at the close of stage 4.1. Partial: the memory guard stopped the adapters
 race group.**

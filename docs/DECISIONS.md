@@ -4589,3 +4589,153 @@ rulings and what was decided while building.
 - **Vanilla**: on the block-editor `/guide/setup/` the owner's heading and paragraph stood byte for
   byte while the agent replaced our `core/html` block, the injected regions did not move, and the
   reverts gave back the bytes. The nested sheet planned no `/brewing/`.
+
+## 2026-10-23 — stage 4.3a: real token counts beside bytes, and 4.2's two loose ends
+
+The owner split 4.3 in two: 4.3a counts what a call costs in the tokens of the current OpenAI models,
+as a local metric beside bytes, and closes 4.2's two loose ends; 4.3b keeps the screens, the full gate
+and phase 14's report. The task list and the checkpoint are under 4.3a in the phase plan; a Sonnet
+researcher chose the tokenizer and a Fable critic read the plan (no blocking finding; five serious
+folded in).
+
+### The tokenizer
+
+- **`github.com/tiktoken-go/tokenizer` v0.8.1** (the owner's link, the researcher's pick): MIT, pure
+  Go, no cgo, `o200k_base` compiled in as generated source, nothing fetched at test time or on first
+  use; tags run to 2026-10-21. `pkoukk/tiktoken-go` was rejected: it downloads by default, its
+  offline loader dates from 2024, it carries an open `o200k` round-trip bug and knows no gpt-5.
+  v0.10.0, two days old, rewrites the merging: v0.8.1 is pinned, and every count of the report was
+  checked once against v0.10.0 through `-modfile` in the scratchpad: the two JSON reports are
+  byte-identical.
+- **Verified** by `TestTheCounterAgreesWithTheEncodingsOwnVectors`, the library's own `o200k_base`
+  vectors read from the module cache (`'RE`, `hello world` as `[24912 2375]`, two and three spaces,
+  `supercalifragilistic` in six, the fourteen-token sentence) and the empty string. OpenAI's own
+  `tiktoken` tests hold no `o200k_base` ids.
+- **Its cost on this machine**: a cold build of its package with its standard-library dependencies
+  takes 61 s and the compiler peaks at 381 MB; a test binary that loads `o200k_base` peaks at a
+  26 MB working set with a heap of about 5 MB, so the race groups gain little.
+- **The encoding map is the command's** (`encodingFor`), after tiktoken's names and prefixes for
+  `o200k_base`; the catalog's three `gpt-5.6-*` map, and `gpt-image-2` falls back to `o200k_base`
+  with the report saying so. Each measured prompt is counted in the encoding of the model its role
+  resolved to.
+- **Never in the build**: imported only from `_test.go` files and `cmd/tokenreport`.
+  `TestTheTokenizerStaysOutOfTheBinary` joins `internal/app/deps_test.go` as a new rule beside the
+  others, which stay as they were: `go list -deps ./cmd/postulator`, plain and `uiharness`, holds no
+  tokenizer package, and no non-test package but the command imports one. It was run red once
+  against a scratch import in `kernel/clock`, which was not committed.
+
+### Decided while building
+
+- **The chat prompts moved into `application/agent`** (`Instructions`, `Situation`), beside the
+  title prompt and the `SiteContext` it renders, as `application/content` owns the judge's prompt;
+  the runner renders through them. The report and the instructions tripwire read them there, so the
+  rule that only `internal/app` imports `transport` needed no exception (the critic's finding; the
+  plan had first exempted the command).
+- **`sitemodeltest`** holds the capture format and the in-memory store the `sitemodel` tests used,
+  beside `applicationtest`; both stands' `site.json` moved under its `testdata` and are embedded, so
+  a test in another package and the report load a stand by name. The `packs.golden` files stayed and
+  did not move a byte. It has no tests of its own, so `covergate` neither counts nor misses it.
+- **`runtime.EstimatedInput`** is the input the estimate prices for one step on one target (the
+  prompt overhead, half the step's output and the pack its read layer prices); `price` calls it, so
+  the report compares the estimate itself.
+- **The report runs the code as it is**: `resolve_context`, `generate_body`, `repair_links` and the
+  judge over each captured page, with a model client that records the request and answers nothing,
+  a page's template resolved through `templates.ResolveForPage` over the built-ins (each captured
+  type given its preset's template, as migration 0066 does), the catalog's default model per role
+  and the tuning defaults. Every write its adapters are asked for is refused. A placeholder in a
+  prompt, a pack missing from its prompt or a step that errs before its request fails the report.
+- **The tripwires**: `schemaCeilingTokens` 14,626 for 14,623 tokens beside `schemaCeilingBytes`;
+  `instructionsCeilingTokens` 1,924 for the autonomous instructions' 1,921 with the replica's
+  captured brief (confirm mode 1,918), in `application/agent`. Both took the byte ceiling's margin.
+  The schema log's "about bytes over four" was 16,430, 12% above the real count.
+
+### What the report found (2026-10-23, both captures)
+
+- **The agent**: the instructions are 1,655 tokens in confirm mode and 1,658 autonomous; the 92
+  schemas 14,623 (`templates_create` the widest at 911); the replica's brief 209 and vanilla's 150;
+  every round of every turn sends 16,587 tokens on the replica and 16,528 on vanilla before the
+  conversation, 3,668 and 3,609 with tools loaded on demand.
+- **The steps**: eight pages are measured (six on the replica, two on vanilla); the others are named
+  with the reason (technical, store category and catalog pages have no template; the products, the
+  front page, the posts and the sample pages are unmapped). The writer's prompt runs 1,258 to 1,825
+  tokens (357 of instructions, a pack of 240 to 782, 474 to 546 of the rest, a 188-token schema), a
+  linker call 255 to 266, the judge's prompt 766 to 1,299 over the captured bodies.
+- **The estimate against the real count**: the run estimate prices the writer's input at 2.28 times
+  the real count, pooled (2.08 to 2.52), a linker call at 3.57 and the judge at 2.07: the 800-token
+  overhead and half the answer stand for less than they price, and the judge's estimate has no body
+  term. `llm.Tokens` counts a pack at 136% of its real tokens (a section from 0.54 to 1.04 of it).
+  `Fit` keeps every pack under its budget in fact: at 1,500 tokens three packs were cut and the
+  widest kept 802 real tokens, and no pack went over at 4,096, 3,000 or 1,500.
+- **Tokens per word**: three captured bodies carry fifty words or more (the WordPress privacy,
+  refund and sample pages, 1,343 words); as a writer would answer them (HTML without the block
+  editor's comments, as a JSON string) they run 1.71 to 1.85 tokens per word, 1.77 pooled; as plain
+  text 1.17, as HTML 1.59.
+- **Proposed, not changed** (the owner's call): `llm.WordTokens` at 1.8 tokens per word instead of
+  2.2; `llm.Tokens` at 1.7 tokens per word and 3.7 runes per token instead of 2.2 and 3 (both move
+  `tokensPerTenWords`, the one constant the two read); `steps.tokensPerWord` (3) holds against the
+  densest body's 1.85. The input overestimate is `promptOverhead` and `inputShareOfOutput`, not a
+  tokens-per-word constant. The sample is thin and is WordPress's own boilerplate, not the client's
+  copy: the ledger's real `input_tokens` from a funded key is the comparison that settles it.
+
+### The replica's client blocks (Part 2.1)
+
+- **The owner's answer at the plan**: the replica already holds a hub with the client's text,
+  `/tb-500/` (two paragraphs and his link to `/bpc-157/`, typed Hub, `RootFound`), so the proof uses
+  it instead of a new paragraph on `/peptides/`; the stand, its pins and the captures did not move.
+  `writerStand.clientPage` names the page each stand proves on (`/tb-500/`, `/guide/setup/`), and
+  `TestTheAgentEditsABlock` refuses a page with no block of the client's, asserts his blocks after
+  the run and again after the agent's edit, and reverts to the run's bytes and then his base.
+- **What the proof found**: the first replica run failed. His paragraphs stood byte for byte, but
+  after the agent's edit his link sat in the model a second time with an empty region. The steps
+  that record a body's links (`sync_back`, `relink_page`, `relink_neighbors`, the revert, the field
+  revert and `edit_page`, through `observedOn`) wrote them with no region and resolved a relative
+  href against the site's root, while the observation writes the same rows in the content region,
+  resolved against the page (the 2026-10-18 ruling), and a sync that finds the same body writes
+  nothing over them. `observe.ContentLinks` and `observe.Resolver` are now the one way a body's
+  links are recorded and marked, on both sides (`1c7bf8d`, and `3207739`, which adds the file
+  `1c7bf8d` left out of its commit: the tree at `1c7bf8d` alone does not build).
+  `TestTheLinksARelinkRecordsStandInTheContentWhereThePageResolvesThem` failed first on both
+  counts. `TestSyncBackResolvesALinkAgainstTheFolderTheSiteLivesIn` had pinned the root resolution
+  (`coffee/` from `/blog/coffee/espresso/` landing on `/blog/coffee/`); its linking page moved to
+  the subfolder site's own front page, where a relative link still resolves under the folder.
+  `ResolveAt` does not collapse `..`; that is unchanged.
+- **Green after the fix**: on the replica `TestTheAgentEditsABlock`,
+  `TestTheWholeLoopReachesTheDockerSite` and `TestAnExistingPageIsEditedBlockByBlock`; on vanilla
+  the same three. Both stands were taken down.
+
+### The runtime flake (Part 2.2), stopped by the owner
+
+- **Attempt 1**, `go test -race -count=10 -p 1 ./internal/runtime/...`, green in 3,219 s (runtime
+  1,974 s, steps 1,127 s), while the session compiled and tested beside it.
+- **Attempt 2**, the same with `-cpu 1,4`: the first run was cancelled by the owner before any
+  package finished; the rerun took 8,484 s and failed in `internal/runtime/steps`, in the one-CPU
+  pass (no `-4` suffix): `TestATitleSweepIsAnsweredByTheFieldsStepAlone` (79.62 s) and
+  `TestAMetaSweepIsNotHeldOnAPageASaveWouldChange` (34.38 s), both "timed out waiting for the run
+  to finish", both 4.2's scoped sweeps over three pages. `internal/runtime` passed 20 times. The 4.2
+  checkpoint's "runtime package failed once" was most likely this package of the same group.
+- **What the investigation established**: a running step does not lose its item (the lease is the
+  step's own timeout plus a second, `claim.go`); the "re-armed from waiting" lines are publish
+  waking between its units. The working cause is starvation: at `-cpu 1` the `-parallel` default
+  stays at the machine's eight, so up to eight parallel tests, each with its own engine, share one
+  P under the race detector, and a three-page run outlives the harness's fixed 20 s `pollTimeout`,
+  the same fixed wait the `runtime`, `runtime/steps` and `sync` harnesses keep.
+- **Not proven, not fixed**: the instrumented reproduction (`go test -race -count=10 -cpu 1
+  ./internal/runtime/steps/`) was stopped by the session's memory guard with nothing logged, and the
+  owner stopped the hunt there. What landed is the evidence for next time: a sweep's timeout names
+  each item's status, step, attempts and error (`97671c1`). The fix the evidence points to is a wait
+  bounded by the test binary's own deadline instead of a fixed span. To reproduce, with output that
+  survives a stopped run: `go test -race -count=10 -cpu 1 -v ./internal/runtime/steps/`.
+
+### Deviations from the request
+
+- **The flake is found, not fixed**: the owner stopped the hunt after its two runs (5.4 hours in
+  all); the record and the command are above.
+- **The instructions moved** from `transport/agent` into `application/agent` instead of a line in
+  `deps_test.go`; `deps_test.go` gained one rule (the tokenizer's) and changed none.
+- **The captures moved** into `sitemodeltest/testdata` so every package loads them by name.
+- **No product prompt is measured**: every product in both captures is unmapped, and the steps refuse
+  a page with no entity. A capture taken after mapping the products would measure them.
+- **The briefs carry no link totals**: a capture holds no link audit, so a few tokens of the real
+  brief are missing.
+- **The per-turn context message** is a line of the agent's round and of its sum, beside what the
+  request named.
