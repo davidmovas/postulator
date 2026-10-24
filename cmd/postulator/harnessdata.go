@@ -170,6 +170,7 @@ func seedLoosePages() []seedPage {
 		{Path: "/blog/the-2025-buying-guide/", Title: "The 2025 buying guide", Status: statusArchived},
 		{Path: "/reviews/", Title: "Machine reviews", Status: statusPublished},
 		{Path: "/reviews/gaggia-classic-pro/", Title: "Gaggia Classic Pro review", Status: statusPublished},
+		{Path: "/reviews/breville-bambino-plus/", Title: duplicateTitle, Status: statusPublished},
 		{Path: "/reviews/rancilio-silvia/", Title: "Rancilio Silvia review", Status: statusExists},
 		{Path: "/reviews/lelit-anna/", Title: "Lelit Anna review", Status: statusExists},
 		{Path: "/glossary/", Title: "An espresso glossary", Status: statusPublished},

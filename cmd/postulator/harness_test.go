@@ -19,7 +19,9 @@ import (
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
 	"github.com/davidmovas/postulator/internal/app"
 	"github.com/davidmovas/postulator/internal/application/agent"
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/models"
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/pages"
@@ -32,6 +34,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -114,11 +117,11 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 44 {
-		t.Errorf("entities = %d, want 44", len(loaded.Entities))
+	if len(loaded.Entities) != 45 {
+		t.Errorf("entities = %d, want 45, the workbook's planned guide included", len(loaded.Entities))
 	}
-	if len(loaded.Edges) != 48 {
-		t.Errorf("edges = %d, want 48", len(loaded.Edges))
+	if len(loaded.Edges) != 49 {
+		t.Errorf("edges = %d, want 49, the planned guide's parent included", len(loaded.Edges))
 	}
 
 	proposed := 0
@@ -162,11 +165,11 @@ func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 		cursor = string(page.Next)
 	}
 
-	if total != 66 {
-		t.Errorf("pages = %d, want 66", total)
+	if total != 68 {
+		t.Errorf("pages = %d, want 68, the duplicated review and the workbook's planned guide included", total)
 	}
-	if mapped != 47 {
-		t.Errorf("mapped pages = %d, want 47", mapped)
+	if mapped != 48 {
+		t.Errorf("mapped pages = %d, want 48", mapped)
 	}
 }
 
@@ -537,8 +540,8 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 44 {
-		t.Fatalf("entities after the restart = %d, want the forty-four that were seeded", len(loaded.Entities))
+	if len(loaded.Entities) != 45 {
+		t.Fatalf("entities after the restart = %d, want the forty-five that were seeded", len(loaded.Entities))
 	}
 }
 
@@ -1465,6 +1468,120 @@ func stopActiveRuns(t *testing.T, core *app.Core) {
 			t.Fatalf("Cancel %s: %v", listed.Items[index].ID, cancelErr)
 		}
 	}
+}
+
+func openFindings(t *testing.T, core *app.Core, siteID, code string) []findings.Finding {
+	t.Helper()
+
+	out := make([]findings.Finding, 0)
+	cursor := ""
+	for {
+		listed, err := core.Findings.List(t.Context(), findings.ListRequest{
+			SiteID: siteID, Status: string(finding.Open), Code: code, Cursor: cursor, Limit: 100,
+		})
+		if err != nil {
+			t.Fatalf("List findings: %v", err)
+		}
+		out = append(out, listed.Items...)
+		if !listed.HasMore {
+			return out
+		}
+		cursor = string(listed.Next)
+	}
+}
+
+func TestTheSeededWorkbookFillsTheInboxTheMapAndThePreview(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	siteID := listed.Items[0].ID
+
+	counts, err := core.Findings.Counts(t.Context(), findings.CountsRequest{SiteID: siteID, Status: string(finding.Open)})
+	if err != nil {
+		t.Fatalf("Counts: %v", err)
+	}
+	t.Logf("the inbox opens on %d findings: %+v", counts.Total, counts.Codes)
+	for _, code := range []finding.Code{finding.RowAmbiguous, finding.RowWithoutPage, finding.ParentDiffers} {
+		if held := openFindings(t, core, siteID, string(code)); len(held) == 0 {
+			t.Errorf("the seeded workbook raised no %s", code)
+		}
+	}
+	misplaced := openFindings(t, core, siteID, string(finding.ParentDiffers))
+	if !slices.ContainsFunc(misplaced, func(f findings.Finding) bool { return f.PagePath == misplacedPath }) {
+		t.Errorf("parent_differs = %+v, want one on %s named by its path", misplaced, misplacedPath)
+	}
+
+	workbookPath := filepath.Join(os.Getenv(app.HomeVariable), workbookName)
+	preview, err := core.Imports.Preview(t.Context(), imports.PreviewRequest{SiteID: siteID, Path: workbookPath, Mapping: workbookMapping(siteID)})
+	if err != nil {
+		t.Fatalf("Preview the kept workbook: %v", err)
+	}
+	at := slices.IndexFunc(preview.Report.Pages, func(p imports.PreviewPage) bool { return p.Action == string(imports.ActionAmbiguous) })
+	if at < 0 || len(preview.Report.Pages[at].Candidates) != 2 || preview.Report.Pages[at].RowKey == "" {
+		t.Fatalf("the preview's pages = %+v, want the duplicated review as one row with two candidates", preview.Report.Pages)
+	}
+	ambiguous := preview.Report.Pages[at]
+	picked, err := core.Imports.Preview(t.Context(), imports.PreviewRequest{
+		SiteID: siteID, Path: workbookPath, Mapping: workbookMapping(siteID),
+		Choices: []imports.Choice{{RowKey: ambiguous.RowKey, PageID: ambiguous.Candidates[0].PageID}},
+	})
+	if err != nil {
+		t.Fatalf("Preview with the pick: %v", err)
+	}
+	if !slices.ContainsFunc(picked.Report.Pages, func(p imports.PreviewPage) bool {
+		return p.Path == ambiguous.Candidates[0].Path && p.MatchedBy == string(pagemap.RuleMapped)
+	}) {
+		t.Errorf("the picked preview = %+v, want %s matched by the mapping", picked.Report.Pages, ambiguous.Candidates[0].Path)
+	}
+
+	byPath := pagesByPath(t, core, siteID)
+	hub := byPath[hubPath]
+	first, err := core.SiteModel.SiteMap(t.Context(), sitemodel.MapRequest{SiteID: siteID, ParentID: hub.ID, Limit: 3})
+	if err != nil {
+		t.Fatalf("SiteMap of the hub: %v", err)
+	}
+	if first.Parent == nil || first.Parent.Twin == nil || len(first.Nodes.Items) != 3 || !first.Nodes.HasMore {
+		t.Fatalf("the hub's first page = %+v, want three children, more to come, and its store category beside it", first)
+	}
+	rest, err := core.SiteModel.SiteMap(t.Context(), sitemodel.MapRequest{SiteID: siteID, ParentID: hub.ID, Limit: 200, Cursor: first.Nodes.Next})
+	if err != nil {
+		t.Fatalf("SiteMap of the hub's rest: %v", err)
+	}
+	if got := len(first.Nodes.Items) + len(rest.Nodes.Items); got != first.Parent.Children {
+		t.Errorf("the hub's children come back %d over two pages, want %d", got, first.Parent.Children)
+	}
+
+	code, many := "", []findings.Finding{}
+	for _, held := range counts.Codes {
+		found := openFindings(t, core, siteID, held.Code)
+		if len(found) >= 2 && slices.ContainsFunc(found[0].Options, func(o findings.Option) bool { return o.Name == string(finding.Ignore) }) {
+			code, many = held.Code, found
+			break
+		}
+	}
+	if code == "" {
+		t.Fatalf("no code of %+v holds two findings to ignore at once", counts.Codes)
+	}
+	ids := make([]string, 0, len(many))
+	for i := range many {
+		ids = append(ids, many[i].ID)
+	}
+	settled, err := core.Findings.ResolveMany(t.Context(), findings.ResolveManyRequest{SiteID: siteID, Code: code, Option: string(finding.Ignore), FindingIDs: ids})
+	if err != nil {
+		t.Fatalf("ResolveMany: %v", err)
+	}
+	for _, held := range settled.Findings {
+		if held.Status != string(finding.Dismissed) || held.ResolvedBy != finding.ResolvedByPerson {
+			t.Errorf("%s = %+v, want it dismissed by the person", held.ID, held)
+		}
+	}
+	if left := openFindings(t, core, siteID, code); len(left) != 0 {
+		t.Errorf("%d findings %s stay open after the bulk ignore", len(left), code)
+	}
+	t.Logf("a bulk ignore dismissed %d findings %s", len(settled.Findings), code)
 }
 
 func pagesByPath(t *testing.T, core *app.Core, siteID string) map[string]pages.Page {

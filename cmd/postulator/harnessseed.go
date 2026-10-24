@@ -378,7 +378,7 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 }
 
 func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pacedProvider,
-	script *assistantScript, key string) error {
+	script *assistantScript, key, home string) error {
 	created, err := core.Sites.Create(ctx, sites.CreateRequest{
 		Name: siteName, BaseURL: site.URL(), Username: harnessUser, Password: harnessPassword, AllowInsecure: true,
 	})
@@ -423,6 +423,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	}
 	if cardErr := seedCardProposal(ctx, core, siteID, entities); cardErr != nil {
 		return cardErr
+	}
+	if workbookErr := seedWorkbook(ctx, core, siteID, home); workbookErr != nil {
+		return workbookErr
 	}
 	if key != "" {
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})

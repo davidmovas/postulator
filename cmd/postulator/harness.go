@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -137,7 +138,7 @@ func configure(cfg app.Config) (harness, error) {
 		}}, nil
 	}
 	return harness{Config: cfg, Seed: func(ctx context.Context, core *app.Core) error {
-		return seed(ctx, core, site, provider, script, key)
+		return seed(ctx, core, site, provider, script, key, filepath.Dir(cfg.DatabasePath))
 	}}, nil
 }
 
