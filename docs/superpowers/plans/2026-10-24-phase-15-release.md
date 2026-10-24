@@ -77,6 +77,28 @@
 - the picker's whole-branch pick, if the owner wants it back;
 - the docs, `task package` and the PR when the owner asks.
 
-## Session 2 — polish, docs, the build and the PR
+## Session 2 — polish, docs, the build and the PR (2026-10-24)
 
-Planned at its start from session 1's checkpoint.
+Planned at its start from session 1's checkpoint and the owner's brief: the owner asks for the release, so the session ends with a pull request from `dev` to `master`, neither merged nor tagged.
+
+- **Touches.** `frontend/src/features/{map,graph,palette,findings}`, `frontend/src/ui`, `frontend/scripts` (the harness walk); the version files (`Taskfile.yml`, `build/config.yml`, `build/windows/info.json`, `internal/app/version.go`, `frontend/package.json`); the docs. No Go behaviour, migration, tool or plugin change.
+- **Exit.** The Site map fits at 960 with the dock open, proven by the walk; no screen file over 300 lines; a refused bulk batch reported in plain words; the docs current; 2.5.0 built; the whole gate on the final code; the installer and the plugin zip; the PR open.
+
+### Decided at the plan
+
+1. **The version is 2.5.0.** `v2.4.0` was released on 2026-10-04 (PR #30, the workbooks, the products, OpenAI only and the categories' removal), after the `v2.3.0` the brief names, so the next minor is 2.5.0. DECISIONS holds no versioning rule beyond the tag pattern `v2.x.y` of `release.yml`; a major is proposed to the owner, not taken.
+2. **Bulk resolution stays in batches of 1,000, each its own unit, and the dialog reports a partial result.** Measured on the 5,003-page generated store: a unit holds SQLite's one writer about 0.23 ms per finding it dismisses (941 ms for 4,131) and about 0.8 ms per finding whose site value it accepts (97 ms for 125). A code of 10,000 findings in one unit would hold the writer 2.3 to 8 s, past the 5 s `busy_timeout` every other writer waits (the observation, the engine, every screen's write), while a batch holds it under a second. A unit also refuses whole on one finding it cannot settle (an `accept_site` over 5,000 was refused by one page without an observed value), so one transaction would settle none of them.
+3. **The Site map measures its table and picks its columns**: every column while they fit; then without the parent, the links and the children counts; then the page column shrinks and truncates before anything scrolls. The tree, the type, the body's state and the open findings are always shown; what collapses stays in the page drawer. The walk gains a `fits` step that fails a shot whose element scrolls sideways.
+4. **The two files split by concern, behaviour unchanged**: the graph screen into its state hook, its map view and its empty state; the palette into its sections hook and its list.
+
+### Tasks
+
+- [ ] **0.0 — the plan.** This list.
+- [ ] **P1 — the Site map beside the dock.** The layout by width, failing first in the model project; the walk's `fits` step and two shots at 960 × 600 with the dock open, narrow and wide.
+- [ ] **P2 — the two files under 300 lines.** The existing vitest suites and the walk's graph and palette shots, before and after.
+- [ ] **P3 — bulk's partial result.** The batches' outcome as a pure function, failing first; the dialog's sentence; the decision in DECISIONS.
+- [ ] **D — the docs.** STATUS (the release, what Postulator does, the known limits), VISION, ARCHITECTURE, CONTRACTS (the plugin's floors and 1.5.2), `CLAUDE.md` (the rulings short, the footguns current).
+- [ ] **V — 2.5.0** in the five version files.
+- [ ] **G — the gate**, exit codes checked: `task build` with no drift; `go vet` (three builds); `golangci-lint` (three builds), `task lint:e2e` alone; the five race groups and `covergate`; the comment check and `gofmt`; `npm run typecheck`, `npm run test:run`, `task ui:lint`; the plugin on 7.2, 7.4 and 8.5; `e2e:full` on both stands from fresh resets and `e2e:full:noplugin` on vanilla.
+- [ ] **B — the build.** `task package VERSION=2.5.0`; `task plugin:zip` (1.5.2).
+- [ ] **R — the pull request** from `dev` to `master` with the release notes; not merged, not tagged.
