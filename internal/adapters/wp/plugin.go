@@ -30,7 +30,8 @@ const (
 	defaultContentLimit = 100
 	maxContentLimit     = 500
 
-	PluginVersion = "1.5.1"
+	PluginVersion = "1.5.2"
+	PluginMinimum = "1.5.1"
 )
 
 var requiredCapabilities = []string{
@@ -80,7 +81,7 @@ func (c Capabilities) Missing() []string {
 }
 
 func (c Capabilities) Outdated() bool {
-	return versionBelow(c.Version, PluginVersion) || len(c.Missing()) > 0
+	return versionBelow(c.Version, PluginMinimum) || len(c.Missing()) > 0
 }
 
 func versionBelow(version, floor string) bool {

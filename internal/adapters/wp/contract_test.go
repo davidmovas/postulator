@@ -3,6 +3,7 @@ package wp_test
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -153,7 +154,7 @@ func TestThePluginContractDeclaresItsShapes(t *testing.T) {
 		{name: "preview query argument", snippet: "preview_token query argument"},
 		{name: "preview capability", snippet: "\n              - preview\n"},
 		{name: "seo read capability", snippet: "\n              - seo_meta_read\n"},
-		{name: "plugin version", snippet: "\n  version: 1.5.1\n"},
+		{name: "plugin version", snippet: "\n  version: 1.5.2\n"},
 		{name: "meta write request schema", snippet: "\n    MetaWriteRequest:\n"},
 		{name: "meta write result schema", snippet: "\n    MetaWriteResult:\n"},
 		{name: "moved conflict schema", snippet: "\n    MovedConflict:\n"},
@@ -217,6 +218,35 @@ func TestTheContractsDenySetIncludesTheCatalogs(t *testing.T) {
 	}
 	if !slices.Equal(prefixes, denied.Prefixes) {
 		t.Errorf("the contract denies the prefixes %v, and the catalog %v", prefixes, denied.Prefixes)
+	}
+}
+
+func TestTheBundledPluginIsPluginVersion(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "wp-plugin", "postulator-companion", "postulator-companion.php"))
+	if err != nil {
+		t.Fatalf("read the plugin's main file: %v", err)
+	}
+	source := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	declared := []struct {
+		where   string
+		text    string
+		pattern *regexp.Regexp
+	}{
+		{where: "the plugin header", text: source, pattern: regexp.MustCompile(`(?m)^ \* Version: (\S+)$`)},
+		{where: "the plugin's VERSION", text: source, pattern: regexp.MustCompile(`(?m)^const VERSION\s+= '([^']+)';$`)},
+		{where: "the contract", text: contractDocument(t), pattern: regexp.MustCompile(`(?m)^ {2}version: (\S+)$`)},
+	}
+	for _, each := range declared {
+		found := each.pattern.FindStringSubmatch(each.text)
+		if found == nil {
+			t.Errorf("%s declares no version", each.where)
+			continue
+		}
+		if found[1] != wp.PluginVersion {
+			t.Errorf("%s declares %s, and the client bundles %s", each.where, found[1], wp.PluginVersion)
+		}
 	}
 }
 

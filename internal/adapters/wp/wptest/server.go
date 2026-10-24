@@ -182,7 +182,7 @@ func New(t TB, opts ...Option) *Server {
 		user:          DefaultUser,
 		password:      DefaultPassword,
 		seoPlugin:     "yoast",
-		pluginVersion: "1.5.1",
+		pluginVersion: "1.5.2",
 		capabilities: []string{
 			"bulk", "seo_meta", "seo_meta_read", "content_hash", "raw", "preview", "rendered", "meta", "terms", "settings",
 			"meta_write", "guarded_write",
