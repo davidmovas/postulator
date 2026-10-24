@@ -10,8 +10,8 @@ code path.
 ```
 cmd/postulator        Wails bootstrap only
 internal/kernel       errors, paging, id, clock, log, ctx, dto, settings, middleware
-internal/domain       pure logic: site graph pagemap keyword importmap template content run schedule settings llm
-internal/application  use cases, UnitOfWork, tool registry, event registry
+internal/domain       pure logic: site graph pagemap block render field finding pagetype contextpack keyword note importmap template content run schedule agent llm
+internal/application  use cases (observe, sitemodel, findings, edit, runs, imports and the rest), UnitOfWork, tool registry, event registry
 internal/adapters     sqlite, wp, llm (openai, tuning, retry, limiter, ledger, recordreplay, catalog, profiles, fake), images, secrets, importer
 internal/runtime      the run engine and its step catalog
 internal/transport    wails services and event bridge, agent runner and tools
@@ -84,7 +84,9 @@ and options), `keyword` (the ordered list with volumes and the one cell grammar)
 mapping of a sheet's headers, its level and note columns, and what each column became),
 `template` (spec plus link policy, resolved global → site → page by JSON merge patch),
 `content` (an HTML document, link context, link insertion, compliance and structure reports),
-`contextpack` (the read functions over a snapshot of the model, the writer's pack and its fit),
+`contextpack` (the read functions over a snapshot of the model, the writer's pack and its fit, the
+folded site map and the entity proposals named from it), `pagetype` (the client's types over six
+presets and their field scopes),
 `run`, `schedule`, `settings`, and the `llm` model catalog types with the service tiers, the
 reasoning allowance per effort, `Cost` and the purpose rules the spend report groups by.
 
@@ -118,19 +120,49 @@ audit through `reports` rather than a second computation. The writer's steps, th
 drawer's "What the writer will see", the agent's brief and `sites_explore` all ask it, so none of
 them computes a fact differently.
 
+Since stage 4 the workbook and the site are reconciled through **findings** that last. Every
+workbook row finds its page through `pagemap.MatchRow` (mapped, URL, slug, entity, title, H1, SKU);
+the import and the observation raise and clear findings once per subject, and
+`application/findings` is the one use case a person and the agent settle them through: `List`,
+`Counts`, `Explain` (the one sentence of what an option does), `Resolve` and `ResolveMany`. An
+option either changes the model inside one unit, written through `PageRepo` so `pages.changed` is
+published after the commit, or answers what it asks for and settles nothing: a `StartRequest`, a
+rescan, or a site preview of entity proposals. A writable page no entity carries is
+`page_without_entity`, raised and cleared by the derive stage and cleared by every writer that maps a
+page; `contextpack.Map.EntityProposals` names its entity from the H1 or the title and scopes it
+under the nearest ancestor's entity or the twin hub of its store category, with no model call.
+
+There is **one tree**, `contextpack.Map`: the site by derived parent, a store category folded into
+the hub of its name, a loop cut at its first path. The Site map, the findings' subtree and the run
+start's picker read it. Since phase 15 it is materialized as `page_map` (migration 0074): one row per
+page with its folded parent, depth, a root-first trail of ids, children, descendants, twin, type and
+search keys. Triggers bump `page_map_sites.generation` whenever a page, its parent, status, path,
+title, H1, type or technical reason moves, a read that finds the map stale refreshes it once
+(`sitemodel.Refresh`, reading outside the unit and writing only the rows that moved), and the derive
+stage refreshes it at the end of every walk. So a map page, the picker and the findings list run the
+same statements at 2,000 and at 5,000 pages, which `internal/app/scale` proves on a real store.
+
+The whole-site reads that stay are named, not hidden: the writer's pack (a snapshot once per pack and
+once per estimate), the graph preflight, a map search or type filter, the observation's content and
+store stages, the brief, the link audit and `Pages.Tree`, which the Overview and the Reports still
+read.
+
 ## Run engine
 
 A run is a recipe of named steps over a set of target pages, and a run kind may own that
-recipe. `relink` (`resolve_context relink_page sync_back report`), `sync` (`sync_site`) and
-`revert` (`revert`) hand out their own steps and refuse a recipe that disagrees; `generate`
+recipe. `relink` (`resolve_context relink_page sync_back report`), `sync` (`sync_site`),
+`revert` (`revert`) and `edit` (`edit_page`, the agent's one field change or block operation on
+one page, started only by `runs.StartEdit` and waiting for the person) hand out their own steps and
+refuse a recipe that disagrees; `generate`
 takes the template's, or `run.GenerateRecipe()` when neither the request nor the template names
 one; `custom` is the one kind exempt from every step rule; `repair` owns nothing since
 2026-10-18 and cannot be started, the hierarchy being read-only, while its word stays for old
-rows. The three steps a kind owns — `sync_site`, `relink_page` and `revert` — are
+rows. The four steps a kind owns — `sync_site`, `relink_page`, `revert` and `edit_page` — are
 `PerKindStepName` values, a type of their own, because `StepName` is the vocabulary a
 *template* recipe may draw from and it is rendered into `vocab.ts`, into the blank template's
-recipe and into three tool enums. Fifteen steps are registered; twelve of them a template may
-name.
+recipe and into three tool enums. Seventeen steps are registered; thirteen of them a template may
+name. A run scoped to chosen fields (`StartRequest.fields`) disables the steps those fields do not
+need, and its estimate prices only the steps it keeps.
 
 `sync_site` is the observation. Each execution runs one batch of one stage of
 `application/observe` — inventory (the plugin's manifest and outdated verdict, the post types,
@@ -203,7 +235,12 @@ template the start is about to assign to it, runs the preflight each step declar
 model role it will call (profile, API key, catalog entry) and prices every page on its own spec,
 each step at its role's service tier and, on a model that reasons, with half the allowance of the
 role's effort as output, both read from the same tuning policy the calls are sent with;
-a finding graded `error` stops `Start`. The step that completes an item may return a notice, which
+a finding graded `error` stops `Start`. The input side is measured, not guessed: `llm.Tokens` reads
+1.7 tokens a word or 3.7 runes a token, each step adds its own measured prompt overhead, and a step
+that reads the body adds the template's words; `go run ./cmd/tokenreport` holds every measured input
+within ±25% of its real `o200k_base` count, and `Fit` keeps a twentieth of its budget as headroom.
+The output side stays conservative on purpose (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) until
+a funded key's ledger can be compared. The step that completes an item may return a notice, which
 the engine keeps as the item's note and sends on `item.done`; the report step words what the
 page lacks there. A page
 whose validation finds an error is held as `needs_human`, and `Engine.Accept` requeues the step

@@ -4,32 +4,131 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.3.0` on 2026-09-25 (2.2.0 and the 2026-09-25 work). **The 2026-10-02,
-2026-10-03 and 2026-10-03/04 work is on `dev`**, not yet released; what its gate did and did not
-run is under **The gate**. **The site-model redesign (phase 14) is done**: stage 0 and the owner's
-answers on 2026-10-17, stage 1 (the plugin's reads, the two stands, the page model, the observation
-and its screens) on 2026-10-17 and 18, stage 2 (page types and their scopes, the read layer, the
-writer's pack and the agent's view) on 2026-10-19 and 20, stage 3 (the field writers and the
-editable body, plugin 1.5.1) from 2026-10-20 to 23, and stage 4 (4.1 the matcher and the findings,
-4.2 the agent works the loop, 4.3a token counts beside bytes, 4.3b the screens) from 2026-10-23 to
-24. **Phase 14 closed on 2026-10-24 with the whole gate green on the final code on both stands.**
-**Phase 15, the release, opened the same day** (`docs/superpowers/plans/2026-10-24-phase-15-release.md`):
-session 1 is done, session 2 (polish, docs, the build and the PR) is next. None of it is released yet.
+**Released:** `v2.4.0` on 2026-10-04 (PR #30: the client's workbooks, the WooCommerce products,
+OpenAI only and the spend in view, the categories taken out again). **2.5.0 is built and waits in the
+pull request from `dev` to `master`**, neither merged nor tagged: the site-model redesign (phase 14,
+2026-10-17 to 24) and the release work (phase 15, 2026-10-24), its notes under **Release 2.5.0**
+below and in the pull request's body. Its gate is under **The gate**.
 
 ## Next, in order
 
-1. **Phase 15, session 2**: polish, the docs, `task build` and `task package`, and the PR from `dev`
-   to `master` when the owner asks. It plans itself from session 1's checkpoint in the phase plan;
-   session 1's gate is green, every leg.
-2. **Plugin 1.5.2 on the client's sites**, uploaded over 1.2.0 ("Replace current with uploaded"); it
-   installs on PHP 7.2 and WordPress 5.7, and a released app refuses to write through one below 1.5.1.
-3. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+1. **The owner merges the pull request and tags `v2.5.0` on `master`**; the tag's workflow builds and
+   publishes the installer, the executable and the plugin zip.
+2. **Plugin 1.5.2 on the client's sites**, uploaded over the old one ("Replace current with
+   uploaded"); it installs on PHP 7.2 and WordPress 5.7, and 2.5.0 writes nothing through a plugin
+   below 1.5.1.
+3. **The first sync on a real site**, then the client's workbook, then typing and scoping; what to look
+   at first is under **Release 2.5.0**.
+4. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
    `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24); settle the
    output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and whether tools load on demand
    (`agent.toolLoading: deferred`). Until then the owner judges the writer by hand from
    `go run ./cmd/tokenreport -prompts out/prompts`.
 
+## What Postulator does
+
+A Windows desktop application (Wails v3, Go 1.27, a local encrypted SQLite database, no server, no
+account) for one SEO specialist who runs dozens of WordPress and WooCommerce sites of up to a few
+thousand pages each. It builds **one structured model of each site** and edits the site's content
+through it; [`VISION.md`](VISION.md) is the longer version.
+
+- **The site, read as a model.** A sync walks every page of every public post type and the store's
+  categories: its identity and terms, its fields (title, excerpt, SEO meta, the product's
+  descriptions, custom fields by key), its body as blocks, what its public render adds (regions,
+  breadcrumbs, product grids, JSON-LD), its links by type, and a parent derived from its breadcrumbs
+  with the reason. Later syncs read only what changed; every tenth walks the whole site.
+- **Page types and field scopes.** The client names his types over six presets (Hub, Store category,
+  Catalog, Product, Entity, Technical) and enables, per type, the fields the writer may write, each
+  with an instruction, limits, a switch for rewriting his own text, and the link policy.
+- **The workbook, reconciled through findings.** Each row of his xlsx workbooks finds its page by
+  URL, slug, entity, title, H1 or SKU. What disagrees becomes a finding in the inbox (a row two
+  pages answer, a row no page answers, a parent the sheet and the site disagree on, a field changed
+  on the site, a page no entity carries), which he or the agent settles one at a time or a whole code
+  at once. The Site map shows the site by its derived hierarchy.
+- **The entity graph** says what links where: up to parents, down to children, sideways only to the
+  related pages the graph names. A page without an entity gets one through proposals named from the
+  site itself, with no model call.
+- **The writer's full picture.** Before it writes a field, the model sees the page's type, its entity
+  card, its breadcrumb path, its children and siblings, the products it lists, the keywords with
+  their volumes, the anchors, the notes and the field's own instruction and policy, fitted to a
+  budget.
+- **Edits that keep the client's text.** The body changes block by block. Every block we did not
+  write is the client's and stays byte for byte unless a run confirmed rewriting it. Nothing
+  structural (slug, status, parent, prices, stock, SKU, taxonomies, a variation's attributes) is
+  ever written to an existing page. Every write goes under the hash of what was read and keeps what
+  it replaced.
+- **Runs** generate, relink, sync and revert, scoped to chosen fields when asked, priced before they
+  start, resumed after a crash, and reviewed by a person, whole or field by field, when they write a
+  draft. A revert puts back per field and per block and hands back what the client changed since.
+- **The agent** in the dock works the same loop through the same use cases: it reads the model,
+  resolves findings, starts runs and edits a page field by field or block by block. Every write it
+  makes to a page waits for the person.
+
+## Release 2.5.0
+
+The notes as the pull request carries them, in short:
+
+- **What is new**: the site read as a model; page types and field scopes; the workbook reconciled
+  through findings; the writer's full picture; edits that keep the client's text; field-scoped runs;
+  the agent working the loop; revert per field and per block; pages without an entity made writable
+  through proposals; the Site map, the Findings inbox and screens that stay fast at 5,000 pages.
+- **What the client does**: upload `postulator-companion.zip` 1.5.2 over the old plugin on every site
+  (the Sites panel hands it out); connect a site with its address and an administrator's
+  application password; run the first sync (a first walk of 2,000 pages takes about half an hour at
+  the default four requests a second); import his workbook and settle the findings; give his pages
+  their types and scope the fields each type may write.
+- **What to look at first on a real site**: the Overview's observation summary (pages, types,
+  trails resolved), the Site map against the site's own breadcrumbs, the Findings inbox's counts by
+  code, and one page's Model tab and "What the writer will see".
+- **The known limits** are below; the first is that **no run has been made with a funded OpenAI key**.
+
+## Known limits at 2.5.0
+
+- **No live smoke test yet.** No run has been made with a funded key, so nothing a model call costs
+  has been compared with a bill. The input side of the estimate was adopted from offline
+  `o200k_base` counts (every measured input within ±25%); the output side stays conservative on
+  purpose (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3), and on-demand tool loading
+  (`agent.toolLoading: deferred`) stays off.
+- **The first real run's checks**: the ledger's `input_tokens` for each step (Settings → Models, or
+  `ModelsService.ListCalls`) against `go run ./cmd/tokenreport` for the same pages; then the live
+  probe's open tests and the seven checks before tool loading, under **Known gaps**.
+- **The plugin's floors**: PHP 7.2 and WordPress 5.7. Without the plugin, on WordPress below 6.0 or
+  WooCommerce below 6.9, the front page and the store's pages cannot be learned; Yoast 18.3 on the
+  oldest WordPress was not exercised.
+- **Scale**: the screens hold at 5,000 pages, but the writer's pack still reads a whole-site snapshot
+  (0.7 s at 2,000 pages, 4.6 s at 5,000), and a first walk is paced by the site's request limit.
+- **Bulk resolution** settles 1,000 findings per transaction; a refused batch stops the action and the
+  dialog says what was settled and what was not.
+- **At the window's least width with the dock open** the Site map fits; the Runs table still scrolls
+  sideways, the Models table cuts a model's name, and the rail shows a horizontal scrollbar at 600 px
+  high.
+- **The rest** is under **Known gaps**, each with its reason.
+
 ## Where we are
+
+**2026-10-24, phase 15 session 2: the polish, the docs, the build and the pull request.** The
+reasoning is under "phase 15, session 2" in `DECISIONS.md`; the task list is in the phase plan.
+
+- **The Site map fits beside the dock** (`1329d97`): the table measures itself and drops the links and
+  the children counts, then the parent's source, keeping the tree, the type, the body's state and the
+  findings; the page and type columns shrink before anything scrolls. The harness walk gains a `fits`
+  step, which fails a shot whose element scrolls sideways, and three Site map shots at 960 × 600 with
+  the dock open, narrow and wide; it fails on the Runs table there, as it should.
+- **The two oversized screen files are split** (`123fae2`, `004fc29`): the graph screen into its state
+  hook, its map view and its empty state (556 lines to 277 at most), the palette into its sections
+  and its list (332 to 181 at most), with the harness's graph and palette shots the same before and
+  after.
+- **Bulk resolution says what a refused batch left** (`b550336`, `b4efaca`): batches of 1,000 stay,
+  one transaction each, because one transaction over a 10,000-finding code would hold SQLite's writer
+  past the 5 s busy timeout (measured on the 5,003-page store); the dialog names what was settled,
+  what was not and why.
+- **2.5.0** (`8feaa56`): the version files, and `wails_tools.nsh`, so the installer stops registering
+  itself as 2.0.0.
+- **The docs**: STATUS for a fresh reader, VISION and ARCHITECTURE with the plugin's floors, the
+  findings, the Site map's `page_map` and the `edit` kind, CONTRACTS with `FindingsService`,
+  `SiteMap`, `Parents`, the proposals' `source`, 92 tools and the floors' proof, `CLAUDE.md` short.
+- Schemas unchanged (66,394 bytes and 14,779 tokens, 92 tools); migrations to 0074; plugin 1.5.2; 137
+  bound methods in 16 services.
 
 **2026-10-24, phase 15 session 1: what must hold before the client gets it.** The reasoning is under
 "phase 15, session 1" in `DECISIONS.md`; the task list and the checkpoint are in the phase plan.
@@ -1031,11 +1130,18 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
 | 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | done, closed 2026-10-24 with the whole gate green on both stands |
-| 15 | The release (2026-10-24), two sessions in `2026-10-24-phase-15-release.md` | session 1 done on 2026-10-24 (the plugin's floors, pages without an entity, the input estimate, scale, the prompts); session 2 next |
+| 15 | The release (2026-10-24), two sessions in `2026-10-24-phase-15-release.md` | done on 2026-10-24: session 1 (the plugin's floors, pages without an entity, the input estimate, scale, the prompts) and session 2 (the polish, the docs, 2.5.0 built, the pull request open) |
 
 ## Known gaps
 
-- **Phase 15 session 1 left these:**
+- **Phase 15 left these:**
+  - **No funded key has run**: see **Known limits at 2.5.0**.
+  - **The UI at the window's least width with the dock open**: the Runs table scrolls sideways
+    inside its panel (the walk's `fits` step names it: 726 px of content in 288 px), the Models
+    table shows about ten characters of a model's name, and the rail shows a horizontal scrollbar
+    at 600 px high. The Site map fits.
+  - **Three feature files are still over 300 lines**: `graph/canvas/map.tsx` (849, the canvas
+    renderer), `agent/conversation/model/markdown.ts` (494) and `links/panel.tsx` (311).
   - **Whole-tree reads**: the Overview's drift count and the Reports' run panel and site tab still
     read `Pages.Tree`, the whole tree. The run start's picker no longer does, but `Pages.Tree` stays
     while they call it.
@@ -1147,10 +1253,9 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Phase 15, session 2**, planned at its start from session 1's checkpoint: polish (the whole-tree
-   reads above, the picker's whole-branch pick if the owner wants it back), the docs, the build and
-   the PR.
-2. **The pre-release smoke with a funded OpenAI key**, whenever there is one: one generate run with the writer on flex
+1. **The owner merges the 2.5.0 pull request and tags `v2.5.0`**; then plugin 1.5.2 goes onto the
+   client's sites and the first sync runs on a real one.
+2. **The smoke with a funded OpenAI key**, whenever there is one: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
    probe's open tests and the seven checks under **Known gaps**, and only then a decision on
@@ -1158,13 +1263,12 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 3. **A sandbox walk with the client's sheets and a real provider** (`task sandbox:up
    E2E_PLUGIN=1 E2E_WOO=1`, after `task sandbox:reset` if it still carries plugin 1.3.0 and its
    terms): import `samples/client-sheets.xlsx` as one workbook and check each sheet's tab, the
-   Groups segment, that Category and Subcategory read ignored, and the Groups sheet's deeper rows
-   under their URL parent inside Peptides; sync; run a page under TB-500 › Liquid; create a product
-   by hand in WooCommerce under a category of the client's own, import the variation sheet in
-   products mode, run it and see its categories untouched; revert both.
-4. **The client's own sites**: what a real model writes into the attributes, and whether a page
-   builder hides the description, which `product_description_hidden` will say.
-5. **A release** when the owner asks: the 2026-10-02, 2026-10-03 and 2026-10-03/04 work as one
-   minor version.
-6. The residue above: the denied tool row's decision, the four narrow-width UI items,
+   Groups segment, the Category and Subcategory columns compared as each row's expected trail, and
+   the findings the import raises; sync; run a page under TB-500 › Liquid; create a product by hand
+   in WooCommerce under a category of the client's own, settle its `page_without_entity` through a
+   proposal, run it and see its categories untouched; revert both.
+4. **The client's own sites**: what a real model writes into a short description and a body, and
+   whether a page builder hides the description, which `product_description_hidden` will say.
+5. The residue above: the denied tool row's decision, the narrow-width UI items (the Runs table, the
+   Models table, the rail), the last callers of `Pages.Tree`, the three feature files over 300 lines,
    `ProposeFromPages` and `Import.Apply` as runs, and `settings.changed` for a declared value.

@@ -27,7 +27,8 @@ earns its place by serving that loop.
 - **The client**, through a desktop UI: the site as a model and as a map by its derived hierarchy,
   a canvas over the graph, page types and field scopes he names and configures, an inbox of
   findings he settles one at a time or a whole code at once, the import preview that names how
-  each row found its page, run monitors, quality reports.
+  each row found its page, entity proposals named from the site for the pages no entity carries
+  yet, run monitors, quality reports.
 - **The in-app agent**, through the same use cases exposed as tools: read and explain his data,
   observe a site, resolve findings, edit a page field by field and block by block, edit the graph,
   the types and the scopes, start and watch pipelines, create schedules. The agent can do
@@ -48,6 +49,15 @@ back exactly that.
 Long work runs on a durable engine: a run is a sequence of steps with checkpoints, artifacts and
 a sequenced event log, so a crash resumes from the last completed step instead of leaving zombie
 rows and half-written pages behind.
+
+A site needs WordPress's own REST API and an administrator's application password. The companion
+plugin, `postulator-companion` **1.5.2**, adds what core cannot answer: the raw body under its hash,
+the render as `the_content` filters it, meta and SEO writes under the hash each value was read with,
+the front page and the store's pages, a signed draft preview. It installs on **PHP 7.2 and WordPress
+5.7 or newer**, and the client updates it by uploading the zip over the old one; a released app
+writes nothing through a plugin older than 1.5.1. Without the plugin the loop still observes the
+site, writes and reads back, while the SEO meta, the neighbour relink, the draft preview and the
+revert of an updated page stand down.
 
 ## Boundaries
 
@@ -102,6 +112,7 @@ and its import.
 - The full design: `docs/superpowers/specs/2026-09-17-postulator-v2-design.md` (the site model is
   part 16).
 - The phase plan: `docs/superpowers/plans/2026-09-17-postulator-v2-roadmap.md`; the site model's
-  four stages: `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`.
+  four stages: `docs/superpowers/plans/2026-10-17-phase-14-site-model.md`; the release:
+  `docs/superpowers/plans/2026-10-24-phase-15-release.md`.
 - The shape of the code: `docs/ARCHITECTURE.md`.
 - Where the work stands: `docs/STATUS.md`.

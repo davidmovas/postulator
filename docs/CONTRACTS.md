@@ -30,9 +30,10 @@ the composition root binds the two.
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard` |
-| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical PreviewLink SetType Model ModelSummary WriterPack` |
+| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical PreviewLink SetType Model ModelSummary WriterPack SiteMap` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope` |
-| `RunsService` | `Start Estimate Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
+| `RunsService` | `Start Estimate Parents Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
+| `FindingsService` | `List Get Counts Explain Resolve ResolveMany` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
@@ -43,7 +44,8 @@ the composition root binds the two.
 | `BrowserService` | `Open Locate` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and thirty methods: stage 2a took the six policy methods out and put five page-type
+A hundred and thirty-seven methods in sixteen services since phase 15; the stage 4 and phase 15
+methods are described after this paragraph. Stage 2a took the six policy methods out and put five page-type
 methods and `PagesService.SetType` in, and 2b adds `PagesService.WriterPack{pageId, field?, budget?}`,
 exactly what the writer would be sent for a page and field (`application/sitemodel`'s pack: its
 sections in priority order with their token counts, as `Fit` left them under the role's input
@@ -68,6 +70,34 @@ writtenAt, ours}`, `ours` false once the site's value moved from what the run wr
 `application/observe` through the service's second source. Where a use case answers with bytes the service writes them
 to the path the request names and returns it, because the webview has no filesystem;
 `SyncService.SavePluginPackage{path}` is the only such method.
+
+`FindingsService` (stage 4.3b) reads and settles the findings through `application/findings`, the
+one use case a person and the agent share. `List{siteId, status?, code?, pageId?, pageTypeId?,
+under?, cursor?, limit?}` pages them with their pages named (`under` is a node of the Site map, its
+whole subtree); `Counts{siteId, status?, pageTypeId?, under?}` answers each code's count and
+severity; `Get{findingId}` one finding; `Explain{siteId, findingIds, option, pageId?, pageTypeId?}`
+the one sentence of what an option does (`findings.Explain`, the agent's words too) and its kind.
+`Resolve{findingId, option, pageId?, pageTypeId?, proposalHash?}` settles one finding; a `run`
+option settles nothing and answers the `StartRequest` or the `SyncSiteRequest` it asks for, and a
+`proposal` option (`propose_entity`) answers `proposals`, the site preview's
+`PreviewFromPagesRequest`. `ResolveMany{siteId, code, option, findingIds, pageTypeId?}` takes only
+`finding.BulkOptions()` (`ignore accept_site accept_workbook set_type propose_entity`) over at most
+1,000 findings of one code in one unit; the inbox sends a larger set in batches and says what a
+refused batch left unsettled. `By` is `json:"-"` on both: a bound call is the person's.
+
+`PagesService.SiteMap{siteId, parentId?, search?, pageTypeId?, cursor?, limit?}` (stage 4.3b, over
+`page_map` since phase 15) answers a node's children a page at a time, a store category folded into
+the hub of its name (`twin`), with each node's type, parent reason and method, body state, links in
+and out, open findings, children and descendants; a search or a type answers flat matches with their
+trails. `RunsService.Parents{siteId, pageIds}` (phase 15) answers the planned ancestors a selection
+writes first, which the run start's picker adds. `GraphService.PreviewFromPages` takes `source`
+(`model`, the default, or `site`): a site preview names each page's entity from its H1 or title,
+scopes it under its nearest ancestor's entity or the twin hub of its store category, makes no model
+call, and marks a name clash (`no_name`, `name_in_batch`, `name_carried`) unticked rather than
+refusing the batch; `ApplyProposals` takes the preview's `source` and writes a site proposal's
+parent edge approved. `ProposeFromPages` stays the model's. `RunsService.Start` takes `fields` (the field keys a run is scoped to; the
+steps they do not need are disabled) and `rewrite` (the pages whose client text a person confirmed
+may be rewritten).
 
 `SitesService.Update{…, settings?}` takes a site's settings since 2026-10-18 (`userAgent`, the
 `observe` block's `renderConcurrency` 1–16 and `fullWalkEvery` ≥ 1, `linkUrlForm`), keeping the
@@ -244,10 +274,11 @@ enables a step another kind owns, for every kind but `custom`.
 | `repair` | none since 2026-10-18: the hierarchy is read from the site and never written, so `runs.Start` refuses the kind and names `relink` instead; the word stays in `runs.kind` and `runKinds` so old rows decode |
 | `sync` | `sync_site`, which takes the params `full` (walk the whole site) and `renderRescan` (fetch every published render again) |
 | `revert` | `revert`, and `runs.Start` refuses the kind: only `RunsService.RevertRun` can set `parentRunId` |
+| `edit` | `edit_page` over one page, carrying one field change or one block operation; only `runs.StartEdit` starts it (the agent's `pages_fields` and `pages_blocks`), and its write waits for the person in either mode; `CHECK` rebuilt by 0073 |
 | `audit`, `import` | none of its own |
 | `custom` | none of its own, and the one kind exempt from every step rule |
 
-`sync_site`, `relink_page` and `revert` are `run.PerKindStepName` values,
+`sync_site`, `relink_page`, `revert` and `edit_page` are `run.PerKindStepName` values,
 a type of their own, so none of them reaches `vocab.ts`, the blank template's recipe or the
 three tool step enums; `run.PerKindStep(name)` is the domain predicate and
 `run.StepNames()` is what a template recipe may draw from.
@@ -485,6 +516,14 @@ from the cached manifest, before any request, and **an outdated plugin writes no
 `SetSEOMeta`, `ReplaceSEOMeta` and `PutMeta` answer `plugin_outdated`, since an older SEO route
 ignores the expected hashes and an older raw write answers no content.
 
+The floors are proven, not declared: `wp-plugin/tests/functions.php` requires every function the
+plugin calls to be its own, on `testdata/wordpress.json` with its `@since`, or in the PHP running the
+scan, and the list's newest core `@since` to be the header's `Requires at least` (5.7.0, `wp_robots`);
+the lint and the tests run under `E_ALL` on PHP 7.2.34, 7.4.33 and 8.5.12, and the contract suite
+ran on WordPress 5.7.2 with PHP 7.3, WooCommerce 6.5.2 and Rank Math 1.0.98.1 (`STAND=legacy`).
+On a WordPress below 6.0 or a WooCommerce below 6.9, core's REST names neither the front page nor
+the store's cart, checkout and account pages; only the plugin's `/settings` answers them.
+
 Stage 3's routes, every write under the hash it was read with (`wp-plugin/openapi.yaml` is the
 contract):
 - `PUT /meta/{id}` takes each key with the hash of the value it was read with (null for one the
@@ -563,22 +602,26 @@ sites, starts a run, follows the events and the catch-up, and sends an agent mes
 
 A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Run}`,
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
-every call. Ninety-three tools, `runs_revert` (`dangerous`), `graph_move_entity` (`write`),
-`graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`) and
-`graph_apply_proposals` (`write`) among them, measuring 63,183 bytes of schema — about 15,800
-tokens resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds
-against `schemaCeilingBytes` (63,200) and logs with the eight widest. A description names what a
+every call. Ninety-two tools since phase 15, `runs_revert` (`dangerous`), `graph_move_entity`
+(`write`), `graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`),
+`graph_apply_proposals` (`write`), and stage 4's `pages_fields`, `pages_blocks` and `findings`, each
+with an `op` enum, among them, measuring 66,394 bytes and 14,779 `o200k_base` tokens of schema
+resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds against
+`schemaCeilingBytes` (66,407) and `schemaCeilingTokens` (14,782) and logs with the eight widest.
+Every agent write to a page is a one-item `edit` run that waits for the person in either mode, and
+so do `graph_apply_proposals` and `graph_propose_from_pages`; resolving a finding and starting a run
+follow the conversation's mode. A description names what a
 field takes, its default, its limits and the tool an id comes from, and no more; the chat
 instructions say once that an id is used as a read tool returned it and that a field left out
 keeps its value. `imports_preview` and `imports_apply` take `sheets: [{sheet, mappingId?,
 rowType?}]`.
 
 With `agent.toolLoading` set to `deferred`, a round sends ten orienting reads whole (`sites_list
-sites_get reports_site_overview graph_list_entities pages_list pages_get pages_tree runs_list
+sites_get sites_explore reports_site_overview graph_list_entities pages_list pages_get runs_list
 runs_get templates_list`) and every other tool inside its group, the prefix of its name, as a
-namespace of `defer_loading` functions beside one `tool_search` tool: 6,506 bytes before any
-search, which a test in `registry_test.go` logs without a ceiling. It is experimental until it has
-been tried with a funded key.
+namespace of `defer_loading` functions beside one `tool_search` tool, which a test in
+`registry_test.go` logs without a ceiling (`go run ./cmd/tokenreport` prints it). It stays off
+until it has been tried with a funded key.
 
 The guard chain runs in this order and the order matters: `fence` wraps tool output as
 untrusted data so a result cannot inject instructions into the model, `audit` writes the
