@@ -181,3 +181,43 @@ describe("the import flow over a workbook", () => {
         expect(result.current.recent[0]).toMatchObject({ path, rows: 5 });
     });
 });
+
+describe("the pages a person picks for ambiguous rows", () => {
+    it("previews again with every pick and applies the same picks", () => {
+        const { result } = renderHook(() => useImportFlow("s1", path, true));
+        expect(lastPreview()).not.toHaveProperty("choices");
+
+        act(() => {
+            result.current.pick("Catalog#4", "p-lab");
+        });
+        expect(lastPreview()["choices"]).toStrictEqual([{ rowKey: "Catalog#4", pageId: "p-lab" }]);
+
+        act(() => {
+            result.current.pick("Catalog#2", "p-shop");
+        });
+        act(() => {
+            result.current.pick("Catalog#4", "p-shop");
+        });
+        expect(lastPreview()["choices"]).toStrictEqual([
+            { rowKey: "Catalog#2", pageId: "p-shop" },
+            { rowKey: "Catalog#4", pageId: "p-shop" },
+        ]);
+
+        act(() => {
+            result.current.startApply();
+        });
+        expect((applyMutate.mock.calls[0]?.[0] as Record<string, unknown>)["choices"]).toStrictEqual(lastPreview()["choices"]);
+    });
+
+    it("forgets the picks once the columns change, since the rows they named may no longer be there", () => {
+        const { result } = renderHook(() => useImportFlow("s1", path, true));
+        act(() => {
+            result.current.pick("Catalog#4", "p-lab");
+        });
+        act(() => {
+            result.current.assign("Title", "h1");
+        });
+        expect(result.current.choices.size).toBe(0);
+        expect(lastPreview()).not.toHaveProperty("choices");
+    });
+});

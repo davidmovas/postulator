@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApplySheet, useInspectSheet, usePreviewSheet, useSheetSample } from "../../data/hooks/imports.js";
 import type { ImportMapping, ImportOptions } from "../../data/types.js";
 import type { ImportField } from "../../generated/vocab.js";
+import type { Choices } from "./choices.js";
+import { choicesOf, noChoices, withChoice } from "./choices.js";
 import type { ColumnMap } from "./columns.js";
 import { forget, readRecent, remember, writeRecent } from "./recent.js";
 import type { RecentFile } from "./recent.js";
@@ -39,6 +41,8 @@ export interface ImportFlow {
     request: WorkbookRequest | null;
     saveAs: string;
     recent: readonly RecentFile[];
+    choices: Choices;
+    pick: (rowKey: string, pageId: string) => void;
     choose: (sheet: string, on: boolean) => void;
     activate: (sheet: string) => void;
     assign: (header: string, field: ImportField | null) => void;
@@ -59,6 +63,7 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
     const [pending, setPending] = useState<ImportMapping | null>(null);
     const [saveAs, setSaveAs] = useState("");
     const [recent, setRecent] = useState<readonly RecentFile[]>(() => readRecent(siteId));
+    const [picked, setPicked] = useState<{ stamp: string; choices: Choices }>({ stamp: "", choices: noChoices });
     const opened = useRef("");
     const adopted = useRef<unknown>(null);
     const previewed = useRef("");
@@ -135,18 +140,34 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
 
     const detected = noHeader || sheet === undefined ? null : (sheet.detected.columns ?? null);
     const request = useMemo(() => (book === null ? null : requestOf(book)), [book]);
+    const requestStamp = request === null ? "" : `${path}|${JSON.stringify(request)}`;
+    const choices = picked.stamp === requestStamp ? picked.choices : noChoices;
+    const sent = useMemo(() => {
+        const listed = choicesOf(choices);
+        return listed.length === 0 ? {} : { choices: listed };
+    }, [choices]);
 
     useEffect(() => {
         if (!previewing || siteId === "" || path === "" || request === null) {
             return;
         }
-        const stamp = `${path}|${JSON.stringify(request)}`;
+        const stamp = `${requestStamp}|${JSON.stringify(sent)}`;
         if (previewed.current === stamp) {
             return;
         }
         previewed.current = stamp;
-        previewMutate({ siteId, path, ...request });
-    }, [previewing, siteId, path, request, previewMutate]);
+        previewMutate({ siteId, path, ...request, ...sent });
+    }, [previewing, siteId, path, request, requestStamp, sent, previewMutate]);
+
+    const pick = useCallback(
+        (rowKey: string, pageId: string) => {
+            setPicked((held) => ({
+                stamp: requestStamp,
+                choices: withChoice(held.stamp === requestStamp ? held.choices : noChoices, rowKey, pageId),
+            }));
+        },
+        [requestStamp],
+    );
 
     const edit = useCallback((change: (held: Workbook) => Workbook) => {
         setBook((held) => (held === null ? held : change(held)));
@@ -219,8 +240,8 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
             return;
         }
         const name = saveAs.trim();
-        applyMutate({ siteId, path, ...request, options: name === "" ? {} : { saveMappingAs: name } });
-    }, [applyMutate, siteId, path, request, saveAs]);
+        applyMutate({ siteId, path, ...request, ...sent, options: name === "" ? {} : { saveMappingAs: name } });
+    }, [applyMutate, siteId, path, request, sent, saveAs]);
 
     return {
         inspect,
@@ -232,6 +253,8 @@ export function useImportFlow(siteId: string, path: string, previewing: boolean)
         request,
         saveAs,
         recent,
+        choices,
+        pick,
         choose,
         activate,
         assign,

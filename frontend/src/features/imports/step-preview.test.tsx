@@ -1,9 +1,27 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../copy/index.js";
-import type { PreviewReport } from "../../data/types.js";
+import type { PreviewPage, PreviewReport } from "../../data/types.js";
+import type { Choices } from "./choices.js";
+import { noChoices, withChoice } from "./choices.js";
 import { StepPreview } from "./step-preview.js";
+
+beforeAll(() => {
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.releasePointerCapture = () => undefined;
+    Element.prototype.scrollIntoView = () => undefined;
+});
+
+const candidates = [
+    { pageId: "p-lab", path: "/lab/guides/", title: "Lab guides" },
+    { pageId: "p-shop", path: "/shop/guides/", title: "Shop guides" },
+];
+
+function guides(part: Partial<PreviewPage>): PreviewReport {
+    const page: PreviewPage = { sheet: "Catalog", path: "/guides/", title: "Guides", keywords: null, wpType: "page", action: "ambiguous", ...part };
+    return { ...workbook, pages: [...(workbook.pages ?? []), page] };
+}
 
 type Entity = NonNullable<PreviewReport["entities"]>[number];
 
@@ -64,8 +82,8 @@ function oneSheet(): PreviewReport {
     };
 }
 
-function show(report: PreviewReport, onNext = vi.fn()) {
-    render(<StepPreview report={report} onBack={() => {}} onNext={onNext} />);
+function show(report: PreviewReport, onNext = vi.fn(), choices: Choices = noChoices, onPick = vi.fn()) {
+    render(<StepPreview report={report} choices={choices} onPick={onPick} onBack={() => {}} onNext={onNext} />);
     return onNext;
 }
 
@@ -128,6 +146,40 @@ describe("the preview of a workbook", () => {
         const onNext = show(workbook);
         fireEvent.click(screen.getByRole("button", { name: copy.imports.next }));
         expect(onNext).toHaveBeenCalledOnce();
+    });
+
+    it("names the rule each row found its page by, in words", () => {
+        show(guides({ path: "/peptides/kpv/", action: "update", matchedBy: "slug" }));
+        expect(screen.getByText(copy.imports.preview.columnMatched)).toBeDefined();
+        const found = within(rowFor("/peptides/kpv/")).getByText(copy.imports.preview.matchRules.slug);
+        expect(found.getAttribute("title")).toBe(copy.imports.preview.matchedTooltip(copy.imports.preview.matchedBy.slug));
+    });
+
+    it("offers the pages an ambiguous row matches and sends the one a person picks", () => {
+        const onPick = vi.fn();
+        show(guides({ rowKey: "Catalog#4", matchedBy: "title", candidates }), vi.fn(), noChoices, onPick);
+
+        const pick = screen.getByRole("combobox", { name: copy.imports.preview.pickLabel("/guides/") });
+        expect(pick.textContent).toContain(copy.imports.preview.pick);
+        fireEvent.pointerDown(pick, { button: 0, ctrlKey: false, pointerType: "mouse" });
+        fireEvent.click(screen.getByRole("option", { name: copy.imports.preview.candidate("/shop/guides/", "Shop guides") }));
+
+        expect(onPick).toHaveBeenCalledWith("Catalog#4", "p-shop");
+    });
+
+    it("keeps the pick on a row the preview mapped, so it can change", () => {
+        const picked = withChoice(noChoices, "Catalog#4", "p-lab");
+        show(guides({ path: "/lab/guides/", rowKey: "Catalog#4", matchedBy: "mapped", action: "update", candidates }), vi.fn(), picked);
+
+        const pick = screen.getByRole("combobox", { name: copy.imports.preview.pickLabel("/lab/guides/") });
+        expect(pick.textContent).toContain(copy.imports.preview.candidate("/lab/guides/", "Lab guides"));
+    });
+
+    it("tells a person a row with nothing to pick it by needs a URL", () => {
+        show(guides({ matchedBy: "title", candidates }));
+
+        expect(within(rowFor("/guides/")).getByText(copy.imports.preview.needsUrl)).toBeDefined();
+        expect(screen.queryByRole("combobox", { name: copy.imports.preview.pickLabel("/guides/") })).toBeNull();
     });
 
     it("keeps the next step shut while the preview reports errors", () => {

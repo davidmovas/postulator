@@ -7,6 +7,7 @@ import {
     importFields,
     importFindingCodes,
     importRowTypes,
+    matchRules,
 } from "../../generated/vocab.js";
 import {
     actionLabel,
@@ -17,6 +18,7 @@ import {
     fieldLabel,
     findingLabel,
     findingPlace,
+    matchRuleLabel,
     noField,
     productNote,
     reasonLabel,
@@ -30,7 +32,14 @@ const vocabularies: readonly [string, readonly string[], (value: string) => stri
     ["import action", importActions, actionLabel],
     ["cannibalisation reason", cannibalizationReasons, reasonLabel],
     ["row type", importRowTypes, rowTypeLabel],
+    ["match rule", matchRules, matchRuleLabel],
 ];
+
+describe("the rule a row found its page by", () => {
+    it("says nothing for a row that found no page", () => {
+        expect(matchRuleLabel("")).toBe("");
+    });
+});
 
 describe("what a product row of the preview says", () => {
     it.each([
