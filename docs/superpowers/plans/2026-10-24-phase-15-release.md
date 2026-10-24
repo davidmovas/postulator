@@ -93,12 +93,25 @@ Planned at its start from session 1's checkpoint and the owner's brief: the owne
 
 ### Tasks
 
-- [ ] **0.0 — the plan.** This list.
-- [ ] **P1 — the Site map beside the dock.** The layout by width, failing first in the model project; the walk's `fits` step and two shots at 960 × 600 with the dock open, narrow and wide.
-- [ ] **P2 — the two files under 300 lines.** The existing vitest suites and the walk's graph and palette shots, before and after.
-- [ ] **P3 — bulk's partial result.** The batches' outcome as a pure function, failing first; the dialog's sentence; the decision in DECISIONS.
-- [ ] **D — the docs.** STATUS (the release, what Postulator does, the known limits), VISION, ARCHITECTURE, CONTRACTS (the plugin's floors and 1.5.2), `CLAUDE.md` (the rulings short, the footguns current).
-- [ ] **V — 2.5.0** in the five version files.
-- [ ] **G — the gate**, exit codes checked: `task build` with no drift; `go vet` (three builds); `golangci-lint` (three builds), `task lint:e2e` alone; the five race groups and `covergate`; the comment check and `gofmt`; `npm run typecheck`, `npm run test:run`, `task ui:lint`; the plugin on 7.2, 7.4 and 8.5; `e2e:full` on both stands from fresh resets and `e2e:full:noplugin` on vanilla.
-- [ ] **B — the build.** `task package VERSION=2.5.0`; `task plugin:zip` (1.5.2).
-- [ ] **R — the pull request** from `dev` to `master` with the release notes; not merged, not tagged.
+- [x] **0.0 — the plan** (`56099c3`). This list.
+- [x] **P1 — the Site map beside the dock** (`1329d97`). The layout by width, failing first in the model project; the walk's `fits` step and three shots at 960 × 600 with the dock open, narrow and wide, the search and the tree.
+- [x] **P2 — the two files under 300 lines** (`123fae2`, `004fc29`). The existing vitest suites and the walk's graph and palette shots, before and after.
+- [x] **P3 — bulk's partial result** (`b550336`, `b4efaca`). The batches' outcome as a pure function, failing first; the dialog's sentence; the decision in DECISIONS.
+- [x] **V — 2.5.0** (`8feaa56`) in seven version files, `wails_tools.nsh` among them.
+- [x] **D — the docs** (`03265bc` and this commit). STATUS (the release, what Postulator does, the known limits, the gate), VISION, ARCHITECTURE, CONTRACTS (the plugin's floors and 1.5.2), `CLAUDE.md` (the rulings at 2.5.0, the footguns current).
+- [x] **G — the gate**, exit codes checked, green on every leg; the record is under "The gate" in `STATUS.md`.
+- [x] **B — the build.** `task package VERSION=2.5.0` (`bin/postulator-amd64-installer.exe`, 2.5.0); `task plugin:zip` (`bin/postulator-companion.zip`, 1.5.2).
+- [x] **R — the pull request** from `dev` to `master` with the release notes; not merged, not tagged.
+
+#### Decided while building
+
+- **`wails_tools.nsh` moves with the version.** It is generated from `build/config.yml` and had not been refreshed since 2.0.0, and no `makensis` call passes a version, so every installer from 2.0.0 to 2.4.0 registered itself as 2.0.0. Passing `VERSION` to `makensis` would break a development package, whose `-dev` suffix `VIProductVersion` refuses; the file's default moves with the other six instead, and `CLAUDE.md` lists the seven.
+- **The map measures its table** rather than using a container query: the columns are an inline `grid-template-columns` on every row, which a query class cannot override. `useWidthOf` moved from the preview frame to `ui`.
+- **The narrowest map layout lets the type shrink too**: a dock dragged to its widest at 960 leaves the map 292 px, and the fixed tracks with the type at 72 px needed 322.
+- **Three other feature files stay over 300 lines** (`graph/canvas/map.tsx` 849, `agent/conversation/model/markdown.ts` 494, `links/panel.tsx` 311): the brief named the two screen files; the others are listed in STATUS.
+
+#### Checkpoint, 2026-10-24 (session 2 closed, phase 15 done)
+
+**Landed on `dev`**: the three polish items, 2.5.0, the docs; the whole gate green; the installer and the plugin zip built; the pull request from `dev` to `master` open for the owner to merge and tag.
+
+**Owed**: nothing of this phase. The owner's steps after the merge are under "Next, in order" in `STATUS.md`.

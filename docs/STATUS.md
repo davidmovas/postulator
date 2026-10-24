@@ -701,6 +701,38 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
 
+**2026-10-24, on Windows, at the close of phase 15 session 2, for 2.5.0. Green on the final code
+(`03265bc`), every leg, exit codes checked, one leg at a time:**
+
+- The comment check over 1,141 Go files and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`; `golangci-lint run ./...` and `--build-tags
+  uiharness`, then `task lint:e2e` alone: 0 issues each.
+- The five race groups, `-count=1` with coverage, in sequence: kernel and domain 28 packages (130 s);
+  application 22 at `-p 2` (758 s, `imports` 496 s); runtime 3 at `-p 1` (257 s); adapters 30 at
+  `-p 1 -timeout 30m` (618 s, `sqlite` 330 s); app, transport, cmd and frontend 10 at `-p 1` (510 s).
+  `covergate` over the five profiles merged one line per block: domain and application 88.05% of
+  17,800 statements (gate 80%), total 87.66% of 35,629 (gate 70%).
+- `go test -count=1 ./internal/app/scale/` (it skips under `-race`), 91 s.
+- `task plugin:lint` and `task plugin:test` on PHP 7.2.34, 7.4.33 and 8.5.12: 14 files parse clean;
+  the function scan (112 functions, 23 hooks, the newest `wp_robots_no_robots` at 5.7.0), 53 href
+  cases and 35 meta-key cases on each.
+- `task build VERSION=2.5.0` (246 s) with no generated drift; its first try stopped on a transient
+  `EBUSY` while `npm ci` emptied `node_modules`, and the retry was clean. The executable's file
+  version is 2.5.0.0.
+- `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 1,954 tests in 188 files (181 s);
+  `task ui:lint`, the harness tests in 124 s. The walk's three Site map shots at 960 × 600 with the
+  dock open pass `fits`.
+- **The replica**, after `task e2e:reset` and `task plugin:deploy`: `task e2e:full -- -v`, 14 passed
+  and 2 skipped by design, 553 s; taken down.
+- **Vanilla**, the same: `task e2e:full -- -v`, 12 passed and 4 skipped by design, 375 s; then `task
+  e2e:full:noplugin`, 176 s; the plugin restored with `e2e:up`; taken down.
+- `task package VERSION=2.5.0`: `bin/postulator-amd64-installer.exe`, 13,995,424 bytes, product and
+  file version 2.5.0. `task plugin:zip`: `bin/postulator-companion.zip`, 15,098 bytes, plugin 1.5.2,
+  `Requires PHP: 7.2`, `Requires at least: 5.7`, packed by the same `plugin.Pack` the Sites panel
+  uses.
+- `go run ./cmd/tokenreport`: 92 tools, 66,394 bytes and 14,779 tokens of schema, unchanged; a
+  deferred round would send 7,671 bytes and 1,704 tokens of tools.
+
 **2026-10-24, on Windows, at the close of phase 15 session 1. Green on the final code, every leg:
 the record below, then the owed legs run on the owner's word the same evening.**
 
