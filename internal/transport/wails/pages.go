@@ -31,8 +31,9 @@ type ModelUseCase interface {
 	SummaryOf(ctx context.Context, req observe.SummaryRequest) (observe.Summary, error)
 }
 
-type PackUseCase interface {
+type SiteModelUseCase interface {
 	Pack(ctx context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error)
+	SiteMap(ctx context.Context, req sitemodel.MapRequest) (sitemodel.MapView, error)
 }
 
 type PagesService struct {
@@ -50,9 +51,12 @@ type PagesService struct {
 	model        middleware.Handler[observe.ModelRequest, observe.ModelView]
 	modelSummary middleware.Handler[observe.SummaryRequest, observe.Summary]
 	writerPack   middleware.Handler[sitemodel.PackRequest, sitemodel.PackView]
+	siteMap      middleware.Handler[sitemodel.MapRequest, sitemodel.MapView]
 }
 
-func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models Source[ModelUseCase], packs Source[PackUseCase]) *PagesService {
+func NewPagesService(
+	logger *zap.Logger, useCase Source[PagesUseCase], models Source[ModelUseCase], siteModel Source[SiteModelUseCase],
+) *PagesService {
 	return &PagesService{
 		create:       Wrap(logger, "pages.create", call(useCase, PagesUseCase.Create)),
 		update:       Wrap(logger, "pages.update", call(useCase, PagesUseCase.Update)),
@@ -67,8 +71,13 @@ func NewPagesService(logger *zap.Logger, useCase Source[PagesUseCase], models So
 		setType:      Wrap(logger, "pages.setType", call(useCase, PagesUseCase.SetType)),
 		model:        Wrap(logger, "pages.model", call(models, ModelUseCase.Model)),
 		modelSummary: Wrap(logger, "pages.modelSummary", call(models, ModelUseCase.SummaryOf)),
-		writerPack:   Wrap(logger, "pages.writerPack", call(packs, PackUseCase.Pack)),
+		writerPack:   Wrap(logger, "pages.writerPack", call(siteModel, SiteModelUseCase.Pack)),
+		siteMap:      Wrap(logger, "pages.siteMap", call(siteModel, SiteModelUseCase.SiteMap)),
 	}
+}
+
+func (s *PagesService) SiteMap(c context.Context, req sitemodel.MapRequest) (sitemodel.MapView, error) {
+	return s.siteMap(c, req)
 }
 
 func (s *PagesService) WriterPack(c context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error) {

@@ -213,6 +213,8 @@ function handlersFor(client: QueryClient): Handlers {
             const siteId = envelope.payload.siteId;
             coalesce(`pages:${siteId}`, () => {
                 invalidateBySite(client, keys.pages.lists(), siteId);
+                invalidateBySite(client, keys.pages.maps(), siteId);
+                invalidateBySite(client, keys.findings.lists(), siteId);
                 invalidateAll(
                     client,
                     keys.pages.details(),
@@ -220,6 +222,9 @@ function handlersFor(client: QueryClient): Handlers {
                     keys.pages.models(),
                     keys.pages.packs(),
                     keys.pages.summary(siteId),
+                    keys.findings.details(),
+                    keys.findings.explanations(),
+                    keys.findings.countsAll(),
                     keys.reports.site(siteId),
                     keys.graph.entityAll(),
                     keys.graph.full(siteId),

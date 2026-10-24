@@ -1,6 +1,7 @@
 export {
     AgentService as Agent,
     BrowserService as Browser,
+    FindingsService as Findings,
     GraphService as Graph,
     HealthService as Health,
     ImportService as Import,
@@ -19,6 +20,8 @@ export {
 export type * as BrowserModels from "../../bindings/github.com/davidmovas/postulator/internal/application/browser/models.js";
 export type * as AgentModels from "../../bindings/github.com/davidmovas/postulator/internal/application/agent/models.js";
 export type * as ContentModels from "../../bindings/github.com/davidmovas/postulator/internal/application/content/models.js";
+export type * as FindingsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/findings/models.js";
+export type * as ContextPackModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/contextpack/models.js";
 export type * as GraphModels from "../../bindings/github.com/davidmovas/postulator/internal/application/graph/models.js";
 export type * as ImportModels from "../../bindings/github.com/davidmovas/postulator/internal/application/imports/models.js";
 export type * as SchemaModels from "../../bindings/github.com/davidmovas/postulator/internal/application/llm/models.js";

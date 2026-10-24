@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
     createPage,
@@ -12,15 +12,37 @@ import {
     previewLink,
     setCanonicalPage,
     setPageType,
+    siteMap,
     unmapPage,
     updatePage,
     writerPack,
 } from "../endpoints/pages.js";
-import { quietMeta } from "../client.js";
+import { infiniteGcTimeMs, quietMeta } from "../client.js";
 import { keys } from "../keys.js";
+import { useLockGate } from "../lock.js";
 import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
 import type { PageSort } from "../sorts.js";
-import type { Page, PageFilter } from "../types.js";
+import type { Page, PageFilter, SiteMapFilter, SiteMapView } from "../types.js";
+import type { Cursor } from "../../lib/paging.js";
+
+export const siteMapLimit = 100;
+
+export function useSiteMap(filter: SiteMapFilter, enabled = true) {
+    const gate = useLockGate();
+    return useInfiniteQuery({
+        queryKey: keys.pages.map(filter, siteMapLimit),
+        enabled: enabled && filter.siteId !== "" && gate.ready && !gate.locked,
+        initialPageParam: undefined as Cursor | undefined,
+        queryFn: ({ pageParam, signal }) =>
+            siteMap({ ...filter, limit: siteMapLimit, ...(pageParam === undefined ? {} : { cursor: pageParam }) }, signal),
+        getNextPageParam: (last: SiteMapView) =>
+            last.nodes.hasMore && last.nodes.nextCursor !== undefined ? last.nodes.nextCursor : undefined,
+        getPreviousPageParam: () => undefined,
+        refetchOnWindowFocus: false,
+        gcTime: infiniteGcTimeMs,
+        placeholderData: keepPreviousData,
+    });
+}
 
 export function usePages(filter: PageFilter, sort: PageSort | null = null, limit?: number) {
     return useUnlockedInfinite<PageFilter, Page>({

@@ -2,8 +2,10 @@ import type {
     AgentModels,
     CatalogModels,
     ContentModels,
+    ContextPackModels,
     DtoModels,
     FieldModels,
+    FindingsModels,
     GraphModels,
     ImportModels,
     LlmModels,
@@ -56,6 +58,24 @@ export type ModelBlock = Wire<ObserveModels.BlockView>;
 export type ModelField = Wire<ObserveModels.FieldView>;
 export type ModelFinding = Wire<ObserveModels.FindingView>;
 export type ModelSummary = Wire<ObserveModels.Summary>;
+
+export type Finding = Wire<FindingsModels.Finding>;
+export type FindingChoice = Wire<FindingsModels.Option>;
+export type FindingFilter = ListFilter<FindingsModels.ListRequest>;
+export type FindingCountsRequest = FindingsModels.CountsRequest;
+export type FindingCounts = Wire<FindingsModels.CountsResponse>;
+export type FindingCodeCount = Wire<FindingsModels.CodeCount>;
+export type ExplainRequest = FindingsModels.ExplainRequest;
+export type Explanation = Wire<FindingsModels.Explanation>;
+export type ResolveFindingRequest = FindingsModels.ResolveRequest;
+export type ResolveFindingResponse = Wire<FindingsModels.ResolveResponse>;
+export type ResolveFindingsRequest = FindingsModels.ResolveManyRequest;
+export type ResolveFindingsResponse = Wire<FindingsModels.ResolveManyResponse>;
+
+export type SiteMapView = Wire<SiteModelModels.MapView>;
+export type SiteMapNode = Wire<ContextPackModels.MapNode>;
+export type SiteMapRef = Wire<ContextPackModels.Ref>;
+export type SiteMapFilter = Omit<SiteModelModels.MapRequest, "cursor" | "limit">;
 
 export type WriterPack = Wire<SiteModelModels.PackView>;
 export type WriterPackSection = Wire<SiteModelModels.Section>;
@@ -134,6 +154,8 @@ export type ImportConflict = Wire<ImportModels.Conflict>;
 export type ImportCounts = Wire<ImportModels.Counts>;
 export type PreviewReport = Wire<ImportModels.PreviewReport>;
 export type PreviewPage = Wire<ImportModels.PreviewPage>;
+export type ImportCandidate = Wire<ImportModels.Candidate>;
+export type ImportChoice = ImportModels.Choice;
 export type PreviewEntity = Wire<ImportModels.PreviewEntity>;
 export type PreviewGroup = Wire<ImportModels.PreviewGroup>;
 export type PreviewEdge = Wire<ImportModels.PreviewEdge>;

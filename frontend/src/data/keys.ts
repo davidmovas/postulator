@@ -5,6 +5,9 @@ import type {
     ConversationFilter,
     EdgeFilter,
     EntityFilter,
+    ExplainRequest,
+    FindingCountsRequest,
+    FindingFilter,
     MessageFilter,
     ModelCallFilter,
     PageFilter,
@@ -12,6 +15,7 @@ import type {
     RunFilter,
     ScheduleFilter,
     SiteFilter,
+    SiteMapFilter,
     TemplateFilter,
 } from "./types.js";
 
@@ -68,6 +72,19 @@ export const keys = {
         summary: (siteId: string) => [scope, "pages", "summary", siteId] as const,
         packs: () => [scope, "pages", "pack"] as const,
         pack: (pageId: string, field: string) => [scope, "pages", "pack", pageId, field] as const,
+        maps: () => [scope, "pages", "map"] as const,
+        map: (filter: SiteMapFilter, limit?: number) => [scope, "pages", "map", filter, limitSegment(limit)] as const,
+    },
+    findings: {
+        root: () => [scope, "findings"] as const,
+        lists: () => [scope, "findings", "list"] as const,
+        list: (filter: FindingFilter, limit?: number) => [scope, "findings", "list", filter, limitSegment(limit)] as const,
+        details: () => [scope, "findings", "detail"] as const,
+        detail: (id: string) => [scope, "findings", "detail", id] as const,
+        countsAll: () => [scope, "findings", "counts"] as const,
+        counts: (request: FindingCountsRequest) => [scope, "findings", "counts", request] as const,
+        explanations: () => [scope, "findings", "explain"] as const,
+        explain: (request: ExplainRequest) => [scope, "findings", "explain", request] as const,
     },
     previews: {
         root: () => [scope, "preview"] as const,

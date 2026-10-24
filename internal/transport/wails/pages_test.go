@@ -69,15 +69,19 @@ func (f pageModelsFake) SummaryOf(context.Context, observe.SummaryRequest) (obse
 	return answer[observe.Summary](f.mode)
 }
 
-type packsFake struct{ mode failure }
+type siteModelFake struct{ mode failure }
 
-func (f packsFake) Pack(context.Context, sitemodel.PackRequest) (sitemodel.PackView, error) {
+func (f siteModelFake) Pack(context.Context, sitemodel.PackRequest) (sitemodel.PackView, error) {
 	return answer[sitemodel.PackView](f.mode)
+}
+
+func (f siteModelFake) SiteMap(context.Context, sitemodel.MapRequest) (sitemodel.MapView, error) {
+	return answer[sitemodel.MapView](f.mode)
 }
 
 func pagesService(mode failure) *wails.PagesService {
 	return wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: mode}),
-		ready[wails.ModelUseCase](pageModelsFake{mode: mode}), ready[wails.PackUseCase](packsFake{mode: mode}))
+		ready[wails.ModelUseCase](pageModelsFake{mode: mode}), ready[wails.SiteModelUseCase](siteModelFake{mode: mode}))
 }
 
 func TestPagesServiceConvertsEveryFailure(t *testing.T) {
@@ -85,7 +89,7 @@ func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 
 	assertMethodNames(t, pagesService(missing), []string{
 		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "SetCanonical",
-		"SetType", "Tree", "Unmap", "Update", "WriterPack",
+		"SetType", "SiteMap", "Tree", "Unmap", "Update", "WriterPack",
 	})
 	assertEveryMethodConverts(t, pagesService(missing), missingBody)
 	assertEveryMethodConverts(t, pagesService(panicking), panicBody)
