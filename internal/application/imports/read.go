@@ -41,6 +41,7 @@ type rowDraft struct {
 	trail        []string
 	expected     []string
 	match        pagemap.Match
+	picked       []pagemap.Page
 	unreadable   bool
 	wantsProduct bool
 	modeProduct  bool

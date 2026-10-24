@@ -40,6 +40,7 @@ type plan struct {
 	rows      int
 	lasting   []lasting
 	agreed    []string
+	chosen    []chosenRow
 	keys      map[string]map[string]struct{}
 }
 

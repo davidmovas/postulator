@@ -109,6 +109,22 @@ export const findingOptions = [
 ] as const;
 export type FindingOption = (typeof findingOptions)[number];
 
+export const findingBulkOptions: readonly FindingOption[] = [
+    "ignore",
+    "accept_site",
+    "accept_workbook",
+    "set_type",
+];
+
+export const findingOptionKinds = ["model", "run"] as const;
+export type FindingOptionKind = (typeof findingOptionKinds)[number];
+
+export const matchRules = ["mapped", "url", "slug", "entity", "title", "h1", "sku"] as const;
+export type MatchRule = (typeof matchRules)[number];
+
+export const bodyStates = ["empty", "client", "ours", "mixed", "dynamic"] as const;
+export type BodyState = (typeof bodyStates)[number];
+
 export const blockKinds = [
     "paragraph",
     "heading",
@@ -484,7 +500,7 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
     "scope_clash",
 ];
 
-export const importActions = ["create", "update", "skip"] as const;
+export const importActions = ["create", "update", "skip", "ambiguous"] as const;
 export type ImportAction = (typeof importActions)[number];
 
 export const exportFormats = ["xlsx", "csv"] as const;

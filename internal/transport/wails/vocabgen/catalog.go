@@ -5,6 +5,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/tools"
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -42,7 +43,15 @@ func catalog() []vocabulary {
 		{export: "findingCodes", tsType: "FindingCode", pkg: "internal/domain/finding", typeName: "Code"},
 		{export: "findingSeverities", tsType: "FindingSeverity", pkg: "internal/domain/finding", typeName: "Severity"},
 		{export: "findingStatuses", tsType: "FindingStatus", pkg: "internal/domain/finding", typeName: "Status"},
-		{export: "findingOptions", tsType: "FindingOption", pkg: "internal/domain/finding", typeName: "Option"},
+		{
+			export: "findingOptions", tsType: "FindingOption", pkg: "internal/domain/finding", typeName: "Option",
+			derived: []derivation{
+				{export: "findingBulkOptions", keep: func(value string) bool { return finding.Option(value).Bulk() }},
+			},
+		},
+		{export: "findingOptionKinds", tsType: "FindingOptionKind", pkg: "internal/domain/finding", typeName: "OptionKind"},
+		{export: "matchRules", tsType: "MatchRule", pkg: "internal/domain/pagemap", typeName: "MatchRule"},
+		{export: "bodyStates", tsType: "BodyState", pkg: "internal/domain/contextpack", typeName: "BodyState"},
 		{export: "blockKinds", tsType: "BlockKind", pkg: "internal/domain/block", typeName: "BlockKind"},
 		{export: "bodyKinds", tsType: "BodyKind", pkg: "internal/domain/block", typeName: "Kind"},
 		{export: "blockOwners", tsType: "BlockOwner", pkg: "internal/domain/block", typeName: "Owner"},

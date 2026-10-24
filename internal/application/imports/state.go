@@ -18,6 +18,7 @@ type siteFacts struct {
 	fields      map[string][]field.Value
 	terms       map[string][]pagemap.Term
 	termParents map[int64]int64
+	chosen      *choices
 }
 
 type siteState struct {

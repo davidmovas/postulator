@@ -21,11 +21,17 @@ type SheetMapping struct {
 	Mapping Mapping `json:"mapping"`
 }
 
+type Choice struct {
+	RowKey string `json:"rowKey"`
+	PageID string `json:"pageId"`
+}
+
 type PreviewRequest struct {
 	SiteID  string         `json:"siteId"`
 	Path    string         `json:"path"`
 	Mapping Mapping        `json:"mapping"`
 	Sheets  []SheetMapping `json:"sheets,omitempty"`
+	Choices []Choice       `json:"choices,omitempty"`
 }
 
 type PreviewResponse struct {
@@ -41,11 +47,12 @@ type ApplyRequest struct {
 	Path    string         `json:"path"`
 	Mapping Mapping        `json:"mapping"`
 	Sheets  []SheetMapping `json:"sheets,omitempty"`
+	Choices []Choice       `json:"choices,omitempty"`
 	Options ApplyOptions   `json:"options"`
 }
 
 func (r ApplyRequest) preview() PreviewRequest {
-	return PreviewRequest{SiteID: r.SiteID, Path: r.Path, Mapping: r.Mapping, Sheets: r.Sheets}
+	return PreviewRequest{SiteID: r.SiteID, Path: r.Path, Mapping: r.Mapping, Sheets: r.Sheets, Choices: r.Choices}
 }
 
 type ApplyResponse struct {

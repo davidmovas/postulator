@@ -28,6 +28,8 @@ type pageDraft struct {
 	own         ownership
 	modeType    pagemap.WPType
 	match       pagemap.Match
+	picked      []pagemap.Page
+	chosenKey   string
 	rows        []int
 	unit        int
 	generated   bool
@@ -143,6 +145,9 @@ func pagesOf(rows []rowDraft, p *plan) *drafts {
 			p.noteAt(row.at, string(importmap.FieldPath), CodeDuplicatePath, "the path repeats an earlier row and was merged: "+row.path)
 		} else {
 			draft.url, draft.match = row.url, row.match
+			if row.picked != nil {
+				draft.picked, draft.chosenKey = row.picked, row.key
+			}
 			if row.modeProduct {
 				draft.modeType = pagemap.WPProduct
 			}

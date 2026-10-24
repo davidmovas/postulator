@@ -85,6 +85,9 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 	if err != nil {
 		return workbook{}, err
 	}
+	if state.chosen, err = newChoices(req.Choices); err != nil {
+		return workbook{}, err
+	}
 
 	now := s.now()
 	book := workbook{plans: make([]plan, 0, len(reads))}
@@ -104,6 +107,9 @@ func (s *Service) compute(ctx context.Context, req PreviewRequest) (workbook, er
 		}
 		state = next
 		book.add(&planned)
+	}
+	if err := state.chosen.settle(); err != nil {
+		return workbook{}, err
 	}
 	book.report.settle()
 	return book, nil

@@ -35,6 +35,9 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 			if keepErr := s.keep(c, &book.plans[i]); keepErr != nil {
 				return keepErr
 			}
+			if mapErr := s.mapChosen(c, &book.plans[i]); mapErr != nil {
+				return mapErr
+			}
 		}
 		return s.remember(c, req, book.plans)
 	})
@@ -45,6 +48,16 @@ func (s *Service) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, e
 		return ApplyResponse{}, err
 	}
 	return ApplyResponse{Report: book.report, Counts: book.counts()}, nil
+}
+
+func (s *Service) mapChosen(ctx context.Context, computed *plan) error {
+	now := s.now()
+	for _, row := range computed.chosen {
+		if err := s.deps.Pages.SetRowKey(ctx, computed.siteID, row.pageID, row.key, row.trail, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) write(ctx context.Context, computed *plan) error {

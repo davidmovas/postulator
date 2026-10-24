@@ -1,6 +1,7 @@
 package imports
 
 import (
+	"cmp"
 	"encoding/json"
 	"slices"
 
@@ -14,9 +15,10 @@ import (
 type Action string
 
 const (
-	ActionCreate Action = "create"
-	ActionUpdate Action = "update"
-	ActionSkip   Action = "skip"
+	ActionCreate    Action = "create"
+	ActionUpdate    Action = "update"
+	ActionSkip      Action = "skip"
+	ActionAmbiguous Action = "ambiguous"
 )
 
 type FindingCode string
@@ -114,6 +116,14 @@ type PreviewPage struct {
 	Entity          string        `json:"entity,omitempty"`
 	Action          string        `json:"action"`
 	Generated       bool          `json:"generated,omitempty"`
+	RowKey          string        `json:"rowKey,omitempty"`
+	Candidates      []Candidate   `json:"candidates,omitempty"`
+}
+
+type Candidate struct {
+	PageID string `json:"pageId"`
+	Path   string `json:"path"`
+	Title  string `json:"title"`
 }
 
 type PreviewEntity struct {
@@ -287,5 +297,32 @@ func pageView(sheet string, p pagemap.Page, draft *pageDraft, action Action, pag
 		Entity:          draft.entity,
 		Action:          string(action),
 		Generated:       draft.generated,
+		RowKey:          draft.chosenKey,
+		Candidates:      candidatesOf(draft.picked),
 	}
+}
+
+func ambiguousView(sheet string, row *rowDraft) PreviewPage {
+	wpType := pagemap.WPPage
+	if row.wantsProduct {
+		wpType = pagemap.WPProduct
+	}
+	return PreviewPage{
+		Sheet: sheet, Path: row.url, MatchedBy: string(row.match.Rule), Title: row.title, H1: row.h1,
+		Keywords: application.KeywordViews(row.keywords), WPType: string(wpType), Entity: row.name,
+		Action: string(ActionAmbiguous), RowKey: row.key, Candidates: candidatesOf(row.match.Candidates),
+	}
+}
+
+func candidatesOf(pages []pagemap.Page) []Candidate {
+	if len(pages) == 0 {
+		return nil
+	}
+	sorted := slices.Clone(pages)
+	slices.SortFunc(sorted, func(a, b pagemap.Page) int { return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.ID, b.ID)) })
+	out := make([]Candidate, 0, len(sorted))
+	for i := range sorted {
+		out = append(out, Candidate{PageID: sorted[i].ID, Path: sorted[i].Path, Title: sorted[i].Title})
+	}
+	return out
 }

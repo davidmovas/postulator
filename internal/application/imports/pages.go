@@ -158,6 +158,10 @@ func (b *builder) updatePage(current pagemap.Page, draft *pageDraft, entityID *s
 	if entityID != nil {
 		next.EntityID = entityID
 	}
+	if draft.chosenKey != "" {
+		next.RowKey = draft.chosenKey
+		b.p.chosen = append(b.p.chosen, chosenRow{pageID: current.ID, key: draft.chosenKey, trail: draft.trail})
+	}
 	if err := b.compareTrail(current, draft); err != nil {
 		return err
 	}

@@ -58,6 +58,7 @@ func matchRows(rows []rowDraft, rowType importmap.RowType, state *siteState, p *
 		case row.match.Ambiguous():
 			p.noteAt(row.at, string(ruleFields[row.match.Rule]), CodeRowAmbiguous, ambiguity(row))
 			p.keepAmbiguous(row)
+			p.report.Pages = append(p.report.Pages, ambiguousView(p.rowSheet(row.at), row))
 			p.report.Skipped++
 		case row.path == "" && row.name == "" && len(row.levels) == 0 && !row.unreadable:
 			noTarget(row.at, p)
@@ -72,6 +73,7 @@ func matchRows(rows []rowDraft, rowType importmap.RowType, state *siteState, p *
 
 func (s *siteState) address(row *rowDraft, sheet *sheetRows) {
 	row.match = s.matchRow(row, sheet)
+	s.chosen.pick(row)
 	switch {
 	case row.match.Ambiguous():
 	case row.match.Found():

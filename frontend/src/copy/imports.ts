@@ -267,6 +267,7 @@ export const imports = {
         create: "new",
         update: "updated",
         skip: "skipped",
+        ambiguous: "pick a page",
     },
     edgeKinds: {
         parent: "Parent",
