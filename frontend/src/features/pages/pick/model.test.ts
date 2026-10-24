@@ -1,65 +1,59 @@
 import { describe, expect, it } from "vitest";
 
-import type { Page, PageTreeNode } from "../../../data/types.js";
-import { aPage } from "../../../testing/pages.js";
-import { branchOf, everyPage, indexTree, narrowTree, tick, toggled } from "./model.js";
+import type { SiteMapNode } from "../../../data/types.js";
+import { aNode } from "../../map/model/fixture.js";
+import type { Branches } from "../../map/model/tree.js";
+import { everyNode, kept, labelOf, tick, toggled } from "./model.js";
 
-const roots: PageTreeNode[] = [
-    {
-        page: aPage("shop", "/shop/", { entityId: "e1" }),
-        children: [
-            { page: aPage("mugs", "/shop/mugs/"), children: [{ page: aPage("travel", "/shop/mugs/travel/", { title: "Travel mugs" }), children: [] }] },
-            { page: aPage("bags", "/shop/bags/", { entityId: "e2" }), children: [] },
-        ],
-    },
-    { page: aPage("about", "/about/"), children: [] },
-];
+const shop = aNode("shop", "/shop/", { children: 2, descendants: 3 });
+const mugs = aNode("mugs", "/shop/mugs/", { children: 1, descendants: 1 });
+const bags = aNode("bags", "/shop/bags/");
+const travel = aNode("travel", "/shop/mugs/travel/");
 
-const unmapped = (page: Page): boolean => page.entityId === null;
+const branches: Branches = new Map([
+    ["", { nodes: [shop], hasMore: false, pending: false }],
+    ["shop", { nodes: [mugs, bags], hasMore: false, pending: false }],
+    ["mugs", { nodes: [travel], hasMore: false, pending: false }],
+]);
 
-describe("narrowTree", () => {
-    it("keeps a match with the parents that lead to it", () => {
-        const kept = narrowTree(roots, "travel", everyPage);
-        expect(kept.map((node) => node.page.id)).toStrictEqual(["shop"]);
-        expect(kept[0]?.children?.map((node) => node.page.id)).toStrictEqual(["mugs"]);
-    });
+const onSite = (node: SiteMapNode): boolean => node.page.onSite;
 
-    it("keeps only the pages a predicate accepts, with their ancestors", () => {
-        const kept = narrowTree(roots, "", unmapped);
-        expect(kept.map((node) => node.page.id)).toStrictEqual(["shop", "about"]);
-        expect(kept[0]?.children?.map((node) => node.page.id)).toStrictEqual(["mugs"]);
-    });
-
-    it("answers the whole tree when nothing narrows it", () => {
-        expect(narrowTree(roots, " ", everyPage)).toBe(roots);
-        expect(narrowTree(null, "x", everyPage)).toStrictEqual([]);
-    });
-});
-
-describe("branchOf", () => {
-    it("takes a page and everything below it that the predicate accepts", () => {
-        const index = indexTree(roots);
-        expect(branchOf("shop", index, unmapped)).toStrictEqual(["mugs", "travel", "about"].filter((id) => id !== "about"));
-        expect(branchOf("shop", index, everyPage)).toStrictEqual(["shop", "mugs", "bags", "travel"]);
-    });
-});
-
-describe("tick and toggled", () => {
-    it("reads chosen, required, partly chosen and untouched", () => {
-        const index = indexTree(roots);
+describe("tick", () => {
+    it("reads picked, required, partly picked below and untouched over the loaded branches", () => {
         const selected = new Set(["travel"]);
         const required = new Map([["mugs", "/shop/mugs/travel/"]]);
-        expect(tick("travel", selected, required, index)).toBe("on");
-        expect(tick("mugs", selected, required, index)).toBe("on");
-        expect(tick("shop", selected, new Map(), index)).toBe("some");
-        expect(tick("about", selected, required, index)).toBe("off");
+        expect(tick("travel", selected, required, branches)).toBe("on");
+        expect(tick("mugs", selected, required, branches)).toBe("on");
+        expect(tick("shop", selected, required, branches)).toBe("some");
+        expect(tick("bags", selected, required, branches)).toBe("off");
     });
 
-    it("adds and removes ids without touching the set it was given", () => {
-        const held: ReadonlySet<string> = new Set(["a"]);
-        const more = toggled(held, ["b", "c"], true);
-        expect([...more]).toStrictEqual(["a", "b", "c"]);
-        expect([...toggled(more, ["a", "c"], false)]).toStrictEqual(["b"]);
-        expect([...held]).toStrictEqual(["a"]);
+    it("reads a page picked from a branch that is not loaded as picked", () => {
+        expect(tick("elsewhere", new Set(["elsewhere"]), new Map(), branches)).toBe("on");
+    });
+});
+
+describe("toggled", () => {
+    it("adds or drops the ids and keeps every other pick", () => {
+        expect([...toggled(new Set(["a"]), ["b", "c"], true)]).toStrictEqual(["a", "b", "c"]);
+        expect([...toggled(new Set(["a", "b"]), ["a"], false)]).toStrictEqual(["b"]);
+    });
+});
+
+describe("kept", () => {
+    it("keeps a node the filter accepts and a node with children to open", () => {
+        const missing = (node: SiteMapNode): boolean => !onSite(node);
+        expect(kept(aNode("x", "/x/", { page: { ...shop.page, onSite: false } }), missing)).toBe(true);
+        expect(kept(bags, missing)).toBe(false);
+        expect(kept(shop, missing)).toBe(true);
+        expect(kept(bags, everyNode)).toBe(true);
+    });
+});
+
+describe("labelOf", () => {
+    it("names a tree row by its last segment and a search match by its whole path", () => {
+        expect(labelOf(travel, false)).toBe("travel/");
+        expect(labelOf(travel, true)).toBe("/shop/mugs/travel/");
+        expect(labelOf(aNode("root", "/"), false)).toBe("/");
     });
 });

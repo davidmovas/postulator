@@ -2,8 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../copy/index.js";
-import type { PageTreeNode, StepSpec } from "../../data/types.js";
-import { aPage } from "../../testing/pages.js";
+import type { StepSpec } from "../../data/types.js";
 import { renderScreen } from "../../testing/render.js";
 import { writesBody } from "./start-rewrite.js";
 
@@ -31,12 +30,7 @@ function mutation(into: unknown[]) {
     };
 }
 
-const roots: PageTreeNode[] = [
-    {
-        page: aPage("p-hub", "/peptides/", { entityId: "e1", wpId: 10, status: "exists" }),
-        children: [{ page: aPage("p-guide", "/lab-guides/", { entityId: "e2", wpId: 11, status: "exists" }), children: [] }],
-    },
-];
+const paths: Readonly<Record<string, string>> = { "p-hub": "/peptides/", "p-guide": "/lab-guides/" };
 
 vi.mock("../../data/hooks/runs.js", () => ({
     useEstimateRun: () => mutation(held.priced),
@@ -52,7 +46,7 @@ vi.mock("../../data/hooks/templates.js", () => ({
 }));
 
 vi.mock("../../data/hooks/pages.js", () => ({
-    usePageTree: () => ({ data: { roots }, isPending: false }),
+    usePagePaths: (ids: readonly string[]) => new Map(ids.flatMap((id) => (paths[id] === undefined ? [] : [[id, paths[id]]]))),
 }));
 
 vi.mock("./start-tree.js", () => ({

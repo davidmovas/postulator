@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { copy } from "../../../copy/index.js";
 import type { SegmentedOption, SelectOption } from "../../../ui/index.js";
 import { Field, Segmented, Select, Textarea } from "../../../ui/index.js";
-import { everyPage } from "../../pages/pick/model.js";
+import { everyNode } from "../../pages/pick/model.js";
 import { PageTree } from "../../pages/pick/tree.js";
 import type { GraphIndex } from "../model/index.js";
 import { keywordLines, unmapped } from "../model/proposals.js";
@@ -47,7 +47,7 @@ export interface ProposalPickProps {
 }
 
 export function ProposalPick({ siteId, index, pick, onPick }: ProposalPickProps): ReactElement {
-    const keep = useMemo(() => (pick.scope === "unmapped" ? unmapped : everyPage), [pick.scope]);
+    const keep = useMemo(() => (pick.scope === "unmapped" ? unmapped : everyNode), [pick.scope]);
     const lines = useMemo(() => keywordLines(pick.keywords), [pick.keywords]);
     const parents: SelectOption<string>[] = useMemo(
         () => [
@@ -78,7 +78,7 @@ export function ProposalPick({ siteId, index, pick, onPick }: ProposalPickProps)
                     keep={keep}
                     label={copy.graph.ai.pickPages}
                     picked={copy.graph.ai.pickedPages(pick.selected.size)}
-                    refusalOf={(page) => (page.path === rootPath ? copy.graph.ai.root : unmapped(page) ? null : copy.graph.ai.mapped)}
+                    refusalOf={(node) => (node.page.path === rootPath ? copy.graph.ai.root : unmapped(node) ? null : copy.graph.ai.mapped)}
                     filter={
                         <Segmented
                             label={copy.graph.ai.pickScope}

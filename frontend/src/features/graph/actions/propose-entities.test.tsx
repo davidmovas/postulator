@@ -2,8 +2,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
-import type { PageTreeNode, PreviewFromPagesRequest, ProposedEntity } from "../../../data/types.js";
-import { aPage } from "../../../testing/pages.js";
+import type { PreviewFromPagesRequest, ProposedEntity } from "../../../data/types.js";
+import { answerSiteMap, resetSiteMap } from "../../../testing/site-map.js";
+import { aNode } from "../../map/model/fixture.js";
 import { buildGraphIndex } from "../model/index.js";
 
 interface Calls {
@@ -42,15 +43,6 @@ const fromSite: ProposedEntity[] = [
     { pageId: "p4", path: "/shop/plates/", name: "Plates", label: "Plates", parent: "/shop/", existingEntityId: "e7" },
 ];
 
-const roots: PageTreeNode[] = [
-    {
-        page: aPage("shop", "/shop/", { entityId: "e1" }),
-        children: [
-            { page: aPage("mugs", "/shop/mugs/"), children: [{ page: aPage("travel", "/shop/mugs/travel/"), children: [] }] },
-        ],
-    },
-];
-
 function mutation<Request, Answer>(record: (request: Request) => void, answer: (request: Request) => Answer) {
     return {
         mutate: (input: { request: Request }, options?: { onSuccess?: (answered: Answer) => void }) => {
@@ -63,9 +55,10 @@ function mutation<Request, Answer>(record: (request: Request) => void, answer: (
     };
 }
 
-vi.mock("../../../data/hooks/pages.js", () => ({
-    usePageTree: () => ({ data: { roots }, isPending: false, error: null }),
-}));
+vi.mock("../../../data/hooks/pages.js", async () => {
+    const fake = await import("../../../testing/site-map.js");
+    return { useSiteMap: fake.fakeSiteMap };
+});
 
 vi.mock("../../../data/hooks/graph.js", () => ({
     usePreviewFromPages: () =>
@@ -110,6 +103,8 @@ beforeEach(() => {
     calls.previewed.length = 0;
     calls.keyworded.length = 0;
     calls.applied.length = 0;
+    resetSiteMap();
+    answerSiteMap({}, [aNode("shop", "/shop/", { entityId: "e1", children: 1, descendants: 2 }), aNode("mugs", "/shop/mugs/"), aNode("travel", "/shop/mugs/travel/")]);
 });
 
 describe("the entity proposal drawer", () => {

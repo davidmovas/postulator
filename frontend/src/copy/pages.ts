@@ -108,9 +108,8 @@ export const pages = {
         noMatch: "No page matches.",
         expand: "Expand",
         collapse: "Collapse",
-        branch: "Select the whole branch",
         unavailable: "This page cannot be picked here.",
-        showMore: (hidden: number) => `Show ${hidden} more`,
+        more: "Show more",
     },
     detail: {
         close: "Close",

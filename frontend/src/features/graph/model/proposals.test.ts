@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ProposedEntity } from "../../../data/types.js";
-import { aPage } from "../../../testing/pages.js";
+import { aNode } from "../../map/model/fixture.js";
 import { chosenOf, everyTickable, keywordLines, placeOf, tickable, toggled, unmapped, writesOf } from "./proposals.js";
 
 const mugs: ProposedEntity = { pageId: "p1", path: "/shop/mugs/", name: "Mugs", label: "Mugs", parent: "/shop/" };
@@ -17,9 +17,10 @@ describe("keywordLines", () => {
 
 describe("unmapped", () => {
     it("accepts a page without an entity and never the root", () => {
-        expect(unmapped(aPage("a", "/a/"))).toBe(true);
-        expect(unmapped(aPage("a", "/a/", { entityId: "e1" }))).toBe(false);
-        expect(unmapped(aPage("root", "/"))).toBe(false);
+        expect(unmapped(aNode("a", "/a/"))).toBe(true);
+        expect(unmapped(aNode("a", "/a/", { entityId: "" }))).toBe(true);
+        expect(unmapped(aNode("a", "/a/", { entityId: "e1" }))).toBe(false);
+        expect(unmapped(aNode("root", "/"))).toBe(false);
     });
 });
 

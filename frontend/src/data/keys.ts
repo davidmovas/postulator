@@ -131,6 +131,8 @@ export const keys = {
             [scope, "runs", "items", runId, status ?? "any", limitSegment(limit)] as const,
         artifactsOf: (itemId: string) => [scope, "runs", "artifact", itemId] as const,
         artifact: (itemId: string, kind: string) => [scope, "runs", "artifact", itemId, kind] as const,
+        parentsAll: () => [scope, "runs", "parents"] as const,
+        parents: (siteId: string, pageIds: readonly string[]) => [scope, "runs", "parents", { siteId, pageIds }] as const,
     },
     schedules: {
         root: () => [scope, "schedules"] as const,

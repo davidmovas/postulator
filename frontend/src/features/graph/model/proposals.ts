@@ -1,9 +1,9 @@
-import type { Page, ProposedEntity } from "../../../data/types.js";
+import type { ProposedEntity, SiteMapNode } from "../../../data/types.js";
 
 const rootPath = "/";
 
-export function unmapped(page: Page): boolean {
-    return (page.entityId === null || page.entityId === "") && page.path !== rootPath;
+export function unmapped(node: SiteMapNode): boolean {
+    return (node.entityId ?? "") === "" && node.page.path !== rootPath;
 }
 
 export function keywordLines(text: string): string[] {

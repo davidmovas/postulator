@@ -581,7 +581,7 @@
         "wait": 900
       },
       {
-        "click": "[data-run-target] label"
+        "click": "[data-page-pick] label"
       },
       {
         "wait": 300

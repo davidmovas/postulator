@@ -215,6 +215,7 @@ function handlersFor(client: QueryClient): Handlers {
                 invalidateBySite(client, keys.pages.lists(), siteId);
                 invalidateBySite(client, keys.pages.maps(), siteId);
                 invalidateBySite(client, keys.findings.lists(), siteId);
+                invalidateBySite(client, keys.runs.parentsAll(), siteId);
                 invalidateAll(
                     client,
                     keys.pages.details(),

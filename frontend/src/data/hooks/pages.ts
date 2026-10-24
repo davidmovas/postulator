@@ -20,7 +20,7 @@ import {
 import { infiniteGcTimeMs, quietMeta } from "../client.js";
 import { keys } from "../keys.js";
 import { useLockGate } from "../lock.js";
-import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
+import { useUnlockedInfinite, useUnlockedQueries, useUnlockedQuery } from "../query.js";
 import type { PageSort } from "../sorts.js";
 import type { Page, PageFilter, SiteMapFilter, SiteMapView } from "../types.js";
 import type { Cursor } from "../../lib/paging.js";
@@ -61,6 +61,25 @@ export function usePage(id: string | null) {
         queryFn: ({ signal }) => getPage({ id: id ?? "" }, signal),
         enabled: id !== null && id !== "",
     });
+}
+
+export function usePagePaths(ids: readonly string[], enabled: boolean): ReadonlyMap<string, string> {
+    const answered = useUnlockedQueries(
+        ids.map((id) => ({
+            queryKey: keys.pages.detail(id),
+            queryFn: ({ signal }: { signal: AbortSignal }) => getPage({ id }, signal),
+            enabled: enabled && id !== "",
+        })),
+    );
+    const out = new Map<string, string>();
+    answered.forEach((held, at) => {
+        const id = ids[at];
+        const path = held.data?.page.path;
+        if (id !== undefined && path !== undefined) {
+            out.set(id, path);
+        }
+    });
+    return out;
 }
 
 export function usePageTree(siteId: string | null) {

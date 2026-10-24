@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
-import { usePageTree } from "../../data/hooks/pages.js";
+import { usePagePaths } from "../../data/hooks/pages.js";
 import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
 import { useResolvedTemplate, useTemplates } from "../../data/hooks/templates.js";
 import type { AddedPage, Estimate } from "../../data/types.js";
@@ -27,7 +27,6 @@ import { RewriteSwitch, rewriteOf, writesBody } from "./start-rewrite.js";
 import { StartScope } from "./start-scope.js";
 import type { StartSeed } from "./start-seed.js";
 import { seededFields, seededRewrite } from "./start-seed.js";
-import { indexTree } from "./start-selection.js";
 import { TargetTree } from "./start-tree.js";
 import { kindGenerate } from "./statuses.js";
 
@@ -65,13 +64,12 @@ export function StartRunDrawer({
     const [estimate, setEstimate] = useState<Estimate | null>(null);
     const [added, setAdded] = useState<readonly AddedPage[]>([]);
     const [rewrite, setRewrite] = useState<ReadonlySet<string>>(new Set());
+    const [named, setNamed] = useState<ReadonlyMap<string, string>>(new Map());
 
     const priced = useEstimateRun();
     const start = useStartRun();
     const siteTemplates = useTemplates({ siteId }, { field: "name", desc: false }, listSize);
     const globalTemplates = useTemplates({ scope: "global" }, { field: "name", desc: false }, listSize);
-    const tree = usePageTree(open ? siteId : null);
-    const index = useMemo(() => indexTree(tree.data?.roots ?? null), [tree.data]);
     const first = [...selected][0] ?? null;
     const resolved = useResolvedTemplate(open && takesATemplate(kind) ? first : null, templateId);
     const fields = seededFields(seed, kind);
@@ -79,7 +77,9 @@ export function StartRunDrawer({
     const offersRewrite =
         takesATemplate(kind) && (seededPages.length > 0 || (resolved.data !== undefined && writesBody(resolved.data.spec.recipe)));
     const rewritten = offersRewrite ? rewriteOf(rewrite, selected) : [];
-    const pathOf = (id: string): string => index.byId.get(id)?.path ?? id;
+    const unnamed = useMemo(() => [...selected].filter((id) => !named.has(id)), [selected, named]);
+    const fetched = usePagePaths(unnamed, open && (offersRewrite || fields.length > 0));
+    const pathOf = (id: string): string => named.get(id) ?? fetched.get(id) ?? id;
 
     useEffect(() => {
         if (!open) {
@@ -94,6 +94,7 @@ export function StartRunDrawer({
         setEstimate(null);
         setAdded([]);
         setRewrite(new Set(seed?.rewrite ?? []));
+        setNamed(new Map());
         priced.reset();
         start.reset();
     }, [open, siteId, seed]);
@@ -187,8 +188,9 @@ export function StartRunDrawer({
                     siteId={siteId}
                     selected={selected}
                     problem={refusal.targets}
-                    onChange={(next) => {
+                    onChange={(next, pages) => {
                         setSelected(next);
+                        setNamed((held) => new Map([...held, ...pages.map((page): [string, string] => [page.id, page.path])]));
                         forget();
                     }}
                 />
