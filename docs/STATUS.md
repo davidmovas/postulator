@@ -13,21 +13,62 @@ writer's pack and the agent's view) on 2026-10-19 and 20, stage 3 (the field wri
 editable body, plugin 1.5.1) from 2026-10-20 to 23, and stage 4 (4.1 the matcher and the findings,
 4.2 the agent works the loop, 4.3a token counts beside bytes, 4.3b the screens) from 2026-10-23 to
 24. **Phase 14 closed on 2026-10-24 with the whole gate green on the final code on both stands.**
-None of it is released yet.
+**Phase 15, the release, opened the same day** (`docs/superpowers/plans/2026-10-24-phase-15-release.md`):
+session 1 is done, session 2 (polish, docs, the build and the PR) is next. None of it is released yet.
 
 ## Next, in order
 
-1. **A smoke test with a funded OpenAI key** on the owner's sandbox (8089), provisioned as the
-   replica (`task sandbox:provision STAND=replica E2E_PLUGIN=1`): connect it, sync, import the
-   client's workbook, run one hub and one product, one agent turn; judge the text by eye; compare
-   the ledger's real `input_tokens` with `go run ./cmd/tokenreport`, and only then decide the
-   proposed constants (`llm.WordTokens` 1.8, `llm.Tokens` 1.7 and 3.7) and whether tools load on
-   demand (`agent.toolLoading: deferred`).
-2. **Plugin 1.5.1 on the client's sites**, uploaded over 1.2.0 ("Replace current with uploaded");
-   a released app refuses to write through an older one.
-3. **The release**, only when the owner asks: a PR from `dev` to `master` and a tag.
+1. **Phase 15, session 2**: polish, the docs, `task build` and `task package`, and the PR from `dev`
+   to `master` when the owner asks. It plans itself from session 1's checkpoint in the phase plan,
+   and starts with the commands session 1 left owed (under **The gate**).
+2. **Plugin 1.5.2 on the client's sites**, uploaded over 1.2.0 ("Replace current with uploaded"); it
+   installs on PHP 7.2 and WordPress 5.7, and a released app refuses to write through one below 1.5.1.
+3. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+   `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24); settle the
+   output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and whether tools load on demand
+   (`agent.toolLoading: deferred`). Until then the owner judges the writer by hand from
+   `go run ./cmd/tokenreport -prompts out/prompts`.
 
 ## Where we are
+
+**2026-10-24, phase 15 session 1: what must hold before the client gets it.** The reasoning is under
+"phase 15, session 1" in `DECISIONS.md`; the task list and the checkpoint are in the phase plan.
+
+- **The owner's answers at the plan**: the run start's picker reads the Site map's tree; accepting a
+  site proposal approves its parent edge; the old-WordPress stand stays as `STAND=legacy`.
+- **The plugin** (agent P, `07d80d4`, `434f3fb`, `7ecb29f`):
+  - **Floors**: PHP 7.2 and WordPress 5.7.0 (`wp_robots`), proven by a function scan
+    (`tests/functions.php`) and strict tests on PHP 7.2.34, 7.4.33 and 8.5.12.
+  - **Version**: 1.5.2, with `wp.PluginMinimum` 1.5.1 still accepted.
+  - **The legacy stand** (WordPress 5.7.2, PHP 7.3, WooCommerce 6.5.2, Rank Math 1.0.98.1): the
+    contract suite ran 60 passed, with every skip naming what the stand lacks.
+- **Pages without an entity** (`d526041` to `0565751`, the screens `42bb440`, the proof `958d677`):
+  - **The finding**: `page_without_entity` per writable page.
+  - **The site proposal**: `contextpack.Map.EntityProposals` (no model call), behind
+    `PreviewFromPages{source: site}`.
+  - **The apply**: under the parent, with the edge approved and a clash skipped.
+  - **The person's path**: the inbox opens the proposal drawer, for one finding or the whole code.
+  - **The agent**: both proposal writers wait for the person in either mode.
+  - **The proof on the replica**: a planted product gets its entity under its category's twin hub,
+    then its run writes the description with no store key on the wire.
+- **The estimate's input side** (`692f710`, `faa5242`, `347a04e`):
+  - **The counter**: `llm.Tokens` at 1.7 tokens a word and 3.7 runes a token.
+  - **Overheads**: each step's own (writer 1,040, meta writer 440, linker call 290, judge 510 plus
+    the body it reads); none scales with the answer.
+  - **`Fit`**: it keeps a twentieth of its budget as headroom.
+  - **Result**: every measured input is within ±25% of its real count. It used to be 2 to 3.6 times
+    too high.
+- **Scale on a real store** (agent S, `99f7183` to `ad5e692`):
+  - **The test**: a seeded generator of 2,003 and 5,003 pages; the statements of the map, the
+    picker, the findings list, the pack, the estimate and the walk are equal at both sizes.
+  - **`page_map`** (0074): the folded map, kept fresh by triggers and a generation.
+  - **The reads**: the Site map and the findings read it by index.
+  - **The picker**: the run start's picker pages the map (`8f215d8`), with `RunsService.Parents`.
+- **The prompts** (`16553bd`): `go run ./cmd/tokenreport -prompts out/prompts` writes ten plain-text
+  files: the body writer, the meta writer and the judge on three replica pages, and an agent turn's
+  first round.
+- Schemas 66,394 bytes and 14,779 tokens (92 tools); the instructions with the replica's brief 1,929
+  tokens; migrations to 0074; plugin 1.5.2.
 
 **2026-10-24, stage 4.3b: the screens, the full gate, and phase 14 closed.** The reasoning is under
 "stage 4.3b" in `DECISIONS.md`; the task list and the checkpoint are under 4.3b in the phase plan.
@@ -561,6 +602,53 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
 
+**2026-10-24, on Windows, at the close of phase 15 session 1 (`8f215d8` and the docs after it).
+Partial: the memory guard stopped two legs, which are owed.**
+
+- **Run and green on the final code:**
+  - `task build` with no generated drift;
+  - `go vet` plain, `-tags e2e` and `-tags uiharness`; `gofmt -l .` silent; the comment check;
+  - `golangci-lint run ./...` and `--build-tags uiharness`, then `task lint:e2e` alone, 0 issues
+    each;
+  - the race groups:
+    - kernel and domain, 28 packages;
+    - runtime at `-p 1`, `runtime` 157 s and `steps` 67 s;
+    - adapters at `-p 1 -timeout 30m`, 28 packages with `sqlite` at 458 s. `wptest` failed once
+      inside the group, every failure a dial to the fake's own 127.0.0.1 port timing out on a
+      loaded machine; alone it passed in 5 s;
+    - app, transport, cmd and frontend at `-p 1`, 10 packages;
+  - `go test -count=1 ./internal/app/scale/` (it skips under `-race`), 113 s;
+  - `task plugin:lint` and `task plugin:test` on PHP 7.2.34, 7.4.33 and 8.5.12;
+  - `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 1,943 tests in 187 files;
+    `task ui:lint`, the harness in 195 s;
+  - `go run ./cmd/tokenreport`: 92 tools, 66,394 bytes and 14,779 tokens; every measured input
+    within ±25%.
+- **On the stands, before the gate:**
+  - the replica's fresh capture, then `TestAProductWithoutAnEntityIsWrittenThroughAProposal`, green;
+  - the legacy stand's contract suite (agent P), 60 passed and none failed.
+- **Stopped by the memory guard, owed.** Other sessions held the machine; once the WSL VM had kept
+  7.3 GB of cache, 1.3 GB stayed free.
+  - The application race group: `internal/application/...`. The packages S touched passed race at
+    `-p 1` during S's work, and every application package passed without race during the session.
+  - Therefore `covergate`.
+  - The replica's `e2e:full`, stopped while it compiled; no test had finished, and vanilla's was
+    never started.
+- **The commands owed**, one at a time on an idle machine (`wsl --shutdown` first frees the VM's
+  cache; Docker Desktop then needs a start). The merge keeps one line per block, because a package
+  measured twice would otherwise count twice:
+  ```
+  go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov1.out ./internal/kernel/... ./internal/domain/...
+  go test -race -count=1 -p 1 -timeout 40m -covermode=atomic -coverprofile=cov2.out ./internal/application/...
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov3.out ./internal/runtime/...
+  go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov4.out ./internal/adapters/...
+  go test -race -count=1 -p 1 -timeout 40m -covermode=atomic -coverprofile=cov5.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/...
+  awk 'FNR==1{next} {k=$1" "$2; if (!(k in c) || $3>c[k]) c[k]=$3} END {print "mode: atomic"; for (k in c) print k, c[k]}' cov1.out cov2.out cov3.out cov4.out cov5.out > coverage.out
+  go run ./cmd/covergate
+  task e2e:reset STAND=replica ; task plugin:deploy STAND=replica ; task e2e:full STAND=replica -- -v ; task e2e:down STAND=replica
+  task e2e:reset STAND=vanilla ; task plugin:deploy STAND=vanilla ; task e2e:full STAND=vanilla -- -v
+  task e2e:full:noplugin STAND=vanilla ; task e2e:up STAND=vanilla ; task e2e:down STAND=vanilla
+  ```
+
 **2026-10-24, on Windows, at the close of stage 4.3b and phase 14. Green on the final code, every
 leg.**
 - `go build ./...`; `go vet ./...`, `-tags e2e` and `-tags uiharness`; `gofmt -l .` silent; the
@@ -883,9 +971,12 @@ task ui:run · walk · shot · reset the harness window, seeded, DevTools on 922
 task ui:lint                      lint and tests behind the uiharness build tag
 task lint:e2e                     the build-tagged sources golangci-lint run skips
 task e2e:up · test · full · full:noplugin · down STAND=vanilla|replica   8088 or 8087; -- <args> to go test
+task e2e:up · test · down STAND=legacy   WordPress 5.7.2 on PHP 7.3 on 8086, the plugin's contract suite only
 task e2e:both                     both stands up and their suites, one after the other
 task plugin:deploy STAND=         the zip reinstalled over the plugin on a running stand
-task plugin:test                  wp-plugin/tests on PHP 7.4 (the href table)
+task plugin:lint · plugin:test    every plugin file and test on PHP 7.2, 7.4 and 8.5 (the href table, the meta deny list, the function scan)
+go run ./cmd/tokenreport -prompts out/prompts   the steps' and the agent's prompts as plain text, beside the report
+go test -count=1 ./internal/app/scale/          the 2,000- and 5,000-page counts, which a -race run skips
 task sandbox:up · down · reset    the owner's WordPress on 8089, bare unless E2E_PLUGIN=1
 task sandbox:provision STAND=     the owner's sandbox made a stand, on that command only
 go test -race -count=1 -p 2 -covermode=atomic -coverprofile=coverage.out ./...
@@ -921,9 +1012,30 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | 13 | The product frontend on one screen contract | done |
 | — | Hardening 2026-09-22/23: links, agent reliability, reversibility, agent cost, relink and repair as kinds, the content steps, the client scenario | done, gate green per wave |
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
-| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | stages 0 to 3 done (stage 3 on 2026-10-20 to 23, its gate green on both stands); stage 4 in three sessions, 4.1 half done (2026-10-23) |
+| 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | done, closed 2026-10-24 with the whole gate green on both stands |
+| 15 | The release (2026-10-24), two sessions in `2026-10-24-phase-15-release.md` | session 1 done on 2026-10-24 (the plugin's floors, pages without an entity, the input estimate, scale, the prompts); session 2 next |
 
 ## Known gaps
+
+- **Phase 15 session 1 left these:**
+  - **Whole-tree reads**: the Overview's drift count and the Reports' run panel and site tab still
+    read `Pages.Tree`, the whole tree. The run start's picker no longer does, but `Pages.Tree` stays
+    while they call it.
+  - **"Select the whole branch" is gone from the run start's picker**, since a branch loads a page
+    at a time; a server pick of a node's descendants (`page_map`'s trail makes it one query) would
+    bring it back.
+  - **The writer's pack reads a whole-site snapshot** once per pack and once per estimate: the same
+    statements at 2,003 and 5,003 pages, but 0.7 s against 4.6 s.
+  - **The observation's content and store stages read all pages every batch**, since a cached row
+    would let an update overwrite an edit made during the stage.
+  - **`page_map`'s triggers**: a migration that rebuilds `pages`, `page_fields` or `page_types`
+    must recreate them.
+  - **Without the plugin, on WordPress below 6.0 or WooCommerce below 6.9**, the front page or the
+    store's pages cannot be learned; with it, `/settings` answers both. Yoast 18.3 on the legacy
+    stand was not exercised.
+  - **The judge's and the meta writer's measured prompts read stand-ins** of what a run's writer
+    would write.
+  - **The estimate's sample is nine pages** of mostly WordPress boilerplate.
 
 - **`agent.Deps.Allowed` is never set**, so `Permit` can never deny in production and the
   transcript's refused tool row has no producer; `TestTheSeededConversationShowsADeniedToolCall`
@@ -1017,10 +1129,10 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 
 ## Next steps
 
-1. **Stage 4.1 of the site model, resumed at 4.1.4**: the row findings persisted, the resolution
-   use case, the samples, `TestTheWorkbookReconcilesWithTheSite` on both stands, and the gate legs
-   the 4.1 checkpoint lists; then 4.2 and 4.3, each planned at its start.
-2. **The pre-release smoke with a funded OpenAI key**: one generate run with the writer on flex
+1. **Phase 15, session 2**, planned at its start from session 1's checkpoint: the commands session 1
+   left owed, polish (the whole-tree reads above, the picker's whole-branch pick if the owner wants
+   it back), the docs, the build and the PR.
+2. **The pre-release smoke with a funded OpenAI key**, whenever there is one: one generate run with the writer on flex
    (the tier served and the reasoning shown in the ledger), one agent turn with tools (cached
    tokens from its second round), and the spend panel naming both by purpose and model; then the
    probe's open tests and the seven checks under **Known gaps**, and only then a decision on

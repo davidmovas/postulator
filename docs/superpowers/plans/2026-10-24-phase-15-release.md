@@ -37,32 +37,46 @@
 
 ### Tasks
 
-- [ ] **0.0 — the plan.** This list and the roadmap row. Commit `docs(plan): phase 15, the release, session 1's task list`.
-- [ ] **R — research.** The `@since` of every WordPress function and hook the plugin uses; the docker tags for that WordPress and its WP-CLI; the last WooCommerce, Rank Math and Yoast releases for it.
-- [ ] **P1 — the PHP matrix** (agent). The function scan, strict tests, `plugin:lint` and `plugin:test` on 7.2, 7.4 and 8.4, the CI matrix, the headers. Commit `build(plugin): lint and test the plugin on PHP 7.2, 7.4 and 8.4`.
-- [ ] **P2 — 1.5.2** (agent). The version on both sides, `PluginMinimum` 1.5.1, the pinned tests. Commit `feat(plugin): 1.5.2 declares the PHP and WordPress it runs on`.
-- [ ] **P3 — the legacy stand** (agent). `WP_IMAGE`, `WP_CLI_IMAGE`, `STAND=legacy`, the contract suite run once and recorded. Commit `test(e2e): a stand on the oldest WordPress the plugin declares`.
-- [ ] **E1 — the finding.** Code, option, kind, rule; derive raises and clears it. Commit `feat(observe): a writable page no entity carries is a finding`.
-- [ ] **E2 — the site proposal.** `graph.ProposeFromSite`, `PreviewFromPages` `source`. Commit `feat(graph): propose an entity for each page from the site itself`.
-- [ ] **E3 — apply under the parent.** Approved edge, scope, scope-and-key match, depth order, marked clashes; the mapping writers clear the finding. Commit `feat(graph): a site proposal is written under its parent`.
-- [ ] **E4 — the resolution and the tools.** `Resolve` and `ResolveMany` answer the preview; `Explain`; `source`; the two `Confirm` summaries and their registry test; the ceilings; `vocab.ts`; the bindings. Commit `feat(findings): propose entities for the pages without one`.
-- [ ] **C1 — the counter.** `llm.Tokens` on its own constants. Commit `feat(llm): count a pack's tokens as the report measured them`.
-- [ ] **C2 — the input estimate.** Per-step overhead, no share of the output, the judge's body; the ±25% and `Fit` tests. Commit `feat(runtime): price a step's input as its prompt measures`.
-- [ ] **S1 — the trace hook.** Commit `test(sqlite): count the statements and rows a store runs`.
-- [ ] **S2 — the generator and the counts.** Red where a count differs. Commit `test(scale): a generated site of 2,000 and 5,000 pages on a real store`.
-- [ ] **S3 — `page_map`.** 0074, the function and its writers, the differential test. Commit `feat(sitemodel): the folded map is stored as it is derived`.
-- [ ] **S4 — the Site map over `page_map`.** Commit `perf(sitemodel): a map page reads its nodes, never the site`.
-- [ ] **S5 — the findings list.** Commit `perf(findings): filter and page the findings in SQL`.
-- [ ] **S6 — the picker.** The map's API with what the picker reads; the parents from the run's plan; `Pages.Tree` gone. Commit `feat(pages): the run start picks from the site map`.
-- [ ] **S7 — the pack, the estimate and the observation.** Commit `perf(runtime): a run's estimate reads the site once`, and `perf(observe): a walk reads the model once per stage`.
-- [ ] **S8 — the plans.** `EXPLAIN QUERY PLAN` over every traced statement; the indexes. Commit `perf(sqlite): index what the large reads scan`.
-- [ ] **F1 — the inbox's proposal** (agent). Commit `feat(findings): propose entities from the inbox`.
-- [ ] **F2 — the picker** (agent). Commit `feat(runs): the run start picks pages from the site map`.
-- [ ] **X1 — the replica proof.** A product with no entity gets one through the proposal, a product run writes its description on the fake provider, the wire log carries no denied key, the store facts stand; then the replica capture. Commit `test(e2e): a product without an entity is written through a proposal`.
-- [ ] **W1 — the report over the new capture.** Meta measured, the product measured. Commit `feat(tokenreport): the meta writer and a product are measured`.
-- [ ] **W2 — the prompts.** `-prompts`, the agent's first round, `out/` ignored. Commit `feat(tokenreport): write the steps' prompts for a person to read`.
-- [ ] **G — the gate**, one leg at a time on the final code.
-- [ ] **D — the docs and the checkpoint.** `DECISIONS.md` (the 2026-10-12 ruling amended), `CLAUDE.md`, `ARCHITECTURE.md`, `STATUS.md`, this checkpoint. Commit `docs: phase 15, session 1`.
+- [x] **0.0 — the plan** (`a16f683`). This list and the roadmap row.
+- [x] **R — research.** A Sonnet researcher: 5.7.0 from `wp_robots`, the docker tags for 5.7, the plugin releases for it. Corrected three times by the stand (WP-CLI 2.6.0, Rank Math 1.0.98.1, Yoast 18.3).
+- [x] **P1 — the PHP matrix** (agent P, `07d80d4`). The function scan, strict tests, `plugin:lint` and `plugin:test` on 7.2, 7.4 and 8.5 (8.4 in the plan; 8.5 is the current 8.x), the CI matrix, the headers.
+- [x] **P2 — 1.5.2** (agent P, `434f3fb`). The version on both sides, `PluginMinimum` 1.5.1, the pinned tests.
+- [x] **P3 — the legacy stand** (agent P, `7ecb29f`). `WP_IMAGE`, `WP_CLI_IMAGE`, `STAND=legacy`, the contract suite: 60 passed, none failed, the skips named.
+- [x] **E1 — the finding** (`d526041`).
+- [x] **E2 — the site proposal** (`e17ff06`). `contextpack.Map.EntityProposals` in place of `graph.ProposeFromSite`, `contextpack` being the one package that sees the folded map, the fields and the graph.
+- [x] **E3 — apply under the parent** (`52e36f3`).
+- [x] **E4 — the resolution and the tools** (`0565751`). The registry test covers the two proposal writers, not every tool that maps a page (decision below).
+- [x] **C1 — the counter** (`692f710`).
+- [x] **C2 — the input estimate** (`faa5242`), with `Fit`'s headroom.
+- [x] **S1 to S8** (agent S): `99f7183`, `26df77d`, `d0979c9`, `f7643eb`, `93910b6`, `4c54bf9`, `aab40fd`, `87840d4`, `8fd5828`, `ffc2b72`, `ad5e692`. `Pages.Tree` stays: the Overview and the Reports still call it.
+- [x] **F1 — the inbox's proposal** (agent F, `42bb440`).
+- [x] **F2 — the picker** (agent F, `8f215d8`). "Select the whole branch" is gone.
+- [x] **X1 — the replica proof and the recapture** (`958d677`).
+- [x] **W1 — the report over the new capture** (`347a04e`). The linker's overhead became 290 once the product was measured.
+- [x] **W2 — the prompts** (`16553bd`).
+- [~] **G — the gate.** Every leg green except two the memory guard stopped: the application race group (with `covergate`) and both stands' `e2e:full`. The record and the commands owed are under "The gate" in `STATUS.md`.
+- [x] **D — the docs and the checkpoint** (`15f3e22` and this commit).
+
+#### Decided while building
+
+- **Only the proposal writers wait in either mode.** `pages_map_to_entity` and `pages_set_canonical` map a page to an entity a person or the agent names, and they follow the conversation's mode, as resolving a finding does. The plan's "every tool that maps a page" was narrowed to the two that write entity proposals.
+- **The writers clear `page_without_entity` as `model` with `page_mapped`**, not as the observation, so the record says who cleared it and an unmap still opens it again.
+- **The report judges a stand-in body** of the template's length, cut from the captured bodies' HTML, and measures the meta writer over a stand-in draft; their prompt files say so.
+- **The replica's capture accepts one product's site proposal**: every e2e test opens a database of its own, so the product only X1 mapped could not reach the capture.
+- **The scale tests skip under `-race`**, and the gate runs them without it.
+- **Agent S took Part 4 whole** rather than the orchestrator, so that its packages had one writer while the orchestrator ran the replica proof and the report.
+
+#### Checkpoint, 2026-10-24 (session 1 closed but for two gate legs)
+
+**Landed on `dev`**, the reasoning under "phase 15, session 1" in `DECISIONS.md`: the plugin's floors and 1.5.2 with the legacy stand; `page_without_entity` and the site proposals with the inbox and the replica proof; the input side of the estimate; `page_map` and the reads over it; the run start's picker over the map; the prompt files.
+
+**Owed**: the application race group, `covergate`, and `e2e:full` on both stands with `e2e:full:noplugin` on vanilla. The commands are under "The gate" in `STATUS.md`.
+
+**What session 2 starts with**:
+- the owed legs;
+- the Overview's and the Reports' whole-tree reads, the last callers of `Pages.Tree`;
+- the picker's whole-branch pick, if the owner wants it back;
+- the docs, `task package` and the PR when the owner asks.
 
 ## Session 2 — polish, docs, the build and the PR
 

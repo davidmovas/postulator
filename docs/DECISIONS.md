@@ -5002,3 +5002,94 @@ folded in). Agent P built Part 1, agent F the screens, agent S Part 4.
   - its types carry their templates (migration 0066), which the report now maps to the preset's
     built-in;
   - the replica's brief grew, so `instructionsCeilingTokens` is 1,932 for 1,929.
+
+### Part 4: scale on a real SQLite database (agent S)
+
+- **Counting**: `sqlite.Config.Trace` takes an interface the store declares (`Statement`, `Row`),
+  hooked through the driver's `Conn.Trace` on every writer and reader connection.
+  `sqlitetest.Counter` and `OpenCounted` serve the tests.
+  - **Blind spots**: the driver traces no statement run without arguments (`BEGIN`, `COMMIT`, DDL;
+    every repository statement has arguments).
+  - **Warm-up**: each new connection runs one `PRAGMA query_only`, so a measurement runs once
+    before it counts.
+- **The generator** (`internal/app/scale`, tests only) is seeded and writes 40 pages per block in
+  one unit, settled by one walk:
+  - hubs four levels deep, and two store categories folded into twin hubs;
+  - 12 products with 2 variations each, posts, and an archived page;
+  - two planned pages per block from a CSV import through `Imports.Apply`;
+  - every link type and region, fields, bodies, renders, and findings of six codes.
+
+  It runs at 2,003 and 5,003 pages, on the real core over a plain store file.
+- **The map is materialized** (the critic's blocking finding: a recursive query keeps statements
+  and rows flat while its work grows with the site).
+  - **What is stored**: `page_map` (migration 0074) holds a row per page: its folded parent, depth,
+    a root-first trail of ids, children, descendants, twin, hub, whether it is a node, its type,
+    its shown title and its search keys. `contextpack.Map.Rows()` computes them, and
+    `sitemodel.Refresh` writes only the rows that moved.
+  - **How it stays fresh**: triggers bump `page_map_sites.generation` when a page is inserted or
+    deleted, when its parent, status, path, title, H1, WordPress type, page type or technical
+    reason changes, when its title or H1 field changes, or when a page type changes. A read finds
+    `built < generation` inside its read transaction and refreshes once, reading outside the unit
+    and writing inside it after checking again. The derive stage refreshes at the end of every walk.
+  - **On upgrade**: 0074 seeds every existing site stale.
+  - **Proof**: a differential test compares the stored map with `contextpack.Map`, node for node,
+    after an import, a derive, an archive, a parent pin, a map-to-page, a page created and deleted,
+    and a retitle that breaks then remakes a twin.
+  - **Footgun**: a later migration that rebuilds `pages`, `page_fields` or `page_types` must
+    recreate these triggers.
+- **What reads it**:
+  - **`SiteMap`**: `page_map` by parent with a keyset on path. For the page's nodes only, it reads
+    their pages, types, open-finding counts, contextual links in and out (the audit's meaning),
+    bodies and written hashes. Search and type filters run in SQL.
+  - **The findings list**: it filters in SQL, `under` being a trail prefix and the page type
+    joined. Get, Resolve, Explain and ResolveMany read only the pages they name.
+  - **The picker's API**: `MapNode` gains `entityId` and `status`, and `RunsService.Parents`
+    answers the parents a selection writes first.
+  - **The estimate**: a context memo reads the site once per estimate.
+  - **The observation**: the render and fields stages read the model once per stage, and the
+    render stage reads when every body was observed in one query.
+- **The plans**: every distinct traced statement passes `EXPLAIN QUERY PLAN` without a scan of a
+  large table, or a paged read that sorts every match, unless listed as a whole-site read by design.
+  The indexes are `page_map_children`, `page_map_trail`, `page_map_nodes` and `findings_site_code`;
+  without the last, the code filter scans.
+
+| operation (2,003 / 5,003 pages) | statements before → after | rows before → after | time before → after |
+|---|---|---|---|
+| a Site map page (7 variants) | 23 → 10 to 13, both sizes | 69.5k / 174k → 20 to 715, both | 1.6–2.9 s / 6–25 s → 3–100 ms / 6–142 ms |
+| the run start's picker | `Pages.Tree` 3 → a level 12, `Parents` 15 | 2,054 / 5,129 → 61 and 14 | 0.1 / 0.9 s → 7–10 ms |
+| the findings list (5 filters) | 12 → 6 to 8 | 28.9k / 72.2k → 46 to 79 | 0.6–2 s / 2.4–20 s → 3–6 / 4–21 ms |
+| a writer's pack | 19 → 19 | a whole-site snapshot, by design | 0.8 / 0.7 s → 0.7 / 4.6 s |
+| a run's estimate (5 targets) | 486 → 292 | 449k / 1.12M → 50.3k / 124k | 10 / 15 s → 1.4 / 6.5 s |
+| an incremental walk | 1,925 / 4,700 fixed + 46.5 a page → 91 fixed + 58.9 a page, both sizes | | |
+
+  The timings swung two to six times between runs, because other work held the machine's CPUs.
+  They are logged and never asserted. A touched page costs about 12 statements more than before,
+  for the staleness triggers and the map's refresh.
+- **Whole-site reads kept by design**:
+  - the writer's pack, which reads a snapshot once per pack and once per estimate;
+  - `graphPreflight`, which reads entities, edges and pages once per estimate;
+  - a refresh after a stale mark;
+  - a map search or type filter, which walks the site's map rows in path order until a page fills;
+  - findings under a node or of a type, which sort that subtree's or type's findings before paging;
+  - the engine's sweep of pending items;
+  - in the observation, the content and store stages, which still read all pages and the open
+    findings of their codes every batch, since a cached row would let `Pages.Update` overwrite an
+    edit made during the stage;
+  - `SiteModel.Map` for the site proposals, `Pages.Tree`, the link audit, the brief and explore.
+- **The scale tests skip under `-race`** (`//go:build !race`): under the detector the package would
+  run past the default ten minutes, and it measures counts the detector does not change. The gate
+  runs them without race.
+
+### Deviations from the request
+
+- **The legacy stand runs PHP 7.3, not 7.2**: no WordPress 5.7 image exists on 7.2. PHP 7.2 is
+  proven by the lint, the tests and the function scan on `php:7.2.34-cli`.
+- **The current 8.x is 8.5**, not the plan's 8.4.
+- **The sync's counts are a fixed part and a per-page part**, each equal at both sizes. A raw count
+  cannot be equal when 5% of the site grows with it.
+- **`Pages.Tree` stays**: the Overview and the Reports read it.
+- **"Select the whole branch" left the run start's picker.**
+- **Only the two proposal writers wait in either mode**, not every tool that maps a page.
+- **The judge is measured over a stand-in body.**
+- **The gate is partial**: the memory guard stopped the application race group and both stands'
+  `e2e:full`; `STATUS.md` lists the commands.
