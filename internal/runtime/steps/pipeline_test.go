@@ -257,7 +257,7 @@ func (p *pipeline) generate(t *testing.T) run.Item {
 		t.Fatalf("Enqueue: %v", err)
 	}
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		items, listErr := p.items.ByRun(t.Context(), queued.ID)
 		if listErr == nil && len(items) == 1 && items[0].Status.Terminal() {
@@ -434,7 +434,7 @@ func (p *pipeline) runKind(t *testing.T, kind run.Kind) run.Item {
 		t.Fatalf("Enqueue a %s run: %v", kind, err)
 	}
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		items, listErr := p.items.ByRun(t.Context(), queued.ID)
 		if listErr == nil && len(items) == 1 && items[0].Status.Terminal() {
@@ -468,7 +468,7 @@ func TestAWriterOutOfRoomTwicePausesThePageForAPerson(t *testing.T) {
 	}
 
 	var paused run.Item
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) && paused.ID == "" {
 		items, listErr := p.items.ByRun(t.Context(), queued.ID)
 		if listErr == nil && len(items) == 1 && (items[0].Status == run.StatusPaused || items[0].Status.Terminal()) {

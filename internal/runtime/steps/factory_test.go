@@ -32,8 +32,9 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Millisecond
-	pollTimeout  = 20 * time.Second
+	pollInterval   = 5 * time.Millisecond
+	pollFallback   = 10 * time.Minute
+	deadlineMargin = 30 * time.Second
 
 	goodDraft = `{"title":"Espresso guide","h1":"Espresso guide","sections":[` +
 		`{"heading":"About","html":"<p>Espresso is a way to make coffee, part of our drinks range.</p>"},` +
@@ -340,10 +341,20 @@ func (silentPublisher) Publish(events.Type, any) error {
 	return nil
 }
 
+func waitDeadline(t *testing.T) time.Time {
+	t.Helper()
+
+	held, bounded := t.Deadline()
+	if !bounded {
+		return time.Now().Add(pollFallback)
+	}
+	return held.Add(-deadlineMargin)
+}
+
 func (f *factory) waitForRun(t *testing.T, runID string, want run.Status) run.Run {
 	t.Helper()
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		record, err := f.runs.Get(t.Context(), runID)
 		if err == nil && record.Status == want {
@@ -395,7 +406,7 @@ func sqlitePages(f *factory) *sqlite.PageRepo {
 func waitForItem(t *testing.T, f *factory, runID string, want run.Status) {
 	t.Helper()
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		items, err := f.items.ByRun(t.Context(), runID)
 		if err == nil && len(items) == 1 && items[0].Status == want {

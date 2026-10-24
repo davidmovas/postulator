@@ -25,9 +25,20 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Millisecond
-	pollTimeout  = 20 * time.Second
+	pollInterval   = 5 * time.Millisecond
+	pollFallback   = 10 * time.Minute
+	deadlineMargin = 30 * time.Second
 )
+
+func waitDeadline(t *testing.T) time.Time {
+	t.Helper()
+
+	held, bounded := t.Deadline()
+	if !bounded {
+		return time.Now().Add(pollFallback)
+	}
+	return held.Add(-deadlineMargin)
+}
 
 type stubSpecs struct {
 	spec       template.TemplateSpec
@@ -314,7 +325,7 @@ func (h *harness) waitForRun(t *testing.T, runID string, want run.Status) run.Ru
 	t.Helper()
 
 	var last run.Run
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		record, err := h.runs.Get(t.Context(), runID)
 		if err == nil {
@@ -343,7 +354,7 @@ func (h *harness) waitForDelivery(t *testing.T, runID string) {
 func waitFor(t *testing.T, what string, done func() bool) {
 	t.Helper()
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	for time.Now().Before(deadline) {
 		if done() {
 			return

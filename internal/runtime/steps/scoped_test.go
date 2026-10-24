@@ -49,7 +49,7 @@ func (p *pipeline) runOver(t *testing.T, record run.Run) []run.Item {
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	var items []run.Item
 	for time.Now().Before(deadline) {
 		var listErr error

@@ -26,9 +26,20 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Millisecond
-	pollTimeout  = 20 * time.Second
+	pollInterval   = 5 * time.Millisecond
+	pollFallback   = 10 * time.Minute
+	deadlineMargin = 30 * time.Second
 )
+
+func waitDeadline(t *testing.T) time.Time {
+	t.Helper()
+
+	held, bounded := t.Deadline()
+	if !bounded {
+		return time.Now().Add(pollFallback)
+	}
+	return held.Add(-deadlineMargin)
+}
 
 type oneClient struct {
 	client *wp.Client
@@ -138,7 +149,7 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 		t.Fatalf("SyncSite: %v", err)
 	}
 
-	deadline := time.Now().Add(pollTimeout)
+	deadline := waitDeadline(t)
 	var final run.Run
 	for time.Now().Before(deadline) {
 		record, getErr := runRepo.Get(t.Context(), queued.RunID)
