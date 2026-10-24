@@ -142,7 +142,7 @@ ITS OTHER FIELDS
 - Title: Checkout
 --- fits in 3000 tokens
 
-=== /healing-peptides/ · Hub · body · 690 tokens
+=== /healing-peptides/ · Hub · body · 726 tokens
 THE PAGE
 Path: /healing-peptides/
 Title: Healing Peptides
@@ -170,6 +170,7 @@ The parent comes from the page's JSON-LD breadcrumb.
 PAGES THIS FIELD LINKS TO
 - /peptides/ (Peptides, above it, required). Anchors: Peptides. About it: Hub for Peptides under Home; lists Bacteriostatic Water, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more; its children are Healing Peptides
 - /bpc-157/ (BPC-157, below it). Anchors: BPC-157. About it: Hub for BPC-157 under Healing Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more
+- /product/bpc-157-peptide/ (BPC-157 Peptide, below it). Anchors: BPC-157 Peptide. About it: Lyophilized BPC-157 in a sealed vial.
 - /tb-500/ (TB-500, below it). Anchors: TB-500. About it: TB-500 is a synthetic fragment of thymosin beta-4, sold for research use only.
 
 PRODUCTS IT LISTS
@@ -618,7 +619,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content; a product listing of 8 links outside the content
 --- fits in 3000 tokens
 
-=== /product/bpc-157-peptide/ · Product · product_description · 706 tokens
+=== /product/bpc-157-peptide/ · Product · product_description · 801 tokens
 THE PAGE
 Path: /product/bpc-157-peptide/
 Title: BPC-157 Peptide
@@ -631,6 +632,10 @@ Field: Product description
 The current value is the client's: keep it as it stands and write only what it lacks.
 Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
 
+THE ENTITY
+Entity: BPC-157 Peptide
+- Strength: 10 mg, 5 mg
+
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 BPC-157 is a pentadecapeptide studied for tissue repair.
 Each vial is sealed under nitrogen.
@@ -640,6 +645,9 @@ The parent comes from the page's JSON-LD breadcrumb.
 - Healing Peptides (/product-category/peptides/healing-peptides/, Store category): Store category for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are BPC-157, BPC-157 Capsules, BPC-157 Nasal Spray and 2 more
 - Peptides (/product-category/peptides/, Store category): Store category for Peptides under Home; lists Bacteriostatic Water; its children are Healing Peptides, Bacteriostatic Water
 - Home (/, Entity): Research peptides for the laboratory, shipped cold and sealed under nitrogen.
+
+PAGES THIS FIELD LINKS TO
+- /healing-peptides/ (Healing Peptides, above it, required). Anchors: Healing Peptides. About it: Hub for Healing Peptides under Peptides; lists BPC-157 Capsules, BPC-157 Nasal Spray, BPC-157 Peptide and 1 more; its children are TB-500
 
 PRODUCTS IT LISTS
 - BPC-157 Capsules (/product/bpc-157-capsules/): price 49.00, SKU BPC157-CAPS, in stock; Capsules for research use.

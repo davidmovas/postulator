@@ -79,6 +79,10 @@ type writerStand struct {
 	keptText   string
 	edit       clientEditPlan
 	graph      []seededEntity
+
+	product         string
+	productCategory string
+	productHub      string
 }
 
 func writerStandOf(t *testing.T, env environment) writerStand {
@@ -122,6 +126,9 @@ func writerStandOf(t *testing.T, env environment) writerStand {
 				{name: "Lab Guides", path: "/lab-guides/", keyword: "peptide lab guides", volume: 300},
 				{name: "Reconstitution", path: "/reconstitution/", parent: "Lab Guides", keyword: "peptide reconstitution", volume: 1300},
 			},
+			product:         "/product/bpc-157-peptide/",
+			productCategory: "healing-peptides",
+			productHub:      "/healing-peptides/",
 		}
 	}
 	t.Fatalf("E2E_STAND is %q, and the writer test knows the vanilla and the replica stands", env.stand)

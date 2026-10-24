@@ -59,6 +59,9 @@ func TestTheStandModelIsCaptured(t *testing.T) {
 	siteID := owner.Site.ID
 	runSync(t, core, siteID)
 	seedStandGraph(t, core, siteID, stand.graph)
+	if stand.product != "" {
+		proposedFromTheSite(t, core, siteID, stand.product)
+	}
 
 	rows := readStandRows(t, core, siteID)
 	ids := rows.settle()
