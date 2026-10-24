@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../copy/index.js";
-import { entityTypeLabel, formatScore, scored } from "./labels.js";
+import { proposalClashes } from "../../generated/vocab.js";
+import { clashLabel, entityTypeLabel, formatScore, scored } from "./labels.js";
+
+describe("clashLabel", () => {
+    it("words every clash a site proposal can carry", () => {
+        for (const clash of proposalClashes.filter((held) => held !== "")) {
+            expect(clashLabel(clash)).not.toBe(clash);
+            expect(clashLabel(clash).length).toBeGreaterThan(0);
+        }
+    });
+
+    it("says nothing for a proposal that does not clash", () => {
+        expect(clashLabel("")).toBe("");
+    });
+});
 
 describe("formatScore", () => {
     it("shows a computed score to two places", () => {

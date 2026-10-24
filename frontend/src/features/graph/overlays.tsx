@@ -102,9 +102,7 @@ export function GraphOverlays({
                     }
                 }}
                 siteId={siteId}
-                source={proposing === "keywords" ? "keywords" : "pages"}
-                index={index}
-                onReview={onReviewQueue}
+                start={{ kind: "pick", source: proposing === "keywords" ? "keywords" : "pages", index, onReview: onReviewQueue }}
             />
             <ProposeRelatedDialog
                 open={proposing === "related"}

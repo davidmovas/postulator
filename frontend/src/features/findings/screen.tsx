@@ -5,8 +5,9 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { useFindingCounts, useFindings, useResolveFinding } from "../../data/hooks/findings.js";
-import type { Finding, FindingChoice, SyncSiteRequest } from "../../data/types.js";
+import type { Finding, FindingChoice, PreviewFromPagesRequest, SyncSiteRequest } from "../../data/types.js";
 import { CountBadge, Screen } from "../../ui/index.js";
+import { ProposeEntitiesDrawer } from "../graph/actions/propose-entities.js";
 import { cardsSearch } from "../graph/model/params.js";
 import { StartRunDrawer } from "../runs/start.js";
 import type { StartSeed } from "../runs/start-seed.js";
@@ -14,9 +15,11 @@ import { seedOf } from "../runs/start-seed.js";
 import { SyncDialog } from "../sites/sync-dialog.js";
 import { BulkDialog } from "./bulk-dialog.js";
 import { FindingList } from "./list.js";
+import type { BulkChoice } from "./model/bulk.js";
 import { bulkOptions } from "./model/bulk.js";
 import { countsOf, defaultQuery, filterOf, narrowed, readQuery, writeQuery } from "./model/params.js";
 import type { FindingsQuery } from "./model/params.js";
+import { useBulkProposal } from "./proposals.js";
 import { FindingsRail } from "./rail.js";
 import type { Resolving } from "./resolve-dialog.js";
 import { ResolveDialog } from "./resolve-dialog.js";
@@ -25,6 +28,7 @@ import { FindingsToolbar } from "./toolbar.js";
 
 const pageSize = 100;
 const runKind = "run";
+const proposalKind = "proposal";
 
 export function FindingsScreen(): ReactElement {
     const params = useParams();
@@ -41,6 +45,7 @@ export function FindingsScreen(): ReactElement {
     const [bulk, setBulk] = useState<string | null>(null);
     const [seed, setSeed] = useState<StartSeed | null>(null);
     const [sync, setSync] = useState<SyncSiteRequest | null>(null);
+    const [proposing, setProposing] = useState<PreviewFromPagesRequest | null>(null);
 
     const offered = useMemo(() => bulkOptions(query.code, query.status, findings), [query.code, query.status, findings]);
     const codeCount = counts.data?.codes?.find((held) => held.code === query.code)?.count ?? 0;
@@ -54,6 +59,16 @@ export function FindingsScreen(): ReactElement {
         void counts.refetch();
     };
 
+    const proposal = useBulkProposal({ siteId, code: query.code, filter, onSeed: setProposing, onGone: reread });
+
+    const bulkChosen = (choice: BulkChoice): void => {
+        if (choice.kind === proposalKind) {
+            proposal.propose(choice.name);
+            return;
+        }
+        setBulk(choice.name);
+    };
+
     const toRun = (runId: string): void => {
         setSeed(null);
         setSync(null);
@@ -65,7 +80,7 @@ export function FindingsScreen(): ReactElement {
             void navigate(`/s/${siteId}/graph${cardsSearch(finding.entityId ?? "")}`);
             return;
         }
-        if (option.kind !== runKind) {
+        if (option.kind !== runKind && option.kind !== proposalKind) {
             setResolving({ finding, option: option.name });
             return;
         }
@@ -77,6 +92,8 @@ export function FindingsScreen(): ReactElement {
                         setSeed(seedOf(answered.start));
                     } else if (answered.sync !== undefined && answered.sync !== null) {
                         setSync(answered.sync);
+                    } else if (answered.proposals !== undefined && answered.proposals !== null) {
+                        setProposing(answered.proposals);
                     }
                 },
             },
@@ -92,7 +109,7 @@ export function FindingsScreen(): ReactElement {
                 <FindingsToolbar
                     siteId={siteId}
                     query={query}
-                    bulk={{ options: codeCount === 0 ? [] : offered, count: codeCount, onBulk: setBulk }}
+                    bulk={{ options: codeCount === 0 ? [] : offered, count: codeCount, gathering: proposal.gathering, onBulk: bulkChosen }}
                     onChange={change}
                 />
             }
@@ -163,6 +180,18 @@ export function FindingsScreen(): ReactElement {
                 }}
                 onStarted={toRun}
             />
+            {proposing === null ? null : (
+                <ProposeEntitiesDrawer
+                    open={true}
+                    onOpenChange={(next) => {
+                        if (!next) {
+                            setProposing(null);
+                        }
+                    }}
+                    siteId={siteId}
+                    start={{ kind: "seed", seed: proposing }}
+                />
+            )}
         </Screen>
     );
 }

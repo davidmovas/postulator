@@ -1,4 +1,4 @@
-import type { InfiniteData, QueryClient } from "@tanstack/react-query";
+import type { InfiniteData, QueryClient, QueryKey } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { Cursor, List } from "../../lib/paging.js";
@@ -198,6 +198,7 @@ export interface BatchInput<Request> {
 
 function useGraphBatch<Request extends { siteId: string }, Answer>(
     call: (request: Request, signal?: AbortSignal) => Promise<Answer>,
+    alsoMoved: readonly QueryKey[] = [],
 ) {
     const client = useQueryClient();
     return useMutation({
@@ -206,9 +207,14 @@ function useGraphBatch<Request extends { siteId: string }, Answer>(
             void client.invalidateQueries({ queryKey: keys.graph.root() });
             void client.invalidateQueries({ queryKey: keys.pages.lists() });
             void client.invalidateQueries({ queryKey: keys.reports.site(input.request.siteId) });
+            for (const key of alsoMoved) {
+                void client.invalidateQueries({ queryKey: key });
+            }
         },
     });
 }
+
+const mappingMoves: readonly QueryKey[] = [keys.findings.root(), keys.pages.maps(), keys.pages.models()];
 
 export function useProposeRelated() {
     return useGraphBatch((request: Parameters<typeof proposeRelated>[0], signal?: AbortSignal) => proposeRelated(request, signal));
@@ -227,7 +233,10 @@ export function useProposeFromKeywords() {
 }
 
 export function useApplyProposals() {
-    return useGraphBatch((request: Parameters<typeof applyProposals>[0], signal?: AbortSignal) => applyProposals(request, signal));
+    return useGraphBatch(
+        (request: Parameters<typeof applyProposals>[0], signal?: AbortSignal) => applyProposals(request, signal),
+        mappingMoves,
+    );
 }
 
 export function useRecomputeScores() {

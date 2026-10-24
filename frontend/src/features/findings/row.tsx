@@ -3,7 +3,8 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import type { Finding, FindingChoice } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
-import { Button, EditNoteIcon, PlayArrowIcon, StatusBadge } from "../../ui/index.js";
+import type { IconComponent } from "../../ui/index.js";
+import { Button, EditNoteIcon, HubIcon, PlayArrowIcon, StatusBadge } from "../../ui/index.js";
 import { findingCodeLabel, severityLabel, severityTone } from "../pages/model/labels.js";
 import { optionDoes, optionLabel, resolutionLabel, resolvedByLabel } from "./labels.js";
 import { findingSentence } from "./model/subject.js";
@@ -14,11 +15,22 @@ export const findingRowHeight = 88;
 
 const openStatus = "open";
 const runKind = "run";
+const proposalKind = "proposal";
 const cardCode = "entity_card_proposed";
 const acceptOption = "accept";
 
 export function onTheGraph(finding: Finding, option: string): boolean {
     return finding.code === cardCode && option === acceptOption;
+}
+
+function iconOf(option: FindingChoice, graph: boolean): IconComponent | undefined {
+    if (option.kind === runKind) {
+        return PlayArrowIcon;
+    }
+    if (option.kind === proposalKind) {
+        return HubIcon;
+    }
+    return graph ? EditNoteIcon : undefined;
 }
 
 function OptionButton({ finding, option, onChoose }: { finding: Finding; option: FindingChoice; onChoose: () => void }): ReactElement {
@@ -27,7 +39,7 @@ function OptionButton({ finding, option, onChoose }: { finding: Finding; option:
         <Button
             size="sm"
             variant="secondary"
-            icon={option.kind === runKind ? PlayArrowIcon : graph ? EditNoteIcon : undefined}
+            icon={iconOf(option, graph)}
             title={graph ? said.cards : optionDoes(option.name)}
             data-finding-option={option.name}
             onClick={onChoose}

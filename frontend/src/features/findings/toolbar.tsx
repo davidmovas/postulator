@@ -7,14 +7,16 @@ import { usePageTypes } from "../../data/hooks/templates.js";
 import { findingStatuses } from "../../generated/vocab.js";
 import type { FindingStatus } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
-import { AccountTreeIcon, Button, CloseIcon, Dialog, Segmented, Select, TaskAltIcon, Toolbar } from "../../ui/index.js";
+import { AccountTreeIcon, Button, CloseIcon, Dialog, HubIcon, Segmented, Select, TaskAltIcon, Toolbar } from "../../ui/index.js";
 import { optionLabel, statusLabel } from "./labels.js";
+import type { BulkChoice } from "./model/bulk.js";
 import type { FindingsQuery } from "./model/params.js";
 import { PageSearch } from "./page-search.js";
 
 const said = copy.findings;
 
 const everyType = "every";
+const proposalKind = "proposal";
 
 function UnderChip({ pageId, onClear }: { pageId: string; onClear: () => void }): ReactElement {
     const page = usePage(pageId);
@@ -76,9 +78,30 @@ function UnderPick({ siteId, onPick }: { siteId: string; onPick: (pageId: string
 }
 
 export interface BulkOffer {
-    options: readonly string[];
+    options: readonly BulkChoice[];
     count: number;
-    onBulk: (option: string) => void;
+    gathering: boolean;
+    onBulk: (choice: BulkChoice) => void;
+}
+
+function BulkButton({ choice, offer }: { choice: BulkChoice; offer: BulkOffer }): ReactElement {
+    const proposal = choice.kind === proposalKind;
+    return (
+        <Button
+            size="sm"
+            variant="secondary"
+            icon={proposal ? HubIcon : TaskAltIcon}
+            title={proposal ? (offer.gathering ? said.bulk.collecting : said.bulk.proposeTooltip) : said.bulk.tooltip}
+            busy={proposal && offer.gathering}
+            disabled={proposal && offer.gathering}
+            data-finding-bulk={choice.name}
+            onClick={() => {
+                offer.onBulk(choice);
+            }}
+        >
+            {proposal ? said.bulk.propose(offer.count) : said.bulk.all(optionLabel(choice.name), offer.count)}
+        </Button>
+    );
 }
 
 export interface FindingsToolbarProps {
@@ -131,20 +154,8 @@ export function FindingsToolbar({ siteId, query, bulk, onChange }: FindingsToolb
                 />
             )}
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                {bulk.options.map((option) => (
-                    <Button
-                        key={option}
-                        size="sm"
-                        variant="secondary"
-                        icon={TaskAltIcon}
-                        title={said.bulk.tooltip}
-                        data-finding-bulk={option}
-                        onClick={() => {
-                            bulk.onBulk(option);
-                        }}
-                    >
-                        {said.bulk.all(optionLabel(option), bulk.count)}
-                    </Button>
+                {bulk.options.map((choice) => (
+                    <BulkButton key={choice.name} choice={choice} offer={bulk} />
                 ))}
             </div>
         </Toolbar>

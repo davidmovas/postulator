@@ -24,13 +24,22 @@ export function useFindings(filter: FindingFilter, limit?: number) {
     });
 }
 
+async function findingIds(filter: FindingFilter, signal?: AbortSignal): Promise<string[]> {
+    return (await collectAll((args: Parameters<typeof listFindings>[0]) => listFindings(args, signal), filter)).map((held) => held.id);
+}
+
 export function useFindingIds(filter: FindingFilter, enabled: boolean) {
     return useUnlockedQuery({
         queryKey: keys.findings.ids(filter),
-        queryFn: async ({ signal }) =>
-            (await collectAll((args: Parameters<typeof listFindings>[0]) => listFindings(args, signal), filter)).map((held) => held.id),
+        queryFn: ({ signal }) => findingIds(filter, signal),
         enabled: enabled && filter.siteId !== "",
         staleTime: 0,
+    });
+}
+
+export function useCollectFindingIds() {
+    return useMutation({
+        mutationFn: (filter: FindingFilter) => findingIds(filter),
     });
 }
 

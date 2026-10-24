@@ -372,6 +372,35 @@ export const graph = {
         applied: (entities: number, mapped: number, edges: number, skipped: number) =>
             `${entities} ${entities === 1 ? "entity" : "entities"} created, ${mapped} ${mapped === 1 ? "page" : "pages"} mapped, ${edges} ${edges === 1 ? "edge" : "edges"} proposed${skipped > 0 ? `, ${skipped} skipped` : ""}.`,
         reviewEdges: "Review the edges",
+        siteBody:
+            "Each page proposes an entity named from what the site shows, under the entity of its parent page. Nothing is written until you confirm the ones you keep.",
+        reading: "Reading the pages",
+        siteReviewBody: "Untick what you do not want. A row the site cannot name, or whose name is taken under its parent, stays unticked.",
+        columnPage: "Page",
+        columnParent: "Parent",
+        topLevel: "top level",
+        unnamed: "No name",
+        joins: "joins the existing entity of this name",
+        keepRow: (label: string, path: string) => `${label} at ${path}`,
+        facts: (facts: readonly { label: string; value: string }[]) => facts.map((fact) => `${fact.label}: ${fact.value}`).join(" · "),
+        clashes: {
+            no_name: "The page shows no name to take.",
+            name_in_batch: "Another page under the same parent proposes this name.",
+            name_carried: "An entity of this name under that parent already carries another page.",
+        },
+        confirmTitle: "Write the ticked entities",
+        confirmBody: (written: number, joined: number) => {
+            const writes =
+                written === 0
+                    ? ""
+                    : `${written === 1 ? "1 entity is" : `${written} entities are`} written to the graph, each under the entity of its parent page with that parent edge written approved, and each page is mapped to its entity. `;
+            const joins =
+                joined === 0 ? "" : `${joined === 1 ? "1 page joins" : `${joined} pages join`} an entity of the same name that already exists. `;
+            return `${writes}${joins}Nothing is written to the site.`;
+        },
+        confirmApply: "Confirm",
+        siteApplied: (entities: number, mapped: number, skipped: number) =>
+            `${entities} ${entities === 1 ? "entity" : "entities"} written, ${mapped} ${mapped === 1 ? "page" : "pages"} mapped${skipped > 0 ? `, ${skipped} skipped` : ""}.`,
     },
     cards: {
         open: "Card proposals",

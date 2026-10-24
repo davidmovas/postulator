@@ -1,7 +1,19 @@
 import { copy } from "../../copy/index.js";
+import type { ProposalClash } from "../../generated/vocab.js";
+import { isOneOf, proposalClashes } from "../../generated/vocab.js";
 import type { Tone } from "../../ui/index.js";
 import type { EntityType, NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
+
+type Clash = Exclude<ProposalClash, "">;
+
+const clashKinds: readonly Clash[] = proposalClashes.filter((held): held is Clash => held !== "");
+
+const clashWords: Readonly<Record<Clash, string>> = copy.graph.ai.clashes;
+
+export function clashLabel(clash: string): string {
+    return isOneOf(clashKinds, clash) ? clashWords[clash] : clash;
+}
 
 export function entityTypeLabel(type: EntityType | null): string {
     return type === null ? copy.pageTypes.untyped : type.name;

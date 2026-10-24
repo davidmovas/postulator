@@ -87,6 +87,7 @@ export type Anchor = Wire<GraphModels.Anchor>;
 export type EntityPage = Wire<GraphModels.EntityPage>;
 export type EntityFilter = ListFilter<GraphModels.ListEntitiesRequest>;
 export type ProposedEntity = Wire<GraphModels.ProposedEntity>;
+export type PreviewFromPagesRequest = GraphModels.PreviewFromPagesRequest;
 export type PreviewFromPagesResponse = Wire<GraphModels.PreviewFromPagesResponse>;
 export type ProposeFromKeywordsResponse = Wire<GraphModels.ProposeFromKeywordsResponse>;
 export type ApplyProposalsResponse = Wire<GraphModels.ApplyProposalsResponse>;
