@@ -159,7 +159,7 @@ export const brokenRows = [
   ["/laws/uk/", "E-Bike Law in the UK", "E-Bike Laws", "uk e-bike law", "", "topic"],
   ["/laws/germany/", "E-Bike Law in Germany", "Rules Nobody Declared", "germany e-bike law", "", "topic"],
   ["/laws/ france /", "A path with spaces", "E-Bike Laws", "france e-bike law", "", "topic"],
-  ["", "A row that names nothing", "", "", "", ""],
+  ["", "", "", "a keyword with nowhere to go", "", ""],
   ["/laws/loop-a/", "Loop A", "Loop B", "loop a", "", "topic"],
   ["/laws/loop-b/", "Loop B", "Loop A", "loop b", "", "topic"],
   ["/laws/itself/", "Its own parent", "Its own parent", "itself", "", "topic"],
