@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
 type BodyState string
@@ -234,6 +235,10 @@ func (m Map) Place(pageID string) (Place, bool) {
 		return Place{}, false
 	}
 	return Place{Ref: m.snapshot.ref(page, false), TypeID: m.snapshot.typeOf(page).ID}, true
+}
+
+func (m Map) Type(typeID string) (pagetype.Type, bool) {
+	return m.snapshot.Types.ByID(typeID)
 }
 
 func (m Map) node(pageID string) MapNode {

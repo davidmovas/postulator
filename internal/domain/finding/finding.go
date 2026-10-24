@@ -78,6 +78,14 @@ const (
 	Run         OptionKind = "run"
 )
 
+func BulkOptions() []Option {
+	return []Option{Ignore, AcceptSite, AcceptWorkbook, SetType}
+}
+
+func (o Option) Bulk() bool {
+	return slices.Contains(BulkOptions(), o)
+}
+
 func (o Option) Kind() OptionKind {
 	switch o {
 	case Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType:

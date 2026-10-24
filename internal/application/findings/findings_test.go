@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -469,6 +470,91 @@ func TestFindingsAreCountedByCodeUnderTheListsFilters(t *testing.T) {
 	}
 	if _, err := service.Counts(t.Context(), findings.CountsRequest{SiteID: siteID, Status: "lost"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("an unknown status = %v, want Invalid", err)
+	}
+}
+
+func TestOneSentenceExplainsWhatAResolutionDoes(t *testing.T) {
+	t.Parallel()
+
+	technical := func(page string) finding.Finding { return onPage(finding.TechnicalDetected, page) }
+	changed := onPage(finding.FieldChangedOnSite, "page-5")
+	changed.Subject = json.RawMessage(`{"key":"seo_description"}`)
+	service, _ := newService(t, technical(pageID), technical("page-2"), technical("page-3"), technical("page-4"),
+		changed, onPage(finding.RowAmbiguous, "page-2"), onPage(finding.RenderRedirected, pageID))
+	cases := []struct {
+		name string
+		req  findings.ExplainRequest
+		says []string
+		kind finding.OptionKind
+	}{
+		{
+			name: "a dismissal", req: findings.ExplainRequest{FindingIDs: []string{"f-technical_detected-page-1"}, Option: "ignore"},
+			says: []string{"Dismiss the finding technical_detected on /a/", "nothing is written to the site"}, kind: finding.ModelChange,
+		},
+		{
+			name: "a type named", req: findings.ExplainRequest{FindingIDs: []string{"f-technical_detected-page-2"}, Option: "set_type", PageTypeID: "type-hub"},
+			says: []string{"Type /a/b/ as Hub"}, kind: finding.ModelChange,
+		},
+		{
+			name: "a row mapped onto a page", req: findings.ExplainRequest{FindingIDs: []string{"f-row_ambiguous-page-2"}, Option: "map_to_page", PageID: "page-5"},
+			says: []string{"onto /z/"}, kind: finding.ModelChange,
+		},
+		{
+			name: "a field rewritten by a run", req: findings.ExplainRequest{FindingIDs: []string{"f-field_changed_on_site-page-5"}, Option: "rewrite_field"},
+			says: []string{"run start that rewrites the seo_description of /z/", "estimate"}, kind: finding.Run,
+		},
+		{
+			name: "a rescan", req: findings.ExplainRequest{FindingIDs: []string{"f-render_redirected-page-1"}, Option: "rescan"},
+			says: []string{"full sync", "renders every page again"}, kind: finding.Run,
+		},
+		{
+			name: "four findings dismissed at once",
+			req: findings.ExplainRequest{Option: "ignore", FindingIDs: []string{
+				"f-technical_detected-page-1", "f-technical_detected-page-2", "f-technical_detected-page-3", "f-technical_detected-page-4",
+			}},
+			says: []string{"Dismiss the 4 findings technical_detected on /a/, /a/b/, /a/b/c/ and 1 more", "nothing is written to the site"},
+			kind: finding.ModelChange,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tc.req.SiteID = siteID
+			said, err := service.Explain(t.Context(), tc.req)
+			if err != nil {
+				t.Fatalf("Explain: %v", err)
+			}
+			for _, part := range tc.says {
+				if !strings.Contains(said.Sentence, part) {
+					t.Errorf("the sentence %q does not say %q", said.Sentence, part)
+				}
+			}
+			if said.Kind != string(tc.kind) {
+				t.Errorf("kind = %q, want %q", said.Kind, tc.kind)
+			}
+		})
+	}
+
+	refused := []struct {
+		name string
+		req  findings.ExplainRequest
+		code errors.Code
+	}{
+		{name: "no finding", req: findings.ExplainRequest{Option: "ignore"}, code: errors.Invalid},
+		{name: "two codes at once", req: findings.ExplainRequest{Option: "ignore", FindingIDs: []string{"f-technical_detected-page-1", "f-row_ambiguous-page-2"}}, code: errors.Invalid},
+		{name: "a run option at once", req: findings.ExplainRequest{Option: "rescan", FindingIDs: []string{"f-render_redirected-page-1", "f-render_redirected-page-1"}}, code: errors.Invalid},
+		{name: "a type the site lacks", req: findings.ExplainRequest{Option: "set_type", PageTypeID: "type-nobody", FindingIDs: []string{"f-technical_detected-page-1"}}, code: errors.NotFound},
+	}
+	for _, tc := range refused {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tc.req.SiteID = siteID
+			if _, err := service.Explain(t.Context(), tc.req); !errors.IsCode(err, tc.code) {
+				t.Errorf("Explain(%+v) = %v, want %s", tc.req, err, tc.code)
+			}
+		})
 	}
 }
 

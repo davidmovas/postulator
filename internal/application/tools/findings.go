@@ -6,7 +6,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/pages"
-	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -93,46 +92,11 @@ func findingsTool(deps Deps) Tool {
 	return enumOn(enumOn(tool, "code", codes), "option", options)
 }
 
-const unwritten = "; nothing is written to the site"
-
 func (deps Deps) resolution(ctx context.Context, b Binding, in findingsArgs) (string, error) {
-	held, err := deps.Findings.Get(ctx, findings.GetRequest{SiteID: b.SiteID, FindingID: in.FindingID})
-	if err != nil {
-		return "", err
-	}
-	where := "the site"
-	if held.PageID != "" {
-		if where, err = deps.pathOf(ctx, held.PageID); err != nil {
-			return "", err
-		}
-	}
-	about := "the finding " + held.Code + " on " + where
-	switch finding.Option(in.Option) {
-	case finding.Ignore:
-		return "Dismiss " + about + ": it stays dismissed while what it names stands" + unwritten, nil
-	case finding.Accept:
-		return "Write the entity card the agent proposed in " + about + unwritten, nil
-	case finding.AcceptSite:
-		return "Take what the site holds as the model's for " + about + unwritten, nil
-	case finding.AcceptWorkbook:
-		return "Pin the parent of " + where + " to the workbook's: the model's parent follows the sheet from the next sync" +
-			unwritten, nil
-	case finding.MapToPage:
-		target, pathErr := deps.pathOf(ctx, in.PageID)
-		if pathErr != nil {
-			return "", pathErr
-		}
-		return "Map the workbook row of " + about + " onto " + target + ", and delete the planned page it replaces " +
-			"when no run names it" + unwritten, nil
-	case finding.SetType:
-		kind, typeErr := deps.PageTypes.Get(ctx, pagetypes.GetRequest{ID: in.PageTypeID})
-		if typeErr != nil {
-			return "", typeErr
-		}
-		return "Type " + where + " as " + kind.Name + ", which settles " + about + unwritten, nil
-	default:
-		return "", nil
-	}
+	said, err := deps.Findings.Explain(ctx, findings.ExplainRequest{
+		SiteID: b.SiteID, FindingIDs: []string{in.FindingID}, Option: in.Option, PageID: in.PageID, PageTypeID: in.PageTypeID,
+	})
+	return said.Sentence, err
 }
 
 func (deps Deps) pathOf(ctx context.Context, pageID string) (string, error) {

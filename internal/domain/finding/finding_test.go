@@ -83,6 +83,20 @@ func TestAnOptionIsAModelChangeOrARun(t *testing.T) {
 	}
 }
 
+func TestOnlyAModelChangeWithoutAChoicePerFindingIsTakenInBulk(t *testing.T) {
+	t.Parallel()
+
+	for _, option := range finding.Options() {
+		want := slices.Contains([]finding.Option{finding.Ignore, finding.AcceptSite, finding.AcceptWorkbook, finding.SetType}, option)
+		if option.Bulk() != want {
+			t.Errorf("%s in bulk = %v, want %v", option, option.Bulk(), want)
+		}
+		if option.Bulk() && option.Kind() != finding.ModelChange {
+			t.Errorf("%s is taken in bulk but is a %s", option, option.Kind())
+		}
+	}
+}
+
 func TestEveryCodeIsListedOnceAndOffersOnlyListedOptions(t *testing.T) {
 	t.Parallel()
 

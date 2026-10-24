@@ -179,13 +179,9 @@ func prepared(held finding.Finding, option finding.Option) (ResolveResponse, err
 	case finding.RelinkPage:
 		shown.Start = &runs.StartRequest{SiteID: held.SiteID, PageIDs: []string{pageID}, Kind: string(run.KindRelink)}
 	case finding.RewriteField:
-		key := field.Title
-		if held.Code == finding.FieldChangedOnSite {
-			values, err := valuesOf(held)
-			if err != nil || values.Key == "" {
-				return ResolveResponse{}, invalid("the finding names no field", "findingId")
-			}
-			key = field.Key(values.Key)
+		key, err := rewritten(held)
+		if err != nil {
+			return ResolveResponse{}, err
 		}
 		shown.Start = &runs.StartRequest{
 			SiteID: held.SiteID, PageIDs: []string{pageID}, Fields: []string{string(key)}, Rewrite: []string{pageID},
