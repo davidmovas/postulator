@@ -106,6 +106,29 @@ func selectByIDs[T any](ctx context.Context, exec executor, prefix, suffix strin
 	return out, nil
 }
 
+type counted struct {
+	id    string
+	count int
+}
+
+func scanCounted(rows *sql.Rows) (counted, error) {
+	var held counted
+	err := rows.Scan(&held.id, &held.count)
+	return held, err
+}
+
+func countByIDs(ctx context.Context, exec executor, prefix, suffix string, ids []string, message string) (map[string]int, error) {
+	listed, err := selectByIDs(ctx, exec, prefix, suffix, ids, scanCounted, message)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int, len(listed))
+	for i := range listed {
+		out[listed[i].id] += listed[i].count
+	}
+	return out, nil
+}
+
 func placeholders(count int) string {
 	if count <= 0 {
 		return ""

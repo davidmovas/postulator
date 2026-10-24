@@ -19,6 +19,10 @@ const (
 	selectLinksToPage  = `SELECT ` + linkColumns + ` FROM page_links WHERE to_page_id = ? ORDER BY from_page_id, id`
 	selectContextual   = `SELECT ` + linkColumns + ` FROM page_links WHERE site_id = ? AND type = 'contextual' AND source = 'raw'
 		ORDER BY from_page_id, id`
+	countContextualIn  = `SELECT to_page_id, count(*) FROM page_links WHERE type = 'contextual' AND from_page_id <> to_page_id AND to_page_id IN `
+	groupContextualIn  = ` GROUP BY to_page_id`
+	countContextualOut = `SELECT from_page_id, count(*) FROM page_links WHERE type = 'contextual' AND from_page_id IN `
+	groupContextualOut = ` GROUP BY from_page_id`
 )
 
 type PageLinkRepo struct {
@@ -59,6 +63,14 @@ func (r *PageLinkRepo) ReplaceForPage(ctx context.Context, pageID string, source
 		}
 		return nil
 	})
+}
+
+func (r *PageLinkRepo) CountContextual(ctx context.Context, pageIDs []string) (inbound, outbound map[string]int, err error) {
+	if inbound, err = countByIDs(ctx, r.store.execFrom(ctx), countContextualIn, groupContextualIn, pageIDs, "count the links into the pages"); err != nil {
+		return nil, nil, err
+	}
+	outbound, err = countByIDs(ctx, r.store.execFrom(ctx), countContextualOut, groupContextualOut, pageIDs, "count the links out of the pages")
+	return inbound, outbound, err
 }
 
 func (r *PageLinkRepo) ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error) {

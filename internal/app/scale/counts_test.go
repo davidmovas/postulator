@@ -13,7 +13,10 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
-const listLimit = 20
+const (
+	mapLimit  = 50
+	listLimit = 20
+)
 
 func (s *scaled) typeOf(t *testing.T, preset pagetype.Preset) string {
 	t.Helper()
@@ -47,6 +50,17 @@ type operation struct {
 	call func(t *testing.T, s *scaled) func() error
 }
 
+func siteMap(name string, request func(t *testing.T, s *scaled) sitemodel.MapRequest) operation {
+	return operation{name: "map: " + name, rows: true, call: func(t *testing.T, s *scaled) func() error {
+		req := request(t, s)
+		req.SiteID = s.siteID
+		return func() error {
+			_, err := s.core.SiteModel.SiteMap(t.Context(), req)
+			return err
+		}
+	}}
+}
+
 func findingsList(name string, request func(t *testing.T, s *scaled) findings.ListRequest) operation {
 	return operation{name: "findings: " + name, call: func(t *testing.T, s *scaled) func() error {
 		req := request(t, s)
@@ -60,6 +74,32 @@ func findingsList(name string, request func(t *testing.T, s *scaled) findings.Li
 
 func operations() []operation {
 	return []operation{
+		siteMap("the roots", func(*testing.T, *scaled) sitemodel.MapRequest { return sitemodel.MapRequest{} }),
+		siteMap("the front page's children", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			return sitemodel.MapRequest{ParentID: s.id(t, "/"), Limit: mapLimit}
+		}),
+		siteMap("a deep node's children", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			return sitemodel.MapRequest{ParentID: s.id(t, "/c010/s1/t1/")}
+		}),
+		siteMap("a store category's children", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			return sitemodel.MapRequest{ParentID: s.id(t, "/product-category/c010/s1/")}
+		}),
+		siteMap("a search", func(*testing.T, *scaled) sitemodel.MapRequest { return sitemodel.MapRequest{Search: "article"} }),
+		siteMap("a search under a hub", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			return sitemodel.MapRequest{ParentID: s.id(t, "/c010/"), Search: "article"}
+		}),
+		siteMap("a type filter", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			return sitemodel.MapRequest{PageTypeID: s.typeOf(t, pagetype.Product)}
+		}),
+		siteMap("a second page", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			req := sitemodel.MapRequest{SiteID: s.siteID, ParentID: s.id(t, "/c010/s1/"), Limit: 3}
+			first, err := s.core.SiteModel.SiteMap(t.Context(), req)
+			if err != nil || !first.Nodes.HasMore {
+				t.Fatalf("the first page of a hub = %+v, %v", first.Nodes, err)
+			}
+			req.Cursor = first.Nodes.Next
+			return req
+		}),
 		findingsList("by code", func(*testing.T, *scaled) findings.ListRequest {
 			return findings.ListRequest{Code: string(finding.PageWithoutEntity), Limit: listLimit}
 		}),

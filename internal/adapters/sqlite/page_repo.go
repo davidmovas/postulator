@@ -1,8 +1,10 @@
 package sqlite
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,6 +32,8 @@ const (
 	deletePage        = `DELETE FROM pages WHERE id = ?`
 	selectPage        = `SELECT ` + pageColumns + ` FROM pages WHERE id = ?`
 	selectPagesBySite = `SELECT ` + pageColumns + ` FROM pages WHERE site_id = ? ORDER BY path, id`
+	selectPagesByIDs  = `SELECT ` + pageColumns + ` FROM pages WHERE id IN `
+	orderPagesByPath  = ` ORDER BY path, id`
 )
 
 type PageRepo struct {
@@ -184,6 +188,15 @@ func (r *PageRepo) Get(ctx context.Context, id string) (pagemap.Page, error) {
 
 func (r *PageRepo) ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectPagesBySite, []any{siteID}, scanPage, "list the site pages")
+}
+
+func (r *PageRepo) ListByIDs(ctx context.Context, ids []string) ([]pagemap.Page, error) {
+	pages, err := selectByIDs(ctx, r.store.execFrom(ctx), selectPagesByIDs, orderPagesByPath, ids, scanPage, "list the pages by id")
+	if err != nil {
+		return nil, err
+	}
+	slices.SortFunc(pages, func(a, b pagemap.Page) int { return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.ID, b.ID)) })
+	return pages, nil
 }
 
 func pageKeyset(q pagemap.Query) paging.Keyset[pagemap.Page] {

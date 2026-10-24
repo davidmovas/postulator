@@ -1,6 +1,7 @@
 package sitemodeltest
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type Memory struct {
@@ -319,4 +321,61 @@ func (r findingReader) ListBySite(_ context.Context, _ string, status finding.St
 		}
 	}
 	return out, nil
+}
+
+func (r findingReader) CountOpen(_ context.Context, ids []string) (map[string]int, error) {
+	out := map[string]int{}
+	for i := range r.m.Findings {
+		if held := &r.m.Findings[i]; held.Status == finding.Open && held.PageID != nil && slices.Contains(ids, *held.PageID) {
+			out[*held.PageID]++
+		}
+	}
+	return out, nil
+}
+
+func (r mapReader) ListByIDs(_ context.Context, ids []string) ([]contextpack.MapRow, error) {
+	rows := r.m.rows()
+	return slices.DeleteFunc(rows, func(row contextpack.MapRow) bool { return !slices.Contains(ids, row.PageID) }), nil
+}
+
+func (r mapReader) List(_ context.Context, q contextpack.MapRowQuery, page paging.Request) (paging.List[contextpack.MapRow], error) {
+	rows := slices.DeleteFunc(r.m.rows(), func(row contextpack.MapRow) bool { return !q.Holds(row) })
+	slices.SortFunc(rows, func(a, b contextpack.MapRow) int {
+		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.PageID, b.PageID))
+	})
+	keyset := paging.Keyset[contextpack.MapRow]{
+		IDColumn: "page_id",
+		ID:       func(row contextpack.MapRow) string { return row.PageID },
+		Keys: []paging.SortKey[contextpack.MapRow]{
+			paging.TextKey[contextpack.MapRow]("path", "path", func(row contextpack.MapRow) any { return row.Path }),
+		},
+	}
+	return keyset.Page(rows, page)
+}
+
+func (r pageReader) ListByIDs(_ context.Context, ids []string) ([]pagemap.Page, error) {
+	out := make([]pagemap.Page, 0, len(ids))
+	for i := range r.m.Pages {
+		if slices.Contains(ids, r.m.Pages[i].ID) {
+			out = append(out, r.m.Pages[i])
+		}
+	}
+	return out, nil
+}
+
+func (r linkReader) CountContextual(_ context.Context, ids []string) (inbound, outbound map[string]int, err error) {
+	inbound, outbound = map[string]int{}, map[string]int{}
+	for i := range r.m.Links {
+		link := &r.m.Links[i]
+		if link.Type != pagemap.LinkContextual {
+			continue
+		}
+		if slices.Contains(ids, link.FromPageID) {
+			outbound[link.FromPageID]++
+		}
+		if link.ToPageID != nil && *link.ToPageID != link.FromPageID && slices.Contains(ids, *link.ToPageID) {
+			inbound[*link.ToPageID]++
+		}
+	}
+	return inbound, outbound, nil
 }

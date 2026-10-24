@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 type reader interface {
@@ -27,6 +28,7 @@ type siteStore interface {
 type pageStore interface {
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	ListByIDs(ctx context.Context, ids []string) ([]pagemap.Page, error)
 }
 
 type entityStore interface {
@@ -53,6 +55,8 @@ type fieldStore interface {
 type mapStore interface {
 	State(ctx context.Context, siteID string) (generation, built int64, err error)
 	ListBySite(ctx context.Context, siteID string) ([]contextpack.MapRow, error)
+	ListByIDs(ctx context.Context, pageIDs []string) ([]contextpack.MapRow, error)
+	List(ctx context.Context, q contextpack.MapRowQuery, page paging.Request) (paging.List[contextpack.MapRow], error)
 	Write(ctx context.Context, siteID string, moved []contextpack.MapRow, gone []string, generation int64) error
 }
 
@@ -78,11 +82,13 @@ type linkStore interface {
 	ListToPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 	ListContextual(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
+	CountContextual(ctx context.Context, pageIDs []string) (inbound, outbound map[string]int, err error)
 }
 
 type findingStore interface {
 	ListForPage(ctx context.Context, pageID string) ([]finding.Finding, error)
 	ListBySite(ctx context.Context, siteID string, status finding.Status) ([]finding.Finding, error)
+	CountOpen(ctx context.Context, pageIDs []string) (map[string]int, error)
 }
 
 type budgets interface {

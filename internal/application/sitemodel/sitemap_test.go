@@ -5,7 +5,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
 	"github.com/davidmovas/postulator/internal/domain/block"
@@ -37,12 +36,23 @@ func wide() *sitemodeltest.Memory {
 			bodies = append(bodies, block.Snapshot{PageID: id, Side: block.Current, Raw: "<p>The client's words.</p>", Kind: block.Classic})
 		}
 	}
+	links := make([]pagemap.PageLink, 0, 7)
+	contextual := func(from, to string) pagemap.PageLink {
+		return pagemap.PageLink{
+			ID: from + "-" + to, SiteID: siteID, FromPageID: from, ToPageID: &to, ToURL: "/" + to + "/",
+			Type: pagemap.LinkContextual, Source: pagemap.SourceRaw,
+		}
+	}
+	for c := 1; c <= 4; c++ {
+		links = append(links, contextual(fmt.Sprintf("page-07-%02d", c), "page-07-00"))
+	}
+	links = append(links, contextual("page-07-00", "page-07-05"), contextual("page-07-00", "page-07-06"))
+	navigation := contextual("page-07-07", "page-07-00")
+	navigation.Type = pagemap.LinkNavigation
+	links = append(links, navigation)
 	return &sitemodeltest.Memory{
 		Site:  site.Site{ID: siteID, Name: "Shop", BaseURL: "https://shop.example.com", Settings: site.DefaultSettings()},
-		Pages: pages, Types: presetSet(), Bodies: bodies,
-		Audit: reports.LinkAuditResponse{SiteID: siteID, Pages: []reports.PageAudit{
-			{PageID: "page-07-00", Inbound: 4, ByType: reports.LinkTypeCounts{Contextual: 2}},
-		}},
+		Pages: pages, Types: presetSet(), Bodies: bodies, Links: links,
 	}
 }
 

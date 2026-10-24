@@ -26,6 +26,8 @@ const (
 	selectOfSite    = selectFindings + ` WHERE site_id = ?` + findingOrder
 	selectOfStatus  = selectFindings + ` WHERE site_id = ? AND status = ?` + findingOrder
 	selectOfPage    = selectFindings + ` WHERE page_id = ?` + findingOrder
+	countOpenOf     = `SELECT page_id, count(*) FROM findings WHERE status = 'open' AND page_id IN `
+	groupOpenOf     = ` GROUP BY page_id`
 )
 
 type FindingRepo struct {
@@ -128,6 +130,10 @@ func (r *FindingRepo) ListBySite(ctx context.Context, siteID string, status find
 		return nil, errors.New(errors.Invalid, "finding status is not recognized").WithDetail("status", string(status))
 	}
 	return selectAll(ctx, r.store.execFrom(ctx), selectOfStatus, []any{siteID, string(status)}, scanFinding, "list the site findings")
+}
+
+func (r *FindingRepo) CountOpen(ctx context.Context, pageIDs []string) (map[string]int, error) {
+	return countByIDs(ctx, r.store.execFrom(ctx), countOpenOf, groupOpenOf, pageIDs, "count the open findings of the pages")
 }
 
 func (r *FindingRepo) ListForPage(ctx context.Context, pageID string) ([]finding.Finding, error) {
