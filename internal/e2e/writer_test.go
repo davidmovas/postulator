@@ -69,15 +69,16 @@ type clientEditPlan struct {
 }
 
 type writerStand struct {
-	existing string
-	preset   pagetype.Preset
-	empty    string
-	lists    bool
-	child    plannedChild
-	kept     string
-	keptText string
-	edit     clientEditPlan
-	graph    []seededEntity
+	existing   string
+	clientPage string
+	preset     pagetype.Preset
+	empty      string
+	lists      bool
+	child      plannedChild
+	kept       string
+	keptText   string
+	edit       clientEditPlan
+	graph      []seededEntity
 }
 
 func writerStandOf(t *testing.T, env environment) writerStand {
@@ -86,10 +87,11 @@ func writerStandOf(t *testing.T, env environment) writerStand {
 	switch env.stand {
 	case "vanilla":
 		return writerStand{
-			existing: "/guide/setup/",
-			preset:   pagetype.Entity,
-			empty:    "/guide/setup/grinding/",
-			child:    plannedChild{path: "/guide/setup/grinding/", name: "Grinding", keyword: "grinding coffee beans"},
+			existing:   "/guide/setup/",
+			clientPage: "/guide/setup/",
+			preset:     pagetype.Entity,
+			empty:      "/guide/setup/grinding/",
+			child:      plannedChild{path: "/guide/setup/grinding/", name: "Grinding", keyword: "grinding coffee beans"},
 			edit: clientEditPlan{
 				path: "/guide/", from: "what you bought.", to: "what you bought, and how long each bag keeps.",
 			},
@@ -100,13 +102,14 @@ func writerStandOf(t *testing.T, env environment) writerStand {
 		}
 	case "replica":
 		return writerStand{
-			existing: "/peptides/",
-			preset:   pagetype.Hub,
-			empty:    "/healing-peptides/",
-			lists:    true,
-			child:    plannedChild{path: "/peptides/peptide-storage/", name: "Peptide Storage", keyword: "peptide storage"},
-			kept:     "/lab-guides/",
-			keptText: "Step-by-step guides for handling research peptides in the laboratory.",
+			existing:   "/peptides/",
+			clientPage: "/tb-500/",
+			preset:     pagetype.Hub,
+			empty:      "/healing-peptides/",
+			lists:      true,
+			child:      plannedChild{path: "/peptides/peptide-storage/", name: "Peptide Storage", keyword: "peptide storage"},
+			kept:       "/lab-guides/",
+			keptText:   "Step-by-step guides for handling research peptides in the laboratory.",
 			edit: clientEditPlan{
 				path: "/reconstitution/", from: "Swirl gently and never shake the vial.",
 				to: "Swirl gently, never shake the vial and keep it cold.",
