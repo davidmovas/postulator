@@ -22,3 +22,4 @@ coverage.html
 docker/e2e/.env.*
 frontend/shots/
 .superpowers/
+out/

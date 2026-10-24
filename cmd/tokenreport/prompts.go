@@ -60,6 +60,7 @@ type pageRow struct {
 	Linker  *linkerRow `json:"linker,omitempty"`
 	Judge   *prompt    `json:"judge,omitempty"`
 	Meta    *prompt    `json:"meta,omitempty"`
+	sent    map[string]llm.Request
 }
 
 type harness struct {
@@ -114,7 +115,7 @@ func measurePages(ctx context.Context, c *counters, models *catalog.Catalog) ([]
 
 func (h *harness) measure(ctx context.Context, c *counters, stand string, page pagemap.Page) (pageRow, error) {
 	kind := h.model.Types.TypeOf(page)
-	row := pageRow{Stand: stand, Path: page.Path, Type: kind.Name}
+	row := pageRow{Stand: stand, Path: page.Path, Type: kind.Name, sent: map[string]llm.Request{}}
 	resolved, err := h.specs.ResolveForPage(ctx, templates.ResolveForPageRequest{PageID: page.ID})
 	if errors.IsCode(err, errors.NotFound) {
 		row.Skipped = "no template: a run writes no " + kind.Name + " page"
@@ -140,7 +141,7 @@ func (h *harness) measure(ctx context.Context, c *counters, stand string, page p
 	}
 	hold(sc, links.Artifacts...)
 
-	if row.Writer, err = h.asked(ctx, c, steps.GenerateBody(h.deps), sc, contextpack.SectionKeywords); err != nil {
+	if row.Writer, err = h.asked(ctx, c, steps.GenerateBody(h.deps), sc, row.sent, stepWriter, contextpack.SectionKeywords); err != nil {
 		return pageRow{}, err
 	}
 
@@ -153,7 +154,7 @@ func (h *harness) measure(ctx context.Context, c *counters, stand string, page p
 	}
 
 	hold(sc, run.Artifact{Kind: run.ArtifactBodyHTML, Blob: []byte(standInBody(h.prose, runtime.TargetWords(sc.Spec)))})
-	if row.Judge, err = h.asked(ctx, c, steps.Judge(h.deps), sc, contextpack.SectionCurrent, contextpack.SectionKeywords); err != nil {
+	if row.Judge, err = h.asked(ctx, c, steps.Judge(h.deps), sc, row.sent, stepJudge, contextpack.SectionCurrent, contextpack.SectionKeywords); err != nil {
 		return pageRow{}, err
 	}
 
@@ -162,13 +163,14 @@ func (h *harness) measure(ctx context.Context, c *counters, stand string, page p
 		return pageRow{}, err
 	}
 	hold(sc, run.Artifact{Kind: run.ArtifactDraft, Blob: draft})
-	if row.Meta, err = h.asked(ctx, c, steps.GenerateMeta(h.deps), sc, contextpack.SectionTargets); err != nil {
+	if row.Meta, err = h.asked(ctx, c, steps.GenerateMeta(h.deps), sc, row.sent, stepMeta, contextpack.SectionTargets); err != nil {
 		return pageRow{}, err
 	}
 	return row, nil
 }
 
-func (h *harness) asked(ctx context.Context, c *counters, def run.StepDef, sc *run.StepContext, leave ...contextpack.SectionName) (*prompt, error) {
+func (h *harness) asked(ctx context.Context, c *counters, def run.StepDef, sc *run.StepContext, sent map[string]llm.Request, step string,
+	leave ...contextpack.SectionName) (*prompt, error) {
 	h.client.take()
 	h.pictures.take()
 	_, stepErr := def.Run(ctx, sc)
@@ -179,6 +181,7 @@ func (h *harness) asked(ctx context.Context, c *counters, def run.StepDef, sc *r
 	if len(asked) == 0 {
 		return nil, fmt.Errorf("%s returned without sending a request", def.Name)
 	}
+	sent[step] = asked[0]
 	if len(seen) == 0 {
 		return nil, fmt.Errorf("%s read no pack", def.Name)
 	}

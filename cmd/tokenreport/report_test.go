@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -11,7 +13,7 @@ func TestTheReportNamesEachModelsEncodingAndTheFallback(t *testing.T) {
 	t.Parallel()
 
 	var table bytes.Buffer
-	if err := execute(t.Context(), &table, false); err != nil {
+	if err := execute(t.Context(), &table, false, ""); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	for _, want := range []string{"gpt-5.6-terra", "o200k_base", "gpt-image-2"} {
@@ -21,8 +23,12 @@ func TestTheReportNamesEachModelsEncodingAndTheFallback(t *testing.T) {
 	}
 
 	var encoded bytes.Buffer
-	if err := execute(t.Context(), &encoded, true); err != nil {
-		t.Fatalf("execute -json: %v", err)
+	prompts := t.TempDir()
+	if err := execute(t.Context(), &encoded, true, prompts); err != nil {
+		t.Fatalf("execute -json -prompts: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(prompts, agentFile)); err != nil {
+		t.Errorf("-prompts wrote no agent round: %v", err)
 	}
 	var decoded struct {
 		Models []struct {
