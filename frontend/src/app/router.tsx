@@ -1,6 +1,7 @@
 import { createHashRouter, Navigate } from "react-router";
 
 import { AgentScreen, InboxScreen } from "../features/agent/index.js";
+import { FindingsScreen } from "../features/findings/index.js";
 import { GraphScreen } from "../features/graph/index.js";
 import { ImportScreen } from "../features/imports/index.js";
 import { LinksScreen } from "../features/links/index.js";
@@ -42,6 +43,7 @@ export const router = createHashRouter([
                     { path: "pages/:pageId", element: <PagesScreen /> },
                     { path: "links", element: <LinksScreen /> },
                     { path: "links/:pageId", element: <LinksScreen /> },
+                    { path: "findings", element: <FindingsScreen /> },
                     { path: "runs", element: <RunsScreen /> },
                     { path: "runs/:runId", element: <RunDetailScreen /> },
                     { path: "runs/:runId/items/:itemId", element: <RunDetailScreen /> },

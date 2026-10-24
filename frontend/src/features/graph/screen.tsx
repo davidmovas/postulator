@@ -42,7 +42,7 @@ import type { FoldState } from "./model/fold.js";
 import { buildGraphIndex } from "./model/index.js";
 import { isolate, matchedSet } from "./model/lens.js";
 import type { Lens } from "./model/lens.js";
-import { readQuery, searchOf, writeQuery } from "./model/params.js";
+import { cardsAction, cardsFocusParam, readQuery, searchOf, writeQuery } from "./model/params.js";
 import type { GraphQuery, GraphView } from "./model/params.js";
 import { pruneRows } from "./model/prune.js";
 import { NodeCard } from "./node-card.js";
@@ -128,13 +128,18 @@ export function GraphScreen(): ReactElement {
 
     const asked = searchParams.get("action");
 
+    const askedFocus = searchParams.get(cardsFocusParam);
+
     useEffect(() => {
-        if (asked !== "new") {
+        if (asked === "new") {
+            setCreating({ parentId: null });
+        } else if (asked === cardsAction) {
+            patchSession({ cards: true, cardFocus: askedFocus });
+        } else {
             return;
         }
-        setCreating({ parentId: null });
         setSearchParams(writeQuery(query), { replace: true });
-    }, [asked, query, setSearchParams]);
+    }, [asked, askedFocus, query, setSearchParams, patchSession]);
 
     const setFold = useCallback(
         (next: FoldState): void => {

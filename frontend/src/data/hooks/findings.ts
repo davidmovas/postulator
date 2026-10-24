@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { quietMeta } from "../client.js";
+import { collectAll } from "../collect.js";
 import {
     countFindings,
     explainResolution,
@@ -20,6 +21,16 @@ export function useFindings(filter: FindingFilter, limit?: number) {
         filters: filter,
         limit,
         enabled: filter.siteId !== "",
+    });
+}
+
+export function useFindingIds(filter: FindingFilter, enabled: boolean) {
+    return useUnlockedQuery({
+        queryKey: keys.findings.ids(filter),
+        queryFn: async ({ signal }) =>
+            (await collectAll((args: Parameters<typeof listFindings>[0]) => listFindings(args, signal), filter)).map((held) => held.id),
+        enabled: enabled && filter.siteId !== "",
+        staleTime: 0,
     });
 }
 

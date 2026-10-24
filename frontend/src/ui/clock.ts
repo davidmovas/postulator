@@ -20,6 +20,21 @@ export function useNow(intervalMs: number, active: boolean): number {
     return now;
 }
 
+export function useDebounced<T>(value: T, delayMs: number): T {
+    const [settled, setSettled] = useState(value);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setSettled(value);
+        }, delayMs);
+        return () => {
+            window.clearTimeout(timer);
+        };
+    }, [value, delayMs]);
+
+    return settled;
+}
+
 export function useElapsed(running: boolean): number {
     const [seconds, setSeconds] = useState(0);
 

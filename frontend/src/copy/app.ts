@@ -38,6 +38,7 @@ export const nav = {
     graph: "Graph",
     pages: "Pages",
     links: "Linking",
+    findings: "Findings",
     runs: "Runs",
     templates: "Templates",
     schedules: "Schedules",

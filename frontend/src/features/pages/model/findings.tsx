@@ -6,7 +6,7 @@ import { absoluteTime, relativeTime } from "../../../domain/format.js";
 import { CountBadge, Panel, PanelHeader, StatusBadge } from "../../../ui/index.js";
 import { Note } from "./facts.js";
 import { findingCodeLabel, severityLabel, severityTone } from "./labels.js";
-import { findingSentence } from "./subject.js";
+import { findingSentence } from "../../findings/model/subject.js";
 
 const said = copy.pages.model.findings;
 

@@ -79,6 +79,7 @@ export const keys = {
         root: () => [scope, "findings"] as const,
         lists: () => [scope, "findings", "list"] as const,
         list: (filter: FindingFilter, limit?: number) => [scope, "findings", "list", filter, limitSegment(limit)] as const,
+        ids: (filter: FindingFilter) => [scope, "findings", "ids", filter] as const,
         details: () => [scope, "findings", "detail"] as const,
         detail: (id: string) => [scope, "findings", "detail", id] as const,
         countsAll: () => [scope, "findings", "counts"] as const,

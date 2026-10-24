@@ -25,6 +25,7 @@ import {
     SyncIcon,
     TuneIcon,
     cx,
+    useDebounced,
 } from "../../ui/index.js";
 import type { IconComponent } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
@@ -48,19 +49,6 @@ interface Section {
     key: string;
     label: string;
     rows: readonly Row[];
-}
-
-function useDebounced(value: string): string {
-    const [settled, setSettled] = useState(value);
-    useEffect(() => {
-        const timer = window.setTimeout(() => {
-            setSettled(value);
-        }, debounceMs);
-        return () => {
-            window.clearTimeout(timer);
-        };
-    }, [value]);
-    return settled;
 }
 
 export interface Destination {
@@ -88,7 +76,7 @@ function PaletteDialog({ siteId, destinations }: CommandPaletteProps): ReactElem
     const sync = useSyncSite();
     const [query, setQuery] = useState("");
     const [active, setActive] = useState(0);
-    const settled = useDebounced(query.trim());
+    const settled = useDebounced(query.trim(), debounceMs);
     const listRef = useRef<HTMLDivElement | null>(null);
 
     const entities = useEntities(

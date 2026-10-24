@@ -5,6 +5,7 @@ import {
     AccountTreeIcon,
     DashboardCustomizeIcon,
     HubIcon,
+    InboxIcon,
     LinkIcon,
     MonitoringIcon,
     PlayCircleIcon,
@@ -36,6 +37,7 @@ export function siteEntries(siteId: string): readonly NavEntry[] {
         { key: "graph", label: copy.nav.graph, to: `/s/${siteId}/graph`, Icon: HubIcon },
         { key: "pages", label: copy.nav.pages, to: `/s/${siteId}/pages`, Icon: AccountTreeIcon },
         { key: "links", label: copy.nav.links, to: `/s/${siteId}/links`, Icon: LinkIcon },
+        { key: "findings", label: copy.nav.findings, to: `/s/${siteId}/findings`, Icon: InboxIcon },
         { key: "runs", label: copy.nav.runs, to: `/s/${siteId}/runs`, Icon: PlayCircleIcon },
     ];
 }

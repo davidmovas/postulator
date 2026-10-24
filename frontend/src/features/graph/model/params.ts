@@ -1,4 +1,4 @@
-import { choiceParam, flagParam, listParam, queryCodec } from "../../../data/params.js";
+import { actionParam, choiceParam, flagParam, listParam, queryCodec } from "../../../data/params.js";
 import { presetRoles } from "../../settings/types/labels.js";
 import type { PresetRole } from "../../settings/types/labels.js";
 import { nodeStates } from "./index.js";
@@ -35,3 +35,15 @@ export const readQuery = codec.read;
 export const writeQuery = codec.write;
 
 export const searchOf = codec.search;
+
+export const cardsAction = "cards";
+
+export const cardsFocusParam = "entity";
+
+export function cardsSearch(entityId: string): string {
+    const asked = new URLSearchParams({ [actionParam]: cardsAction });
+    if (entityId !== "") {
+        asked.set(cardsFocusParam, entityId);
+    }
+    return `?${asked.toString()}`;
+}

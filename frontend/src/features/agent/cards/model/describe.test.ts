@@ -4,7 +4,7 @@ import { copy } from "../../../../copy/index.js";
 import type { TemplateSpec, ToolSchema } from "../../../../data/types.js";
 import { aFinding } from "../../../../testing/findings.js";
 import { findingCodeLabel } from "../../../pages/model/labels.js";
-import { findingSentence } from "../../../pages/model/subject.js";
+import { findingSentence } from "../../../findings/model/subject.js";
 import { optionDoes, optionLabel } from "../../../findings/labels.js";
 import { stepLabel } from "../../../templates/labels.js";
 import type { Part } from "./card.js";

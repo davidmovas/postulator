@@ -1,7 +1,28 @@
 import { describe, expect, it } from "vitest";
 
 import { findingCodes } from "../../../generated/vocab.js";
-import { findingSentence } from "./subject.js";
+import { findingSentence, rowCandidates } from "./subject.js";
+
+describe("the pages a workbook row matches", () => {
+    it("pairs each candidate page with its path", () => {
+        expect(rowCandidates({ candidates: ["/lab/guides/", "/shop/guides/"], pageIds: ["p1", "p2"] })).toStrictEqual([
+            { pageId: "p1", path: "/lab/guides/" },
+            { pageId: "p2", path: "/shop/guides/" },
+        ]);
+    });
+
+    it("keeps a page whose path is missing under its id and drops what is no id", () => {
+        expect(rowCandidates({ candidates: ["/a/"], pageIds: ["p1", "p2", 7, ""] })).toStrictEqual([
+            { pageId: "p1", path: "/a/" },
+            { pageId: "p2", path: "p2" },
+        ]);
+    });
+
+    it("answers none for a subject that names no pages", () => {
+        expect(rowCandidates(null)).toStrictEqual([]);
+        expect(rowCandidates({ pageIds: "p1" })).toStrictEqual([]);
+    });
+});
 
 describe("a finding's subject in words", () => {
     it.each([

@@ -1,5 +1,3 @@
-const quoted = (text: string): string => `“${text}”`;
-
 export const model = {
     loading: "Reading the page model",
     notOnSite: "This page is not on the site yet, so nothing has been observed.",
@@ -91,75 +89,6 @@ export const model = {
     findings: {
         title: "Open findings",
         none: "No open findings.",
-        unresolved: (name: string, path: string) => {
-            if (name === "") {
-                return "A crumb of the breadcrumb leads to no page in the model.";
-            }
-            return path === ""
-                ? `The breadcrumb names ${quoted(name)}, which leads to no page in the model.`
-                : `The breadcrumb names ${quoted(name)} at ${path}, which is no page in the model.`;
-        },
-        ambiguous: (name: string, candidates: readonly string[]) => {
-            if (name === "" || candidates.length === 0) {
-                return "A crumb of the breadcrumb matches several pages.";
-            }
-            return `The breadcrumb names ${quoted(name)}, which ${candidates.length} pages carry: ${candidates.join(", ")}.`;
-        },
-        twin: (name: string, page: string, terms: readonly string[]) => {
-            if (name === "" || page === "") {
-                return "A crumb's name is shared by a page and a store category, so the page was taken.";
-            }
-            const over = terms.length === 0 ? "a store category of the same name" : `the store category ${terms.join(", ")}`;
-            return `The breadcrumb names ${quoted(name)}: the page ${page} was taken over ${over}.`;
-        },
-        cycle: (paths: readonly string[]) =>
-            paths.length === 0
-                ? "The parents loop, so the loop is broken here."
-                : `The parents loop through ${paths.join(" › ")}, so the loop is broken here.`,
-        differs: (sheet: readonly string[], site: readonly string[]) => {
-            if (sheet.length === 0) {
-                return "The workbook places this page under other parents than the site shows.";
-            }
-            const shown = site.length === 0 ? "at the top" : `under ${site.join(" › ")}`;
-            return `The workbook puts this page under ${sheet.join(" › ")}; the site shows it ${shown}.`;
-        },
-        rowAmbiguous: (sheet: string, candidates: readonly string[]) => {
-            const from = sheet === "" ? "the workbook" : `the sheet ${sheet}`;
-            return candidates.length === 0
-                ? `A row of ${from} matches several pages.`
-                : `A row of ${from} matches ${candidates.length} pages: ${candidates.join(", ")}.`;
-        },
-        rowWithoutPage: (sheet: string, planned: string, product: boolean) => {
-            const from = sheet === "" ? "the workbook" : `the sheet ${sheet}`;
-            if (product) {
-                return `A product row of ${from} waits for its product in the store.`;
-            }
-            return planned === ""
-                ? `A row of ${from} has no page on the site yet.`
-                : `A row of ${from} has no page on the site yet; it is planned at ${planned}.`;
-        },
-        outdated: (version: string, required: string) =>
-            required === ""
-                ? "The companion plugin is out of date."
-                : `The companion plugin is version ${version === "" ? "unknown" : version} and ${required} is needed.`,
-        field: (field: string) => `The ${field} was edited on the site since it was last read or written.`,
-        body: "The body was edited on the site since it was last read or written.",
-        unreachable: (status: number) =>
-            status > 0
-                ? `The site answered ${status} when the page was fetched.`
-                : "The page could not be fetched from the site.",
-        redirected: (target: string) =>
-            target === "" ? "Visiting the page landed on another address." : `Visiting the page landed on ${target}.`,
-        builder: (name: string) => `Made with ${name}, so its body is read only.`,
-        technical: (reason: string) => `Read as a technical page: ${reason}.`,
-        titleDiffers: (planned: string, site: string) => `The plan says ${quoted(planned)}, the site says ${quoted(site)}.`,
-        urlForms: (absolute: number, relative: number) =>
-            `The site's pages mix link forms: ${absolute} absolute, ${relative} relative.`,
-        cardProposed: (name: string) =>
-            name === ""
-                ? "The agent proposed a card for an entity; accept or dismiss it on the Graph screen."
-                : `The agent proposed a card for ${name}; accept or dismiss it on the Graph screen.`,
-        generic: "The observation flagged something here.",
     },
     fieldNames: {
         title: "title",

@@ -2,7 +2,7 @@ import { copy } from "../../../../copy/index.js";
 import type { Finding } from "../../../../data/types.js";
 import { optionDoes, optionLabel } from "../../../findings/labels.js";
 import { findingCodeLabel } from "../../../pages/model/labels.js";
-import { findingSentence } from "../../../pages/model/subject.js";
+import { findingSentence } from "../../../findings/model/subject.js";
 import type { Describer, Line, Part } from "./card.js";
 import { line, ref, text, view } from "./card.js";
 

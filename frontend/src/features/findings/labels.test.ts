@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { findingOptions } from "../../generated/vocab.js";
-import { optionDoes, optionLabel } from "./labels.js";
+import { copy } from "../../copy/index.js";
+import { findingOptions, findingStatuses } from "../../generated/vocab.js";
+import { optionDoes, optionLabel, resolutionLabel, resolvedByLabel, statusLabel } from "./labels.js";
 
 const runOptions = new Set(["rewrite_field", "relink_page", "rescan"]);
 
@@ -23,5 +24,31 @@ describe("the words of a finding's options", () => {
     it("keeps an option this build does not know as it came", () => {
         expect(optionLabel("teleport")).toBe("teleport");
         expect(optionDoes("teleport")).toBe("");
+    });
+});
+
+describe("who settled a finding and how", () => {
+    it.each([
+        ["person", "a person"],
+        ["agent", "the agent"],
+        ["observation", "the observation"],
+        ["import", "an import"],
+        ["", copy.findings.someone],
+    ])("names %s", (by, said) => {
+        expect(resolvedByLabel(by)).toBe(said);
+    });
+
+    it("words every option and every settlement the site records on its own", () => {
+        for (const resolution of [...findingOptions, "observed_clear", "row_matched", "row_left_sheet"]) {
+            expect(resolutionLabel(resolution)).not.toBe(copy.findings.unknownResolution);
+            expect(resolutionLabel(resolution)).not.toContain("_");
+        }
+        expect(resolutionLabel("teleported")).toBe(copy.findings.unknownResolution);
+    });
+
+    it("has a word for every status", () => {
+        for (const status of findingStatuses) {
+            expect(statusLabel(status)).not.toBe(status);
+        }
     });
 });

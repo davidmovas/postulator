@@ -148,8 +148,8 @@ describe("the page model tab", () => {
 
         const findings = within(pane(said.findings.title));
         expect(findings.getByText("Crumb without a page")).toBeDefined();
-        expect(findings.getByText(said.findings.unresolved("Healing Peptides", ""))).toBeDefined();
-        expect(findings.getByText(said.findings.ambiguous("Guides", ["/lab-guides/", "/reconstitution/guides/"]))).toBeDefined();
+        expect(findings.getByText(copy.findings.subjects.unresolved("Healing Peptides", ""))).toBeDefined();
+        expect(findings.getByText(copy.findings.subjects.ambiguous("Guides", ["/lab-guides/", "/reconstitution/guides/"]))).toBeDefined();
         expect(findings.queryByRole("button")).toBeNull();
     });
 
