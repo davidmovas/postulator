@@ -18,7 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 74
+const latestMigration = 75
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -95,6 +95,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0072_pages_workbook_hierarchy.sql",
 		"0073_runs_kind_edit.sql",
 		"0074_page_map.sql",
+		"0075_page_renders_h1.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1177,6 +1178,58 @@ func TestAnEditRunIsStoredAndADownTakesItAwayAlone(t *testing.T) {
 	}
 	if got := rowsOf(t, store, `SELECT id FROM runs ORDER BY id`); !slices.Equal(got, []string{"r2", "r3"}) {
 		t.Fatalf("the down kept the runs %v, want every run but the edit", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestTheVisibleH1IsFilledFromTheStoredHeadingsWhereTheThemePrintsNone(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 74)
+	renders := schemaOf(t, store, "page_renders")
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-24T09:00:00Z"
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	for _, render := range []struct{ id, themeH1, headings, final string }{
+		{"pg1", "absent", `[{"level":2,"text":"Dosage","generated":false},{"level":1,"text":" Lab notes ","generated":false}]`, ""},
+		{"pg2", "absent", `[{"level":2,"text":"Dosage","generated":false}]`, ""},
+		{"pg3", "printed", `[]`, ""},
+		{"pg4", "", `[{"level":1,"text":"Assumed","generated":false}]`, ""},
+		{"pg5", "absent", `[{"level":1,"text":"Elsewhere","generated":false}]`, "/cart/"},
+	} {
+		must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES (?, 's1', ?, ?, 'page', 'exists', ?, ?)`,
+			render.id, "/"+render.id+"/", render.id, at, at)
+		must(`INSERT INTO page_renders (page_id, render_hash, content_root, headings, theme_h1, final_path, extracted_at) VALUES (?, 'h', 'found', ?, ?, ?, ?)`,
+			render.id, render.headings, render.themeH1, render.final, at)
+	}
+
+	if _, err = provider.UpTo(t.Context(), 75); err != nil {
+		t.Fatalf("up to 75: %v", err)
+	}
+	want := []string{"pg1 | Lab notes | content", "pg2 |  | none", "pg3 |  | ", "pg4 |  | ", "pg5 |  | "}
+	if got := rowsOf(t, store, `SELECT page_id, h1, h1_source FROM page_renders ORDER BY page_id`); !slices.Equal(got, want) {
+		t.Fatalf("renders after 0075 =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if _, err = store.writer.ExecContext(t.Context(), `UPDATE page_renders SET h1_source = 'guess' WHERE page_id = 'pg1'`); err == nil {
+		t.Fatal("the check accepted a source the model does not name")
+	}
+
+	if _, err = provider.DownTo(t.Context(), 74); err != nil {
+		t.Fatalf("down to 74: %v", err)
+	}
+	if got := schemaOf(t, store, "page_renders"); !slices.Equal(got, renders) {
+		t.Fatalf("the down left page_renders as\n%s\nwant it as migration 74 left it\n%s", strings.Join(got, "\n"), strings.Join(renders, "\n"))
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)

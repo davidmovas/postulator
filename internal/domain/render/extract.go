@@ -72,6 +72,7 @@ func Extract(in Input) (Extraction, error) {
 	out.Regions, out.WordsContent, out.WordsGenerated = p.regions()
 	out.Headings = p.headings()
 	out.ThemeH1 = p.themeH1(out.Headings)
+	out.H1, out.H1Source = p.visibleH1()
 	out.Builder = p.builder()
 	out.URLForm = p.urlForm()
 	out.Robots = p.robots()
