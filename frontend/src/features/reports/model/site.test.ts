@@ -15,6 +15,8 @@ function page(overrides: Partial<Page> = {}): Page {
         wpId: 1,
         title: "A",
         h1: "A",
+        observedH1: "A",
+        h1Source: "theme",
         metaTitle: "",
         metaDescription: "",
         keywords: [],

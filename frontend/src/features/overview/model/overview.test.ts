@@ -40,6 +40,8 @@ function node(id: string, drift: boolean, children: PageTreeNode[] = []): PageTr
             wpId: 1,
             title: id,
             h1: id,
+            observedH1: id,
+            h1Source: "theme",
             metaTitle: "",
             metaDescription: "",
             keywords: [],

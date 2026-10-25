@@ -25,6 +25,7 @@ import { DriftCell, EntityCell, PageTableRow, SyncedCell } from "./cells.js";
 import type { EntityIndex } from "./entities.js";
 import { defaultQuery, filterOf, narrowed } from "./params.js";
 import type { PagesQuery } from "./params.js";
+import { observedH1Line, titleBesideH1 } from "./labels.js";
 
 const columns = "minmax(96px,2.4fr) minmax(80px,2fr) 60px 84px minmax(80px,1.5fr) 36px 72px";
 const rowHeight = 28;
@@ -38,13 +39,23 @@ interface PageRowProps {
     onOpen: (pageId: string) => void;
 }
 
+function TitleCell({ page }: { page: Page }): ReactElement {
+    const h1 = titleBesideH1(page);
+    return (
+        <TableCell muted={true} title={observedH1Line(page)}>
+            {page.title === "" ? copy.pages.untitled : page.title}
+            {h1 === null ? null : <span className="ml-2 text-ink-faint">{h1}</span>}
+        </TableCell>
+    );
+}
+
 function PageRow({ page, selected, entityName, onSelect, onOpen }: PageRowProps): ReactElement {
     return (
         <PageTableRow page={page} selected={selected} onSelect={onSelect} onOpen={onOpen}>
             <TableCell mono={true} title={page.path}>
                 {page.path}
             </TableCell>
-            <TableCell muted={true}>{page.title === "" ? copy.pages.untitled : page.title}</TableCell>
+            <TitleCell page={page} />
             <TableCell mono={true} muted={true}>
                 {page.wpType}
             </TableCell>

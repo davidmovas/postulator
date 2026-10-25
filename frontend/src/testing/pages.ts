@@ -12,6 +12,8 @@ export function aPage(id: string, path: string, overrides: Partial<Page> = {}): 
         wpId: null,
         title: `Title ${id}`,
         h1: "",
+        observedH1: "",
+        h1Source: "none",
         metaTitle: "",
         metaDescription: "",
         keywords: [],
