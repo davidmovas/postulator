@@ -23,6 +23,8 @@ type Page struct {
 	WPID            *int64        `json:"wpId"`
 	Title           string        `json:"title"`
 	H1              string        `json:"h1"`
+	ObservedH1      string        `json:"observedH1"`
+	H1Source        string        `json:"h1Source"`
 	MetaTitle       string        `json:"metaTitle"`
 	MetaDescription string        `json:"metaDescription"`
 	Keywords        []dto.Keyword `json:"keywords"`
@@ -67,7 +69,8 @@ type Conflict struct {
 	EntityID string `json:"entityId,omitempty"`
 }
 
-func view(p pagemap.Page, drifted bool) Page {
+func view(p pagemap.Page, shown annotations) Page {
+	h1 := shown.h1(p.ID)
 	return Page{
 		ID:              p.ID,
 		SiteID:          p.SiteID,
@@ -79,6 +82,8 @@ func view(p pagemap.Page, drifted bool) Page {
 		WPID:            p.WPID,
 		Title:           p.Title,
 		H1:              p.H1,
+		ObservedH1:      h1.text,
+		H1Source:        string(h1.source),
 		MetaTitle:       p.MetaTitle,
 		MetaDescription: p.MetaDescription,
 		Keywords:        application.KeywordViews(p.Keywords),
@@ -91,7 +96,7 @@ func view(p pagemap.Page, drifted bool) Page {
 		TypeReason:      string(p.TypeReason),
 		WPModifiedAt:    dto.TimeOf(p.WPModifiedAt),
 		LastSyncedAt:    dto.TimeOf(p.LastSyncedAt),
-		Drift:           drifted,
+		Drift:           shown.drifted[p.ID],
 		CreatedAt:       dto.NewTime(p.CreatedAt),
 		UpdatedAt:       dto.NewTime(p.UpdatedAt),
 	}
@@ -130,10 +135,10 @@ func linkViews(links []pagemap.PageLink) []PageLink {
 	return out
 }
 
-func nodeViews(nodes []pagemap.Node, drifted map[string]bool) []TreeNode {
+func nodeViews(nodes []pagemap.Node, shown annotations) []TreeNode {
 	out := make([]TreeNode, 0, len(nodes))
 	for i := range nodes {
-		out = append(out, TreeNode{Page: view(nodes[i].Page, drifted[nodes[i].Page.ID]), Children: nodeViews(nodes[i].Children, drifted)})
+		out = append(out, TreeNode{Page: view(nodes[i].Page, shown), Children: nodeViews(nodes[i].Children, shown)})
 	}
 	return out
 }

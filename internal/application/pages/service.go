@@ -6,10 +6,12 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -52,6 +54,14 @@ type bodyReader interface {
 	Drifted(ctx context.Context, siteID string) ([]string, error)
 }
 
+type fieldReader interface {
+	ListForPages(ctx context.Context, pageIDs []string) (map[string][]field.Value, error)
+}
+
+type renderReader interface {
+	ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -68,6 +78,8 @@ type Deps struct {
 	Edges      edgeReader
 	Sites      siteReader
 	Bodies     bodyReader
+	Fields     fieldReader
+	Renders    renderReader
 	Findings   findingClearer
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
@@ -83,6 +95,8 @@ type Service struct {
 	edges     edgeReader
 	sites     siteReader
 	bodies    bodyReader
+	fields    fieldReader
+	renders   renderReader
 	findings  findingClearer
 	uow       unitOfWork
 	publisher application.Publisher
@@ -93,7 +107,7 @@ type Service struct {
 func New(deps Deps) *Service {
 	return &Service{
 		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
-		bodies: deps.Bodies, findings: deps.Findings, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
+		bodies: deps.Bodies, fields: deps.Fields, renders: deps.Renders, findings: deps.Findings, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
 	}
 }
 
@@ -105,24 +119,70 @@ func (s *Service) carried(ctx context.Context, page pagemap.Page) error {
 		finding.ResolvedByModel, finding.ResolutionPageMapped, s.now())
 }
 
-func (s *Service) drifted(ctx context.Context, siteID string) (map[string]bool, error) {
-	ids, err := s.bodies.Drifted(ctx, siteID)
+type observedH1 struct {
+	text   string
+	source render.H1Source
+}
+
+type annotations struct {
+	drifted map[string]bool
+	h1s     map[string]observedH1
+}
+
+func (a annotations) h1(pageID string) observedH1 {
+	if seen, ok := a.h1s[pageID]; ok {
+		return seen
+	}
+	return observedH1{source: render.H1None}
+}
+
+func (s *Service) annotate(ctx context.Context, siteID string, pages []pagemap.Page) (annotations, error) {
+	drifted, err := s.bodies.Drifted(ctx, siteID)
 	if err != nil {
-		return nil, err
+		return annotations{}, err
 	}
-	drifted := make(map[string]bool, len(ids))
+	out := annotations{drifted: make(map[string]bool, len(drifted)), h1s: make(map[string]observedH1, len(pages))}
+	for _, pageID := range drifted {
+		out.drifted[pageID] = true
+	}
+	ids := make([]string, 0, len(pages))
+	for i := range pages {
+		ids = append(ids, pages[i].ID)
+	}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	stored, err := s.fields.ListForPages(ctx, ids)
+	if err != nil {
+		return annotations{}, err
+	}
+	records, err := s.renders.ListForPages(ctx, ids)
+	if err != nil {
+		return annotations{}, err
+	}
+	byPage := make(map[string]*render.Record, len(records))
+	for i := range records {
+		byPage[records[i].PageID] = &records[i]
+	}
 	for _, pageID := range ids {
-		drifted[pageID] = true
+		content := ""
+		for _, value := range stored[pageID] {
+			if value.Key == field.H1 {
+				content = value.Current
+			}
+		}
+		text, source := render.VisibleH1(byPage[pageID], content)
+		out.h1s[pageID] = observedH1{text: text, source: source}
 	}
-	return drifted, nil
+	return out, nil
 }
 
 func (s *Service) viewOf(ctx context.Context, page pagemap.Page) (Page, error) {
-	drifted, err := s.drifted(ctx, page.SiteID)
+	shown, err := s.annotate(ctx, page.SiteID, []pagemap.Page{page})
 	if err != nil {
 		return Page{}, err
 	}
-	return view(page, drifted[page.ID]), nil
+	return view(page, shown), nil
 }
 
 func (s *Service) now() time.Time {

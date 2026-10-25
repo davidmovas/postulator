@@ -80,7 +80,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	if publishErr := s.changed(page.SiteID); publishErr != nil {
 		return CreateResponse{}, publishErr
 	}
-	return CreateResponse{Page: view(page, false)}, nil
+	return CreateResponse{Page: view(page, annotations{})}, nil
 }
 
 func (s *Service) adopt(ctx context.Context, parent pagemap.Page, siblings []pagemap.Page) error {
@@ -372,11 +372,11 @@ func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page],
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
-	drifted, err := s.drifted(ctx, req.SiteID)
+	shown, err := s.annotate(ctx, req.SiteID, list.Items)
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
-	return application.MapList(list, func(p pagemap.Page) Page { return view(p, drifted[p.ID]) }), nil
+	return application.MapList(list, func(p pagemap.Page) Page { return view(p, shown) }), nil
 }
 
 func (s *Service) entityFilter(ctx context.Context, req ListRequest) ([]string, error) {
@@ -558,9 +558,9 @@ func (s *Service) Tree(ctx context.Context, req TreeRequest) (TreeResponse, erro
 	if err != nil {
 		return TreeResponse{}, err
 	}
-	drifted, err := s.drifted(ctx, req.SiteID)
+	shown, err := s.annotate(ctx, req.SiteID, all)
 	if err != nil {
 		return TreeResponse{}, err
 	}
-	return TreeResponse{Roots: nodeViews(pagemap.BuildTree(all), drifted)}, nil
+	return TreeResponse{Roots: nodeViews(pagemap.BuildTree(all), shown)}, nil
 }

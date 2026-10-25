@@ -164,7 +164,8 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 
 	pagesService := pages.New(pages.Deps{
 		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Types: sqlite.NewPageTypeRepo(store),
-		Bodies: sqlite.NewPageBodyRepo(store), UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+		Bodies: sqlite.NewPageBodyRepo(store), Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),
+		UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	seeded.store, seeded.types, seeded.pages = store, types, pagesService
 	graphService := graph.New(graph.Deps{
