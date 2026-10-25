@@ -5132,3 +5132,146 @@ person, chosen by what SQLite allows at that size. It is the partial result (`b5
   - a refusal before anything was settled is shown as before.
 - **What it amends**: 4.3b's "A bulk over 1,000 findings is not one transaction" stands, and the
   person is now told what it left.
+
+## 2026-10-25 — phase 16: 2.5.1, the client's first feedback
+
+2.5.0 was released and the client came back with four things: pages with no H1 after a sync, an
+agent chat outside the selected site, a Proposed Entities dialog that forgot his selection, and the
+three layout faults the release had listed. The task list is in
+`docs/superpowers/plans/2026-10-25-phase-16-patch.md`.
+
+### The H1 a visitor sees
+
+- **Where it was lost.**
+  - The `h1` field was written only from the content's first `<h1>`: the plugin's `h1` from its
+    filtered content, or core's content through `headingOne`.
+  - On Blocksy (the client's theme, as on the replica) and on vanilla's block theme, the theme
+    prints the title as the page's H1, outside the content root. So the field stayed empty: 20 of 20
+    published pages on the replica and 11 of 11 on vanilla, reproduced on 2.5.0's code before the
+    fix.
+  - Stage 3's extraction saw that H1 (`ThemeH1Printed`, 0071) but kept only the flag, never the text.
+  - The stored extraction keeps the headings inside the root, not the public HTML, so no stored
+    render could give a theme's H1 back.
+- **The visible H1.**
+  - The extraction records `H1` and `H1Source`: the first visible `<h1>` in document order outside
+    the site's banner, navigation, sidebars and footer. A `<header>` or `<footer>` inside an article,
+    a section or `main` belongs to the page.
+  - The source is `content` when the h1 sits inside the content root and the client's own content
+    (raw or filtered) holds an h1 of that text, and `theme` otherwise.
+  - A text test was tried first and dropped: a one-word heading such as "Cart" matched loose words
+    of the raw.
+  - An empty render shows `none`. A visit that landed elsewhere keeps the source unknown.
+  - It does not depend on the root being located, since a visitor sees the h1 either way; the plan's
+    "unknown when the root was not located" was dropped.
+- **One rule, one value.**
+  - `render.VisibleH1(record, contentH1)`: a render with a known source wins; otherwise the content's
+    H1 is used as `content`; failing both, `none`. Never a guess.
+  - The content stage applies the rule with the page's stored render before `merge` and `fields`.
+    The render stage applies it after each extraction and writes the field itself. So no walk
+    flips the field between the two stages.
+- **The planned H1 stays apart.**
+  - `pages.h1` is both the workbook's H1 and a mirror of the observed one, and `hasPlan` reads
+    "planned" from the column differing from the field.
+  - So the render stage moves the column only through `PageRepo.FollowObservedH1(id, was, now)`,
+    which writes where the column still equals the previous observed value. A planned H1 is never
+    touched, and `page_h1_differs` tells the two apart on the next walk.
+- **A read-only field is always agreed.** The H1 is the catalog's one field with `Write: None` that
+  is not denied, and `observeFields` raised `field_changed_on_site` on it whenever it moved. It now
+  agrees it, as `CLAUDE.md` already stated the rule.
+- **Pages synced on 2.5.0.**
+  - 0075 adds `page_renders.h1` and `h1_source` and fills every render whose theme prints no H1 from
+    its stored headings (`content` or `none`).
+  - A render whose theme printed an H1, or whose root was unknown, keeps an unknown source. The
+    render stage's `stale()` fetches those again on the next ordinary sync, and only those: their
+    text was never stored. Renders that landed elsewhere are excluded.
+  - Proven by the migration test (0074 to 0075 with the backfill and the down) and by an
+    observation test whose incremental walk visits only the themed page, then nothing on the walk
+    after.
+  - On both stands, the e2e test takes the themed pages' rows back to what 2.5.0 stored, through the
+    repositories. The store exposes no migration control, and adding one for a test was not worth a
+    production API. An ordinary sync then fills every one of them again.
+- **What reads it.**
+  - `pages.View` gains `observedH1` and `h1Source` beside the planned `h1`, read in one pass per
+    call through two consumer-declared readers (fields and renders by page ids).
+  - The Pages list shows the H1 after the title where the two differ, with the H1 and its source on
+    hover. The drawer labels the editable field "Planned H1" and says under it what the site shows
+    and who prints it.
+  - The pack, `MatchRow`, crumb names and the agent's page view already read the field first. The
+    stand census proves each with the fixed value: a row naming a page's H1 finds it, or a store
+    category's hub twin, by `h1`.
+- **Two existing tests changed their fixtures**, not their claims:
+  - `TestACrumbFindsAPageByTheH1TheSiteShows` served a page whose render showed another H1 than the
+    content's, and now serves the H1 it is about;
+  - the observation's H1 tests strip the title from the filtered content, as Blocksy's
+    `the_content` never carries it.
+- **The fake site agreed with itself again.**
+  - `wptest`'s plugin reports an item's `H1` (the harness hands it the workbook's), while its
+    storefront printed the title. So the hub's visible H1 lost the name its store category shares,
+    and the Site map's twin went nil (`TestTheSeededWorkbookFillsTheInboxTheMapAndThePreview`).
+  - The storefront now prints the H1 the fake reports. The real plugin reports the first h1 of the
+    rendered content, so a real site cannot disagree that way.
+
+### One chat, in the selected site
+
+- **Where it went wrong.** The rail's Agent opened `/agent`, a screen that listed every
+  conversation and always started one with no site. A site-less conversation's site tools refuse
+  every call (`requireSite`), so the agent could not use the site's tools and its brief was empty.
+- **Now:**
+  - with a site selected, the rail and the palette open `/s/:siteId/agent` (and the conversation
+    and inbox paths under it);
+  - that screen lists only the site's conversations, starts new ones on the site and names the site
+    in its header ("Agent on …");
+  - it opens the conversation the dock holds for that site and writes back the one it opens, so the
+    two always show the same chat;
+  - the dock hides on agent routes, so one chat is never on screen twice;
+  - switching site from an agent route lands on the new site's chat.
+- **`/agent` holds only conversations with no site**, says plainly that site tools need a site,
+  and offers one button per site. The new-conversation dialog that let a person pick another site
+  is gone. No Go change: a conversation's tools already bind its site.
+- **Proven** by vitest on the paths, the screen and the rail, by
+  `TestTheScriptAnswersASiteQuestionAndAWriteWithTheirTools` (the harness's script answers
+  "explore" with `sites_explore` and a retitle with a confirmable write), and by walk shots from the
+  rail and from the dock that show the tool's outcome and the card.
+- **The harness seeds a second site** ("Tamper Supply") to prove the switch. Two sites created in
+  the same second list in either order, since sites sort by creation and then by a random id. So the
+  harness's restore and its tests find the seeded site by name, and the tests list by name. Before
+  that, the restart tests failed now and then with "the seed published nothing".
+
+### The Proposed Entities dialog
+
+- **The brief kept its redesign for a later session.** The owner opened it mid-session, found it
+  unchanged, small, and unable to untick a parent's children at once, and moved the whole redesign,
+  editing included, into 2.5.1.
+- **What it is now:**
+  - a sheet over nearly the whole window (`ui/workspace.tsx`);
+  - the proposals as a tree by their parent, with expand and collapse per node and for all;
+  - ticking a node ticks its whole subtree, and a parent with some children ticked shows a partial
+    state; keep all and keep none; a count of ticked out of total;
+  - filters (all, ticked, not ticked, blocked) and a search by name or path that keeps the ancestors
+    of every match;
+  - an inspector that edits a proposal's name, its parent (another proposal, an existing entity or
+    the top level, never a cycle) and its keywords, with "Undo my changes";
+  - clashes recomputed after an edit, so a name taken under the same parent stays unticked with its
+    reason.
+- **A ticked child whose parent is unticked is sent at the top level**, and its row says so, which
+  is what `ApplyProposals` does with a parent it cannot find. `ApplyProposals` takes the proposals
+  as the screen holds them, so no Go change was needed.
+- **Its state** (stage, selection, edits, search, filters, expanded nodes) lives in memory per site
+  and per opener (pages, keywords, a findings seed; `proposal-memory.ts`). It clears on accept, on
+  "Start over", on a different findings seed and on restart. The pick's page tree takes its search
+  and expanded nodes from outside for it.
+- **Proven** by 43 tests of the pure model (`graph/model/proposal-tree.ts`), the store's tests, 13
+  new drawer tests, and walk shots at 1280 and 960. The walk builds a selection, goes to Pages,
+  switches site and back, and finds it kept. The review shots open the dialog from Findings, since
+  the harness's fake model cannot answer a preview from pages.
+
+### Three screens at 960 × 600 with the dock open
+
+- One pure helper, `ui/collapse.ts`, picks the columns that fit the measured width, as the Site map
+  does.
+- The Runs table drops the duration, then the spend, then the start, all kept in the run's detail.
+  The Models spend and recent-call tables collapse the same way, and model and role names show whole
+  on hover.
+- The rail scrolls without a sideways bar.
+- `runs-960`, `settings-models-960` and `rail-site-960` carry a `fits` step, and the walk gained an
+  `expect` step.

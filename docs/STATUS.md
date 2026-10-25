@@ -4,22 +4,19 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.4.0` on 2026-10-04 (PR #30: the client's workbooks, the WooCommerce products,
-OpenAI only and the spend in view, the categories taken out again). **2.5.0 is built and waits in
-pull request #31 from `dev` to `master`** (https://github.com/davidmovas/postulator/pull/31), neither
-merged nor tagged: the site-model redesign (phase 14,
-2026-10-17 to 24) and the release work (phase 15, 2026-10-24), its notes under **Release 2.5.0**
-below and in the pull request's body. Its gate is under **The gate**.
+**Released:** `v2.5.0` on 2026-10-24 (PR #31: the site-model redesign of phase 14 and the release
+work of phase 15, notes under **Release 2.5.0**). **2.5.1 is built and waits in a pull request
+from `dev` to `master`**, neither merged nor tagged: the client's first feedback (phase 16,
+2026-10-25), its notes under **Release 2.5.1** below and in the pull request's body. Its gate is
+under **The gate**.
 
 ## Next, in order
 
-1. **The owner merges the pull request and tags `v2.5.0` on `master`**; the tag's workflow builds and
+1. **The owner merges the pull request and tags `v2.5.1` on `master`**; the tag's workflow builds and
    publishes the installer, the executable and the plugin zip.
-2. **Plugin 1.5.2 on the client's sites**, uploaded over the old one ("Replace current with
-   uploaded"); it installs on PHP 7.2 and WordPress 5.7, and 2.5.0 writes nothing through a plugin
-   below 1.5.1.
-3. **The first sync on a real site**, then the client's workbook, then typing and scoping; what to look
-   at first is under **Release 2.5.0**.
+2. **The client installs 2.5.1 over 2.5.0.** The plugin did not change: 1.5.2 stays on his sites, no
+   new zip. His next ordinary sync fetches again the pages whose theme prints the H1, and only those.
+3. **The next session**: page classification and the Pages screen's views.
 4. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
    `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24); settle the
    output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and whether tools load on demand
@@ -65,6 +62,25 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   resolves findings, starts runs and edits a page field by field or block by block. Every write it
   makes to a page waits for the person.
 
+## Release 2.5.1
+
+The client's first feedback on 2.5.0, in short:
+
+- **The H1 is back.** A page whose theme prints its title as the H1 (Blocksy, the client's theme, and
+  block themes) came out of a sync with no H1, which also broke matching a workbook row by its H1.
+  The model now keeps the H1 a visitor sees and says who prints it: the theme or the page's content.
+  Pages synced on 2.5.0 get theirs on the next ordinary sync, which fetches only those pages again.
+- **One chat, in the selected site.** The rail's Agent opened a chat outside the site, where the
+  agent could not use the site's tools. It now opens the same chat as the dock, bound to the selected
+  site; a chat with no site exists only when no site is selected, and says so.
+- **The Proposed Entities dialog**, rebuilt: nearly full-window, the proposals as a tree where
+  unticking a parent unticks its children, select all and none, search, and editing a proposal's
+  name, parent and keywords before accepting. What the person built stays while he looks elsewhere or
+  switches site, until he accepts, starts over or restarts the app.
+- **Three screens fit the smallest window with the dock open**: the Runs table, the Models tables
+  and the left rail.
+- **No new plugin.** 1.5.2 stays.
+
 ## Release 2.5.0
 
 The notes as the pull request carries them, in short:
@@ -100,12 +116,32 @@ The notes as the pull request carries them, in short:
   (0.7 s at 2,000 pages, 4.6 s at 5,000), and a first walk is paced by the site's request limit.
 - **Bulk resolution** settles 1,000 findings per transaction; a refused batch stops the action and the
   dialog says what was settled and what was not.
-- **At the window's least width with the dock open** the Site map fits; the Runs table still scrolls
-  sideways, the Models table cuts a model's name, and the rail shows a horizontal scrollbar at 600 px
-  high.
+- **At the window's least width with the dock open** every screen the walk measures fits (2.5.1
+  fixed the Runs table, the Models tables and the rail).
 - **The rest** is under **Known gaps**, each with its reason.
 
 ## Where we are
+
+**2026-10-25, phase 16: 2.5.1, the client's first feedback.** The reasoning is under "phase 16" in
+`DECISIONS.md`; the task list is in `docs/superpowers/plans/2026-10-25-phase-16-patch.md`.
+
+- **The visible H1** (`de68e5a`, `edee058`, `e46a764`, `07a7c56`, `655f5f3`):
+  - the extraction keeps the first visible h1 and its source;
+  - 0075 stores both on the render;
+  - one rule (`render.VisibleH1`) feeds the `h1` field from both observation stages;
+  - the planned H1 follows only where no plan holds it, and a read-only field is always agreed;
+  - `pages.View` carries `observedH1` and `h1Source`.
+  Reproduced on 2.5.0's code (20 of 20 published pages on the replica, 11 of 11 on vanilla without
+  an H1), then green on both stands with the census and the upgrade proof.
+- **One chat per site** (`f90967d`, `548deaa`): `/s/:siteId/agent`, shared with the dock; `/agent`
+  for site-less chats only.
+- **The proposal dialog** (`c802a6e`): the near full-window tree with cascading ticks, search,
+  filters and an inspector that edits name, parent and keywords, its state kept per site and opener.
+- **Three layouts at 960** (`1fdb6b4`): runs, models and the rail, each with a `fits` shot.
+- **The harness** (`18a6b38`): the fake storefront prints the H1 its plugin reports; the second
+  seeded site is found by name.
+- **2.5.1** (`869dfa9`) in the seven version files.
+- Schemas unchanged (66,394 bytes and 14,779 tokens, 92 tools); migrations to 0075; plugin 1.5.2.
 
 **2026-10-24, phase 15 session 2: the polish, the docs, the build and the pull request.** The
 reasoning is under "phase 15, session 2" in `DECISIONS.md`; the task list is in the phase plan.
