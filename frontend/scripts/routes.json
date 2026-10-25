@@ -66,6 +66,207 @@
     ]
   },
   {
+    "name": "propose-entities-picked",
+    "route": "#/s/:siteId/graph",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "main button:has-text(\"Model\")"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Propose entities from the pages\")"
+      },
+      {
+        "expect": "[role=dialog] [data-page-pick] input:not([disabled])"
+      },
+      {
+        "click": ":nth-match([role=dialog] [data-page-pick] label:has(input:not([disabled])), 1)"
+      },
+      {
+        "click": ":nth-match([role=dialog] [data-page-pick] label:has(input:not([disabled])), 2)"
+      },
+      {
+        "expect": "[role=dialog] [data-page-pick] input:checked",
+        "count": 2
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-kept",
+    "route": "#/s/:siteId/graph",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Pages\"]"
+      },
+      {
+        "expect": "[data-page-row]"
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Tamper Supply\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Crema Bench\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Graph\"]"
+      },
+      {
+        "wait": 1500
+      },
+      {
+        "click": "main button:has-text(\"Model\")"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Propose entities from the pages\")"
+      },
+      {
+        "expect": "[role=dialog] [data-page-pick] input:checked",
+        "count": 2
+      },
+      {
+        "expect": "[role=dialog] button:has-text(\"Start over\")"
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-review",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "button:has-text(\"Propose entities for all\")"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]",
+        "timeout": 20000
+      },
+      {
+        "click": ":nth-match([data-workspace] [data-proposal-at]:has(button[aria-expanded]), 1)"
+      },
+      {
+        "type": "[data-proposal-inspector] input=Field notes"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]:has-text(\"Field notes\")"
+      },
+      {
+        "click": ":nth-match([data-workspace] [data-proposal-at]:has(button[aria-expanded]) label, 1)"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-state=off]"
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-review-960",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "width": 960,
+    "height": 600,
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "click": "button:has-text(\"Propose entities for all\")"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]:has-text(\"Field notes\")",
+        "timeout": 20000
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-review-kept",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Pages\"]"
+      },
+      {
+        "expect": "[data-page-row]"
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Tamper Supply\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Crema Bench\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Findings\"]"
+      },
+      {
+        "click": "main nav button:has-text(\"Page without an entity\")"
+      },
+      {
+        "click": "button:has-text(\"Propose entities for all\")"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]:has-text(\"Field notes\")",
+        "timeout": 20000
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-state=off]"
+      },
+      {
+        "expect": "[data-proposal-inspector] input"
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
     "name": "pages",
     "route": "#/s/:siteId/pages",
     "wait": 1200
@@ -807,12 +1008,22 @@
   },
   {
     "name": "agent",
-    "route": "#/agent",
+    "route": "#/s/:siteId/agent",
     "wait": 1200
   },
   {
-    "name": "agent-tool-outcomes",
+    "name": "agent-nosite",
     "route": "#/agent",
+    "wait": 1200,
+    "steps": [
+      {
+        "expect": "[role=note] button[aria-label=\"Talk about Crema Bench\"]"
+      }
+    ]
+  },
+  {
+    "name": "agent-tool-outcomes",
+    "route": "#/s/:siteId/agent",
     "wait": 1800,
     "steps": [
       {
@@ -832,6 +1043,166 @@
   {
     "name": "agent-inbox",
     "route": "#/agent/inbox"
+  },
+  {
+    "name": "agent-site-explore",
+    "route": "#/s/:siteId/overview",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Agent\"]"
+      },
+      {
+        "expect": "h1:has-text(\"Agent on Crema Bench\")"
+      },
+      {
+        "expect": "[data-agent-dock]",
+        "count": 0
+      },
+      {
+        "click": "button:has-text(\"New conversation\")"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "type": "main textarea=Explore the site's tree for me"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "main [data-tool=sites_explore][data-tool-status=ok]",
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
+    "name": "agent-site-card",
+    "route": "#/s/:siteId/agent",
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "main [data-tool=sites_explore][data-tool-status=ok]"
+      },
+      {
+        "expect": "main >> text=The top of the site holds the six hubs",
+        "timeout": 30000
+      },
+      {
+        "expect": "main button:has-text(\"Stop\")",
+        "count": 0,
+        "timeout": 60000
+      },
+      {
+        "type": "main textarea=Retitle the espresso machines under $500 page"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "main [data-card-tool=pages_update][data-card-status=pending]",
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
+    "name": "agent-site-switch",
+    "route": "#/s/:siteId/agent",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Tamper Supply\")"
+      },
+      {
+        "expect": "h1:has-text(\"Agent on Tamper Supply\")"
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Crema Bench\")"
+      },
+      {
+        "expect": "main [data-card-tool=pages_update][data-card-status=pending]"
+      }
+    ]
+  },
+  {
+    "name": "agent-dock-explore",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "[data-agent-dock] [data-card-tool=pages_update][data-card-status=pending]"
+      },
+      {
+        "click": "[data-agent-dock] [data-card-status=pending] button:has-text(\"Reject\")"
+      },
+      {
+        "expect": "[data-agent-dock] [data-card-status=pending]",
+        "count": 0,
+        "timeout": 30000
+      },
+      {
+        "expect": "[data-agent-dock] button:has-text(\"Stop\")",
+        "count": 0,
+        "timeout": 60000
+      },
+      {
+        "type": "[data-agent-dock] textarea=Explore the tree once more"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "[data-agent-dock] [data-tool=sites_explore][data-tool-status=ok]",
+        "count": 2,
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
+    "name": "agent-dock-card",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "[data-agent-dock] >> text=The top of the site holds the six hubs",
+        "count": 2,
+        "timeout": 30000
+      },
+      {
+        "expect": "[data-agent-dock] button:has-text(\"Stop\")",
+        "count": 0,
+        "timeout": 60000
+      },
+      {
+        "type": "[data-agent-dock] textarea=Retitle that page after all"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "[data-agent-dock] [data-card-tool=pages_update][data-card-status=pending]",
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
   },
   {
     "name": "settings-models",
@@ -912,7 +1283,25 @@
     "name": "settings-models-960",
     "route": "#/settings/models",
     "width": 960,
-    "height": 600
+    "height": 600,
+    "wait": 1200,
+    "steps": [
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "fits": "main"
+      },
+      {
+        "fits": "[data-spend-models]"
+      },
+      {
+        "fits": "[data-recent-calls]"
+      },
+      {
+        "fits": "nav[aria-label=\"Sections\"]"
+      }
+    ]
   },
   {
     "name": "palette",
@@ -1055,7 +1444,11 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[aria-label=\"Collapse the agent dock\"]"
+        "expect": "[data-agent-dock]",
+        "count": 0
+      },
+      {
+        "key": "Control+J"
       },
       {
         "wait": 800
@@ -1095,11 +1488,28 @@
     "route": "#/s/:siteId/runs",
     "width": 960,
     "height": 600,
-    "wait": 1200
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[aria-label=\"Expand the agent dock\"]"
+      },
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "fits": "[data-runs-table]"
+      },
+      {
+        "fits": "main"
+      }
+    ]
   },
   {
     "name": "agent-960",
-    "route": "#/agent",
+    "route": "#/s/:siteId/agent",
     "width": 960,
     "height": 600,
     "wait": 1200
@@ -1109,7 +1519,15 @@
     "route": "#/s/:siteId/graph",
     "width": 960,
     "height": 600,
-    "wait": 1400
+    "wait": 1400,
+    "steps": [
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "fits": "nav[aria-label=\"Sections\"]"
+      }
+    ]
   },
   {
     "name": "palette-960",

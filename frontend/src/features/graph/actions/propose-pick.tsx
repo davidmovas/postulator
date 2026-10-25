@@ -5,7 +5,8 @@ import { copy } from "../../../copy/index.js";
 import type { SegmentedOption, SelectOption } from "../../../ui/index.js";
 import { Field, Segmented, Select, Textarea } from "../../../ui/index.js";
 import { everyNode } from "../../pages/pick/model.js";
-import { PageTree } from "../../pages/pick/tree.js";
+import type { TreeView } from "../../pages/pick/tree.js";
+import { PageTree, blankTreeView } from "../../pages/pick/tree.js";
 import type { GraphIndex } from "../model/index.js";
 import { keywordLines, unmapped } from "../model/proposals.js";
 
@@ -33,10 +34,11 @@ export interface Pick {
     scope: PickScope;
     keywords: string;
     parentId: string;
+    tree: TreeView;
 }
 
 export function freshPick(input: ProposalInput): Pick {
-    return { input, selected: new Set(), scope: "unmapped", keywords: "", parentId: noParent };
+    return { input, selected: new Set(), scope: "unmapped", keywords: "", parentId: noParent, tree: blankTreeView };
 }
 
 export interface ProposalPickProps {
@@ -76,6 +78,11 @@ export function ProposalPick({ siteId, index, pick, onPick }: ProposalPickProps)
                     }}
                     pickable={unmapped}
                     keep={keep}
+                    fill={true}
+                    view={pick.tree}
+                    onView={(tree) => {
+                        onPick({ ...pick, tree });
+                    }}
                     label={copy.graph.ai.pickPages}
                     picked={copy.graph.ai.pickedPages(pick.selected.size)}
                     refusalOf={(node) => (node.page.path === rootPath ? copy.graph.ai.root : unmapped(node) ? null : copy.graph.ai.mapped)}
@@ -98,7 +105,7 @@ export function ProposalPick({ siteId, index, pick, onPick }: ProposalPickProps)
                             <Textarea
                                 id={control.id}
                                 aria-describedby={control["aria-describedby"]}
-                                rows={10}
+                                rows={16}
                                 value={pick.keywords}
                                 onChange={(event) => {
                                     onPick({ ...pick, keywords: event.target.value });

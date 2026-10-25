@@ -43,6 +43,8 @@ export { Select } from "./select.js";
 export type { SelectOption, SelectProps } from "./select.js";
 export { Sheet } from "./sheet.js";
 export type { SheetProps } from "./sheet.js";
+export { Workspace } from "./workspace.js";
+export type { WorkspaceProps } from "./workspace.js";
 export { Skeleton, SkeletonRows } from "./skeleton.js";
 export type { SkeletonProps, SkeletonRowsProps } from "./skeleton.js";
 export { Spinner } from "./spinner.js";

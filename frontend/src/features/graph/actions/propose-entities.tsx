@@ -3,29 +3,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { errorMessageOf } from "../../../data/errors.js";
-import { useApplyProposals, usePreviewFromPages, useProposeFromKeywords } from "../../../data/hooks/graph.js";
+import { useApplyProposals, useGraph, usePreviewFromPages, useProposeFromKeywords } from "../../../data/hooks/graph.js";
 import { pushToast } from "../../../data/toasts.js";
 import type { ApplyProposalsResponse, PreviewFromPagesRequest, ProposedEntity } from "../../../data/types.js";
-import { Button, Drawer, Stars2Icon, cx, useElapsed } from "../../../ui/index.js";
+import { Button, RestartAltIcon, Stars2Icon, Workspace, useElapsed } from "../../../ui/index.js";
 import type { GraphIndex } from "../model/index.js";
-import { chosenOf, everyTickable, keywordLines, writesOf } from "../model/proposals.js";
+import { buildGraphIndex } from "../model/index.js";
+import type { ProposalEdits, ProposalSource } from "../model/proposal-tree.js";
+import { clashesOf, everyTickable, sentProposals } from "../model/proposal-tree.js";
+import { keywordLines, writesOf } from "../model/proposals.js";
+import type { ProposalMemory, ProposalOpener, ProposalStage } from "./proposal-memory.js";
+import { blankMemory, forgetProposal, memoryOf, remember, seedKey, useProposalMemory } from "./proposal-memory.js";
 import type { Pick, ProposalInput } from "./propose-pick.js";
-import { ProposalPick, freshPick, noParent } from "./propose-pick.js";
+import { ProposalPick, noParent } from "./propose-pick.js";
+import type { ExistingEntity, ReviewState } from "./propose-review.js";
 import { ProposalConfirm, ProposalReview } from "./propose-review.js";
 
 export type { ProposalInput } from "./propose-pick.js";
 
 const said = copy.graph.ai;
 
-const drawerWidth = 688;
-
 const siteSource = "site" as PreviewFromPagesRequest["source"];
+
+const noEdits: ProposalEdits = new Map();
 
 export type ProposalStart =
     | { kind: "pick"; source: ProposalInput; index: GraphIndex; onReview: () => void }
     | { kind: "seed"; seed: PreviewFromPagesRequest };
-
-type Stage = "pick" | "review" | "confirm" | "done";
 
 export interface ProposeEntitiesDrawerProps {
     open: boolean;
@@ -34,17 +38,49 @@ export interface ProposeEntitiesDrawerProps {
     start: ProposalStart;
 }
 
+function freshReview(answered: readonly ProposedEntity[]): Partial<ProposalMemory> {
+    return {
+        proposals: answered,
+        kept: everyTickable(answered.length, clashesOf(answered, noEdits)),
+        edits: noEdits,
+        query: "",
+        filter: "all",
+        collapsed: new Set(),
+        focus: null,
+    };
+}
+
+function existingOf(index: GraphIndex | null): readonly ExistingEntity[] {
+    if (index === null) {
+        return [];
+    }
+    return index.entities
+        .map((entity) => ({ id: entity.id, label: index.labels.get(entity.id) ?? entity.name }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+}
+
 export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: ProposeEntitiesDrawerProps): ReactElement | null {
     const input = start.kind === "pick" ? start.source : null;
     const seed = start.kind === "seed" ? start.seed : null;
-    const [stage, setStage] = useState<Stage>(seed === null ? "pick" : "review");
-    const [pick, setPick] = useState<Pick>(() => freshPick(input ?? "pages"));
-    const [proposals, setProposals] = useState<readonly ProposedEntity[]>([]);
-    const [kept, setKept] = useState<ReadonlySet<number>>(new Set());
+    const opener: ProposalOpener = input ?? "seed";
+    const source: ProposalSource = seed === null ? "model" : "site";
+    const memory = useProposalMemory(siteId, opener);
+    const { stage, pick, proposals } = memory;
     const [outcome, setOutcome] = useState<ApplyProposalsResponse | null>(null);
     const [stopped, setStopped] = useState(false);
     const controller = useRef<AbortController | null>(null);
 
+    const graph = useGraph(open && start.kind === "seed" ? siteId : null);
+    const index = useMemo(
+        () =>
+            start.kind === "pick"
+                ? start.index
+                : graph.data === undefined
+                  ? null
+                  : buildGraphIndex(graph.data.entities ?? [], graph.data.edges ?? []),
+        [start, graph.data],
+    );
+    const existing = useMemo(() => existingOf(index), [index]);
     const previewPages = usePreviewFromPages();
     const previewKeywords = useProposeFromKeywords();
     const apply = useApplyProposals();
@@ -52,39 +88,64 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
     const seconds = useElapsed(previewing || apply.isPending);
     const lines = useMemo(() => keywordLines(pick.keywords), [pick.keywords]);
 
-    const received = (answered: readonly ProposedEntity[]): void => {
-        setProposals(answered);
-        setKept(everyTickable(answered));
-        setStage("review");
+    const setStage = (next: ProposalStage): void => {
+        remember(siteId, opener, { stage: next });
     };
+    const setPick = (next: Pick): void => {
+        remember(siteId, opener, { pick: next });
+    };
+    const setReview = (patch: Partial<ReviewState>): void => {
+        remember(siteId, opener, patch);
+    };
+
+    useEffect(() => {
+        return () => {
+            controller.current?.abort();
+        };
+    }, []);
+
+    const asked = seed === null ? null : seedKey(seed);
 
     useEffect(() => {
         if (!open) {
             return;
         }
-        setStage(seed === null ? "pick" : "review");
-        setPick(freshPick(input ?? "pages"));
-        setProposals([]);
-        setKept(new Set());
         setOutcome(null);
         setStopped(false);
         previewPages.reset();
         previewKeywords.reset();
         apply.reset();
-        if (seed === null) {
+        if (seed === null || asked === null) {
             return;
         }
-        const held = new AbortController();
-        controller.current = held;
-        previewPages.mutate({ request: { ...seed, source: siteSource }, signal: held.signal }, { onSuccess: (answered) => received(answered.entities ?? []) });
+        const held = memoryOf(siteId, "seed");
+        if (held.seed === asked && held.proposals.length > 0) {
+            return;
+        }
+        forgetProposal(siteId, "seed");
+        remember(siteId, "seed", { seed: asked });
+        const abort = new AbortController();
+        controller.current = abort;
+        previewPages.mutate(
+            { request: { ...seed, source: siteSource }, signal: abort.signal },
+            {
+                onSuccess: (answered) => {
+                    remember(siteId, "seed", freshReview(answered.entities ?? []));
+                },
+            },
+        );
         return () => {
-            held.abort();
+            abort.abort();
         };
-    }, [open, siteId, input, seed]);
+    }, [open, siteId, asked]);
 
     if (!open) {
         return null;
     }
+
+    const received = (answered: readonly ProposedEntity[]): void => {
+        remember(siteId, opener, { ...freshReview(answered), stage: "review" });
+    };
 
     const stop = (): void => {
         controller.current?.abort();
@@ -109,15 +170,18 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
         previewKeywords.mutate({ request, signal: held.signal }, { onSuccess: (answered) => received(answered.entities ?? []) });
     };
 
-    const chosen = chosenOf(proposals, kept);
+    const chosen = sentProposals(proposals, memory.edits, memory.kept, {
+        source,
+        entityName: (id) => index?.byId.get(id)?.name,
+    });
 
     const create = (): void => {
         apply.mutate(
             { request: { siteId, entities: chosen } },
             {
                 onSuccess: (answered) => {
+                    forgetProposal(siteId, opener);
                     setOutcome(answered);
-                    setStage("done");
                 },
             },
         );
@@ -128,6 +192,7 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
             { request: { siteId, entities: chosen, source: siteSource } },
             {
                 onSuccess: (answered) => {
+                    forgetProposal(siteId, opener);
                     pushToast("info", said.siteApplied(answered.entities?.length ?? 0, answered.mapped, answered.skipped));
                     onOpenChange(false);
                 },
@@ -142,30 +207,62 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
         onOpenChange(next);
     };
 
+    const startOver = (): void => {
+        forgetProposal(siteId, opener);
+        setStopped(false);
+        previewPages.reset();
+        previewKeywords.reset();
+        apply.reset();
+    };
+
     const error = errorMessageOf(previewPages.error) ?? errorMessageOf(previewKeywords.error) ?? errorMessageOf(apply.error);
     const ready = pick.input === "pages" ? pick.selected.size : lines.length;
     const edges = outcome?.edges?.length ?? 0;
     const writes = writesOf(chosen);
+    const shown: ProposalStage | "done" = outcome === null ? stage : "done";
     const working = (
         <span aria-live="polite" className="mr-auto text-xs text-ink-soft">
             {seed === null ? said.previewing : said.reading} <span className="font-mono text-2xs text-ink-faint">{said.elapsed(seconds)}</span>
         </span>
     );
+    const restart =
+        start.kind === "pick" && memory !== blankMemory(opener) && !previewing ? (
+            <Button
+                variant="ghost"
+                icon={RestartAltIcon}
+                title={said.resetHint}
+                className="mr-auto"
+                disabled={apply.isPending}
+                onClick={startOver}
+            >
+                {said.reset}
+            </Button>
+        ) : (
+            <span className="mr-auto" />
+        );
+    const notes = (
+        <>
+            {stopped && !previewing ? <span className="text-xs text-ink-dim">{said.cancelled}</span> : null}
+            {error === null ? null : <span className="min-w-0 truncate text-xs text-danger">{error}</span>}
+        </>
+    );
 
     const footer =
-        stage === "pick" ? (
-            <div className="flex items-center justify-end gap-2">
-                {previewing ? working : null}
+        shown === "pick" ? (
+            <>
+                {previewing ? working : restart}
+                {notes}
                 <Button variant="secondary" onClick={previewing ? stop : () => close(false)}>
                     {previewing ? said.stop : said.cancel}
                 </Button>
                 <Button variant="primary" icon={Stars2Icon} busy={previewing} disabled={ready === 0 || previewing} onClick={preview}>
                     {said.preview(ready)}
                 </Button>
-            </div>
-        ) : stage === "review" ? (
-            <div className="flex items-center justify-end gap-2">
-                {previewing ? working : null}
+            </>
+        ) : shown === "review" ? (
+            <>
+                {previewing ? working : restart}
+                {notes}
                 {seed === null ? (
                     <Button variant="ghost" disabled={apply.isPending} onClick={() => setStage("pick")}>
                         {said.back}
@@ -183,18 +280,21 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
                 >
                     {said.create(chosen.length)}
                 </Button>
-            </div>
-        ) : stage === "confirm" ? (
-            <div className="flex items-center justify-end gap-2">
+            </>
+        ) : shown === "confirm" ? (
+            <>
+                {restart}
+                {notes}
                 <Button variant="ghost" disabled={apply.isPending} onClick={() => setStage("review")}>
                     {said.back}
                 </Button>
                 <Button variant="primary" busy={apply.isPending} disabled={apply.isPending} onClick={write}>
                     {said.confirmApply}
                 </Button>
-            </div>
+            </>
         ) : (
-            <div className="flex items-center justify-end gap-2">
+            <>
+                <span className="mr-auto" />
                 <Button variant="secondary" onClick={() => close(false)}>
                     {said.close}
                 </Button>
@@ -209,34 +309,33 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
                         {said.reviewEdges}
                     </Button>
                 ) : null}
-            </div>
+            </>
         );
 
     return (
-        <Drawer
+        <Workspace
             open={open}
             onOpenChange={close}
             title={said.entitiesTitle}
             description={seed === null ? said.entitiesBody : said.siteBody}
             closeLabel={said.close}
-            width={drawerWidth}
             footer={footer}
         >
-            <div className={cx("flex flex-col gap-3 p-3", stage === "review" && "h-full")}>
-                {stage === "pick" && start.kind === "pick" ? (
+            {shown === "pick" && start.kind === "pick" ? (
+                <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
                     <ProposalPick siteId={siteId} index={start.index} pick={pick} onPick={setPick} />
-                ) : stage === "review" ? (
-                    previewing ? null : <ProposalReview proposals={proposals} kept={kept} onKept={setKept} fromSite={seed !== null} />
-                ) : stage === "confirm" ? (
-                    <ProposalConfirm written={writes.written} joined={writes.joined} />
-                ) : (
-                    <p className="text-xs text-ink-soft">
-                        {said.applied(outcome?.entities?.length ?? 0, outcome?.mapped ?? 0, edges, outcome?.skipped ?? 0)}
-                    </p>
-                )}
-                {stopped && !previewing ? <p className="shrink-0 text-xs text-ink-dim">{said.cancelled}</p> : null}
-                {error === null ? null : <p className="shrink-0 text-xs text-danger">{error}</p>}
-            </div>
-        </Drawer>
+                </div>
+            ) : shown === "review" ? (
+                previewing ? null : (
+                    <ProposalReview proposals={proposals} state={memory} source={source} existing={existing} onChange={setReview} />
+                )
+            ) : shown === "confirm" ? (
+                <ProposalConfirm written={writes.written} joined={writes.joined} />
+            ) : (
+                <p className="p-4 text-xs text-ink-soft">
+                    {said.applied(outcome?.entities?.length ?? 0, outcome?.mapped ?? 0, edges, outcome?.skipped ?? 0)}
+                </p>
+            )}
+        </Workspace>
     );
 }
