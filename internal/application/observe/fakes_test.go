@@ -281,6 +281,19 @@ func (p pageStore) UpdateDerived(_ context.Context, page pagemap.Page) error {
 	return nil
 }
 
+func (p pageStore) FollowObservedH1(_ context.Context, pageID, was, now string, at time.Time) error {
+	p.s.interleaved()
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	stored, ok := p.s.pages[pageID]
+	if !ok || stored.H1 != was || stored.H1 == now {
+		return nil
+	}
+	stored.H1, stored.UpdatedAt = now, at
+	p.s.pages[pageID] = stored
+	return nil
+}
+
 type identityStore struct{ s *stores }
 
 func (i identityStore) Put(_ context.Context, identity pagemap.Identity) error {
@@ -531,6 +544,18 @@ func (r renderStore) ListBySite(_ context.Context, siteID string) ([]render.Reco
 	for pageID := range r.s.renders {
 		if r.s.pages[pageID].SiteID == siteID {
 			out = append(out, r.s.renders[pageID])
+		}
+	}
+	return out, nil
+}
+
+func (r renderStore) ListForPages(_ context.Context, pageIDs []string) ([]render.Record, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	out := make([]render.Record, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		if record, ok := r.s.renders[pageID]; ok {
+			out = append(out, record)
 		}
 	}
 	return out, nil

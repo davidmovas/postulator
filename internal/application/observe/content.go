@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -70,6 +71,9 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 	}
 	resolved := resolveDraftPaths(items, a.rows.byWPID)
 	if a.seen, err = a.lastSeen(ctx, resolved); err != nil {
+		return err
+	}
+	if err = a.visibleH1s(ctx, resolved); err != nil {
 		return err
 	}
 	batch, err := a.prepare(ctx, resolved)
@@ -138,6 +142,34 @@ func (a *absorber) lastSeen(ctx context.Context, items []item) (map[string]lastS
 		seen[pageID] = seenOf(identity, held, fields[pageID], blocks[pageID])
 	}
 	return seen, nil
+}
+
+func (a *absorber) visibleH1s(ctx context.Context, items []item) error {
+	ids := make([]string, 0, len(items))
+	owners := make([]string, len(items))
+	for i := range items {
+		if current, known, _ := match(items[i], a.rows); known {
+			ids = append(ids, current.ID)
+			owners[i] = current.ID
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	records, err := a.service.deps.Renders.ListForPages(ctx, ids)
+	if err != nil {
+		return err
+	}
+	byPage := make(map[string]*render.Record, len(records))
+	for i := range records {
+		byPage[records[i].PageID] = &records[i]
+	}
+	for i := range items {
+		if record := byPage[owners[i]]; record != nil {
+			items[i].H1, _ = render.VisibleH1(record, items[i].H1)
+		}
+	}
+	return nil
 }
 
 func (a *absorber) siteFields(ctx context.Context) (map[string][]field.Value, error) {
@@ -336,7 +368,7 @@ func (a *absorber) observeFields(ctx context.Context, page pagemap.Page, values 
 		subject := finding.SubjectPageField(page.ID, string(value.Key))
 		switch {
 		case !value.Changed():
-		case known && spec.Denied, field.SameText(value.Key, value.Base, value.Current):
+		case known && (spec.Denied || spec.Write == field.None), field.SameText(value.Key, value.Base, value.Current):
 			if err := a.service.deps.Fields.Agree(ctx, page.ID, value.Key, a.now); err != nil {
 				return err
 			}

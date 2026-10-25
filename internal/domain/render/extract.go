@@ -46,6 +46,7 @@ func Extract(in Input) (Extraction, error) {
 		JSONLD:   map[string][]json.RawMessage{},
 		Links:    []Link{},
 		Headings: []Heading{},
+		H1Source: H1None,
 	}
 	if strings.TrimSpace(in.Public) == "" {
 		return out, nil

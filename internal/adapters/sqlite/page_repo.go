@@ -25,6 +25,7 @@ const (
 	setRowKey         = `UPDATE pages SET row_key = ?, planned_trail = CASE WHEN planned_trail = '[]' THEN ? ELSE planned_trail END, updated_at = ? WHERE id = ? AND site_id = ?`
 	releaseRowKey     = `UPDATE pages SET row_key = '', updated_at = ? WHERE site_id = ? AND row_key = ? AND id <> ?`
 	updateDerived     = `UPDATE pages SET parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, status = ?, updated_at = ? WHERE id = ?`
+	followObservedH1  = `UPDATE pages SET h1 = ?, updated_at = ? WHERE id = ? AND h1 = ? AND h1 <> ?`
 	updatePublished   = `UPDATE pages SET wp_id = ?, status = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
 	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE id = ?`
 	autoPageType      = `UPDATE pages SET page_type_id = ?, page_type_source = 'auto', page_type_reason = ?, updated_at = ? WHERE id = ? AND page_type_id IS NULL`
@@ -154,6 +155,12 @@ func (r *PageRepo) UpdateDerived(ctx context.Context, p pagemap.Page) error {
 		string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.Status), formatTime(p.UpdatedAt), p.ID,
 	}, nil, "update the page's derived facts")
 	return requireAffected(affected, err, pageNotFound(p.ID))
+}
+
+func (r *PageRepo) FollowObservedH1(ctx context.Context, pageID, was, now string, at time.Time) error {
+	_, err := execWrite(ctx, r.store.writeFrom(ctx), followObservedH1, []any{now, formatTime(at), pageID, was, now}, nil,
+		"let the page's h1 follow the observed one")
+	return err
 }
 
 func (r *PageRepo) UpdatePublished(ctx context.Context, p pagemap.Page) error {

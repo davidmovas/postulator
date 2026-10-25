@@ -138,7 +138,10 @@ func TestACrumbFindsAPageByTheH1TheSiteShows(t *testing.T) {
 		}
 	}
 	s.serveTheSite(false)
-	s.serve(tb500Page(false, crumb{name: "Home", path: "/"}, crumb{name: "The Peptide Shelf", bare: true}, crumb{name: "TB-500", path: "/tb-500/"}))
+	s.serve(
+		publicPage{title: "The Peptide Shelf", path: "/peptides/", crumbs: []crumb{{name: "Home", path: "/"}, {name: "The Peptide Shelf", path: "/peptides/"}}, listing: []string{"/product/bpc-157-peptide/"}},
+		tb500Page(false, crumb{name: "Home", path: "/"}, crumb{name: "The Peptide Shelf", bare: true}, crumb{name: "TB-500", path: "/tb-500/"}),
+	)
 
 	s.run(t, observe.Options{})
 

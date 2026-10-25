@@ -27,6 +27,7 @@ type pageStore interface {
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
 	UpdateDerived(ctx context.Context, page pagemap.Page) error
+	FollowObservedH1(ctx context.Context, pageID, was, now string, at time.Time) error
 	AutoType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
 }
 
@@ -67,6 +68,7 @@ type renderStore interface {
 	Put(ctx context.Context, record render.Record) error
 	Get(ctx context.Context, pageID string) (render.Record, error)
 	ListBySite(ctx context.Context, siteID string) ([]render.Record, error)
+	ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error)
 }
 
 type linkStore interface {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -158,7 +159,11 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 
 	outcomes := s.fetch(ctx, readers, owner, settings, state.Technical, m, targets)
 	lookUpCrumbs(ctx, readers, pagemap.NewSite(owner.BaseURL), m.index, outcomes)
-	if keepErr := s.keepRenders(ctx, state, m, outcomes); keepErr != nil {
+	h1s, err := s.observedH1s(ctx, targets)
+	if err != nil {
+		return false, err
+	}
+	if keepErr := s.keepRenders(ctx, state, m, outcomes, h1s); keepErr != nil {
 		return false, keepErr
 	}
 	return exhausted, nil
@@ -167,6 +172,9 @@ func (s *Service) render(ctx context.Context, state *State, readers Readers, bat
 func stale(state *State, page pagemap.Page, identity pagemap.Identity, m siteModel, observed map[string]time.Time) bool {
 	record, rendered := m.renders[page.ID]
 	if state.Full || state.Rescan || !rendered || (identity.ModifiedGMT != nil && identity.ModifiedGMT.After(record.ExtractedAt)) {
+		return true
+	}
+	if record.H1Source == render.H1Unknown && record.FinalPath == "" && record.ThemeH1 != render.ThemeH1Absent {
 		return true
 	}
 	at, hasBody := observed[page.ID]
@@ -369,7 +377,44 @@ func (l crumbLookups) trails(ctx context.Context, page pagemap.Page, trails []pa
 	return nil
 }
 
-func (s *Service) keepRenders(ctx context.Context, state *State, m siteModel, outcomes []renderOutcome) error {
+func (s *Service) observedH1s(ctx context.Context, targets []renderTarget) (map[string]field.Value, error) {
+	ids := make([]string, 0, len(targets))
+	for i := range targets {
+		ids = append(ids, targets[i].page.ID)
+	}
+	stored, err := s.deps.Fields.ListForPages(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]field.Value, len(ids))
+	for pageID, values := range stored {
+		for i := range values {
+			if values[i].Key == field.H1 {
+				out[pageID] = values[i]
+			}
+		}
+	}
+	return out, nil
+}
+
+func (s *Service) keepH1(ctx context.Context, page pagemap.Page, extraction render.Extraction, was field.Value, held bool, now time.Time) error {
+	if extraction.H1Source == render.H1Unknown {
+		return nil
+	}
+	value := field.NewValue(page.ID, field.H1, extraction.H1, now)
+	if held && was.CurrentHash == value.CurrentHash {
+		return nil
+	}
+	if err := s.deps.Fields.Observe(ctx, page.ID, []field.Value{value}); err != nil {
+		return err
+	}
+	if err := s.deps.Fields.Agree(ctx, page.ID, field.H1, now); err != nil {
+		return err
+	}
+	return s.deps.Pages.FollowObservedH1(ctx, page.ID, was.Current, extraction.H1, now)
+}
+
+func (s *Service) keepRenders(ctx context.Context, state *State, m siteModel, outcomes []renderOutcome, h1s map[string]field.Value) error {
 	tracked, err := s.findings(ctx, state.SiteID, finding.RenderUnreachable, finding.RenderRedirected)
 	if err != nil {
 		return err
@@ -390,6 +435,10 @@ func (s *Service) keepRenders(ctx context.Context, state *State, m siteModel, ou
 			}
 			record := render.Record{PageID: page.ID, Extraction: outcomes[i].extraction, FinalPath: outcomes[i].landed, ExtractedAt: now}
 			if err := s.deps.Renders.Put(c, record); err != nil {
+				return err
+			}
+			was, held := h1s[page.ID]
+			if err := s.keepH1(c, page, outcomes[i].extraction, was, held, now); err != nil {
 				return err
 			}
 			if err := s.deps.Links.ReplaceForPage(c, page.ID, pagemap.SourceRender, renderLinks(page, outcomes[i].extraction, m.index, now)); err != nil {

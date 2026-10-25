@@ -346,6 +346,41 @@ func TestPageRepoUpdatePublishedTouchesOnlyWhatAPublishOwns(t *testing.T) {
 	}
 }
 
+func TestPageRepoFollowsTheObservedH1OnlyWhereNoPlanHoldsIt(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageRepo(store)
+
+	mirrored := fullPage(owner.ID, "/bpc-157/", sqlitetest.Stamp)
+	mirrored.H1 = ""
+	planned := fullPage(owner.ID, "/tb-500/", sqlitetest.Stamp)
+	planned.H1 = "TB-500 Research Peptide"
+	for _, page := range []pagemap.Page{mirrored, planned} {
+		if err := repo.Insert(t.Context(), page); err != nil {
+			t.Fatalf("Insert: %v", err)
+		}
+	}
+
+	later := sqlitetest.Stamp.Add(time.Hour)
+	for _, page := range []pagemap.Page{mirrored, planned} {
+		if err := repo.FollowObservedH1(t.Context(), page.ID, "", page.Title, later); err != nil {
+			t.Fatalf("FollowObservedH1: %v", err)
+		}
+	}
+
+	got, err := repo.Get(t.Context(), mirrored.ID)
+	want := mirrored
+	want.H1, want.UpdatedAt = mirrored.Title, later
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("the mirrored page = %+v, %v\nwant %+v", got, err, want)
+	}
+	if got, err = repo.Get(t.Context(), planned.ID); err != nil || !reflect.DeepEqual(got, planned) {
+		t.Errorf("the planned page = %+v, %v\nwant it untouched %+v", got, err, planned)
+	}
+}
+
 func TestPageRepoUpdateDerivedTouchesOnlyTheDerivedColumns(t *testing.T) {
 	t.Parallel()
 

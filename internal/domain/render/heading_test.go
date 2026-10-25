@@ -191,9 +191,9 @@ func TestExtractTellsTheH1sSource(t *testing.T) {
 			want: "Lab notes", source: render.H1Theme,
 		},
 		{
-			name: "an empty render says nothing",
+			name: "an empty render shows none",
 			in:   render.Input{Filtered: filtered, Body: block.Parse(raw)},
-			want: "", source: render.H1Unknown,
+			want: "", source: render.H1None,
 		},
 	}
 	for _, tc := range cases {
