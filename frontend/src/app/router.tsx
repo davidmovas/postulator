@@ -55,6 +55,9 @@ export const router = createHashRouter([
                     { path: "schedules", element: <SchedulesScreen /> },
                     { path: "import", element: <ImportScreen /> },
                     { path: "reports", element: <ReportsScreen /> },
+                    { path: "agent", element: <AgentScreen /> },
+                    { path: "agent/inbox", element: <InboxScreen /> },
+                    { path: "agent/:conversationId", element: <AgentScreen /> },
                 ],
             },
             {

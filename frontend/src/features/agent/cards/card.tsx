@@ -117,6 +117,8 @@ export function ConfirmationCard({
             tabIndex={pending ? 0 : -1}
             role="group"
             aria-label={copy.agent.confirmTitle}
+            data-card-tool={tool}
+            data-card-status={status}
             onKeyDown={keyed}
             className={cx(
                 "flex shrink-0 flex-col overflow-hidden rounded-lg border bg-panel outline-none",

@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import type { TabItem } from "../../ui/index.js";
 import { Tabs } from "../../ui/index.js";
+import { agentHome, inboxPath } from "./model/paths.js";
 
 export type AgentTab = "chat" | "inbox";
 
@@ -10,6 +11,7 @@ export function agentTabs(
     active: AgentTab,
     waiting: number,
     navigate: (to: string) => void | Promise<void>,
+    siteId: string | null,
 ): ReactElement {
     const items: readonly TabItem<AgentTab>[] = [
         { key: "chat", label: copy.agent.screen.conversations },
@@ -26,7 +28,7 @@ export function agentTabs(
             items={items}
             value={active}
             onValueChange={(key) => {
-                void navigate(key === "inbox" ? "/agent/inbox" : "/agent");
+                void navigate(key === "inbox" ? inboxPath(siteId) : agentHome(siteId));
             }}
         />
     );

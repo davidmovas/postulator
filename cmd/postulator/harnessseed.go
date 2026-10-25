@@ -42,6 +42,9 @@ const (
 	pollEvery = 100 * time.Millisecond
 	pollFor   = 3 * time.Minute
 
+	secondSiteName = "Tamper Supply"
+	secondSiteURL  = "http://tamper-supply.invalid"
+
 	scriptedProviderKey = "sk-harness-scripted"
 
 	failingPath = "/grinders/single-dosing/"
@@ -358,6 +361,13 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 			Text: "The listing came back longer than one message can carry, so I read the opening of it. " +
 				"Ask me for one hub at a time and I will read each in full.",
 		}
+	case strings.Contains(lowered, "explore"):
+		return fake.Turn{
+			Tool: "sites_explore",
+			Args: json.RawMessage(`{"view":"tree"}`),
+			Text: "The top of the site holds the six hubs and the journal. Grinders and Coffee beans carry " +
+				"the most children, and every hub page is mapped to its entity.",
+		}
 	case strings.Contains(lowered, "retitle") || strings.Contains(lowered, "rename"):
 		return fake.Turn{
 			Tool: "pages_update",
@@ -426,6 +436,11 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	}
 	if workbookErr := seedWorkbook(ctx, core, siteID, home); workbookErr != nil {
 		return workbookErr
+	}
+	if _, secondErr := core.Sites.Create(ctx, sites.CreateRequest{
+		Name: secondSiteName, BaseURL: secondSiteURL, Username: harnessUser, AllowInsecure: true,
+	}); secondErr != nil {
+		return secondErr
 	}
 	if key != "" {
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})

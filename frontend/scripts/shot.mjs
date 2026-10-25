@@ -10,6 +10,7 @@ const usage = `postulator ui screenshots
       [--width 1280] [--height 820] [--wait 800] [--site <id>]
       [--clip "<x>,<y>,<w>,<h>"]
       [--click "<css>"] [--type "<css>=<text>"] [--key "<Key>"] [--fits "<css>"]
+      [--expect "<css>"]
 
   node scripts/shot.mjs --port 9222 --routes scripts/routes.json --out-dir shots
 
@@ -31,10 +32,15 @@ window, which is how a strip is judged at pixel scale.
 scrolls, holds content wider than itself: the proof that a screen fits its
 panel rather than scrolling sideways.
 
+--expect waits up to 15 s for the named element and fails the shot when it
+never appears; in routes.json an expect step may add "count", the exact number
+of matches to wait for, and "timeout" in milliseconds.
+
 routes.json is an array of
   { "name", "route", "width", "height", "wait", "site", "clip",
     "steps": [ {"click": "<css>"}, {"type": "<css>=<text>"},
-               {"key": "Control+K"}, {"wait": 500}, {"fits": "<css>"} ] }
+               {"key": "Control+K"}, {"wait": 500}, {"fits": "<css>"},
+               {"expect": "<css>", "count": 2, "timeout": 15000} ] }
 and each name becomes <out-dir>/<name>.png.`;
 
 const flags = new Set([
@@ -52,6 +58,7 @@ const flags = new Set([
     "--type",
     "--key",
     "--fits",
+    "--expect",
 ]);
 
 function parse(argv) {
@@ -111,6 +118,9 @@ function parse(argv) {
                 break;
             case "--fits":
                 options.steps.push({ fits: value });
+                break;
+            case "--expect":
+                options.steps.push({ expect: value });
                 break;
             default:
                 throw new Error(`unhandled flag ${flag}`);
@@ -204,6 +214,29 @@ async function fits(page, css) {
     }
 }
 
+async function expectIn(page, step) {
+    const timeout = step.timeout ?? 15000;
+    const matches = page.locator(step.expect);
+    if (step.count === undefined) {
+        await matches
+            .first()
+            .waitFor({ state: "attached", timeout })
+            .catch(() => {
+                throw new Error(`nothing matched ${step.expect} within ${timeout} ms`);
+            });
+        return;
+    }
+    const deadline = Date.now() + timeout;
+    let found = await matches.count();
+    while (found !== step.count && Date.now() < deadline) {
+        await page.waitForTimeout(200);
+        found = await matches.count();
+    }
+    if (found !== step.count) {
+        throw new Error(`${found} elements matched ${step.expect} after ${timeout} ms, want ${step.count}`);
+    }
+}
+
 async function apply(page, steps) {
     for (const step of steps) {
         if (step.click !== undefined) {
@@ -231,7 +264,11 @@ async function apply(page, steps) {
             await fits(page, step.fits);
             continue;
         }
-        throw new Error(`a step names none of click, type, key, wait or fits: ${JSON.stringify(step)}`);
+        if (step.expect !== undefined) {
+            await expectIn(page, step);
+            continue;
+        }
+        throw new Error(`a step names none of click, type, key, wait, fits or expect: ${JSON.stringify(step)}`);
     }
 }
 

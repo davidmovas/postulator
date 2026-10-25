@@ -13,6 +13,7 @@ export const agent = {
     composer: {
         placeholder: "Ask the agent to change something…",
         firstPlaceholder: "Ask something. Your first message starts a conversation on this site.",
+        firstPlaceholderNoSite: "Ask something. Your first message starts a conversation with no site.",
         noModel: "No chat model is set. Point the chat role at a model in the settings first.",
     },
     status: {
@@ -177,7 +178,14 @@ export const agent = {
         conversations: "Conversations",
         search: "Search conversations",
         noMatch: "No conversation matches.",
-        groupEverywhere: "Everywhere",
+        onSite: (name: string) => `Agent on ${name}`,
+        noSiteTitle: "These conversations belong to no site",
+        noSiteBody:
+            "Here the agent can only read the list of sites and add one. To read or change a site's pages, " +
+            "links, findings or runs, talk to it inside that site.",
+        noSites: "Add a site to give the agent pages to work on.",
+        addSite: "Add a site",
+        siteChat: (name: string) => `Talk about ${name}`,
         deleteTitle: "Delete this conversation?",
         deleteBody:
             "Everything in it goes: the messages, the tool calls it made, the actions still waiting for you " +
@@ -186,10 +194,6 @@ export const agent = {
         deleteConfirm: "Delete it",
         cancel: "Cancel",
         delete: "Delete",
-        newTitle: "New conversation",
-        newSite: "Site",
-        newEverywhere: "No site. The agent can only read the list of sites and create one.",
-        newStart: "Start",
         pendingCount: (count: number) => (count === 1 ? "1 waiting" : `${count} waiting`),
         awaiting: (count: number) => (count === 1 ? "1 awaiting approval" : `${count} awaiting approval`),
     },

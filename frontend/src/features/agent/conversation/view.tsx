@@ -51,7 +51,9 @@ function StartPane({ siteId, starting, startError, prefillSeq, takePrefill, onSt
                 answering={false}
                 stopping={false}
                 disabled={starting}
-                placeholder={copy.agent.composer.firstPlaceholder}
+                placeholder={
+                    siteId === null ? copy.agent.composer.firstPlaceholderNoSite : copy.agent.composer.firstPlaceholder
+                }
                 error={
                     errorMessageOf(startError) ??
                     (chat === null && profiles.data !== undefined ? copy.agent.composer.noModel : null)

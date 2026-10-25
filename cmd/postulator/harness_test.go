@@ -108,8 +108,8 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
-	if len(listed.Items) != 1 {
-		t.Fatalf("seeded sites = %d, want 1", len(listed.Items))
+	if len(listed.Items) != 2 || listed.Items[0].Name != siteName || listed.Items[1].Name != secondSiteName {
+		t.Fatalf("seeded sites = %+v, want %s and then %s to switch to", listed.Items, siteName, secondSiteName)
 	}
 	siteID := listed.Items[0].ID
 
@@ -532,8 +532,8 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
-	if len(listed.Items) != 1 {
-		t.Fatalf("sites after the restart = %d, want the one that was seeded", len(listed.Items))
+	if len(listed.Items) != 2 || listed.Items[0].Name != siteName {
+		t.Fatalf("sites after the restart = %+v, want the two that were seeded, %s first", listed.Items, siteName)
 	}
 
 	loaded, err := reopened.Graph.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: listed.Items[0].ID})
@@ -1603,5 +1603,43 @@ func pagesByPath(t *testing.T, core *app.Core, siteID string) map[string]pages.P
 			return out
 		}
 		cursor = string(page.Next)
+	}
+}
+
+func TestTheScriptAnswersASiteQuestionAndAWriteWithTheirTools(t *testing.T) {
+	script := &assistantScript{}
+	script.naming("page-1")
+
+	cases := []struct {
+		prompt string
+		tool   string
+		args   map[string]any
+	}{
+		{prompt: "Explore the site's tree for me", tool: "sites_explore", args: map[string]any{"view": "tree"}},
+		{prompt: "Retitle the espresso page", tool: "pages_update", args: map[string]any{
+			"id": "page-1", "metaTitle": "Espresso machines under $500: nine we would buy",
+		}},
+		{prompt: "How is the map?", tool: "", args: nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.prompt, func(t *testing.T) {
+			turn := script.answer(tc.prompt)
+			if turn.Tool != tc.tool {
+				t.Fatalf("answer(%q) called %q, want %q", tc.prompt, turn.Tool, tc.tool)
+			}
+			if turn.Text == "" {
+				t.Errorf("answer(%q) says nothing after its call", tc.prompt)
+			}
+			if tc.args == nil {
+				return
+			}
+			var got map[string]any
+			if err := json.Unmarshal(turn.Args, &got); err != nil {
+				t.Fatalf("answer(%q) args %s: %v", tc.prompt, turn.Args, err)
+			}
+			if !maps.Equal(got, tc.args) {
+				t.Errorf("answer(%q) args = %v, want %v", tc.prompt, got, tc.args)
+			}
+		})
 	}
 }

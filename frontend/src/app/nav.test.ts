@@ -32,6 +32,15 @@ describe("railSections", () => {
         ]);
     });
 
+    it.each([
+        { siteId: null, to: "/agent" },
+        { siteId: "s1", to: "/s/s1/agent" },
+    ])("sends the agent entry to the chat of the site $siteId", ({ siteId, to }) => {
+        const workspace = railSections(siteId, 0).find((section) => section.key === "workspace");
+        expect(workspace?.entries.find((entry) => entry.key === "agent")?.to).toBe(to);
+        expect(goToEntries(siteId).find((entry) => entry.key === "agent")?.to).toBe(to);
+    });
+
     it("carries the pending count on the agent entry alone", () => {
         const workspace = railSections("s1", 4).find((section) => section.key === "workspace");
         expect(workspace?.entries.map((entry) => entry.badge)).toEqual([undefined, 4]);

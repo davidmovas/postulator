@@ -24,6 +24,8 @@ import {
     SmartToyIcon,
 } from "../../../ui/index.js";
 import { ConversationView } from "../conversation/view.js";
+import { inScope } from "../model/conversations.js";
+import { agentHome, conversationPath } from "../model/paths.js";
 import { RenameDialog } from "../rename-dialog.js";
 import type { DockMode } from "./state.js";
 import {
@@ -143,7 +145,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
     const windowWidth = useWindowWidth();
     const listed = useConversations(siteId === null ? {} : { siteId }, 50);
     const start = useStartConversation();
-    const conversations = useMemo(() => flatten(listed.data?.pages), [listed.data]);
+    const conversations = useMemo(() => inScope(flatten(listed.data?.pages), siteId, ""), [listed.data, siteId]);
     const [fresh, setFresh] = useState(false);
     const [started, setStarted] = useState<Conversation | null>(null);
     const [renaming, setRenaming] = useState<Conversation | null>(null);
@@ -180,6 +182,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
     return (
         <aside
             aria-label={copy.shell.agentDock}
+            data-agent-dock={true}
             className="relative flex shrink-0 flex-col border-l border-hairline bg-panel"
             style={{ width: `${width}px` }}
         >
@@ -209,7 +212,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                         setRenaming(current);
                     }}
                     onAll={() => {
-                        void navigate("/agent");
+                        void navigate(agentHome(siteId));
                     }}
                 />
                 <Segmented
@@ -226,7 +229,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                            void navigate(`/agent/${current.id}`);
+                            void navigate(conversationPath(siteId, current.id));
                         }}
                     />
                 )}
@@ -265,7 +268,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                     }}
                     onOpenTools={() => {
                         if (current !== null) {
-                            void navigate(`/agent/${current.id}?tools=1`);
+                            void navigate(`${conversationPath(siteId, current.id)}?tools=1`);
                         }
                     }}
                 />
