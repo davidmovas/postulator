@@ -738,6 +738,37 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
 
+**2026-10-25, on Windows, at the close of phase 16, for 2.5.1. Green on the final code (`743e4e4`),
+every leg, exit codes checked:**
+
+- The comment check and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`.
+- `golangci-lint run ./...` and `--build-tags uiharness`, then `task lint:e2e` alone: 0 issues each.
+- **The race groups**, `-count=1` with coverage, in sequence:
+  - kernel and domain (57 s);
+  - application at `-p 2` (1,069 s);
+  - runtime at `-p 1` (301 s);
+  - adapters at `-p 1 -timeout 30m` (643 s);
+  - every package that uses `wptest`, again after its storefront changed (330 s);
+  - app, transport, cmd and frontend at `-p 1` (365 s).
+- `covergate` over the merged profiles: domain and application 88.06% of 17,915 statements (gate
+  80%), total 87.67% of 35,848 (gate 70%).
+- `go test -count=1 ./internal/app/scale/`, 129 s.
+- `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 2,090 tests in 195 files (245 s);
+  `task ui:lint`, the harness tests in 168 s. Agent F's walk: 101 routes, the new `fits` shots
+  included.
+- `task build VERSION=2.5.1` with no generated drift; the executable's file version is 2.5.1.0.
+- **The replica**, provisioned fresh: `task e2e:full -- -v`, 15 passed and 2 skipped by design, 674 s;
+  taken down.
+- **Vanilla**, the same: `task e2e:full -- -v`, 13 passed and 4 skipped by design, 338 s; then `task
+  e2e:full:noplugin`, 32 s; taken down.
+- Before the fix, a throwaway test on 2.5.0's code, run on both stands, found 20 of 20 published pages
+  on the replica and 11 of 11 on vanilla without the H1 their render shows.
+- The plugin did not change, so its lint and tests were not run.
+- `task package VERSION=2.5.1`: `bin/postulator-amd64-installer.exe`, 14,006,773 bytes, product and
+  file version 2.5.1. `bin/postulator-companion.zip` is still plugin 1.5.2.
+- `go run ./cmd/tokenreport`: 92 tools, 66,394 bytes and 14,779 tokens of schema, unchanged.
+
 **2026-10-24, on Windows, at the close of phase 15 session 2, for 2.5.0. Green on the final code
 (`03265bc`), every leg, exit codes checked, one leg at a time:**
 
