@@ -166,9 +166,10 @@ func (s *Service) annotate(ctx context.Context, siteID string, pages []pagemap.P
 	}
 	for _, pageID := range ids {
 		content := ""
-		for _, value := range stored[pageID] {
-			if value.Key == field.H1 {
-				content = value.Current
+		values := stored[pageID]
+		for i := range values {
+			if values[i].Key == field.H1 {
+				content = values[i].Current
 			}
 		}
 		text, source := render.VisibleH1(byPage[pageID], content)

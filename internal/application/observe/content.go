@@ -73,8 +73,8 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 	if a.seen, err = a.lastSeen(ctx, resolved); err != nil {
 		return err
 	}
-	if err = a.visibleH1s(ctx, resolved); err != nil {
-		return err
+	if h1Err := a.visibleH1s(ctx, resolved); h1Err != nil {
+		return h1Err
 	}
 	batch, err := a.prepare(ctx, resolved)
 	if err != nil {

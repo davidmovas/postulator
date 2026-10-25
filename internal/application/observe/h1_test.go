@@ -13,13 +13,11 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/render"
 )
 
-func (s *scenario) visitsSince(clear bool) []string {
+func (s *scenario) takeVisits() []string {
 	s.visitor.mu.Lock()
 	defer s.visitor.mu.Unlock()
 	visits := slices.Clone(s.visitor.visits)
-	if clear {
-		s.visitor.visits = nil
-	}
+	s.visitor.visits = nil
 	return visits
 }
 
@@ -47,8 +45,9 @@ func (s *scenario) renderOf(t *testing.T, pageID string) render.Record {
 
 func (s *scenario) h1FindingsRaised() int {
 	count := 0
-	for _, f := range s.openFindings(finding.FieldChangedOnSite) {
-		if f.PageID != nil && f.SubjectKey == finding.SubjectPageField(*f.PageID, string(field.H1)) {
+	open := s.openFindings(finding.FieldChangedOnSite)
+	for i := range open {
+		if open[i].PageID != nil && open[i].SubjectKey == finding.SubjectPageField(*open[i].PageID, string(field.H1)) {
 			count++
 		}
 	}
@@ -161,11 +160,11 @@ func TestARenderStoredBeforeTheH1IsFetchedAgainOnceOnAnOrdinaryWalk(t *testing.T
 	printed.ThemeH1, absent.ThemeH1 = render.ThemeH1Printed, render.ThemeH1Absent
 	s.stores.renders[tb.ID], s.stores.renders[bpc.ID] = printed, absent
 	s.stores.mu.Unlock()
-	s.visitsSince(true)
+	s.takeVisits()
 
 	s.walkAgain(t, time.Hour)
 
-	if visits := s.visitsSince(true); !slices.Equal(visits, []string{baseURL + "/tb-500/"}) {
+	if visits := s.takeVisits(); !slices.Equal(visits, []string{baseURL + "/tb-500/"}) {
 		t.Errorf("the walk visited %v, want only the page whose theme prints an H1 the store never kept", visits)
 	}
 	if got := s.fieldOf(t, tb.ID, field.H1); got.Current != "TB-500" {
@@ -176,7 +175,7 @@ func TestARenderStoredBeforeTheH1IsFetchedAgainOnceOnAnOrdinaryWalk(t *testing.T
 	}
 
 	s.walkAgain(t, 2*time.Hour)
-	if visits := s.visitsSince(true); len(visits) != 0 {
+	if visits := s.takeVisits(); len(visits) != 0 {
 		t.Errorf("a third walk visited %v, want none: the H1 is stored now", visits)
 	}
 }

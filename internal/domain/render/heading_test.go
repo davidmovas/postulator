@@ -153,7 +153,7 @@ func TestExtractTellsTheH1sSource(t *testing.T) {
 		{
 			name: "a title the theme prints before the content",
 			in: render.Input{
-				Public: `<html><body><main><header class="entry-header"><h1 class="page-title">Lab notes</h1></header><div class="entry">` + paragraphs + `</div></main></body></html>`,
+				Public:   `<html><body><main><header class="entry-header"><h1 class="page-title">Lab notes</h1></header><div class="entry">` + paragraphs + `</div></main></body></html>`,
 				Filtered: filtered, Body: block.Parse(raw),
 			},
 			want: "Lab notes", source: render.H1Theme,
@@ -161,7 +161,7 @@ func TestExtractTellsTheH1sSource(t *testing.T) {
 		{
 			name: "the site's name in the banner is not the page's heading",
 			in: render.Input{
-				Public: `<html><body><header class="site-header"><h1 class="site-title">Peptide Lab</h1><nav><h1>Menu</h1></nav></header><main><h1 class="page-title">Lab notes</h1><div class="entry">` + paragraphs + `</div></main><aside><h1>Recent</h1></aside><footer><h1>Contact</h1></footer></body></html>`,
+				Public:   `<html><body><header class="site-header"><h1 class="site-title">Peptide Lab</h1><nav><h1>Menu</h1></nav></header><main><h1 class="page-title">Lab notes</h1><div class="entry">` + paragraphs + `</div></main><aside><h1>Recent</h1></aside><footer><h1>Contact</h1></footer></body></html>`,
 				Filtered: filtered, Body: block.Parse(raw),
 			},
 			want: "Lab notes", source: render.H1Theme,
