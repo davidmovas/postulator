@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { react } from "../../../data/errors.js";
@@ -23,7 +23,10 @@ import {
     TableHead,
     TableRow,
     cx,
+    useWidthOf,
 } from "../../../ui/index.js";
+import { shown } from "../../../ui/collapse.js";
+import { modelLayout, purposeLayout } from "./columns.js";
 import type { SpendDays } from "./spend-labels.js";
 import { daysOf, defaultSpendDays, purposeLabel, spendDays, tierLabel } from "./spend-labels.js";
 
@@ -33,10 +36,6 @@ const rangeOptions: readonly SegmentedOption<string>[] = spendDays.map((days) =>
     value: String(days),
     label: said.days(days),
 }));
-
-const purposeColumns = "minmax(8rem,1.4fr) 4.5rem 4.5rem 5.5rem minmax(7rem,1fr)";
-
-const modelColumns = "minmax(9rem,1.6fr) 5rem 4rem 4.5rem 4.5rem 4.5rem 4.5rem 5rem";
 
 interface ShareTileProps {
     label: string;
@@ -107,54 +106,64 @@ function ShareBar({ fraction }: { fraction: number }): ReactElement {
 
 function PurposeTable({ rows }: { rows: readonly PurposeRow[] }): ReactElement {
     const named = said.byPurpose;
+    const [attach, width] = useWidthOf();
+    const layout = useMemo(() => purposeLayout(width), [width]);
     return (
         <Panel>
             <PanelHeader title={named.title} />
-            <DenseTable columns={purposeColumns} label={named.title}>
-                <TableHead>
-                    <span>{named.purpose}</span>
-                    <span className="text-right">{named.calls}</span>
-                    <span className="text-right">{named.failed}</span>
-                    <span className="text-right">{named.spent}</span>
-                    <span className="text-right">{named.share}</span>
-                </TableHead>
-                {rows.map((row) => (
-                    <TableRow key={row.purpose}>
-                        <TableCell>{purposeLabel(row.purpose)}</TableCell>
-                        <TableCell mono={true} align="right">
-                            {count(row.calls)}
-                        </TableCell>
-                        <TableCell mono={true} align="right" muted={row.failed === 0}>
-                            <span className={row.failed > 0 ? "text-danger" : undefined}>{count(row.failed)}</span>
-                        </TableCell>
-                        <TableCell mono={true} align="right">
-                            {usd(row.usd)}
-                        </TableCell>
-                        <TableCell>
-                            <ShareBar fraction={row.share} />
-                        </TableCell>
-                    </TableRow>
-                ))}
-            </DenseTable>
+            <div ref={attach} data-spend-purposes={layout.columns.join(" ")} className="min-w-0">
+                <DenseTable columns={layout.template} label={named.title}>
+                    <TableHead>
+                        <span>{named.purpose}</span>
+                        <span className="text-right">{named.calls}</span>
+                        {shown(layout, "failed") ? <span className="text-right">{named.failed}</span> : null}
+                        <span className="text-right">{named.spent}</span>
+                        {shown(layout, "share") ? <span className="text-right">{named.share}</span> : null}
+                    </TableHead>
+                    {rows.map((row) => (
+                        <TableRow key={row.purpose}>
+                            <TableCell title={purposeLabel(row.purpose)}>{purposeLabel(row.purpose)}</TableCell>
+                            <TableCell mono={true} align="right">
+                                {count(row.calls)}
+                            </TableCell>
+                            {shown(layout, "failed") ? (
+                                <TableCell mono={true} align="right" muted={row.failed === 0}>
+                                    <span className={row.failed > 0 ? "text-danger" : undefined}>{count(row.failed)}</span>
+                                </TableCell>
+                            ) : null}
+                            <TableCell mono={true} align="right">
+                                {usd(row.usd)}
+                            </TableCell>
+                            {shown(layout, "share") ? (
+                                <TableCell>
+                                    <ShareBar fraction={row.share} />
+                                </TableCell>
+                            ) : null}
+                        </TableRow>
+                    ))}
+                </DenseTable>
+            </div>
         </Panel>
     );
 }
 
 function ModelTable({ rows }: { rows: readonly ModelRow[] }): ReactElement {
     const named = said.byModel;
+    const [attach, width] = useWidthOf();
+    const layout = useMemo(() => modelLayout(width), [width]);
     return (
         <Panel>
             <PanelHeader title={named.title} />
-            <div className="overflow-x-auto">
-                <DenseTable columns={modelColumns} label={named.title} className="min-w-[44rem]">
+            <div ref={attach} data-spend-models={layout.columns.join(" ")} className="min-w-0">
+                <DenseTable columns={layout.template} label={named.title}>
                     <TableHead>
                         <span>{named.model}</span>
-                        <span>{named.tier}</span>
+                        {shown(layout, "tier") ? <span>{named.tier}</span> : null}
                         <span className="text-right">{named.calls}</span>
-                        <span className="text-right">{named.input}</span>
-                        <span className="text-right">{named.cached}</span>
-                        <span className="text-right">{named.output}</span>
-                        <span className="text-right">{named.reasoning}</span>
+                        {shown(layout, "input") ? <span className="text-right">{named.input}</span> : null}
+                        {shown(layout, "cached") ? <span className="text-right">{named.cached}</span> : null}
+                        {shown(layout, "output") ? <span className="text-right">{named.output}</span> : null}
+                        {shown(layout, "reasoning") ? <span className="text-right">{named.reasoning}</span> : null}
                         <span className="text-right">{named.spent}</span>
                     </TableHead>
                     {rows.map((row) => (
@@ -162,26 +171,36 @@ function ModelTable({ rows }: { rows: readonly ModelRow[] }): ReactElement {
                             <TableCell mono={true} title={`${row.provider}/${row.model}`}>
                                 {row.model}
                             </TableCell>
-                            <TableCell muted={true}>
-                                <span className={row.tier === "flex" ? "text-accent" : undefined}>
-                                    {tierLabel(row.tier)}
-                                </span>
-                            </TableCell>
+                            {shown(layout, "tier") ? (
+                                <TableCell muted={true}>
+                                    <span className={row.tier === "flex" ? "text-accent" : undefined}>
+                                        {tierLabel(row.tier)}
+                                    </span>
+                                </TableCell>
+                            ) : null}
                             <TableCell mono={true} align="right">
                                 {count(row.calls)}
                             </TableCell>
-                            <TableCell mono={true} align="right">
-                                {tokens(row.input)}
-                            </TableCell>
-                            <TableCell mono={true} align="right" muted={true}>
-                                {tokens(row.cachedInput)}
-                            </TableCell>
-                            <TableCell mono={true} align="right">
-                                {tokens(row.output)}
-                            </TableCell>
-                            <TableCell mono={true} align="right" muted={true}>
-                                {tokens(row.reasoning)}
-                            </TableCell>
+                            {shown(layout, "input") ? (
+                                <TableCell mono={true} align="right">
+                                    {tokens(row.input)}
+                                </TableCell>
+                            ) : null}
+                            {shown(layout, "cached") ? (
+                                <TableCell mono={true} align="right" muted={true}>
+                                    {tokens(row.cachedInput)}
+                                </TableCell>
+                            ) : null}
+                            {shown(layout, "output") ? (
+                                <TableCell mono={true} align="right">
+                                    {tokens(row.output)}
+                                </TableCell>
+                            ) : null}
+                            {shown(layout, "reasoning") ? (
+                                <TableCell mono={true} align="right" muted={true}>
+                                    {tokens(row.reasoning)}
+                                </TableCell>
+                            ) : null}
                             <TableCell mono={true} align="right">
                                 {usd(row.usd)}
                             </TableCell>
