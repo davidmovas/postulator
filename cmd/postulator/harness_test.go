@@ -39,6 +39,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -104,7 +105,7 @@ func seeded(t *testing.T) *app.Core {
 func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -138,7 +139,7 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -372,7 +373,7 @@ func TestTheSeededRunsCoverEveryKindAScreenOffers(t *testing.T) {
 func TestTheHarnessSeedsAnEditItsReviewAndTheRevertOfAField(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -528,7 +529,7 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 		}
 	}
 
-	listed, err := reopened.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := reopened.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -575,7 +576,7 @@ func TestTheHarnessOpensTheDevtoolsEndpointOnDemand(t *testing.T) {
 func TestTheSeededGraphIsATreeAndNotAFlatList(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -740,7 +741,7 @@ func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
 func TestTheHarnessSeedsAProductTheStoreLetsARunEdit(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -826,7 +827,7 @@ func TestTheCompletedRunSucceedsOnEveryItem(t *testing.T) {
 func TestTheSeededGraphCarriesScores(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -869,7 +870,7 @@ func TestTheSeededConversationIsNamedLikeAConversation(t *testing.T) {
 func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -948,7 +949,7 @@ func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
 func TestARestorePutsBackTheBodiesTheSiteHeld(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1051,10 +1052,12 @@ func reopen(t *testing.T) (*app.Core, harness) {
 	return reopened, again
 }
 
+var seededSites = sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10, Sort: &dto.Sort{Field: string(site.SortName)}}}
+
 func publishedPage(t *testing.T, core *app.Core) pages.Page {
 	t.Helper()
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1139,7 +1142,7 @@ func TestARestartOfAnOpenHomeRestoresAtOnce(t *testing.T) {
 func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1191,7 +1194,7 @@ func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 func TestTheSeededSiteIsObservedIntoTheModel(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1229,7 +1232,7 @@ func TestTheSeededSiteIsObservedIntoTheModel(t *testing.T) {
 func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1307,7 +1310,7 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 func TestTheSeededHubShowsTheWriterItsPictureAndTheGraphAProposal(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1430,7 +1433,7 @@ func TestTheHarnessRecordsSpendWorthReading(t *testing.T) {
 		}
 	}
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1493,7 +1496,7 @@ func openFindings(t *testing.T, core *app.Core, siteID, code string) []findings.
 func TestTheSeededWorkbookFillsTheInboxTheMapAndThePreview(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
