@@ -8,9 +8,12 @@ import (
 )
 
 func (m Map) Facts(rendered map[string]pagetype.Rendered, products map[string]int) []pagetype.Facts {
-	rows := m.Rows()
+	return FactsOf(m.Rows(), m.snapshot.Index, rendered, products)
+}
+
+func FactsOf(rows []MapRow, index pagemap.Index, rendered map[string]pagetype.Rendered, products map[string]int) []pagetype.Facts {
 	front := ""
-	pages := m.snapshot.Index.Pages()
+	pages := index.Pages()
 	for i := range pages {
 		if pages[i].Path == pagemap.RootPath && live(pages[i]) && onSite(pages[i]) {
 			front = pages[i].ID
@@ -19,7 +22,7 @@ func (m Map) Facts(rendered map[string]pagetype.Rendered, products map[string]in
 	out := make([]pagetype.Facts, 0, len(rows))
 	for i := range rows {
 		row := &rows[i]
-		page, known := m.snapshot.Index.ByID(row.PageID)
+		page, known := index.ByID(row.PageID)
 		if !known || !onSite(page) || !live(page) || !row.Row && row.HubID == "" {
 			continue
 		}

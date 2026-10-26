@@ -5,6 +5,7 @@ package scale_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -143,6 +144,31 @@ func (s *scaled) agrees(t *testing.T, step string) {
 		if got, want := s.stored(t, query), refPaths(tree.Matches(q)); !slices.Equal(got, want) {
 			t.Errorf("%s: the stored map finds %v for %+v, the model %v", step, got, q, want)
 		}
+	}
+	s.factsAgree(t, step, tree)
+}
+
+func (s *scaled) factsAgree(t *testing.T, step string, tree contextpack.Map) {
+	t.Helper()
+
+	stored, err := s.core.SiteModel.ClassificationFacts(t.Context(), s.siteID)
+	if err != nil {
+		t.Fatalf("%s: the classification's facts: %v", step, err)
+	}
+	rendered, err := sqlite.NewPageRenderRepo(s.core.Store).ListRenderedBySite(t.Context(), s.siteID)
+	if err != nil {
+		t.Fatalf("%s: summarize the renders: %v", step, err)
+	}
+	products, err := sqlite.NewPageLinkRepo(s.core.Store).ListedProductsBySite(t.Context(), s.siteID)
+	if err != nil {
+		t.Fatalf("%s: count the listed products: %v", step, err)
+	}
+	modeled := tree.Facts(rendered, products)
+	byPage := func(a, b pagetype.Facts) int { return strings.Compare(a.PageID, b.PageID) }
+	slices.SortFunc(stored, byPage)
+	slices.SortFunc(modeled, byPage)
+	if !reflect.DeepEqual(stored, modeled) {
+		t.Errorf("%s: the preview's facts over the stored map differ from the walk's over the model (%d against %d)", step, len(stored), len(modeled))
 	}
 }
 
