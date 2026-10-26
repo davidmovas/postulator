@@ -60,6 +60,9 @@ func (s *Service) MoveEntity(ctx context.Context, req MoveEntityRequest) (MoveEn
 	if err != nil {
 		return MoveEntityResponse{}, err
 	}
+	if movedErr := s.parentsMoved(ctx, answer.Edge.SiteID); movedErr != nil {
+		return MoveEntityResponse{}, movedErr
+	}
 	if publishErr := s.changed(answer.Edge.SiteID); publishErr != nil {
 		return MoveEntityResponse{}, publishErr
 	}
