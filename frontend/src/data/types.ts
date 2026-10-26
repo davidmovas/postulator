@@ -44,6 +44,14 @@ export type PageLink = Wire<PagesModels.PageLink>;
 export type PageTreeNode = Wire<PagesModels.TreeNode>;
 export type PreviewLink = Wire<PagesModels.PreviewLinkResponse>;
 export type PageFilter = ListFilter<PagesModels.ListRequest>;
+export type PageCountRequest = PagesModels.CountRequest;
+export type PageSelection = PagesModels.Selection;
+export type PageFacets = PagesModels.PageFilter;
+export type PageSubtree = PagesModels.Subtree;
+export type SetTypesRequest = PagesModels.SetTypesRequest;
+export type SetTypesResponse = Wire<PagesModels.SetTypesResponse>;
+export type SetTemplatesRequest = PagesModels.SetTemplatesRequest;
+export type SetTemplatesResponse = Wire<PagesModels.SetTemplatesResponse>;
 
 export type PageModel = Wire<ObserveModels.ModelView>;
 export type ModelIdentity = Wire<ObserveModels.IdentityView>;
