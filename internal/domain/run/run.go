@@ -91,6 +91,7 @@ type Run struct {
 	PublishMode     PublishMode
 	Budget          Budget
 	Stats           Stats
+	Brief           Brief
 	CreatedBy       kctx.Actor
 	ParentRunID     *string
 	PauseReason     PauseReason

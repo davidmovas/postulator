@@ -14,11 +14,11 @@ import (
 
 const (
 	itemColumns = `id, run_id, site_id, target_id, status, current_step, attempts, seq, advance_seq, blocked_by,
-		checkpoint, lease_until, wake_at, pause_reason, error, note, created_at, updated_at, finished_at`
+		checkpoint, lease_until, wake_at, pause_reason, error, note, created_at, updated_at, finished_at, directive`
 	prefixedItemColumns = `i.id, i.run_id, i.site_id, i.target_id, i.status, i.current_step, i.attempts,
 		i.seq, i.advance_seq, i.blocked_by, i.checkpoint, i.lease_until, i.wake_at, i.pause_reason, i.error, i.note,
-		i.created_at, i.updated_at, i.finished_at`
-	insertItem = `INSERT INTO run_items (` + itemColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		i.created_at, i.updated_at, i.finished_at, i.directive`
+	insertItem = `INSERT INTO run_items (` + itemColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	selectItem = `SELECT ` + itemColumns + ` FROM run_items WHERE id = ?`
 	claimItem  = `UPDATE run_items SET status = 'running', advance_seq = advance_seq + 1, lease_until = ?,
 		wake_at = NULL, updated_at = ? WHERE id = ? AND advance_seq = ?
@@ -92,12 +92,18 @@ func (r *RunItemRepo) Insert(ctx context.Context, item run.Item) error {
 	if err != nil {
 		return err
 	}
+	directive := ""
+	if !item.Directive.Empty() {
+		if directive, err = encodeJSON(item.Directive); err != nil {
+			return err
+		}
+	}
 
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertItem, []any{
 		item.ID, item.RunID, item.SiteID, item.TargetID, string(item.Status), item.CurrentStep, item.Attempts,
 		item.Seq, item.AdvanceSeq, nullText(item.BlockedBy), checkpoint, nullTime(item.LeaseUntil), nullTime(item.WakeAt),
 		string(item.PauseReason), item.Error, item.Note, formatTime(item.CreatedAt), formatTime(item.UpdatedAt),
-		nullTime(item.FinishedAt),
+		nullTime(item.FinishedAt), directive,
 	}, errors.New(errors.Conflict, "a run item with this id already exists"), "insert the run item")
 	return err
 }
@@ -269,13 +275,19 @@ func scanItem(rows *sql.Rows) (run.Item, error) {
 		leaseUntil, wakeAt   sql.NullString
 		createdAt, updatedAt string
 		finishedAt           sql.NullString
+		directive            string
 	)
 	if err := rows.Scan(
 		&item.ID, &item.RunID, &item.SiteID, &item.TargetID, &status, &item.CurrentStep, &item.Attempts, &item.Seq,
 		&item.AdvanceSeq, &blockedBy, &checkpoint, &leaseUntil, &wakeAt, &pauseReason, &item.Error, &item.Note,
-		&createdAt, &updatedAt, &finishedAt,
+		&createdAt, &updatedAt, &finishedAt, &directive,
 	); err != nil {
 		return run.Item{}, err
+	}
+	if directive != "" {
+		if err := decodeJSON(directive, &item.Directive, "stored run item directive is not readable"); err != nil {
+			return run.Item{}, err
+		}
 	}
 
 	item.Status = run.Status(status)

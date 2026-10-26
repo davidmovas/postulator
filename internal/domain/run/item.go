@@ -14,6 +14,7 @@ type Item struct {
 	AdvanceSeq  int64
 	BlockedBy   string
 	Checkpoint  Checkpoint
+	Directive   Directive
 	LeaseUntil  *time.Time
 	WakeAt      *time.Time
 	PauseReason PauseReason
