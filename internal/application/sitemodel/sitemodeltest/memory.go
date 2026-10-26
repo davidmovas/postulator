@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/davidmovas/postulator/internal/application/reports"
@@ -37,6 +38,7 @@ type Memory struct {
 	Findings []finding.Finding
 	Budgets  map[domainllm.Role]int
 	Audit    reports.LinkAuditResponse
+	Owed     map[string][]reports.RequiredLink
 
 	mu      sync.Mutex
 	reads   int
@@ -149,6 +151,19 @@ func (r auditReader) LinkAudit(_ context.Context, req reports.LinkAuditRequest) 
 		return reports.LinkAuditResponse{}, errors.New(errors.NotFound, "no such site")
 	}
 	return r.m.Audit, nil
+}
+
+func (r auditReader) LinkAuditPages(_ context.Context, req reports.LinkAuditPagesRequest) (reports.LinkAuditPagesResponse, error) {
+	if req.SiteID != r.m.Site.ID {
+		return reports.LinkAuditPagesResponse{}, errors.New(errors.NotFound, "no such site")
+	}
+	out := reports.LinkAuditPagesResponse{Pages: make([]reports.PageLinks, 0, len(req.PageIDs))}
+	for i := range r.m.Audit.Pages {
+		if summary := r.m.Audit.Pages[i]; slices.Contains(req.PageIDs, summary.PageID) {
+			out.Pages = append(out.Pages, reports.PageLinks{Page: summary, Required: r.m.Owed[summary.PageID], Extra: []reports.ExtraLink{}})
+		}
+	}
+	return out, nil
 }
 
 func (r auditReader) LinkAuditPage(_ context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error) {
@@ -402,6 +417,16 @@ func (r findingReader) CountOpen(_ context.Context, ids []string) (map[string]in
 	for i := range r.m.Findings {
 		if held := &r.m.Findings[i]; held.Status == finding.Open && held.PageID != nil && slices.Contains(ids, *held.PageID) {
 			out[*held.PageID]++
+		}
+	}
+	return out, nil
+}
+
+func (r mapReader) IDsUnder(_ context.Context, siteID, trail, typeID string) ([]string, error) {
+	out := make([]string, 0)
+	for _, row := range r.m.rows() {
+		if row.SiteID == siteID && strings.HasPrefix(row.Trail, trail) && (typeID == "" || row.TypeID == typeID) {
+			out = append(out, row.PageID)
 		}
 	}
 	return out, nil

@@ -56,6 +56,7 @@ type mapStore interface {
 	State(ctx context.Context, siteID string) (generation, built int64, err error)
 	ListBySite(ctx context.Context, siteID string) ([]contextpack.MapRow, error)
 	ListByIDs(ctx context.Context, pageIDs []string) ([]contextpack.MapRow, error)
+	IDsUnder(ctx context.Context, siteID, trail, typeID string) ([]string, error)
 	List(ctx context.Context, q contextpack.MapRowQuery, page paging.Request) (paging.List[contextpack.MapRow], error)
 	Write(ctx context.Context, siteID string, moved []contextpack.MapRow, gone []string, generation int64) error
 }
@@ -101,6 +102,7 @@ type budgets interface {
 type audits interface {
 	LinkAudit(ctx context.Context, req reports.LinkAuditRequest) (reports.LinkAuditResponse, error)
 	LinkAuditPage(ctx context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error)
+	LinkAuditPages(ctx context.Context, req reports.LinkAuditPagesRequest) (reports.LinkAuditPagesResponse, error)
 }
 
 type Deps struct {

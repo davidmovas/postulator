@@ -198,6 +198,22 @@ type ExtraLink struct {
 	Ours     bool   `json:"ours"`
 }
 
+type LinkAuditPagesRequest struct {
+	SiteID  string   `json:"siteId"`
+	PageIDs []string `json:"pageIds"`
+}
+
+type PageLinks struct {
+	Page     PageAudit       `json:"page"`
+	Rules    field.LinkRules `json:"rules"`
+	Required []RequiredLink  `json:"required"`
+	Extra    []ExtraLink     `json:"extra"`
+}
+
+type LinkAuditPagesResponse struct {
+	Pages []PageLinks `json:"pages"`
+}
+
 type LinkAuditPageResponse struct {
 	Page       PageAudit       `json:"page"`
 	TemplateID string          `json:"templateId"`

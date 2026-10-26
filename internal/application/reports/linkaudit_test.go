@@ -180,6 +180,42 @@ func TestLinkAuditPageAgreesWithTheSiteAudit(t *testing.T) {
 	}
 }
 
+func TestTheAuditOfManyPagesAgreesWithEachPagesAudit(t *testing.T) {
+	t.Parallel()
+
+	f := auditFixture(t)
+	whole, err := f.service.LinkAudit(t.Context(), reports.LinkAuditRequest{SiteID: f.siteID})
+	if err != nil {
+		t.Fatalf("LinkAudit: %v", err)
+	}
+	ids := make([]string, 0, len(whole.Pages)+1)
+	for _, row := range whole.Pages {
+		ids = append(ids, row.PageID)
+	}
+	ids = append(ids, "a-page-of-another-site")
+
+	many, err := f.service.LinkAuditPages(t.Context(), reports.LinkAuditPagesRequest{SiteID: f.siteID, PageIDs: ids})
+	if err != nil {
+		t.Fatalf("LinkAuditPages: %v", err)
+	}
+	if len(many.Pages) != len(whole.Pages) {
+		t.Fatalf("the audit of many pages answered %d of %d, want every page of the site and nothing else", len(many.Pages), len(whole.Pages))
+	}
+	for _, held := range many.Pages {
+		one, oneErr := f.service.LinkAuditPage(t.Context(), reports.LinkAuditPageRequest{PageID: held.Page.PageID})
+		if oneErr != nil {
+			t.Fatalf("LinkAuditPage(%s): %v", held.Page.Path, oneErr)
+		}
+		if !reflect.DeepEqual(held.Page, one.Page) || !reflect.DeepEqual(held.Required, one.Required) ||
+			!reflect.DeepEqual(held.Extra, one.Extra) || held.Rules != one.Rules {
+			t.Fatalf("%s reads apart from its own audit:\n%+v\n%+v", held.Page.Path, held, one)
+		}
+	}
+	if _, err = f.service.LinkAuditPages(t.Context(), reports.LinkAuditPagesRequest{PageIDs: ids}); err == nil {
+		t.Fatal("an audit of many pages with no site was answered")
+	}
+}
+
 func TestTheAuditNamesAnEntityWhoseNameIsSharedWithItsParent(t *testing.T) {
 	t.Parallel()
 
