@@ -64,6 +64,8 @@ const (
 	productName    = "Gaggia Classic Pro"
 	productKeyword = "gaggia classic pro"
 	productHub     = "Espresso machines"
+
+	articleRuleName = "An article under a category"
 )
 
 var (
@@ -311,26 +313,14 @@ func metaOf(subject string) string {
 
 type assistantScript struct {
 	page atomic.Pointer[string]
-	site atomic.Pointer[string]
 }
 
 func (a *assistantScript) naming(pageID string) {
 	a.page.Store(&pageID)
 }
 
-func (a *assistantScript) onSite(siteID string) {
-	a.site.Store(&siteID)
-}
-
 func (a *assistantScript) pageID() string {
 	if held := a.page.Load(); held != nil {
-		return *held
-	}
-	return ""
-}
-
-func (a *assistantScript) siteID() string {
-	if held := a.site.Load(); held != nil {
 		return *held
 	}
 	return ""
@@ -357,7 +347,7 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 	case strings.Contains(lowered, "every page"):
 		return fake.Turn{
 			Tool: "pages_list",
-			Args: json.RawMessage(`{"siteId":"` + a.siteID() + `","limit":100}`),
+			Args: json.RawMessage(`{"limit":100}`),
 			Text: "The listing came back longer than one message can carry, so I read the opening of it. " +
 				"Ask me for one hub at a time and I will read each in full.",
 		}
@@ -410,7 +400,6 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 		return typeErr
 	}
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
-	script.onSite(siteID)
 
 	guide, err := seedTemplates(ctx, core, siteID)
 	if err != nil {
@@ -441,6 +430,15 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 		Name: secondSiteName, BaseURL: secondSiteURL, Username: harnessUser, AllowInsecure: true,
 	}); secondErr != nil {
 		return secondErr
+	}
+	total, err := scalePages()
+	if err != nil {
+		return err
+	}
+	if total > 0 {
+		if scaleErr := seedScale(ctx, core, total); scaleErr != nil {
+			return scaleErr
+		}
 	}
 	if key != "" {
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})
@@ -739,6 +737,12 @@ func seedPageTypes(ctx context.Context, core *app.Core, siteID string, byPath ma
 	}
 
 	hub := byPreset[pagetype.Category]
+	if _, err = core.PageTypes.SaveRule(ctx, pagetypes.SaveRuleRequest{
+		SiteID: siteID, Name: articleRuleName, Enabled: true, TypeID: byPreset[pagetype.Guide].ID,
+		Conditions: pagetype.Conditions{Ancestor: &pagetype.Ancestor{TypeID: hub.ID}},
+	}); err != nil {
+		return err
+	}
 	body, found := scopeOf(hub, field.Body)
 	if !found {
 		return errors.New(errors.NotFound, "the Category type carries no body scope")

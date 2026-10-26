@@ -199,10 +199,10 @@ func seedTypes() []seedTyped {
 		{Path: "/beans/", Preset: pagetype.Category},
 		{Path: "/accessories/", Preset: pagetype.Category},
 		{Path: "/home-roasting/", Preset: pagetype.Category},
-		{Path: "/accessories/tampers/", Preset: pagetype.Product},
-		{Path: "/accessories/distribution-tools/", Preset: pagetype.Product},
-		{Path: "/accessories/scales/", Preset: pagetype.Product},
-		{Path: "/accessories/knock-boxes/", Preset: pagetype.Product},
+		{Path: "/accessories/tampers/", Preset: pagetype.Guide},
+		{Path: "/accessories/distribution-tools/", Preset: pagetype.Guide},
+		{Path: "/accessories/scales/", Preset: pagetype.Guide},
+		{Path: "/accessories/knock-boxes/", Preset: pagetype.Guide},
 	}
 }
 

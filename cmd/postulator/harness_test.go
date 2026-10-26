@@ -1266,7 +1266,7 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 	for _, declared := range seedTypes() {
 		cases = append(cases, typedPage{declared.Path, declared.Preset, pagemap.TypeSourceManual, pagemap.TypeByUser})
 	}
-	cases = append(cases, typedPage{productPath, pagetype.Product, pagemap.TypeSourceAuto, pagemap.TypeByProduct})
+	cases = append(cases, typedPage{productPath, pagetype.Product, pagemap.TypeSourceAuto, pagemap.TypeByRule})
 
 	held := pagesByPath(t, core, siteID)
 	for _, want := range cases {
@@ -1283,6 +1283,15 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 			t.Errorf("%s is typed %q by %q %q, want %s (%s) by %s %s", want.path, typedAs, page.TypeSource, page.TypeReason,
 				kind.Name, kind.ID, want.source, want.reason)
 		}
+	}
+	rules, err := core.PageTypes.ListRules(t.Context(), pagetypes.ListRulesRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("List rules: %v", err)
+	}
+	article := slices.IndexFunc(rules.Rules, func(rule pagetypes.Rule) bool { return rule.Name == articleRuleName })
+	if grind := held["/grinders/grind-size/"]; article < 0 || grind.PageTypeID == nil || *grind.PageTypeID != byPreset[pagetype.Guide].ID ||
+		grind.TypeRuleID != rules.Rules[article].ID {
+		t.Errorf("/grinders/grind-size/ is typed %+v by the rule %q, want Guide by the site's own %q", grind.PageTypeID, grind.TypeRuleID, articleRuleName)
 	}
 
 	hub := byPreset[pagetype.Category]

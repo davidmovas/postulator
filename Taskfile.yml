@@ -82,6 +82,7 @@ tasks:
     env:
       POSTULATOR_HOME: '{{.UI_HOME}}'
       POSTULATOR_DEVTOOLS_PORT: '{{.UI_DEVTOOLS_PORT}}'
+      POSTULATOR_HARNESS_PAGES: '5000'
     cmds:
       - cmd: powershell -NoProfile -Command 'Start-Process -FilePath "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.UI_NAME}}.exe"'
         platforms: [windows]
