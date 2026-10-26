@@ -39,9 +39,11 @@ type TypeView struct {
 }
 
 type ParentView struct {
-	Reason pagemap.ParentReason `json:"reason"`
-	Method pagemap.ParentMethod `json:"method,omitempty"`
-	Trail  []contextpack.Ref    `json:"trail"`
+	ParentID string                 `json:"parentId"`
+	Why      *contextpack.ParentWhy `json:"why,omitempty"`
+	Reason   pagemap.ParentReason   `json:"reason"`
+	Method   pagemap.ParentMethod   `json:"method,omitempty"`
+	Trail    []contextpack.Ref      `json:"trail"`
 }
 
 type BodySummary struct {
@@ -124,9 +126,33 @@ func (s *Service) Page(ctx context.Context, req PageRequest) (PageModel, error) 
 			return err
 		}
 		model = pageModel(facts, page, pagemap.NewSite(owner.BaseURL))
-		return nil
+		if len(model.Parent.Trail) > 0 {
+			model.Parent.ParentID = model.Parent.Trail[0].PageID
+			return nil
+		}
+		why, err := s.whyNoParent(c, page)
+		model.Parent.Why = &why
+		return err
 	})
 	return model, err
+}
+
+func (s *Service) whyNoParent(ctx context.Context, page pagemap.Page) (contextpack.ParentWhy, error) {
+	open, err := s.deps.Findings.ListOpenFor(ctx, []string{page.ID})
+	if err != nil {
+		return contextpack.ParentWhy{}, err
+	}
+	renders, err := s.deps.Renders.ListForPages(ctx, []string{page.ID})
+	if err != nil {
+		return contextpack.ParentWhy{}, err
+	}
+	evidence := contextpack.ParentEvidence{Page: page, Findings: open, Rendered: len(renders) > 0}
+	if page.ParentPageID != nil {
+		if parent, getErr := s.deps.Pages.Get(ctx, *page.ParentPageID); getErr == nil && parent.Status == pagemap.StatusArchived {
+			evidence.Parent = &parent
+		}
+	}
+	return contextpack.WhyNoParent(evidence), nil
 }
 
 func pageModel(facts contextpack.Facts, page pagemap.Page, site pagemap.Site) PageModel {

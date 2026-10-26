@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -39,8 +40,16 @@ func TestThePageModelAnswersWhatTheAgentAsksOfAPage(t *testing.T) {
 	if got.Type.Name == "" || got.Type.Source == "" {
 		t.Errorf("type = %+v, want its name and where it came from", got.Type)
 	}
-	if got.Parent.Reason != pagemap.ParentJSONLD || got.Parent.Method != pagemap.MethodHref || len(got.Parent.Trail) == 0 {
-		t.Errorf("parent = %+v, want the trail with its reason and method", got.Parent)
+	if got.Parent.Reason != pagemap.ParentJSONLD || got.Parent.Method != pagemap.MethodHref || len(got.Parent.Trail) == 0 ||
+		got.Parent.ParentID != "hub" || got.Parent.Why != nil {
+		t.Errorf("parent = %+v, want the hub by id, the trail with its reason and method, and no why", got.Parent)
+	}
+	far, err := m.Service().Page(t.Context(), sitemodel.PageRequest{SiteID: siteID, PageID: "far"})
+	if err != nil {
+		t.Fatalf("Page(far): %v", err)
+	}
+	if far.Parent.ParentID != "" || far.Parent.Why == nil || far.Parent.Why.Reason != contextpack.WhyNotDerived {
+		t.Errorf("a page with no parent reads %+v, want why it has none", far.Parent)
 	}
 	if got.Body.Blocks != 2 || got.Body.Ours != 1 || got.Body.Client != 1 || got.Body.Hash != block.BodyHash(raw) {
 		t.Errorf("body = %+v, want two blocks, one of each owner, and the body's hash", got.Body)
