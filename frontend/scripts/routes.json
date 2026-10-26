@@ -566,7 +566,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -586,7 +586,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -612,7 +612,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -638,7 +638,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -663,7 +663,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -688,7 +688,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -713,7 +713,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -732,7 +732,10 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-page-open]"
+        "click": "[data-page-row]"
+      },
+      {
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -757,7 +760,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -1920,6 +1923,39 @@
       { "wait": 600 },
       { "fits": "[data-page-list]" },
       { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-proposals-wide",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1500,
+    "steps": [
+      {
+        "timed": "large proposals",
+        "click": "button:has-text(\"Propose entities for all\")",
+        "until": "[data-workspace] [data-proposal-at]"
+      },
+      { "wait": 600 },
+      { "scroll": "[data-workspace] [data-virtual-rows]", "label": "large proposals" },
+      { "fits": "[data-workspace]" }
+    ]
+  },
+  {
+    "name": "large-proposals-960",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "button:has-text(\"Propose entities for all\")" },
+      { "expect": "[data-workspace] [data-proposal-at]", "timeout": 30000 },
+      { "wait": 600 },
+      { "fits": "[data-workspace]" }
     ]
   },
   {

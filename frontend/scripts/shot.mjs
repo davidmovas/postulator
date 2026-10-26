@@ -13,12 +13,12 @@ const usage = `postulator ui screenshots
       [--expect "<css>"]
 
   node scripts/shot.mjs --port 9222 --routes scripts/routes.json --out-dir shots
-      [--from <name>] [--dock]
+      [--from <name>] [--until <name>] [--dock]
 
 A walk closes the agent dock and reloads once before its first shot, so the
 set does not depend on what the last session left open. --from starts the walk
-at the named shot, and --dock opens the dock after that reload, for a walk
-started past the shots that open it.
+at the named shot and --until stops it after the named one, and --dock opens
+the dock after that reload, for a walk started past the shots that open it.
 
 The window is the one "task ui:run" started; it is reached over the DevTools
 protocol and never launched here. --click, --type and --key are applied in the
@@ -73,6 +73,7 @@ const flags = new Set([
     "--fits",
     "--expect",
     "--from",
+    "--until",
 ]);
 
 function parse(argv) {
@@ -142,6 +143,9 @@ function parse(argv) {
                 break;
             case "--from":
                 options.from = value;
+                break;
+            case "--until":
+                options.until = value;
                 break;
             default:
                 throw new Error(`unhandled flag ${flag}`);
@@ -428,7 +432,11 @@ async function planned(options) {
     if (first < 0) {
         throw new Error(`no route in ${options.routes} is named ${options.from}`);
     }
-    const listed = read.slice(first);
+    const last = options.until === undefined ? read.length - 1 : read.findIndex((entry) => entry.name === options.until);
+    if (last < 0) {
+        throw new Error(`no route in ${options.routes} is named ${options.until}`);
+    }
+    const listed = read.slice(first, last + 1);
     return listed.map((entry) => {
         if (typeof entry.name !== "string" || typeof entry.route !== "string") {
             throw new Error(`a route entry needs a name and a route: ${JSON.stringify(entry)}`);
