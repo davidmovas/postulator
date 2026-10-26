@@ -32,7 +32,7 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 		return StartResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned, plan.directives...)
 	if err != nil {
 		return StartResponse{}, err
 	}
@@ -61,7 +61,7 @@ func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateRespo
 		return EstimateResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned, plan.directives...)
 	if err != nil {
 		return EstimateResponse{}, err
 	}

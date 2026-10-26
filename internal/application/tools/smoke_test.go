@@ -70,7 +70,7 @@ func (stubEngine) Enqueue(_ context.Context, record domainrun.Run, _ ...domainru
 	return record, nil
 }
 
-func (stubEngine) EstimateRun(context.Context, domainrun.Run, map[string]string) (domainrun.Estimate, error) {
+func (stubEngine) EstimateRun(context.Context, domainrun.Run, map[string]string, ...domainrun.Directive) (domainrun.Estimate, error) {
 	return domainrun.Estimate{}, nil
 }
 

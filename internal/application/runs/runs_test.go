@@ -77,7 +77,7 @@ func (f *fakeEdges) AddEdge(_ context.Context, req appgraph.AddEdgeRequest) (app
 	return appgraph.AddEdgeResponse{}, nil
 }
 
-func (f *fakeEngine) EstimateRun(_ context.Context, record run.Run, assigned map[string]string) (run.Estimate, error) {
+func (f *fakeEngine) EstimateRun(_ context.Context, record run.Run, assigned map[string]string, _ ...run.Directive) (run.Estimate, error) {
 	if f.failWith != nil {
 		return run.Estimate{}, f.failWith
 	}

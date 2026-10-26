@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -25,10 +26,16 @@ type Claim struct {
 }
 
 type PackRequest struct {
-	PageID string `json:"pageId"`
-	Field  string `json:"field"`
-	Budget int    `json:"budget"`
-	Claim  *Claim `json:"-"`
+	PageID    string         `json:"pageId"`
+	Field     string         `json:"field"`
+	Budget    int            `json:"budget"`
+	Brief     *run.Brief     `json:"brief,omitempty"`
+	Directive *run.Directive `json:"directive,omitempty"`
+	Claim     *Claim         `json:"-"`
+}
+
+func (r PackRequest) directed() bool {
+	return r.Brief != nil || r.Directive != nil
 }
 
 type Picture struct {
@@ -52,6 +59,11 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 		facts, scope, plan, err := s.read(c, req.PageID, req.Field, req.Claim)
 		if err != nil {
 			return err
+		}
+		if req.directed() {
+			if facts.Directions, err = s.directions(c, req); err != nil {
+				return err
+			}
 		}
 		pack := contextpack.Build(facts, scope)
 		fitted, err := contextpack.Fit(pack, req.Budget)
@@ -86,6 +98,25 @@ func (s *Service) read(ctx context.Context, pageID, fieldName string, claim *Cla
 		facts.Page.Type, facts.Page.Preset, facts.Page.Role = claim.Type.Name, claim.Type.Preset, claim.Type.Preset.Role()
 	}
 	return facts, scope, plan, nil
+}
+
+func (s *Service) directions(ctx context.Context, req PackRequest) (*contextpack.Directions, error) {
+	page, err := s.deps.Pages.Get(ctx, req.PageID)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := s.base(ctx, page.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	brief, directive := run.Brief{}, run.Directive{PageID: req.PageID}
+	if req.Brief != nil {
+		brief = *req.Brief
+	}
+	if req.Directive != nil {
+		directive = *req.Directive
+	}
+	return contextpack.DirectionsOf(brief, directive, snapshot.Index), nil
 }
 
 func (s *Service) Pack(ctx context.Context, req PackRequest) (PackView, error) {

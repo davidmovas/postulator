@@ -18,7 +18,7 @@ import (
 
 type engine interface {
 	Enqueue(ctx context.Context, record run.Run, directives ...run.Directive) (run.Run, error)
-	EstimateRun(ctx context.Context, record run.Run, assigned map[string]string) (run.Estimate, error)
+	EstimateRun(ctx context.Context, record run.Run, assigned map[string]string, directives ...run.Directive) (run.Estimate, error)
 	Pause(ctx context.Context, runID string, reason run.PauseReason) error
 	Resume(ctx context.Context, runID string) error
 	Cancel(ctx context.Context, runID string) error

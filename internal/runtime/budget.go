@@ -51,7 +51,7 @@ func (p *pricing) add(finding run.EstimateFinding) {
 	p.findings = append(p.findings, finding)
 }
 
-func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[string]string) (run.Estimate, error) {
+func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[string]string, directives ...run.Directive) (run.Estimate, error) {
 	if e.deps.Snapshots != nil {
 		ctx = e.deps.Snapshots.Remembering(ctx)
 	}
@@ -64,6 +64,11 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[s
 	targets, err := e.planTargets(ctx, record, assigned, priced)
 	if err != nil {
 		return run.Estimate{}, err
+	}
+	byPage := directed(directives)
+	for targetID, target := range targets {
+		target.Brief, target.Directive = record.Brief, byPage[targetID]
+		targets[targetID] = target
 	}
 	for i := range defs {
 		if defs[i].Preflight == nil {

@@ -45,7 +45,7 @@ func memoOf(ctx context.Context) *memo {
 }
 
 func (m *memo) picture(req PackRequest) (remembered, bool) {
-	if m == nil || req.Claim != nil {
+	if m == nil || req.Claim != nil || req.directed() {
 		return remembered{}, false
 	}
 	m.mu.Lock()
@@ -55,7 +55,7 @@ func (m *memo) picture(req PackRequest) (remembered, bool) {
 }
 
 func (m *memo) keep(req PackRequest, picture Picture, err error) {
-	if m == nil || req.Claim != nil {
+	if m == nil || req.Claim != nil || req.directed() {
 		return
 	}
 	m.mu.Lock()

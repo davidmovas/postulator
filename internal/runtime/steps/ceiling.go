@@ -26,8 +26,8 @@ func plannedWords(spec template.TemplateSpec) int {
 	return words
 }
 
-func writerCeiling(spec template.TemplateSpec, attempts int) int {
-	ceiling := max(leastWriterTokens, plannedWords(spec)*tokensPerWord+tokenHeadroom)
+func writerCeiling(spec template.TemplateSpec, directedWords, attempts int) int {
+	ceiling := max(leastWriterTokens, max(plannedWords(spec), directedWords)*tokensPerWord+tokenHeadroom)
 	return ceiling << min(max(attempts, 0), ceilingDoublings)
 }
 

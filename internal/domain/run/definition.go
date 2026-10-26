@@ -110,9 +110,11 @@ type Price struct {
 }
 
 type Target struct {
-	Page  pagemap.Page
-	Spec  template.TemplateSpec
-	Links field.LinkPolicy
+	Page      pagemap.Page
+	Spec      template.TemplateSpec
+	Links     field.LinkPolicy
+	Brief     Brief
+	Directive Directive
 }
 
 type Preflight func(ctx context.Context, record Run, targets map[string]Target) ([]EstimateFinding, error)

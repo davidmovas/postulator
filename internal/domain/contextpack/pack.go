@@ -76,8 +76,11 @@ func Build(f Facts, scope field.Scope) Pack {
 	sections := []Section{
 		pageSection(f),
 		rulesSection(f, scope),
+		briefSection(f),
 		cardSection(f),
 		currentSection(f, scope.Key),
+		referenceSection(f),
+		styleSection(f),
 		keywordsSection(f),
 		trailSection(f),
 		notesSection(f),

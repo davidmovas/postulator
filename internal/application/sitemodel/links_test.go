@@ -2,6 +2,7 @@ package sitemodel_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/reports"
@@ -10,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -174,6 +176,40 @@ func TestAPagesLinkPlanIsTheOneTheWriterReads(t *testing.T) {
 	}
 	if _, err = m.Service().LinkContextOf(t.Context(), "another-site", "vitc"); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("another site's page = %v, want NotFound", err)
+	}
+}
+
+func TestWhatTheWriterWillSeeHoldsARunsBriefAndThePagesDirective(t *testing.T) {
+	t.Parallel()
+
+	m := site1()
+	view, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{
+		PageID: "bpc", Brief: &run.Brief{Goal: "Sell to the lab buyer", Reference: "Shipped on dry ice."},
+		Directive: &run.Directive{PageID: "bpc", Notes: "Lead with storage.", MustLink: []run.MustLink{{PageID: "hub", Anchor: "peptides"}}},
+	})
+	if err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	byName := map[string]sitemodel.Section{}
+	for _, section := range view.Sections {
+		byName[section.Name] = section
+	}
+	brief := strings.Join(byName["brief"].Lines, "\n")
+	if !strings.Contains(brief, "Goal: Sell to the lab buyer") || !strings.Contains(brief, "Link to /peptides/ with the anchor “peptides”") ||
+		!strings.Contains(brief, "For this page: Lead with storage.") {
+		t.Errorf("the brief the writer will see =\n%s", brief)
+	}
+	if reference := byName["reference"]; len(reference.Items) != 1 || reference.Items[0] != "Shipped on dry ice." {
+		t.Errorf("the reference = %+v", reference)
+	}
+	plain, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "bpc"})
+	if err != nil {
+		t.Fatalf("Pack without a brief: %v", err)
+	}
+	for _, section := range plain.Sections {
+		if section.Name == "brief" {
+			t.Fatal("a pack without a brief shows one")
+		}
 	}
 }
 

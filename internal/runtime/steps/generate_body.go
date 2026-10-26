@@ -72,7 +72,7 @@ func GenerateBody(deps Deps) run.StepDef {
 			prompt := bodyPrompt{
 				Page: sc.Page, Type: sc.Type.Name, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
 			}
-			ceiling := writerCeiling(sc.Spec, sc.Item.Attempts)
+			ceiling := writerCeiling(sc.Spec, sc.Item.Directive.MaxWords, sc.Item.Attempts)
 			seen, err := deps.fitted(ctx, sc, call, bodyField(sc), &lc, ceiling, func() (string, string, error) {
 				return prompts.Render(NameGenerateBody, prompt)
 			}, schemaText[content.DraftAnswer]())
