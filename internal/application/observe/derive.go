@@ -19,7 +19,7 @@ type timeStamp = time.Time
 var deriveCodes = []finding.Code{
 	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentAmbiguous, finding.ParentCycle,
 	finding.ParentNameTwin, finding.ParentDiffers, finding.URLFormMixed, finding.RenderUnreachable, finding.RenderRedirected,
-	finding.PageWithoutEntity, finding.TypeByDefault,
+	finding.PageWithoutEntity, finding.TypeByDefault, finding.EntityParentDiffers,
 }
 
 func (s *Service) derive(ctx context.Context, state *State, readers Readers) error {
@@ -121,6 +121,9 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		return err
 	}
 	if err := s.entityless(ctx, tracked, m, changed, typed, set); err != nil {
+		return err
+	}
+	if err := s.parentsDiffer(ctx, tracked, state.SiteID, m, set); err != nil {
 		return err
 	}
 

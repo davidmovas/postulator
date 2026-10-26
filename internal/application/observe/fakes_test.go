@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -74,6 +75,8 @@ type stores struct {
 	renders       map[string]render.Record
 	links         map[string]map[pagemap.LinkSource][]pagemap.PageLink
 	findings      map[string]finding.Finding
+	entities      []graph.Entity
+	edges         []graph.Edge
 	published     []events.Type
 	bodyLists     int
 	bodyGets      int
@@ -750,8 +753,24 @@ func (s *stores) deps(clk clock.Clock) observe.Deps {
 	return observe.Deps{
 		Sites: s, Pages: pageStore{s}, Identity: identityStore{s}, Fields: fieldStore{s}, Bodies: bodyStore{s},
 		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, Types: s.types, UnitOfWork: unit{s.guard}, Publisher: bus{s}, Clock: clk,
-		Maps: &s.maps,
+		Maps: &s.maps, Entities: graphStore{s}, Edges: edgeList{s},
 	}
+}
+
+type graphStore struct{ s *stores }
+
+func (g graphStore) ListBySite(context.Context, string) ([]graph.Entity, error) {
+	g.s.mu.Lock()
+	defer g.s.mu.Unlock()
+	return slices.Clone(g.s.entities), nil
+}
+
+type edgeList struct{ s *stores }
+
+func (e edgeList) ListBySite(context.Context, string) ([]graph.Edge, error) {
+	e.s.mu.Lock()
+	defer e.s.mu.Unlock()
+	return slices.Clone(e.s.edges), nil
 }
 
 type mapRefresher struct {

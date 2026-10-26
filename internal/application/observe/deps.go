@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -95,6 +96,14 @@ type mapRefresher interface {
 	Refresh(ctx context.Context, siteID string) error
 }
 
+type entityReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]graph.Entity, error)
+}
+
+type edgeReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
+}
+
 type Deps struct {
 	Sites      siteStore
 	Pages      pageStore
@@ -106,6 +115,8 @@ type Deps struct {
 	Findings   findingStore
 	Types      typeSet
 	Maps       mapRefresher
+	Entities   entityReader
+	Edges      edgeReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

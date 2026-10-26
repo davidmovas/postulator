@@ -92,7 +92,7 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 	observer := observe.New(observe.Deps{
 		Sites: siteRepo, Pages: pageRepo, Identity: identityRepo, Fields: fieldRepo, Bodies: bodyRepo,
 		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: findingRepo,
-		UnitOfWork: store, Publisher: bus, Clock: fake,
+		Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store), UnitOfWork: store, Publisher: bus, Clock: fake,
 		Types: pagetypes.New(pagetypes.Deps{
 			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: pageRepo,
 			Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: fake,

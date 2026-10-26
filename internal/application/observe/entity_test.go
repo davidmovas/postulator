@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 )
 
 func (s *scenario) carry(t *testing.T, path string, entityID *string) {
@@ -72,6 +73,49 @@ func TestAWritablePageNoEntityCarriesIsAFindingUntilOneDoes(t *testing.T) {
 	s.walkAgain(t, 3*time.Hour)
 	if got := s.withoutEntity(); !slices.Equal(got, []string{"/bpc-157/", "/peptides/", "/product/bpc-157-peptide/"}) {
 		t.Errorf("after unmapping /peptides/ = %v, want its finding open again", got)
+	}
+}
+
+func TestAnEntityWhoseParentDisagreesWithItsPagesIsAFindingUntilTheGraphAgrees(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	s.run(t, observe.Options{})
+
+	peptides, tb500 := s.pageAt(t, "/peptides/"), s.pageAt(t, "/tb-500/")
+	s.carry(t, "/peptides/", new("e-peptides"))
+	s.carry(t, "/tb-500/", new("e-tb"))
+	s.stores.mu.Lock()
+	s.stores.entities = []graph.Entity{
+		{ID: "e-peptides", SiteID: siteID, Name: "Peptides", CanonicalPageID: new(peptides.ID), Source: graph.SourceUser},
+		{ID: "e-tb", SiteID: siteID, Name: "TB-500", CanonicalPageID: new(tb500.ID), Source: graph.SourceUser},
+	}
+	s.stores.mu.Unlock()
+	s.walkAgain(t, time.Hour)
+
+	raised, found := s.finding(finding.EntityParentDiffers, finding.SubjectEntityParent("e-tb"))
+	if !found || raised.Status != finding.Open || raised.PageID == nil || *raised.PageID != tb500.ID ||
+		raised.EntityID == nil || *raised.EntityID != "e-tb" {
+		t.Fatalf("the flat entity's finding = %+v, found %v", raised, found)
+	}
+	want := `{"entityId":"e-tb","entity":"TB-500","path":"/tb-500/","graphIds":[],"graph":[],"treeEntityId":"e-peptides","tree":"Peptides","treePath":"/peptides/"}`
+	if string(raised.Subject) != want || !slices.Equal(raised.Options, []finding.Option{finding.AdoptTree, finding.KeepGraph, finding.Ignore}) {
+		t.Errorf("the finding = %s %v", raised.Subject, raised.Options)
+	}
+	if _, rooted := s.finding(finding.EntityParentDiffers, finding.SubjectEntityParent("e-peptides")); rooted {
+		t.Errorf("a hub at the top of the tree with no parent edge was raised")
+	}
+
+	s.stores.mu.Lock()
+	s.stores.edges = []graph.Edge{{
+		ID: "edge-tb", SiteID: siteID, FromEntityID: "e-tb", ToEntityID: "e-peptides", Kind: graph.EdgeParent, Weight: 1,
+		Source: graph.SourceUser, Status: graph.StatusApproved,
+	}}
+	s.stores.mu.Unlock()
+	s.walkAgain(t, 2*time.Hour)
+	if cleared, _ := s.finding(finding.EntityParentDiffers, finding.SubjectEntityParent("e-tb")); cleared.Status != finding.Resolved ||
+		cleared.ResolvedBy != finding.ResolvedByObservation {
+		t.Errorf("the finding once the graph agrees = %s by %s", cleared.Status, cleared.ResolvedBy)
 	}
 }
 
