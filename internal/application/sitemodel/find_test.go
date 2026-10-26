@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -80,5 +81,47 @@ func TestManyPagesAreFoundInOneCallWithTheirKeyFacts(t *testing.T) {
 
 	if _, err := m.Service().Find(t.Context(), sitemodel.FindRequest{SiteID: m.Site.ID, Gap: "everything"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("an unknown gap answered %v", err)
+	}
+}
+
+func TestPagesAreFoundByTheirEntityAndTheirState(t *testing.T) {
+	t.Parallel()
+
+	m := wide()
+	for i := range m.Pages {
+		switch m.Pages[i].ID {
+		case "page-03-04", "page-05-01":
+			m.Pages[i].EntityID = new("entity-serum")
+		case "page-06-02":
+			m.Pages[i].EntityID = new("entity-serum")
+			m.Pages[i].Status = pagemap.StatusExists
+		}
+	}
+	cases := []struct {
+		name string
+		req  sitemodel.FindRequest
+		want []string
+	}{
+		{name: "by entity", req: sitemodel.FindRequest{EntityID: "entity-serum"}, want: []string{"page-03-04", "page-05-01", "page-06-02"}},
+		{name: "by entity and state", req: sitemodel.FindRequest{EntityID: "entity-serum", Status: pagemap.StatusExists}, want: []string{"page-06-02"}},
+		{name: "by state", req: sitemodel.FindRequest{Status: pagemap.StatusExists}, want: []string{"page-06-02"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := findAll(t, m, tc.req)
+			ids := make([]string, 0, len(got))
+			for _, node := range got {
+				ids = append(ids, node.Page.PageID)
+			}
+			if !slices.Equal(ids, tc.want) {
+				t.Fatalf("found %v, want %v", ids, tc.want)
+			}
+		})
+	}
+
+	if _, err := m.Service().Find(t.Context(), sitemodel.FindRequest{SiteID: m.Site.ID, Status: "lost"}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an unknown state answered %v", err)
 	}
 }
