@@ -136,6 +136,22 @@ export type BodyState = (typeof bodyStates)[number];
 export const proposalClashes = ["", "no_name", "name_in_batch", "name_carried"] as const;
 export type ProposalClash = (typeof proposalClashes)[number];
 
+export const parentWhyReasons = [
+    "root",
+    "parent_archived",
+    "cycle_broken",
+    "crumb_ambiguous",
+    "crumb_unresolved",
+    "planned",
+    "render_failed",
+    "not_derived",
+    "no_signal",
+] as const;
+export type ParentWhyReason = (typeof parentWhyReasons)[number];
+
+export const adoptionSkips = ["loop", "name_taken"] as const;
+export type AdoptionSkip = (typeof adoptionSkips)[number];
+
 export const proposalSources = ["model", "site"] as const;
 export type ProposalSource = (typeof proposalSources)[number];
 
@@ -492,6 +508,21 @@ export const toolRisksNeedingConfirmation: readonly ToolRisk[] = ["write", "dang
 
 export const toolCallStatuses = ["ok", "denied", "error"] as const;
 export type ToolCallStatus = (typeof toolCallStatuses)[number];
+
+export const planStatuses = ["proposed", "running", "done", "declined"] as const;
+export type PlanStatus = (typeof planStatuses)[number];
+
+export const planStepStatuses = [
+    "proposed",
+    "declined",
+    "pending",
+    "running",
+    "waiting",
+    "done",
+    "failed",
+    "skipped",
+] as const;
+export type PlanStepStatus = (typeof planStepStatuses)[number];
 
 export const importFields = [
     "path",

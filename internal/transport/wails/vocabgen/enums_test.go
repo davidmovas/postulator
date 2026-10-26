@@ -31,6 +31,7 @@ var freeText = map[string]bool{
 var prose = map[string]bool{
 	"graph_add_edge.parameters.reason":              true,
 	"graph_propose_cards.parameters.cards[].reason": true,
+	"plans.parameters.steps[].reason":               true,
 }
 
 func vocabularies(t *testing.T) map[string]string {
