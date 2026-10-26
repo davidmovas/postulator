@@ -7,10 +7,12 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/application/findings"
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
@@ -68,6 +70,14 @@ func TestTheHarnessSeedsALargeSiteTheRulesType(t *testing.T) {
 	wanted := scaleGuides - scaleGuides/guideKept + owned + categories + len(scaleInfo) + len(scaleLeftovers)
 	if len(proposed.Entities) != wanted {
 		t.Errorf("%d proposals, want one for each of the %d writable pages without an entity", len(proposed.Entities), wanted)
+	}
+	counted, err := core.Findings.Counts(t.Context(), findings.CountsRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("Counts: %v", err)
+	}
+	flagged := slices.IndexFunc(counted.Codes, func(code findings.CodeCount) bool { return code.Code == string(finding.PageWithoutEntity) })
+	if flagged < 0 || counted.Codes[flagged].Count != wanted {
+		t.Errorf("the findings by code = %+v, want a page_without_entity for each of the %d pages the dialog proposes for", counted.Codes, wanted)
 	}
 	sources := map[string]bool{}
 	for i := range proposed.Entities {

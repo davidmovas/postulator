@@ -16,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	domaingraph "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/note"
@@ -175,8 +176,39 @@ func seedScale(ctx context.Context, core *app.Core, total int) error {
 	if err != nil {
 		return err
 	}
-	_, err = core.Classification.Apply(ctx, pagetypes.ApplyRequest{SiteID: siteID, Hash: preview.Hash})
-	return err
+	if _, err = core.Classification.Apply(ctx, pagetypes.ApplyRequest{SiteID: siteID, Hash: preview.Hash}); err != nil {
+		return err
+	}
+	return core.Store.Do(ctx, func(unit context.Context) error { return flagEntityless(unit, core, siteID) })
+}
+
+func flagEntityless(ctx context.Context, core *app.Core, siteID string) error {
+	set, err := core.PageTypes.Set(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	listed, err := sqlite.NewPageRepo(core.Store).ListBySite(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	findings := sqlite.NewFindingRepo(core.Store)
+	for i := range listed {
+		page := &listed[i]
+		if !set.NeedsEntity(*page) {
+			continue
+		}
+		record, newErr := finding.New(finding.Finding{
+			ID: id.New(), SiteID: siteID, PageID: &page.ID, Code: finding.PageWithoutEntity, SubjectKey: finding.SubjectPage(page.ID),
+			Subject: []byte(`{"path":"` + page.Path + `"}`), CreatedAt: scaleAt, UpdatedAt: scaleAt,
+		})
+		if newErr != nil {
+			return newErr
+		}
+		if upsertErr := findings.Upsert(ctx, record); upsertErr != nil {
+			return upsertErr
+		}
+	}
+	return nil
 }
 
 func writeScale(ctx context.Context, store *sqlite.Store, siteID string, shape []scalePage) error {
