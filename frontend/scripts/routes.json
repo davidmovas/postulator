@@ -32,7 +32,7 @@
     "wait": 1400,
     "steps": [
       {
-        "click": "[data-entity-row=hub]"
+        "click": "[data-entity-row=category]"
       },
       {
         "wait": 900
@@ -1220,7 +1220,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-page-type-row=hub]"
+        "click": "[data-page-type-row=category]"
       },
       {
         "wait": 900
@@ -1570,5 +1570,377 @@
     "width": 960,
     "height": 600,
     "wait": 1800
+  },
+  {
+    "name": "pages-list-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-list-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-tree-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"Tree\")" },
+      { "expect": "[data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-map-table]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-tree-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-map-table]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"By type\")" },
+      { "click": "[role=radiogroup][aria-label=\"Show its pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-type-open] [data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-type-open] [data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-tree-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show its pages as\"] [role=radio]:has-text(\"Tree\")" },
+      { "expect": "[data-type-open] [data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-tree-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-type-open] [data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-bulk-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-page-row]" },
+      { "click": "[data-page-row] label >> nth=0" },
+      { "click": "[data-page-row] label >> nth=2" },
+      { "click": "[data-page-row] label >> nth=3" },
+      { "expect": "[data-bulk-bar] [data-bulk-count=\"3\"]" },
+      { "wait": 500 },
+      { "fits": "[data-bulk-bar]" },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-bulk-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-bulk-bar] [data-bulk-count=\"3\"]" },
+      { "wait": 500 },
+      { "fits": "[data-bulk-bar]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-classification-960",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-rule-row]" },
+      { "expect": "[data-rule-fallback]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-classification-wide",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-rule-row]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-rule-drawer-960",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[data-rule-row] button[aria-label^=\"Edit\"] >> nth=1" },
+      { "expect": "[data-rule-drawer]" },
+      { "wait": 700 },
+      { "fits": "[data-rule-drawer]" }
+    ]
+  },
+  {
+    "name": "settings-rule-drawer-wide",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "click": "[data-rule-row] button[aria-label^=\"Edit\"] >> nth=1" },
+      { "expect": "[data-rule-drawer]" },
+      { "wait": 700 },
+      { "fits": "[data-rule-drawer]" }
+    ]
+  },
+  {
+    "name": "settings-classification-preview-960",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-rule-row][data-rule-enabled=true] [aria-label=\"Use An article under a category\"]" },
+      { "click": "label:has([aria-label=\"Use An article under a category\"])" },
+      { "expect": "[data-rule-row][data-rule-enabled=false] [aria-label=\"Use An article under a category\"]" },
+      { "click": "button:has-text(\"Preview the changes\")" },
+      { "expect": "[data-workspace]" },
+      { "expect": "[data-workspace] [data-preview-group]", "timeout": 30000 },
+      { "wait": 700 },
+      { "fits": "[data-workspace]" }
+    ]
+  },
+  {
+    "name": "settings-classification-preview-wide",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "click": "button:has-text(\"Preview the changes\")" },
+      { "expect": "[data-workspace] [data-preview-group]", "timeout": 30000 },
+      { "click": "[data-workspace] [data-preview-group] button[aria-expanded] >> nth=0" },
+      { "wait": 900 },
+      { "fits": "[data-workspace]" }
+    ]
+  },
+  {
+    "name": "settings-classification-rule-on",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-rule-row][data-rule-enabled=false] [aria-label=\"Use An article under a category\"]" },
+      { "click": "label:has([aria-label=\"Use An article under a category\"])" },
+      { "expect": "[data-rule-row][data-rule-enabled=true] [aria-label=\"Use An article under a category\"]" },
+      { "wait": 500 },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-page-types-960",
+    "route": "#/settings/types?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-page-type-row]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-page-types-wide",
+    "route": "#/settings/types?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-page-type-row]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-list-wide",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "timed": "[data-page-row]",
+    "steps": [
+      { "scroll": "[data-page-list] [data-virtual-rows]", "label": "large list" },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-tree-wide",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      {
+        "timed": "large tree",
+        "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"Tree\")",
+        "until": "[data-map-node]"
+      },
+      { "wait": 600 },
+      { "fits": "[data-map-table]" }
+    ]
+  },
+  {
+    "name": "large-pages-types-wide",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      {
+        "timed": "large by type",
+        "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"By type\")",
+        "until": "[data-type-group]"
+      },
+      {
+        "timed": "large by type, the products",
+        "click": "[aria-label=\"Show the Product pages\"]",
+        "until": "[data-type-open] [data-page-row]"
+      },
+      { "scroll": "[data-type-open] [data-virtual-rows]", "label": "large by type, the products" },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-types-960",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-type-open] [data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-list-960",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-bulk-type-960",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"By type\")" },
+      { "click": "[aria-label=\"Show the Info pages\"]" },
+      { "click": "[data-type-group]:has([aria-label=\"Show the Info pages\"]) label" },
+      { "expect": "[data-bulk-bar]" },
+      { "click": "[data-bulk-bar] button:has-text(\"Set type\")" },
+      { "click": "[role=menuitem]:has-text(\"Guide\")" },
+      { "click": "[role=dialog] button:has-text(\"Apply\")" },
+      { "expect": "[role=status]:has-text(\"Guide now\")", "timeout": 30000 },
+      { "wait": 400 },
+      { "fits": "main" }
+    ]
   }
 ]

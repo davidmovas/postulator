@@ -85,6 +85,7 @@ export function VirtualRows({
     return (
         <div
             ref={viewport}
+            data-virtual-rows={true}
             onScroll={remember}
             className={cx("min-h-0 flex-1 overflow-auto", className)}
         >
