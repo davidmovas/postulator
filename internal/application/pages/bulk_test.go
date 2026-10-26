@@ -114,6 +114,15 @@ func TestASelectionIsResolvedFromItsIDsSubtreesFilterAndRuleLessItsExceptions(t 
 		if err != nil || !slices.Equal(b.paths(got.PageIDs), tc.want) {
 			t.Errorf("%s = %v %v, want %v", name, b.paths(got.PageIDs), err, tc.want)
 		}
+		named := make([]string, 0, len(got.Paths))
+		for _, pageID := range got.PageIDs {
+			if path, held := got.Paths[pageID]; held && b.ids[path] == pageID {
+				named = append(named, path)
+			}
+		}
+		if slices.Sort(named); len(got.Paths) != len(got.PageIDs) || !slices.Equal(named, tc.want) {
+			t.Errorf("%s names its pages %v, want each one's path %v", name, got.Paths, tc.want)
+		}
 	}
 	if _, err := b.service.Resolve(t.Context(), pages.Selection{SiteID: b.siteID, Filter: &pages.PageFilter{PageTypeID: b.category.ID}, Seen: 3}); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("a filter whose matches moved since they were seen = %v, want CONFLICT", err)

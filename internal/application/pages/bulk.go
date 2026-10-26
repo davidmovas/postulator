@@ -23,7 +23,18 @@ const (
 
 func (s *Service) Resolve(ctx context.Context, sel Selection) (ResolveResponse, error) {
 	ids, err := s.resolve(ctx, sel)
-	return ResolveResponse{PageIDs: ids}, err
+	if err != nil {
+		return ResolveResponse{}, err
+	}
+	held, err := s.pages.ListByIDs(ctx, ids)
+	if err != nil {
+		return ResolveResponse{}, err
+	}
+	out := ResolveResponse{PageIDs: ids, Paths: make(map[string]string, len(held))}
+	for i := range held {
+		out.Paths[held[i].ID] = held[i].Path
+	}
+	return out, nil
 }
 
 func (s *Service) resolve(ctx context.Context, sel Selection) ([]string, error) {

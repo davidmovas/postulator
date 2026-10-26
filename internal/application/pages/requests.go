@@ -111,7 +111,8 @@ type Selection struct {
 }
 
 type ResolveResponse struct {
-	PageIDs []string `json:"pageIds"`
+	PageIDs []string          `json:"pageIds"`
+	Paths   map[string]string `json:"paths"`
 }
 
 type SetTypesRequest struct {
