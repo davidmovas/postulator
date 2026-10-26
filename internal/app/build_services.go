@@ -94,7 +94,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now, Preview: previewIssuer{clients: writing.wordpress},
 	})
 	runsService := runs.New(running.engine, stores.runs, stores.items, stores.artifacts, stores.runEvents,
-		writing.templates, stores.pages, running.steps, pagesService)
+		writing.templates, stores.pages, writing.pageTypes, running.steps, pagesService)
 	graphService := graph.New(graph.Deps{
 		Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
 		Maps: writing.siteModel, Identities: stores.identities, Fields: stores.fields, Work: stores.items, Profiles: llm.profiles,

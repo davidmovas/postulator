@@ -21,6 +21,7 @@ type planned struct {
 	added    []AddedPage
 	assigned map[string]string
 	picked   []string
+	fields   []string
 }
 
 func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, error) {
@@ -46,7 +47,7 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 	if err != nil {
 		return StartResponse{}, err
 	}
-	return StartResponse{RunID: queued.ID, Estimate: estimate, Added: plan.added}, nil
+	return StartResponse{RunID: queued.ID, Estimate: estimate, Added: plan.added, Fields: plan.fields}, nil
 }
 
 func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateResponse, error) {
@@ -59,7 +60,7 @@ func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateRespo
 	if err != nil {
 		return EstimateResponse{}, err
 	}
-	return EstimateResponse{Estimate: estimate, Added: plan.added}, nil
+	return EstimateResponse{Estimate: estimate, Added: plan.added, Fields: plan.fields}, nil
 }
 
 func refusedByPreflight(blocking []run.EstimateFinding) error {
@@ -135,10 +136,16 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	if recipe, err = withRewrite(recipe, req.Rewrite, chosen); err != nil {
 		return planned{}, err
 	}
-	if recipe, err = run.ScopeRecipe(recipe, req.Fields); err != nil {
+	fields := req.Fields
+	if _, owns := kind.Recipe(); len(fields) == 0 && kind.PageScoped() && !owns && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
+		if fields, err = s.bodySwitch(ctx, siteID, chosen, recipe); err != nil {
+			return planned{}, err
+		}
+	}
+	if recipe, err = run.ScopeRecipe(recipe, fields); err != nil {
 		return planned{}, err
 	}
-	bodyKept := len(req.Fields) > 0 && !run.WritesBody(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish))))
+	bodyKept := len(fields) > 0 && !run.WritesBody(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish))))
 	if bodyKept {
 		if offSite := s.onTheSite(ctx, targets); offSite != nil {
 			return planned{}, offSite
@@ -188,7 +195,17 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 		added:    added,
 		assigned: assigned,
 		picked:   assign,
+		fields:   scopedFields(recipe),
 	}, nil
+}
+
+func scopedFields(recipe []template.StepSpec) []string {
+	keys := run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish)))
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, string(key))
+	}
+	return out
 }
 
 func assignment(chosen []string, templateID string) (assigned map[string]string, picked []string) {

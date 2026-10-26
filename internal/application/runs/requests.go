@@ -22,11 +22,13 @@ type StartResponse struct {
 	RunID    string       `json:"runId"`
 	Estimate run.Estimate `json:"estimate"`
 	Added    []AddedPage  `json:"added"`
+	Fields   []string     `json:"fields"`
 }
 
 type EstimateResponse struct {
 	Estimate run.Estimate `json:"estimate"`
 	Added    []AddedPage  `json:"added"`
+	Fields   []string     `json:"fields"`
 }
 
 type ParentsRequest struct {

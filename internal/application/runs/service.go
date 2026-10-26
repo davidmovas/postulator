@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -64,6 +65,10 @@ type templateAssigner interface {
 	AssignTemplate(ctx context.Context, req pages.AssignTemplateRequest) (pages.AssignTemplateResponse, error)
 }
 
+type typeSets interface {
+	Set(ctx context.Context, siteID string) (pagetype.Set, error)
+}
+
 type Service struct {
 	engine    engine
 	runs      runStore
@@ -72,15 +77,16 @@ type Service struct {
 	events    eventStore
 	specs     specResolver
 	pages     pageReader
+	types     typeSets
 	steps     stepDefs
 	assigner  templateAssigner
 }
 
 func New(engine engine, runs runStore, items itemStore, artifacts artifactStore, events eventStore,
-	specs specResolver, pageMap pageReader, steps stepDefs, assigner templateAssigner) *Service {
+	specs specResolver, pageMap pageReader, types typeSets, steps stepDefs, assigner templateAssigner) *Service {
 	return &Service{
 		engine: engine, runs: runs, items: items, artifacts: artifacts, events: events,
-		specs: specs, pages: pageMap, steps: steps, assigner: assigner,
+		specs: specs, pages: pageMap, types: types, steps: steps, assigner: assigner,
 	}
 }
 

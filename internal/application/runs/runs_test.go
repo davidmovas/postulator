@@ -17,6 +17,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
 	kctx "github.com/davidmovas/postulator/internal/kernel/ctx"
@@ -153,8 +154,17 @@ func (f *fakePages) Get(_ context.Context, pageID string) (pagemap.Page, error) 
 	return pagemap.Page{ID: pageID, Path: "/" + pageID + "/", EntityID: &entityID}, nil
 }
 
+type fakeTypes struct {
+	set pagetype.Set
+}
+
+func (f *fakeTypes) Set(context.Context, string) (pagetype.Set, error) {
+	return f.set, nil
+}
+
 type fixture struct {
 	service  *runs.Service
+	types    *fakeTypes
 	assigner *fakeAssigner
 	engine   *fakeEngine
 	specs    *fakeSpecs
@@ -198,9 +208,11 @@ func newFixture(t *testing.T) *fixture {
 	logRepo := sqlite.NewRunEventRepo(store)
 	mapping := &fakePages{unmapped: map[string]string{}}
 	assigner := &fakeAssigner{}
+	types := &fakeTypes{set: pagetype.NewSet(nil, nil)}
 
 	return &fixture{
-		service:  runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, mapping, stepRegistry(t), assigner),
+		service:  runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, mapping, types, stepRegistry(t), assigner),
+		types:    types,
 		assigner: assigner,
 		engine:   engine,
 		specs:    specs,
@@ -332,7 +344,7 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 	want := `{"estimate":{"tokens":4200,"usd":0.12,` +
-		`"findings":[{"severity":"warn","code":"unpriced_step","message":"images are not priced"}]},"added":[]}`
+		`"findings":[{"severity":"warn","code":"unpriced_step","message":"images are not priced"}]},"added":[],"fields":[]}`
 	if string(encoded) != want {
 		t.Fatalf("Estimate = %s", encoded)
 	}
