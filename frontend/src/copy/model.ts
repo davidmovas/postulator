@@ -224,6 +224,7 @@ export const model = {
         row_without_page: "Workbook row without a page",
         page_without_entity: "Page without an entity",
         type_by_default: "Typed by no rule",
+        entity_parent_differs: "Graph parent differs from the page tree",
     },
     severities: {
         info: "Note",

@@ -89,6 +89,7 @@ export const findingCodes = [
     "row_without_page",
     "page_without_entity",
     "type_by_default",
+    "entity_parent_differs",
 ] as const;
 export type FindingCode = (typeof findingCodes)[number];
 
@@ -109,6 +110,8 @@ export const findingOptions = [
     "relink_page",
     "rescan",
     "propose_entity",
+    "adopt_tree",
+    "keep_graph",
 ] as const;
 export type FindingOption = (typeof findingOptions)[number];
 
@@ -118,6 +121,7 @@ export const findingBulkOptions: readonly FindingOption[] = [
     "accept_workbook",
     "set_type",
     "propose_entity",
+    "keep_graph",
 ];
 
 export const findingOptionKinds = ["model", "run", "proposal"] as const;

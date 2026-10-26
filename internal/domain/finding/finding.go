@@ -12,26 +12,27 @@ import (
 type Code string
 
 const (
-	ParentUnresolved   Code = "parent_unresolved"
-	ParentAmbiguous    Code = "parent_ambiguous"
-	ParentCycle        Code = "parent_cycle"
-	ParentNameTwin     Code = "parent_name_twin"
-	ParentDiffers      Code = "parent_differs"
-	PluginOutdated     Code = "plugin_outdated"
-	FieldChangedOnSite Code = "field_changed_on_site"
-	BodyChangedOnSite  Code = "body_changed_on_site"
-	RenderUnreachable  Code = "render_unreachable"
-	RenderRedirected   Code = "render_redirected"
-	BuilderDetected    Code = "builder_detected"
-	TechnicalDetected  Code = "technical_detected"
-	PageTitleDiffers   Code = "page_title_differs"
-	PageH1Differs      Code = "page_h1_differs"
-	URLFormMixed       Code = "url_form_mixed"
-	EntityCardProposed Code = "entity_card_proposed"
-	RowAmbiguous       Code = "row_ambiguous"
-	RowWithoutPage     Code = "row_without_page"
-	PageWithoutEntity  Code = "page_without_entity"
-	TypeByDefault      Code = "type_by_default"
+	ParentUnresolved    Code = "parent_unresolved"
+	ParentAmbiguous     Code = "parent_ambiguous"
+	ParentCycle         Code = "parent_cycle"
+	ParentNameTwin      Code = "parent_name_twin"
+	ParentDiffers       Code = "parent_differs"
+	PluginOutdated      Code = "plugin_outdated"
+	FieldChangedOnSite  Code = "field_changed_on_site"
+	BodyChangedOnSite   Code = "body_changed_on_site"
+	RenderUnreachable   Code = "render_unreachable"
+	RenderRedirected    Code = "render_redirected"
+	BuilderDetected     Code = "builder_detected"
+	TechnicalDetected   Code = "technical_detected"
+	PageTitleDiffers    Code = "page_title_differs"
+	PageH1Differs       Code = "page_h1_differs"
+	URLFormMixed        Code = "url_form_mixed"
+	EntityCardProposed  Code = "entity_card_proposed"
+	RowAmbiguous        Code = "row_ambiguous"
+	RowWithoutPage      Code = "row_without_page"
+	PageWithoutEntity   Code = "page_without_entity"
+	TypeByDefault       Code = "type_by_default"
+	EntityParentDiffers Code = "entity_parent_differs"
 )
 
 type Severity string
@@ -72,6 +73,8 @@ const (
 	RelinkPage     Option = "relink_page"
 	Rescan         Option = "rescan"
 	ProposeEntity  Option = "propose_entity"
+	AdoptTree      Option = "adopt_tree"
+	KeepGraph      Option = "keep_graph"
 )
 
 type OptionKind string
@@ -83,7 +86,7 @@ const (
 )
 
 func BulkOptions() []Option {
-	return []Option{Ignore, AcceptSite, AcceptWorkbook, SetType, ProposeEntity}
+	return []Option{Ignore, AcceptSite, AcceptWorkbook, SetType, ProposeEntity, KeepGraph}
 }
 
 func (o Option) Bulk() bool {
@@ -92,7 +95,7 @@ func (o Option) Bulk() bool {
 
 func (o Option) Kind() OptionKind {
 	switch o {
-	case Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType:
+	case Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType, AdoptTree, KeepGraph:
 		return ModelChange
 	case RewriteField, RelinkPage, Rescan:
 		return Run
@@ -115,6 +118,7 @@ const (
 	ResolutionRowMatched    = "row_matched"
 	ResolutionRowLeftSheet  = "row_left_sheet"
 	ResolutionPageTyped     = "page_typed"
+	ResolutionParentAdopted = "parent_adopted"
 )
 
 func Settled(status Status, resolvedBy string) bool {
@@ -127,26 +131,27 @@ type rule struct {
 }
 
 var rules = map[Code]rule{
-	ParentUnresolved:   {Warning, []Option{Ignore}},
-	ParentAmbiguous:    {Warning, []Option{Ignore}},
-	ParentCycle:        {Warning, []Option{Ignore}},
-	ParentNameTwin:     {Info, []Option{Ignore}},
-	ParentDiffers:      {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
-	PluginOutdated:     {Warning, []Option{Ignore}},
-	FieldChangedOnSite: {Warning, []Option{AcceptSite, RewriteField, Ignore}},
-	BodyChangedOnSite:  {Warning, []Option{AcceptSite, RelinkPage, Ignore}},
-	RenderUnreachable:  {Warning, []Option{Rescan, Ignore}},
-	RenderRedirected:   {Info, []Option{Rescan, Ignore}},
-	BuilderDetected:    {Info, []Option{Ignore}},
-	TechnicalDetected:  {Info, []Option{SetType, Ignore}},
-	PageTitleDiffers:   {Warning, []Option{AcceptSite, RewriteField, Ignore}},
-	PageH1Differs:      {Warning, []Option{AcceptSite, Ignore}},
-	URLFormMixed:       {Info, []Option{Ignore}},
-	EntityCardProposed: {Info, []Option{Accept, Ignore}},
-	RowAmbiguous:       {Warning, []Option{MapToPage, Ignore}},
-	RowWithoutPage:     {Info, []Option{MapToPage, Ignore}},
-	PageWithoutEntity:  {Warning, []Option{ProposeEntity, Ignore}},
-	TypeByDefault:      {Info, []Option{SetType, Ignore}},
+	ParentUnresolved:    {Warning, []Option{Ignore}},
+	ParentAmbiguous:     {Warning, []Option{Ignore}},
+	ParentCycle:         {Warning, []Option{Ignore}},
+	ParentNameTwin:      {Info, []Option{Ignore}},
+	ParentDiffers:       {Warning, []Option{AcceptSite, AcceptWorkbook, Ignore}},
+	PluginOutdated:      {Warning, []Option{Ignore}},
+	FieldChangedOnSite:  {Warning, []Option{AcceptSite, RewriteField, Ignore}},
+	BodyChangedOnSite:   {Warning, []Option{AcceptSite, RelinkPage, Ignore}},
+	RenderUnreachable:   {Warning, []Option{Rescan, Ignore}},
+	RenderRedirected:    {Info, []Option{Rescan, Ignore}},
+	BuilderDetected:     {Info, []Option{Ignore}},
+	TechnicalDetected:   {Info, []Option{SetType, Ignore}},
+	PageTitleDiffers:    {Warning, []Option{AcceptSite, RewriteField, Ignore}},
+	PageH1Differs:       {Warning, []Option{AcceptSite, Ignore}},
+	URLFormMixed:        {Info, []Option{Ignore}},
+	EntityCardProposed:  {Info, []Option{Accept, Ignore}},
+	RowAmbiguous:        {Warning, []Option{MapToPage, Ignore}},
+	RowWithoutPage:      {Info, []Option{MapToPage, Ignore}},
+	PageWithoutEntity:   {Warning, []Option{ProposeEntity, Ignore}},
+	TypeByDefault:       {Info, []Option{SetType, Ignore}},
+	EntityParentDiffers: {Warning, []Option{AdoptTree, KeepGraph, Ignore}},
 }
 
 func (c Code) Valid() bool {
@@ -161,6 +166,7 @@ func Codes() []Code {
 func Options() []Option {
 	return slices.Sorted(slices.Values([]Option{
 		Ignore, Accept, AcceptSite, AcceptWorkbook, MapToPage, SetType, RewriteField, RelinkPage, Rescan, ProposeEntity,
+		AdoptTree, KeepGraph,
 	}))
 }
 
@@ -237,6 +243,10 @@ func SubjectPageField(pageID, key string) string {
 
 func SubjectCrumb(pageID, path string) string {
 	return "page:" + pageID + ":crumb:" + path
+}
+
+func SubjectEntityParent(entityID string) string {
+	return "entity:" + entityID + ":parent"
 }
 
 func SubjectEntityCard(entityID string) string {

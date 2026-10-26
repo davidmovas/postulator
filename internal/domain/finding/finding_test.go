@@ -71,6 +71,8 @@ func TestAnOptionIsAModelChangeOrARun(t *testing.T) {
 		finding.RelinkPage:     finding.Run,
 		finding.Rescan:         finding.Run,
 		finding.ProposeEntity:  finding.Proposal,
+		finding.AdoptTree:      finding.ModelChange,
+		finding.KeepGraph:      finding.ModelChange,
 	}
 	for option, want := range cases {
 		if got := option.Kind(); got != want {
@@ -88,7 +90,7 @@ func TestAnOptionIsAModelChangeOrARun(t *testing.T) {
 func TestOnlyAModelChangeOrAProposalWithoutAChoicePerFindingIsTakenInBulk(t *testing.T) {
 	t.Parallel()
 
-	bulk := []finding.Option{finding.Ignore, finding.AcceptSite, finding.AcceptWorkbook, finding.SetType, finding.ProposeEntity}
+	bulk := []finding.Option{finding.Ignore, finding.AcceptSite, finding.AcceptWorkbook, finding.SetType, finding.ProposeEntity, finding.KeepGraph}
 	for _, option := range finding.Options() {
 		want := slices.Contains(bulk, option)
 		if option.Bulk() != want {
@@ -119,6 +121,13 @@ func TestEveryCodeIsListedOnceAndOffersOnlyListedOptions(t *testing.T) {
 	}
 	if !slices.Contains(codes, finding.RowWithoutPage) || slices.Contains(codes, finding.Code("made_up")) {
 		t.Errorf("Codes() = %v", codes)
+	}
+	if got := finding.OptionsOf(finding.EntityParentDiffers); !slices.Equal(got, []finding.Option{finding.AdoptTree, finding.KeepGraph, finding.Ignore}) ||
+		finding.AdoptTree.Kind() != finding.ModelChange || finding.KeepGraph.Kind() != finding.ModelChange || finding.AdoptTree.Bulk() {
+		t.Errorf("an entity whose parents disagree offers %v, adopt_tree a %s in bulk %v", got, finding.AdoptTree.Kind(), finding.AdoptTree.Bulk())
+	}
+	if finding.SubjectEntityParent("e-1") != "entity:e-1:parent" {
+		t.Errorf("the subject of an entity's parent = %q", finding.SubjectEntityParent("e-1"))
 	}
 }
 

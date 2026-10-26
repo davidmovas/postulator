@@ -94,6 +94,66 @@ func TestThePageTreeAndTheGraphAreComparedByTheirPagedAncestors(t *testing.T) {
 	}
 }
 
+func TestAdoptingTheTreesParentsSkipsALoopAndANameTakenUnderTheNewParent(t *testing.T) {
+	t.Parallel()
+
+	f := replicaLike()
+	tb := typed(mapped(under(onSitePage("tb", "/tb-500/", "TB-500", 50, pagemap.WPPage), "healing", pagemap.ParentJSONLD), "e-tb"), pagetype.Entity)
+	twin := typed(mapped(under(onSitePage("twin", "/healing-peptides/tb-500/", "TB-500", 51, pagemap.WPPage), "healing", pagemap.ParentJSONLD), "e-tb-twin"), pagetype.Entity)
+	f.pages = append(f.pages, tb, twin)
+	f.entities = append(f.entities,
+		graph.Entity{ID: "e-tb", SiteID: siteID, Name: "TB-500", CanonicalPageID: new("tb"), Source: graph.SourceUser},
+		graph.Entity{ID: "e-tb-twin", SiteID: siteID, Name: "TB-500", CanonicalPageID: new("twin"), ScopeID: new("e-healing"), Source: graph.SourceUser},
+	)
+	f.edges = []graph.Edge{
+		parentEdge("g1", "e-peptides", "e-healing"),
+		parentEdge("g2", "e-tb-twin", "e-healing"),
+	}
+	tree := f.snapshot(t).Map(nil)
+
+	steps := map[string]contextpack.Adoption{}
+	for _, step := range tree.Adoptions(nil, nil) {
+		steps[step.EntityID] = step
+	}
+	cases := []struct {
+		entity string
+		to     string
+		from   []string
+		skip   contextpack.AdoptionSkip
+	}{
+		{entity: "e-peptides", from: []string{"e-healing"}},
+		{entity: "e-healing", to: "e-peptides"},
+		{entity: "e-bpc", to: "e-peptides"},
+		{entity: "e-tb", to: "e-healing", skip: contextpack.AdoptionNameTaken},
+	}
+	for _, tc := range cases {
+		step, listed := steps[tc.entity]
+		if !listed || step.To != tc.to || !slices.Equal(step.From, tc.from) || step.Skip != tc.skip {
+			t.Errorf("%s adopts %+v, want to %q from %v skipping %q", tc.entity, step, tc.to, tc.from, tc.skip)
+		}
+	}
+	if len(steps) != len(cases) {
+		t.Errorf("the adoption plans %d steps, want %d: %+v", len(steps), len(cases), steps)
+	}
+
+	only := tree.Adoptions(nil, []string{"e-bpc"})
+	if len(only) != 1 || only[0].EntityID != "e-bpc" || only[0].Skip != "" {
+		t.Errorf("the adoption of one entity = %+v", only)
+	}
+	alone := tree.Adoptions(nil, []string{"e-healing"})
+	if len(alone) != 1 || alone[0].Skip != contextpack.AdoptionLoop {
+		t.Errorf("adopting a parent that still sits under the entity = %+v, want a loop skipped", alone)
+	}
+	subject := tree.SubjectOf(contextpack.ParentDisagreement{
+		EntityID: "e-bpc", PageID: "bpc", Path: "/bpc-157/", GraphParents: []string{"e-healing"},
+		Tree: contextpack.TreeParent{PageID: "hub", Path: "/peptides/", EntityID: "e-peptides"},
+	})
+	if subject.Entity != "BPC-157" || subject.Tree != "Peptides" || !slices.Equal(subject.Graph, []string{"Healing Peptides"}) ||
+		subject.TreeEntityID != "e-peptides" || subject.Path != "/bpc-157/" {
+		t.Errorf("the subject = %+v", subject)
+	}
+}
+
 func cmpPath(a, b string) int {
 	switch {
 	case a < b:

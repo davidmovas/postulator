@@ -51,6 +51,9 @@ export const findings = {
         relink_page: "the page was relinked",
         rescan: "the page was fetched again",
         propose_entity: "an entity was proposed for the page",
+        adopt_tree: "the page tree's parent was taken",
+        keep_graph: "the graph's parent was kept",
+        parent_adopted: "the entity took the page tree's parent",
         page_mapped: "an entity now carries the page",
         observed_clear: "the site no longer shows it",
         row_matched: "the row found its page",
@@ -102,6 +105,8 @@ export const findings = {
         relink_page: "Relink the page",
         rescan: "Fetch again",
         propose_entity: "Propose an entity",
+        adopt_tree: "Take the page tree's parent",
+        keep_graph: "Keep the graph's parent",
     },
     optionDoes: {
         ignore: "Dismisses the finding, so the model keeps what it holds; nothing is written to the site.",
@@ -115,6 +120,9 @@ export const findings = {
         rescan: "Opens a sync that walks every page and fetches each render again.",
         propose_entity:
             "Opens entity proposals named from the site, which the model takes only once you accept them; nothing is written to the site.",
+        adopt_tree:
+            "Gives the entity the parent its page has in the page tree, in the entity graph; nothing is written to the site.",
+        keep_graph: "Keeps the entity graph's parent as it is and settles the finding; nothing is written to the site.",
     },
     subjects: {
         unresolved: (name: string, path: string) => {
@@ -189,6 +197,15 @@ export const findings = {
             path === ""
                 ? "No entity carries this page, so no run can write it."
                 : `No entity carries ${path}, so no run can write it.`,
+        entityParent: (entity: string, graph: readonly string[], tree: string, treePath: string) => {
+            const name = entity === "" ? "This entity" : quoted(entity);
+            const held = graph.length === 0 ? "has no parent in the entity graph" : `sits under ${graph.map(quoted).join(" and ")} in the entity graph`;
+            const shown =
+                tree === ""
+                    ? "the page tree puts its page at the top"
+                    : `the page tree puts its page under ${quoted(tree)}${treePath === "" ? "" : ` at ${treePath}`}`;
+            return `${name} ${held}, while ${shown}.`;
+        },
         typeByDefault: (path: string, type: string) =>
             path === ""
                 ? "No classification rule matched this page, so it took the type for anything else. Check it, or give it a type."
