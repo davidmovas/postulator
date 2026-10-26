@@ -351,7 +351,7 @@ func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page],
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
-	shown, err := s.annotate(ctx, req.SiteID, list.Items)
+	shown, err := s.annotate(ctx, list.Items)
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
@@ -598,7 +598,7 @@ func (s *Service) Tree(ctx context.Context, req TreeRequest) (TreeResponse, erro
 	if err != nil {
 		return TreeResponse{}, err
 	}
-	shown, err := s.annotate(ctx, req.SiteID, all)
+	shown, err := s.annotate(ctx, all)
 	if err != nil {
 		return TreeResponse{}, err
 	}

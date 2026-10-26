@@ -26,8 +26,8 @@ const (
 	orderBodies         = ` ORDER BY page_id`
 	selectDrifted       = `SELECT c.page_id FROM page_bodies AS c
 		JOIN page_bodies AS b ON b.page_id = c.page_id AND b.side = 'base'
-		JOIN pages AS p ON p.id = c.page_id
-		WHERE c.side = 'current' AND p.site_id = ? AND c.hash <> b.hash ORDER BY c.page_id`
+		WHERE c.side = 'current' AND c.hash <> b.hash AND c.page_id IN `
+	orderDrifted = ` ORDER BY c.page_id`
 
 	deleteWritten = `DELETE FROM page_blocks_written WHERE page_id = ?`
 	insertWritten = `INSERT INTO page_blocks_written (page_id, block_hash, run_id, written_at) VALUES (?, ?, ?, ?)
@@ -129,8 +129,8 @@ func (r *PageBodyRepo) ObservedBySite(ctx context.Context, siteID string) (map[s
 	return out, nil
 }
 
-func (r *PageBodyRepo) Drifted(ctx context.Context, siteID string) ([]string, error) {
-	return selectAll(ctx, r.store.execFrom(ctx), selectDrifted, []any{siteID}, scanPageID, "list the bodies that moved from their base")
+func (r *PageBodyRepo) Drifted(ctx context.Context, pageIDs []string) ([]string, error) {
+	return selectByIDs(ctx, r.store.execFrom(ctx), selectDrifted, orderDrifted, pageIDs, scanPageID, "list the bodies that moved from their base")
 }
 
 func scanPageID(rows *sql.Rows) (string, error) {

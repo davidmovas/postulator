@@ -194,6 +194,24 @@ func (h *syncHarness) byPath(t *testing.T, path string) pagemap.Page {
 	return page
 }
 
+func (h *syncHarness) drifted(t *testing.T) []string {
+	t.Helper()
+
+	stored, err := h.pages.ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the pages: %v", err)
+	}
+	ids := make([]string, 0, len(stored))
+	for i := range stored {
+		ids = append(ids, stored[i].ID)
+	}
+	drifted, err := h.bodies.Drifted(t.Context(), ids)
+	if err != nil {
+		t.Fatalf("Drifted: %v", err)
+	}
+	return drifted
+}
+
 func (h *syncHarness) rawLinks(t *testing.T, pageID string) []pagemap.PageLink {
 	t.Helper()
 
@@ -407,8 +425,8 @@ func TestSyncSiteFlagsDriftWhereTheBodyMovedFromItsBaseAndArchivesWhatIsGone(t *
 	child := h.byPath(t, "/coffee/espresso/")
 	filter := h.byPath(t, "/coffee/filter/")
 	hub := h.byPath(t, "/coffee/")
-	if drifted, err := h.bodies.Drifted(t.Context(), h.siteID); err != nil || len(drifted) != 0 {
-		t.Fatalf("the first sync drifted %v (%v), want nothing: every base is what it read", drifted, err)
+	if drifted := h.drifted(t); len(drifted) != 0 {
+		t.Fatalf("the first sync drifted %v, want nothing: every base is what it read", drifted)
 	}
 
 	stored, ok := h.server.Lookup(*child.WPID)
@@ -432,10 +450,7 @@ func TestSyncSiteFlagsDriftWhereTheBodyMovedFromItsBaseAndArchivesWhatIsGone(t *
 	if state.Archived != 1 {
 		t.Fatalf("state = %+v", state)
 	}
-	drifted, err := h.bodies.Drifted(t.Context(), h.siteID)
-	if err != nil {
-		t.Fatalf("Drifted: %v", err)
-	}
+	drifted := h.drifted(t)
 	want := []string{child.ID, hub.ID}
 	slices.Sort(want)
 	if !slices.Equal(drifted, want) {

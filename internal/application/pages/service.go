@@ -77,7 +77,7 @@ type siteReader interface {
 }
 
 type bodyReader interface {
-	Drifted(ctx context.Context, siteID string) ([]string, error)
+	Drifted(ctx context.Context, pageIDs []string) ([]string, error)
 }
 
 type fieldReader interface {
@@ -172,21 +172,21 @@ func (a annotations) h1(pageID string) observedH1 {
 	return observedH1{source: render.H1None}
 }
 
-func (s *Service) annotate(ctx context.Context, siteID string, pages []pagemap.Page) (annotations, error) {
-	drifted, err := s.bodies.Drifted(ctx, siteID)
-	if err != nil {
-		return annotations{}, err
-	}
-	out := annotations{drifted: make(map[string]bool, len(drifted)), h1s: make(map[string]observedH1, len(pages))}
-	for _, pageID := range drifted {
-		out.drifted[pageID] = true
-	}
+func (s *Service) annotate(ctx context.Context, pages []pagemap.Page) (annotations, error) {
+	out := annotations{drifted: make(map[string]bool), h1s: make(map[string]observedH1, len(pages))}
 	ids := make([]string, 0, len(pages))
 	for i := range pages {
 		ids = append(ids, pages[i].ID)
 	}
 	if len(ids) == 0 {
 		return out, nil
+	}
+	drifted, err := s.bodies.Drifted(ctx, ids)
+	if err != nil {
+		return annotations{}, err
+	}
+	for _, pageID := range drifted {
+		out.drifted[pageID] = true
 	}
 	stored, err := s.fields.ListForPages(ctx, ids)
 	if err != nil {
@@ -215,7 +215,7 @@ func (s *Service) annotate(ctx context.Context, siteID string, pages []pagemap.P
 }
 
 func (s *Service) viewOf(ctx context.Context, page pagemap.Page) (Page, error) {
-	shown, err := s.annotate(ctx, page.SiteID, []pagemap.Page{page})
+	shown, err := s.annotate(ctx, []pagemap.Page{page})
 	if err != nil {
 		return Page{}, err
 	}
