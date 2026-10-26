@@ -85,6 +85,10 @@ func modelOf(t *testing.T, env environment) standModel {
 			types: map[string]expectedType{
 				"/guide/":                    typedGuideWord,
 				"/guide/setup/":              typedGuideWord,
+				"/hello-world/":              typedPost,
+				"/sample-page/":              typedByDefault,
+				"/privacy-policy/":           typedTechnical,
+				"/refund_returns/":           typedTechnical,
 				"/product/powder/":           typedProduct,
 				"/product/coffee-beans/":     typedProduct,
 				"/product-category/koffein/": typedStoreCategory,
