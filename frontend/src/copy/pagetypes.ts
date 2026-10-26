@@ -15,6 +15,14 @@ export const pageTypes = {
         catalog: "Catalog",
         technical: "Technical",
     },
+    roles: {
+        hub: "Hub",
+        entity: "Entity",
+        product: "Product",
+        archive: "Store category",
+        catalog: "Catalog",
+        technical: "Technical",
+    },
     sources: {
         "": "Not typed yet",
         auto: "Set automatically",
@@ -107,6 +115,22 @@ export const pageTypes = {
         siteDefault: "Site default",
         readOnly: "Read only",
         open: (name: string) => `Open ${name}`,
+        suggested: (name: string) => `Suggested: ${name}`,
+        suggestedBuiltIn: "the built-in template for this role",
+        useSuggested: "Use it",
+        usedSuggested: (template: string, type: string) => `${type} pages are written on ${template} now.`,
+        overrides: (count: number) => (count === 1 ? "1 page keeps its own template" : `${count} pages keep their own template`),
+        follow: "Make them follow the type",
+    },
+    follow: {
+        title: (name: string) => `Make the ${name} pages follow their type?`,
+        body: (count: number, template: string) =>
+            `${count === 1 ? "1 page has a template of its own" : `${count} pages have a template of their own`}. That choice is cleared, so from now on ${count === 1 ? "it is" : "they are"} written on ${template}, like the rest of the type.`,
+        confirm: "Make them follow",
+        cancel: "Cancel",
+        done: (count: number) => (count === 1 ? "1 page follows its type now." : `${count} pages follow their type now.`),
+        none: "Every page already followed its type.",
+        moved: "The pages changed while you looked. Open the type again and retry.",
     },
     form: {
         createTitle: "New page type",

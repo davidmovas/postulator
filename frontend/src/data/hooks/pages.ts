@@ -11,6 +11,7 @@ import {
     pageTree,
     previewLink,
     setCanonicalPage,
+    setPageTemplates,
     setPageType,
     siteMap,
     unmapPage,
@@ -170,6 +171,19 @@ export function useSetPageType() {
             void client.invalidateQueries({ queryKey: keys.sites.types(answered.page.siteId) });
             void client.invalidateQueries({ queryKey: keys.templates.resolved(answered.page.id) });
             void client.invalidateQueries({ queryKey: keys.graph.full(answered.page.siteId) });
+        },
+    });
+}
+
+export function useSetPageTemplates() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof setPageTemplates>[0]) => setPageTemplates(request),
+        meta: quietMeta(["CONFLICT"]),
+        onSuccess: () => {
+            void client.invalidateQueries({ queryKey: keys.pages.root() });
+            void client.invalidateQueries({ queryKey: keys.sites.typesAll() });
+            void client.invalidateQueries({ queryKey: keys.templates.resolvedAll() });
         },
     });
 }

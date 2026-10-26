@@ -17,3 +17,4 @@ export const pageModel = one(Pages.Model);
 export const modelSummary = one(Pages.ModelSummary);
 export const writerPack = one(Pages.WriterPack);
 export const siteMap = one(Pages.SiteMap);
+export const setPageTemplates = one(Pages.SetTemplates);

@@ -7,6 +7,7 @@ import {
     isOneOf,
     pageTypePresets,
     pageTypeReasons,
+    pageTypeRoles,
     pageTypeSources,
 } from "../../../generated/vocab.js";
 import type { IconComponent, Tone } from "../../../ui/index.js";
@@ -71,6 +72,10 @@ export function presetLabel(preset: string): string {
         return copy.pageTypes.untyped;
     }
     return isOneOf(pageTypePresets, preset) ? copy.pageTypes.presets[preset] : spaced(preset);
+}
+
+export function roleLabel(role: string): string {
+    return isOneOf(pageTypeRoles, role) ? copy.pageTypes.roles[role] : spaced(role);
 }
 
 export function presetHint(preset: string): string {

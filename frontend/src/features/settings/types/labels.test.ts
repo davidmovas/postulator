@@ -7,6 +7,7 @@ import {
     fieldProviders,
     pageTypePresets,
     pageTypeReasons,
+    pageTypeRoles,
     pageTypeSources,
 } from "../../../generated/vocab.js";
 import {
@@ -20,12 +21,14 @@ import {
     presetTone,
     providerLabel,
     reasonLabel,
+    roleLabel,
     roleOf,
     sourceLabel,
 } from "./labels.js";
 
 const tables: readonly { name: string; values: readonly string[]; label: (value: string) => string }[] = [
     { name: "pageTypePresets", values: pageTypePresets, label: presetLabel },
+    { name: "pageTypeRoles", values: pageTypeRoles, label: roleLabel },
     { name: "pageTypeSources", values: pageTypeSources, label: sourceLabel },
     { name: "pageTypeReasons", values: pageTypeReasons, label: reasonLabel },
     { name: "fieldKeys", values: fieldKeys, label: (value) => fieldLabel(value) },
