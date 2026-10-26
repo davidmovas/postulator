@@ -9,10 +9,14 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/findings"
+	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
 
 const (
@@ -58,6 +62,20 @@ func siteMap(name string, request func(t *testing.T, s *scaled) sitemodel.MapReq
 		req.SiteID = s.siteID
 		return func() error {
 			_, err := s.core.SiteModel.SiteMap(t.Context(), req)
+			return err
+		}
+	}}
+}
+
+func pagesList(name string, request func(t *testing.T, s *scaled) pages.ListRequest) operation {
+	return operation{name: "pages: " + name, rows: true, call: func(t *testing.T, s *scaled) func() error {
+		req := request(t, s)
+		req.SiteID, req.Limit = s.siteID, listLimit
+		if req.Sort == nil {
+			req.Sort = &dto.Sort{Field: string(pagemap.SortPath)}
+		}
+		return func() error {
+			_, err := s.core.Pages.List(t.Context(), req)
 			return err
 		}
 	}}
@@ -143,6 +161,47 @@ func operations() []operation {
 				return err
 			}
 		}},
+		{name: "classify: the facts", call: func(t *testing.T, s *scaled) func() error {
+			return func() error {
+				_, err := s.core.SiteModel.ClassificationFacts(t.Context(), s.siteID)
+				return err
+			}
+		}},
+		{name: "classify: the preview", call: func(t *testing.T, s *scaled) func() error {
+			return func() error {
+				_, err := s.core.Classification.Preview(t.Context(), pagetypes.PreviewRequest{SiteID: s.siteID})
+				return err
+			}
+		}},
+		pagesList("a type's first page", func(t *testing.T, s *scaled) pages.ListRequest {
+			return pages.ListRequest{PageFilter: pages.PageFilter{PageTypeID: s.typeOf(t, pagetype.Product)}}
+		}),
+		pagesList("a search", func(*testing.T, *scaled) pages.ListRequest {
+			return pages.ListRequest{PageFilter: pages.PageFilter{Search: "article"}}
+		}),
+		pagesList("by title", func(*testing.T, *scaled) pages.ListRequest {
+			return pages.ListRequest{ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: string(pagemap.SortTitle)}}}
+		}),
+		pagesList("under a hub", func(t *testing.T, s *scaled) pages.ListRequest {
+			return pages.ListRequest{PageFilter: pages.PageFilter{Under: s.id(t, "/c010/")}}
+		}),
+		{name: "pages: a type's count", rows: true, call: func(t *testing.T, s *scaled) func() error {
+			req := pages.CountRequest{SiteID: s.siteID, PageFilter: pages.PageFilter{PageTypeID: s.typeOf(t, pagetype.Guide)}}
+			return func() error {
+				_, err := s.core.Pages.Count(t.Context(), req)
+				return err
+			}
+		}},
+		{name: "pages: a hub's subtree selected", rows: true, call: func(t *testing.T, s *scaled) func() error {
+			selection := pages.Selection{SiteID: s.siteID, Subtrees: []pages.Subtree{{PageID: s.id(t, "/c010/")}}}
+			return func() error {
+				_, err := s.core.Pages.Resolve(t.Context(), selection)
+				return err
+			}
+		}},
+		siteMap("the roots within a type", func(t *testing.T, s *scaled) sitemodel.MapRequest {
+			return sitemodel.MapRequest{Within: s.typeOf(t, pagetype.Guide), Limit: mapLimit}
+		}),
 		{name: "estimate: five articles", call: func(t *testing.T, s *scaled) func() error {
 			targets := []string{
 				s.id(t, "/c010/s1/t1/p0/"), s.id(t, "/c010/s1/t1/p1/"), s.id(t, "/c011/s0/t0/p0/"),
@@ -185,6 +244,7 @@ func TestTheCountsHoldFromTwoThousandToFiveThousandPages(t *testing.T) {
 		mu      sync.Mutex
 		counted = map[int]map[string]measured{}
 		walks   = map[int]walked{}
+		applied = map[int]map[string]measured{}
 	)
 	t.Run("sizes", func(t *testing.T) {
 		for _, blocks := range sizes {
@@ -197,10 +257,11 @@ func TestTheCountsHoldFromTwoThousandToFiveThousandPages(t *testing.T) {
 					got[held.name] = s.measure(t, held.name, held.call(t, s))
 				}
 				walk := s.walked(t)
+				retyped := s.retyped(t)
 				s.scansNothingLarge(t)
 				mu.Lock()
 				defer mu.Unlock()
-				counted[blocks], walks[blocks] = got, walk
+				counted[blocks], walks[blocks], applied[blocks] = got, walk, retyped
 			})
 		}
 	})
@@ -209,6 +270,9 @@ func TestTheCountsHoldFromTwoThousandToFiveThousandPages(t *testing.T) {
 	}
 	for _, held := range operations() {
 		flat(t, held.name, counted[smallBlocks][held.name], counted[largeBlocks][held.name], held.rows)
+	}
+	for name, small := range applied[smallBlocks] {
+		flat(t, name, small, applied[largeBlocks][name], false)
 	}
 	if small, large := walks[smallBlocks], walks[largeBlocks]; small != large {
 		t.Errorf("a walk runs %.1f + %.2f statements per touched page at %d pages and %.1f + %.2f at %d",
