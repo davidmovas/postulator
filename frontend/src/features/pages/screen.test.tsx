@@ -22,9 +22,10 @@ interface Calls {
     listed: unknown[];
     asked: string[];
     run: (readonly string[])[];
+    paths: (readonly (readonly [string, string])[])[];
 }
 
-const calls: Calls = { typed: [], templated: [], resolved: [], counted: [], listed: [], asked: [], run: [] };
+const calls: Calls = { typed: [], templated: [], resolved: [], counted: [], listed: [], asked: [], run: [], paths: [] };
 
 const answers: { typeError: Error | null; count: number } = { typeError: null, count: 3 };
 
@@ -75,7 +76,7 @@ vi.mock("../../data/hooks/pages.js", async () => {
         usePagePaths: () => new Map(),
         useSetPageTypes: writer(calls.typed, { typed: 2, refused: 1 }, () => answers.typeError),
         useSetPageTemplates: writer(calls.templated, { changed: 2 }),
-        useResolveSelection: writer(calls.resolved, { pageIds: ["p1", "p2"] }),
+        useResolveSelection: writer(calls.resolved, { pageIds: ["p1", "p2"], paths: { p1: "/peptides/", p2: "/bpc-157/" } }),
     };
 });
 
@@ -107,9 +108,10 @@ vi.mock("./drawer.js", () => ({ PageDrawer: () => null }));
 vi.mock("./create.js", () => ({ PlanPageDialog: () => null }));
 
 vi.mock("../runs/start.js", () => ({
-    StartRunDrawer: ({ open, preselect }: { open: boolean; preselect: readonly string[] }) => {
+    StartRunDrawer: ({ open, preselect, paths }: { open: boolean; preselect: readonly string[]; paths?: ReadonlyMap<string, string> }) => {
         if (open) {
             calls.run.push(preselect);
+            calls.paths.push(paths === undefined ? [] : [...paths]);
         }
         return open ? <div data-run-drawer={preselect.join(",")} /> : null;
     },
@@ -129,7 +131,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-    for (const record of [calls.typed, calls.templated, calls.resolved, calls.counted, calls.listed, calls.asked, calls.run]) {
+    for (const record of [calls.typed, calls.templated, calls.resolved, calls.counted, calls.listed, calls.asked, calls.run, calls.paths]) {
         record.length = 0;
     }
     answers.typeError = null;
@@ -265,6 +267,10 @@ describe("the pages as a list", () => {
         fireEvent.click(bar().getByRole("button", { name: said.bulk.run }));
         expect(calls.resolved).toStrictEqual([{ siteId: "s1", pageIds: ["p1", "p2"] }]);
         expect(calls.run.at(-1)).toStrictEqual(["p1", "p2"]);
+        expect(calls.paths.at(-1)).toStrictEqual([
+            ["p1", "/peptides/"],
+            ["p2", "/bpc-157/"],
+        ]);
     });
 });
 

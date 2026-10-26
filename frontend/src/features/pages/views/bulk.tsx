@@ -55,7 +55,11 @@ export interface BulkBarProps {
     known: () => ReadonlyMap<string, KnownRow>;
     entityName: (entityId: string) => string;
     selectAll: SelectAllOffer | null;
-    onStartRun: (pageIds: readonly string[]) => void;
+    onStartRun: (pageIds: readonly string[], paths: ReadonlyMap<string, string>) => void;
+}
+
+function pathsOf(held: Readonly<Record<string, string | undefined>> | null): ReadonlyMap<string, string> {
+    return new Map(Object.entries(held ?? {}).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
 
 export function BulkBar({ siteId, selection, onSelection, naming, known, entityName, selectAll, onStartRun }: BulkBarProps): ReactElement {
@@ -255,7 +259,7 @@ export function BulkBar({ siteId, selection, onSelection, naming, known, entityN
                     onClick={() => {
                         resolve.mutate(request, {
                             onSuccess: (answered) => {
-                                onStartRun(answered.pageIds ?? []);
+                                onStartRun(answered.pageIds ?? [], pathsOf(answered.paths));
                             },
                             onError: refused,
                         });

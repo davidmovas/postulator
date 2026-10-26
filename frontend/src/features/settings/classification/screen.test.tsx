@@ -79,7 +79,7 @@ const preview: ClassificationPreview = {
     siteId: "s1",
     hash: "h1",
     groups: [
-        { from: "", to: "t-landing", pages: 1, retyped: true, rules: [{ ruleId: "r1", pages: 1 }], dependsOn: [] },
+        { from: "", to: "t-landing", pages: 1, retyped: true, rules: [{ ruleId: "r1", pages: 1 }], dependsOn: [], samples: ["/"] },
         {
             from: "t-cat",
             to: "t-guide",
@@ -90,6 +90,7 @@ const preview: ClassificationPreview = {
                 { ruleId: "", pages: 30 },
             ],
             dependsOn: [{ from: "", to: "t-landing" }],
+            samples: ["/lab-guides/reconstitution/"],
         },
     ],
     moving: 91,

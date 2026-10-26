@@ -19,15 +19,6 @@ export function TypeScope({ fields }: TypeScopeProps): ReactElement {
     );
 }
 
-export interface ScopedAnswer {
-    estimate: unknown;
-    fields?: readonly string[] | null;
-}
-
-export function scopedFields(answered: ScopedAnswer): readonly string[] {
-    return answered.fields ?? [];
-}
-
 export interface StartScopeProps {
     fields: readonly string[];
     rewritten: readonly string[];

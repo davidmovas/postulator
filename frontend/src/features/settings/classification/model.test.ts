@@ -166,6 +166,7 @@ describe("choosing the changes to apply", () => {
         retyped: true,
         rules: [],
         dependsOn,
+        samples: [],
     });
     const groups = [group("", "t-hub", 3), group("t-entity", "t-cat", 20, [{ from: "", to: "t-hub" }]), group("t-entity", "t-guide", 90, [{ from: "t-entity", to: "t-cat" }])];
     const key = (from: string, to: string): string => groupKey({ from, to });

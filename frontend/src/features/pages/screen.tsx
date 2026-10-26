@@ -46,7 +46,7 @@ export function PagesScreen(): ReactElement {
     const selection = memory.selections[view];
     const [selectedId, setSelectedId] = useState<string | null>(pageId);
     const [creating, setCreating] = useState(false);
-    const [running, setRunning] = useState<readonly string[] | null>(null);
+    const [running, setRunning] = useState<{ pageIds: readonly string[]; paths: ReadonlyMap<string, string> } | null>(null);
     const [treeExpanded, setTreeExpanded] = useState<ReadonlySet<string>>(new Set());
     const known = useRef(new Map<string, KnownRow>());
     const filter = useMemo(() => filterOf(siteId, query), [siteId, query]);
@@ -273,7 +273,9 @@ export function PagesScreen(): ReactElement {
                               }
                             : null
                     }
-                    onStartRun={setRunning}
+                    onStartRun={(pageIds, paths) => {
+                        setRunning({ pageIds, paths });
+                    }}
                 />
             )}
 
@@ -302,8 +304,8 @@ export function PagesScreen(): ReactElement {
                     }
                 }}
                 siteId={siteId}
-                preselect={running ?? []}
-                paths={running === null ? undefined : new Map([...known.current].map(([id, held]) => [id, held.path] as const))}
+                preselect={running?.pageIds ?? []}
+                paths={running?.paths}
                 onStarted={(runId) => {
                     setRunning(null);
                     void navigate(`/s/${siteId}/runs/${runId}`);

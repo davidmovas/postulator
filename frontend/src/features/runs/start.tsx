@@ -24,7 +24,7 @@ import {
 } from "./start-model.js";
 import { StartCaps, StartPrice } from "./start-price.js";
 import { RewriteSwitch, rewriteOf, writesBody } from "./start-rewrite.js";
-import { scopedFields, StartScope, TypeScope } from "./start-scope.js";
+import { StartScope, TypeScope } from "./start-scope.js";
 import type { StartSeed } from "./start-seed.js";
 import { seededFields, seededRewrite } from "./start-seed.js";
 import { TargetTree } from "./start-tree.js";
@@ -157,7 +157,7 @@ export function StartRunDrawer({
                                 onSuccess: (answered) => {
                                     setEstimate(answered.estimate);
                                     setAdded(answered.added ?? []);
-                                    setScoped(scopedFields(answered));
+                                    setScoped(answered.fields ?? []);
                                 },
                             });
                         }}
