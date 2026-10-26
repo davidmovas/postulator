@@ -18,8 +18,14 @@ plan), W1 (the read layer: the tree by shape and depth with a reason for every e
 parents, a body as text, a section's links, many pages in one call, a capped list that drops its cursor), W2 (the
 two hierarchies: `entity_parent_differs` raised by a sync and by every parent writer, `graph.AdoptParents` previewed
 and applied under its hash, `adopt_tree` and `keep_graph`, a model proposal's parent from the page tree, a URL-less
-row's parent from its page). Next: W3, the run brief. The tools that expose W1 and W2 arrive with W5's fold;
-`internal/application/tools/fit.go` waits uncommitted for its first caller there.
+row's parent from its page), W3 (the run brief: `run.Brief` and `run.Directive` kept by migration 0082, refused
+or made an approved edge at the start, a priority-1 pack section for the writer, the judge and the linker, the
+writer pane reads a draft or a run), W4 (plans: `agent_plans` by migration 0083, each step checked as its own tool
+would check it, `AgentService.ConfirmPlan` approving whole or in part with inline text edits, an executor that
+waits on runs, skips what a failure strands and resumes when the core opens) and W6 (the support bundle,
+`SupportService.WriteBundle`, with no secret and none of the client's text). Next: W5, the toolset fold and the
+instructions, with W7 (the screens) beside it; then W8, the capability suite. The tools that expose W1–W4 arrive
+with W5's fold; `internal/application/tools/fit.go` waits uncommitted for its first caller there.
 
 ## Next, in order
 
