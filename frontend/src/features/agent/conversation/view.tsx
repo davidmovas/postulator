@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import { copy } from "../../../copy/index.js";
 import { useAgentTurn } from "../../../data/agent/use-agent-turn.js";
 import { flatten } from "../../../data/call.js";
-import { errorMessageOf } from "../../../data/errors.js";
+import { errorMessageOf, failure } from "../../../data/errors.js";
 import {
     useCancelTurn,
     useConfirmAction,
+    useConfirmPlan,
     usePendingActions,
+    usePlans,
     useSendMessage,
     useSetConversationMode,
     useTranscript,
@@ -17,9 +19,11 @@ import {
 import { useRoleProfiles, useUsage } from "../../../data/hooks/models.js";
 import { useSite } from "../../../data/hooks/sites.js";
 import { useTools } from "../../../data/hooks/tools.js";
-import type { Conversation } from "../../../data/types.js";
+import type { Conversation, Plan, PlanStepChoice } from "../../../data/types.js";
 import { Banner, Button, EmptyState, SkeletonRows, SmartToyIcon } from "../../../ui/index.js";
 import type { CardBusy } from "../cards/card.js";
+import type { PlanBusy } from "../plans/card.js";
+import { PlanCard } from "../plans/card.js";
 import { Composer } from "./composer.js";
 import { ConversationMeta } from "./meta.js";
 import { lastUserText, rows as transcriptRows } from "./model/transcript.js";
@@ -87,14 +91,53 @@ function LivePane({ conversation, prefillSeq, takePrefill, onOpenTools }: LivePa
     const cancel = useCancelTurn();
     const confirm = useConfirmAction();
     const setMode = useSetConversationMode();
+    const plans = usePlans(conversationId);
+    const confirmPlan = useConfirmPlan(conversationId);
     const [settling, setSettling] = useState<{ id: string; busy: CardBusy } | null>(null);
+    const [planning, setPlanning] = useState<{ planId: string; busy: PlanBusy } | null>(null);
+    const [planRefusal, setPlanRefusal] = useState<{ planId: string; message: string } | null>(null);
 
     useTurnReconciler(conversationId);
 
     const pendingActions = useMemo(() => flatten(pending.data?.pages), [pending.data]);
+    const listedPlans = plans.data?.plans;
     const rows = useMemo(
-        () => transcriptRows(transcript.messages, turn, pendingActions),
-        [transcript.messages, turn, pendingActions],
+        () =>
+            transcriptRows(transcript.messages, turn, pendingActions, {
+                listed: listedPlans ?? [],
+                complete: transcript.complete,
+            }),
+        [transcript.messages, turn, pendingActions, listedPlans, transcript.complete],
+    );
+
+    const settlePlan = (planId: string, steps: PlanStepChoice[], busy: Exclude<PlanBusy, null>): void => {
+        setPlanning({ planId, busy });
+        setPlanRefusal(null);
+        confirmPlan.mutate(
+            { planId, steps },
+            {
+                onError: (thrown) => {
+                    const message =
+                        failure(thrown).code === "CONFLICT" ? copy.plans.settled : (errorMessageOf(thrown) ?? "");
+                    setPlanRefusal(message === "" ? null : { planId, message });
+                },
+                onSettled: () => {
+                    setPlanning(null);
+                },
+            },
+        );
+    };
+
+    const renderPlan = (plan: Plan) => (
+        <PlanCard
+            plan={plan}
+            siteId={siteId}
+            busy={planning?.planId === plan.id ? planning.busy : null}
+            refusal={planRefusal?.planId === plan.id ? planRefusal.message : null}
+            onConfirm={(steps, busy) => {
+                settlePlan(plan.id, steps, busy);
+            }}
+        />
     );
     const asked = useMemo(() => lastUserText(rows), [rows]);
 
@@ -166,6 +209,7 @@ function LivePane({ conversation, prefillSeq, takePrefill, onOpenTools }: LivePa
                     settling={settling}
                     canRetry={asked !== null}
                     header={earlier}
+                    renderPlan={renderPlan}
                     onApprove={(actionId) => {
                         settle(actionId, true);
                     }}

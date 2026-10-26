@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../../copy/index.js";
+import { aPlan } from "../plans/fixture.js";
 import type { Row } from "./model/transcript.js";
 import { Transcript } from "./transcript.js";
 
@@ -29,6 +30,7 @@ function transcript(rows: readonly Row[]) {
             settling={null}
             canRetry={false}
             header={null}
+            renderPlan={(plan) => <output data-testid="plan">{plan.title}</output>}
             onApprove={() => {}}
             onReject={() => {}}
             onRetry={() => {}}
@@ -98,5 +100,11 @@ describe("the transcript rows for a tool call", () => {
 
         expect(screen.getByText(words.running)).toBeDefined();
         expect(screen.queryByText(words.duration(120))).toBeNull();
+    });
+
+    it("hands a plan row to the plan card it is given", () => {
+        transcript([toolRow({ tool: "plans" }), { kind: "plan", id: "plan:p1", plan: aPlan([]) }]);
+
+        expect(screen.getByTestId("plan").textContent).toBe("Link the kits");
     });
 });

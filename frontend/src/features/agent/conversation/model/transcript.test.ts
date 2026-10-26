@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Turn } from "../../../../data/agent/turn.js";
 import type { Message, PendingAction } from "../../../../data/types.js";
+import { aPlan, aStep, withStatus } from "../../plans/fixture.js";
 import { lastUserText, rows } from "./transcript.js";
 
 const idle: Turn = {
@@ -301,5 +302,41 @@ describe("rows over a live turn", () => {
             message: "you stopped the turn",
         };
         expect(rows([], stopped, []).map((row) => row.kind)).toStrictEqual(["assistant", "stopped"]);
+    });
+});
+
+describe("plan rows", () => {
+    const proposed = aPlan([aStep(1)]);
+    const running = withStatus(proposed, "running");
+    const proposal = { status: "planProposed", planId: "p1", plan: proposed };
+
+    function saved(): Message[] {
+        return [
+            message(1, "user", "link the kits"),
+            message(2, "tool", "", { tool: "plans", callId: "k1", payload: proposal }),
+            message(3, "assistant", "here is the plan"),
+        ];
+    }
+
+    it("puts the plan right after the call that proposed it", () => {
+        expect(rows(saved(), idle, [], { listed: [], complete: false }).map((row) => row.kind)).toStrictEqual([
+            "user",
+            "tool",
+            "plan",
+            "assistant",
+        ]);
+    });
+
+    it("shows the plan's live state over what the call answered", () => {
+        const shown = rows(saved(), idle, [], { listed: [running], complete: true }).find((row) => row.kind === "plan");
+        expect(shown).toMatchObject({ kind: "plan", plan: { status: "running" } });
+    });
+
+    it("keeps a plan whose call answered too much to anchor it at the end of a whole transcript", () => {
+        const preview = { truncated: true, preview: "{" };
+        const cut = [message(1, "tool", "", { tool: "plans", callId: "k1", payload: preview })];
+        const kinds = (complete: boolean) => rows(cut, idle, [], { listed: [running], complete }).map((row) => row.kind);
+        expect(kinds(false)).toStrictEqual(["tool"]);
+        expect(kinds(true)).toStrictEqual(["tool", "plan"]);
     });
 });

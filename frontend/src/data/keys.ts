@@ -171,6 +171,7 @@ export const keys = {
         pendingAll: () => [scope, "agent", "pending"] as const,
         pending: (filter: PendingActionFilter, limit?: number) =>
             [scope, "agent", "pending", filter, limitSegment(limit)] as const,
+        plans: (conversationId: string) => [scope, "agent", "plans", conversationId] as const,
     },
     models: {
         root: () => [scope, "models"] as const,

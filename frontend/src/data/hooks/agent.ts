@@ -6,21 +6,24 @@ import { maxLimit } from "../../lib/paging.js";
 import { reconcileConversation } from "../agent/reconcile.js";
 import { attachAssistant, beginStop, failTurn, startTurn } from "../agent/turn.js";
 import { flatten } from "../call.js";
+import { quietMeta } from "../client.js";
 import {
     cancelTurn,
     confirmAction,
+    confirmPlan,
     createConversation,
     deleteConversation,
     listConversations,
     listMessages,
     listPendingActions,
+    listPlans,
     renameConversation,
     sendMessage,
     setConversationMode,
 } from "../endpoints/agent.js";
 import { failure, messages as errorMessages } from "../errors.js";
 import { keys } from "../keys.js";
-import { useUnlockedInfinite } from "../query.js";
+import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
 import type {
     Conversation,
     ConversationFilter,
@@ -28,6 +31,7 @@ import type {
     MessageFilter,
     PendingAction,
     PendingActionFilter,
+    Plan,
 } from "../types.js";
 
 export const maxAutoPages = 4;
@@ -216,6 +220,32 @@ export function useConfirmAction() {
         onSettled: () => {
             void client.invalidateQueries({ queryKey: keys.agent.pendingAll() });
             void client.invalidateQueries({ queryKey: keys.agent.messagesAll() });
+        },
+    });
+}
+
+export function usePlans(conversationId: string | null) {
+    return useUnlockedQuery({
+        queryKey: keys.agent.plans(conversationId ?? ""),
+        queryFn: ({ signal }) => listPlans({ conversationId: conversationId ?? "" }, signal),
+        enabled: conversationId !== null && conversationId !== "",
+    });
+}
+
+export function useConfirmPlan(conversationId: string) {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof confirmPlan>[0]) => confirmPlan(request),
+        meta: quietMeta(["CONFLICT", "INVALID"]),
+        onSuccess: (answered) => {
+            const settled = (plan: Plan): Plan => (plan.id === answered.plan.id ? answered.plan : plan);
+            client.setQueryData<{ plans: Plan[] | null }>(keys.agent.plans(conversationId), (held) =>
+                held === undefined ? held : { plans: (held.plans ?? []).map(settled) },
+            );
+        },
+        onSettled: () => {
+            void client.invalidateQueries({ queryKey: keys.agent.plans(conversationId) });
+            void client.invalidateQueries({ queryKey: keys.agent.messagesOf(conversationId) });
         },
     });
 }

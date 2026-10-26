@@ -24,6 +24,7 @@ import type {
     SyncModels,
     TemplateDomainModels,
     TemplatesModels,
+    ToolsModels,
     TransportModels,
 } from "../lib/api.js";
 import type { Wire } from "./wire.js";
@@ -84,6 +85,7 @@ export type ResolveFindingsResponse = Wire<FindingsModels.ResolveManyResponse>;
 export type SiteMapView = Wire<SiteModelModels.MapView>;
 export type SiteMapNode = Wire<ContextPackModels.MapNode>;
 export type SiteMapRef = Wire<ContextPackModels.Ref>;
+export type ParentWhy = Wire<ContextPackModels.ParentWhy>;
 export type SiteMapFilter = Omit<SiteModelModels.MapRequest, "cursor" | "limit">;
 
 export type WriterPack = Wire<SiteModelModels.PackView>;
@@ -104,6 +106,9 @@ export type EdgeFilter = ListFilter<GraphModels.ListEdgesRequest>;
 export type CardProposal = Wire<GraphModels.CardProposal>;
 export type ProposedCard = Wire<GraphModels.Card>;
 export type CardFact = Wire<GraphModels.Fact>;
+export type Adoption = Wire<GraphModels.AdoptionView>;
+export type AdoptParentsRequest = GraphModels.AdoptParentsRequest;
+export type AdoptParentsResponse = Wire<GraphModels.AdoptParentsResponse>;
 
 export type Template = Wire<TemplatesModels.Template>;
 export type TemplateOverride = Wire<TemplatesModels.Override>;
@@ -144,6 +149,9 @@ export type RunEventRow = Wire<RunsModels.Event>;
 export type RunFilter = ListFilter<RunsModels.ListRequest>;
 export type RunItemFilter = ListFilter<RunsModels.ListItemsRequest>;
 export type RunStartRequest = RunsModels.StartRequest;
+export type RunBrief = RunDomainModels.Brief;
+export type RunDirective = RunDomainModels.Directive;
+export type RunMustLink = RunDomainModels.MustLink;
 export type Budget = Wire<RunDomainModels.Budget>;
 export type Estimate = Wire<RunDomainModels.Estimate>;
 export type RunTotals = Wire<RunDomainModels.Stats>;
@@ -154,6 +162,10 @@ export type PendingAction = Wire<AgentModels.PendingAction>;
 export type ConversationFilter = ListFilter<AgentModels.ListConversationsRequest>;
 export type MessageFilter = ListFilter<AgentModels.ListMessagesRequest>;
 export type PendingActionFilter = ListFilter<AgentModels.ListPendingActionsRequest>;
+export type Plan = Wire<ToolsModels.PlanView>;
+export type PlanStep = Wire<ToolsModels.PlanStepView>;
+export type PlanStepEdit = Wire<ToolsModels.EditView>;
+export type PlanStepChoice = AgentModels.StepChoice;
 
 export type Schedule = Wire<SchedulesModels.Schedule>;
 export type ScheduleFilter = ListFilter<SchedulesModels.ListRequest>;

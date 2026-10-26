@@ -1,8 +1,9 @@
 import type { ReactElement, ReactNode, UIEvent } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { absoluteTime } from "../../../domain/format.js";
+import type { Plan } from "../../../data/types.js";
 import type { Timestamp } from "../../../data/wire.js";
 import { ArrowDownwardIcon, Button, cx, SmartToyIcon, Spinner, toneClasses } from "../../../ui/index.js";
 import { ActionCard } from "../cards/action-card.js";
@@ -98,12 +99,22 @@ export interface TranscriptProps {
     settling: { id: string; busy: CardBusy } | null;
     canRetry: boolean;
     header: ReactNode;
+    renderPlan: (plan: Plan) => ReactNode;
     onApprove: (actionId: string) => void;
     onReject: (actionId: string) => void;
     onRetry: () => void;
 }
 
-export function Transcript({ rows, settling, canRetry, header, onApprove, onReject, onRetry }: TranscriptProps): ReactElement {
+export function Transcript({
+    rows,
+    settling,
+    canRetry,
+    header,
+    renderPlan,
+    onApprove,
+    onReject,
+    onRetry,
+}: TranscriptProps): ReactElement {
     const scroller = useRef<HTMLDivElement>(null);
     const [pinned, setPinned] = useState(true);
     const pinnedRef = useRef(true);
@@ -217,6 +228,8 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
                                 />
                             );
                         }
+                        case "plan":
+                            return <Fragment key={row.id}>{renderPlan(row.plan)}</Fragment>;
                         case "stopped":
                             return <StoppedCard key={row.id} detail={row.detail} canRetry={canRetry} onRetry={onRetry} />;
                         case "failed":

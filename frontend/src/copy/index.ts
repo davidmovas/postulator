@@ -10,6 +10,7 @@ import { map } from "./map.js";
 import { overview, readiness } from "./overview.js";
 import { pages } from "./pages.js";
 import { palette } from "./palette.js";
+import { plans } from "./plans.js";
 import { reports } from "./reports.js";
 import { pageTypes } from "./pagetypes.js";
 import { templates } from "./templates.js";
@@ -35,6 +36,7 @@ export const copy = {
     reports,
     schedules,
     agent,
+    plans,
     pages,
     graph,
     links,
