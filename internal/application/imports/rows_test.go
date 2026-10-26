@@ -125,6 +125,86 @@ func TestARowWithoutAURLUpdatesThePageItNames(t *testing.T) {
 	}
 }
 
+func (h harness) parentsOf(t *testing.T, name string) []string {
+	t.Helper()
+
+	entities, err := sqlite.NewEntityRepo(h.store).ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the entities: %v", err)
+	}
+	edges, err := sqlite.NewEdgeRepo(h.store).ListBySite(t.Context(), h.siteID)
+	if err != nil {
+		t.Fatalf("list the edges: %v", err)
+	}
+	names := make(map[string]string, len(entities))
+	child := ""
+	for i := range entities {
+		names[entities[i].ID] = entities[i].Name
+		if entities[i].Name == name {
+			child = entities[i].ID
+		}
+	}
+	if child == "" {
+		t.Fatalf("the import made no entity %q", name)
+	}
+	out := make([]string, 0)
+	for i := range edges {
+		if edges[i].Kind == graph.EdgeParent && edges[i].FromEntityID == child {
+			out = append(out, names[edges[i].ToEntityID])
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestARowWithoutAURLTakesItsPagesDerivedParentWhenItNamesNone(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		sheet   string
+		columns map[string]string
+		levels  bool
+		want    []string
+	}{
+		{
+			name:    "the page tree's parent, the URL being flat",
+			sheet:   "title,keywords\nVitamin C,vitamin c serum\n",
+			columns: map[string]string{string(importmap.FieldTitle): "title", string(importmap.FieldKeywords): "keywords"},
+			want:    []string{"Serums"},
+		},
+		{
+			name:    "the workbook's own level wins",
+			sheet:   "Root Entity,title,keywords\nOils,Vitamin C,vitamin c serum\n",
+			columns: map[string]string{string(importmap.FieldTitle): "title", string(importmap.FieldKeywords): "keywords"},
+			levels:  true,
+			want:    []string{"Oils"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := newHarness(t)
+			serums := h.siteEntity(t, "Serums")
+			hub := h.sitePage(t, "/serums/", "Serums", 11, &serums.ID)
+			child := h.sitePage(t, "/vitamin-c/", "Vitamin C", 12, nil)
+			child.ParentPageID, child.ParentReason = &hub.ID, pagemap.ParentJSONLD
+			if err := sqlite.NewPageRepo(h.store).Update(t.Context(), child); err != nil {
+				t.Fatalf("place the child under the hub: %v", err)
+			}
+			mapping := h.mapping(tc.columns)
+			if tc.levels {
+				mapping = levelMapping(h, tc.columns)
+			}
+			h.apply(t, h.file(t, "rows.csv", tc.sheet), mapping)
+			if got := h.parentsOf(t, "Vitamin C"); !slices.Equal(got, tc.want) {
+				t.Fatalf("the row's entity sits under %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestARowThatGivesAPageAnEntityClearsItsMissingEntityFinding(t *testing.T) {
 	t.Parallel()
 
