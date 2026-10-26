@@ -24,7 +24,7 @@ type queue struct {
 	err    error
 }
 
-func (q *queue) Enqueue(_ context.Context, record run.Run) (run.Run, error) {
+func (q *queue) Enqueue(_ context.Context, record run.Run, _ ...run.Directive) (run.Run, error) {
 	if q.err != nil {
 		return run.Run{}, q.err
 	}

@@ -3,8 +3,10 @@ package runs
 import (
 	"context"
 
+	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -15,7 +17,7 @@ import (
 )
 
 type engine interface {
-	Enqueue(ctx context.Context, record run.Run) (run.Run, error)
+	Enqueue(ctx context.Context, record run.Run, directives ...run.Directive) (run.Run, error)
 	EstimateRun(ctx context.Context, record run.Run, assigned map[string]string) (run.Estimate, error)
 	Pause(ctx context.Context, runID string, reason run.PauseReason) error
 	Resume(ctx context.Context, runID string) error
@@ -69,6 +71,14 @@ type typeSets interface {
 	Set(ctx context.Context, siteID string) (pagetype.Set, error)
 }
 
+type linkPlans interface {
+	LinkContextOf(ctx context.Context, siteID, pageID string) (content.LinkContext, error)
+}
+
+type edgeWriter interface {
+	AddEdge(ctx context.Context, req graph.AddEdgeRequest) (graph.AddEdgeResponse, error)
+}
+
 type Service struct {
 	engine    engine
 	runs      runStore
@@ -80,13 +90,16 @@ type Service struct {
 	types     typeSets
 	steps     stepDefs
 	assigner  templateAssigner
+	links     linkPlans
+	edges     edgeWriter
 }
 
 func New(engine engine, runs runStore, items itemStore, artifacts artifactStore, events eventStore,
-	specs specResolver, pageMap pageReader, types typeSets, steps stepDefs, assigner templateAssigner) *Service {
+	specs specResolver, pageMap pageReader, types typeSets, steps stepDefs, assigner templateAssigner,
+	links linkPlans, edges edgeWriter) *Service {
 	return &Service{
 		engine: engine, runs: runs, items: items, artifacts: artifacts, events: events,
-		specs: specs, pages: pageMap, types: types, steps: steps, assigner: assigner,
+		specs: specs, pages: pageMap, types: types, steps: steps, assigner: assigner, links: links, edges: edges,
 	}
 }
 

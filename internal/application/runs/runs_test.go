@@ -11,6 +11,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	appgraph "github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/templates"
@@ -42,14 +43,38 @@ type fakeEngine struct {
 	regenerated    string
 	restarted      []string
 	acceptedFields []field.Key
+	directives     []run.Directive
 }
 
-func (f *fakeEngine) Enqueue(_ context.Context, record run.Run) (run.Run, error) {
+func (f *fakeEngine) Enqueue(_ context.Context, record run.Run, directives ...run.Directive) (run.Run, error) {
 	if f.enqueueErr != nil {
 		return run.Run{}, f.enqueueErr
 	}
-	f.queued = record
+	f.queued, f.directives = record, directives
 	return record, nil
+}
+
+type fakeLinks struct {
+	owed  map[string][]string
+	asked []string
+}
+
+func (f *fakeLinks) LinkContextOf(_ context.Context, _, pageID string) (content.LinkContext, error) {
+	f.asked = append(f.asked, pageID)
+	lc := content.LinkContext{PageID: pageID}
+	for _, target := range f.owed[pageID] {
+		lc.Targets = append(lc.Targets, content.LinkTarget{PageID: target, URL: "/" + target + "/"})
+	}
+	return lc, nil
+}
+
+type fakeEdges struct {
+	added []appgraph.AddEdgeRequest
+}
+
+func (f *fakeEdges) AddEdge(_ context.Context, req appgraph.AddEdgeRequest) (appgraph.AddEdgeResponse, error) {
+	f.added = append(f.added, req)
+	return appgraph.AddEdgeResponse{}, nil
 }
 
 func (f *fakeEngine) EstimateRun(_ context.Context, record run.Run, assigned map[string]string) (run.Estimate, error) {
@@ -164,6 +189,8 @@ func (f *fakeTypes) Set(context.Context, string) (pagetype.Set, error) {
 
 type fixture struct {
 	service  *runs.Service
+	links    *fakeLinks
+	edges    *fakeEdges
 	types    *fakeTypes
 	assigner *fakeAssigner
 	engine   *fakeEngine
@@ -209,9 +236,12 @@ func newFixture(t *testing.T) *fixture {
 	mapping := &fakePages{unmapped: map[string]string{}}
 	assigner := &fakeAssigner{}
 	types := &fakeTypes{set: pagetype.NewSet(nil, nil)}
+	links, edges := &fakeLinks{owed: map[string][]string{}}, &fakeEdges{}
 
 	return &fixture{
-		service:  runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, mapping, types, stepRegistry(t), assigner),
+		service:  runs.New(engine, runRepo, itemRepo, blobRepo, logRepo, specs, mapping, types, stepRegistry(t), assigner, links, edges),
+		links:    links,
+		edges:    edges,
 		types:    types,
 		assigner: assigner,
 		engine:   engine,

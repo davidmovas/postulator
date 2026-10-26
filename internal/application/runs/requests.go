@@ -16,6 +16,9 @@ type StartRequest struct {
 	Budget      run.Budget          `json:"budget"`
 	Rewrite     []string            `json:"rewrite,omitempty"`
 	Fields      []string            `json:"fields,omitempty"`
+	Brief       *run.Brief          `json:"brief,omitempty"`
+	Directives  []run.Directive     `json:"directives,omitempty"`
+	AddEdges    bool                `json:"addEdges,omitempty"`
 }
 
 type StartResponse struct {

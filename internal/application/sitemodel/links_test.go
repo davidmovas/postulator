@@ -161,6 +161,22 @@ func TestASectionSaysWhatItOwesAndWhatToDoAboutIt(t *testing.T) {
 	}
 }
 
+func TestAPagesLinkPlanIsTheOneTheWriterReads(t *testing.T) {
+	t.Parallel()
+
+	m := aSection()
+	plan, err := m.Service().LinkContextOf(t.Context(), siteID, "vitc")
+	if err != nil {
+		t.Fatalf("LinkContextOf: %v", err)
+	}
+	if _, owed := plan.ByPageID("serums"); !owed || plan.PageID != "vitc" {
+		t.Errorf("the plan of vitamin C = %+v, want its parent hub among its targets", plan)
+	}
+	if _, err = m.Service().LinkContextOf(t.Context(), "another-site", "vitc"); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("another site's page = %v, want NotFound", err)
+	}
+}
+
 func TestALinksViewRefusesWhatItCannotRead(t *testing.T) {
 	t.Parallel()
 

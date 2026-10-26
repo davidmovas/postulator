@@ -17,11 +17,13 @@ import (
 )
 
 type planned struct {
-	record   run.Run
-	added    []AddedPage
-	assigned map[string]string
-	picked   []string
-	fields   []string
+	record     run.Run
+	added      []AddedPage
+	assigned   map[string]string
+	picked     []string
+	fields     []string
+	directives []run.Directive
+	missing    []missingEdge
 }
 
 func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, error) {
@@ -41,9 +43,12 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 	if assignErr := s.assign(ctx, plan); assignErr != nil {
 		return StartResponse{}, assignErr
 	}
+	if edgeErr := s.addEdges(ctx, plan.record.SiteID, plan.missing); edgeErr != nil {
+		return StartResponse{}, edgeErr
+	}
 
 	plan.record.ID = id.New()
-	queued, err := s.engine.Enqueue(ctx, plan.record)
+	queued, err := s.engine.Enqueue(ctx, plan.record, plan.directives...)
 	if err != nil {
 		return StartResponse{}, err
 	}
@@ -174,6 +179,10 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	}
 
 	assigned, assign := assignment(chosen, picked)
+	missing, err := s.directed(ctx, req, siteID, chosen)
+	if err != nil {
+		return planned{}, err
+	}
 
 	actor, ok := kctx.ActorFrom(ctx)
 	if !ok {
@@ -190,12 +199,15 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 			TemplateVersion: version,
 			PublishMode:     mode,
 			Budget:          req.Budget,
+			Brief:           briefOf(req),
 			CreatedBy:       actor,
 		},
-		added:    added,
-		assigned: assigned,
-		picked:   assign,
-		fields:   scopedFields(recipe),
+		added:      added,
+		assigned:   assigned,
+		picked:     assign,
+		fields:     scopedFields(recipe),
+		directives: req.Directives,
+		missing:    missing,
 	}, nil
 }
 
