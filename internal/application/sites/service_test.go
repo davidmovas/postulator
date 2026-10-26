@@ -54,7 +54,7 @@ func newHarness(t *testing.T) harness {
 	recorder := &applicationtest.Recorder{}
 	reach := &probeStub{reached: site.Reachability{Reach: site.ReachOK, Message: "the site answered", HasPlugin: true}}
 	types := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: sqlite.NewPageRepo(store),
 		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk,
 	})
 	return harness{

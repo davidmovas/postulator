@@ -94,7 +94,7 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: findingRepo,
 		UnitOfWork: store, Publisher: bus, Clock: fake,
 		Types: pagetypes.New(pagetypes.Deps{
-			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: pageRepo,
 			Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: fake,
 		}),
 	})

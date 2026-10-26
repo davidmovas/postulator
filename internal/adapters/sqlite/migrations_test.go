@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 76
+const latestMigration = 78
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -97,6 +98,8 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0074_page_map.sql",
 		"0075_page_renders_h1.sql",
 		"0076_page_type_presets.sql",
+		"0077_page_type_rules.sql",
+		"0078_pages_type_rule.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1731,6 +1734,148 @@ func TestTheNewPresetsJoinEverySiteThatHasTypesAndNoPageMoves(t *testing.T) {
 		"page_map_type_added", "page_map_type_moved", "page_map_type_removed", "page_types_site_name", "page_types_site_preset",
 	}) {
 		t.Fatalf("the down left the indexes and triggers %v", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestTheMigrationSeedsTheRulesTheApplicationSeeds(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 76)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-26T09:00:00Z"
+	for _, site := range []string{"fresh", "upgraded", "renamed", "bare"} {
+		must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+			site, site, "https://"+site, "site:"+site+":wp_password", at, at)
+	}
+	seed := func(site string, presets []pagetype.Preset, names map[pagetype.Preset]string) {
+		for i, preset := range presets {
+			name := preset.DefaultName()
+			if renamed, held := names[preset]; held {
+				name = renamed
+			}
+			must(`INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+				id.New(), site, name, string(preset), "2026-10-26T09:00:0"+strconv.Itoa(i)+"Z", at)
+		}
+	}
+	seed("fresh", pagetype.Seeded(), nil)
+	seed("upgraded", pagetype.Presets(), nil)
+	seed("renamed", []pagetype.Preset{
+		pagetype.Hub, pagetype.Entity, pagetype.Product, pagetype.StoreCategory, pagetype.Catalog, pagetype.Technical,
+		pagetype.Landing, pagetype.Guide, pagetype.Info,
+	}, map[pagetype.Preset]string{pagetype.Hub: "Category"})
+
+	if _, err = provider.UpTo(t.Context(), 77); err != nil {
+		t.Fatalf("up to 77: %v", err)
+	}
+
+	typesRepo, rulesRepo := NewPageTypeRepo(store), NewPageTypeRuleRepo(store)
+	for _, site := range []string{"fresh", "upgraded", "renamed"} {
+		types, listErr := typesRepo.ListBySite(t.Context(), site)
+		if listErr != nil {
+			t.Fatalf("ListBySite types: %v", listErr)
+		}
+		stored, listErr := rulesRepo.ListBySite(t.Context(), site)
+		if listErr != nil {
+			t.Fatalf("ListBySite rules: %v", listErr)
+		}
+		want := pagetype.DefaultRules(pagetype.NewSet(types, nil), site, time.Time{}, func() string { return "" })
+		if len(stored) != len(want) {
+			t.Fatalf("%s: the migration seeded %d rules, the application seeds %d", site, len(stored), len(want))
+		}
+		for i := range stored {
+			if !id.Valid(stored[i].ID) {
+				t.Errorf("%s: the seeded rule id %q is not a canonical v4 UUID", site, stored[i].ID)
+			}
+			stored[i].ID, stored[i].CreatedAt, stored[i].UpdatedAt = "", time.Time{}, time.Time{}
+			if !reflect.DeepEqual(stored[i], want[i]) {
+				t.Errorf("%s: rule %d =\n%+v\nwant what the application seeds\n%+v", site, i+1, stored[i], want[i])
+			}
+		}
+	}
+	renamedHub := rowsOf(t, store, `SELECT id FROM page_types WHERE site_id = 'renamed' AND name = 'Category'`)
+	if got := rowsOf(t, store, `SELECT page_type_id FROM page_type_rules WHERE site_id = 'renamed' AND position = 7`); !slices.Equal(got, renamedHub) {
+		t.Errorf("the category rule on the renamed site gives %v, want the client's Category %v", got, renamedHub)
+	}
+	if got := rowsOf(t, store, `SELECT count(*) FROM page_type_rules WHERE site_id = 'bare'`); !slices.Equal(got, []string{"0"}) {
+		t.Errorf("a site without types got %v rules", got)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 76); err != nil {
+		t.Fatalf("down to 76: %v", err)
+	}
+	if got := schemaOf(t, store, "page_type_rules"); len(got) != 0 {
+		t.Fatalf("the down kept the rules: %v", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestAPagesRuleAndItsReasonsComeAndGoWithTheirMigration(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 77)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-26T09:00:00Z"
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	must(`INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES ('t-guide', 's1', 'Guide', 'guide', ?, ?)`, at, at)
+	for _, page := range []struct{ id, source, reason string }{{"pg-user", "manual", "user"}, {"pg-listing", "auto", "listing"}, {"pg-rule", "auto", "default"}} {
+		must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, page_type_id, page_type_source, page_type_reason, created_at, updated_at)
+			VALUES (?, 's1', ?, ?, 'page', 'exists', 't-guide', ?, ?, ?, ?)`, page.id, "/"+page.id+"/", page.id, page.source, page.reason, at, at)
+	}
+	if got := rowsOf(t, store, `SELECT sql FROM sqlite_schema WHERE type = 'index' AND tbl_name = 'pages' AND sql IS NOT NULL ORDER BY name`); len(got) == 0 {
+		t.Fatal("the pages table carries no index to keep")
+	}
+	indexes := rowsOf(t, store, `SELECT name FROM sqlite_schema WHERE type IN ('index', 'trigger') AND tbl_name = 'pages' ORDER BY name`)
+
+	if _, err = provider.UpTo(t.Context(), 78); err != nil {
+		t.Fatalf("up to 78: %v", err)
+	}
+	must(`UPDATE pages SET page_type_reason = 'rule', page_type_rule_id = 'rule-10' WHERE id = 'pg-rule'`)
+	must(`UPDATE pages SET page_type_reason = 'unmatched' WHERE id = 'pg-listing'`)
+	if _, execErr := store.writer.ExecContext(t.Context(), `UPDATE pages SET page_type_reason = 'hunch' WHERE id = 'pg-user'`); execErr == nil {
+		t.Fatal("a reason the model does not name was accepted")
+	}
+	if got := rowsOf(t, store, `SELECT id, page_type_reason, page_type_rule_id FROM pages ORDER BY id`); !slices.Equal(got, []string{
+		"pg-listing | unmatched | ", "pg-rule | rule | rule-10", "pg-user | user | ",
+	}) {
+		t.Fatalf("the pages after 78 = %v", got)
+	}
+	if got := rowsOf(t, store, `SELECT name FROM sqlite_schema WHERE type IN ('index', 'trigger') AND tbl_name = 'pages' ORDER BY name`); !slices.Equal(got, indexes) {
+		t.Fatalf("78 changed the pages' indexes and triggers to %v, was %v", got, indexes)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 77); err != nil {
+		t.Fatalf("down to 77: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, page_type_source, page_type_reason FROM pages ORDER BY id`); !slices.Equal(got, []string{
+		"pg-listing | auto | default", "pg-rule | auto | default", "pg-user | manual | user",
+	}) {
+		t.Fatalf("the down left the pages as %v, want a rule's reason taken back to the default", got)
+	}
+	if got := columnOf(t, store, "pages", "page_type_rule_id"); got != "" {
+		t.Fatalf("the down kept page_type_rule_id: %q", got)
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)

@@ -150,7 +150,8 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	modelProfiles := profiles.New(sqlite.NewModelProfileRepo(store), siteRepo, built, now)
 	templateService := templates.New(templateRepo, pageRepo, entityRepo, siteRepo, sqlite.NewPageTypeRepo(store), store, bus, now)
 	types := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
+		Pages: pageRepo, Templates: templateRepo,
 		Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now,
 	})
 	if seedErr := types.Seed(t.Context(), owner.ID); seedErr != nil {

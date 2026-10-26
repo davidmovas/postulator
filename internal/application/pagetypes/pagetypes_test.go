@@ -33,9 +33,9 @@ func newHarness(t *testing.T) harness {
 	other := sqlitetest.Site(t, store, "other")
 	recorder := &applicationtest.Recorder{}
 	service := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
-		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: recorder,
-		Clock: clock.NewFake(time.Date(2026, time.October, 18, 9, 0, 0, 0, time.UTC)),
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
+		Pages: sqlite.NewPageRepo(store), Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store,
+		Publisher: recorder, Clock: clock.NewFake(time.Date(2026, time.October, 18, 9, 0, 0, 0, time.UTC)),
 	})
 	h := harness{service: service, store: store, recorder: recorder, siteID: owner.ID, otherID: other.ID}
 	for _, site := range []string{owner.ID, other.ID} {

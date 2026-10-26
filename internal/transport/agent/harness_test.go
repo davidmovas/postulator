@@ -153,7 +153,8 @@ func briefsOver(store *sqlite.Store, publisher application.Publisher, now clock.
 	linkRepo := sqlite.NewPageLinkRepo(store)
 	templateRepo := sqlite.NewTemplateRepo(store)
 	types := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
+		Pages: pageRepo, Templates: templateRepo,
 		Sites: siteRepo, UnitOfWork: store, Publisher: publisher, Clock: now,
 	})
 	audits := reports.New(reports.Deps{
@@ -201,7 +202,8 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 		sqlite.NewPageTypeRepo(store), store, bus, now)
 	registered := tools.New(tools.Deps{
 		Sites: sites.New(siteRepo, nil, store, pagetypes.New(pagetypes.Deps{
-			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: sqlite.NewTemplateRepo(store),
+			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
+			Pages: pageRepo, Templates: sqlite.NewTemplateRepo(store),
 			Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now,
 		}), nil, bus, now),
 		Pages: pages.New(pages.Deps{

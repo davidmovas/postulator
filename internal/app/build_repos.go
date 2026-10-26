@@ -30,6 +30,7 @@ type repos struct {
 	findings      *sqlite.FindingRepo
 	pageTypes     *sqlite.PageTypeRepo
 	scopes        *sqlite.FieldScopeRepo
+	rules         *sqlite.PageTypeRuleRepo
 	templates     *sqlite.TemplateRepo
 	overrides     *sqlite.ModelCatalogRepo
 	profiles      *sqlite.ModelProfileRepo
@@ -86,6 +87,7 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		findings:      sqlite.NewFindingRepo(store),
 		pageTypes:     sqlite.NewPageTypeRepo(store),
 		scopes:        sqlite.NewFieldScopeRepo(store),
+		rules:         sqlite.NewPageTypeRuleRepo(store),
 		templates:     sqlite.NewTemplateRepo(store),
 		overrides:     sqlite.NewModelCatalogRepo(store),
 		profiles:      sqlite.NewModelProfileRepo(store),

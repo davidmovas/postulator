@@ -39,6 +39,7 @@ type scopeStore interface {
 }
 
 type pageStore interface {
+	Get(ctx context.Context, id string) (pagemap.Page, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 	ReassignType(ctx context.Context, fromTypeID, toTypeID string, reason pagemap.TypeReason, at time.Time) (int64, error)
 }
@@ -59,6 +60,7 @@ type unitOfWork interface {
 type Deps struct {
 	Types      typeStore
 	Scopes     scopeStore
+	Rules      ruleStore
 	Pages      pageStore
 	Templates  templateReader
 	Sites      siteReader
@@ -109,7 +111,7 @@ func (s *Service) Seed(ctx context.Context, siteID string) error {
 				return insertErr
 			}
 		}
-		return nil
+		return s.seedRules(c, siteID)
 	})
 }
 
@@ -319,6 +321,9 @@ func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse
 		var reassignErr error
 		if moved, reassignErr = s.deps.Pages.ReassignType(c, kind.ID, target.ID, pagemap.TypeByUser, s.now()); reassignErr != nil {
 			return reassignErr
+		}
+		if repointErr := s.repointRules(c, kind.SiteID, kind.ID, target); repointErr != nil {
+			return repointErr
 		}
 		return s.deps.Types.Delete(c, kind.ID)
 	})

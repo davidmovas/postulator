@@ -13,13 +13,14 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const (
-	pageColumns       = `id, site_id, path, planned_path, planned_trail, row_key, slug, parent_page_id, parent_reason, parent_method, parent_source, page_type_id, page_type_source, page_type_reason, technical_reason, read_only_reason, wp_type, wp_id, title, h1, meta_title, meta_description, keywords, notes, status, entity_id, template_id, wp_modified_at, last_synced_at, created_at, updated_at`
-	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	pageColumns       = `id, site_id, path, planned_path, planned_trail, row_key, slug, parent_page_id, parent_reason, parent_method, parent_source, page_type_id, page_type_source, page_type_reason, page_type_rule_id, technical_reason, read_only_reason, wp_type, wp_id, title, h1, meta_title, meta_description, keywords, notes, status, entity_id, template_id, wp_modified_at, last_synced_at, created_at, updated_at`
+	insertPage        = `INSERT INTO pages (` + pageColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updatePage        = `UPDATE pages SET path = ?, planned_path = ?, planned_trail = ?, row_key = ?, slug = ?, parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, wp_type = ?, wp_id = ?, title = ?, h1 = ?, meta_title = ?, meta_description = ?, keywords = ?, notes = ?, status = ?, entity_id = ?, template_id = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
 	setParentSource   = `UPDATE pages SET parent_source = ?, updated_at = ? WHERE id = ?`
 	setRowKey         = `UPDATE pages SET row_key = ?, planned_trail = CASE WHEN planned_trail = '[]' THEN ? ELSE planned_trail END, updated_at = ? WHERE id = ? AND site_id = ?`
@@ -27,9 +28,10 @@ const (
 	updateDerived     = `UPDATE pages SET parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, status = ?, updated_at = ? WHERE id = ?`
 	followObservedH1  = `UPDATE pages SET h1 = ?, updated_at = ? WHERE id = ? AND h1 = ? AND h1 <> ?`
 	updatePublished   = `UPDATE pages SET wp_id = ?, status = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
-	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE id = ?`
+	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, page_type_rule_id = '', updated_at = ? WHERE id = ?`
 	autoPageType      = `UPDATE pages SET page_type_id = ?, page_type_source = 'auto', page_type_reason = ?, updated_at = ? WHERE id = ? AND page_type_id IS NULL`
-	reassignPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, updated_at = ? WHERE page_type_id = ?`
+	reassignPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, page_type_rule_id = '', updated_at = ? WHERE page_type_id = ?`
+	classifyPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'auto', page_type_reason = ?, page_type_rule_id = ?, updated_at = ? WHERE id = ? AND page_type_id IS ? AND page_type_source = ? AND page_type_reason = ? AND page_type_rule_id = ?`
 	deletePage        = `DELETE FROM pages WHERE id = ?`
 	selectPage        = `SELECT ` + pageColumns + ` FROM pages WHERE id = ?`
 	selectPagesBySite = `SELECT ` + pageColumns + ` FROM pages WHERE site_id = ? ORDER BY path, id`
@@ -126,7 +128,7 @@ func (r *PageRepo) Insert(ctx context.Context, p pagemap.Page) error {
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertPage, []any{
 		p.ID, p.SiteID, p.Path, p.PlannedPath, plan.trail, p.RowKey, p.Slug, nullString(p.ParentPageID),
 		storedParentReason(p.ParentReason), string(p.ParentMethod), storedParentSource(p.ParentSource),
-		nullString(p.PageTypeID), string(p.TypeSource), string(p.TypeReason),
+		nullString(p.PageTypeID), string(p.TypeSource), string(p.TypeReason), p.TypeRuleID,
 		string(p.TechnicalReason), string(p.ReadOnlyReason), string(p.WPType), nullInt(p.WPID),
 		p.Title, p.H1, p.MetaTitle, p.MetaDescription, keywords, notes, string(p.Status), nullString(p.EntityID), nullString(p.TemplateID),
 		nullTime(p.WPModifiedAt), nullTime(p.LastSyncedAt), formatTime(p.CreatedAt), formatTime(p.UpdatedAt),
@@ -182,6 +184,21 @@ func (r *PageRepo) AutoType(ctx context.Context, pageID, typeID string, reason p
 
 func (r *PageRepo) ReassignType(ctx context.Context, fromTypeID, toTypeID string, reason pagemap.TypeReason, at time.Time) (int64, error) {
 	return execWrite(ctx, r.store.writeFrom(ctx), reassignPageType, []any{toTypeID, string(reason), formatTime(at), fromTypeID}, nil, "reassign the pages of a type")
+}
+
+func (r *PageRepo) Classify(ctx context.Context, pageID string, was, now pagetype.Assignment, at time.Time) (bool, error) {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), classifyPageType, []any{
+		now.TypeID, string(now.Reason), now.RuleID, formatTime(at),
+		pageID, nullString(optional(was.TypeID)), string(was.Source), string(was.Reason), was.RuleID,
+	}, nil, "type the page by the site's rules")
+	return affected == 1, err
+}
+
+func optional(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func (r *PageRepo) Delete(ctx context.Context, id string) error {
@@ -264,7 +281,7 @@ func scanPage(rows *sql.Rows) (pagemap.Page, error) {
 		keywords, notes                string
 	)
 	if err := rows.Scan(&p.ID, &p.SiteID, &p.Path, &p.PlannedPath, &trail, &p.RowKey, &p.Slug, &parentID, &parentReason, &parentMethod, &parentSource,
-		&pageTypeID, &typeSource, &typeReason, &technicalReason, &readOnlyReason,
+		&pageTypeID, &typeSource, &typeReason, &p.TypeRuleID, &technicalReason, &readOnlyReason,
 		&wpType, &wpID, &p.Title, &p.H1, &p.MetaTitle, &p.MetaDescription,
 		&keywords, &notes, &status, &entityID, &templateID, &wpModifiedAt, &lastSyncedAt, &createdAt, &updatedAt); err != nil {
 		return pagemap.Page{}, err

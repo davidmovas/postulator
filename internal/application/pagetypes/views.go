@@ -34,6 +34,26 @@ type Scope struct {
 	Stored      bool             `json:"stored"`
 }
 
+type Rule struct {
+	ID         string              `json:"id"`
+	SiteID     string              `json:"siteId"`
+	Kind       string              `json:"kind"`
+	Number     int                 `json:"number"`
+	Name       string              `json:"name"`
+	Enabled    bool                `json:"enabled"`
+	TypeID     string              `json:"typeId"`
+	Conditions pagetype.Conditions `json:"conditions"`
+	CreatedAt  dto.Time            `json:"createdAt"`
+	UpdatedAt  dto.Time            `json:"updatedAt"`
+}
+
+func ruleView(rule pagetype.Rule, number int) Rule {
+	return Rule{
+		ID: rule.ID, SiteID: rule.SiteID, Kind: string(rule.Kind), Number: number, Name: rule.Name, Enabled: rule.Enabled,
+		TypeID: rule.TypeID, Conditions: rule.Conditions, CreatedAt: dto.NewTime(rule.CreatedAt), UpdatedAt: dto.NewTime(rule.UpdatedAt),
+	}
+}
+
 type Field struct {
 	Key        string `json:"key"`
 	Read       string `json:"read"`

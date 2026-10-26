@@ -1,6 +1,36 @@
 package pagetypes
 
-import "github.com/davidmovas/postulator/internal/domain/field"
+import (
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
+)
+
+type ListRulesRequest struct {
+	SiteID string `json:"siteId"`
+}
+
+type RulesResponse struct {
+	Rules    []Rule `json:"rules"`
+	Fallback *Rule  `json:"fallback"`
+}
+
+type SaveRuleRequest struct {
+	ID         string              `json:"id,omitempty"`
+	SiteID     string              `json:"siteId"`
+	Name       string              `json:"name"`
+	Enabled    bool                `json:"enabled"`
+	TypeID     string              `json:"typeId"`
+	Conditions pagetype.Conditions `json:"conditions"`
+}
+
+type DeleteRuleRequest struct {
+	ID string `json:"id"`
+}
+
+type ReorderRulesRequest struct {
+	SiteID  string   `json:"siteId"`
+	RuleIDs []string `json:"ruleIds"`
+}
 
 type ListRequest struct {
 	SiteID string `json:"siteId"`

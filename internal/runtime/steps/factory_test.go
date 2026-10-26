@@ -120,7 +120,7 @@ func typedSite(t *testing.T, store *sqlite.Store, siteID string, rules field.Lin
 	t.Helper()
 
 	service := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: sqlite.NewPageRepo(store),
 		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: silentPublisher{}, Clock: clock.System{},
 	})
 	if err := service.Seed(t.Context(), siteID); err != nil {
