@@ -209,7 +209,7 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 		Pages: pages.New(pages.Deps{
 			Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
 			Bodies: sqlite.NewPageBodyRepo(store), Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),
-			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+			Rows: sqlite.NewPageMapRepo(store), UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 		}),
 		Templates: templateService,
 		Reports: reports.New(reports.Deps{

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Masterminds/squirrel"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/dbx"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -188,6 +189,43 @@ func (r *PageRepo) Classify(ctx context.Context, pageID string, was, now pagetyp
 	return affected == 1, err
 }
 
+func (r *PageRepo) SetTypes(ctx context.Context, siteID string, pageIDs []string, typeID string, reason pagemap.TypeReason, at time.Time) (int64, error) {
+	if len(pageIDs) == 0 {
+		return 0, nil
+	}
+	args := append([]any{typeID, string(reason), formatTime(at), siteID, typeID, string(reason)}, idArgs(pageIDs)...)
+	return execWrite(ctx, r.store.writeFrom(ctx), `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?,
+		page_type_rule_id = '', updated_at = ? WHERE site_id = ? AND NOT (page_type_id IS ? AND page_type_source = 'manual' AND page_type_reason = ?)
+		AND id IN (`+placeholders(len(pageIDs))+`)`, args, nil, "type the chosen pages")
+}
+
+func (r *PageRepo) ClearTypes(ctx context.Context, siteID string, pageIDs []string, at time.Time) (int64, error) {
+	if len(pageIDs) == 0 {
+		return 0, nil
+	}
+	args := append([]any{formatTime(at), siteID}, idArgs(pageIDs)...)
+	return execWrite(ctx, r.store.writeFrom(ctx), `UPDATE pages SET page_type_id = NULL, page_type_source = '', page_type_reason = '',
+		page_type_rule_id = '', updated_at = ? WHERE site_id = ? AND id IN (`+placeholders(len(pageIDs))+`)`, args, nil,
+		"hand the chosen pages back to the rules")
+}
+
+func (r *PageRepo) SetTemplates(ctx context.Context, siteID string, pageIDs []string, templateID *string, at time.Time) (int64, error) {
+	if len(pageIDs) == 0 {
+		return 0, nil
+	}
+	args := append([]any{nullString(templateID), formatTime(at), siteID, nullString(templateID)}, idArgs(pageIDs)...)
+	return execWrite(ctx, r.store.writeFrom(ctx), `UPDATE pages SET template_id = ?, updated_at = ?
+		WHERE site_id = ? AND template_id IS NOT ? AND id IN (`+placeholders(len(pageIDs))+`)`, args, nil, "set the chosen pages' template")
+}
+
+func idArgs(ids []string) []any {
+	out := make([]any, 0, len(ids))
+	for _, pageID := range ids {
+		out = append(out, pageID)
+	}
+	return out
+}
+
 func optional(value string) *string {
 	if value == "" {
 		return nil
@@ -219,8 +257,11 @@ func (r *PageRepo) ListByIDs(ctx context.Context, ids []string) ([]pagemap.Page,
 
 func pageKeyset(q pagemap.Query) paging.Keyset[pagemap.Page] {
 	key := paging.TimeKey[pagemap.Page]("createdAt", "created_at", func(p pagemap.Page) any { return p.CreatedAt })
-	if q.Sort == pagemap.SortPath {
+	switch q.Sort {
+	case pagemap.SortPath:
 		key = paging.TextKey[pagemap.Page]("path", "path", func(p pagemap.Page) any { return p.Path })
+	case pagemap.SortTitle:
+		key = paging.TextKey[pagemap.Page]("title", "title", func(p pagemap.Page) any { return p.Title })
 	}
 	return paging.Keyset[pagemap.Page]{
 		IDColumn: "id",
@@ -230,8 +271,7 @@ func pageKeyset(q pagemap.Query) paging.Keyset[pagemap.Page] {
 	}
 }
 
-func (r *PageRepo) List(ctx context.Context, q pagemap.Query, page paging.Request) (paging.List[pagemap.Page], error) {
-	builder := squirrel.Select(pageColumns).From("pages")
+func filtered(builder squirrel.SelectBuilder, q pagemap.Query) squirrel.SelectBuilder {
 	if q.SiteID != "" {
 		builder = builder.Where(squirrel.Eq{"site_id": q.SiteID})
 	}
@@ -247,8 +287,51 @@ func (r *PageRepo) List(ctx context.Context, q pagemap.Query, page paging.Reques
 	if q.PathPrefix != "" {
 		builder = builder.Where(`path LIKE ? ESCAPE '\'`, escapeLike(q.PathPrefix)+"%")
 	}
+	if q.PageTypeID != "" {
+		builder = builder.Where(`EXISTS (SELECT 1 FROM page_map AS m WHERE m.page_id = pages.id AND m.type_id = ?)`, q.PageTypeID)
+	}
+	if q.Trail != "" {
+		builder = builder.Where(`EXISTS (SELECT 1 FROM page_map AS m WHERE m.page_id = pages.id AND m.trail LIKE ? ESCAPE '\')`,
+			escapeLike(q.Trail)+"%")
+	}
+	if q.Search != "" {
+		builder = builder.Where(`EXISTS (SELECT 1 FROM page_map AS m WHERE m.page_id = pages.id AND (instr(m.title_key, ?) > 0 OR instr(m.path_key, ?) > 0))`,
+			q.Search, q.Search)
+	}
+	switch q.Body {
+	case pagemap.BodyWith:
+		builder = builder.Where(`EXISTS (SELECT 1 FROM page_bodies AS b WHERE b.page_id = pages.id AND b.side = 'current' AND b.raw <> '')`)
+	case pagemap.BodyWithout:
+		builder = builder.Where(`NOT EXISTS (SELECT 1 FROM page_bodies AS b WHERE b.page_id = pages.id AND b.side = 'current' AND b.raw <> '')`)
+	}
+	if q.Findings {
+		builder = builder.Where(`EXISTS (SELECT 1 FROM findings AS f WHERE f.page_id = pages.id AND f.status = 'open')`)
+	}
+	return builder
+}
 
-	return selectKeyed(ctx, r.store.execFrom(ctx), builder, pageKeyset(q), page, scanPage, "pages")
+func (r *PageRepo) List(ctx context.Context, q pagemap.Query, page paging.Request) (paging.List[pagemap.Page], error) {
+	return selectKeyed(ctx, r.store.execFrom(ctx), filtered(squirrel.Select(pageColumns).From("pages"), q), pageKeyset(q), page, scanPage, "pages")
+}
+
+func (r *PageRepo) Count(ctx context.Context, q pagemap.Query) (int, error) {
+	query, args, err := filtered(squirrel.Select("count(*)").From("pages"), q).ToSql()
+	if err != nil {
+		return 0, errors.Wrap(err, errors.Internal, "build the page count")
+	}
+	var count int
+	if scanErr := r.store.execFrom(ctx).QueryRowContext(ctx, query, args...).Scan(&count); scanErr != nil {
+		return 0, dbx.Convert(scanErr, "count the pages")
+	}
+	return count, nil
+}
+
+func (r *PageRepo) IDs(ctx context.Context, q pagemap.Query) ([]string, error) {
+	query, args, err := filtered(squirrel.Select("id").From("pages"), q).OrderBy("path", "id").ToSql()
+	if err != nil {
+		return nil, errors.Wrap(err, errors.Internal, "build the page ids")
+	}
+	return selectAll(ctx, r.store.execFrom(ctx), query, args, scanText, "list the pages' ids")
 }
 
 func storedParentReason(reason pagemap.ParentReason) string {

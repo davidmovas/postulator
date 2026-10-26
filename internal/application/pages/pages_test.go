@@ -1,6 +1,7 @@
 package pages_test
 
 import (
+	"context"
 	"encoding/json"
 	stderrors "errors"
 	"maps"
@@ -28,11 +29,26 @@ import (
 )
 
 type harness struct {
-	service  *pages.Service
-	store    *sqlite.Store
-	recorder *applicationtest.Recorder
-	clock    *clock.Fake
-	siteID   string
+	service    *pages.Service
+	store      *sqlite.Store
+	recorder   *applicationtest.Recorder
+	clock      *clock.Fake
+	classifier *fakeClassifier
+	siteID     string
+}
+
+type fakeClassifier struct {
+	matches      map[string][]string
+	reclassified [][]string
+}
+
+func (f *fakeClassifier) Matching(_ context.Context, _, ruleID string) ([]string, error) {
+	return f.matches[ruleID], nil
+}
+
+func (f *fakeClassifier) Reclassify(_ context.Context, _ string, pageIDs []string) (int, error) {
+	f.reclassified = append(f.reclassified, pageIDs)
+	return len(pageIDs), nil
 }
 
 func newHarness(t *testing.T) harness {
@@ -48,17 +64,20 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	owner := sqlitetest.Site(t, store, "shop")
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
+	classifier := &fakeClassifier{matches: map[string][]string{}}
 	return harness{
 		service: pages.New(pages.Deps{
 			Pages: sqlite.NewPageRepo(store), Types: sqlite.NewPageTypeRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
 			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
 			Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),
-			Findings: sqlite.NewFindingRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
+			Findings: sqlite.NewFindingRepo(store), Rows: sqlite.NewPageMapRepo(store), Classifier: classifier,
+			Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
 		}),
-		store:    store,
-		recorder: recorder,
-		clock:    clk,
-		siteID:   owner.ID,
+		store:      store,
+		recorder:   recorder,
+		clock:      clk,
+		classifier: classifier,
+		siteID:     owner.ID,
 	}
 }
 
@@ -583,7 +602,7 @@ func TestListAndTree(t *testing.T) {
 	if _, err = h.service.List(t.Context(), pages.ListRequest{SiteID: h.siteID, Status: "lost"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("bad status code = %q, want INVALID", errors.CodeOf(err))
 	}
-	if _, err = h.service.List(t.Context(), pages.ListRequest{ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: "title"}}, SiteID: h.siteID}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.List(t.Context(), pages.ListRequest{ListRequest: dto.ListRequest{Sort: &dto.Sort{Field: "wpType"}}, SiteID: h.siteID}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("bad sort code = %q, want INVALID", errors.CodeOf(err))
 	}
 	if _, err = h.service.List(t.Context(), pages.ListRequest{}); !errors.IsCode(err, errors.Invalid) {

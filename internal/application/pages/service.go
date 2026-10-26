@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -13,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -24,8 +26,32 @@ type pageStore interface {
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	List(ctx context.Context, q pagemap.Query, page paging.Request) (paging.List[pagemap.Page], error)
+	Count(ctx context.Context, q pagemap.Query) (int, error)
+	IDs(ctx context.Context, q pagemap.Query) ([]string, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	ListByIDs(ctx context.Context, ids []string) ([]pagemap.Page, error)
 	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+	SetTypes(ctx context.Context, siteID string, pageIDs []string, typeID string, reason pagemap.TypeReason, at time.Time) (int64, error)
+	ClearTypes(ctx context.Context, siteID string, pageIDs []string, at time.Time) (int64, error)
+	SetTemplates(ctx context.Context, siteID string, pageIDs []string, templateID *string, at time.Time) (int64, error)
+}
+
+type mapRefresher interface {
+	Refresh(ctx context.Context, siteID string) error
+}
+
+type mapRows interface {
+	ListByIDs(ctx context.Context, pageIDs []string) ([]contextpack.MapRow, error)
+	IDsUnder(ctx context.Context, siteID, trail, typeID string) ([]string, error)
+}
+
+type classifier interface {
+	Matching(ctx context.Context, siteID, ruleID string) ([]string, error)
+	Reclassify(ctx context.Context, siteID string, pageIDs []string) (int, error)
+}
+
+type templateReader interface {
+	Get(ctx context.Context, id string) (template.Template, error)
 }
 
 type typeReader interface {
@@ -81,6 +107,10 @@ type Deps struct {
 	Fields     fieldReader
 	Renders    renderReader
 	Findings   findingClearer
+	Maps       mapRefresher
+	Rows       mapRows
+	Classifier classifier
+	Templates  templateReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock
@@ -88,26 +118,32 @@ type Deps struct {
 }
 
 type Service struct {
-	pages     pageStore
-	types     typeReader
-	links     linkReader
-	entities  entityStore
-	edges     edgeReader
-	sites     siteReader
-	bodies    bodyReader
-	fields    fieldReader
-	renders   renderReader
-	findings  findingClearer
-	uow       unitOfWork
-	publisher application.Publisher
-	clock     clock.Clock
-	preview   previewIssuer
+	pages      pageStore
+	types      typeReader
+	links      linkReader
+	entities   entityStore
+	edges      edgeReader
+	sites      siteReader
+	bodies     bodyReader
+	fields     fieldReader
+	renders    renderReader
+	findings   findingClearer
+	maps       mapRefresher
+	rows       mapRows
+	classifier classifier
+	templates  templateReader
+	uow        unitOfWork
+	publisher  application.Publisher
+	clock      clock.Clock
+	preview    previewIssuer
 }
 
 func New(deps Deps) *Service {
 	return &Service{
 		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
-		bodies: deps.Bodies, fields: deps.Fields, renders: deps.Renders, findings: deps.Findings, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
+		bodies: deps.Bodies, fields: deps.Fields, renders: deps.Renders, findings: deps.Findings, maps: deps.Maps, rows: deps.Rows,
+		classifier: deps.Classifier, templates: deps.Templates, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock,
+		preview: deps.Preview,
 	}
 }
 

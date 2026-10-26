@@ -581,7 +581,7 @@ export type SettingGroup = (typeof settingGroups)[number];
 export const entitySortFields = ["createdAt", "name"] as const;
 export type EntitySortField = (typeof entitySortFields)[number];
 
-export const pageSortFields = ["createdAt", "path"] as const;
+export const pageSortFields = ["createdAt", "path", "title"] as const;
 export type PageSortField = (typeof pageSortFields)[number];
 
 export const runSortFields = ["createdAt", "status"] as const;

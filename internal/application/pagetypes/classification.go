@@ -274,6 +274,41 @@ func (c *Classification) Apply(ctx context.Context, req ApplyRequest) (ApplyResp
 	return out, nil
 }
 
+func (c *Classification) Reclassify(ctx context.Context, siteID string, pageIDs []string) (int, error) {
+	state, err := c.classify(ctx, siteID)
+	if err != nil {
+		return 0, err
+	}
+	wanted := make(map[string]bool, len(pageIDs))
+	for _, pageID := range pageIDs {
+		wanted[pageID] = true
+	}
+	outcomes := pagetype.NewClassifier(state.rules, state.set).Classify(state.facts, pagetype.ModeWalk)
+	pending := make([]*pagetype.Outcome, 0, len(pageIDs))
+	for i := range outcomes {
+		if outcome := &outcomes[i]; wanted[outcome.PageID] && outcome.Changed() {
+			pending = append(pending, outcome)
+		}
+	}
+	paths := make(map[string]string, len(state.facts))
+	for i := range state.facts {
+		paths[state.facts[i].PageID] = state.facts[i].Path
+	}
+	typed := 0
+	for start := 0; start < len(pending); start += ApplyBatch {
+		batch := pending[start:min(start+ApplyBatch, len(pending))]
+		err = c.deps.UnitOfWork.Do(ctx, func(u context.Context) error {
+			moved, _, batchErr := c.applyBatch(u, siteID, batch, state.set, paths)
+			typed += moved
+			return batchErr
+		})
+		if err != nil {
+			return typed, err
+		}
+	}
+	return typed, nil
+}
+
 func chosenGroups(groups []PreviewGroup, asked []GroupKey) (map[GroupKey]bool, error) {
 	chosen := make(map[GroupKey]bool, len(groups))
 	if len(asked) == 0 {

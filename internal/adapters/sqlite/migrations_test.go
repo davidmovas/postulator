@@ -19,7 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 78
+const latestMigration = 79
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -100,6 +100,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0076_page_type_presets.sql",
 		"0077_page_type_rules.sql",
 		"0078_pages_type_rule.sql",
+		"0079_pages_site_title.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)

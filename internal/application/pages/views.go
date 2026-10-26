@@ -35,6 +35,7 @@ type Page struct {
 	PageTypeID      *string       `json:"pageTypeId"`
 	TypeSource      string        `json:"typeSource"`
 	TypeReason      string        `json:"typeReason"`
+	TypeRuleID      string        `json:"typeRuleId"`
 	WPModifiedAt    dto.Time      `json:"wpModifiedAt"`
 	LastSyncedAt    dto.Time      `json:"lastSyncedAt"`
 	Drift           bool          `json:"drift"`
@@ -94,6 +95,7 @@ func view(p pagemap.Page, shown annotations) Page {
 		PageTypeID:      p.PageTypeID,
 		TypeSource:      string(p.TypeSource),
 		TypeReason:      string(p.TypeReason),
+		TypeRuleID:      p.TypeRuleID,
 		WPModifiedAt:    dto.TimeOf(p.WPModifiedAt),
 		LastSyncedAt:    dto.TimeOf(p.LastSyncedAt),
 		Drift:           shown.drifted[p.ID],

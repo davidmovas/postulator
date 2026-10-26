@@ -55,6 +55,16 @@ func (r *PageMapRepo) ListByIDs(ctx context.Context, pageIDs []string) ([]contex
 	return selectByIDs(ctx, r.store.execFrom(ctx), selectMapIDs, orderMapIDs, pageIDs, scanMapRow, "list the map rows of the pages")
 }
 
+func (r *PageMapRepo) IDsUnder(ctx context.Context, siteID, trail, typeID string) ([]string, error) {
+	query := `SELECT page_id FROM page_map WHERE site_id = ? AND trail LIKE ? ESCAPE '\'`
+	args := []any{siteID, escapeLike(trail) + "%"}
+	if typeID != "" {
+		query += ` AND type_id = ?`
+		args = append(args, typeID)
+	}
+	return selectAll(ctx, r.store.execFrom(ctx), query+` ORDER BY trail, page_id`, args, scanText, "list the pages under a node")
+}
+
 func (r *PageMapRepo) Write(ctx context.Context, siteID string, moved []contextpack.MapRow, gone []string, generation int64) error {
 	return r.store.Do(ctx, func(c context.Context) error {
 		exec := r.store.writeFrom(c)
