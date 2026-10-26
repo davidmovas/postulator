@@ -89,6 +89,34 @@ func TestThePagesAreFilteredByTypeTextFindingsAndSubtreeAndTypedInBulk(t *testin
 			t.Errorf("%s: Count = %d %v, want %d", name, count, countErr, len(tc.want))
 		}
 	}
+	maps := sqlite.NewPageMapRepo(store)
+	within := func(parentID, typeID string) []string {
+		t.Helper()
+		listed, listErr := maps.List(t.Context(), contextpack.MapRowQuery{SiteID: owner.ID, ParentID: &parentID, Within: typeID}, paging.Request{Limit: 50})
+		if listErr != nil {
+			t.Fatalf("List within %s: %v", typeID, listErr)
+		}
+		out := make([]string, 0, len(listed.Items))
+		for i := range listed.Items {
+			out = append(out, listed.Items[i].Path)
+		}
+		return out
+	}
+	for name, tc := range map[string]struct {
+		parent, typeID string
+		want           []string
+	}{
+		"the roots that hold a guide":    {"", "guide-type", []string{home.Path}},
+		"the front page's guides":        {home.ID, "guide-type", []string{guide.Path}},
+		"the front page's categories":    {home.ID, "category-type", []string{hub.Path}},
+		"a category's categories":        {hub.ID, "category-type", []string{child.Path}},
+		"a category that holds no guide": {hub.ID, "guide-type", []string{}},
+	} {
+		if got := within(tc.parent, tc.typeID); !slices.Equal(got, tc.want) {
+			t.Errorf("%s = %v, want %v", name, got, tc.want)
+		}
+	}
+
 	ids, err := repo.IDs(t.Context(), pagemap.Query{SiteID: owner.ID, PageTypeID: "category-type"})
 	if err != nil || len(ids) != 2 {
 		t.Fatalf("IDs = %v %v", ids, err)

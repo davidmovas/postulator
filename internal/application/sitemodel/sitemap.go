@@ -21,6 +21,7 @@ type MapRequest struct {
 	ParentID   string        `json:"parentId,omitempty"`
 	Search     string        `json:"search,omitempty"`
 	PageTypeID string        `json:"pageTypeId,omitempty"`
+	Within     string        `json:"within,omitempty"`
 	Cursor     paging.Cursor `json:"cursor,omitempty"`
 	Limit      int           `json:"limit,omitempty"`
 }
@@ -88,7 +89,7 @@ func (s *Service) siteMap(ctx context.Context, req MapRequest) (MapView, error) 
 		}
 		parent = &row
 	}
-	q := contextpack.MapRowQuery{SiteID: req.SiteID}
+	q := contextpack.MapRowQuery{SiteID: req.SiteID, Within: req.Within}
 	searching := req.Search != "" || req.PageTypeID != ""
 	switch {
 	case searching:

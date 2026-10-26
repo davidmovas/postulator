@@ -405,7 +405,10 @@ func (r mapReader) ListByIDs(_ context.Context, ids []string) ([]contextpack.Map
 }
 
 func (r mapReader) List(_ context.Context, q contextpack.MapRowQuery, page paging.Request) (paging.List[contextpack.MapRow], error) {
-	rows := slices.DeleteFunc(r.m.rows(), func(row contextpack.MapRow) bool { return !q.Holds(row) })
+	every := r.m.rows()
+	rows := slices.DeleteFunc(slices.Clone(every), func(row contextpack.MapRow) bool {
+		return !q.Holds(row) || q.Within != "" && !row.Holding(every, q.Within)
+	})
 	slices.SortFunc(rows, func(a, b contextpack.MapRow) int {
 		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.PageID, b.PageID))
 	})

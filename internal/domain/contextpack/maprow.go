@@ -35,6 +35,7 @@ type MapRowQuery struct {
 	Under    string
 	Text     string
 	TypeID   string
+	Within   string
 }
 
 func (r MapRow) Ancestors() []string {
@@ -52,6 +53,18 @@ func (r MapRow) Mentions(text string) bool {
 
 func (r MapRow) Typed(typeID string) bool {
 	return r.TypeID == typeID || (r.TwinID != "" && r.TwinTypeID == typeID)
+}
+
+func (r MapRow) Holding(rows []MapRow, typeID string) bool {
+	if r.Typed(typeID) {
+		return true
+	}
+	for i := range rows {
+		if rows[i].SiteID == r.SiteID && rows[i].TypeID == typeID && len(rows[i].Trail) > len(r.Trail) && strings.HasPrefix(rows[i].Trail, r.Trail) {
+			return true
+		}
+	}
+	return false
 }
 
 func (q MapRowQuery) Holds(r MapRow) bool {

@@ -25,10 +25,13 @@ const (
 		twin_id = excluded.twin_id, hub_id = excluded.hub_id, node = excluded.node, type_id = excluded.type_id,
 		twin_type_id = excluded.twin_type_id, title = excluded.title, title_key = excluded.title_key, path_key = excluded.path_key,
 		twin_title_key = excluded.twin_title_key, twin_path_key = excluded.twin_path_key`
-	deleteMapRow  = `DELETE FROM page_map WHERE page_id = ? AND site_id = ?`
-	markMapBuilt  = `UPDATE page_map_sites SET built = max(built, ?) WHERE site_id = ?`
-	trailCeiling  = "0"
-	textCondition = `(instr(title_key, ?) > 0 OR instr(path_key, ?) > 0 OR instr(twin_title_key, ?) > 0 OR instr(twin_path_key, ?) > 0)`
+	deleteMapRow    = `DELETE FROM page_map WHERE page_id = ? AND site_id = ?`
+	markMapBuilt    = `UPDATE page_map_sites SET built = max(built, ?) WHERE site_id = ?`
+	trailCeiling    = "0"
+	textCondition   = `(instr(title_key, ?) > 0 OR instr(path_key, ?) > 0 OR instr(twin_title_key, ?) > 0 OR instr(twin_path_key, ?) > 0)`
+	withinCondition = `(type_id = ? OR twin_type_id = ? OR EXISTS (SELECT 1 FROM page_map AS below
+		WHERE below.site_id = page_map.site_id AND below.type_id = ? AND below.trail > page_map.trail
+		AND below.trail < substr(page_map.trail, 1, length(page_map.trail) - 1) || '` + trailCeiling + `'))`
 )
 
 type PageMapRepo struct {
@@ -110,6 +113,9 @@ func (r *PageMapRepo) List(ctx context.Context, q contextpack.MapRowQuery, page 
 	}
 	if q.Text != "" {
 		builder = builder.Where(textCondition, q.Text, q.Text, q.Text, q.Text)
+	}
+	if q.Within != "" {
+		builder = builder.Where(withinCondition, q.Within, q.Within, q.Within)
 	}
 	return selectKeyed(ctx, r.store.execFrom(ctx), builder, mapKeyset(), page, scanMapRow, "site map")
 }
