@@ -54,6 +54,80 @@ func ruleView(rule pagetype.Rule, number int) Rule {
 	}
 }
 
+type RuleCount struct {
+	RuleID string `json:"ruleId"`
+	Pages  int    `json:"pages"`
+}
+
+type PreviewGroup struct {
+	From      string      `json:"from"`
+	To        string      `json:"to"`
+	Pages     int         `json:"pages"`
+	Retyped   bool        `json:"retyped"`
+	Rules     []RuleCount `json:"rules"`
+	DependsOn []GroupKey  `json:"dependsOn"`
+}
+
+type PreviewResponse struct {
+	SiteID    string         `json:"siteId"`
+	Hash      string         `json:"hash"`
+	Groups    []PreviewGroup `json:"groups"`
+	Moving    int            `json:"moving"`
+	Refreshed int            `json:"refreshed"`
+	Kept      int            `json:"kept"`
+	Waiting   int            `json:"waiting"`
+	Unchanged int            `json:"unchanged"`
+	ByDefault int            `json:"byDefault"`
+}
+
+type PreviewPage struct {
+	PageID    string `json:"pageId"`
+	Path      string `json:"path"`
+	From      string `json:"from"`
+	To        string `json:"to"`
+	RuleID    string `json:"ruleId"`
+	Reason    string `json:"reason"`
+	Was       string `json:"was"`
+	WasRuleID string `json:"wasRuleId"`
+}
+
+type ApplyResponse struct {
+	Moved   int `json:"moved"`
+	Changed int `json:"changed"`
+}
+
+type FactsView struct {
+	PageID    string   `json:"pageId"`
+	Path      string   `json:"path"`
+	Slug      string   `json:"slug"`
+	PostType  string   `json:"postType"`
+	Technical string   `json:"technical"`
+	FrontPage bool     `json:"frontPage"`
+	Rendered  bool     `json:"rendered"`
+	Listing   bool     `json:"listing"`
+	Products  int      `json:"products"`
+	Schema    []string `json:"schema"`
+	Words     int      `json:"words"`
+	H2        int      `json:"h2"`
+	Level     int      `json:"level"`
+	Ancestors []string `json:"ancestors"`
+}
+
+type OutcomeView struct {
+	TypeID  string `json:"typeId"`
+	RuleID  string `json:"ruleId"`
+	Reason  string `json:"reason"`
+	Waiting bool   `json:"waiting"`
+	Kept    bool   `json:"kept"`
+}
+
+type TestRuleResponse struct {
+	Verdict    string                     `json:"verdict"`
+	Conditions []pagetype.ConditionResult `json:"conditions"`
+	Facts      FactsView                  `json:"facts"`
+	Outcome    OutcomeView                `json:"outcome"`
+}
+
 type Field struct {
 	Key        string `json:"key"`
 	Read       string `json:"read"`

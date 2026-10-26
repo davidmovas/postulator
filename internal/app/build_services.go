@@ -24,12 +24,13 @@ import (
 )
 
 type authoring struct {
-	templates *templates.Service
-	pageTypes *pagetypes.Service
-	siteModel *sitemodel.Service
-	reports   *reports.Service
-	wordpress *registry.Registry
-	content   *content.Service
+	templates      *templates.Service
+	pageTypes      *pagetypes.Service
+	classification *pagetypes.Classification
+	siteModel      *sitemodel.Service
+	reports        *reports.Service
+	wordpress      *registry.Registry
+	content        *content.Service
 }
 
 type useCases struct {
@@ -70,6 +71,10 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 	return authoring{
 		templates: templateService,
 		pageTypes: pageTypes,
+		classification: pagetypes.NewClassification(pagetypes.ClassificationDeps{
+			Facts: siteModel, Types: pageTypes, Pages: stores.pages, Findings: stores.findings, UnitOfWork: stores.store,
+			Publisher: c.Events, Clock: stores.now,
+		}),
 		siteModel: siteModel,
 		reports:   reportsService,
 		wordpress: wordpress,

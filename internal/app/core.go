@@ -124,6 +124,7 @@ type kit struct {
 	Findings        *findings.Service
 	Templates       *templates.Service
 	PageTypes       *pagetypes.Service
+	Classification  *pagetypes.Classification
 	SiteModel       *sitemodel.Service
 	Content         *content.Service
 	LLM             llmport.Client
@@ -233,6 +234,7 @@ func (c *Core) assemble(ctx context.Context, store *sqlite.Store, key []byte) (k
 		Findings:        services.findings,
 		Templates:       writing.templates,
 		PageTypes:       writing.pageTypes,
+		Classification:  writing.classification,
 		SiteModel:       writing.siteModel,
 		Content:         writing.content,
 		LLM:             llm.client,

@@ -288,6 +288,14 @@ func (r renderReader) ListBySite(context.Context, string) ([]render.Record, erro
 	return slices.Clone(r.m.Renders), nil
 }
 
+func (r renderReader) ListRenderedBySite(context.Context, string) (map[string]pagetype.Rendered, error) {
+	out := make(map[string]pagetype.Rendered, len(r.m.Renders))
+	for i := range r.m.Renders {
+		out[r.m.Renders[i].PageID] = pagetype.RenderedOf(&r.m.Renders[i])
+	}
+	return out, nil
+}
+
 func (r renderReader) URLForms(context.Context, string) ([]string, error) {
 	out := make([]string, 0)
 	for i := range r.m.Renders {
@@ -332,6 +340,31 @@ func (r linkReader) ListContextual(context.Context, string) ([]pagemap.PageLink,
 
 func (r linkReader) ListBySite(context.Context, string) ([]pagemap.PageLink, error) {
 	return slices.Clone(r.m.Links), nil
+}
+
+func (r linkReader) ListedProductsBySite(context.Context, string) (map[string]int, error) {
+	products := make(map[string]bool)
+	for i := range r.m.Pages {
+		if r.m.Pages[i].WPType == pagemap.WPProduct {
+			products[r.m.Pages[i].ID] = true
+		}
+	}
+	seen := make(map[string]map[string]bool)
+	out := make(map[string]int)
+	for i := range r.m.Links {
+		link := &r.m.Links[i]
+		if link.Type != pagemap.LinkListing || link.ToPageID == nil || !products[*link.ToPageID] {
+			continue
+		}
+		if seen[link.FromPageID] == nil {
+			seen[link.FromPageID] = make(map[string]bool)
+		}
+		if !seen[link.FromPageID][*link.ToPageID] {
+			seen[link.FromPageID][*link.ToPageID] = true
+			out[link.FromPageID]++
+		}
+	}
+	return out, nil
 }
 
 type findingReader struct{ m *Memory }

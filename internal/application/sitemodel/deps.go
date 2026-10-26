@@ -74,6 +74,7 @@ type bodyStore interface {
 type renderStore interface {
 	ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error)
 	ListBySite(ctx context.Context, siteID string) ([]render.Record, error)
+	ListRenderedBySite(ctx context.Context, siteID string) (map[string]pagetype.Rendered, error)
 	URLForms(ctx context.Context, siteID string) ([]string, error)
 }
 
@@ -82,6 +83,7 @@ type linkStore interface {
 	ListToPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 	ListContextual(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
+	ListedProductsBySite(ctx context.Context, siteID string) (map[string]int, error)
 	CountContextual(ctx context.Context, pageIDs []string) (inbound, outbound map[string]int, err error)
 }
 
