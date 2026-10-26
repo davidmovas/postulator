@@ -101,14 +101,14 @@ func TestARuleIsAddedEditedMovedAndRemoved(t *testing.T) {
 		t.Errorf("an order that leaves a rule out = %v, want INVALID", err)
 	}
 
-	if err = h.service.DeleteRule(t.Context(), pagetypes.DeleteRuleRequest{ID: added.ID}); err != nil {
+	if _, err = h.service.DeleteRule(t.Context(), pagetypes.DeleteRuleRequest{ID: added.ID}); err != nil {
 		t.Fatalf("DeleteRule: %v", err)
 	}
 	after := h.rules(t, h.siteID)
 	if len(after.Rules) != 14 || !slices.Equal(numbers(after.Rules), []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}) {
 		t.Fatalf("after the delete = %v, want the others renumbered", numbers(after.Rules))
 	}
-	if err = h.service.DeleteRule(t.Context(), pagetypes.DeleteRuleRequest{ID: after.Fallback.ID}); !errors.IsCode(err, errors.Invalid) {
+	if _, err = h.service.DeleteRule(t.Context(), pagetypes.DeleteRuleRequest{ID: after.Fallback.ID}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("deleting the fallback = %v, want INVALID", err)
 	}
 	if len(h.recorder.Events()) == 0 {

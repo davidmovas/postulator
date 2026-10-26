@@ -24,6 +24,7 @@ export function aPage(id: string, path: string, overrides: Partial<Page> = {}): 
         pageTypeId: null,
         typeSource: "",
         typeReason: "",
+        typeRuleId: "",
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,

@@ -52,6 +52,7 @@ function node(id: string, drift: boolean, children: PageTreeNode[] = []): PageTr
             pageTypeId: null,
             typeSource: "",
             typeReason: "",
+            typeRuleId: "",
             wpModifiedAt: null,
             lastSyncedAt: null,
             drift,

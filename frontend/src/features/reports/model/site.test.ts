@@ -27,6 +27,7 @@ function page(overrides: Partial<Page> = {}): Page {
         pageTypeId: null,
         typeSource: "",
         typeReason: "",
+        typeRuleId: "",
         wpModifiedAt: null,
         lastSyncedAt: null,
         drift: false,

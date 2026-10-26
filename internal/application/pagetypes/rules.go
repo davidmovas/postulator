@@ -146,7 +146,7 @@ func (s *Service) makeRoom(ctx context.Context, rules []pagetype.Rule, at int, n
 	return nil
 }
 
-func (s *Service) DeleteRule(ctx context.Context, req DeleteRuleRequest) error {
+func (s *Service) DeleteRule(ctx context.Context, req DeleteRuleRequest) (DeleteRuleResponse, error) {
 	var siteID string
 	err := s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
 		rule, err := s.deps.Rules.Get(c, req.ID)
@@ -161,9 +161,9 @@ func (s *Service) DeleteRule(ctx context.Context, req DeleteRuleRequest) error {
 		return s.deps.Rules.Delete(c, rule.ID)
 	})
 	if err != nil {
-		return err
+		return DeleteRuleResponse{}, err
 	}
-	return s.changed(siteID)
+	return DeleteRuleResponse{}, s.changed(siteID)
 }
 
 func (s *Service) ReorderRules(ctx context.Context, req ReorderRulesRequest) (RulesResponse, error) {

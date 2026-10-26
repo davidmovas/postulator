@@ -24,6 +24,10 @@ type PagesUseCase interface {
 	SetCanonical(ctx context.Context, req pages.SetCanonicalRequest) (pages.SetCanonicalResponse, error)
 	PreviewLink(ctx context.Context, req pages.PreviewLinkRequest) (pages.PreviewLinkResponse, error)
 	SetType(ctx context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error)
+	Count(ctx context.Context, req pages.CountRequest) (pages.CountResponse, error)
+	Resolve(ctx context.Context, sel pages.Selection) (pages.ResolveResponse, error)
+	SetTypes(ctx context.Context, req pages.SetTypesRequest) (pages.SetTypesResponse, error)
+	SetTemplates(ctx context.Context, req pages.SetTemplatesRequest) (pages.SetTemplatesResponse, error)
 }
 
 type ModelUseCase interface {
@@ -48,6 +52,10 @@ type PagesService struct {
 	setCanonical middleware.Handler[pages.SetCanonicalRequest, pages.SetCanonicalResponse]
 	previewLink  middleware.Handler[pages.PreviewLinkRequest, pages.PreviewLinkResponse]
 	setType      middleware.Handler[pages.SetTypeRequest, pages.SetTypeResponse]
+	count        middleware.Handler[pages.CountRequest, pages.CountResponse]
+	resolve      middleware.Handler[pages.Selection, pages.ResolveResponse]
+	setTypes     middleware.Handler[pages.SetTypesRequest, pages.SetTypesResponse]
+	setTemplates middleware.Handler[pages.SetTemplatesRequest, pages.SetTemplatesResponse]
 	model        middleware.Handler[observe.ModelRequest, observe.ModelView]
 	modelSummary middleware.Handler[observe.SummaryRequest, observe.Summary]
 	writerPack   middleware.Handler[sitemodel.PackRequest, sitemodel.PackView]
@@ -69,6 +77,10 @@ func NewPagesService(
 		setCanonical: Wrap(logger, "pages.setCanonical", call(useCase, PagesUseCase.SetCanonical)),
 		previewLink:  Wrap(logger, "pages.previewLink", call(useCase, PagesUseCase.PreviewLink)),
 		setType:      Wrap(logger, "pages.setType", call(useCase, PagesUseCase.SetType)),
+		count:        Wrap(logger, "pages.count", call(useCase, PagesUseCase.Count)),
+		resolve:      Wrap(logger, "pages.resolveSelection", call(useCase, PagesUseCase.Resolve)),
+		setTypes:     Wrap(logger, "pages.setTypes", call(useCase, PagesUseCase.SetTypes)),
+		setTemplates: Wrap(logger, "pages.setTemplates", call(useCase, PagesUseCase.SetTemplates)),
 		model:        Wrap(logger, "pages.model", call(models, ModelUseCase.Model)),
 		modelSummary: Wrap(logger, "pages.modelSummary", call(models, ModelUseCase.SummaryOf)),
 		writerPack:   Wrap(logger, "pages.writerPack", call(siteModel, SiteModelUseCase.Pack)),
@@ -134,4 +146,21 @@ func (s *PagesService) PreviewLink(c context.Context, req pages.PreviewLinkReque
 
 func (s *PagesService) SetType(c context.Context, req pages.SetTypeRequest) (pages.SetTypeResponse, error) {
 	return s.setType(c, req)
+}
+
+func (s *PagesService) Count(c context.Context, req pages.CountRequest) (pages.CountResponse, error) {
+	return s.count(c, req)
+}
+
+func (s *PagesService) ResolveSelection(c context.Context, sel pages.Selection) (pages.ResolveResponse, error) {
+	return s.resolve(c, sel)
+}
+
+func (s *PagesService) SetTypes(c context.Context, req pages.SetTypesRequest) (pages.SetTypesResponse, error) {
+	req.By = ""
+	return s.setTypes(c, req)
+}
+
+func (s *PagesService) SetTemplates(c context.Context, req pages.SetTemplatesRequest) (pages.SetTemplatesResponse, error) {
+	return s.setTemplates(c, req)
 }

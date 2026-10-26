@@ -28,6 +28,8 @@ type DeleteRuleRequest struct {
 	ID string `json:"id"`
 }
 
+type DeleteRuleResponse struct{}
+
 type PreviewRequest struct {
 	SiteID string `json:"siteId"`
 }

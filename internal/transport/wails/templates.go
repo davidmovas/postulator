@@ -28,6 +28,17 @@ type PageTypesUseCase interface {
 	Save(ctx context.Context, req pagetypes.SaveRequest) (pagetypes.Type, error)
 	Delete(ctx context.Context, req pagetypes.DeleteRequest) (pagetypes.DeleteResponse, error)
 	SetScope(ctx context.Context, req pagetypes.SetScopeRequest) (pagetypes.Scope, error)
+	ListRules(ctx context.Context, req pagetypes.ListRulesRequest) (pagetypes.RulesResponse, error)
+	SaveRule(ctx context.Context, req pagetypes.SaveRuleRequest) (pagetypes.Rule, error)
+	DeleteRule(ctx context.Context, req pagetypes.DeleteRuleRequest) (pagetypes.DeleteRuleResponse, error)
+	ReorderRules(ctx context.Context, req pagetypes.ReorderRulesRequest) (pagetypes.RulesResponse, error)
+}
+
+type ClassificationUseCase interface {
+	Preview(ctx context.Context, req pagetypes.PreviewRequest) (pagetypes.PreviewResponse, error)
+	PreviewPages(ctx context.Context, req pagetypes.PreviewPagesRequest) (paging.List[pagetypes.PreviewPage], error)
+	Apply(ctx context.Context, req pagetypes.ApplyRequest) (pagetypes.ApplyResponse, error)
+	TestRule(ctx context.Context, req pagetypes.TestRuleRequest) (pagetypes.TestRuleResponse, error)
 }
 
 type TemplatesService struct {
@@ -44,9 +55,18 @@ type TemplatesService struct {
 	savePageType   middleware.Handler[pagetypes.SaveRequest, pagetypes.Type]
 	deletePageType middleware.Handler[pagetypes.DeleteRequest, pagetypes.DeleteResponse]
 	setScope       middleware.Handler[pagetypes.SetScopeRequest, pagetypes.Scope]
+	listRules      middleware.Handler[pagetypes.ListRulesRequest, pagetypes.RulesResponse]
+	saveRule       middleware.Handler[pagetypes.SaveRuleRequest, pagetypes.Rule]
+	deleteRule     middleware.Handler[pagetypes.DeleteRuleRequest, pagetypes.DeleteRuleResponse]
+	reorderRules   middleware.Handler[pagetypes.ReorderRulesRequest, pagetypes.RulesResponse]
+	preview        middleware.Handler[pagetypes.PreviewRequest, pagetypes.PreviewResponse]
+	previewPages   middleware.Handler[pagetypes.PreviewPagesRequest, paging.List[pagetypes.PreviewPage]]
+	apply          middleware.Handler[pagetypes.ApplyRequest, pagetypes.ApplyResponse]
+	testRule       middleware.Handler[pagetypes.TestRuleRequest, pagetypes.TestRuleResponse]
 }
 
-func NewTemplatesService(logger *zap.Logger, useCase Source[TemplatesUseCase], types Source[PageTypesUseCase]) *TemplatesService {
+func NewTemplatesService(logger *zap.Logger, useCase Source[TemplatesUseCase], types Source[PageTypesUseCase],
+	classification Source[ClassificationUseCase]) *TemplatesService {
 	return &TemplatesService{
 		createTemplate: Wrap(logger, "templates.createTemplate", call(useCase, TemplatesUseCase.CreateTemplate)),
 		updateTemplate: Wrap(logger, "templates.updateTemplate", call(useCase, TemplatesUseCase.UpdateTemplate)),
@@ -61,7 +81,47 @@ func NewTemplatesService(logger *zap.Logger, useCase Source[TemplatesUseCase], t
 		savePageType:   Wrap(logger, "templates.savePageType", call(types, PageTypesUseCase.Save)),
 		deletePageType: Wrap(logger, "templates.deletePageType", call(types, PageTypesUseCase.Delete)),
 		setScope:       Wrap(logger, "templates.setScope", call(types, PageTypesUseCase.SetScope)),
+		listRules:      Wrap(logger, "templates.listRules", call(types, PageTypesUseCase.ListRules)),
+		saveRule:       Wrap(logger, "templates.saveRule", call(types, PageTypesUseCase.SaveRule)),
+		deleteRule:     Wrap(logger, "templates.deleteRule", call(types, PageTypesUseCase.DeleteRule)),
+		reorderRules:   Wrap(logger, "templates.reorderRules", call(types, PageTypesUseCase.ReorderRules)),
+		preview:        Wrap(logger, "templates.previewClassification", call(classification, ClassificationUseCase.Preview)),
+		previewPages:   Wrap(logger, "templates.previewClassificationPages", call(classification, ClassificationUseCase.PreviewPages)),
+		apply:          Wrap(logger, "templates.applyClassification", call(classification, ClassificationUseCase.Apply)),
+		testRule:       Wrap(logger, "templates.testRule", call(classification, ClassificationUseCase.TestRule)),
 	}
+}
+
+func (s *TemplatesService) ListRules(c context.Context, req pagetypes.ListRulesRequest) (pagetypes.RulesResponse, error) {
+	return s.listRules(c, req)
+}
+
+func (s *TemplatesService) SaveRule(c context.Context, req pagetypes.SaveRuleRequest) (pagetypes.Rule, error) {
+	return s.saveRule(c, req)
+}
+
+func (s *TemplatesService) DeleteRule(c context.Context, req pagetypes.DeleteRuleRequest) (pagetypes.DeleteRuleResponse, error) {
+	return s.deleteRule(c, req)
+}
+
+func (s *TemplatesService) ReorderRules(c context.Context, req pagetypes.ReorderRulesRequest) (pagetypes.RulesResponse, error) {
+	return s.reorderRules(c, req)
+}
+
+func (s *TemplatesService) PreviewClassification(c context.Context, req pagetypes.PreviewRequest) (pagetypes.PreviewResponse, error) {
+	return s.preview(c, req)
+}
+
+func (s *TemplatesService) PreviewClassificationPages(c context.Context, req pagetypes.PreviewPagesRequest) (paging.List[pagetypes.PreviewPage], error) {
+	return s.previewPages(c, req)
+}
+
+func (s *TemplatesService) ApplyClassification(c context.Context, req pagetypes.ApplyRequest) (pagetypes.ApplyResponse, error) {
+	return s.apply(c, req)
+}
+
+func (s *TemplatesService) TestRule(c context.Context, req pagetypes.TestRuleRequest) (pagetypes.TestRuleResponse, error) {
+	return s.testRule(c, req)
 }
 
 func (s *TemplatesService) ListPageTypes(c context.Context, req pagetypes.ListRequest) (pagetypes.ListResponse, error) {

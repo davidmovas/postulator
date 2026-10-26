@@ -68,17 +68,52 @@ func (f pageTypesFake) SetScope(context.Context, pagetypes.SetScopeRequest) (pag
 	return answer[pagetypes.Scope](f.mode)
 }
 
+func (f pageTypesFake) ListRules(context.Context, pagetypes.ListRulesRequest) (pagetypes.RulesResponse, error) {
+	return answer[pagetypes.RulesResponse](f.mode)
+}
+
+func (f pageTypesFake) SaveRule(context.Context, pagetypes.SaveRuleRequest) (pagetypes.Rule, error) {
+	return answer[pagetypes.Rule](f.mode)
+}
+
+func (f pageTypesFake) DeleteRule(context.Context, pagetypes.DeleteRuleRequest) (pagetypes.DeleteRuleResponse, error) {
+	return answer[pagetypes.DeleteRuleResponse](f.mode)
+}
+
+func (f pageTypesFake) ReorderRules(context.Context, pagetypes.ReorderRulesRequest) (pagetypes.RulesResponse, error) {
+	return answer[pagetypes.RulesResponse](f.mode)
+}
+
+type classificationFake struct{ mode failure }
+
+func (f classificationFake) Preview(context.Context, pagetypes.PreviewRequest) (pagetypes.PreviewResponse, error) {
+	return answer[pagetypes.PreviewResponse](f.mode)
+}
+
+func (f classificationFake) PreviewPages(context.Context, pagetypes.PreviewPagesRequest) (paging.List[pagetypes.PreviewPage], error) {
+	return answer[paging.List[pagetypes.PreviewPage]](f.mode)
+}
+
+func (f classificationFake) Apply(context.Context, pagetypes.ApplyRequest) (pagetypes.ApplyResponse, error) {
+	return answer[pagetypes.ApplyResponse](f.mode)
+}
+
+func (f classificationFake) TestRule(context.Context, pagetypes.TestRuleRequest) (pagetypes.TestRuleResponse, error) {
+	return answer[pagetypes.TestRuleResponse](f.mode)
+}
+
 func templatesService(mode failure) *wails.TemplatesService {
 	return wails.NewTemplatesService(zap.NewNop(), ready[wails.TemplatesUseCase](templatesFake{mode: mode}),
-		ready[wails.PageTypesUseCase](pageTypesFake{mode: mode}))
+		ready[wails.PageTypesUseCase](pageTypesFake{mode: mode}), ready[wails.ClassificationUseCase](classificationFake{mode: mode}))
 }
 
 func TestTemplatesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, templatesService(missing), []string{
-		"CreatePageType", "CreateTemplate", "DeleteOverride", "DeletePageType", "DeleteTemplate", "GetTemplate",
-		"ListPageTypes", "ListTemplates", "ResolveForPage", "SavePageType", "SetOverride", "SetScope", "UpdateTemplate",
+		"ApplyClassification", "CreatePageType", "CreateTemplate", "DeleteOverride", "DeletePageType", "DeleteRule", "DeleteTemplate",
+		"GetTemplate", "ListPageTypes", "ListRules", "ListTemplates", "PreviewClassification", "PreviewClassificationPages",
+		"ReorderRules", "ResolveForPage", "SavePageType", "SaveRule", "SetOverride", "SetScope", "TestRule", "UpdateTemplate",
 	})
 	assertEveryMethodConverts(t, templatesService(missing), missingBody)
 	assertEveryMethodConverts(t, templatesService(panicking), panicBody)

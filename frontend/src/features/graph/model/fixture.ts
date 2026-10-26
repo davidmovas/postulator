@@ -56,6 +56,8 @@ export function pageType(preset: string, name = preset): PageType {
         role: roleOfPreset(preset),
         writable: ["hub", "entity", "product"].includes(roleOfPreset(preset)),
         templateId: null,
+        suggestedTemplateId: null,
+        overrides: 0,
         pages: 0,
         scopes: [],
         createdAt: "2026-09-19T10:00:00Z",

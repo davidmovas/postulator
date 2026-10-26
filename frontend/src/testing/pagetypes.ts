@@ -67,6 +67,8 @@ export function aPageType(id: string, preset: string, overrides: Partial<PageTyp
         role: roleOfPreset(preset),
         writable: writableRole(roleOfPreset(preset)),
         templateId: null,
+        suggestedTemplateId: null,
+        overrides: 0,
         pages: 0,
         scopes: [],
         createdAt: "2026-10-18T09:00:00Z",
