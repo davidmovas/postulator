@@ -50,10 +50,11 @@ type ProposedEntity struct {
 }
 
 type PreviewFromPagesResponse struct {
-	Entities []ProposedEntity `json:"entities"`
-	Pages    int              `json:"pages"`
-	Skipped  int              `json:"skipped"`
-	Tokens   int              `json:"tokens"`
+	Entities  []ProposedEntity  `json:"entities"`
+	PageTypes map[string]string `json:"pageTypes,omitempty"`
+	Pages     int               `json:"pages"`
+	Skipped   int               `json:"skipped"`
+	Tokens    int               `json:"tokens"`
 }
 
 type ProposeFromKeywordsRequest struct {
