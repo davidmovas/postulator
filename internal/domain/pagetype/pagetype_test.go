@@ -178,7 +178,11 @@ func TestAnUntypedPageIsTypedByWhatTheSiteShows(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			role, reason, assigned := pagetype.Assign(pagetype.FactsOf(tc.page, tc.record))
+			var rendered *pagetype.Rendered
+			if tc.record != nil {
+				rendered = new(pagetype.RenderedOf(tc.record))
+			}
+			role, reason, assigned := pagetype.Assign(pagetype.FactsOf(tc.page, rendered))
 			if assigned != tc.assigned || role != tc.role || reason != tc.reason {
 				t.Errorf("Assign = %s %s %t, want %s %s %t", role, reason, assigned, tc.role, tc.reason, tc.assigned)
 			}

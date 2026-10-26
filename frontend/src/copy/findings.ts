@@ -189,6 +189,10 @@ export const findings = {
             path === ""
                 ? "No entity carries this page, so no run can write it."
                 : `No entity carries ${path}, so no run can write it.`,
+        typeByDefault: (path: string, type: string) =>
+            path === ""
+                ? "No classification rule matched this page, so it took the type for anything else. Check it, or give it a type."
+                : `No classification rule matched ${path}, so it became ${type === "" ? "the type for anything else" : type}. Check it, or give it a type.`,
         generic: "The observation flagged something here.",
     },
 };

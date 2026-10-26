@@ -31,6 +31,7 @@ const (
 	RowAmbiguous       Code = "row_ambiguous"
 	RowWithoutPage     Code = "row_without_page"
 	PageWithoutEntity  Code = "page_without_entity"
+	TypeByDefault      Code = "type_by_default"
 )
 
 type Severity string
@@ -144,6 +145,7 @@ var rules = map[Code]rule{
 	RowAmbiguous:       {Warning, []Option{MapToPage, Ignore}},
 	RowWithoutPage:     {Info, []Option{MapToPage, Ignore}},
 	PageWithoutEntity:  {Warning, []Option{ProposeEntity, Ignore}},
+	TypeByDefault:      {Info, []Option{SetType, Ignore}},
 }
 
 func (c Code) Valid() bool {

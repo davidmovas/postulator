@@ -66,6 +66,8 @@ export function findingSentence(code: string, subject: Subject): string {
             return said.cardProposed(subjectText(subject, "name"));
         case "page_without_entity":
             return said.withoutEntity(subjectText(subject, "path"));
+        case "type_by_default":
+            return said.typeByDefault(subjectText(subject, "path"), subjectText(subject, "type"));
         default:
             return said.generic;
     }

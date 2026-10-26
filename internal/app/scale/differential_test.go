@@ -134,7 +134,7 @@ func (s *scaled) agrees(t *testing.T, step string) {
 	hub := s.id(t, "/c001/")
 	for _, q := range []contextpack.MapQuery{
 		{Text: "Article 001 0"}, {Text: "product-category"}, {TypeID: s.typeOf(t, pagetype.Product)},
-		{TypeID: s.typeOf(t, pagetype.StoreCategory)}, {Under: hub, Text: "item"}, {Under: hub, TypeID: s.typeOf(t, pagetype.Entity)},
+		{TypeID: s.typeOf(t, pagetype.StoreCategory)}, {Under: hub, Text: "item"}, {Under: hub, TypeID: s.typeOf(t, pagetype.Guide)},
 	} {
 		query := contextpack.MapRowQuery{Text: graph.Key(q.Text), TypeID: q.TypeID}
 		if q.Under != "" {

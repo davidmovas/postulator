@@ -28,12 +28,13 @@ type pageStore interface {
 	Update(ctx context.Context, page pagemap.Page) error
 	UpdateDerived(ctx context.Context, page pagemap.Page) error
 	FollowObservedH1(ctx context.Context, pageID, was, now string, at time.Time) error
-	AutoType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+	Classify(ctx context.Context, pageID string, was, now pagetype.Assignment, at time.Time) (bool, error)
 }
 
 type typeSet interface {
 	Seed(ctx context.Context, siteID string) error
 	Set(ctx context.Context, siteID string) (pagetype.Set, error)
+	Rules(ctx context.Context, siteID string) ([]pagetype.Rule, error)
 }
 
 type identityStore interface {
@@ -75,6 +76,7 @@ type linkStore interface {
 	ReplaceForPage(ctx context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error
 	ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
+	ListedProductsBySite(ctx context.Context, siteID string) (map[string]int, error)
 }
 
 type findingStore interface {

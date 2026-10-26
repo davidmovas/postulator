@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"slices"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -99,6 +102,45 @@ func (r *PageRenderRepo) Get(ctx context.Context, pageID string) (render.Record,
 
 func (r *PageRenderRepo) ListBySite(ctx context.Context, siteID string) ([]render.Record, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectRendersBySite, []any{siteID}, scanRender, "list the site renders")
+}
+
+const selectRenderedBySite = `SELECT r.page_id,
+		EXISTS (SELECT 1 FROM json_each(r.regions) WHERE json_extract(value, '$.kind') = 'listing' AND json_extract(value, '$.inside') = 1),
+		coalesce((SELECT group_concat(key, char(10)) FROM json_each(r.jsonld)), ''),
+		r.word_count_content,
+		(SELECT count(*) FROM json_each(r.headings) WHERE json_extract(value, '$.level') = 2 AND json_extract(value, '$.generated') = 0)
+		FROM page_renders AS r JOIN pages AS p ON p.id = r.page_id WHERE p.site_id = ? ORDER BY r.page_id`
+
+type renderedRow struct {
+	pageID   string
+	rendered pagetype.Rendered
+}
+
+func (r *PageRenderRepo) ListRenderedBySite(ctx context.Context, siteID string) (map[string]pagetype.Rendered, error) {
+	rows, err := selectAll(ctx, r.store.execFrom(ctx), selectRenderedBySite, []any{siteID}, scanRendered, "summarize the site's renders")
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]pagetype.Rendered, len(rows))
+	for i := range rows {
+		out[rows[i].pageID] = rows[i].rendered
+	}
+	return out, nil
+}
+
+func scanRendered(rows *sql.Rows) (renderedRow, error) {
+	var (
+		row    renderedRow
+		schema string
+	)
+	if err := rows.Scan(&row.pageID, &row.rendered.Listing, &schema, &row.rendered.Words, &row.rendered.H2); err != nil {
+		return renderedRow{}, err
+	}
+	if schema != "" {
+		row.rendered.Schema = strings.Split(schema, "\n")
+		slices.Sort(row.rendered.Schema)
+	}
+	return row, nil
 }
 
 func (r *PageRenderRepo) URLForms(ctx context.Context, siteID string) ([]string, error) {

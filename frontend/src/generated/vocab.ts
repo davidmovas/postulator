@@ -88,6 +88,7 @@ export const findingCodes = [
     "row_ambiguous",
     "row_without_page",
     "page_without_entity",
+    "type_by_default",
 ] as const;
 export type FindingCode = (typeof findingCodes)[number];
 

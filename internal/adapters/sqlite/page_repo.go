@@ -29,7 +29,6 @@ const (
 	followObservedH1  = `UPDATE pages SET h1 = ?, updated_at = ? WHERE id = ? AND h1 = ? AND h1 <> ?`
 	updatePublished   = `UPDATE pages SET wp_id = ?, status = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
 	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, page_type_rule_id = '', updated_at = ? WHERE id = ?`
-	autoPageType      = `UPDATE pages SET page_type_id = ?, page_type_source = 'auto', page_type_reason = ?, updated_at = ? WHERE id = ? AND page_type_id IS NULL`
 	reassignPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, page_type_rule_id = '', updated_at = ? WHERE page_type_id = ?`
 	classifyPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'auto', page_type_reason = ?, page_type_rule_id = ?, updated_at = ? WHERE id = ? AND page_type_id IS ? AND page_type_source = ? AND page_type_reason = ? AND page_type_rule_id = ?`
 	deletePage        = `DELETE FROM pages WHERE id = ?`
@@ -175,11 +174,6 @@ func (r *PageRepo) UpdatePublished(ctx context.Context, p pagemap.Page) error {
 func (r *PageRepo) SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error {
 	affected, err := execWrite(ctx, r.store.writeFrom(ctx), setPageType, []any{typeID, string(reason), formatTime(at), pageID}, nil, "set the page's type")
 	return requireAffected(affected, err, pageNotFound(pageID))
-}
-
-func (r *PageRepo) AutoType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error {
-	_, err := execWrite(ctx, r.store.writeFrom(ctx), autoPageType, []any{typeID, string(reason), formatTime(at), pageID}, nil, "type the untyped page")
-	return err
 }
 
 func (r *PageRepo) ReassignType(ctx context.Context, fromTypeID, toTypeID string, reason pagemap.TypeReason, at time.Time) (int64, error) {

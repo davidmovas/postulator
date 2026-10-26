@@ -142,30 +142,42 @@ type Facts struct {
 	Current   Assignment
 }
 
-func FactsOf(page pagemap.Page, record *render.Record) Facts {
-	facts := Facts{
-		PageID: page.ID, Path: page.Path, Slug: page.Slug, WPType: page.WPType, Technical: page.TechnicalReason,
-		Rendered: record != nil, Current: AssignmentOf(page),
-	}
-	if record == nil {
-		return facts
-	}
+type Rendered struct {
+	Listing bool
+	Schema  []string
+	Words   int
+	H2      int
+}
+
+func RenderedOf(record *render.Record) Rendered {
+	var out Rendered
 	for _, region := range record.Regions {
 		if region.Kind == render.RegionListing && region.Inside {
-			facts.Listing = true
+			out.Listing = true
 			break
 		}
 	}
 	for kind := range record.JSONLD {
-		facts.Schema = append(facts.Schema, kind)
+		out.Schema = append(out.Schema, kind)
 	}
-	slices.Sort(facts.Schema)
+	slices.Sort(out.Schema)
 	for _, heading := range record.Headings {
 		if heading.Level == 2 && !heading.Generated {
-			facts.H2++
+			out.H2++
 		}
 	}
-	facts.Words = record.WordsContent
+	out.Words = record.WordsContent
+	return out
+}
+
+func FactsOf(page pagemap.Page, rendered *Rendered) Facts {
+	facts := Facts{
+		PageID: page.ID, Path: page.Path, Slug: page.Slug, WPType: page.WPType, Technical: page.TechnicalReason,
+		Rendered: rendered != nil, Current: AssignmentOf(page),
+	}
+	if rendered != nil {
+		facts.Listing, facts.Schema, facts.Words, facts.H2 = rendered.Listing, rendered.Schema, rendered.Words, rendered.H2
+	}
 	return facts
 }
 

@@ -28,6 +28,10 @@ type ruleStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]pagetype.Rule, error)
 }
 
+func (s *Service) Rules(ctx context.Context, siteID string) ([]pagetype.Rule, error) {
+	return s.deps.Rules.ListBySite(ctx, siteID)
+}
+
 func (s *Service) ListRules(ctx context.Context, req ListRulesRequest) (RulesResponse, error) {
 	if strings.TrimSpace(req.SiteID) == "" {
 		return RulesResponse{}, errors.New(errors.Invalid, "a site is required").WithDetail("field", "siteId")

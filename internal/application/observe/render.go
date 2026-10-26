@@ -40,6 +40,7 @@ type siteModel struct {
 	identities map[string]pagemap.Identity
 	renders    map[string]render.Record
 	bodies     map[string]block.Snapshot
+	fields     map[string][]field.Value
 	names      map[string][]string
 	index      pagemap.Index
 	landed     map[string]string
@@ -68,7 +69,8 @@ func (s *Service) model(ctx context.Context, siteID string) (siteModel, error) {
 	}
 	m := siteModel{
 		pages: pages, identities: make(map[string]pagemap.Identity, len(identities)),
-		renders: make(map[string]render.Record, len(renders)), bodies: map[string]block.Snapshot{}, names: pagemap.Names(stored),
+		renders: make(map[string]render.Record, len(renders)), bodies: map[string]block.Snapshot{}, fields: stored,
+		names: pagemap.Names(stored),
 	}
 	m.reindex()
 	for i := range identities {

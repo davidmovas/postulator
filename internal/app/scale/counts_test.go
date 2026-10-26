@@ -119,7 +119,7 @@ func operations() []operation {
 			return findings.ListRequest{Code: string(finding.PageWithoutEntity), Limit: listLimit}
 		}),
 		findingsList("by page type", func(t *testing.T, s *scaled) findings.ListRequest {
-			return findings.ListRequest{PageTypeID: s.typeOf(t, pagetype.Entity), Limit: listLimit}
+			return findings.ListRequest{PageTypeID: s.typeOf(t, pagetype.Guide), Limit: listLimit}
 		}),
 		findingsList("under a hub", func(t *testing.T, s *scaled) findings.ListRequest {
 			return findings.ListRequest{Under: s.id(t, "/c010/"), Limit: listLimit}

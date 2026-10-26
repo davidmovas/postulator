@@ -65,6 +65,31 @@ func (r *PageLinkRepo) ReplaceForPage(ctx context.Context, pageID string, source
 	})
 }
 
+const selectListedProducts = `SELECT l.from_page_id, count(DISTINCT l.to_page_id) FROM page_links AS l
+		JOIN pages AS p ON p.id = l.to_page_id
+		WHERE l.site_id = ? AND l.type = 'listing' AND p.wp_type = 'product' GROUP BY l.from_page_id ORDER BY l.from_page_id`
+
+type listedRow struct {
+	pageID   string
+	products int
+}
+
+func (r *PageLinkRepo) ListedProductsBySite(ctx context.Context, siteID string) (map[string]int, error) {
+	rows, err := selectAll(ctx, r.store.execFrom(ctx), selectListedProducts, []any{siteID}, func(rows *sql.Rows) (listedRow, error) {
+		var row listedRow
+		err := rows.Scan(&row.pageID, &row.products)
+		return row, err
+	}, "count the products each page lists")
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int, len(rows))
+	for _, row := range rows {
+		out[row.pageID] = row.products
+	}
+	return out, nil
+}
+
 func (r *PageLinkRepo) CountContextual(ctx context.Context, pageIDs []string) (inbound, outbound map[string]int, err error) {
 	if inbound, err = countByIDs(ctx, r.store.execFrom(ctx), countContextualIn, groupContextualIn, pageIDs, "count the links into the pages"); err != nil {
 		return nil, nil, err
