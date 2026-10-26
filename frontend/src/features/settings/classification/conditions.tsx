@@ -65,18 +65,19 @@ function NumberBox({ label, value, onChange }: NumberBoxProps): ReactElement {
     return (
         <label className="flex items-center gap-2 text-xs text-ink-dim">
             <span>{label}</span>
-            <Input
-                type="number"
-                min={0}
-                size="sm"
-                mono={true}
-                aria-label={label}
-                value={value}
-                className="w-20"
-                onChange={(event) => {
-                    onChange(event.target.value);
-                }}
-            />
+            <span className="w-20">
+                <Input
+                    type="number"
+                    min={0}
+                    size="sm"
+                    mono={true}
+                    aria-label={label}
+                    value={value}
+                    onChange={(event) => {
+                        onChange(event.target.value);
+                    }}
+                />
+            </span>
         </label>
     );
 }
