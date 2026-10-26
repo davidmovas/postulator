@@ -20,7 +20,7 @@
 ## The owner's answers at the plan (2026-10-26)
 
 1. **A sync re-types the auto pages the rules placed** (reason `rule` or `unmatched`) as well as the untyped ones; a page typed before 2.6 moves only when the person applies a classification; a manual type is never touched. It amends stage 2a's "the observation types only an untyped page".
-2. **A rule's conditions combine with AND only.** The brief's rule 8 is seeded as four rules and its rule 9 as two, each with its own reason: fifteen rules and the fallback.
+2. **A rule's conditions combine with AND only.** The brief's rule 8 is seeded as four rules and its rule 9 as two, each with its own reason: fifteen rules and the fallback (fourteen as built, a miscount; `DECISIONS.md` has the list).
 
 ## Decided at the plan
 
@@ -37,26 +37,26 @@
 
 ### Tasks
 
-- [ ] **0.0 — the plan.** This list and the roadmap row.
-- [ ] **P1 — roles.** `pagetype.Role`, the four presets, the sweep of every preset switch, vocab, the tool enum, the ceilings.
-- [ ] **P2 — existing sites.** 0076 (the preset CHECK widened by column swap, the index and `page_map_type_moved` recreated, the presets added), `Seed`, the role lookups; the migration tests pinned to the six old presets where they prove 0060.
-- [ ] **P3 — the body switch** at the run start.
-- [ ] **R1 — rules.** The model, `Validate`, the glob matcher.
-- [ ] **R2 — `Classify` and `Explain`** over a table that hits every default rule and edge: first match, waiting, ancestors, the role guard, the level.
-- [ ] **R3 — the store.** 0077 (`page_type_rules`, seeded per site, equal to Go's defaults), 0078 (`page_type_reason` widened, `page_type_rule_id`), the repository, CRUD and reorder, the deletions.
-- [ ] **R4 — the walk.** The facts function, the classification in derive, `type_by_default`.
-- [ ] **A1 — preview and apply.** The hash, dependencies and batches; the preview equals what the apply does; a manual type is kept.
-- [ ] **A2 — bulk.** `pages.Selection`, `SetTypes`, `SetTemplates` (replacing `AssignTemplate`'s loop), Back to the rules.
-- [ ] **A3 — the agent's tool**, the ceilings and the token report.
-- [ ] **T1 — the PageType view**: role, overrides, suggested template.
-- [ ] **L1 — the Pages reads.** List filters (type, body, findings, search), title and status sorts, `Count`, `MapRequest.Within`.
-- [ ] **G1 — the proposals** name their source page's type.
-- [ ] **B — the bindings**, `task build` with no drift.
-- [ ] **F0–F6 — the screens** (agent F): the role switches; the shared selection model; the Pages views and the bulk bar; Settings → Classification and the preview; Page types; the dialog's additions; the harness shots and the large seeded site.
-- [ ] **E1 — the stands**: the replica's and vanilla's classification tables; a run on auto over a Landing, a Category and a Guide page picks Hub, Hub and Guide.
-- [ ] **S1 — scale**: the facts, the preview and the apply flat at 2,000 and 5,000 pages; a second writer's wait during an apply.
-- [ ] **D — the docs.**
-- [ ] **V — 2.6.0** in the seven version files.
+- [x] **0.0 — the plan.** This list and the roadmap row (`857b64c`).
+- [x] **P1 — roles.** `pagetype.Role`, the four presets, the sweep of every preset switch, vocab, the tool enum, the ceilings (`34ccddd`).
+- [x] **P2 — existing sites.** 0076 (the preset CHECK widened by column swap, the index and `page_map_type_moved` recreated, the presets added), `Seed`, the role lookups; the migration tests pinned to the six old presets where they prove 0060 (`34ccddd`).
+- [x] **P3 — the body switch** at the run start (`0f857c4`).
+- [x] **R1 — rules.** The model, `Validate`, the glob matcher (`7f36f91`).
+- [x] **R2 — `Classify` and `Explain`** over a table that hits every default rule and edge: first match, waiting, ancestors, the role guard, the level (`7f36f91`).
+- [x] **R3 — the store.** 0077 (`page_type_rules`, seeded per site, equal to Go's defaults), 0078 (`page_type_reason` widened, `page_type_rule_id`), the repository, CRUD and reorder, the deletions (`02074b2`).
+- [x] **R4 — the walk.** The facts function, the classification in derive, `type_by_default` (`595c307`).
+- [x] **A1 — preview and apply.** The hash, dependencies and batches; the preview equals what the apply does; a manual type is kept (`a8b2743`).
+- [x] **A2 — bulk.** `pages.Selection`, `SetTypes`, `SetTemplates` (replacing `AssignTemplate`'s loop), Back to the rules (`9edb27e`, `3a48cde`).
+- [x] **A3 — the agent's tool**, the ceilings and the token report (`7d5bbc0`).
+- [x] **T1 — the PageType view**: role, overrides, suggested template (`bfa2967`).
+- [x] **L1 — the Pages reads.** List filters (type, body, findings, search), title and status sorts, `Count`, `MapRequest.Within` (`9edb27e`, `c93ef71`).
+- [x] **G1 — the proposals** name their source page's type (`7997d37`).
+- [x] **B — the bindings**, `task build` with no drift (`701bb1b`).
+- [x] **F0–F6 — the screens** (agent F): the role switches; the shared selection model; the Pages views and the bulk bar; Settings → Classification and the preview; Page types; the dialog's additions; the harness shots and the large seeded site (`868906f` to `5e5f448`, the seed `9ac5913`, `74bfbd4`).
+- [x] **E1 — the stands**: the replica's and vanilla's classification tables; a run on auto over a Landing, a Category and a Guide page picks Hub, Hub and Guide (`9d1477c`, `1c9796a`, the import fix `d46da00`).
+- [x] **S1 — scale**: the facts, the preview and the apply flat at 2,000 and 5,000 pages; a second writer's wait during an apply (`2b55a29`, with `7863691` and `30f4dff`).
+- [x] **D — the docs.**
+- [x] **V — 2.6.0** in the seven version files (`d803ddc`).
 - [ ] **G — the gate**, exit codes checked.
 - [ ] **K — the build**: `task package VERSION=2.6.0`.
 - [ ] **PR — the pull request** from `dev` to `master`; not merged, not tagged.

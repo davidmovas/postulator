@@ -30,8 +30,8 @@ the composition root binds the two.
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard` |
-| `PagesService` | `Create Update Delete Get List Tree MapToEntity Unmap SetCanonical PreviewLink SetType Model ModelSummary WriterPack SiteMap` |
-| `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope` |
+| `PagesService` | `Create Update Delete Get List Count Tree MapToEntity Unmap SetCanonical PreviewLink SetType ResolveSelection SetTypes SetTemplates Model ModelSummary WriterPack SiteMap` |
+| `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope ListRules SaveRule DeleteRule ReorderRules TestRule PreviewClassification PreviewClassificationPages ApplyClassification` |
 | `RunsService` | `Start Estimate Parents Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
 | `FindingsService` | `List Get Counts Explain Resolve ResolveMany` |
 | `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
@@ -85,7 +85,24 @@ option settles nothing and answers the `StartRequest` or the `SyncSiteRequest` i
 1,000 findings of one code in one unit; the inbox sends a larger set in batches and says what a
 refused batch left unsettled. `By` is `json:"-"` on both: a bound call is the person's.
 
-`PagesService.SiteMap{siteId, parentId?, search?, pageTypeId?, cursor?, limit?}` (stage 4.3b, over
+**Classification** (phase 17). `TemplatesService.ListRules{siteId}` answers the ordered rules and the
+fallback; `SaveRule{id?, siteId, name, enabled, typeId, conditions}` adds or edits one (the fallback
+takes only its type), refused on the field it names (`conditions.urls[0].value`); `DeleteRule{id}`,
+`ReorderRules{siteId, ruleIds}`; `TestRule{siteId, pageId, ruleId? | rule?}` answers each
+condition's verdict, the page's facts and its outcome. `PreviewClassification{siteId}` answers the
+groups (from, to, pages, rules, samples, `dependsOn`) with a `hash` and the kept, waiting and
+by-default counts; `PreviewClassificationPages{siteId, from, to, status?, cursor?, limit?}` pages a
+group; `ApplyClassification{siteId, hash, groups?}` writes them, `CONFLICT` with `preview_moved` when
+the hash moved and `INVALID` with `group_depends` naming a group left out. `PagesService.Count` takes
+the list's filters; `ResolveSelection{siteId, pageIds?, subtrees?, filter?, seen?, ruleId?, except?,
+exceptSubtrees?}` answers the ids and each one's path (at most 10,000, `CONFLICT` when the filter's
+count moved from `seen`); `SetTypes{selection, pageTypeId | null}` types them by hand, role-guarded,
+or hands them back to the rules; `SetTemplates{selection, templateId | null}` sets or clears their
+own template. A page answers `typeRuleId`; a type answers `role`, `overrides` and
+`suggestedTemplateId`; `RunsService.Estimate` and `Start` answer `fields`, the fields a run writes
+when it is scoped, a type with its body off scoping it.
+
+`PagesService.SiteMap{siteId, parentId?, search?, pageTypeId?, within?, cursor?, limit?}` (stage 4.3b, over
 `page_map` since phase 15) answers a node's children a page at a time, a store category folded into
 the hub of its name (`twin`), with each node's type, parent reason and method, body state, links in
 and out, open findings, children and descendants; a search or a type answers flat matches with their
@@ -602,12 +619,15 @@ sites, starts a run, follows the events and the catch-up, and sends an agent mes
 
 A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Run}`,
 every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
-every call. Ninety-two tools since phase 15, `runs_revert` (`dangerous`), `graph_move_entity`
+every call. Ninety-three tools since phase 17, `runs_revert` (`dangerous`), `graph_move_entity`
 (`write`), `graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`),
-`graph_apply_proposals` (`write`), and stage 4's `pages_fields`, `pages_blocks` and `findings`, each
-with an `op` enum, among them, measuring 66,394 bytes and 14,779 `o200k_base` tokens of schema
-resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds against
-`schemaCeilingBytes` (66,407) and `schemaCeilingTokens` (14,782) and logs with the eight widest.
+`graph_apply_proposals` (`write`), stage 4's `pages_fields`, `pages_blocks` and `findings`, and phase
+17's `pagetypes_classify` (`preview` reads; `apply` writes the groups by their number in the preview
+its `hash` pins and waits for the person in either mode), each with an `op` enum, among them,
+measuring 67,165 bytes and 14,955 `o200k_base` tokens of schema resent on every round of every turn,
+which `TestTheToolSchemasFitTheirCeiling` holds against `schemaCeilingBytes` (67,178) and
+`schemaCeilingTokens` (14,958) and logs with the eight widest. `pages_list` takes its own arguments
+(the type, the subtree, a title sort).
 Every agent write to a page is a one-item `edit` run that waits for the person in either mode, and
 so do `graph_apply_proposals` and `graph_propose_from_pages`; resolving a finding and starting a run
 follow the conversation's mode. A description names what a

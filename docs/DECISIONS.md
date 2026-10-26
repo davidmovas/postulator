@@ -5275,3 +5275,218 @@ three layout faults the release had listed. The task list is in
 - The rail scrolls without a sideways bar.
 - `runs-960`, `settings-models-960` and `rail-site-960` carry a `fits` step, and the walk gained an
   `expect` step.
+
+## 2026-10-26 — phase 17: 2.6.0, page classification by rules, templates per type, the Pages views
+
+The client's second request after 2.5.1: a sync should say what each page is, he wants to see the
+site by aggregates and give a whole aggregate one template, and the Pages screen should show the
+site's structure. Before it, `pagetype.Assign` was fixed code over six presets and everything that
+was not a product, a hub or technical fell into Entity; nothing retyped pages in bulk and nothing
+previewed a change. The task list is in `docs/superpowers/plans/2026-10-26-phase-17-classification.md`.
+
+### The owner's answers at the plan
+
+1. **A sync re-types the auto pages the rules placed** (reason `rule` or `unmatched`) as well as
+   the untyped ones. A page typed before 2.6 (reasons `listing`, `product`, `default` and the rest)
+   moves only when the person applies a classification, and a manual type is never touched. This
+   amends stage 2a's "the observation types only an untyped page".
+2. **A rule's conditions combine with AND only.** The brief's rules that read as an OR (its 8 and 9)
+   are seeded as separate rules, each with its own name.
+
+### The vocabulary
+
+- **A preset is a named starting point over a fixed role.** `pagetype.Role` is `hub`, `entity`,
+  `product`, `archive`, `catalog` or `technical`; `Preset.Role()` never changes. Every behavioural
+  switch (the link field, the writer's role sentence, the field defaults, the graph's orphan rule,
+  the last-of-its-kind guard, the import's synonyms) reads the role, never the preset.
+- **The presets**: Landing and Category (hub), Guide and Info (entity), Product, Store category
+  (archive), Catalog, Technical, and Hub and Entity, which sites from before 2.6 keep and a person may
+  still create. A new site is seeded with the first eight (`pagetype.Seeded()`).
+- **A lookup by role prefers an order**: hub takes Category, then Hub, then Landing; entity takes
+  Guide, then Entity, then Info. It answers the untyped page's guess in `Set.TypeOf`, the import's
+  synonyms and the delete guard, which became "the last type of its role" (`last_of_role`).
+- **Templates and scopes.** Landing and Category take the Hub built-in and Guide and Info the Guide
+  built-in, under 0066's rule (never on a site whose default template a person chose). Info enables
+  only the SEO title and description: its body is off.
+
+### Existing sites (0076)
+
+- The preset `CHECK` is widened by column swap (as 0063 did), and the index
+  `page_types_site_preset` and the 0074 trigger `page_map_type_moved` are dropped and recreated.
+- Every site that has types gains Landing, Category, Guide and Info once. A name already taken by a
+  type of the same role stands for the preset, so the rules point at that type; a name taken by
+  another role adds the preset as "<Name> pages", then "<Name> pages 2". No type is renamed or
+  deleted, and no page moves. `Seed` still fills only a site with no types.
+- The down maps landing and category back to hub, and guide and info to entity.
+
+### The rules
+
+- **A rule** is a position, a name, an enabled switch, a target type and conditions that all must
+  hold; a list inside one condition means any of its values. One fallback row per site
+  (`kind fallback`, a partial unique index) types what no rule matched.
+- **The conditions**: WordPress post types; the URL by prefix, segment or glob; slugs; an ancestor
+  (one page, or any page of a type); the level; a listing, present or absent, with a minimum of
+  products; the JSON-LD types (Article, BlogPosting, HowTo, FAQPage, AboutPage, ContactPage,
+  CollectionPage, ItemList); a word range; technical. Three that the brief's own rules needed were
+  added: "is the front page", "is the shop" and "at least N H2s".
+- **The URL's segment mode** matches a whole segment or a run of hyphenated words inside one, so
+  `guides` matches `/lab-guides/`. A glob is our own matcher (`*` inside a segment, `**` across),
+  compiled at save; no raw regex reaches the screen.
+- **The level counts from the front page**: the front page is 0, a root or a child of the front page
+  is 1, and each ancestor below adds one. The technical condition is every technical reason but the
+  shop's.
+- **Validate** refuses an empty rule, a bad glob, an unknown type or another site's, and an inverted
+  range, each on its field (`conditions.urls[0].value`). A site holds at most 100 rules.
+- **The defaults are fourteen rules and the fallback**, not the plan's fifteen (a miscount):
+  technical pages; products; store categories; the shop; the front page; a listing at the top level
+  (Landing); a listing below it (Category); blog posts; an article, a blog post or a how-to by its
+  schema; a guide's word in the address (blog, guide, guides, how-to, learn, research); under a
+  guide; an about, contact or FAQ page by its schema; one by its address (24 slugs, `refund_returns`
+  among them); a long article with sections (800 words, two H2s, no listing) as a Guide; then the
+  fallback, Info, "Anything no rule matched".
+- **0077** creates `page_type_rules` and seeds every site from a `rule_seeds` table with an `@guide`
+  placeholder for the ancestor condition, numbered by `row_number()`. A test proves the seed equals
+  `pagetype.DefaultRules` on a fresh site, an upgraded one and one whose type names were taken.
+- **0078** widens `pages.page_type_reason` with `rule` and `unmatched` and adds
+  `pages.page_type_rule_id`, with no foreign key, so a deleted rule leaves its pages' reason readable
+  ("a rule since removed") until the next walk. The down maps both reasons to `default`.
+
+### One classification, two callers
+
+- **`pagetype.Classify`** walks the folded tree root-first (`contextpack.Map`, by level then path),
+  so an ancestor's type is settled before its children's. The first enabled rule that matches wins.
+- **A page waits** when the next rule needs a render it lacks, and when a condition asks for an
+  ancestor's type and that ancestor waits; an unmet condition beats a waiting one. **The role guard**
+  (`Fits`) keeps a product to the product role and a term to the archive role, so no rule can put
+  either anywhere else.
+- **The facts** are one function over the Map (`Map.Facts`), the renders summarized in SQL (a listing
+  inside the root, the JSON-LD keys, the H2s not generated, the content's words) and the listed
+  products from `page_links`. A test proves the SQL summary equals `pagetype.RenderedOf` on the same
+  record.
+- **The walk** classifies inside derive's unit, over the Map it builds from its own pages after the
+  parents and before the map refresh, so the Site map ends the walk fresh. It writes through
+  `PageRepo.Classify`, guarded by the assignment it read. `type_by_default` is raised for a page the
+  fallback typed and cleared when a rule or a person types it.
+- **The preview** reads the same facts through `sitemodel` in a fixed number of statements, in
+  `ModePreview` (every auto page) where the walk uses `ModeWalk` (untyped and rule-placed pages).
+
+### Preview, apply and bulk
+
+- **The preview** groups the pages that would change by from-type and to-type, with the count per
+  rule, up to five sample paths, the groups each rests on, the kept (manual), waiting and by-default
+  counts, and a hash of the whole diff. A group's pages page by path through `Keyset.Page`.
+- **Apply** takes all groups or chosen ones. A choice must hold every group it rests on (a page whose
+  ancestor's rule moves with another group), refused as `group_depends`, and the screen ticks those
+  for the person; a moved hash is `preview_moved`. It writes in units of at most 1,000 pages, each row
+  guarded by the type, source, reason and rule it was read with, and answers what moved and what
+  changed since. `Classification.Chosen` is the same check without the write, which the agent's
+  confirmation reads.
+- **Bulk by hand.** `pages.Selection` takes ids, subtrees (optionally within a type), a filter with
+  the count the person saw (CONFLICT when it moved) or a rule's matches, less exceptions, at most
+  10,000 pages. `SetTypes(typeId)` is manual and role-guarded and clears the rule id; `SetTypes(null)`
+  ("Back to the rules") hands the pages back and classifies them at once; `SetTemplates` sets or
+  clears a page's own template in one statement per batch of 1,000, replacing `AssignTemplate`'s
+  row-by-row loop.
+- **Deletions.** Deleting a type repoints its rules, the fallback and the ancestor conditions that
+  name it to the reassignment, and refuses a fallback moved onto a role that cannot hold a page
+  (`fallback_role`). Every manual writer clears `page_type_rule_id`.
+- **The agent's tool, `pagetypes_classify`.** `preview` reads freely and answers each group with its
+  type names, its rules by name and its sample paths, numbered; `apply` names groups by those
+  numbers, which the hash pins, so a moved preview is refused before a number could mean another
+  group. Groups as `{from, to}` objects cost 767 bytes of schema; numbers cost 547 bytes and 124
+  tokens. An apply waits for the person in either mode, and its summary refuses what the apply would
+  refuse. Every schema went from 66,394 bytes and 14,779 tokens (92 tools, 2.5.1) to 67,165 bytes and
+  14,955 tokens (93 tools); `pages_list` took its own arguments (type and subtree filters, a title
+  sort) on the way.
+
+### Templates per aggregate
+
+- **A page type answers** its role, its pages, the pages that carry a template of their own
+  (`overrides`, with "Make them follow the type", which clears them) and `suggestedTemplateId`, the
+  role's built-in when the type has none.
+- **A run on auto** already resolved each item's template per page at claim time
+  (`runtime/claim.go`), so a run over Landing, Category and Guide pages takes Hub, Hub and Guide from
+  their types, and an estimate on auto writes no override.
+- **A type's body switch binds the run start** (`runs/body.go`). When every target's type has its
+  body off, the run is scoped to the fields those types write, as a person's field-scoped run is, and
+  the estimate and the start answer those fields so the screen can say why the run is cheaper. Types
+  that disagree on the body are refused with a run for each; a planned page of a body-off type is
+  refused, as no run can create it; a page with no type keeps the whole run. A field the template's
+  recipe has no step for is dropped, as a whole run would skip it.
+
+### The Pages screen and the dialog
+
+- **Three views**, List, Tree and By type, remembered per site, over one selection model
+  (`ui/selection.ts`: ids, a branch, a group, every page a filter matches less exceptions, a
+  shift-range) that Go resolves without loading the pages, and one set of bulk actions: set a type,
+  back to the rules, a template or follow the type, start a run, open in the agent.
+- **The reads page by cursor**: the List filters (type, body, open findings, a search), the title and
+  status sorts and `Count` on keyset indexes (0079, `pages(site_id, title, id)`), and
+  `MapRequest.Within(typeId)`, the folded tree pruned to the branches that hold the type (0080,
+  `page_map(site_id, type_id, trail)`).
+- **`@tanstack/react-virtual` was already in use** (`ui/virtual-rows.tsx`), so no library was chosen.
+- **The Proposed Entities dialog** gained a shift-range, "select all of one source page type" (the
+  preview names each source page's type, `PreviewFromPagesResponse.pageTypes`), the naming conflict
+  on its row before acceptance, the count on the accept button and keyboard control, over the
+  virtualised rows it already had. It was not redesigned.
+
+### What the stands said
+
+- **The replica** (Rank Math, Blocksy): the front page and `/peptides/` are Landing (the front page;
+  a listing at the top level); `/healing-peptides/`, `/bpc-157/` and `/tb-500/` Category (a listing
+  below it); `/lab-guides/`, `/reconstitution/` and `/sample-page/` Guide by their schema, because
+  Rank Math gives every plain page an Article schema and that rule comes before the guide's word;
+  `/hello-world/` Guide as a post; the cart, the checkout, the account, the privacy page and the
+  unpublished refund page (noindex) Technical; five products and three store categories by theirs;
+  **no page by default**. The plan expected `/refund_returns/` as Info by its slug and `/sample-page/`
+  by default; the technical rule and the schema rule come first, and the census is the truth.
+- **Vanilla** (no SEO plugin): `/guide/` and `/guide/setup/` Guide by the guide's word,
+  `/hello-world/` by its post type, and WordPress's `/sample-page/` the one page on either stand that
+  falls to Info by default, with its finding.
+- **Both**: every page on the site has a type after the first sync, nothing falls to Info that the
+  stand's table does not name, and the preview moves nothing after the first or the second sync.
+- **What they caught**: a workbook naming a type over a page the rules had typed kept the rule's id
+  under the import's reason, which the page refuses; four replica tests failed on it until the import
+  cleared the rule (`fix(imports)`). No unit test had imported over a rule-typed page.
+
+### Scale
+
+- **Flat**: every new read (the facts, the preview, a group's page, an apply of one block, the pages
+  list by type, search, title and subtree, the count, a selected subtree, the map within a type)
+  runs the same statements at 2,003 and 5,003 pages, the list reads the same rows, and EXPLAIN finds
+  no scan of a large table beyond the three by design.
+- **Two faults it found.** The pages list marked drifted bodies by reading every drifted body of the
+  site, one row per block of the generated site, so each page of the list grew with the site; it
+  now asks about the pages it shows. The classification folded the whole site again on every read
+  (1.4 s at 5,003 pages), against the ruling that the tree is read through `page_map`; it now reads
+  the stored map, and the differential test proves the facts equal the walk's at every step. The
+  facts went from 2.0 s to 0.39 s and the preview from 2.9–3.8 s to 0.48 s at 5,003 pages; a read
+  right after a change pays one refresh, about 1 s.
+- **An apply beside a second writer**: an apply of 2,753 pages at 5,003 took 4 to 6 s in batches of
+  1,000, and a second writer waited at most 484 ms uncontended (1.2 to 2.9 s with a stand
+  bootstrapping beside it), under SQLite's 5 s busy timeout.
+
+### The critic's findings, adopted at the plan
+
+- Lookups by role, never by preset, since a new site has no Hub and no Entity.
+- The classification inside derive's unit and before the map refresh, or the map would end the walk
+  stale.
+- Groups closed under their dependencies, rows guarded by what was read, and batches of 1,000, so a
+  second writer never waits past SQLite's 5 s busy timeout.
+- The level counted from the front page, not from the root of the tree.
+- Rules repointed when their type is deleted; the role guard; "Back to the rules".
+- `/sample-page/`, WordPress's placeholder, expected as the replica's one page typed by default.
+
+### Deviations from the request
+
+- **Fourteen default rules and the fallback**, where the plan said fifteen.
+- **Three conditions beyond the brief's list** (front page, shop, minimum H2s), which its own rules
+  needed.
+- **The agent's apply names groups by number**, not by type ids, to keep its schema small; the hash
+  keeps the numbers honest.
+- **A settled `type_by_default` resolves as `page_typed`**, by the person or the model that typed the
+  page.
+- **The UI harness.** The coffee site's four accessory pages are Guide, since a WordPress page can no
+  longer be a Product. A site rule types an article under a category as a Guide, as a person would on
+  that site. `POSTULATOR_HARNESS_PAGES` (5,000 under `task ui:run`) seeds a third site for the shots
+  at scale.

@@ -4,20 +4,36 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.5.0` on 2026-10-24 (PR #31: the site-model redesign of phase 14 and the release
-work of phase 15, notes under **Release 2.5.0**). **2.5.1 is built and waits in a pull request
-from `dev` to `master`**, neither merged nor tagged: the client's first feedback (phase 16,
-2026-10-25), its notes under **Release 2.5.1** below and in the pull request's body. Its gate is
-under **The gate**.
+**Released:** `v2.5.0` on 2026-10-24 (PR #31, notes under **Release 2.5.0**). 2.5.1, the client's
+first feedback (phase 16), was never merged or tagged: its pull request #32 goes from `dev` to
+`master`, so it now carries 2.6.0 too. **2.6.0 is built and waits in that pull request**, neither
+merged nor tagged: page classification by rules, templates per type and the Pages screen's three
+views (phase 17, 2026-10-26), its notes under **Release 2.6.0** below and in the pull request's body,
+which carries 2.5.1's as well. Its gate is under **The gate**.
 
 ## Next, in order
 
-1. **The owner merges the pull request and tags `v2.5.1` on `master`**; the tag's workflow builds and
-   publishes the installer, the executable and the plugin zip.
-2. **The client installs 2.5.1 over 2.5.0.** The plugin did not change: 1.5.2 stays on his sites, no
-   new zip. His next ordinary sync fetches again the pages whose theme prints the H1, and only those.
-3. **The next session**: page classification and the Pages screen's views.
-4. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+1. **The owed gate legs**, in sequence on a quiet machine, from the repository root under bash:
+   ```
+   go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov-app.out ./internal/application/...
+   go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-runtime.out ./internal/runtime/...
+   go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov-adapters.out ./internal/adapters/...
+   go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-rest.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/... ./wp-plugin/...
+   go test -race -count=1 -covermode=atomic -coverprofile=cov-kd.out ./internal/kernel/... ./internal/domain/...
+   (head -1 cov-kd.out; tail -q -n +2 cov-kd.out cov-app.out cov-runtime.out cov-adapters.out cov-rest.out) > coverage.out
+   go run ./cmd/covergate
+   ```
+   then delete the `cov-*.out` files, which no ignore rule covers.
+2. **The owner merges the pull request and tags `v2.6.0` on `master`** (2.5.1 ships inside it); the
+   tag's workflow builds and publishes the installer, the executable and the plugin zip.
+3. **The client installs 2.6.0 over 2.5.0.** The plugin did not change: 1.5.2 stays on his sites, no
+   new zip. Each site gains Landing, Category, Guide and Info and the default rules on first start;
+   no page moves until his next sync types the untyped ones, and the pages typed before 2.6 move only
+   when he applies a preview in Settings → Classification.
+4. **What to look at first on his site**: Settings → Classification's preview (what the rules would
+   change on the pages typed before 2.6), the Findings inbox's "typed by no rule", and the Page types
+   screen's counts and overrides.
+5. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
    `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24); settle the
    output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and whether tools load on demand
    (`agent.toolLoading: deferred`). Until then the owner judges the writer by hand from
@@ -35,9 +51,12 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   descriptions, custom fields by key), its body as blocks, what its public render adds (regions,
   breadcrumbs, product grids, JSON-LD), its links by type, and a parent derived from its breadcrumbs
   with the reason. Later syncs read only what changed; every tenth walks the whole site.
-- **Page types and field scopes.** The client names his types over six presets (Hub, Store category,
-  Catalog, Product, Entity, Technical) and enables, per type, the fields the writer may write, each
-  with an instruction, limits, a switch for rewriting his own text, and the link policy.
+- **Page types, rules and field scopes.** The client names his types over presets (Landing,
+  Category, Guide, Info, Product, Store category, Catalog, Technical, each over a fixed role) and
+  enables, per type, the fields the writer may write, each with an instruction, limits, a switch for
+  rewriting his own text, and the link policy. A site's ordered rules give each page its type and
+  say why; a preview shows what a change of rules would move before he applies it, and he retypes
+  any selection by hand. A run on auto takes each page's template from its type.
 - **The workbook, reconciled through findings.** Each row of his xlsx workbooks finds its page by
   URL, slug, entity, title, H1 or SKU. What disagrees becomes a finding in the inbox (a row two
   pages answer, a row no page answers, a parent the sheet and the site disagree on, a field changed
@@ -61,6 +80,32 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **The agent** in the dock works the same loop through the same use cases: it reads the model,
   resolves findings, starts runs and edits a page field by field or block by block. Every write it
   makes to a page waits for the person.
+
+## Release 2.6.0
+
+The client's second request, in short:
+
+- **The types**: Landing and Category (hubs), Guide (articles), Info (about, contact, shipping,
+  returns: only the SEO title and description are ever written), Product, Store category, Catalog and
+  Technical. A site from 2.5 keeps its types and gains the four new ones; nothing is renamed or
+  deleted and no page moves on upgrade.
+- **How pages get them**: an ordered list of rules per site (Settings → Classification), the first
+  match winning, each page saying which rule placed it; a page no rule matches becomes Info and is
+  listed in the inbox as typed by no rule. A sync types new pages and re-types those the rules
+  placed; a type set by hand never moves.
+- **Preview and bulk**: a change of rules moves nothing until he applies its preview, whole or by
+  groups, in one confirmed action. On the Pages screen he selects pages (one by one, a branch, a type,
+  or every page a filter matches) and sets their type by hand, hands them back to the rules, sets or
+  clears their template, starts a run or asks the agent. The agent previews and applies too, always
+  waiting for him.
+- **Templates per type**: each type shows its pages, its template, the pages that keep a template of
+  their own and a suggestion; a run on auto takes each page's template from its type, and a run over
+  Info pages writes only their SEO pair.
+- **The Pages screen** in three views (List, Tree, By type), remembered per site, one selection and
+  one set of bulk actions, fast at 5,000 pages. **The Proposed Entities dialog** gained shift-click
+  ranges, a whole source type at once, conflicts shown before accepting, the count on the button and
+  the keyboard.
+- **No new plugin.** 1.5.2 stays.
 
 ## Release 2.5.1
 
@@ -99,8 +144,17 @@ The notes as the pull request carries them, in short:
   code, and one page's Model tab and "What the writer will see".
 - **The known limits** are below; the first is that **no run has been made with a funded OpenAI key**.
 
-## Known limits at 2.5.0
+## Known limits at 2.6.0
 
+- **Four race groups and `covergate` are owed** for 2.6.0 (under **Next, in order**); every package
+  in them passed without `-race`.
+- **Classification on a site of 5,000 pages**: a preview or a group's page reads in about half a
+  second from a fresh site map, and about a second right after a change (the map is refreshed once);
+  an apply of 2,750 pages takes 4 to 6 s in batches of 1,000. The Pages Tree shows its first rows in
+  0.9 s there, the List and By type in under 0.35 s.
+- **Rank Math gives every plain page an Article schema**, so on the client's sites the schema rule
+  types such pages as Guide (the replica's `/sample-page/` included) before the guide's word does;
+  he reorders or disables the rule in Settings → Classification if that is wrong for a site.
 - **No live smoke test yet.** No run has been made with a funded key, so nothing a model call costs
   has been compared with a bill. The input side of the estimate was adopted from offline
   `o200k_base` counts (every measured input within ±25%); the output side stays conservative on
@@ -121,6 +175,47 @@ The notes as the pull request carries them, in short:
 - **The rest** is under **Known gaps**, each with its reason.
 
 ## Where we are
+
+**2026-10-26, phase 17: 2.6.0, page classification by rules, templates per type, the Pages views.**
+The reasoning is under "phase 17" in `DECISIONS.md`; the task list is in
+`docs/superpowers/plans/2026-10-26-phase-17-classification.md`.
+
+- **The owner's answers at the plan**: a sync re-types the auto pages the rules placed as well as
+  the untyped ones (a page typed before 2.6 moves only on an apply); a rule's conditions are AND
+  only, so the brief's OR rules are seeded as separate ones.
+- **Roles and presets** (`34ccddd`): a preset over a fixed role, every switch by role, Landing,
+  Category, Guide and Info added; 0076 gave every existing site the four, a same-role name standing
+  for the preset.
+- **Rules** (`7f36f91`, `02074b2`): the model, `Validate`, our glob matcher, `Classify` and
+  `Explain` root-first over the folded tree; 0077 seeds fourteen rules and the fallback per site,
+  equal to Go's; 0078 the reasons and `page_type_rule_id`; CRUD, reorder, deletions repointed.
+- **The walk** (`595c307`): derive classifies untyped and rule-placed pages inside its unit, before
+  the map refresh, and raises `type_by_default`.
+- **Preview, apply, bulk** (`a8b2743`, `9edb27e`, `3a48cde`): the preview's groups, hash and
+  dependencies, apply in batches of 1,000 guarded per row; `pages.Selection` resolved in Go with each
+  page's path, `SetTypes`, Back to the rules, `SetTemplates`; the List filters, sorts and `Count`
+  (0079), `MapRequest.Within` (`c93ef71`, 0080).
+- **Templates per type** (`bfa2967`): a type's role, overrides and suggested template. **The body
+  switch** (`0f857c4`): a run over Info pages writes their SEO pair alone, and says so.
+- **The agent** (`7d5bbc0`): `pagetypes_classify`, preview and a confirmed apply by group number;
+  schemas 66,394 B and 14,779 tokens before, 67,165 B and 14,955 after (93 tools).
+- **The proposals** name their source page's type (`7997d37`); the dialog's shift-range, a type at
+  once, conflicts on the row, the count and the keyboard (`c336ad4`, agent F).
+- **The screens** (agent F): the shared selection (`868906f`, `b7320aa`), Settings → Classification
+  with the rules, the test on a page and the preview (`1739f62`, `f095024`), Page types (`6491850`),
+  the run start's line (`9041e9d`), the Pages screen's List, Tree and By type (`10cb9f8`).
+- **Scale** (`7863691`, `30f4dff`, `2b55a29`): the pages list marks the drifted bodies of the pages
+  it shows, not the site's, so its reads stay flat; the classification reads the stored site map
+  instead of folding the site per request (the facts at 5,003 pages from 2.0 s to 0.39 s, the preview
+  from 2.9–3.8 s to 0.48 s); every new read holds its statements from 2,003 to 5,003 pages.
+- **The stands** (`9d1477c`, `1c9796a`): each page typed by the rule its census names, the preview
+  empty after either sync, a run on auto taking Hub, Hub and Guide by type. The replica's whole suite
+  found that a workbook typing a rule-placed page kept the rule's id; the import clears it now
+  (`d46da00`).
+- **The harness** (`9ac5913`, `74bfbd4`): a third site of 5,000 pages under `task ui:run`, flagging its
+  pages without an entity for the proposal dialog; the coffee site typed as 2.6 types a site; the
+  walk's shots and timings (agent F, `94d832e`, `5e5f448`, `b4154a0`).
+- **2.6.0** (`d803ddc`) in the seven version files. Migrations to 0080; plugin 1.5.2, unchanged.
 
 **2026-10-25, phase 16: 2.5.1, the client's first feedback.** The reasoning is under "phase 16" in
 `DECISIONS.md`; the task list is in `docs/superpowers/plans/2026-10-25-phase-16-patch.md`.
@@ -738,6 +833,38 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
 
+**2026-10-26, on Windows, at the close of phase 17, for 2.6.0. On the final code (`ed70209`), exit
+codes checked, one leg at a time; four race groups and `covergate` are owed, below.**
+
+- The comment check and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`.
+- `golangci-lint run` over every package in four chunks, `--build-tags uiharness`, then `task
+  lint:e2e` alone: 0 issues each.
+- **The race groups**: kernel and domain, 28 packages, `-count=1` with coverage, green in 109 s. The
+  application group at `-p 2` was stopped by Claude Code's low-memory guard after seven packages had
+  passed, while another job on the machine held several gigabytes, so the application, runtime,
+  adapters and the last group and `covergate` are **owed** (the commands are under **Next, in
+  order**). Every package of those groups passed without `-race` during the phase.
+- `go test -count=1 ./internal/app/scale/`, 322 s, after the plan check's sample moved off the title
+  sort 0079 now indexes.
+- `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 2,326 tests in 201 files; `task
+  ui:lint`, 0 issues and the harness tests in 379 s. Agent F's whole walk: 128 of 128 shots from one
+  reset, the Pages views, Classification and Page types at 960 × 600 with the dock and wide with
+  `fits`, a bulk type change from By type and the proposal dialog over 439 proposals on the 5,000-page
+  site.
+- `task build VERSION=2.6.0` (127 s) with no generated drift.
+- **The replica**, provisioned fresh: `task e2e:full -- -v`, 15 passed and 2 skipped by design, 594 s,
+  after the import fix its first run found; taken down.
+- **Vanilla**, the same: `task e2e:full -- -v`, 13 passed and 4 skipped by design, 354 s; `task
+  e2e:full:noplugin`, 54 s; taken down.
+- The plugin did not change, so its lint and tests were not run.
+- `task package VERSION=2.6.0` (122 s): `bin/postulator-amd64-installer.exe`, 14,238,551 bytes,
+  product and file version 2.6.0; the executable's file version is 2.6.0.0.
+  `bin/postulator-companion.zip` is still plugin 1.5.2.
+- `go run ./cmd/tokenreport`: 93 tools, 67,165 bytes and 14,955 tokens of schema (66,394 and 14,779
+  at 2.5.1); `pagetypes_classify` 547 bytes and 124 tokens; the instructions with the replica's brief
+  1,929 tokens, unchanged.
+
 **2026-10-25, on Windows, at the close of phase 16, for 2.5.1. Green on the final code (`743e4e4`),
 every leg, exit codes checked:**
 
@@ -1235,7 +1362,7 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 ## Known gaps
 
 - **Phase 15 left these:**
-  - **No funded key has run**: see **Known limits at 2.5.0**.
+  - **No funded key has run**: see **Known limits at 2.6.0**.
   - **The UI at the window's least width with the dock open**: the Runs table scrolls sideways
     inside its panel (the walk's `fits` step names it: 726 px of content in 288 px), the Models
     table shows about ten characters of a model's name, and the rail shows a horizontal scrollbar
