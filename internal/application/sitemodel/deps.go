@@ -90,6 +90,7 @@ type linkStore interface {
 type findingStore interface {
 	ListForPage(ctx context.Context, pageID string) ([]finding.Finding, error)
 	ListBySite(ctx context.Context, siteID string, status finding.Status) ([]finding.Finding, error)
+	ListOpenFor(ctx context.Context, pageIDs []string) ([]finding.Finding, error)
 	CountOpen(ctx context.Context, pageIDs []string) (map[string]int, error)
 }
 

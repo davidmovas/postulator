@@ -41,7 +41,8 @@ type Memory struct {
 	mu      sync.Mutex
 	reads   int
 	sites   int
-	stale   bool
+	moved   int64
+	built   int64
 	written int
 	asked   [][]string
 }
@@ -49,7 +50,7 @@ type Memory struct {
 func (m *Memory) MarkStale() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.stale = true
+	m.moved++
 }
 
 func (m *Memory) Rebuilt() int {
@@ -100,10 +101,7 @@ type mapReader struct{ m *Memory }
 func (r mapReader) State(context.Context, string) (generation, built int64, err error) {
 	r.m.mu.Lock()
 	defer r.m.mu.Unlock()
-	if r.m.stale {
-		return 2, 1, nil
-	}
-	return 1, 1, nil
+	return 1 + r.m.moved, 1 + r.m.built, nil
 }
 
 func (r mapReader) ListBySite(_ context.Context, siteID string) ([]contextpack.MapRow, error) {
@@ -114,7 +112,7 @@ func (r mapReader) ListBySite(_ context.Context, siteID string) ([]contextpack.M
 func (r mapReader) Write(context.Context, string, []contextpack.MapRow, []string, int64) error {
 	r.m.mu.Lock()
 	defer r.m.mu.Unlock()
-	r.m.stale = false
+	r.m.built = r.m.moved
 	r.m.written++
 	return nil
 }
@@ -389,6 +387,16 @@ func (r findingReader) ListBySite(_ context.Context, _ string, status finding.St
 	return out, nil
 }
 
+func (r findingReader) ListOpenFor(_ context.Context, ids []string) ([]finding.Finding, error) {
+	out := make([]finding.Finding, 0)
+	for i := range r.m.Findings {
+		if held := &r.m.Findings[i]; held.Status == finding.Open && held.PageID != nil && slices.Contains(ids, *held.PageID) {
+			out = append(out, *held)
+		}
+	}
+	return out, nil
+}
+
 func (r findingReader) CountOpen(_ context.Context, ids []string) (map[string]int, error) {
 	out := map[string]int{}
 	for i := range r.m.Findings {
@@ -410,14 +418,23 @@ func (r mapReader) List(_ context.Context, q contextpack.MapRowQuery, page pagin
 		return !q.Holds(row) || q.Within != "" && !row.Holding(every, q.Within)
 	})
 	slices.SortFunc(rows, func(a, b contextpack.MapRow) int {
+		if q.ByDepth && a.Depth != b.Depth {
+			return cmp.Compare(a.Depth, b.Depth)
+		}
 		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.PageID, b.PageID))
 	})
+	keys := []paging.SortKey[contextpack.MapRow]{
+		paging.TextKey[contextpack.MapRow]("path", "path", func(row contextpack.MapRow) any { return row.Path }),
+	}
+	if q.ByDepth {
+		keys = append([]paging.SortKey[contextpack.MapRow]{
+			paging.IntKey[contextpack.MapRow]("depth", "depth", func(row contextpack.MapRow) any { return row.Depth }),
+		}, keys...)
+	}
 	keyset := paging.Keyset[contextpack.MapRow]{
 		IDColumn: "page_id",
 		ID:       func(row contextpack.MapRow) string { return row.PageID },
-		Keys: []paging.SortKey[contextpack.MapRow]{
-			paging.TextKey[contextpack.MapRow]("path", "path", func(row contextpack.MapRow) any { return row.Path }),
-		},
+		Keys:     keys,
 	}
 	return keyset.Page(rows, page)
 }

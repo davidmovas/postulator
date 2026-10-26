@@ -2,8 +2,10 @@ package sitemodel
 
 import (
 	"context"
+	"slices"
 
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -116,7 +118,70 @@ func (s *Service) siteMap(ctx context.Context, req MapRequest) (MapView, error) 
 		node := read.node(*parent)
 		view.Parent, view.Trail = &node, read.trail(*parent)
 	}
+	if err = s.whys(ctx, read, view.Nodes.Items, view.Parent); err != nil {
+		return MapView{}, err
+	}
 	return view, s.bodiesOf(ctx, view.Nodes.Items)
+}
+
+func (s *Service) whys(ctx context.Context, read mapRead, nodes []contextpack.MapNode, also *contextpack.MapNode) error {
+	held := make([]*contextpack.MapNode, 0, len(nodes)+1)
+	for i := range nodes {
+		held = append(held, &nodes[i])
+	}
+	if also != nil {
+		held = append(held, also)
+	}
+	held = slices.DeleteFunc(held, func(node *contextpack.MapNode) bool { return node.ParentID != "" })
+	if len(held) == 0 {
+		return nil
+	}
+
+	ids := make([]string, 0, len(held))
+	parents := make([]string, 0)
+	for _, node := range held {
+		ids = append(ids, node.Page.PageID)
+		if derived := read.pages[node.Page.PageID].ParentPageID; derived != nil {
+			parents = append(parents, *derived)
+		}
+	}
+	open, err := s.deps.Findings.ListOpenFor(ctx, ids)
+	if err != nil {
+		return err
+	}
+	renders, err := s.deps.Renders.ListForPages(ctx, ids)
+	if err != nil {
+		return err
+	}
+	offMap, err := s.deps.Pages.ListByIDs(ctx, parents)
+	if err != nil {
+		return err
+	}
+
+	byPage := make(map[string][]finding.Finding, len(open))
+	for i := range open {
+		byPage[*open[i].PageID] = append(byPage[*open[i].PageID], open[i])
+	}
+	rendered := make(map[string]bool, len(renders))
+	for i := range renders {
+		rendered[renders[i].PageID] = true
+	}
+	parentOf := make(map[string]pagemap.Page, len(offMap))
+	for i := range offMap {
+		parentOf[offMap[i].ID] = offMap[i]
+	}
+	for _, node := range held {
+		page := read.pages[node.Page.PageID]
+		evidence := contextpack.ParentEvidence{Page: page, Findings: byPage[page.ID], Rendered: rendered[page.ID]}
+		if page.ParentPageID != nil {
+			if parent, found := parentOf[*page.ParentPageID]; found && parent.Status == pagemap.StatusArchived {
+				evidence.Parent = &parent
+			}
+		}
+		why := contextpack.WhyNoParent(evidence)
+		node.Why = &why
+	}
+	return nil
 }
 
 func (s *Service) nodeRow(ctx context.Context, siteID, pageID, field string) (contextpack.MapRow, error) {
@@ -239,7 +304,8 @@ func (r mapRead) ref(pageID string) contextpack.Ref {
 func (r mapRead) node(row contextpack.MapRow) contextpack.MapNode {
 	page := r.pages[row.PageID]
 	node := contextpack.MapNode{
-		Page: r.ref(row.PageID), ParentReason: page.ParentReason, ParentMethod: page.ParentMethod, Technical: page.TechnicalReason,
+		Page: r.ref(row.PageID), ParentID: row.ParentID, Depth: row.Depth,
+		ParentReason: page.ParentReason, ParentMethod: page.ParentMethod, Technical: page.TechnicalReason,
 		ReadOnly: page.ReadOnlyReason, Body: contextpack.BodyEmpty, LinksIn: r.inbound[row.PageID], LinksOut: r.outbound[row.PageID],
 		Findings: r.findings[row.PageID], Children: row.Children, Descendants: row.Descendants, Status: page.Status,
 	}

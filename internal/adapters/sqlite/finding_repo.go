@@ -29,6 +29,7 @@ const (
 	selectOfSite    = selectFindings + ` WHERE site_id = ?` + findingOrder
 	selectOfStatus  = selectFindings + ` WHERE site_id = ? AND status = ?` + findingOrder
 	selectOfPage    = selectFindings + ` WHERE page_id = ?` + findingOrder
+	selectOpenOf    = selectFindings + ` WHERE status = 'open' AND page_id IN `
 	countOpenOf     = `SELECT page_id, count(*) FROM findings WHERE status = 'open' AND page_id IN `
 	groupOpenOf     = ` GROUP BY page_id`
 
@@ -194,6 +195,10 @@ func (r *FindingRepo) CountByCode(ctx context.Context, q finding.Query) (map[fin
 
 func (r *FindingRepo) CountOpen(ctx context.Context, pageIDs []string) (map[string]int, error) {
 	return countByIDs(ctx, r.store.execFrom(ctx), countOpenOf, groupOpenOf, pageIDs, "count the open findings of the pages")
+}
+
+func (r *FindingRepo) ListOpenFor(ctx context.Context, pageIDs []string) ([]finding.Finding, error) {
+	return selectByIDs(ctx, r.store.execFrom(ctx), selectOpenOf, findingOrder, pageIDs, scanFinding, "list the open findings of the pages")
 }
 
 func (r *FindingRepo) ListForPage(ctx context.Context, pageID string) ([]finding.Finding, error) {

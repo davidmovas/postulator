@@ -90,13 +90,19 @@ func (r *PageMapRepo) Write(ctx context.Context, siteID string, moved []contextp
 	})
 }
 
-func mapKeyset() paging.Keyset[contextpack.MapRow] {
+func mapKeyset(byDepth bool) paging.Keyset[contextpack.MapRow] {
+	keys := []paging.SortKey[contextpack.MapRow]{
+		paging.TextKey[contextpack.MapRow]("path", "path", func(row contextpack.MapRow) any { return row.Path }),
+	}
+	if byDepth {
+		keys = append([]paging.SortKey[contextpack.MapRow]{
+			paging.IntKey[contextpack.MapRow]("depth", "depth", func(row contextpack.MapRow) any { return row.Depth }),
+		}, keys...)
+	}
 	return paging.Keyset[contextpack.MapRow]{
 		IDColumn: "page_id",
 		ID:       func(row contextpack.MapRow) string { return row.PageID },
-		Keys: []paging.SortKey[contextpack.MapRow]{
-			paging.TextKey[contextpack.MapRow]("path", "path", func(row contextpack.MapRow) any { return row.Path }),
-		},
+		Keys:     keys,
 	}
 }
 
@@ -104,6 +110,15 @@ func (r *PageMapRepo) List(ctx context.Context, q contextpack.MapRowQuery, page 
 	builder := squirrel.Select(mapColumns).From("page_map").Where(squirrel.Eq{"site_id": q.SiteID, "node": 1})
 	if q.ParentID != nil {
 		builder = builder.Where(squirrel.Eq{"parent_id": *q.ParentID})
+	}
+	if q.Except != "" {
+		builder = builder.Where(squirrel.NotEq{"page_id": q.Except})
+	}
+	if q.MinDepth > 0 {
+		builder = builder.Where(squirrel.GtOrEq{"depth": q.MinDepth})
+	}
+	if q.MaxDepth != nil {
+		builder = builder.Where(squirrel.LtOrEq{"depth": *q.MaxDepth})
 	}
 	if q.Under != "" {
 		builder = builder.Where("trail >= ? AND trail < ?", q.Under, q.Under[:len(q.Under)-1]+trailCeiling)
@@ -117,7 +132,7 @@ func (r *PageMapRepo) List(ctx context.Context, q contextpack.MapRowQuery, page 
 	if q.Within != "" {
 		builder = builder.Where(withinCondition, q.Within, q.Within, q.Within)
 	}
-	return selectKeyed(ctx, r.store.execFrom(ctx), builder, mapKeyset(), page, scanMapRow, "site map")
+	return selectKeyed(ctx, r.store.execFrom(ctx), builder, mapKeyset(q.ByDepth), page, scanMapRow, "site map")
 }
 
 func scanMapRow(rows *sql.Rows) (contextpack.MapRow, error) {

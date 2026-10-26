@@ -133,6 +133,65 @@ func TestPageMapRepoKeepsTheMapAndSaysWhenItMoved(t *testing.T) {
 	}
 }
 
+func TestPageMapRepoWalksTheTreeLevelByLevel(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageMapRepo(store)
+	home := sqlitetest.Page(t, store, owner.ID, "/")
+	zeta := sqlitetest.Page(t, store, owner.ID, "/zeta/")
+	alpha := sqlitetest.Page(t, store, owner.ID, "/alpha/")
+	deep := sqlitetest.Page(t, store, owner.ID, "/zeta/a/")
+	deeper := sqlitetest.Page(t, store, owner.ID, "/zeta/a/b/")
+	rows := []contextpack.MapRow{
+		mapRow(home, "", home.ID+"/"),
+		mapRow(zeta, home.ID, home.ID+"/"+zeta.ID+"/"),
+		mapRow(alpha, home.ID, home.ID+"/"+alpha.ID+"/"),
+		mapRow(deep, zeta.ID, home.ID+"/"+zeta.ID+"/"+deep.ID+"/"),
+		mapRow(deeper, deep.ID, home.ID+"/"+zeta.ID+"/"+deep.ID+"/"+deeper.ID+"/"),
+	}
+	for i, depth := range []int{0, 1, 1, 2, 3} {
+		rows[i].Depth = depth
+	}
+	generation, _, err := repo.State(t.Context(), owner.ID)
+	if err != nil {
+		t.Fatalf("State: %v", err)
+	}
+	if err = repo.Write(t.Context(), owner.ID, rows, nil, generation); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	walk := func(q contextpack.MapRowQuery) []string {
+		t.Helper()
+		q.SiteID, q.ByDepth = owner.ID, true
+		var out []string
+		request := paging.Request{Limit: 2}
+		for {
+			got, listErr := repo.List(t.Context(), q, request)
+			if listErr != nil {
+				t.Fatalf("List(%+v): %v", q, listErr)
+			}
+			out = append(out, paths(got.Items)...)
+			if !got.HasMore {
+				return out
+			}
+			request.After = got.Next
+		}
+	}
+	if got := walk(contextpack.MapRowQuery{}); !slices.Equal(got, []string{"/", "/alpha/", "/zeta/", "/zeta/a/", "/zeta/a/b/"}) {
+		t.Errorf("the walk = %v, want each level in path order before the next", got)
+	}
+	two := 2
+	if got := walk(contextpack.MapRowQuery{Under: home.ID + "/", MinDepth: 1, MaxDepth: &two}); !slices.Equal(got, []string{"/alpha/", "/zeta/", "/zeta/a/"}) {
+		t.Errorf("two levels under home = %v", got)
+	}
+	parent := home.ID
+	if got := walk(contextpack.MapRowQuery{ParentID: &parent, Except: zeta.ID}); !slices.Equal(got, []string{"/alpha/"}) {
+		t.Errorf("zeta's siblings = %v", got)
+	}
+}
+
 func TestEveryWriterThatMovesTheMapMarksItStale(t *testing.T) {
 	t.Parallel()
 

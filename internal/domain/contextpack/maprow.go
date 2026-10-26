@@ -30,12 +30,16 @@ type MapRow struct {
 }
 
 type MapRowQuery struct {
-	SiteID   string
 	ParentID *string
+	MaxDepth *int
+	SiteID   string
 	Under    string
 	Text     string
 	TypeID   string
 	Within   string
+	Except   string
+	MinDepth int
+	ByDepth  bool
 }
 
 func (r MapRow) Ancestors() []string {
@@ -72,6 +76,10 @@ func (q MapRowQuery) Holds(r MapRow) bool {
 	case r.SiteID != q.SiteID, !r.Row:
 		return false
 	case q.ParentID != nil && r.ParentID != *q.ParentID:
+		return false
+	case q.Except != "" && r.PageID == q.Except:
+		return false
+	case r.Depth < q.MinDepth, q.MaxDepth != nil && r.Depth > *q.MaxDepth:
 		return false
 	case q.Under != "" && !strings.HasPrefix(r.Trail, q.Under):
 		return false

@@ -27,6 +27,9 @@ func BodyStates() []BodyState {
 
 type MapNode struct {
 	Page         Ref                     `json:"page"`
+	ParentID     string                  `json:"parentId"`
+	Why          *ParentWhy              `json:"why,omitempty"`
+	Depth        int                     `json:"depth"`
 	EntityID     string                  `json:"entityId,omitempty"`
 	Status       pagemap.Status          `json:"status"`
 	Twin         *Ref                    `json:"twin,omitempty"`
