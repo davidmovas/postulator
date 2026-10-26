@@ -7,10 +7,12 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/application/applicationtest"
 	appgraph "github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	graphdomain "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
@@ -56,6 +58,65 @@ func (f *siteProposals) parentsOf(t *testing.T, entityID string) []string {
 		}
 	}
 	return out
+}
+
+func (f proposeFixture) child(t *testing.T, path, title string, parent pagemap.Page) pagemap.Page {
+	t.Helper()
+
+	page := f.page(t, path, title)
+	page.ParentPageID, page.ParentReason, page.WPID = new(parent.ID), pagemap.ParentJSONLD, new(int64(len(path)))
+	if err := f.pages.Update(t.Context(), page); err != nil {
+		t.Fatalf("place %s under %s: %v", path, parent.Path, err)
+	}
+	return page
+}
+
+func TestAModelProposalWithoutAParentTakesThePageTreesParent(t *testing.T) {
+	t.Parallel()
+
+	answer := `{"entities":[
+		{"path":"/coffee/espresso/","name":"Espresso","intent":"","primaryKeyword":"espresso","secondaryKeywords":[],"anchors":[],"parentPath":"","relatedPaths":[]},
+		{"path":"/coffee/espresso/doppio/","name":"Doppio","intent":"","primaryKeyword":"doppio","secondaryKeywords":[],"anchors":[],"parentPath":"","relatedPaths":[]},
+		{"path":"/coffee/filter/","name":"Filter","intent":"","primaryKeyword":"filter","secondaryKeywords":[],"anchors":[],"parentPath":"/tea/","relatedPaths":[]}
+	]}`
+	f := newProposeFixture(t, &scriptedModel{replies: []string{answer}}, fixedProfiles{})
+	service := appgraph.New(appgraph.Deps{
+		Entities: sqlite.NewEntityRepo(f.store), Edges: f.edges, Sites: sqlite.NewSiteRepo(f.store), Pages: f.pages,
+		Profiles: fixedProfiles{}, LLM: f.model, Identities: sqlite.NewPageIdentityRepo(f.store), Fields: sqlite.NewPageFieldRepo(f.store),
+		Findings: sqlite.NewFindingRepo(f.store), Maps: storeMap{store: f.store}, UnitOfWork: f.store,
+		Publisher: &applicationtest.Recorder{}, Clock: clock.NewFake(sqlitetest.Stamp),
+	})
+	coffee := f.page(t, "/coffee/", "Coffee")
+	created, err := service.CreateEntity(t.Context(), appgraph.CreateEntityRequest{SiteID: f.siteID, Name: "Coffee"})
+	if err != nil {
+		t.Fatalf("CreateEntity: %v", err)
+	}
+	coffee.EntityID = new(created.Entity.ID)
+	if err = f.pages.Update(t.Context(), coffee); err != nil {
+		t.Fatalf("map the hub: %v", err)
+	}
+	espresso := f.child(t, "/coffee/espresso/", "Espresso", coffee)
+	f.child(t, "/coffee/espresso/doppio/", "Doppio", espresso)
+	f.child(t, "/coffee/filter/", "Filter", coffee)
+	f.page(t, "/tea/", "Tea")
+
+	out, err := service.PreviewFromPages(t.Context(), appgraph.PreviewFromPagesRequest{SiteID: f.siteID, PathPrefix: "/coffee/"})
+	if err != nil {
+		t.Fatalf("PreviewFromPages: %v", err)
+	}
+	byPath := map[string]appgraph.ProposedEntity{}
+	for _, proposed := range out.Entities {
+		byPath[proposed.Path] = proposed
+	}
+	if got := byPath["/coffee/espresso/"]; got.ParentEntityID != created.Entity.ID || got.Parent != "/coffee/" {
+		t.Errorf("espresso's parent = %q / %q, want the hub and its entity", got.Parent, got.ParentEntityID)
+	}
+	if got := byPath["/coffee/espresso/doppio/"]; got.Parent != "/coffee/espresso/" || got.ParentEntityID != "" {
+		t.Errorf("doppio's parent = %q / %q, want the espresso proposed beside it", got.Parent, got.ParentEntityID)
+	}
+	if got := byPath["/coffee/filter/"]; got.Parent != "/tea/" || got.ParentEntityID != "" {
+		t.Errorf("a parent the model named = %q / %q, want it kept", got.Parent, got.ParentEntityID)
+	}
 }
 
 func TestAGraphWriterThatMovesAParentSettlesTheTwoHierarchiesAtOnce(t *testing.T) {
