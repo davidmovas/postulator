@@ -4,19 +4,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { copy } from "../../../copy/index.js";
 import { errorMessageOf } from "../../../data/errors.js";
 import { useApplyProposals, useGraph, usePreviewFromPages, useProposeFromKeywords } from "../../../data/hooks/graph.js";
+import { usePageTypes } from "../../../data/hooks/templates.js";
 import { pushToast } from "../../../data/toasts.js";
 import type { ApplyProposalsResponse, PreviewFromPagesRequest, ProposedEntity } from "../../../data/types.js";
 import { Button, RestartAltIcon, Stars2Icon, Workspace, useElapsed } from "../../../ui/index.js";
 import type { GraphIndex } from "../model/index.js";
 import { buildGraphIndex } from "../model/index.js";
 import type { ProposalEdits, ProposalSource } from "../model/proposal-tree.js";
-import { clashesOf, everyTickable, sentProposals } from "../model/proposal-tree.js";
+import { clashesOf, everyTickable, sentProposals, sourceTypesOf } from "../model/proposal-tree.js";
 import { keywordLines, writesOf } from "../model/proposals.js";
 import type { ProposalMemory, ProposalOpener, ProposalStage } from "./proposal-memory.js";
 import { blankMemory, forgetProposal, memoryOf, remember, seedKey, useProposalMemory } from "./proposal-memory.js";
 import type { Pick, ProposalInput } from "./propose-pick.js";
 import { ProposalPick, noParent } from "./propose-pick.js";
-import type { ExistingEntity, ReviewState } from "./propose-review.js";
+import type { ExistingEntity, NamedType, ReviewState } from "./propose-review.js";
 import { ProposalConfirm, ProposalReview } from "./propose-review.js";
 
 export type { ProposalInput } from "./propose-pick.js";
@@ -26,6 +27,8 @@ const said = copy.graph.ai;
 const siteSource = "site" as PreviewFromPagesRequest["source"];
 
 const noEdits: ProposalEdits = new Map();
+
+type SourceTypes = Parameters<typeof sourceTypesOf>[0];
 
 export type ProposalStart =
     | { kind: "pick"; source: ProposalInput; index: GraphIndex; onReview: () => void }
@@ -38,7 +41,7 @@ export interface ProposeEntitiesDrawerProps {
     start: ProposalStart;
 }
 
-function freshReview(answered: readonly ProposedEntity[]): Partial<ProposalMemory> {
+function freshReview(answered: readonly ProposedEntity[], pageTypes: SourceTypes): Partial<ProposalMemory> {
     return {
         proposals: answered,
         kept: everyTickable(answered.length, clashesOf(answered, noEdits)),
@@ -47,6 +50,9 @@ function freshReview(answered: readonly ProposedEntity[]): Partial<ProposalMemor
         filter: "all",
         collapsed: new Set(),
         focus: null,
+        anchor: null,
+        pageTypes: sourceTypesOf(pageTypes),
+        typeChoice: null,
     };
 }
 
@@ -81,6 +87,11 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
         [start, graph.data],
     );
     const existing = useMemo(() => existingOf(index), [index]);
+    const pageTypes = usePageTypes(open ? siteId : null);
+    const types: readonly NamedType[] = useMemo(
+        () => (pageTypes.data?.types ?? []).map((type) => ({ id: type.id, name: type.name })),
+        [pageTypes.data],
+    );
     const previewPages = usePreviewFromPages();
     const previewKeywords = useProposeFromKeywords();
     const apply = useApplyProposals();
@@ -130,7 +141,7 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
             { request: { ...seed, source: siteSource }, signal: abort.signal },
             {
                 onSuccess: (answered) => {
-                    remember(siteId, "seed", freshReview(answered.entities ?? []));
+                    remember(siteId, "seed", freshReview(answered.entities ?? [], answered.pageTypes));
                 },
             },
         );
@@ -143,8 +154,8 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
         return null;
     }
 
-    const received = (answered: readonly ProposedEntity[]): void => {
-        remember(siteId, opener, { ...freshReview(answered), stage: "review" });
+    const received = (answered: readonly ProposedEntity[], sourceTypes: SourceTypes): void => {
+        remember(siteId, opener, { ...freshReview(answered, sourceTypes), stage: "review" });
     };
 
     const stop = (): void => {
@@ -159,7 +170,7 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
         if (pick.input === "pages") {
             previewPages.mutate(
                 { request: { siteId, pageIds: [...pick.selected] }, signal: held.signal },
-                { onSuccess: (answered) => received(answered.entities ?? []) },
+                { onSuccess: (answered) => received(answered.entities ?? [], answered.pageTypes) },
             );
             return;
         }
@@ -167,7 +178,7 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
         if (pick.parentId !== noParent) {
             request.parentEntityId = pick.parentId;
         }
-        previewKeywords.mutate({ request, signal: held.signal }, { onSuccess: (answered) => received(answered.entities ?? []) });
+        previewKeywords.mutate({ request, signal: held.signal }, { onSuccess: (answered) => received(answered.entities ?? [], null) });
     };
 
     const chosen = sentProposals(proposals, memory.edits, memory.kept, {
@@ -327,7 +338,14 @@ export function ProposeEntitiesDrawer({ open, onOpenChange, siteId, start }: Pro
                 </div>
             ) : shown === "review" ? (
                 previewing ? null : (
-                    <ProposalReview proposals={proposals} state={memory} source={source} existing={existing} onChange={setReview} />
+                    <ProposalReview
+                        proposals={proposals}
+                        state={memory}
+                        source={source}
+                        existing={existing}
+                        types={types}
+                        onChange={setReview}
+                    />
                 )
             ) : shown === "confirm" ? (
                 <ProposalConfirm written={writes.written} joined={writes.joined} />

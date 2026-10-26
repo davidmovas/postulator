@@ -408,6 +408,12 @@ export const graph = {
         topLevel: "top level",
         unnamed: "No name",
         joins: "joins the existing entity of this name",
+        sharedName: (label: string, name: string) => `Shown as ${label}, because another entity is also named ${name}.`,
+        byType: "Tick by page type",
+        typePlaceholder: "Choose a page type",
+        typeOption: (name: string, count: number) => `${name} (${count})`,
+        keepType: "Keep all of this type",
+        dropType: "Keep none of this type",
         keepRow: (label: string, path: string) => `${label} at ${path}`,
         facts: (facts: readonly { label: string; value: string }[]) => facts.map((fact) => `${fact.label}: ${fact.value}`).join(" · "),
         clashes: {

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
 import type { PreviewFromPagesRequest, ProposedEntity } from "../../../data/types.js";
@@ -45,6 +45,10 @@ const fromSite: ProposedEntity[] = [
     { pageId: "p4", path: "/shop/plates/", name: "Plates", label: "Plates", parent: "/shop/", existingEntityId: "e7" },
 ];
 
+const fromSiteTypes: Readonly<Record<string, string>> = { p1: "t-cat", p2: "t-prod", p3: "t-cat", p4: "t-cat" };
+
+const answers: { site: ProposedEntity[]; siteTypes: Readonly<Record<string, string>> } = { site: fromSite, siteTypes: fromSiteTypes };
+
 function mutation<Request, Answer>(record: (request: Request) => void, answer: (request: Request) => Answer) {
     return {
         mutate: (input: { request: Request; signal?: AbortSignal }, options?: { onSuccess?: (answered: Answer) => void }) => {
@@ -68,11 +72,14 @@ vi.mock("../../../data/hooks/pages.js", async () => {
 
 vi.mock("../../../data/hooks/graph.js", () => ({
     usePreviewFromPages: () =>
-        mutation<PreviewFromPagesRequest, { entities: ProposedEntity[]; pages: number; skipped: number; tokens: number }>(
+        mutation<
+            PreviewFromPagesRequest,
+            { entities: ProposedEntity[]; pageTypes?: Readonly<Record<string, string>>; pages: number; skipped: number; tokens: number }
+        >(
             (request) => calls.previewed.push(request),
             (request) =>
                 request.source === "site"
-                    ? { entities: fromSite, pages: 4, skipped: 0, tokens: 0 }
+                    ? { entities: answers.site, pageTypes: answers.siteTypes, pages: answers.site.length, skipped: 0, tokens: 0 }
                     : { entities: proposals, pages: 2, skipped: 0, tokens: 12 },
         ),
     useProposeFromKeywords: () =>
@@ -87,6 +94,16 @@ vi.mock("../../../data/hooks/graph.js", () => ({
             () => ({ entities: [{}], edges: [{}, {}], mapped: 1, skipped: 0 }),
         ),
 }));
+
+vi.mock("../../../data/hooks/templates.js", async () => {
+    const fake = await import("../../../testing/pagetypes.js");
+    const types = [
+        fake.aPageType("t-cat", "category", { name: "Category" }),
+        fake.aPageType("t-guide", "guide", { name: "Guide" }),
+        fake.aPageType("t-prod", "product", { name: "Product" }),
+    ];
+    return { usePageTypes: () => ({ data: { types, fields: [] }, isPending: false }) };
+});
 
 const { ProposeEntitiesDrawer } = await import("./propose-entities.js");
 const { forgetProposal } = await import("./proposal-memory.js");
@@ -107,10 +124,17 @@ function keepBox(label: string, path: string): HTMLInputElement {
     return screen.getByRole<HTMLInputElement>("checkbox", { name: said.keepRow(label, path) });
 }
 
+beforeAll(() => {
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.releasePointerCapture = () => undefined;
+});
+
 beforeEach(() => {
     calls.previewed.length = 0;
     calls.keyworded.length = 0;
     calls.applied.length = 0;
+    answers.site = fromSite;
+    answers.siteTypes = fromSiteTypes;
     inFlight.hang = false;
     inFlight.signals.length = 0;
     for (const siteId of ["s1", "s2"]) {
@@ -440,5 +464,205 @@ describe("what the entity proposal drawer keeps", () => {
         drawer("s1", fromPages);
         expect(screen.getByRole<HTMLInputElement>("checkbox", { name: "mugs/" }).checked).toBe(true);
         expect(screen.getByRole("button", { name: said.preview(2) })).toBeTruthy();
+    });
+});
+
+const fromFindings = { kind: "seed" as const, seed: { siteId: "s1", pageIds: ["p1", "p2", "p3", "p4"] } };
+
+async function reviewSeed(count = 4): Promise<ReturnType<typeof drawer>> {
+    const shown = drawer("s1", fromFindings);
+    await waitFor(() => {
+        expect(screen.getByText(said.reviewTitle(count))).toBeTruthy();
+    });
+    return shown;
+}
+
+const scrolled: number[] = [];
+
+const scrollingBefore = (["scrollTo", "scrollHeight"] as const).map(
+    (property) => [property, Object.getOwnPropertyDescriptor(HTMLElement.prototype, property)] as const,
+);
+
+function recordScrolls(): void {
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+        configurable: true,
+        writable: true,
+        value(first?: ScrollToOptions | number) {
+            if (typeof first === "object" && first.top !== undefined) {
+                scrolled.push(first.top);
+            }
+        },
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+        configurable: true,
+        get(): number {
+            return 5000;
+        },
+    });
+}
+
+function restoreScrolls(): void {
+    for (const [property, before] of scrollingBefore) {
+        if (before === undefined) {
+            Reflect.deleteProperty(HTMLElement.prototype, property);
+        } else {
+            Object.defineProperty(HTMLElement.prototype, property, before);
+        }
+    }
+}
+
+describe("ticking many proposals at once", () => {
+    it("ticks every shown row between the last box clicked and a shift-clicked one, past a blocked row, and unticks back", async () => {
+        await reviewSeed();
+        fireEvent.click(screen.getByRole("button", { name: said.keepNone }));
+
+        fireEvent.click(keepBox("Mugs", "/shop/mugs/"));
+        fireEvent.click(keepBox("Plates", "/shop/plates/"), { shiftKey: true });
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(keepBox("Mugs", "/shop/cups/").checked).toBe(false);
+        expect(screen.getByRole("button", { name: said.create(3) })).toBeTruthy();
+
+        fireEvent.click(keepBox("Plates", "/shop/plates/"));
+        fireEvent.click(keepBox("Blue Mug", "/shop/mugs/blue/"), { shiftKey: true });
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(false);
+        expect(rowOf("p1").getAttribute("aria-checked")).toBe("mixed");
+        expect(screen.getByRole("button", { name: said.create(1) })).toBeTruthy();
+    });
+
+    it("leaves what a folded branch holds out of a range", async () => {
+        await reviewSeed();
+        fireEvent.click(screen.getByRole("button", { name: said.keepNone }));
+        fireEvent.click(within(rowOf("p1")).getByRole("button", { name: said.collapseRow }));
+
+        fireEvent.click(keepBox("Plates", "/shop/plates/"));
+        fireEvent.click(keepBox("Mugs", "/shop/mugs/"), { shiftKey: true });
+        fireEvent.click(within(rowOf("p1")).getByRole("button", { name: said.expandRow }));
+
+        expect(keepBox("Mugs", "/shop/mugs/").getAttribute("aria-checked")).toBe("mixed");
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
+        expect(screen.getByRole("button", { name: said.create(2) })).toBeTruthy();
+    });
+
+    it("ticks and unticks every proposal of one source page type, and keeps the type chosen", async () => {
+        const first = await reviewSeed();
+        const picker = (): HTMLElement => screen.getByRole("combobox", { name: said.byType });
+
+        fireEvent.pointerDown(picker(), { button: 0, ctrlKey: false, pointerType: "mouse" });
+        expect(screen.getAllByRole("option").map((option) => option.textContent)).toStrictEqual([
+            said.typeOption("Category", 3),
+            said.typeOption("Product", 1),
+        ]);
+        fireEvent.click(screen.getByRole("option", { name: said.typeOption("Category", 3) }));
+
+        fireEvent.click(screen.getByRole("button", { name: said.keepNone }));
+        fireEvent.click(screen.getByRole("button", { name: said.keepType }));
+        expect(keepBox("Mugs", "/shop/mugs/").getAttribute("aria-checked")).toBe("mixed");
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
+        expect(keepBox("Mugs", "/shop/cups/").checked).toBe(false);
+
+        fireEvent.click(screen.getByRole("button", { name: said.keepAll }));
+        fireEvent.click(screen.getByRole("button", { name: said.dropType }));
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(false);
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(screen.getByRole("button", { name: said.create(1) })).toBeTruthy();
+
+        first.unmount();
+        await reviewSeed();
+        expect(picker().textContent).toContain(said.typeOption("Category", 3));
+    });
+
+    it("offers no type to tick by when the preview named none", async () => {
+        answers.siteTypes = {};
+        await reviewSeed();
+        expect(screen.queryByRole("combobox", { name: said.byType })).toBeNull();
+    });
+});
+
+describe("the proposal tree by keyboard", () => {
+    beforeEach(recordScrolls);
+    afterEach(restoreScrolls);
+
+    it("moves the focused row with the arrows, folds with left and right, and ticks with space", async () => {
+        await reviewSeed();
+        const tree = screen.getByRole("tree");
+        const focused = (): string | null => tree.getAttribute("aria-activedescendant");
+        const press = (key: string, shiftKey = false): void => {
+            fireEvent.keyDown(tree, { key, shiftKey });
+        };
+
+        expect(tree.tabIndex).toBe(0);
+        press("ArrowDown");
+        expect(focused()).toBe(rowOf("p1").id);
+        expect(rowOf("p1").getAttribute("aria-current")).toBe("true");
+        expect(document.querySelector('[data-proposal-inspector="0"]')).not.toBeNull();
+
+        press("ArrowDown");
+        expect(focused()).toBe(rowOf("p2").id);
+        expect(rowOf("p2").getAttribute("aria-level")).toBe("2");
+        press("ArrowLeft");
+        expect(focused()).toBe(rowOf("p1").id);
+        press("ArrowLeft");
+        expect(rowOf("p1").getAttribute("aria-expanded")).toBe("false");
+        expect(document.querySelector('[data-proposal-page="p2"]')).toBeNull();
+        press("ArrowRight");
+        expect(rowOf("p1").getAttribute("aria-expanded")).toBe("true");
+        press("ArrowRight");
+        expect(focused()).toBe(rowOf("p2").id);
+        press("End");
+        expect(focused()).toBe(rowOf("p4").id);
+        press("ArrowUp");
+        expect(focused()).toBe(rowOf("p3").id);
+        press("Home");
+        expect(focused()).toBe(rowOf("p1").id);
+
+        press(" ");
+        expect(rowOf("p1").getAttribute("aria-checked")).toBe("false");
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+
+        press("End");
+        press(" ", true);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(false);
+        expect(screen.getByRole("button", { name: said.create(0) })).toBeTruthy();
+    });
+
+    it("keeps the focused row scrolled into view", async () => {
+        answers.site = Array.from({ length: 60 }, (_, at) => ({
+            pageId: `q${String(at)}`,
+            path: `/q${String(at)}/`,
+            name: `Page ${String(at)}`,
+            label: `Page ${String(at)}`,
+        }));
+        answers.siteTypes = {};
+        await reviewSeed(60);
+
+        const tree = screen.getByRole("tree");
+        fireEvent.keyDown(tree, { key: "ArrowDown" });
+        scrolled.length = 0;
+        fireEvent.keyDown(tree, { key: "End" });
+
+        expect(scrolled.some((top) => top > 0)).toBe(true);
+    });
+});
+
+describe("a proposal shown by another name", () => {
+    it("says on its row that it is shown by its label, and stops once renamed", async () => {
+        answers.site = [
+            ...fromSite,
+            { pageId: "p5", path: "/gifts/mugs/", name: "Mugs", label: "Gifts Mugs", parent: "/gifts/", parentEntityId: "e2" },
+        ];
+        await reviewSeed(5);
+
+        const shared = within(rowOf("p5"));
+        expect(shared.getByText("Gifts Mugs")).toBeTruthy();
+        expect(shared.getByText(said.sharedName("Gifts Mugs", "Mugs"))).toBeTruthy();
+        expect(within(rowOf("p1")).queryByText(said.sharedName("Mugs", "Mugs"))).toBeNull();
+        expect(within(rowOf("p3")).getByText(said.clashes.name_in_batch)).toBeTruthy();
+
+        fireEvent.click(shared.getByText("Gifts Mugs"));
+        fireEvent.change(screen.getByLabelText(said.nameField), { target: { value: "Gift mugs" } });
+        expect(within(rowOf("p5")).queryByText(said.sharedName("Gifts Mugs", "Mugs"))).toBeNull();
     });
 });

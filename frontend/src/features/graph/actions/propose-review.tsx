@@ -1,5 +1,5 @@
-import type { ReactElement } from "react";
-import { useMemo, useState } from "react";
+import type { ChangeEvent, KeyboardEvent, ReactElement } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import type { ProposedEntity } from "../../../data/types.js";
@@ -20,7 +20,16 @@ import {
     cx,
 } from "../../../ui/index.js";
 import { clashLabel } from "../labels.js";
-import type { ParentChoice, ProposalEdit, ProposalEdits, ProposalFilter, ProposalSource, ProposalTree, TreeRow } from "../model/proposal-tree.js";
+import type {
+    ParentChoice,
+    ProposalEdit,
+    ProposalEdits,
+    ProposalFilter,
+    ProposalSource,
+    ProposalTree,
+    TreeKey,
+    TreeRow,
+} from "../model/proposal-tree.js";
 import {
     branches,
     cascaded,
@@ -37,7 +46,12 @@ import {
     proposalFilters,
     proposalTree,
     pruned,
+    rangeTicked,
+    sharedLabel,
     tickState,
+    tickedByType,
+    treeStep,
+    typeCounts,
     visibleRows,
 } from "../model/proposal-tree.js";
 
@@ -46,6 +60,15 @@ const said = copy.graph.ai;
 const rowHeight = 38;
 const indentPx = 18;
 
+const treeKeys: Readonly<Record<string, TreeKey>> = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    Home: "home",
+    End: "end",
+};
+
 export interface ReviewState {
     kept: ReadonlySet<number>;
     edits: ProposalEdits;
@@ -53,11 +76,24 @@ export interface ReviewState {
     filter: ProposalFilter;
     collapsed: ReadonlySet<number>;
     focus: number | null;
+    anchor: number | null;
+    pageTypes: ReadonlyMap<string, string>;
+    typeChoice: string | null;
 }
 
 export interface ExistingEntity {
     id: string;
     label: string;
+}
+
+export interface NamedType {
+    id: string;
+    name: string;
+}
+
+function shifted(event: ChangeEvent<HTMLInputElement>): boolean {
+    const native = event.nativeEvent;
+    return native instanceof MouseEvent && native.shiftKey;
 }
 
 const filterOptions: readonly SegmentedOption<ProposalFilter>[] = proposalFilters.map((value) => ({
@@ -131,6 +167,10 @@ function noteOf(context: Context, at: number): { text: string; tone: string } | 
     if ((proposal?.existingEntityId ?? "") !== "" && !changed(context.proposals, context.edits, at)) {
         return { text: said.joins, tone: "text-ink-faint" };
     }
+    const shown = sharedLabel(context.proposals, context.edits, context.clashes, at);
+    if (shown !== null && proposal !== undefined) {
+        return { text: said.sharedName(shown, proposal.name.trim()), tone: "text-info" };
+    }
     const facts = proposal?.facts ?? [];
     if (facts.length > 0) {
         return { text: said.facts(facts), tone: "text-ink-dim" };
@@ -142,14 +182,17 @@ function noteOf(context: Context, at: number): { text: string; tone: string } | 
 interface RowProps {
     context: Context;
     row: TreeRow;
+    id: string;
     focused: boolean;
-    onTick: (at: number) => void;
+    onTick: (at: number, ranged: boolean) => void;
     onFold: (at: number) => void;
     onFocus: (at: number) => void;
+    onGrab: () => void;
 }
 
-function ProposalRow({ context, row, focused, onTick, onFold, onFocus }: RowProps): ReactElement {
+function ProposalRow({ context, row, id, focused, onTick, onFold, onFocus, onGrab }: RowProps): ReactElement {
     const { at } = row;
+    const pressedShift = useRef(false);
     const proposal = context.proposals[at];
     const name = nameOf(context.proposals, context.edits, at);
     const path = pathOf(proposal);
@@ -163,23 +206,37 @@ function ProposalRow({ context, row, focused, onTick, onFold, onFocus }: RowProp
     const allBlocked = blocked && state === "off" && !row.branch;
     return (
         <div
+            id={id}
+            role="treeitem"
+            aria-level={row.depth + 1}
+            aria-expanded={row.branch ? row.open : undefined}
+            aria-checked={state === "some" ? "mixed" : state === "on"}
+            aria-disabled={allBlocked ? true : undefined}
             data-proposal={proposal?.name ?? ""}
             data-proposal-page={proposal?.pageId}
             data-proposal-at={at}
             data-proposal-state={blocked ? "blocked" : state}
             aria-current={focused ? true : undefined}
+            onMouseDown={(event) => {
+                event.preventDefault();
+                pressedShift.current = event.shiftKey;
+                onGrab();
+            }}
             onClick={() => {
                 onFocus(at);
             }}
             className={cx(
-                "flex cursor-default items-center gap-1.5 border-b border-inset pr-3",
-                focused ? "bg-accent-soft" : "hover:bg-raised",
+                "flex cursor-default items-center gap-1.5 border-b border-inset pr-3 select-none",
+                focused
+                    ? "bg-accent-soft group-focus-visible/tree:shadow-[inset_2px_0_0_var(--color-accent)]"
+                    : "hover:bg-raised",
             )}
             style={{ height: rowHeight, paddingLeft: 8 + row.depth * indentPx }}
         >
             {row.branch ? (
                 <button
                     type="button"
+                    tabIndex={-1}
                     aria-label={row.open ? said.collapseRow : said.expandRow}
                     aria-expanded={row.open}
                     className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-ink-dim hover:bg-inset hover:text-ink"
@@ -200,12 +257,15 @@ function ProposalRow({ context, row, focused, onTick, onFold, onFocus }: RowProp
                 className="flex shrink-0 items-center"
             >
                 <Checkbox
+                    tabIndex={-1}
                     checked={state === "on"}
                     indeterminate={state === "some"}
                     disabled={allBlocked}
                     aria-label={path === "" ? shown : said.keepRow(shown, path)}
-                    onChange={() => {
-                        onTick(at);
+                    onChange={(event) => {
+                        const ranged = pressedShift.current || shifted(event);
+                        pressedShift.current = false;
+                        onTick(at, ranged);
                     }}
                 />
             </span>
@@ -362,15 +422,70 @@ function Inspector({ context, at, source, existing, onEdit }: InspectorProps): R
     );
 }
 
+interface TypeBarProps {
+    proposals: readonly ProposedEntity[];
+    state: ReviewState;
+    kept: ReadonlySet<number>;
+    clashes: ReadonlyMap<number, string>;
+    types: readonly NamedType[];
+    onChange: (patch: Partial<ReviewState>) => void;
+}
+
+function TypeBar({ proposals, state, kept, clashes, types, onChange }: TypeBarProps): ReactElement | null {
+    const counts = useMemo(() => typeCounts(proposals, state.pageTypes), [proposals, state.pageTypes]);
+    const options: SelectOption<string>[] = useMemo(
+        () =>
+            types
+                .filter((type) => counts.has(type.id))
+                .map((type) => ({ value: type.id, label: said.typeOption(type.name, counts.get(type.id) ?? 0) })),
+        [types, counts],
+    );
+    if (options.length === 0) {
+        return null;
+    }
+    const chosen = state.typeChoice !== null && counts.has(state.typeChoice) ? state.typeChoice : null;
+    const tickType = (on: boolean): void => {
+        if (chosen !== null) {
+            onChange({ kept: tickedByType(proposals, state.pageTypes, kept, clashes, chosen, on) });
+        }
+    };
+    return (
+        <div data-proposal-types={true} className="flex shrink-0 flex-wrap items-center gap-2 border-b border-hairline px-3 py-1.5">
+            <span className="text-xs text-ink-soft">{said.byType}</span>
+            <div className="w-56 max-w-full">
+                <Select
+                    size="sm"
+                    aria-label={said.byType}
+                    placeholder={said.typePlaceholder}
+                    value={chosen}
+                    options={options}
+                    onValueChange={(typeChoice) => {
+                        onChange({ typeChoice });
+                    }}
+                />
+            </div>
+            <Button size="sm" variant="ghost" disabled={chosen === null} onClick={() => tickType(true)}>
+                {said.keepType}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={chosen === null} onClick={() => tickType(false)}>
+                {said.dropType}
+            </Button>
+        </div>
+    );
+}
+
 export interface ProposalReviewProps {
     proposals: readonly ProposedEntity[];
     state: ReviewState;
     source: ProposalSource;
     existing: readonly ExistingEntity[];
+    types: readonly NamedType[];
     onChange: (patch: Partial<ReviewState>) => void;
 }
 
-export function ProposalReview({ proposals, state, source, existing, onChange }: ProposalReviewProps): ReactElement {
+export function ProposalReview({ proposals, state, source, existing, types, onChange }: ProposalReviewProps): ReactElement {
+    const treeId = useId();
+    const treeRef = useRef<HTMLDivElement>(null);
     const tree = useMemo(() => proposalTree(proposals, state.edits), [proposals, state.edits]);
     const clashes = useMemo(() => clashesOf(proposals, state.edits), [proposals, state.edits]);
     const kept = useMemo(() => pruned(state.kept, clashes), [state.kept, clashes]);
@@ -385,6 +500,8 @@ export function ProposalReview({ proposals, state, source, existing, onChange }:
     );
     const tickableCount = proposals.length - clashes.size;
     const focus = state.focus !== null && state.focus < proposals.length ? state.focus : null;
+    const focusRow = focus === null ? -1 : rows.findIndex((row) => row.at === focus);
+    const rowId = (at: number): string => `${treeId}-${String(at)}`;
 
     const edit = (at: number, next: ProposalEdit | null): void => {
         const edits = new Map(state.edits);
@@ -394,6 +511,43 @@ export function ProposalReview({ proposals, state, source, existing, onChange }:
             edits.set(at, next);
         }
         onChange({ edits });
+    };
+
+    const tick = (at: number, ranged: boolean): void => {
+        const anchored = ranged && state.anchor !== null && rows.some((row) => row.at === state.anchor);
+        const next = ranged ? rangeTicked(tree, kept, clashes, rows, state.anchor, at) : cascaded(tree, kept, clashes, at);
+        onChange(anchored ? { kept: next } : { kept: next, anchor: at });
+    };
+
+    const fold = (at: number, shut: boolean): void => {
+        const collapsed = new Set(state.collapsed);
+        if (shut) {
+            collapsed.add(at);
+        } else {
+            collapsed.delete(at);
+        }
+        onChange({ collapsed });
+    };
+
+    const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+        const key = treeKeys[event.key];
+        if (key !== undefined) {
+            event.preventDefault();
+            const step = treeStep(rows, tree, state.collapsed, focus, key);
+            if (step === null) {
+                return;
+            }
+            if (step.kind === "focus") {
+                onChange({ focus: step.at });
+            } else {
+                fold(step.at, step.kind === "collapse");
+            }
+            return;
+        }
+        if (event.key === " " && focus !== null && focusRow >= 0) {
+            event.preventDefault();
+            tick(focus, event.shiftKey);
+        }
     };
 
     return (
@@ -443,34 +597,40 @@ export function ProposalReview({ proposals, state, source, existing, onChange }:
                         </Button>
                     </span>
                 </div>
-                <div role="tree" aria-label={said.reviewTitle(proposals.length)} className="flex min-h-0 flex-1 flex-col">
+                <TypeBar proposals={proposals} state={state} kept={kept} clashes={clashes} types={types} onChange={onChange} />
+                <div
+                    ref={treeRef}
+                    role="tree"
+                    tabIndex={0}
+                    aria-label={said.reviewTitle(proposals.length)}
+                    aria-activedescendant={focusRow >= 0 && focus !== null ? rowId(focus) : undefined}
+                    onKeyDown={onKeyDown}
+                    className="group/tree flex min-h-0 flex-1 flex-col outline-none"
+                >
                     {rows.length === 0 ? (
                         <p className="p-3 text-xs text-ink-dim">{said.noMatchProposals}</p>
                     ) : (
                         <VirtualRows
                             count={rows.length}
                             rowHeight={rowHeight}
+                            reveal={focusRow >= 0 ? focusRow : undefined}
                             row={(position) => {
                                 const row = rows[position];
                                 return row === undefined ? null : (
                                     <ProposalRow
                                         context={context}
                                         row={row}
+                                        id={rowId(row.at)}
                                         focused={row.at === focus}
-                                        onTick={(at) => {
-                                            onChange({ kept: cascaded(tree, kept, clashes, at) });
-                                        }}
+                                        onTick={tick}
                                         onFold={(at) => {
-                                            const collapsed = new Set(state.collapsed);
-                                            if (collapsed.has(at)) {
-                                                collapsed.delete(at);
-                                            } else {
-                                                collapsed.add(at);
-                                            }
-                                            onChange({ collapsed });
+                                            fold(at, !state.collapsed.has(at));
                                         }}
                                         onFocus={(at) => {
                                             onChange({ focus: at });
+                                        }}
+                                        onGrab={() => {
+                                            treeRef.current?.focus({ preventScroll: true });
                                         }}
                                     />
                                 );

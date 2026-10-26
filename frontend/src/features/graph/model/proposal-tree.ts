@@ -1,4 +1,5 @@
 import type { ProposedEntity } from "../../../data/types.js";
+import { between } from "../../../ui/selection.js";
 
 export type ParentChoice =
     | { kind: "root" }
@@ -268,6 +269,151 @@ export function cascaded(
         }
     }
     return next;
+}
+
+export function rangeTicked(
+    tree: ProposalTree,
+    kept: ReadonlySet<number>,
+    clashes: ReadonlyMap<number, string>,
+    rows: readonly TreeRow[],
+    anchor: number | null,
+    target: number,
+): ReadonlySet<number> {
+    const span = anchor === null ? [] : between(rows.map((row) => row.at), anchor, target);
+    if (anchor === null || span.length === 0) {
+        return cascaded(tree, kept, clashes, target);
+    }
+    const turnOn = tickState(tree, kept, clashes, anchor) !== "off";
+    const next = new Set(kept);
+    for (const held of span) {
+        if (!tickable(clashes, held)) {
+            continue;
+        }
+        if (turnOn) {
+            next.add(held);
+        } else {
+            next.delete(held);
+        }
+    }
+    return next;
+}
+
+export function sourceTypesOf(held: Readonly<Record<string, string | undefined>> | null | undefined): ReadonlyMap<string, string> {
+    const out = new Map<string, string>();
+    for (const [pageId, typeId] of Object.entries(held ?? {})) {
+        if (typeId !== undefined && typeId !== "") {
+            out.set(pageId, typeId);
+        }
+    }
+    return out;
+}
+
+function typeAt(proposals: readonly ProposedEntity[], pageTypes: ReadonlyMap<string, string>, at: number): string | undefined {
+    const pageId = proposals[at]?.pageId ?? "";
+    return pageId === "" ? undefined : pageTypes.get(pageId);
+}
+
+export function typeCounts(proposals: readonly ProposedEntity[], pageTypes: ReadonlyMap<string, string>): ReadonlyMap<string, number> {
+    const out = new Map<string, number>();
+    proposals.forEach((_, at) => {
+        const typeId = typeAt(proposals, pageTypes, at);
+        if (typeId !== undefined) {
+            out.set(typeId, (out.get(typeId) ?? 0) + 1);
+        }
+    });
+    return out;
+}
+
+export function tickedByType(
+    proposals: readonly ProposedEntity[],
+    pageTypes: ReadonlyMap<string, string>,
+    kept: ReadonlySet<number>,
+    clashes: ReadonlyMap<number, string>,
+    typeId: string,
+    on: boolean,
+): ReadonlySet<number> {
+    const next = new Set(kept);
+    proposals.forEach((_, at) => {
+        if (typeAt(proposals, pageTypes, at) !== typeId || !tickable(clashes, at)) {
+            return;
+        }
+        if (on) {
+            next.add(at);
+        } else {
+            next.delete(at);
+        }
+    });
+    return next;
+}
+
+export function sharedLabel(
+    proposals: readonly ProposedEntity[],
+    edits: ProposalEdits,
+    clashes: ReadonlyMap<number, string>,
+    at: number,
+): string | null {
+    const proposal = proposals[at];
+    if (proposal === undefined || clashes.has(at) || renamed(proposal, edits.get(at)) || moved(proposals, edits, at)) {
+        return null;
+    }
+    const label = (proposal.label ?? "").trim();
+    return label === "" || label === proposal.name.trim() ? null : label;
+}
+
+export type TreeKey = "up" | "down" | "left" | "right" | "home" | "end";
+
+export type TreeStep = { kind: "focus"; at: number } | { kind: "collapse"; at: number } | { kind: "expand"; at: number };
+
+export function treeStep(
+    rows: readonly TreeRow[],
+    tree: ProposalTree,
+    collapsed: ReadonlySet<number>,
+    focus: number | null,
+    key: TreeKey,
+): TreeStep | null {
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+    if (first === undefined || last === undefined) {
+        return null;
+    }
+    const position = focus === null ? -1 : rows.findIndex((row) => row.at === focus);
+    const row = rows[position];
+    if (key === "home" || (row === undefined && (key === "up" || key === "down"))) {
+        return { kind: "focus", at: first.at };
+    }
+    if (key === "end") {
+        return { kind: "focus", at: last.at };
+    }
+    if (row === undefined) {
+        return null;
+    }
+    switch (key) {
+        case "down": {
+            const next = rows[position + 1];
+            return next === undefined ? null : { kind: "focus", at: next.at };
+        }
+        case "up": {
+            const next = rows[position - 1];
+            return next === undefined ? null : { kind: "focus", at: next.at };
+        }
+        case "left": {
+            if (row.branch && row.open && !collapsed.has(row.at)) {
+                return { kind: "collapse", at: row.at };
+            }
+            const parent = tree.parentAt.get(row.at);
+            return parent === undefined || !rows.some((held) => held.at === parent) ? null : { kind: "focus", at: parent };
+        }
+        default: {
+            if (!row.branch) {
+                return null;
+            }
+            if (!row.open) {
+                return { kind: "expand", at: row.at };
+            }
+            const child = rows[position + 1];
+            return child === undefined || child.depth <= row.depth ? null : { kind: "focus", at: child.at };
+        }
+    }
 }
 
 export function orphaned(tree: ProposalTree, kept: ReadonlySet<number>, at: number): boolean {

@@ -15,11 +15,18 @@ import {
     parentChoices,
     proposalTree,
     pruned,
+    rangeTicked,
     sentProposals,
+    sharedLabel,
+    sourceTypesOf,
     subtree,
     tickState,
+    tickedByType,
+    treeStep,
+    typeCounts,
     visibleRows,
 } from "./proposal-tree.js";
+import type { TreeKey, TreeStep } from "./proposal-tree.js";
 
 const site: ProposedEntity[] = [
     { pageId: "p0", path: "/shop/", name: "Shop", parent: "/", parentEntityId: "" },
@@ -266,5 +273,111 @@ describe("the rows the tree shows", () => {
         { filter: "clash" as const, rows: [0, 4, 6] },
     ])("filters to the $filter rows with their ancestors", ({ filter, rows }) => {
         expect(visibleRows(site, none, tree, new Set([2]), { ...view, filter }).map((row) => row.at)).toStrictEqual(rows);
+    });
+});
+
+describe("a shift-range over the shown rows", () => {
+    const tree = proposalTree(site, none);
+    const clashes = clashesOf(site, none);
+    const view = { query: "", filter: "all" as const, collapsed: new Set<number>() };
+    const open = visibleRows(site, none, tree, new Set(), view);
+    const folded = visibleRows(site, none, tree, new Set(), { ...view, collapsed: new Set([1]) });
+
+    it.each([
+        { label: "forwards from a ticked anchor, past the blocked rows", rows: open, kept: [1, 2, 3], anchor: 1, target: 5, ticked: [1, 2, 3, 5] },
+        { label: "backwards from a ticked anchor", rows: open, kept: [5], anchor: 5, target: 2, ticked: [2, 3, 5] },
+        { label: "off, when the anchor is off", rows: open, kept: [0, 1, 2, 5], anchor: 3, target: 0, ticked: [5] },
+        { label: "over the shown rows only, leaving a folded branch's children", rows: folded, kept: [5], anchor: 5, target: 0, ticked: [0, 1, 5] },
+        { label: "as a plain click without an anchor", rows: open, kept: [], anchor: null, target: 1, ticked: [1, 2, 3] },
+        { label: "as a plain click when the anchor is hidden", rows: folded, kept: [], anchor: 2, target: 1, ticked: [1, 2, 3] },
+    ])("ticks $label", ({ rows, kept, anchor, target, ticked }) => {
+        expect([...rangeTicked(tree, new Set(kept), clashes, rows, anchor, target)].sort()).toStrictEqual(ticked);
+    });
+});
+
+describe("ticking by the source page's type", () => {
+    const clashes = clashesOf(site, none);
+    const types = sourceTypesOf({ p0: "hub", p1: "cat", p2: "prod", p3: "prod", p4: "cat", p5: "", p6: undefined });
+
+    it("keeps only the pages a type was named for", () => {
+        expect([...types]).toStrictEqual([
+            ["p0", "hub"],
+            ["p1", "cat"],
+            ["p2", "prod"],
+            ["p3", "prod"],
+            ["p4", "cat"],
+        ]);
+        expect(sourceTypesOf(null).size).toBe(0);
+    });
+
+    it("counts the proposals of each type", () => {
+        expect([...typeCounts(site, types)]).toStrictEqual([
+            ["hub", 1],
+            ["cat", 2],
+            ["prod", 2],
+        ]);
+        expect(typeCounts(words, types).size).toBe(0);
+    });
+
+    it.each([
+        { label: "ticks every open proposal of a type, never a blocked one", kept: [], typeId: "cat", on: true, ticked: [1] },
+        { label: "unticks a type and keeps the rest", kept: [0, 1, 2, 3], typeId: "prod", on: false, ticked: [0, 1] },
+        { label: "changes nothing for a type no proposal has", kept: [0], typeId: "none", on: true, ticked: [0] },
+    ])("$label", ({ kept, typeId, on, ticked }) => {
+        expect([...tickedByType(site, types, new Set(kept), clashes, typeId, on)].sort()).toStrictEqual(ticked);
+    });
+});
+
+describe("a name shared with another entity", () => {
+    const shared: ProposedEntity[] = [
+        { pageId: "p0", path: "/shop/", name: "Shop", label: "Shop" },
+        { pageId: "p1", path: "/shop/mugs/", name: "Mugs", label: "Shop Mugs", parent: "/shop/" },
+        { pageId: "p2", path: "/shop/cups/", name: "Mugs", label: "Other Mugs", parent: "/shop/", clash: "name_in_batch" },
+        { pageId: "p3", path: "/cups/", name: "Cups" },
+    ];
+
+    it.each<{ label: string; at: number; changes: ProposalEdits; shown: string | null }>([
+        { label: "says the label it is shown by", at: 1, changes: none, shown: "Shop Mugs" },
+        { label: "says nothing when the label is the name", at: 0, changes: none, shown: null },
+        { label: "says nothing without a label", at: 3, changes: none, shown: null },
+        { label: "leaves a blocked row to its clash", at: 2, changes: none, shown: null },
+        { label: "says nothing once renamed", at: 1, changes: edits([[1, { name: "Mug range" }]]), shown: null },
+        { label: "says nothing once moved", at: 1, changes: edits([[1, { parent: { kind: "root" } }]]), shown: null },
+        { label: "keeps saying it when only the keywords change", at: 1, changes: edits([[1, { keywords: ["mugs"] }]]), shown: "Shop Mugs" },
+    ])("$label", ({ at, changes, shown }) => {
+        expect(sharedLabel(shared, changes, clashesOf(shared, changes), at)).toBe(shown);
+    });
+});
+
+describe("moving through the tree by keyboard", () => {
+    const tree = proposalTree(site, none);
+    const view = { query: "", filter: "all" as const, collapsed: new Set<number>() };
+    const open = visibleRows(site, none, tree, new Set(), view);
+    const folded = visibleRows(site, none, tree, new Set(), { ...view, collapsed: new Set([1]) });
+    const searched = visibleRows(site, none, tree, new Set(), { ...view, query: "red", collapsed: new Set([0, 1]) });
+
+    it.each<{ label: string; rows: typeof open; collapsed: number[]; focus: number | null; key: TreeKey; step: TreeStep | null }>([
+        { label: "down from nothing to the first row", rows: open, collapsed: [], focus: null, key: "down", step: { kind: "focus", at: 0 } },
+        { label: "up from nothing to the first row", rows: open, collapsed: [], focus: null, key: "up", step: { kind: "focus", at: 0 } },
+        { label: "left from nothing nowhere", rows: open, collapsed: [], focus: null, key: "left", step: null },
+        { label: "down to the next shown row", rows: open, collapsed: [], focus: 0, key: "down", step: { kind: "focus", at: 1 } },
+        { label: "down from the last row nowhere", rows: open, collapsed: [], focus: 5, key: "down", step: null },
+        { label: "up to the row above", rows: open, collapsed: [], focus: 1, key: "up", step: { kind: "focus", at: 0 } },
+        { label: "up from the first row nowhere", rows: open, collapsed: [], focus: 0, key: "up", step: null },
+        { label: "home to the first row", rows: open, collapsed: [], focus: 3, key: "home", step: { kind: "focus", at: 0 } },
+        { label: "end to the last row", rows: open, collapsed: [], focus: 0, key: "end", step: { kind: "focus", at: 5 } },
+        { label: "left on an open branch folds it", rows: open, collapsed: [], focus: 1, key: "left", step: { kind: "collapse", at: 1 } },
+        { label: "left on a leaf to its parent", rows: open, collapsed: [], focus: 2, key: "left", step: { kind: "focus", at: 1 } },
+        { label: "left on a top leaf nowhere", rows: open, collapsed: [], focus: 5, key: "left", step: null },
+        { label: "right on a folded branch opens it", rows: folded, collapsed: [1], focus: 1, key: "right", step: { kind: "expand", at: 1 } },
+        { label: "right on an open branch to its first child", rows: open, collapsed: [], focus: 0, key: "right", step: { kind: "focus", at: 1 } },
+        { label: "right on a leaf nowhere", rows: open, collapsed: [], focus: 2, key: "right", step: null },
+        { label: "left on a branch a search holds open to its parent", rows: searched, collapsed: [0, 1], focus: 1, key: "left", step: { kind: "focus", at: 0 } },
+    ])("goes $label", ({ rows, collapsed, focus, key, step }) => {
+        expect(treeStep(rows, tree, new Set(collapsed), focus, key)).toStrictEqual(step);
+    });
+
+    it("goes nowhere in an empty tree", () => {
+        expect(treeStep([], tree, new Set(), null, "down")).toBeNull();
     });
 });

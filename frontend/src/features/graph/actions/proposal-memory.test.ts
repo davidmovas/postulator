@@ -30,7 +30,22 @@ describe("the proposal memory", () => {
         expect(held.filter).toBe("all");
         expect(held.collapsed.size).toBe(0);
         expect(held.focus).toBeNull();
+        expect(held.anchor).toBeNull();
+        expect(held.pageTypes.size).toBe(0);
+        expect(held.typeChoice).toBeNull();
         expect(held.seed).toBeNull();
+    });
+
+    it("keeps the source pages' types, the chosen type and the range's anchor with the review", () => {
+        const pageTypes = new Map([["p1", "t-cat"]]);
+        remember("s1", "seed", { pageTypes, typeChoice: "t-cat", anchor: 2 });
+        remember("s1", "seed", { focus: 1 });
+
+        const held = memoryOf("s1", "seed");
+        expect(held.pageTypes).toBe(pageTypes);
+        expect(held.typeChoice).toBe("t-cat");
+        expect(held.anchor).toBe(2);
+        expect(memoryOf("s2", "seed").typeChoice).toBeNull();
     });
 
     it("keeps what a site's opener built apart from every other site and opener", () => {

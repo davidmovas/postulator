@@ -19,6 +19,9 @@ export interface ProposalMemory {
     filter: ProposalFilter;
     collapsed: ReadonlySet<number>;
     focus: number | null;
+    anchor: number | null;
+    pageTypes: ReadonlyMap<string, string>;
+    typeChoice: string | null;
     seed: string | null;
 }
 
@@ -33,6 +36,9 @@ function blank(input: ProposalInput, stage: ProposalStage): ProposalMemory {
         filter: "all" as const,
         collapsed: new Set<number>(),
         focus: null,
+        anchor: null,
+        pageTypes: new Map<string, string>(),
+        typeChoice: null,
         seed: null,
     });
 }
