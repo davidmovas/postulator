@@ -6,14 +6,17 @@ import { copy } from "../../copy/index.js";
 import type { SiteMapNode } from "../../data/types.js";
 import {
     CenterFocusWeakIcon,
+    Checkbox,
     ChevronRightIcon,
     cx,
     DescriptionIcon,
     IconButton,
+    shiftHeld,
     StatusBadge,
     TableCell,
     TableRow,
 } from "../../ui/index.js";
+import type { TickState } from "../../ui/selection.js";
 import { findingsAddress } from "../findings/index.js";
 import {
     parentMethodName,
@@ -65,11 +68,18 @@ function Marks({ node }: { node: SiteMapNode }): ReactElement | null {
     );
 }
 
+export interface NodeTick {
+    label: string;
+    state: TickState;
+    onChange: (ranged: boolean) => void;
+}
+
 export interface NodeRowProps {
     siteId: string;
     node: SiteMapNode;
     depth: number;
     expanded: boolean;
+    tick?: NodeTick;
     onToggle: (pageId: string) => void;
     onOpen: (pageId: string) => void;
     onUnder: (pageId: string) => void;
@@ -77,12 +87,31 @@ export interface NodeRowProps {
 
 type PageCellProps = Omit<NodeRowProps, "siteId" | "onUnder">;
 
-function PageCell({ node, depth, expanded, onToggle, onOpen }: PageCellProps): ReactElement {
+function PageCell({ node, depth, expanded, tick, onToggle, onOpen }: PageCellProps): ReactElement {
     const { page, twin } = node;
     const trail = (node.trail ?? []).map((held) => held.title);
     return (
         <TableCell>
             <span className="flex min-w-0 items-center gap-1.5" style={{ paddingLeft: `${depth * indentStep}px` }}>
+                {tick === undefined ? null : (
+                    <span
+                        className="flex shrink-0 items-center"
+                        onMouseDown={(event) => {
+                            if (event.shiftKey) {
+                                event.preventDefault();
+                            }
+                        }}
+                    >
+                        <Checkbox
+                            aria-label={tick.label}
+                            checked={tick.state === "on"}
+                            indeterminate={tick.state === "some"}
+                            onChange={(event) => {
+                                tick.onChange(shiftHeld(event));
+                            }}
+                        />
+                    </span>
+                )}
                 {node.children === 0 ? (
                     <DescriptionIcon size={13} className="shrink-0 text-ink-faint" />
                 ) : (
@@ -198,7 +227,7 @@ export function NodeRow(props: NodeRowProps): ReactElement {
     };
 
     return (
-        <TableRow data-map-node={page.pageId}>
+        <TableRow data-map-node={page.pageId} data-map-tick={props.tick?.state}>
             {columns.map((column) => (
                 <Fragment key={column}>{cellOf(column)}</Fragment>
             ))}

@@ -1,7 +1,11 @@
 import { choiceParam, flagParam, queryCodec, sortParam, textParam } from "../../data/params.js";
 import type { PageSort } from "../../data/sorts.js";
-import type { PageFilter } from "../../data/types.js";
+import type { PageFacets, PageFilter } from "../../data/types.js";
 import { pageSortFields, pageStatuses } from "../../generated/vocab.js";
+
+export const bodyChoices = ["with", "without"] as const;
+
+export type BodyChoice = (typeof bodyChoices)[number];
 
 export interface PagesQuery {
     status: string;
@@ -9,6 +13,11 @@ export interface PagesQuery {
     descendants: boolean;
     unmapped: boolean;
     pathPrefix: string;
+    typeId: string;
+    body: BodyChoice | "";
+    findings: boolean;
+    branch: string;
+    search: string;
     sort: PageSort | null;
 }
 
@@ -18,6 +27,11 @@ const codec = queryCodec<PagesQuery>({
     descendants: flagParam("under"),
     unmapped: flagParam("unmapped"),
     pathPrefix: textParam("prefix"),
+    typeId: textParam("type"),
+    body: choiceParam("text", bodyChoices, ""),
+    findings: flagParam("findings"),
+    branch: textParam("branch"),
+    search: textParam("q"),
     sort: sortParam("sort", pageSortFields),
 });
 
@@ -46,11 +60,30 @@ export function filterOf(siteId: string, query: PagesQuery): PageFilter {
     if (query.pathPrefix !== "") {
         filter.pathPrefix = query.pathPrefix;
     }
+    if (query.typeId !== "") {
+        filter.pageTypeId = query.typeId;
+    }
+    if (query.body !== "") {
+        filter.body = query.body;
+    }
+    if (query.findings) {
+        filter.findings = true;
+    }
+    if (query.branch !== "") {
+        filter.under = query.branch;
+    }
+    if (query.search.trim() !== "") {
+        filter.search = query.search.trim();
+    }
     return filter;
 }
 
+export function facetsOf(filter: PageFilter): PageFacets {
+    return Object.fromEntries(Object.entries(filter).filter(([key]) => key !== "siteId")) as PageFacets;
+}
+
 export function narrowed(query: PagesQuery): boolean {
-    return codec.carries(query, ["status", "entityId", "unmapped", "pathPrefix"]);
+    return codec.carries(query, ["status", "entityId", "unmapped", "pathPrefix", "typeId", "body", "findings", "branch", "search"]);
 }
 
 const pageTabs = ["details", "model", "writer", "links", "mapping", "report", "preview"] as const;

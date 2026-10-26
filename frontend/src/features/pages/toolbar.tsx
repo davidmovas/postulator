@@ -2,86 +2,66 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import type { PageSort } from "../../data/sorts.js";
-import type { SelectOption } from "../../ui/index.js";
-import { Input, Select, Toolbar } from "../../ui/index.js";
+import type { SegmentedOption } from "../../ui/index.js";
+import { Input, SearchIcon, Segmented, Toolbar } from "../../ui/index.js";
 import type { PagesQuery } from "./params.js";
+import type { PagesView } from "./views/memory.js";
+import { pagesViews } from "./views/memory.js";
 
-type SortChoice = "pathAsc" | "pathDesc" | "newest" | "oldest";
+const said = copy.pages;
 
-const sortOptions: readonly SelectOption<SortChoice>[] = [
-    { value: "pathAsc", label: copy.pages.sortOptions.pathAsc },
-    { value: "pathDesc", label: copy.pages.sortOptions.pathDesc },
-    { value: "newest", label: copy.pages.sortOptions.newest },
-    { value: "oldest", label: copy.pages.sortOptions.oldest },
-];
-
-const sorts: Readonly<Record<SortChoice, PageSort>> = {
-    pathAsc: { field: "path", desc: false },
-    pathDesc: { field: "path", desc: true },
-    newest: { field: "createdAt", desc: true },
-    oldest: { field: "createdAt", desc: false },
-};
-
-export function sortChoice(sort: PageSort | null): SortChoice {
-    if (sort === null) {
-        return "pathAsc";
-    }
-    if (sort.field === "createdAt") {
-        return sort.desc ? "newest" : "oldest";
-    }
-    return sort.desc ? "pathDesc" : "pathAsc";
-}
+const viewOptions: readonly SegmentedOption<PagesView>[] = pagesViews.map((view) => ({ value: view, label: said.views[view] }));
 
 export interface PageToolbarProps {
+    view: PagesView;
+    onView: (view: PagesView) => void;
     query: PagesQuery;
     onChange: (next: PagesQuery) => void;
 }
 
-export function PageToolbar({ query, onChange }: PageToolbarProps): ReactElement {
-    const [prefix, setPrefix] = useState(query.pathPrefix);
+export function PageToolbar({ view, onView, query, onChange }: PageToolbarProps): ReactElement {
+    const [search, setSearch] = useState(query.search);
 
     useEffect(() => {
-        setPrefix(query.pathPrefix);
-    }, [query.pathPrefix]);
+        setSearch(query.search);
+    }, [query.search]);
 
-    const apply = (): void => {
-        const trimmed = prefix.trim();
-        if (trimmed !== query.pathPrefix) {
-            onChange({ ...query, pathPrefix: trimmed });
+    const apply = (value: string): void => {
+        const trimmed = value.trim();
+        if (trimmed !== query.search) {
+            onChange({ ...query, search: trimmed });
         }
     };
 
     return (
-        <Toolbar label={copy.pages.title}>
-            <div className="w-64">
-                <Input
-                    type="search"
-                    mono={true}
-                    value={prefix}
-                    placeholder="/"
-                    aria-label={copy.pages.search}
-                    onChange={(event) => {
-                        setPrefix(event.target.value);
-                    }}
-                    onBlur={apply}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                            apply();
-                        }
-                    }}
-                />
-            </div>
-            <div className="w-40">
-                <Select
-                    value={sortChoice(query.sort)}
-                    options={sortOptions}
-                    aria-label={copy.pages.sort}
-                    onValueChange={(next) => {
-                        onChange({ ...query, sort: sorts[next] });
-                    }}
-                />
-            </div>
+        <Toolbar label={said.title}>
+            <Segmented label={said.views.label} value={view} options={viewOptions} onValueChange={onView} />
+            {view === "list" ? (
+                <div className="relative w-64">
+                    <SearchIcon size={14} className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-ink-faint" />
+                    <Input
+                        type="search"
+                        value={search}
+                        placeholder={said.searchWords}
+                        aria-label={said.searchWords}
+                        className="pl-7"
+                        onChange={(event) => {
+                            setSearch(event.target.value);
+                            if (event.target.value === "") {
+                                apply("");
+                            }
+                        }}
+                        onBlur={() => {
+                            apply(search);
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                apply(search);
+                            }
+                        }}
+                    />
+                </div>
+            ) : null}
         </Toolbar>
     );
 }

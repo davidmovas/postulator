@@ -9,7 +9,7 @@ export interface Branch {
 export type Branches = ReadonlyMap<string, Branch>;
 
 export type TreeRow =
-    | { kind: "node"; key: string; node: SiteMapNode; depth: number; expanded: boolean }
+    | { kind: "node"; key: string; node: SiteMapNode; depth: number; expanded: boolean; ancestors: readonly string[] }
     | { kind: "more"; key: string; parentId: string; depth: number }
     | { kind: "loading"; key: string; parentId: string; depth: number };
 
@@ -37,7 +37,7 @@ export function openBranches(root: string, expanded: ReadonlySet<string>, branch
 export function flattenTree(root: string, expanded: ReadonlySet<string>, branches: Branches): TreeRow[] {
     const out: TreeRow[] = [];
     const seen = new Set([root]);
-    const walk = (parentId: string, depth: number): void => {
+    const walk = (parentId: string, depth: number, ancestors: readonly string[]): void => {
         const branch = branches.get(parentId);
         if (branch === undefined || (branch.pending && branch.nodes.length === 0)) {
             out.push({ kind: "loading", key: `loading:${parentId}`, parentId, depth });
@@ -46,17 +46,17 @@ export function flattenTree(root: string, expanded: ReadonlySet<string>, branche
         for (const node of branch.nodes) {
             const id = node.page.pageId;
             const open = opens(node, expanded) && !seen.has(id);
-            out.push({ kind: "node", key: `node:${id}`, node, depth, expanded: open });
+            out.push({ kind: "node", key: `node:${id}`, node, depth, expanded: open, ancestors });
             if (open) {
                 seen.add(id);
-                walk(id, depth + 1);
+                walk(id, depth + 1, [id, ...ancestors]);
             }
         }
         if (branch.hasMore) {
             out.push({ kind: "more", key: `more:${parentId}`, parentId, depth });
         }
     };
-    walk(root, 0);
+    walk(root, 0, root === "" ? [] : [root]);
     return out;
 }
 

@@ -41,6 +41,7 @@ export interface StartRunDrawerProps {
     onOpenChange: (open: boolean) => void;
     siteId: string;
     preselect?: readonly string[];
+    paths?: ReadonlyMap<string, string>;
     initialKind?: string;
     seed?: StartSeed | null;
     onStarted: (runId: string) => void;
@@ -51,6 +52,7 @@ export function StartRunDrawer({
     onOpenChange,
     siteId,
     preselect,
+    paths,
     initialKind,
     seed = null,
     onStarted,
@@ -96,7 +98,7 @@ export function StartRunDrawer({
         setAdded([]);
         setScoped([]);
         setRewrite(new Set(seed?.rewrite ?? []));
-        setNamed(new Map());
+        setNamed(new Map(paths ?? []));
         priced.reset();
         start.reset();
     }, [open, siteId, seed]);

@@ -35,11 +35,16 @@ export function useBranch(filter: SiteMapFilter, enabled = true): Loaded {
 export interface BranchLoaderProps {
     siteId: string;
     parentId: string;
+    within?: string;
     onLoaded: (parentId: string, loaded: Loaded) => void;
 }
 
-export function BranchLoader({ siteId, parentId, onLoaded }: BranchLoaderProps): null {
-    const loaded = useBranch(parentId === "" ? { siteId } : { siteId, parentId });
+export function BranchLoader({ siteId, parentId, within, onLoaded }: BranchLoaderProps): null {
+    const loaded = useBranch({
+        siteId,
+        ...(parentId === "" ? {} : { parentId }),
+        ...(within === undefined || within === "" ? {} : { within }),
+    });
 
     useEffect(() => {
         onLoaded(parentId, loaded);

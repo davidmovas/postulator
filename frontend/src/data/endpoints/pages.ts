@@ -18,3 +18,6 @@ export const modelSummary = one(Pages.ModelSummary);
 export const writerPack = one(Pages.WriterPack);
 export const siteMap = one(Pages.SiteMap);
 export const setPageTemplates = one(Pages.SetTemplates);
+export const setPageTypes = one(Pages.SetTypes);
+export const countPages = one(Pages.Count);
+export const resolveSelection = one(Pages.ResolveSelection);

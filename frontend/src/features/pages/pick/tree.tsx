@@ -49,7 +49,9 @@ export const blankTreeView: TreeView = Object.freeze({ search: "", expanded: new
 const noRequired: ReadonlyMap<string, string> = new Map();
 
 function foundRows(nodes: readonly SiteMapNode[], keep: Keep, more: boolean): TreeRow[] {
-    const rows: TreeRow[] = nodes.filter(keep).map((node) => ({ kind: "node", key: `found:${node.page.pageId}`, node, depth: 0, expanded: false }));
+    const rows: TreeRow[] = nodes
+        .filter(keep)
+        .map((node) => ({ kind: "node", key: `found:${node.page.pageId}`, node, depth: 0, expanded: false, ancestors: [] }));
     return more ? [...rows, { kind: "more", key: "more:found", parentId: rootParent, depth: 0 }] : rows;
 }
 

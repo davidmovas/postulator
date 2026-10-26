@@ -1,4 +1,4 @@
-import type { ChangeEvent, KeyboardEvent, ReactElement } from "react";
+import type { KeyboardEvent, ReactElement } from "react";
 import { useId, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
@@ -14,6 +14,7 @@ import {
     SearchIcon,
     Segmented,
     Select,
+    shiftHeld,
     Stars2Icon,
     Textarea,
     VirtualRows,
@@ -91,10 +92,6 @@ export interface NamedType {
     name: string;
 }
 
-function shifted(event: ChangeEvent<HTMLInputElement>): boolean {
-    const native = event.nativeEvent;
-    return native instanceof MouseEvent && native.shiftKey;
-}
 
 const filterOptions: readonly SegmentedOption<ProposalFilter>[] = proposalFilters.map((value) => ({
     value,
@@ -263,7 +260,7 @@ function ProposalRow({ context, row, id, focused, onTick, onFold, onFocus, onGra
                     disabled={allBlocked}
                     aria-label={path === "" ? shown : said.keepRow(shown, path)}
                     onChange={(event) => {
-                        const ranged = pressedShift.current || shifted(event);
+                        const ranged = pressedShift.current || shiftHeld(event);
                         pressedShift.current = false;
                         onTick(at, ranged);
                     }}

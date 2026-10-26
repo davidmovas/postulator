@@ -1,16 +1,112 @@
 import type { ReactElement } from "react";
+import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
+import { usePagePaths } from "../../data/hooks/pages.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
 import { pageStatuses } from "../../generated/vocab.js";
-import type { SelectOption } from "../../ui/index.js";
-import { Button, Checkbox, cx, SectionLabel, Select } from "../../ui/index.js";
+import type { SegmentedOption, SelectOption } from "../../ui/index.js";
+import { Button, Checkbox, cx, Input, SectionLabel, Segmented, Select } from "../../ui/index.js";
+import { PageSearch } from "../findings/page-search.js";
 import type { EntityIndex } from "./entities.js";
 import { pageStatusLabel } from "./labels.js";
 import { defaultQuery, narrowed } from "./params.js";
-import type { PagesQuery } from "./params.js";
+import type { BodyChoice, PagesQuery } from "./params.js";
+import type { TypeNaming } from "./views/naming.js";
 
 const anyEntity = "any";
+
+const anyType = "any";
+
+const said = copy.pages.listFilters;
+
+const bodyOptions: readonly SegmentedOption<BodyChoice | "any">[] = [
+    { value: "any", label: said.bodies.any },
+    { value: "with", label: said.bodies.with },
+    { value: "without", label: said.bodies.without },
+];
+
+function PrefixFilter({ query, onChange }: { query: PagesQuery; onChange: (next: PagesQuery) => void }): ReactElement {
+    const [prefix, setPrefix] = useState(query.pathPrefix);
+
+    useEffect(() => {
+        setPrefix(query.pathPrefix);
+    }, [query.pathPrefix]);
+
+    const apply = (): void => {
+        const trimmed = prefix.trim();
+        if (trimmed !== query.pathPrefix) {
+            onChange({ ...query, pathPrefix: trimmed });
+        }
+    };
+
+    return (
+        <Input
+            type="search"
+            mono={true}
+            size="sm"
+            value={prefix}
+            placeholder="/"
+            aria-label={said.prefix}
+            onChange={(event) => {
+                setPrefix(event.target.value);
+            }}
+            onBlur={apply}
+            onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                    apply();
+                }
+            }}
+        />
+    );
+}
+
+function BranchFilter({ siteId, query, onChange }: { siteId: string; query: PagesQuery; onChange: (next: PagesQuery) => void }): ReactElement {
+    const [picking, setPicking] = useState(false);
+    const ids = query.branch === "" ? [] : [query.branch];
+    const paths = usePagePaths(ids, ids.length > 0);
+    if (query.branch !== "") {
+        return (
+            <div className="flex min-w-0 items-center gap-1.5">
+                <span data-pages-branch={query.branch} className="min-w-0 flex-1 truncate font-mono text-xs text-ink-soft">
+                    {paths.get(query.branch) ?? ""}
+                </span>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                        onChange({ ...query, branch: "" });
+                    }}
+                >
+                    {said.branchClear}
+                </Button>
+            </div>
+        );
+    }
+    return picking ? (
+        <PageSearch
+            siteId={siteId}
+            picked={null}
+            onPick={(page) => {
+                setPicking(false);
+                onChange({ ...query, branch: page.pageId });
+            }}
+        />
+    ) : (
+        <div className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 flex-1 truncate text-xs text-ink-dim">{said.branchAnywhere}</span>
+            <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                    setPicking(true);
+                }}
+            >
+                {said.branchPick}
+            </Button>
+        </div>
+    );
+}
 
 interface CountedRowProps {
     label: string;
@@ -40,12 +136,18 @@ export interface PageRailProps {
     siteId: string;
     query: PagesQuery;
     index: EntityIndex;
+    naming: TypeNaming;
     onChange: (next: PagesQuery) => void;
 }
 
-export function PageRail({ siteId, query, index, onChange }: PageRailProps): ReactElement {
+export function PageRail({ siteId, query, index, naming, onChange }: PageRailProps): ReactElement {
     const overview = useSiteOverview(siteId);
     const totals = overview.data?.pages;
+
+    const typeOptions: SelectOption<string>[] = [
+        { value: anyType, label: said.anyType },
+        ...naming.types.map((type) => ({ value: type.id, label: type.name })),
+    ];
 
     const entityOptions: SelectOption<string>[] = [
         { value: anyEntity, label: copy.pages.filters.anyEntity },
@@ -89,6 +191,48 @@ export function PageRail({ siteId, query, index, onChange }: PageRailProps): Rea
                         }}
                     />
                 ))}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <SectionLabel>{said.type}</SectionLabel>
+                <Select
+                    value={query.typeId === "" ? anyType : query.typeId}
+                    options={typeOptions}
+                    aria-label={said.type}
+                    onValueChange={(next) => {
+                        onChange({ ...query, typeId: next === anyType ? "" : next });
+                    }}
+                />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <SectionLabel>{said.body}</SectionLabel>
+                <Segmented
+                    label={said.body}
+                    size="sm"
+                    value={query.body === "" ? "any" : query.body}
+                    options={bodyOptions}
+                    onValueChange={(next) => {
+                        onChange({ ...query, body: next === "any" ? "" : next });
+                    }}
+                />
+                <Checkbox
+                    checked={query.findings}
+                    label={said.findings}
+                    onChange={(event) => {
+                        onChange({ ...query, findings: event.target.checked });
+                    }}
+                />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <SectionLabel>{said.branch}</SectionLabel>
+                <BranchFilter siteId={siteId} query={query} onChange={onChange} />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <SectionLabel>{said.prefix}</SectionLabel>
+                <PrefixFilter query={query} onChange={onChange} />
             </div>
 
             <div className="flex flex-col gap-1.5">

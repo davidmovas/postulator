@@ -4,7 +4,7 @@ export { Banner } from "./banner.js";
 export type { BannerProps } from "./banner.js";
 export { Button, IconButton } from "./button.js";
 export type { ButtonProps, ButtonSize, ButtonVariant, IconButtonProps } from "./button.js";
-export { Checkbox } from "./checkbox.js";
+export { Checkbox, shiftHeld } from "./checkbox.js";
 export type { CheckboxProps } from "./checkbox.js";
 export { ChipInput } from "./chip-input.js";
 export type { ChipInputProps } from "./chip-input.js";
