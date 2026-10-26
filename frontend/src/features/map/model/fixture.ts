@@ -16,6 +16,8 @@ export function aRef(pageId: string, path: string, overrides: Partial<SiteMapRef
 export function aNode(pageId: string, path: string, overrides: Partial<SiteMapNode> = {}): SiteMapNode {
     return {
         page: aRef(pageId, path),
+        parentId: "",
+        depth: 0,
         status: "published" as SiteMapNode["status"],
         parentReason: "jsonld_breadcrumb" as SiteMapNode["parentReason"],
         parentMethod: "href" as SiteMapNode["parentMethod"],
