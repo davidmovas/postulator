@@ -41,6 +41,24 @@ const templatePage = 100;
 
 const selectionMoved = "selection_moved";
 
+function RowAction({ label, onClick }: { label: string; onClick: () => void }): ReactElement {
+    return (
+        <button
+            type="button"
+            onClick={(event) => {
+                event.stopPropagation();
+                onClick();
+            }}
+            onKeyDown={(event) => {
+                event.stopPropagation();
+            }}
+            className="rounded-sm text-left font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+            {label}
+        </button>
+    );
+}
+
 interface TypeRowProps {
     type: PageType;
     selected: boolean;
@@ -100,33 +118,15 @@ function TypeRow({ type, selected, template, suggestion, onOpen, onSuggest, onFo
                     {template}
                 </span>
                 {suggestion === null ? null : (
-                    <span data-type-suggestion={true} className="flex max-w-full flex-wrap items-center gap-x-2 text-2xs text-ink-dim">
+                    <span data-type-suggestion={true} className="flex max-w-full flex-wrap items-baseline gap-x-2 text-2xs text-ink-dim">
                         <span className="truncate">{said.suggested(suggestion)}</span>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                onSuggest();
-                            }}
-                        >
-                            {said.useSuggested}
-                        </Button>
+                        <RowAction label={said.useSuggested} onClick={onSuggest} />
                     </span>
                 )}
                 {type.overrides === 0 ? null : (
-                    <span data-type-overrides={type.overrides} className="flex max-w-full flex-wrap items-center gap-x-2 text-2xs text-ink-dim">
+                    <span data-type-overrides={type.overrides} className="flex max-w-full flex-wrap items-baseline gap-x-2 text-2xs text-ink-dim">
                         <span>{said.overrides(type.overrides)}</span>
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                onFollow();
-                            }}
-                        >
-                            {said.follow}
-                        </Button>
+                        <RowAction label={said.follow} onClick={onFollow} />
                     </span>
                 )}
             </div>

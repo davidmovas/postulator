@@ -49,7 +49,11 @@ export const classification = {
         lead: (parts: readonly string[]) => `Pages that ${andList(parts)}.`,
         postTypes: (kinds: readonly string[]) => `are ${orList(kinds)}`,
         urls: (matches: readonly string[]) => `have an address that ${orList(matches)}`,
-        url: { prefix: (value: string) => `starts with ${value}`, segment: (value: string) => `has the word ${value}`, glob: (value: string) => `matches ${value}` },
+        url: {
+            prefix: (values: readonly string[]) => `starts with ${orList(values)}`,
+            segment: (values: readonly string[]) => (values.length === 1 ? `has the word ${values[0] ?? ""}` : `has one of the words ${orList(values)}`),
+            glob: (values: readonly string[]) => `matches ${orList(values)}`,
+        },
         slugs: (slugs: readonly string[]) => `have the slug ${orList(slugs)}`,
         underPage: (path: string) => `sit under ${path}`,
         underType: (type: string) => `sit under a ${type} page`,

@@ -190,15 +190,18 @@ export interface Names {
     page: (pageId: string) => string;
 }
 
-function urlPhrase(url: RuleURL): string {
-    switch (url.mode as string) {
-        case "segment":
-            return said.url.segment(url.value);
-        case "glob":
-            return said.url.glob(url.value);
-        default:
-            return said.url.prefix(url.value);
+function urlPhrases(urls: readonly RuleURL[]): string[] {
+    const byMode = new Map<URLMode, string[]>();
+    for (const url of urls) {
+        const mode: URLMode = isOneOf(urlModes, url.mode) ? url.mode : "prefix";
+        const held = byMode.get(mode);
+        if (held === undefined) {
+            byMode.set(mode, [url.value]);
+        } else {
+            held.push(url.value);
+        }
     }
+    return [...byMode].map(([mode, values]) => said.url[mode](values));
 }
 
 function rangePhrase(
@@ -226,7 +229,7 @@ function flagPhrase(value: boolean | null | undefined, yes: string, no: string):
 export function sentence(conditions: RuleConditions, names: Names): string {
     const parts: (string | null)[] = [
         (conditions.postTypes ?? []).length === 0 ? null : said.postTypes((conditions.postTypes ?? []).map(postTypeWord)),
-        (conditions.urls ?? []).length === 0 ? null : said.urls((conditions.urls ?? []).map(urlPhrase)),
+        (conditions.urls ?? []).length === 0 ? null : said.urls(urlPhrases(conditions.urls ?? [])),
         (conditions.slugs ?? []).length === 0 ? null : said.slugs(conditions.slugs ?? []),
         (conditions.ancestor?.pageId ?? "") !== ""
             ? said.underPage(names.page(conditions.ancestor?.pageId ?? ""))

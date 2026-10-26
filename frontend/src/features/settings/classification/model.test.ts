@@ -51,6 +51,19 @@ describe("a rule in words", () => {
             },
             words: "Pages that have an address that starts with /blog/, has the word guides or matches /shop/**.",
         },
+        {
+            label: "several words and prefixes, each mode once",
+            conditions: {
+                urls: [
+                    { mode: "segment", value: "blog" },
+                    { mode: "prefix", value: "/learn/" },
+                    { mode: "segment", value: "guide" },
+                    { mode: "segment", value: "research" },
+                    { mode: "prefix", value: "/news/" },
+                ],
+            },
+            words: "Pages that have an address that has one of the words blog, guide or research or starts with /learn/ or /news/.",
+        },
         { label: "slugs", conditions: { slugs: ["about", "contact"] }, words: "Pages that have the slug about or contact." },
         { label: "under a page", conditions: { ancestor: { pageId: "p-lab" } }, words: "Pages that sit under /lab-guides/." },
         { label: "under a type", conditions: { ancestor: { typeId: "t-cat" } }, words: "Pages that sit under a Category page." },

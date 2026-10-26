@@ -218,27 +218,29 @@ function SiteRules({ siteId }: { siteId: string }): ReactElement {
     return (
         <Panel>
             <PanelHeader title={said.rulesTitle}>
-                <Button
-                    size="sm"
-                    icon={PreviewIcon}
-                    disabled={listed.data === undefined}
-                    onClick={() => {
-                        setPreviewing(true);
-                    }}
-                >
-                    {said.preview}
-                </Button>
-                <Button
-                    size="sm"
-                    variant="primary"
-                    icon={AddIcon}
-                    disabled={listed.data === undefined}
-                    onClick={() => {
-                        setCreating(true);
-                    }}
-                >
-                    {said.add}
-                </Button>
+                <span className="flex items-center gap-2">
+                    <Button
+                        size="sm"
+                        icon={PreviewIcon}
+                        disabled={listed.data === undefined}
+                        onClick={() => {
+                            setPreviewing(true);
+                        }}
+                    >
+                        {said.preview}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="primary"
+                        icon={AddIcon}
+                        disabled={listed.data === undefined}
+                        onClick={() => {
+                            setCreating(true);
+                        }}
+                    >
+                        {said.add}
+                    </Button>
+                </span>
             </PanelHeader>
             {listed.isPending || typed.isPending ? (
                 <SkeletonRows rows={6} label={said.loading} className="p-3" />

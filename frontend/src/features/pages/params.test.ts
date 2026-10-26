@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultQuery, facetsOf, filterOf, narrowed, readQuery, readTab, searchOf, withTab, writeQuery } from "./params.js";
+import { activeFilters, defaultQuery, facetsOf, filterOf, narrowed, readQuery, readTab, searchOf, withTab, writeQuery } from "./params.js";
 
 describe("readQuery", () => {
     it("reads every filter the list endpoint supports", () => {
@@ -118,6 +118,11 @@ describe("narrowed", () => {
         expect(narrowed(defaultQuery)).toBe(false);
         expect(narrowed({ ...defaultQuery, unmapped: true })).toBe(true);
         expect(narrowed({ ...defaultQuery, sort: { field: "path", desc: true } })).toBe(false);
+    });
+
+    it("counts the filters in use, never the sort", () => {
+        expect(activeFilters(defaultQuery)).toBe(0);
+        expect(activeFilters({ ...defaultQuery, typeId: "t1", findings: true, search: "mug", sort: { field: "path", desc: true } })).toBe(3);
     });
 });
 

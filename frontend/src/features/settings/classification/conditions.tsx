@@ -211,15 +211,17 @@ export function ConditionEditors({ siteId, draft, types, underPath, problems, on
             <Row condition="ancestor" problem={problemOf("ancestor")}>
                 {() => (
                     <>
-                        <Segmented
-                            label={conditionLabel("ancestor")}
-                            size="sm"
-                            value={draft.under}
-                            options={underOptions}
-                            onValueChange={(under) => {
-                                onChange({ under });
-                            }}
-                        />
+                        <div>
+                            <Segmented
+                                label={conditionLabel("ancestor")}
+                                size="sm"
+                                value={draft.under}
+                                options={underOptions}
+                                onValueChange={(under) => {
+                                    onChange({ under });
+                                }}
+                            />
+                        </div>
                         {draft.under === "page" ? (
                             <div className="flex flex-col gap-1">
                                 {underPath === null ? null : <span className="font-mono text-xs text-ink-soft">{underPath}</span>}
@@ -265,15 +267,17 @@ export function ConditionEditors({ siteId, draft, types, underPath, problems, on
             <Row condition="listing" problem={problemOf("listing")}>
                 {() => (
                     <>
-                        <Segmented
-                            label={conditionLabel("listing")}
-                            size="sm"
-                            value={draft.listing}
-                            options={listingOptions}
-                            onValueChange={(listing) => {
-                                onChange({ listing });
-                            }}
-                        />
+                        <div>
+                            <Segmented
+                                label={conditionLabel("listing")}
+                                size="sm"
+                                value={draft.listing}
+                                options={listingOptions}
+                                onValueChange={(listing) => {
+                                    onChange({ listing });
+                                }}
+                            />
+                        </div>
                         {draft.listing === "present" ? (
                             <NumberBox label={said.minProducts} value={draft.minProducts} onChange={(minProducts) => onChange({ minProducts })} />
                         ) : null}
@@ -319,15 +323,17 @@ export function ConditionEditors({ siteId, draft, types, underPath, problems, on
             {(["technical", "frontPage", "shop"] as const).map((flag) => (
                 <Row key={flag} condition={flag} problem={problemOf(flag)}>
                     {() => (
-                        <Segmented
-                            label={conditionLabel(flag)}
-                            size="sm"
-                            value={draft[flag]}
-                            options={triOptions}
-                            onValueChange={(value) => {
-                                onChange({ [flag]: value });
-                            }}
-                        />
+                        <div>
+                            <Segmented
+                                label={conditionLabel(flag)}
+                                size="sm"
+                                value={draft[flag]}
+                                options={triOptions}
+                                onValueChange={(value) => {
+                                    onChange({ [flag]: value });
+                                }}
+                            />
+                        </div>
                     )}
                 </Row>
             ))}

@@ -207,15 +207,17 @@ export function PageRail({ siteId, query, index, naming, onChange }: PageRailPro
 
             <div className="flex flex-col gap-1.5">
                 <SectionLabel>{said.body}</SectionLabel>
-                <Segmented
-                    label={said.body}
-                    size="sm"
-                    value={query.body === "" ? "any" : query.body}
-                    options={bodyOptions}
-                    onValueChange={(next) => {
-                        onChange({ ...query, body: next === "any" ? "" : next });
-                    }}
-                />
+                <div>
+                    <Segmented
+                        label={said.body}
+                        size="sm"
+                        value={query.body === "" ? "any" : query.body}
+                        options={bodyOptions}
+                        onValueChange={(next) => {
+                            onChange({ ...query, body: next === "any" ? "" : next });
+                        }}
+                    />
+                </div>
                 <Checkbox
                     checked={query.findings}
                     label={said.findings}

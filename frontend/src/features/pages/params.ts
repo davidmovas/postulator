@@ -82,8 +82,14 @@ export function facetsOf(filter: PageFilter): PageFacets {
     return Object.fromEntries(Object.entries(filter).filter(([key]) => key !== "siteId")) as PageFacets;
 }
 
+const filterKeys: readonly (keyof PagesQuery)[] = ["status", "entityId", "unmapped", "pathPrefix", "typeId", "body", "findings", "branch", "search"];
+
 export function narrowed(query: PagesQuery): boolean {
-    return codec.carries(query, ["status", "entityId", "unmapped", "pathPrefix", "typeId", "body", "findings", "branch", "search"]);
+    return codec.carries(query, filterKeys);
+}
+
+export function activeFilters(query: PagesQuery): number {
+    return filterKeys.filter((key) => codec.carries(query, [key])).length;
 }
 
 const pageTabs = ["details", "model", "writer", "links", "mapping", "report", "preview"] as const;

@@ -7,7 +7,7 @@ import { usePageCount } from "../../data/hooks/pages.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
 import { useSyncSite } from "../../data/hooks/sync.js";
 import { wantsNew } from "../../data/params.js";
-import { AccountTreeIcon, AddIcon, Button, CountBadge, EmptyState, FilterAltIcon, Screen, UploadFileIcon } from "../../ui/index.js";
+import { AccountTreeIcon, AddIcon, Button, CountBadge, EmptyState, FilterAltIcon, Screen, UploadFileIcon, useWidthOf } from "../../ui/index.js";
 import type { Selection } from "../../ui/selection.js";
 import { dropWhole, isEmpty, selectAll } from "../../ui/selection.js";
 import { StartRunDrawer } from "../runs/start.js";
@@ -28,6 +28,10 @@ import { wholeOf } from "./views/model.js";
 import { useTypeNaming } from "./views/naming.js";
 import { PagesTree } from "./views/tree.js";
 import { PagesByType } from "./views/types.js";
+
+const railFrom = 640;
+
+const summaryFrom = 1100;
 
 export function PagesScreen(): ReactElement {
     const params = useParams();
@@ -54,6 +58,11 @@ export function PagesScreen(): ReactElement {
     const facetsKey = JSON.stringify(facets);
     const counted = usePageCount(view === "list" ? filter : null);
     const asked = wantsNew(searchParams);
+    const [attach, width] = useWidthOf();
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const railFits = width === 0 || width >= railFrom;
+    const roomy = width === 0 || width >= summaryFrom;
+    const showRail = view === "list" && (railFits || filtersOpen);
 
     useEffect(() => {
         if (asked) {
@@ -218,7 +227,7 @@ export function PagesScreen(): ReactElement {
                         selection={selection}
                         onSelection={setSelection}
                         focusedId={selectedId}
-                        onFocus={setSelectedId}
+                        onFocus={roomy ? setSelectedId : undefined}
                         onOpen={open}
                         onRows={addRows}
                         empty={listEmpty}
@@ -229,7 +238,7 @@ export function PagesScreen(): ReactElement {
         }
     })();
 
-    return (
+    const screen = (
         <Screen
             title={copy.pages.title}
             badge={total === undefined ? undefined : <CountBadge tone="muted" count={total} />}
@@ -246,10 +255,27 @@ export function PagesScreen(): ReactElement {
                     {copy.pages.newPage}
                 </Button>
             }
-            toolbar={<PageToolbar view={view} onView={showView} query={query} onChange={change} />}
-            left={view === "list" ? <PageRail siteId={siteId} query={query} index={index} naming={naming} onChange={change} /> : undefined}
+            toolbar={
+                <PageToolbar
+                    view={view}
+                    onView={showView}
+                    query={query}
+                    onChange={change}
+                    filters={
+                        railFits
+                            ? null
+                            : {
+                                  open: filtersOpen,
+                                  onToggle: () => {
+                                      setFiltersOpen((held) => !held);
+                                  },
+                              }
+                    }
+                />
+            }
+            left={showRail ? <PageRail siteId={siteId} query={query} index={index} naming={naming} onChange={change} /> : undefined}
             right={
-                view !== "list" || selectedId === null ? undefined : (
+                view !== "list" || !roomy || selectedId === null ? undefined : (
                     <PageSummary key={selectedId} pageId={selectedId} siteId={siteId} search={search} onOpen={open} />
                 )
             }
@@ -312,5 +338,11 @@ export function PagesScreen(): ReactElement {
                 }}
             />
         </Screen>
+    );
+
+    return (
+        <div ref={attach} data-pages-screen={showRail ? "rail" : "list"} className="h-full min-h-0">
+            {screen}
+        </div>
     );
 }

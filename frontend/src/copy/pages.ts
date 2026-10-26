@@ -257,6 +257,7 @@ export const pages = {
         none: "Not typed yet",
     },
     listFilters: {
+        toggle: (active: number) => (active === 0 ? "Filters" : `Filters (${active})`),
         type: "Page type",
         anyType: "Any type",
         body: "Text of its own",
@@ -292,7 +293,7 @@ export const pages = {
         group: (name: string) => `Select every ${name} page`,
         mode: "Show its pages as",
         pick: "Pick a type to see its pages.",
-        none: (name: string) => `No page is a ${name} page yet.`,
+        none: (name: string) => `No page has the type ${name} yet.`,
     },
     describe: {
         everyPage: "every page of the site",
