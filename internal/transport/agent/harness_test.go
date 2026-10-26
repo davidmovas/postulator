@@ -218,6 +218,7 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 			Sites: siteRepo, Specs: templateService,
 		}),
 		Actions:   actionRepo,
+		Plans:     sqlite.NewPlanRepo(store),
 		Publisher: bus,
 		Clock:     now,
 	})
@@ -245,6 +246,8 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 		Conversations: sqlite.NewConversationRepo(store),
 		Messages:      sqlite.NewMessageRepo(store),
 		Actions:       actionRepo,
+		Plans:         sqlite.NewPlanRepo(store),
+		Runs:          sqlite.NewRunRepo(store),
 		Calls:         sqlite.NewToolCallRepo(store),
 		Sites:         siteRepo,
 		Reports: reports.New(reports.Deps{

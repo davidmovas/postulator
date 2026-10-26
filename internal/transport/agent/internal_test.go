@@ -207,8 +207,8 @@ func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
 		t.Fatalf("the shortened result does not say it was shortened: %+v", document)
 	}
 	kept, ok := inner[agentapp.ResultKey].(map[string]any)
-	if !ok || kept["nextCursor"] != "c-42" || kept["hasMore"] != true {
-		t.Fatalf("the shortened result lost the fields that say how to ask for the rest: %+v", inner)
+	if dropped, said := inner["cursorDropped"].([]any); !ok || kept["nextCursor"] != nil || kept["hasMore"] != true || !said || len(dropped) != 1 {
+		t.Fatalf("the shortened result kept a cursor past the rows it cut, or did not say the list goes on: %+v", inner)
 	}
 	if rows, listed := kept["items"].([]any); !listed || len(rows) == 0 || len(rows) >= 128 {
 		t.Fatalf("the shortened result kept %v of 128 rows", kept["items"])

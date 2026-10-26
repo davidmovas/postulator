@@ -77,6 +77,8 @@ type Deps struct {
 	Conversations     conversationStore
 	Messages          messageStore
 	Actions           actionStore
+	Plans             planStore
+	Runs              runReader
 	Calls             callStore
 	Sites             siteReader
 	Reports           overviewReader
@@ -99,7 +101,8 @@ type Deps struct {
 }
 
 type Service struct {
-	deps Deps
+	deps  Deps
+	locks planLocks
 }
 
 func New(deps Deps) *Service {

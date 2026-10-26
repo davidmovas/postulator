@@ -32,6 +32,8 @@ func (c *Core) buildAgent(stores repos, llm llmParts, writing authoring, service
 			Conversations:     stores.conversations,
 			Messages:          stores.messages,
 			Actions:           stores.actions,
+			Plans:             stores.plans,
+			Runs:              stores.runs,
 			Calls:             stores.toolCalls,
 			Sites:             stores.sites,
 			Reports:           services.reports,
