@@ -29,6 +29,9 @@ func (h harness) typedPage(t *testing.T, path string, typed *pagetype.Type, sour
 	if typed != nil {
 		held.PageTypeID = &typed.ID
 	}
+	if reason == pagemap.TypeByRule {
+		held.TypeRuleID = "rule-guides"
+	}
 	built, err := pagemap.NewPage(held)
 	if err != nil {
 		t.Fatalf("build the page: %v", err)
@@ -52,6 +55,8 @@ func TestThePageTypeOfAPageOnTheSiteFollowsTheSheetUnlessAPersonOrTheAgentChoseI
 		{name: "an untyped page", source: pagemap.TypeSourceNone, reason: pagemap.TypeByNone},
 		{name: "a page the site typed", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByDefault},
 		{name: "a page a listing typed", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByListing},
+		{name: "a page a rule typed", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByRule},
+		{name: "a page no rule matched", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByUnmatched},
 		{name: "a page an earlier import typed", typed: true, source: pagemap.TypeSourceManual, reason: pagemap.TypeByImport},
 		{name: "a page a person typed", typed: true, source: pagemap.TypeSourceManual, reason: pagemap.TypeByUser, kept: true},
 		{name: "a page the agent typed", typed: true, source: pagemap.TypeSourceManual, reason: pagemap.TypeByAI, kept: true},
@@ -96,7 +101,7 @@ func TestThePageTypeOfAPageOnTheSiteFollowsTheSheetUnlessAPersonOrTheAgentChoseI
 			}
 			hub := types[pagetype.Category]
 			if !sameType(after.PageTypeID, &hub.ID) || after.TypeSource != pagemap.TypeSourceManual ||
-				after.TypeReason != pagemap.TypeByImport {
+				after.TypeReason != pagemap.TypeByImport || after.TypeRuleID != "" {
 				t.Fatalf("the apply typed the page %+v, want the Category set by the import", after)
 			}
 			if applied.Counts.PagesUpdated != 1 {
