@@ -15,7 +15,7 @@ const writtenBesideTheLinks: ReadonlySet<string> = new Set([
 ]);
 
 export function writerFields(type: PageType | null): WriterField[] {
-    const main = linkField(type?.preset ?? "");
+    const main = linkField(type?.role ?? "");
     const scopes = orderedScopes(type?.scopes ?? []);
     const fields: WriterField[] = [
         { key: main, label: fieldLabel(main, scopes.find((scope) => scope.field === main)?.label ?? "") },

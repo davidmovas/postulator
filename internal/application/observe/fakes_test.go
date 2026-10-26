@@ -243,7 +243,7 @@ func (f *typesFake) Seed(_ context.Context, siteID string) error {
 	if len(f.types[siteID]) > 0 {
 		return nil
 	}
-	for i, preset := range pagetype.Presets() {
+	for i, preset := range pagetype.Seeded() {
 		kind := pagetype.Type{
 			ID: siteID + "-" + string(preset), SiteID: siteID, Name: preset.DefaultName(), Preset: preset,
 			CreatedAt: earlier.Add(time.Duration(i) * time.Second), UpdatedAt: earlier,

@@ -158,13 +158,13 @@ func TestTheClientWorkbookImportsSheetBySheet(t *testing.T) {
 		t.Fatalf("the row that names TB-500 = %+v, want the entity's page updated", tb)
 	}
 	wantTypes := map[string]string{
-		"/peptides/": "Hub", "/peptides/bpc-157/": "Product", "/peptides/tb-500/": "Product", "/peptides/canada/": "Entity",
+		"/peptides/": "Category", "/peptides/bpc-157/": "Product", "/peptides/tb-500/": "Product", "/peptides/canada/": "Guide",
 	}
 	if got := h.typeNames(t); !maps.Equal(got, wantTypes) {
 		t.Fatalf("the wide sheet typed the pages %v, want the types its entity level says %v", got, wantTypes)
 	}
-	if canada, _ := page(wide.Report, "/peptides/canada/"); canada.PageType != "Entity" {
-		t.Fatalf("the preview shows Canada as %+v, want an Entity page", canada)
+	if canada, _ := page(wide.Report, "/peptides/canada/"); canada.PageType != "Guide" {
+		t.Fatalf("the preview shows Canada as %+v, want a Guide page", canada)
 	}
 	if left := ignored(wide.Report); !slices.Equal(left, []string{"Entity ID", "Primary Entity", "Entity Type", "Page Template"}) {
 		t.Fatalf("the wide sheet ignored %v", left)

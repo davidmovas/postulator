@@ -191,14 +191,14 @@ type seedTyped struct {
 
 func seedTypes() []seedTyped {
 	return []seedTyped{
-		{Path: "/espresso-machines/", Preset: pagetype.Hub},
-		{Path: "/grinders/", Preset: pagetype.Hub},
-		{Path: "/brewing/", Preset: pagetype.Hub},
-		{Path: "/brewing/portafilter/", Preset: pagetype.Hub},
-		{Path: "/milk-drinks/", Preset: pagetype.Hub},
-		{Path: "/beans/", Preset: pagetype.Hub},
-		{Path: "/accessories/", Preset: pagetype.Hub},
-		{Path: "/home-roasting/", Preset: pagetype.Hub},
+		{Path: "/espresso-machines/", Preset: pagetype.Category},
+		{Path: "/grinders/", Preset: pagetype.Category},
+		{Path: "/brewing/", Preset: pagetype.Category},
+		{Path: "/brewing/portafilter/", Preset: pagetype.Category},
+		{Path: "/milk-drinks/", Preset: pagetype.Category},
+		{Path: "/beans/", Preset: pagetype.Category},
+		{Path: "/accessories/", Preset: pagetype.Category},
+		{Path: "/home-roasting/", Preset: pagetype.Category},
 		{Path: "/accessories/tampers/", Preset: pagetype.Product},
 		{Path: "/accessories/distribution-tools/", Preset: pagetype.Product},
 		{Path: "/accessories/scales/", Preset: pagetype.Product},

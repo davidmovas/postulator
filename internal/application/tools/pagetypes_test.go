@@ -60,7 +60,7 @@ func TestThePageTypeToolsSaveTypesScopesAndAPagesType(t *testing.T) {
 	listed := called[pagetypes.ListResponse](t, registry, binding, "pagetypes_list", `{"siteId":"`+seeded.site+`"}`)
 	var hub pagetypes.Type
 	for i := range listed.Types {
-		if listed.Types[i].Preset == "hub" {
+		if listed.Types[i].Preset == "category" {
 			hub = listed.Types[i]
 		}
 	}

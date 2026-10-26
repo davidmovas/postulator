@@ -4,6 +4,10 @@ export const pageTypes = {
     imageTitle: (id: string) => `Image ${id}'s title`,
     untyped: "No page type",
     presets: {
+        landing: "Landing",
+        category: "Category",
+        guide: "Guide",
+        info: "Info",
         hub: "Hub",
         entity: "Entity",
         product: "Product",
@@ -70,6 +74,10 @@ export const pageTypes = {
         rotate: "Rotate through every anchor",
     },
     presetHints: {
+        landing: "The front page and the top pages a visitor lands on. Their text and SEO meta are written, and they link down to the pages under them.",
+        category: "One of your own category pages, the ones your snippets fill with products. Their text and SEO meta are written, and they link down and sideways.",
+        guide: "An article: a guide, a how-to, research or a blog post. Its text and SEO meta are written, and it links up to its parents and sideways.",
+        info: "An informational page, such as about, contact, shipping, an FAQ or a policy that is not technical. Only its SEO meta is written; its text stays yours.",
         hub: "A page that gathers and links the pages under it, such as a category page written for the site.",
         entity: "A page about one subject, such as a guide or an article.",
         product: "A WooCommerce product. Its price, stock, SKU and attributes are never written.",
@@ -126,7 +134,7 @@ export const pageTypes = {
         target: "Move its pages to",
         confirm: "Delete it",
         cancel: "Cancel",
-        lastOfPreset: "The last type of a role cannot be deleted.",
+        lastOfRole: "The last type of a role cannot be deleted.",
         moved: (pages: number) => (pages === 1 ? "1 page moved to the other type." : `${pages} pages moved to the other type.`),
     },
     drawer: {

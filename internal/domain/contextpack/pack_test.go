@@ -5,11 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -153,6 +155,37 @@ func TestAProductListIsLessUrgentOnAnArticle(t *testing.T) {
 	body, _ := facts.Field(field.Body)
 	if got := sectionOf(t, contextpack.Build(facts, body.Scope), contextpack.SectionProducts).Priority; got != 6 {
 		t.Errorf("an article's products have priority %d, want 6", got)
+	}
+}
+
+func TestAPresetIsWrittenForByItsRole(t *testing.T) {
+	t.Parallel()
+
+	s := replicaLike().snapshot(t)
+	cases := map[pagetype.Preset]struct {
+		role     string
+		priority int
+	}{
+		pagetype.Landing:  {"a hub: it introduces its topic", 4},
+		pagetype.Category: {"a hub: it introduces its topic", 4},
+		pagetype.Guide:    {"an article about one entity", 6},
+		pagetype.Info:     {"an article about one entity", 6},
+	}
+	for preset, tc := range cases {
+		facts, err := s.Facts("hub", planFor(t, s, "hub"))
+		if err != nil {
+			t.Fatalf("Facts: %v", err)
+		}
+		facts.Page.Type, facts.Page.Preset = preset.DefaultName(), preset
+		body, _ := facts.Field(field.Body)
+		pack := contextpack.Build(facts, body.Scope)
+		page := strings.Join(sectionOf(t, pack, contextpack.SectionPage).Lines, "\n")
+		if !strings.Contains(page, "Page type: "+preset.DefaultName()+", "+tc.role) {
+			t.Errorf("%s reads %q, want its role %q", preset, page, tc.role)
+		}
+		if got := sectionOf(t, pack, contextpack.SectionProducts).Priority; got != tc.priority {
+			t.Errorf("%s's products have priority %d, want %d", preset, got, tc.priority)
+		}
 	}
 }
 

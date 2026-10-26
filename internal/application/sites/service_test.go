@@ -297,8 +297,8 @@ func TestCreateStoresTheSiteAndItsPassword(t *testing.T) {
 		t.Errorf("stored password = %q, %v", password, err)
 	}
 	types, err := sqlite.NewPageTypeRepo(h.store).ListBySite(t.Context(), got.ID)
-	if err != nil || len(types) != len(pagetype.Presets()) {
-		t.Errorf("the new site's page types = %d %v, want the %d presets seeded", len(types), err, len(pagetype.Presets()))
+	if err != nil || len(types) != len(pagetype.Seeded()) {
+		t.Errorf("the new site's page types = %d %v, want the %d presets seeded", len(types), err, len(pagetype.Seeded()))
 	}
 
 	encoded, err := json.Marshal(got)

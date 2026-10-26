@@ -30,7 +30,7 @@ export function ScopeCard({ type, scope, aiWritable = true }: ScopeCardProps): R
     const base = draftOf(scope);
     const readOnly = !type.writable;
     const custom = metaKeyOf(scope.field) !== null;
-    const linked = carriesLinks(scope.field, type.preset);
+    const linked = carriesLinks(scope.field, type.role);
     const label = fieldLabel(scope.field, scope.label);
 
     const stamp = JSON.stringify(scope);

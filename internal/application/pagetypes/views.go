@@ -11,6 +11,7 @@ type Type struct {
 	SiteID     string   `json:"siteId"`
 	Name       string   `json:"name"`
 	Preset     string   `json:"preset"`
+	Role       string   `json:"role"`
 	Writable   bool     `json:"writable"`
 	TemplateID *string  `json:"templateId"`
 	Pages      int      `json:"pages"`
@@ -74,8 +75,8 @@ func typeView(t pagetype.Type, set pagetype.Set, stored []field.Scope, pages int
 		}
 	}
 	return Type{
-		ID: t.ID, SiteID: t.SiteID, Name: t.Name, Preset: string(t.Preset), Writable: t.Preset.Writable(), TemplateID: t.TemplateID,
-		Pages: pages, Scopes: scopes, CreatedAt: dto.NewTime(t.CreatedAt), UpdatedAt: dto.NewTime(t.UpdatedAt),
+		ID: t.ID, SiteID: t.SiteID, Name: t.Name, Preset: string(t.Preset), Role: string(t.Preset.Role()), Writable: t.Preset.Writable(),
+		TemplateID: t.TemplateID, Pages: pages, Scopes: scopes, CreatedAt: dto.NewTime(t.CreatedAt), UpdatedAt: dto.NewTime(t.UpdatedAt),
 	}
 }
 

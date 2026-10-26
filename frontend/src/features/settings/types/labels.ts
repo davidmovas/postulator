@@ -11,11 +11,15 @@ import {
 } from "../../../generated/vocab.js";
 import type { IconComponent, Tone } from "../../../ui/index.js";
 import {
+    AccountTreeIcon,
     BuildIcon,
     CategoryIcon,
     CropSquareIcon,
+    DescriptionIcon,
     HubIcon,
+    InfoIcon,
     Inventory2Icon,
+    SpaceDashboardIcon,
     TableChartIcon,
     TopicIcon,
 } from "../../../ui/index.js";
@@ -27,6 +31,10 @@ export const presetRoles = [...pageTypePresets, untyped] as const;
 export type PresetRole = (typeof presetRoles)[number];
 
 const presetIcons: Readonly<Record<PresetRole, IconComponent>> = {
+    landing: SpaceDashboardIcon,
+    category: AccountTreeIcon,
+    guide: DescriptionIcon,
+    info: InfoIcon,
     hub: HubIcon,
     entity: TopicIcon,
     product: Inventory2Icon,
@@ -37,6 +45,10 @@ const presetIcons: Readonly<Record<PresetRole, IconComponent>> = {
 };
 
 const presetTones: Readonly<Record<PresetRole, Tone>> = {
+    landing: "accent",
+    category: "accent",
+    guide: "muted",
+    info: "muted",
     hub: "accent",
     entity: "muted",
     product: "ok",

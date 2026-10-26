@@ -1,5 +1,5 @@
 import type { CatalogField, FieldScope, LinkPolicy, LinkRules, PageType, SetScopeRequest } from "../../../data/types.js";
-import { anchorStrategies, isOneOf, pageTypePresets, scopableFieldKeys } from "../../../generated/vocab.js";
+import { anchorStrategies, isOneOf, pageTypeRoles, scopableFieldKeys } from "../../../generated/vocab.js";
 import { metaKeyOf, metaPrefix } from "./labels.js";
 
 export interface ScopeDraft {
@@ -115,19 +115,19 @@ export function aiWritableOf(catalog: readonly CatalogField[], field: string): b
     return held === undefined || held.aiWritable;
 }
 
-export function linkField(preset: string): string {
-    return preset === "product" ? "product_description" : "body";
+export function linkField(role: string): string {
+    return role === "product" ? "product_description" : "body";
 }
 
-export function carriesLinks(field: string, preset: string): boolean {
-    return field === linkField(preset);
+export function carriesLinks(field: string, role: string): boolean {
+    return field === linkField(role);
 }
 
-export function usualFor(scope: FieldScope, preset: string): boolean {
+export function usualFor(scope: FieldScope, role: string): boolean {
     if (scope.enabled || scope.stored || metaKeyOf(scope.field) !== null) {
         return true;
     }
-    if (preset === "product") {
+    if (role === "product") {
         return !notOnProducts.has(scope.field);
     }
     return !productFields.has(scope.field);
@@ -158,14 +158,14 @@ export function pickSite(asked: string | null, last: string | null, ids: readonl
     return ids[0] ?? null;
 }
 
-function presetRank(preset: string): number {
-    const at = (pageTypePresets as readonly string[]).indexOf(preset);
-    return at < 0 ? pageTypePresets.length : at;
+function roleRank(role: string): number {
+    const at = (pageTypeRoles as readonly string[]).indexOf(role);
+    return at < 0 ? pageTypeRoles.length : at;
 }
 
 export function orderedTypes(types: readonly PageType[]): PageType[] {
     return [...types].sort((left, right) => {
-        const rank = presetRank(left.preset) - presetRank(right.preset);
+        const rank = roleRank(left.role) - roleRank(right.role);
         if (rank !== 0) {
             return rank;
         }
@@ -173,13 +173,13 @@ export function orderedTypes(types: readonly PageType[]): PageType[] {
     });
 }
 
-export function lastOfPreset(types: readonly PageType[], type: PageType): boolean {
-    return !types.some((held) => held.id !== type.id && held.preset === type.preset);
+export function lastOfRole(types: readonly PageType[], type: PageType): boolean {
+    return !types.some((held) => held.id !== type.id && held.role === type.role);
 }
 
 export function reassignTargets(types: readonly PageType[], type: PageType): PageType[] {
     const others = types.filter((held) => held.id !== type.id);
-    return [...others.filter((held) => held.preset === type.preset), ...others.filter((held) => held.preset !== type.preset)];
+    return [...others.filter((held) => held.role === type.role), ...others.filter((held) => held.role !== type.role)];
 }
 
 export type MetaProblem = "keyMissing" | "keyShape" | "labelMissing" | "taken";

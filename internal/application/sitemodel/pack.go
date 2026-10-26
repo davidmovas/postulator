@@ -83,7 +83,7 @@ func (s *Service) read(ctx context.Context, pageID, fieldName string, claim *Cla
 		return contextpack.Facts{}, field.Scope{}, content.LinkContext{}, err
 	}
 	if claim != nil && claim.Type != nil {
-		facts.Page.Type, facts.Page.Preset = claim.Type.Name, claim.Type.Preset
+		facts.Page.Type, facts.Page.Preset, facts.Page.Role = claim.Type.Name, claim.Type.Preset, claim.Type.Preset.Role()
 	}
 	return facts, scope, plan, nil
 }

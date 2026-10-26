@@ -229,6 +229,6 @@ describe("Settings, Page types", () => {
         const dialog = screen.getByRole("dialog");
         fireEvent.change(within(dialog).getByRole("textbox", { name: new RegExp(`^${said.form.name}`) }), { target: { value: "Category" } });
         fireEvent.click(within(dialog).getByRole("button", { name: said.form.create }));
-        expect(calls.created[0]).toStrictEqual({ siteId: "s1", name: "Category", preset: "hub", templateId: undefined });
+        expect(calls.created[0]).toStrictEqual({ siteId: "s1", name: "Category", preset: "landing", templateId: undefined });
     });
 });

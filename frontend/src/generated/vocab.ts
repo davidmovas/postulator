@@ -166,14 +166,21 @@ export const cannibalizationReasons = [
 export type CannibalizationReason = (typeof cannibalizationReasons)[number];
 
 export const pageTypePresets = [
-    "hub",
-    "entity",
+    "landing",
+    "category",
+    "guide",
+    "info",
     "product",
     "store_category",
     "catalog",
     "technical",
+    "hub",
+    "entity",
 ] as const;
 export type PageTypePreset = (typeof pageTypePresets)[number];
+
+export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
+export type PageTypeRole = (typeof pageTypeRoles)[number];
 
 export const pageTypeSources = ["", "auto", "manual"] as const;
 export type PageTypeSource = (typeof pageTypeSources)[number];

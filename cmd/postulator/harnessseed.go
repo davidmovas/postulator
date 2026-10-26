@@ -738,10 +738,10 @@ func seedPageTypes(ctx context.Context, core *app.Core, siteID string, byPath ma
 		}
 	}
 
-	hub := byPreset[pagetype.Hub]
+	hub := byPreset[pagetype.Category]
 	body, found := scopeOf(hub, field.Body)
 	if !found {
-		return errors.New(errors.NotFound, "the Hub type carries no body scope")
+		return errors.New(errors.NotFound, "the Category type carries no body scope")
 	}
 	if _, err = core.PageTypes.SetScope(ctx, pagetypes.SetScopeRequest{
 		PageTypeID: hub.ID, Field: body.Field, Enabled: body.Enabled, AIWrites: body.AIWrites, Instruction: body.Instruction,

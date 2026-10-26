@@ -1,7 +1,16 @@
 import type { SiteMapNode, SiteMapRef } from "../../../data/types.js";
 
 export function aRef(pageId: string, path: string, overrides: Partial<SiteMapRef> = {}): SiteMapRef {
-    return { pageId, path, title: path, type: "Hub", preset: "hub" as SiteMapRef["preset"], onSite: true, ...overrides };
+    return {
+        pageId,
+        path,
+        title: path,
+        type: "Hub",
+        preset: "hub" as SiteMapRef["preset"],
+        role: "hub" as SiteMapRef["role"],
+        onSite: true,
+        ...overrides,
+    };
 }
 
 export function aNode(pageId: string, path: string, overrides: Partial<SiteMapNode> = {}): SiteMapNode {

@@ -73,7 +73,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatalf("read the page types: %v", err)
 	}
-	hubType, _ := set.ByPreset(pagetype.Hub)
+	hubType, _ := set.ByPreset(pagetype.Category)
 
 	f := &fixture{
 		store: store, siteID: owner.ID, templateID: hub.ID, hubType: hubType.ID, types: types,

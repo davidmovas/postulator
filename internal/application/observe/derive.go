@@ -164,7 +164,7 @@ func typedRegular(page pagemap.Page, set pagetype.Set) bool {
 		return false
 	}
 	kind, found := set.ByID(*page.PageTypeID)
-	return found && kind.Preset != pagetype.Technical
+	return found && kind.Preset.Role() != pagetype.RoleTechnical
 }
 
 func (s *Service) classify(ctx context.Context, tracked *findings, page *pagemap.Page, m siteModel, set pagetype.Set, settings site.Settings, technical site.TechnicalPages) error {
@@ -256,11 +256,11 @@ func untyped(m siteModel, changed map[string]pagemap.Page, set pagetype.Set) []t
 		if held, rendered := m.renders[page.ID]; rendered {
 			record = &held
 		}
-		preset, reason, assigned := pagetype.Assign(pagetype.FactsOf(page, record))
+		role, reason, assigned := pagetype.Assign(pagetype.FactsOf(page, record))
 		if !assigned {
 			continue
 		}
-		if kind, found := set.ByPreset(preset); found {
+		if kind, found := set.ByRole(role); found {
 			out = append(out, typing{pageID: page.ID, typeID: kind.ID, reason: reason})
 		}
 	}

@@ -291,11 +291,11 @@ func TestLinkAuditAuditsAPageWithoutATemplateByItsType(t *testing.T) {
 	}
 	none := ""
 	for i := range seeded.Types {
-		if seeded.Types[i].Preset != string(pagetype.Entity) {
+		if seeded.Types[i].Preset != string(pagetype.Guide) {
 			continue
 		}
 		if _, err = f.types.Save(t.Context(), pagetypes.SaveRequest{ID: seeded.Types[i].ID, TemplateID: &none}); err != nil {
-			t.Fatalf("take the Entity type's template away: %v", err)
+			t.Fatalf("take the Guide type's template away: %v", err)
 		}
 	}
 	page := sqlitetest.Page(t, f.store, other.ID, "/alone/")
@@ -320,7 +320,7 @@ func TestLinkAuditAuditsAPageWithoutATemplateByItsType(t *testing.T) {
 		t.Fatalf("LinkAuditPage: %v", err)
 	}
 	if detail.TemplateID != "" || detail.Rules.MaxLinks != 12 {
-		t.Fatalf("detail = template %q rules %+v, want no template and the Entity type's rules", detail.TemplateID, detail.Rules)
+		t.Fatalf("detail = template %q rules %+v, want no template and the Guide type's rules", detail.TemplateID, detail.Rules)
 	}
 }
 

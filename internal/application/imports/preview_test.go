@@ -399,22 +399,25 @@ func TestACellNamesThePageTypeByTheSitesOwnNameFirst(t *testing.T) {
 		cell   string
 		want   string
 	}{
-		{name: "a type by its name", cell: "Hub", want: "Hub"},
+		{name: "a type by its name", cell: "Category", want: "Category"},
+		{name: "a landing by its name", cell: "Landing", want: "Landing"},
+		{name: "an info page by its name", cell: "info", want: "Info"},
 		{name: "a name in another case", cell: "PRODUCT", want: "Product"},
-		{name: "a category is a hub", cell: "Category", want: "Hub"},
-		{name: "a commercial taxonomy is a hub", cell: "Commercial Taxonomy", want: "Hub"},
-		{name: "a pillar is a hub", cell: "Pillar", want: "Hub"},
-		{name: "a root is a hub", cell: "Root", want: "Hub"},
+		{name: "a hub is the site's category", cell: "Hub", want: "Category"},
+		{name: "a commercial taxonomy is a category", cell: "Commercial Taxonomy", want: "Category"},
+		{name: "a pillar is a category", cell: "Pillar", want: "Category"},
+		{name: "a root is a category", cell: "Root", want: "Category"},
 		{name: "a compound is a product", cell: "Compound", want: "Product"},
 		{name: "a compound product is a product", cell: "Compound/Product", want: "Product"},
 		{name: "a product owner is a product", cell: "Product Owner", want: "Product"},
-		{name: "a topic is an entity", cell: "Topic", want: "Entity"},
-		{name: "a guide is an entity", cell: "guide", want: "Entity"},
-		{name: "a geographic entity is an entity", cell: "Geographic Entity", want: "Entity"},
-		{name: "the store category on a page is a hub", cell: "Store category", want: "Hub"},
-		{name: "the hub renamed category", rename: map[pagetype.Preset]string{pagetype.Hub: "Category"}, cell: "Category", want: "Category"},
-		{name: "the entity renamed category wins the synonym", rename: map[pagetype.Preset]string{pagetype.Entity: "Category"}, cell: "category", want: "Category"},
-		{name: "the hub renamed keeps its synonyms", rename: map[pagetype.Preset]string{pagetype.Hub: "Collection"}, cell: "Pillar", want: "Collection"},
+		{name: "a topic is a guide", cell: "Topic", want: "Guide"},
+		{name: "a guide by its name", cell: "guide", want: "Guide"},
+		{name: "an article is a guide", cell: "Article", want: "Guide"},
+		{name: "a geographic entity is a guide", cell: "Geographic Entity", want: "Guide"},
+		{name: "the store category on a page is a category", cell: "Store category", want: "Category"},
+		{name: "the category renamed keeps its word", rename: map[pagetype.Preset]string{pagetype.Category: "Collection"}, cell: "Category", want: "Collection"},
+		{name: "a type renamed hub wins the synonym", rename: map[pagetype.Preset]string{pagetype.Info: "Hub"}, cell: "hub", want: "Hub"},
+		{name: "the category renamed keeps its synonyms", rename: map[pagetype.Preset]string{pagetype.Category: "Collection"}, cell: "Pillar", want: "Collection"},
 		{name: "a renamed type answers its new name", rename: map[pagetype.Preset]string{pagetype.Product: "Goods"}, cell: "Goods", want: "Goods"},
 		{name: "a renamed type keeps its synonyms", rename: map[pagetype.Preset]string{pagetype.Product: "Goods"}, cell: "Compound", want: "Goods"},
 	}
@@ -497,7 +500,7 @@ func TestAnEntityLevelColumnWinsThePageTypeAndThePreviewNamesTheOneItDropped(t *
 	}{
 		{name: "the kind before the entity type", sheet: "URL,Kind,Entity type\n/a/,Hub,Product\n", column: "Entity type", dropped: "Kind", want: "Product"},
 		{name: "the entity type before the kind", sheet: "URL,Entity type,Kind\n/a/,Product,Hub\n", column: "Entity type", dropped: "Kind", want: "Product"},
-		{name: "the page type before the entity level", sheet: "URL,Page type,Entity level\n/a/,Hub,Topic\n", column: "Entity level", dropped: "Page type", want: "Entity"},
+		{name: "the page type before the entity level", sheet: "URL,Page type,Entity level\n/a/,Hub,Topic\n", column: "Entity level", dropped: "Page type", want: "Guide"},
 	}
 
 	for _, tc := range cases {

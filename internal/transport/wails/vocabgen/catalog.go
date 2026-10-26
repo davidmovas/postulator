@@ -64,6 +64,7 @@ func catalog() []vocabulary {
 			typeName: "Reason",
 		},
 		{export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset"},
+		{export: "pageTypeRoles", tsType: "PageTypeRole", pkg: "internal/domain/pagetype", typeName: "Role"},
 		{export: "pageTypeSources", tsType: "PageTypeSource", pkg: "internal/domain/pagemap", typeName: "TypeSource"},
 		{export: "pageTypeReasons", tsType: "PageTypeReason", pkg: "internal/domain/pagemap", typeName: "TypeReason"},
 		{

@@ -91,8 +91,9 @@ func (s *scaled) agrees(t *testing.T, step string) {
 				t.Errorf("%s: the stored row of %s = %+v, the model's node %+v", step, node.Page.Path, row, node)
 			}
 			trail := make([]string, 0)
-			for _, ref := range tree.Trail(node.Page.PageID) {
-				trail = append(trail, ref.PageID)
+			refs := tree.Trail(node.Page.PageID)
+			for i := range refs {
+				trail = append(trail, refs[i].PageID)
 			}
 			if !slices.Equal(row.Ancestors(), trail) {
 				t.Errorf("%s: the stored trail of %s = %v, the model's %v", step, node.Page.Path, row.Ancestors(), trail)

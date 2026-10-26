@@ -55,7 +55,8 @@ describe("presets as roles", () => {
     it("treats an untyped page and an unknown preset as untyped", () => {
         expect(roleOf(null)).toBe("untyped");
         expect(roleOf("")).toBe("untyped");
-        expect(roleOf("landing")).toBe("untyped");
+        expect(roleOf("pillar")).toBe("untyped");
+        expect(roleOf("landing")).toBe("landing");
         expect(roleOf("hub")).toBe("hub");
         expect(presetLabel("")).toBe(copy.pageTypes.untyped);
     });

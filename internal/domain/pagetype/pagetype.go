@@ -9,25 +9,65 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
+type Role string
+
+const (
+	RoleHub       Role = "hub"
+	RoleEntity    Role = "entity"
+	RoleProduct   Role = "product"
+	RoleArchive   Role = "archive"
+	RoleCatalog   Role = "catalog"
+	RoleTechnical Role = "technical"
+)
+
+func Roles() []Role {
+	return []Role{RoleHub, RoleEntity, RoleProduct, RoleArchive, RoleCatalog, RoleTechnical}
+}
+
+func (r Role) Writable() bool {
+	return r == RoleHub || r == RoleEntity || r == RoleProduct
+}
+
 type Preset string
 
 const (
-	Hub           Preset = "hub"
-	Entity        Preset = "entity"
+	Landing       Preset = "landing"
+	Category      Preset = "category"
+	Guide         Preset = "guide"
+	Info          Preset = "info"
 	Product       Preset = "product"
 	StoreCategory Preset = "store_category"
 	Catalog       Preset = "catalog"
 	Technical     Preset = "technical"
+	Hub           Preset = "hub"
+	Entity        Preset = "entity"
 )
 
 var presetNames = map[Preset]string{
-	Hub: "Hub", Entity: "Entity", Product: "Product", StoreCategory: "Store category", Catalog: "Catalog", Technical: "Technical",
+	Landing: "Landing", Category: "Category", Guide: "Guide", Info: "Info", Product: "Product",
+	StoreCategory: "Store category", Catalog: "Catalog", Technical: "Technical", Hub: "Hub", Entity: "Entity",
 }
 
-var presetTemplates = map[Preset]string{Hub: "Hub", Entity: "Guide", Product: "Product"}
+var presetRoles = map[Preset]Role{
+	Landing: RoleHub, Category: RoleHub, Guide: RoleEntity, Info: RoleEntity, Product: RoleProduct,
+	StoreCategory: RoleArchive, Catalog: RoleCatalog, Technical: RoleTechnical, Hub: RoleHub, Entity: RoleEntity,
+}
+
+var presetTemplates = map[Preset]string{
+	Landing: "Hub", Category: "Hub", Guide: "Guide", Info: "Guide", Product: "Product", Hub: "Hub", Entity: "Guide",
+}
+
+var rolePresets = map[Role][]Preset{
+	RoleHub: {Category, Hub, Landing}, RoleEntity: {Guide, Entity, Info}, RoleProduct: {Product},
+	RoleArchive: {StoreCategory}, RoleCatalog: {Catalog}, RoleTechnical: {Technical},
+}
 
 func Presets() []Preset {
-	return []Preset{Hub, Entity, Product, StoreCategory, Catalog, Technical}
+	return []Preset{Landing, Category, Guide, Info, Product, StoreCategory, Catalog, Technical, Hub, Entity}
+}
+
+func Seeded() []Preset {
+	return []Preset{Landing, Category, Guide, Info, Product, StoreCategory, Catalog, Technical}
 }
 
 func (p Preset) Valid() bool {
@@ -39,8 +79,12 @@ func (p Preset) DefaultName() string {
 	return presetNames[p]
 }
 
+func (p Preset) Role() Role {
+	return presetRoles[p]
+}
+
 func (p Preset) Writable() bool {
-	return p == Hub || p == Entity || p == Product
+	return p.Role().Writable()
 }
 
 func (p Preset) DefaultTemplate() string {
@@ -93,22 +137,22 @@ func FactsOf(page pagemap.Page, record *render.Record) Facts {
 	return facts
 }
 
-func Assign(facts Facts) (Preset, pagemap.TypeReason, bool) {
+func Assign(facts Facts) (Role, pagemap.TypeReason, bool) {
 	switch {
 	case facts.WPType == pagemap.WPProduct:
-		return Product, pagemap.TypeByProduct, true
+		return RoleProduct, pagemap.TypeByProduct, true
 	case facts.WPType.Term():
-		return StoreCategory, pagemap.TypeByStoreCategory, true
+		return RoleArchive, pagemap.TypeByStoreCategory, true
 	case facts.Technical == pagemap.TechnicalShop:
-		return Catalog, pagemap.TypeByShop, true
+		return RoleCatalog, pagemap.TypeByShop, true
 	case facts.Technical != pagemap.TechnicalNone:
-		return Technical, pagemap.TypeByTechnical, true
+		return RoleTechnical, pagemap.TypeByTechnical, true
 	case !facts.Rendered:
 		return "", pagemap.TypeByNone, false
 	case facts.Listing:
-		return Hub, pagemap.TypeByListing, true
+		return RoleHub, pagemap.TypeByListing, true
 	default:
-		return Entity, pagemap.TypeByDefault, true
+		return RoleEntity, pagemap.TypeByDefault, true
 	}
 }
 

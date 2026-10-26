@@ -230,7 +230,8 @@ func (r mapRead) ref(pageID string) contextpack.Ref {
 	row := r.rows[pageID]
 	kind, _ := r.types.ByID(row.TypeID)
 	return contextpack.Ref{
-		PageID: row.PageID, Path: row.Path, Title: row.Title, Type: kind.Name, Preset: kind.Preset, OnSite: r.pages[pageID].WPID != nil,
+		PageID: row.PageID, Path: row.Path, Title: row.Title, Type: kind.Name, Preset: kind.Preset, Role: kind.Preset.Role(),
+		OnSite: r.pages[pageID].WPID != nil,
 	}
 }
 

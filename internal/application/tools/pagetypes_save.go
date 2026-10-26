@@ -12,7 +12,7 @@ type pagetypesSaveArgs struct {
 	ID         string  `json:"id,omitempty" description:"Page type id to change; omit to create one"`
 	SiteID     string  `json:"siteId,omitempty" description:"Site id; required to create"`
 	Name       *string `json:"name,omitempty" description:"Name; required to create"`
-	Preset     string  `json:"preset,omitempty" enum:"hub,entity,product,store_category,catalog,technical" description:"Role it takes; required to create, fixed after"`
+	Preset     string  `json:"preset,omitempty" enum:"landing,category,guide,info,product,store_category,catalog,technical,hub,entity" description:"Role it takes; required to create, fixed after"`
 	TemplateID *string `json:"templateId,omitempty" description:"Template id for its pages; empty clears"`
 }
 

@@ -24,30 +24,90 @@ func seeded(siteID string) []pagetype.Type {
 	return out
 }
 
-func TestThePresetsAndTheirNames(t *testing.T) {
+func TestThePresetsTheirNamesAndTheirRoles(t *testing.T) {
 	t.Parallel()
 
-	want := []pagetype.Preset{pagetype.Hub, pagetype.Entity, pagetype.Product, pagetype.StoreCategory, pagetype.Catalog, pagetype.Technical}
+	want := []pagetype.Preset{
+		pagetype.Landing, pagetype.Category, pagetype.Guide, pagetype.Info, pagetype.Product,
+		pagetype.StoreCategory, pagetype.Catalog, pagetype.Technical, pagetype.Hub, pagetype.Entity,
+	}
 	if got := pagetype.Presets(); !slices.Equal(got, want) {
 		t.Fatalf("Presets = %v, want %v", got, want)
 	}
-	names := map[pagetype.Preset]string{
-		pagetype.Hub: "Hub", pagetype.Entity: "Entity", pagetype.Product: "Product",
-		pagetype.StoreCategory: "Store category", pagetype.Catalog: "Catalog", pagetype.Technical: "Technical",
+	if got := pagetype.Seeded(); !slices.Equal(got, want[:8]) {
+		t.Fatalf("Seeded = %v, want the client's eight, without Hub and Entity", got)
 	}
-	for preset, name := range names {
-		if got := preset.DefaultName(); got != name {
-			t.Errorf("%s.DefaultName = %q, want %q", preset, got, name)
+	cases := map[pagetype.Preset]struct {
+		name     string
+		role     pagetype.Role
+		writable bool
+	}{
+		pagetype.Landing:       {"Landing", pagetype.RoleHub, true},
+		pagetype.Category:      {"Category", pagetype.RoleHub, true},
+		pagetype.Guide:         {"Guide", pagetype.RoleEntity, true},
+		pagetype.Info:          {"Info", pagetype.RoleEntity, true},
+		pagetype.Product:       {"Product", pagetype.RoleProduct, true},
+		pagetype.StoreCategory: {"Store category", pagetype.RoleArchive, false},
+		pagetype.Catalog:       {"Catalog", pagetype.RoleCatalog, false},
+		pagetype.Technical:     {"Technical", pagetype.RoleTechnical, false},
+		pagetype.Hub:           {"Hub", pagetype.RoleHub, true},
+		pagetype.Entity:        {"Entity", pagetype.RoleEntity, true},
+	}
+	if len(cases) != len(pagetype.Presets()) {
+		t.Fatalf("the table names %d presets, Presets has %d", len(cases), len(pagetype.Presets()))
+	}
+	for preset, tc := range cases {
+		if got := preset.DefaultName(); got != tc.name {
+			t.Errorf("%s.DefaultName = %q, want %q", preset, got, tc.name)
+		}
+		if got := preset.Role(); got != tc.role {
+			t.Errorf("%s.Role = %q, want %q", preset, got, tc.role)
+		}
+		if preset.Writable() != tc.writable {
+			t.Errorf("%s.Writable = %t, want %t", preset, preset.Writable(), tc.writable)
 		}
 	}
-	for _, preset := range pagetype.Presets() {
-		writable := preset == pagetype.Hub || preset == pagetype.Entity || preset == pagetype.Product
-		if preset.Writable() != writable {
-			t.Errorf("%s.Writable = %t, want %t", preset, preset.Writable(), writable)
-		}
+	if pagetype.Preset("pillar").Valid() {
+		t.Error("an unknown word names a preset")
 	}
-	if pagetype.Preset("category").Valid() {
-		t.Error("the word category names a preset; the archive preset is store_category")
+	if !slices.Equal(pagetype.Roles(), []pagetype.Role{
+		pagetype.RoleHub, pagetype.RoleEntity, pagetype.RoleProduct, pagetype.RoleArchive, pagetype.RoleCatalog, pagetype.RoleTechnical,
+	}) {
+		t.Errorf("Roles = %v", pagetype.Roles())
+	}
+}
+
+func TestATypeIsFoundByItsRoleThePreferredPresetFirst(t *testing.T) {
+	t.Parallel()
+
+	legacy := []pagetype.Type{
+		{ID: "hub", SiteID: "s1", Name: "Hub", Preset: pagetype.Hub, CreatedAt: stamp},
+		{ID: "entity", SiteID: "s1", Name: "Entity", Preset: pagetype.Entity, CreatedAt: stamp},
+	}
+	upgraded := append(slices.Clone(legacy),
+		pagetype.Type{ID: "category", SiteID: "s1", Name: "Category", Preset: pagetype.Category, CreatedAt: stamp.Add(time.Hour)},
+		pagetype.Type{ID: "landing", SiteID: "s1", Name: "Landing", Preset: pagetype.Landing, CreatedAt: stamp.Add(time.Hour)},
+		pagetype.Type{ID: "guide", SiteID: "s1", Name: "Guide", Preset: pagetype.Guide, CreatedAt: stamp.Add(time.Hour)},
+		pagetype.Type{ID: "info", SiteID: "s1", Name: "Info", Preset: pagetype.Info, CreatedAt: stamp.Add(time.Hour)},
+	)
+	landingOnly := []pagetype.Type{{ID: "landing", SiteID: "s1", Name: "Landing", Preset: pagetype.Landing, CreatedAt: stamp}}
+	cases := map[string]struct {
+		types []pagetype.Type
+		role  pagetype.Role
+		want  string
+	}{
+		"a site before 2.6 keeps its hub":       {legacy, pagetype.RoleHub, "hub"},
+		"a site before 2.6 keeps its entity":    {legacy, pagetype.RoleEntity, "entity"},
+		"an upgraded site prefers Category":     {upgraded, pagetype.RoleHub, "category"},
+		"an upgraded site prefers Guide":        {upgraded, pagetype.RoleEntity, "guide"},
+		"the last hub-like type stands for all": {landingOnly, pagetype.RoleHub, "landing"},
+		"a role the site lacks finds nothing":   {legacy, pagetype.RoleProduct, ""},
+	}
+	for name, tc := range cases {
+		got, found := pagetype.ByRole(tc.types, tc.role)
+		if found != (tc.want != "") || got.ID != tc.want {
+			t.Errorf("%s: ByRole = %q %t, want %q", name, got.ID, found, tc.want)
+		}
 	}
 }
 
@@ -55,6 +115,7 @@ func TestEachWritablePresetNamesItsBuiltInTemplate(t *testing.T) {
 	t.Parallel()
 
 	want := map[pagetype.Preset]string{
+		pagetype.Landing: "Hub", pagetype.Category: "Hub", pagetype.Guide: "Guide", pagetype.Info: "Guide",
 		pagetype.Hub: "Hub", pagetype.Entity: "Guide", pagetype.Product: "Product",
 		pagetype.StoreCategory: "", pagetype.Catalog: "", pagetype.Technical: "",
 	}
@@ -79,7 +140,7 @@ func TestATypeValidatesItsNameAndPreset(t *testing.T) {
 		"no id":          {SiteID: "s1", Name: "Pillar", Preset: pagetype.Hub},
 		"no site":        {ID: "t1", Name: "Pillar", Preset: pagetype.Hub},
 		"a blank name":   {ID: "t1", SiteID: "s1", Name: "  ", Preset: pagetype.Hub},
-		"no such preset": {ID: "t1", SiteID: "s1", Name: "Pillar", Preset: "category"},
+		"no such preset": {ID: "t1", SiteID: "s1", Name: "Pillar", Preset: "pillar"},
 	} {
 		if err := broken.Validate(); err == nil {
 			t.Errorf("%s: Validate passed", name)
@@ -97,42 +158,65 @@ func TestAnUntypedPageIsTypedByWhatTheSiteShows(t *testing.T) {
 	cases := map[string]struct {
 		page     pagemap.Page
 		record   *render.Record
-		preset   pagetype.Preset
+		role     pagetype.Role
 		reason   pagemap.TypeReason
 		assigned bool
 	}{
-		"a product":                             {page: pagemap.Page{WPType: pagemap.WPProduct}, preset: pagetype.Product, reason: pagemap.TypeByProduct, assigned: true},
-		"a store category":                      {page: pagemap.Page{WPType: pagemap.WPProductCategory}, preset: pagetype.StoreCategory, reason: pagemap.TypeByStoreCategory, assigned: true},
-		"the shop":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalShop}, preset: pagetype.Catalog, reason: pagemap.TypeByShop, assigned: true},
-		"the cart":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalCart}, preset: pagetype.Technical, reason: pagemap.TypeByTechnical, assigned: true},
-		"a page the workbook calls technical":   {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalWorkbook}, preset: pagetype.Technical, reason: pagemap.TypeByTechnical, assigned: true},
-		"a page whose content lists products":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(true)), preset: pagetype.Hub, reason: pagemap.TypeByListing, assigned: true},
-		"a page with products in its sidebar":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(false)), preset: pagetype.Entity, reason: pagemap.TypeByDefault, assigned: true},
-		"a page without a listing":              {page: pagemap.Page{WPType: pagemap.WPPost}, record: &render.Record{}, preset: pagetype.Entity, reason: pagemap.TypeByDefault, assigned: true},
+		"a product":                             {page: pagemap.Page{WPType: pagemap.WPProduct}, role: pagetype.RoleProduct, reason: pagemap.TypeByProduct, assigned: true},
+		"a store category":                      {page: pagemap.Page{WPType: pagemap.WPProductCategory}, role: pagetype.RoleArchive, reason: pagemap.TypeByStoreCategory, assigned: true},
+		"the shop":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalShop}, role: pagetype.RoleCatalog, reason: pagemap.TypeByShop, assigned: true},
+		"the cart":                              {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalCart}, role: pagetype.RoleTechnical, reason: pagemap.TypeByTechnical, assigned: true},
+		"a page the workbook calls technical":   {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalWorkbook}, role: pagetype.RoleTechnical, reason: pagemap.TypeByTechnical, assigned: true},
+		"a page whose content lists products":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(true)), role: pagetype.RoleHub, reason: pagemap.TypeByListing, assigned: true},
+		"a page with products in its sidebar":   {page: pagemap.Page{WPType: pagemap.WPPage}, record: new(listing(false)), role: pagetype.RoleEntity, reason: pagemap.TypeByDefault, assigned: true},
+		"a page without a listing":              {page: pagemap.Page{WPType: pagemap.WPPost}, record: &render.Record{}, role: pagetype.RoleEntity, reason: pagemap.TypeByDefault, assigned: true},
 		"a page not rendered yet waits":         {page: pagemap.Page{WPType: pagemap.WPPage}},
-		"a technical page not rendered yet":     {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalNoindex}, preset: pagetype.Technical, reason: pagemap.TypeByTechnical, assigned: true},
-		"a product with a listing is a product": {page: pagemap.Page{WPType: pagemap.WPProduct}, record: new(listing(true)), preset: pagetype.Product, reason: pagemap.TypeByProduct, assigned: true},
+		"a technical page not rendered yet":     {page: pagemap.Page{WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalNoindex}, role: pagetype.RoleTechnical, reason: pagemap.TypeByTechnical, assigned: true},
+		"a product with a listing is a product": {page: pagemap.Page{WPType: pagemap.WPProduct}, record: new(listing(true)), role: pagetype.RoleProduct, reason: pagemap.TypeByProduct, assigned: true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			preset, reason, assigned := pagetype.Assign(pagetype.FactsOf(tc.page, tc.record))
-			if assigned != tc.assigned || preset != tc.preset || reason != tc.reason {
-				t.Errorf("Assign = %s %s %t, want %s %s %t", preset, reason, assigned, tc.preset, tc.reason, tc.assigned)
+			role, reason, assigned := pagetype.Assign(pagetype.FactsOf(tc.page, tc.record))
+			if assigned != tc.assigned || role != tc.role || reason != tc.reason {
+				t.Errorf("Assign = %s %s %t, want %s %s %t", role, reason, assigned, tc.role, tc.reason, tc.assigned)
 			}
 		})
 	}
 }
 
+func legacy(siteID string) []pagetype.Type {
+	out := make([]pagetype.Type, 0, 6)
+	for i, preset := range []pagetype.Preset{pagetype.Hub, pagetype.Entity, pagetype.Product, pagetype.StoreCategory, pagetype.Catalog, pagetype.Technical} {
+		out = append(out, pagetype.Type{
+			ID: siteID + "-" + string(preset), SiteID: siteID, Name: preset.DefaultName(), Preset: preset,
+			CreatedAt: stamp.Add(time.Duration(i) * time.Second), UpdatedAt: stamp,
+		})
+	}
+	return out
+}
+
+func fresh(siteID string) []pagetype.Type {
+	out := make([]pagetype.Type, 0, len(pagetype.Seeded()))
+	for i, preset := range pagetype.Seeded() {
+		out = append(out, pagetype.Type{
+			ID: siteID + "-" + string(preset), SiteID: siteID, Name: preset.DefaultName(), Preset: preset,
+			CreatedAt: stamp.Add(time.Duration(i) * time.Second), UpdatedAt: stamp,
+		})
+	}
+	return out
+}
+
 func TestACellNamesATypeByTheSitesNameFirstThenBySynonym(t *testing.T) {
 	t.Parallel()
 
-	types := seeded("s1")
+	types := legacy("s1")
 	renamed := slices.Clone(types)
 	renamed[0].Name = "Category"
 	pillar := pagetype.Type{ID: "s1-pillar", SiteID: "s1", Name: "Pillar", Preset: pagetype.Hub, CreatedAt: stamp.Add(time.Hour), UpdatedAt: stamp}
 	withPillar := append(slices.Clone(types), pillar)
+	client := fresh("s1")
 
 	cases := map[string]struct {
 		types  []pagetype.Type
@@ -141,24 +225,32 @@ func TestACellNamesATypeByTheSitesNameFirstThenBySynonym(t *testing.T) {
 		want   string
 		found  bool
 	}{
-		"the site's own name":                   {types: withPillar, cell: "pillar", wpType: pagemap.WPPage, want: "s1-pillar", found: true},
-		"a preset's name":                       {types: types, cell: "Entity", wpType: pagemap.WPPage, want: "s1-entity", found: true},
-		"Category on a regular page is a hub":   {types: types, cell: "Category", wpType: pagemap.WPPage, want: "s1-hub", found: true},
-		"a renamed hub keeps the client's word": {types: renamed, cell: "category", wpType: pagemap.WPPage, want: "s1-hub", found: true},
-		"the old kind topic":                    {types: types, cell: "topic", wpType: pagemap.WPPage, want: "s1-entity", found: true},
-		"the old kind custom":                   {types: types, cell: "custom", wpType: pagemap.WPPage, want: "s1-entity", found: true},
-		"GEO, the client's level":               {types: types, cell: "GEO", wpType: pagemap.WPPage, want: "s1-entity", found: true},
-		"Compound/Product, the client's level":  {types: types, cell: "Compound/Product", wpType: pagemap.WPPage, want: "s1-product", found: true},
-		"a commercial taxonomy":                 {types: types, cell: "Commercial Taxonomy", wpType: pagemap.WPPage, want: "s1-hub", found: true},
-		"a pillar without a type of that name":  {types: types, cell: "pillar", wpType: pagemap.WPPage, want: "s1-hub", found: true},
-		"the oldest hub takes a synonym":        {types: withPillar, cell: "hub", wpType: pagemap.WPPage, want: "s1-hub", found: true},
-		"a store category named on a page":      {types: types, cell: "Store category", wpType: pagemap.WPPage, want: "s1-hub", found: true},
-		"a term page whatever its cell":         {types: types, cell: "Product", wpType: pagemap.WPProductCategory, want: "s1-store_category", found: true},
-		"a term page with an empty cell":        {types: types, cell: "", wpType: pagemap.WPProductCategory, want: "s1-store_category", found: true},
-		"an empty cell on a page names nothing": {types: types, cell: " ", wpType: pagemap.WPPage},
-		"an unknown word names nothing":         {types: types, cell: "landing", wpType: pagemap.WPPage},
-		"the shop's word":                       {types: types, cell: "Shop", wpType: pagemap.WPPage, want: "s1-catalog", found: true},
-		"technical":                             {types: types, cell: "technical", wpType: pagemap.WPPage, want: "s1-technical", found: true},
+		"the site's own name":                      {types: withPillar, cell: "pillar", wpType: pagemap.WPPage, want: "s1-pillar", found: true},
+		"a preset's name":                          {types: types, cell: "Entity", wpType: pagemap.WPPage, want: "s1-entity", found: true},
+		"Category on a site before 2.6 is its hub": {types: types, cell: "Category", wpType: pagemap.WPPage, want: "s1-hub", found: true},
+		"a renamed hub keeps the client's word":    {types: renamed, cell: "category", wpType: pagemap.WPPage, want: "s1-hub", found: true},
+		"the old kind topic":                       {types: types, cell: "topic", wpType: pagemap.WPPage, want: "s1-entity", found: true},
+		"the old kind custom":                      {types: types, cell: "custom", wpType: pagemap.WPPage, want: "s1-entity", found: true},
+		"GEO, the client's level":                  {types: types, cell: "GEO", wpType: pagemap.WPPage, want: "s1-entity", found: true},
+		"Compound/Product, the client's level":     {types: types, cell: "Compound/Product", wpType: pagemap.WPPage, want: "s1-product", found: true},
+		"a commercial taxonomy":                    {types: types, cell: "Commercial Taxonomy", wpType: pagemap.WPPage, want: "s1-hub", found: true},
+		"a pillar without a type of that name":     {types: types, cell: "pillar", wpType: pagemap.WPPage, want: "s1-hub", found: true},
+		"the oldest hub takes a synonym":           {types: withPillar, cell: "hub", wpType: pagemap.WPPage, want: "s1-hub", found: true},
+		"a store category named on a page":         {types: types, cell: "Store category", wpType: pagemap.WPPage, want: "s1-hub", found: true},
+		"a term page whatever its cell":            {types: types, cell: "Product", wpType: pagemap.WPProductCategory, want: "s1-store_category", found: true},
+		"a term page with an empty cell":           {types: types, cell: "", wpType: pagemap.WPProductCategory, want: "s1-store_category", found: true},
+		"an empty cell on a page names nothing":    {types: types, cell: " ", wpType: pagemap.WPPage},
+		"an unknown word names nothing":            {types: types, cell: "brochure", wpType: pagemap.WPPage},
+		"the shop's word":                          {types: types, cell: "Shop", wpType: pagemap.WPPage, want: "s1-catalog", found: true},
+		"technical":                                {types: types, cell: "technical", wpType: pagemap.WPPage, want: "s1-technical", found: true},
+		"landing on a site before 2.6 is its hub":  {types: types, cell: "Landing", wpType: pagemap.WPPage, want: "s1-hub", found: true},
+		"Category on a 2.6 site":                   {types: client, cell: "Category", wpType: pagemap.WPPage, want: "s1-category", found: true},
+		"hub on a 2.6 site is its Category":        {types: client, cell: "hub", wpType: pagemap.WPPage, want: "s1-category", found: true},
+		"the old kind topic on a 2.6 site":         {types: client, cell: "topic", wpType: pagemap.WPPage, want: "s1-guide", found: true},
+		"an article on a 2.6 site":                 {types: client, cell: "Article", wpType: pagemap.WPPage, want: "s1-guide", found: true},
+		"information on a 2.6 site":                {types: client, cell: "Information", wpType: pagemap.WPPage, want: "s1-info", found: true},
+		"a store category on a 2.6 page":           {types: client, cell: "Store category", wpType: pagemap.WPPage, want: "s1-category", found: true},
+		"a term page on a 2.6 site":                {types: client, cell: "", wpType: pagemap.WPProductCategory, want: "s1-store_category", found: true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -187,12 +279,19 @@ func TestEachPresetSeedsItsDefaultScopes(t *testing.T) {
 	t.Parallel()
 
 	want := map[pagetype.Preset][]field.Key{
+		pagetype.Landing:       {field.Body, field.SEODescription, field.SEOTitle},
+		pagetype.Category:      {field.Body, field.SEODescription, field.SEOTitle},
+		pagetype.Guide:         {field.Body, field.SEODescription, field.SEOTitle},
+		pagetype.Info:          {field.SEODescription, field.SEOTitle},
 		pagetype.Hub:           {field.Body, field.SEODescription, field.SEOTitle},
 		pagetype.Entity:        {field.Body, field.SEODescription, field.SEOTitle},
 		pagetype.Product:       {field.ProductDescription, field.ProductShortDescription, field.SEODescription, field.SEOTitle},
 		pagetype.StoreCategory: {},
 		pagetype.Catalog:       {},
 		pagetype.Technical:     {},
+	}
+	if len(want) != len(pagetype.Presets()) {
+		t.Fatalf("the table names %d presets, Presets has %d", len(want), len(pagetype.Presets()))
 	}
 	for preset, keys := range want {
 		scopes := pagetype.DefaultScopes(preset, "type-1")
@@ -236,6 +335,10 @@ func TestEachPresetCarriesTheFormerRules(t *testing.T) {
 		"a technical page's body":             {pagetype.Technical, field.Body, field.NoLinks()},
 		"a hub's SEO title":                   {pagetype.Hub, field.SEOTitle, field.NoLinks()},
 		"a hub's excerpt":                     {pagetype.Hub, field.Excerpt, field.NoLinks()},
+		"a landing's body, a hub's":           {pagetype.Landing, field.Body, flags(field.LinkRules{UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 20, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2, ChildrenSection: true})},
+		"a category's body, a hub's":          {pagetype.Category, field.Body, flags(field.LinkRules{UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 20, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2, ChildrenSection: true})},
+		"a guide's body, an entity's":         {pagetype.Guide, field.Body, flags(field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 12, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2})},
+		"an info page's body, off but ready":  {pagetype.Info, field.Body, flags(field.LinkRules{UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 12, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2})},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -299,10 +402,10 @@ func TestTheSetResolvesEveryPageToATypeAndAPolicy(t *testing.T) {
 		links    bool
 	}{
 		"a typed page":                     {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage, PageTypeID: typed("s1-pillar")}, typeID: "s1-pillar", maxLinks: 5, links: true},
-		"an untyped page reads as Entity":  {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage}, typeID: "s1-entity"},
+		"an untyped page reads as Guide":   {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage}, typeID: "s1-guide", maxLinks: 12, links: true},
 		"an untyped product":               {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPProduct}, typeID: "s1-product", maxLinks: 3, links: true},
 		"an untyped shop":                  {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage, TechnicalReason: pagemap.TechnicalShop}, typeID: "s1-catalog"},
-		"a dangling type":                  {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage, PageTypeID: typed("gone")}, typeID: "s1-entity"},
+		"a dangling type":                  {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage, PageTypeID: typed("gone")}, typeID: "s1-guide", maxLinks: 12, links: true},
 		"another site's type":              {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPProduct, PageTypeID: typed("s2-hub")}, typeID: "s1-product", maxLinks: 3, links: true},
 		"a hub's body":                     {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage, PageTypeID: typed("s1-hub")}, typeID: "s1-hub", maxLinks: 20, links: true},
 		"a disabled body carries no links": {page: pagemap.Page{SiteID: "s1", WPType: pagemap.WPPage, PageTypeID: typed("s1-entity")}, typeID: "s1-entity"},

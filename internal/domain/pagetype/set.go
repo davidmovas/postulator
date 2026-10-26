@@ -43,14 +43,18 @@ func (s Set) ByPreset(preset Preset) (Type, bool) {
 	return ByPreset(s.types, preset)
 }
 
+func (s Set) ByRole(role Role) (Type, bool) {
+	return ByRole(s.types, role)
+}
+
 func (s Set) TypeOf(page pagemap.Page) Type {
 	if page.PageTypeID != nil {
 		if kind, found := s.byID[*page.PageTypeID]; found && kind.SiteID == page.SiteID {
 			return kind
 		}
 	}
-	preset, _, _ := Assign(Facts{WPType: page.WPType, Technical: page.TechnicalReason, Rendered: true})
-	kind, _ := s.ByPreset(preset)
+	role, _, _ := Assign(Facts{WPType: page.WPType, Technical: page.TechnicalReason, Rendered: true})
+	kind, _ := s.ByRole(role)
 	return kind
 }
 

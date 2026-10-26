@@ -1250,7 +1250,7 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 		}
 		byPreset[preset] = typed.Types[index]
 	}
-	for _, preset := range pagetype.Presets() {
+	for _, preset := range pagetype.Seeded() {
 		if kind, held := byPreset[preset]; !held || kind.Name != preset.DefaultName() {
 			t.Errorf("the %s type is %+v, want it seeded as %q", preset, kind, preset.DefaultName())
 		}
@@ -1285,14 +1285,14 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 		}
 	}
 
-	hub := byPreset[pagetype.Hub]
+	hub := byPreset[pagetype.Category]
 	if body, found := scopeOf(hub, field.Body); !found || !body.Stored || !body.Enabled || !body.AIWrites || body.Links != harnessLinks() {
-		t.Errorf("the Hub type's body scope is %+v, want the harness's link rules with rotating anchors %+v", body, harnessLinks())
+		t.Errorf("the Category type's body scope is %+v, want the harness's link rules with rotating anchors %+v", body, harnessLinks())
 	}
 
 	custom, found := scopeOf(hub, field.Instance(field.Meta, subtitleKey))
 	if !found || !custom.Stored || !custom.Enabled || custom.AIWrites || custom.Label != subtitleLabel || custom.Provider != string(field.ProviderPlugin) {
-		t.Errorf("the Hub type's custom scope is %+v, want %s named %q, read through the plugin", custom, subtitleKey, subtitleLabel)
+		t.Errorf("the Category type's custom scope is %+v, want %s named %q, read through the plugin", custom, subtitleKey, subtitleLabel)
 	}
 	for path, subtitle := range seedSubtitles() {
 		model, modelErr := core.Observe.Page(t.Context(), held[path].ID)
