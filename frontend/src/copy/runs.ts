@@ -295,6 +295,8 @@ export const runs = {
             count === 0 ? "Replace none" : count === 1 ? "Replace the text of 1 page" : `Replace the text of ${count} pages`,
         rewriteCancel: "Keep their text",
         scopeTitle: "Fields this run writes",
+        typeScope: (fields: readonly string[]) =>
+            `The type of these pages writes no body, so this run writes only their ${fields.length <= 1 ? (fields[0] ?? "") : `${fields.slice(0, -1).join(", ")} and ${fields[fields.length - 1] ?? ""}`}.`,
         fieldScope: (fields: readonly string[]) =>
             `Only ${fields.join(", ")} ${fields.length === 1 ? "is" : "are"} written; nothing else on the page changes.`,
         rewriteField: (fields: readonly string[], paths: readonly string[]) =>

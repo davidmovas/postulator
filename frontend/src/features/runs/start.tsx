@@ -24,7 +24,7 @@ import {
 } from "./start-model.js";
 import { StartCaps, StartPrice } from "./start-price.js";
 import { RewriteSwitch, rewriteOf, writesBody } from "./start-rewrite.js";
-import { StartScope } from "./start-scope.js";
+import { scopedFields, StartScope, TypeScope } from "./start-scope.js";
 import type { StartSeed } from "./start-seed.js";
 import { seededFields, seededRewrite } from "./start-seed.js";
 import { TargetTree } from "./start-tree.js";
@@ -63,6 +63,7 @@ export function StartRunDrawer({
     const [tokenCap, setTokenCap] = useState(defaultTokenCap);
     const [estimate, setEstimate] = useState<Estimate | null>(null);
     const [added, setAdded] = useState<readonly AddedPage[]>([]);
+    const [scoped, setScoped] = useState<readonly string[]>([]);
     const [rewrite, setRewrite] = useState<ReadonlySet<string>>(new Set());
     const [named, setNamed] = useState<ReadonlyMap<string, string>>(new Map());
 
@@ -93,6 +94,7 @@ export function StartRunDrawer({
         setTokenCap(defaultTokenCap);
         setEstimate(null);
         setAdded([]);
+        setScoped([]);
         setRewrite(new Set(seed?.rewrite ?? []));
         setNamed(new Map());
         priced.reset();
@@ -106,6 +108,7 @@ export function StartRunDrawer({
     const forget = (): void => {
         setEstimate(null);
         setAdded([]);
+        setScoped([]);
         priced.reset();
     };
 
@@ -152,6 +155,7 @@ export function StartRunDrawer({
                                 onSuccess: (answered) => {
                                     setEstimate(answered.estimate);
                                     setAdded(answered.added ?? []);
+                                    setScoped(scopedFields(answered));
                                 },
                             });
                         }}
@@ -268,6 +272,8 @@ export function StartRunDrawer({
                         forget();
                     }}
                 />
+
+                {fields.length === 0 && scoped.length > 0 ? <TypeScope fields={scoped} /> : null}
 
                 <StartPrice estimate={estimate} added={added} over={over} refusal={refusal.banner} />
             </div>

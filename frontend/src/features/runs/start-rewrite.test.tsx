@@ -16,7 +16,12 @@ interface Held {
 
 const held: Held = { recipe: null, priced: [], started: [] };
 
-const answered = { estimate: { tokens: 1200, usd: 0.4, findings: [] }, added: [], runId: "r1" };
+const answered: { estimate: { tokens: number; usd: number; findings: never[] }; added: never[]; runId: string; fields: string[] } = {
+    estimate: { tokens: 1200, usd: 0.4, findings: [] },
+    added: [],
+    runId: "r1",
+    fields: [],
+};
 
 function mutation(into: unknown[]) {
     return {
@@ -94,6 +99,26 @@ beforeEach(() => {
     ];
     held.priced = [];
     held.started = [];
+    answered.fields = [];
+});
+
+describe("a run scoped by the type of its pages", () => {
+    it("says in one line which fields it writes when their type writes no body", () => {
+        answered.fields = ["seo_title", "seo_description"];
+        drawer();
+        expect(document.querySelector("[data-run-type-scope]")).toBeNull();
+
+        price();
+
+        expect(screen.getByText(said.typeScope([copy.pageTypes.fields.seo_title, copy.pageTypes.fields.seo_description]))).toBeDefined();
+    });
+
+    it("says nothing of the kind for a whole run", () => {
+        drawer();
+        price();
+
+        expect(document.querySelector("[data-run-type-scope]")).toBeNull();
+    });
 });
 
 describe("the recipe that writes a body", () => {
