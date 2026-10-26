@@ -11,6 +11,16 @@ merged nor tagged: page classification by rules, templates per type and the Page
 views (phase 17, 2026-10-26), its notes under **Release 2.6.0** below and in the pull request's body,
 which carries 2.5.1's as well. Its gate is under **The gate**.
 
+## Phase 18 in progress (2.7.0)
+
+The plan and the capability matrix are `docs/superpowers/plans/2026-10-26-phase-18-assistant.md`. Landed: W0 (the
+plan), W1 (the read layer: the tree by shape and depth with a reason for every empty parent, the graph read with
+parents, a body as text, a section's links, many pages in one call, a capped list that drops its cursor), W2 (the
+two hierarchies: `entity_parent_differs` raised by a sync and by every parent writer, `graph.AdoptParents` previewed
+and applied under its hash, `adopt_tree` and `keep_graph`, a model proposal's parent from the page tree, a URL-less
+row's parent from its page). Next: W3, the run brief. The tools that expose W1 and W2 arrive with W5's fold;
+`internal/application/tools/fit.go` waits uncommitted for its first caller there.
+
 ## Next, in order
 
 1. **The owed gate legs**, in sequence on a quiet machine, from the repository root under bash:
