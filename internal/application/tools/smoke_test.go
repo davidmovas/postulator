@@ -188,6 +188,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
 		Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
 		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
+		Runs: runRepo, Items: itemRepo,
 	})
 	return tools.New(tools.Deps{
 		Sites:     sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),

@@ -31,6 +31,7 @@ type PackRequest struct {
 	Budget    int            `json:"budget"`
 	Brief     *run.Brief     `json:"brief,omitempty"`
 	Directive *run.Directive `json:"directive,omitempty"`
+	RunID     string         `json:"runId,omitempty"`
 	Claim     *Claim         `json:"-"`
 }
 
@@ -100,6 +101,33 @@ func (s *Service) read(ctx context.Context, pageID, fieldName string, claim *Cla
 	return facts, scope, plan, nil
 }
 
+func (s *Service) briefOfRun(ctx context.Context, req PackRequest) (PackRequest, error) {
+	page, err := s.deps.Pages.Get(ctx, req.PageID)
+	if err != nil {
+		return PackRequest{}, err
+	}
+	held, err := s.deps.Runs.Get(ctx, req.RunID)
+	if err != nil {
+		return PackRequest{}, err
+	}
+	if held.SiteID != page.SiteID {
+		return PackRequest{}, errors.New(errors.NotFound, "the page's site holds no such run").WithDetail("runId", req.RunID)
+	}
+	items, err := s.deps.Items.ByRun(ctx, req.RunID)
+	if err != nil {
+		return PackRequest{}, err
+	}
+	brief := held.Brief
+	req.Brief = &brief
+	for i := range items {
+		if items[i].TargetID == req.PageID {
+			directive := items[i].Directive
+			req.Directive = &directive
+		}
+	}
+	return req, nil
+}
+
 func (s *Service) directions(ctx context.Context, req PackRequest) (*contextpack.Directions, error) {
 	page, err := s.deps.Pages.Get(ctx, req.PageID)
 	if err != nil {
@@ -123,6 +151,12 @@ func (s *Service) Pack(ctx context.Context, req PackRequest) (PackView, error) {
 	req.Claim = nil
 	if req.Budget <= 0 {
 		req.Budget = s.deps.Budgets.InputBudget(roleOf(field.Key(req.Field)))
+	}
+	if req.RunID != "" {
+		var err error
+		if req, err = s.briefOfRun(ctx, req); err != nil {
+			return PackView{}, err
+		}
 	}
 	picture, err := s.Picture(ctx, req)
 	if err != nil {

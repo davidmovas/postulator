@@ -213,6 +213,31 @@ func TestWhatTheWriterWillSeeHoldsARunsBriefAndThePagesDirective(t *testing.T) {
 	}
 }
 
+func TestWhatTheWriterSawInARunIsReadByTheRun(t *testing.T) {
+	t.Parallel()
+
+	m := site1()
+	m.Runs = []run.Run{{ID: "run-1", SiteID: siteID, Brief: run.Brief{Goal: "Sell to the lab buyer"}}}
+	m.Items = []run.Item{{ID: "item-1", RunID: "run-1", SiteID: siteID, TargetID: "bpc", Directive: run.Directive{PageID: "bpc", Notes: "Lead with storage."}}}
+	view, err := m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "bpc", RunID: "run-1"})
+	if err != nil {
+		t.Fatalf("Pack: %v", err)
+	}
+	brief := ""
+	for _, section := range view.Sections {
+		if section.Name == "brief" {
+			brief = strings.Join(section.Lines, "\n")
+		}
+	}
+	if !strings.Contains(brief, "Goal: Sell to the lab buyer") || !strings.Contains(brief, "For this page: Lead with storage.") {
+		t.Errorf("the brief the run gave its writer =\n%s", brief)
+	}
+	m.Runs[0].SiteID = "another-site"
+	if _, err = m.Service().Pack(t.Context(), sitemodel.PackRequest{PageID: "bpc", RunID: "run-1"}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("a run of another site = %v, want NotFound", err)
+	}
+}
+
 func TestALinksViewRefusesWhatItCannotRead(t *testing.T) {
 	t.Parallel()
 

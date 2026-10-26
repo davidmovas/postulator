@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
@@ -105,9 +106,19 @@ type audits interface {
 	LinkAuditPages(ctx context.Context, req reports.LinkAuditPagesRequest) (reports.LinkAuditPagesResponse, error)
 }
 
+type runReader interface {
+	Get(ctx context.Context, id string) (run.Run, error)
+}
+
+type runItemReader interface {
+	ByRun(ctx context.Context, runID string) ([]run.Item, error)
+}
+
 type Deps struct {
 	Budgets    budgets
 	Audits     audits
+	Runs       runReader
+	Items      runItemReader
 	Reader     reader
 	UnitOfWork unitOfWork
 	Maps       mapStore

@@ -18,6 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -39,6 +40,8 @@ type Memory struct {
 	Budgets  map[domainllm.Role]int
 	Audit    reports.LinkAuditResponse
 	Owed     map[string][]reports.RequiredLink
+	Runs     []run.Run
+	Items    []run.Item
 
 	mu      sync.Mutex
 	reads   int
@@ -72,8 +75,29 @@ func (m *Memory) Service() *sitemodel.Service {
 		Reader: m, UnitOfWork: m, Maps: mapReader{m}, Sites: siteReader{m}, Pages: pageReader{m}, Entities: entityReader{m},
 		Edges: edgeReader{m}, Types: typeReader{m}, Terms: termReader{m}, Fields: fieldReader{m}, Bodies: bodyReader{m},
 		Renders: renderReader{m}, Links: linkReader{m}, Findings: findingReader{m}, Budgets: budgetReader{m},
-		Audits: auditReader{m},
+		Audits: auditReader{m}, Runs: runReader{m}, Items: runReader{m},
 	})
+}
+
+type runReader struct{ m *Memory }
+
+func (r runReader) Get(_ context.Context, runID string) (run.Run, error) {
+	for i := range r.m.Runs {
+		if r.m.Runs[i].ID == runID {
+			return r.m.Runs[i], nil
+		}
+	}
+	return run.Run{}, errors.New(errors.NotFound, "run not found")
+}
+
+func (r runReader) ByRun(_ context.Context, runID string) ([]run.Item, error) {
+	out := make([]run.Item, 0)
+	for i := range r.m.Items {
+		if r.m.Items[i].RunID == runID {
+			out = append(out, r.m.Items[i])
+		}
+	}
+	return out, nil
 }
 
 func (m *Memory) Do(ctx context.Context, fn func(context.Context) error) error {
