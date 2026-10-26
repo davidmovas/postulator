@@ -65,6 +65,11 @@ func catalog() []vocabulary {
 		},
 		{export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset"},
 		{export: "pageTypeRoles", tsType: "PageTypeRole", pkg: "internal/domain/pagetype", typeName: "Role"},
+		{export: "ruleKinds", tsType: "RuleKind", pkg: "internal/domain/pagetype", typeName: "RuleKind"},
+		{export: "urlModes", tsType: "URLMode", pkg: "internal/domain/pagetype", typeName: "URLMode"},
+		{export: "schemaTypes", tsType: "SchemaType", pkg: "internal/domain/pagetype", typeName: "SchemaType"},
+		{export: "ruleConditions", tsType: "RuleCondition", pkg: "internal/domain/pagetype", typeName: "ConditionKind"},
+		{export: "ruleVerdicts", tsType: "RuleVerdict", pkg: "internal/domain/pagetype", typeName: "Verdict"},
 		{export: "pageTypeSources", tsType: "PageTypeSource", pkg: "internal/domain/pagemap", typeName: "TypeSource"},
 		{export: "pageTypeReasons", tsType: "PageTypeReason", pkg: "internal/domain/pagemap", typeName: "TypeReason"},
 		{

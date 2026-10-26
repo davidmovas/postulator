@@ -32,6 +32,8 @@ export const pageTypes = {
         user: "Chosen by a person",
         ai: "Chosen by the agent",
         import: "Set by a workbook import",
+        rule: "Set by a classification rule",
+        unmatched: "No rule matched it, so it took the type for anything else",
     },
     fields: {
         title: "Title",

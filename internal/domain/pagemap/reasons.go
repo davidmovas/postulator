@@ -59,12 +59,14 @@ const (
 	TypeByUser          TypeReason = "user"
 	TypeByAI            TypeReason = "ai"
 	TypeByImport        TypeReason = "import"
+	TypeByRule          TypeReason = "rule"
+	TypeByUnmatched     TypeReason = "unmatched"
 )
 
 func (r TypeReason) Valid() bool {
 	switch r {
 	case TypeByNone, TypeByProduct, TypeByStoreCategory, TypeByShop, TypeByTechnical, TypeByListing, TypeByDefault,
-		TypeByKind, TypeByUser, TypeByAI, TypeByImport:
+		TypeByKind, TypeByUser, TypeByAI, TypeByImport, TypeByRule, TypeByUnmatched:
 		return true
 	default:
 		return false
@@ -73,6 +75,10 @@ func (r TypeReason) Valid() bool {
 
 func (r TypeReason) Manual() bool {
 	return r == TypeByUser || r == TypeByAI || r == TypeByImport
+}
+
+func (r TypeReason) RulePlaced() bool {
+	return r == TypeByRule || r == TypeByUnmatched
 }
 
 type TechnicalReason string

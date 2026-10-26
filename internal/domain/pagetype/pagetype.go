@@ -1,6 +1,7 @@
 package pagetype
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -116,15 +117,36 @@ func (t Type) Validate() error {
 	}
 }
 
+type Assignment struct {
+	TypeID string
+	Source pagemap.TypeSource
+	Reason pagemap.TypeReason
+	RuleID string
+}
+
 type Facts struct {
+	PageID    string
+	Path      string
+	Slug      string
 	WPType    pagemap.WPType
 	Technical pagemap.TechnicalReason
+	FrontPage bool
 	Rendered  bool
 	Listing   bool
+	Products  int
+	Schema    []string
+	Words     int
+	H2        int
+	Level     int
+	Ancestors []string
+	Current   Assignment
 }
 
 func FactsOf(page pagemap.Page, record *render.Record) Facts {
-	facts := Facts{WPType: page.WPType, Technical: page.TechnicalReason, Rendered: record != nil}
+	facts := Facts{
+		PageID: page.ID, Path: page.Path, Slug: page.Slug, WPType: page.WPType, Technical: page.TechnicalReason,
+		Rendered: record != nil, Current: AssignmentOf(page),
+	}
 	if record == nil {
 		return facts
 	}
@@ -134,7 +156,25 @@ func FactsOf(page pagemap.Page, record *render.Record) Facts {
 			break
 		}
 	}
+	for kind := range record.JSONLD {
+		facts.Schema = append(facts.Schema, kind)
+	}
+	slices.Sort(facts.Schema)
+	for _, heading := range record.Headings {
+		if heading.Level == 2 && !heading.Generated {
+			facts.H2++
+		}
+	}
+	facts.Words = record.WordsContent
 	return facts
+}
+
+func AssignmentOf(page pagemap.Page) Assignment {
+	held := Assignment{Source: page.TypeSource, Reason: page.TypeReason, RuleID: page.TypeRuleID}
+	if page.PageTypeID != nil {
+		held.TypeID = *page.PageTypeID
+	}
+	return held
 }
 
 func Assign(facts Facts) (Role, pagemap.TypeReason, bool) {

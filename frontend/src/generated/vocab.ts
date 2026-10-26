@@ -182,6 +182,43 @@ export type PageTypePreset = (typeof pageTypePresets)[number];
 export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
 export type PageTypeRole = (typeof pageTypeRoles)[number];
 
+export const ruleKinds = ["rule", "fallback"] as const;
+export type RuleKind = (typeof ruleKinds)[number];
+
+export const urlModes = ["prefix", "segment", "glob"] as const;
+export type URLMode = (typeof urlModes)[number];
+
+export const schemaTypes = [
+    "Article",
+    "BlogPosting",
+    "HowTo",
+    "FAQPage",
+    "AboutPage",
+    "ContactPage",
+    "CollectionPage",
+    "ItemList",
+] as const;
+export type SchemaType = (typeof schemaTypes)[number];
+
+export const ruleConditions = [
+    "postType",
+    "url",
+    "slug",
+    "ancestor",
+    "level",
+    "listing",
+    "schema",
+    "words",
+    "h2",
+    "technical",
+    "frontPage",
+    "shop",
+] as const;
+export type RuleCondition = (typeof ruleConditions)[number];
+
+export const ruleVerdicts = ["met", "unmet", "waiting", "blocked"] as const;
+export type RuleVerdict = (typeof ruleVerdicts)[number];
+
 export const pageTypeSources = ["", "auto", "manual"] as const;
 export type PageTypeSource = (typeof pageTypeSources)[number];
 
@@ -197,6 +234,8 @@ export const pageTypeReasons = [
     "user",
     "ai",
     "import",
+    "rule",
+    "unmatched",
 ] as const;
 export type PageTypeReason = (typeof pageTypeReasons)[number];
 

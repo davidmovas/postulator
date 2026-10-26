@@ -79,6 +79,10 @@ func ByPreset(types []Type, preset Preset) (Type, bool) {
 	return *oldest, true
 }
 
+func sameName(a, b string) bool {
+	return graph.Key(a) == graph.Key(b)
+}
+
 func words(text string) string {
 	return strings.Join(strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
