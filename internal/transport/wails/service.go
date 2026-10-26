@@ -60,6 +60,7 @@ type Deps struct {
 	Schedules  Source[SchedulesUseCase]
 	Tools      Source[ToolCatalog]
 	Browser    Source[BrowserUseCase]
+	Support    Source[SupportUseCase]
 	Settings   SettingsDeps
 }
 
@@ -80,6 +81,7 @@ func Services(logger *zap.Logger, build BuildInfo, deps Deps) []application.Serv
 		bind(NewSchedulesService(logger, deps.Schedules)),
 		bind(NewToolsService(logger, deps.Tools)),
 		bind(NewBrowserService(logger, deps.Browser)),
+		bind(NewSupportService(logger, deps.Support)),
 		bind(NewSettingsService(logger, deps.Settings)),
 	}
 }
