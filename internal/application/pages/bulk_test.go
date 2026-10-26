@@ -120,7 +120,8 @@ func TestASelectionIsResolvedFromItsIDsSubtreesFilterAndRuleLessItsExceptions(t 
 				named = append(named, path)
 			}
 		}
-		if slices.Sort(named); len(got.Paths) != len(got.PageIDs) || !slices.Equal(named, tc.want) {
+		slices.Sort(named)
+		if len(got.Paths) != len(got.PageIDs) || !slices.Equal(named, tc.want) {
 			t.Errorf("%s names its pages %v, want each one's path %v", name, got.Paths, tc.want)
 		}
 	}
