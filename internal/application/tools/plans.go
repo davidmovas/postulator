@@ -94,6 +94,12 @@ type PlanStepView struct {
 	EstimateTokens int              `json:"estimateTokens,omitempty"`
 	Error          string           `json:"error,omitempty"`
 	RunID          string           `json:"runId,omitempty"`
+	Edits          []EditView       `json:"edits"`
+}
+
+type EditView struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type PlanView struct {
@@ -120,9 +126,38 @@ func ViewOfPlan(plan agent.Plan) PlanView {
 		view.Steps = append(view.Steps, PlanStepView{
 			Number: i + 1, ID: held.ID, Tool: held.Tool, Summary: held.Summary, Reason: held.Reason, DependsOn: dependsOn,
 			Status: held.Status, EstimateUSD: held.EstimateUSD, EstimateTokens: held.EstimateTokens, Error: held.Error, RunID: held.RunID,
+			Edits: editsOf(held),
 		})
 	}
 	return view
+}
+
+func editsOf(step agent.PlanStep) []EditView {
+	var args map[string]any
+	if json.Unmarshal(step.Args, &args) != nil {
+		args = map[string]any{}
+	}
+	out := make([]EditView, 0, len(step.Editable))
+	for _, field := range step.Editable {
+		out = append(out, EditView{Name: field.Name, Value: valueAt(args, strings.Split(field.Path, "."))})
+	}
+	return out
+}
+
+func valueAt(args map[string]any, path []string) string {
+	held, found := args[path[0]]
+	if !found {
+		return ""
+	}
+	if len(path) == 1 {
+		text, _ := held.(string)
+		return text
+	}
+	nested, object := held.(map[string]any)
+	if !object {
+		return ""
+	}
+	return valueAt(nested, path[1:])
 }
 
 func plansTool(deps Deps) Tool {

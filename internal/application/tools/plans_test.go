@@ -59,6 +59,19 @@ func planCall(t *testing.T, registry *tools.Registry, b tools.Binding, args stri
 	return decoded, nil
 }
 
+func TestAPlansViewOffersEachEditableFieldWithItsValue(t *testing.T) {
+	t.Parallel()
+
+	view := tools.ViewOfPlan(agent.Plan{ID: "p", Title: "t", Steps: []agent.PlanStep{{
+		ID: "s1", Tool: "runs_control", Args: json.RawMessage(`{"op":"start","brief":{"goal":"Sell the kit"},"anchor":"kits"}`),
+		Editable: []agent.EditField{{Name: "goal", Path: "brief.goal"}, {Name: "anchor", Path: "anchor"}, {Name: "tone", Path: "brief.tone"}},
+	}}})
+	edits := view.Steps[0].Edits
+	if len(edits) != 3 || edits[0].Name != "goal" || edits[0].Value != "Sell the kit" || edits[1].Value != "kits" || edits[2].Value != "" {
+		t.Fatalf("the editable fields = %+v", edits)
+	}
+}
+
 func TestAPlanIsProposedOnlyOfWritesTheirToolsWouldTake(t *testing.T) {
 	t.Parallel()
 
