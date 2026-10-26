@@ -47,6 +47,10 @@ type rowMapper interface {
 	MapRow(ctx context.Context, req imports.MapRowRequest) (imports.MapRowResponse, error)
 }
 
+type parentAdopter interface {
+	AdoptParents(ctx context.Context, req graph.AdoptParentsRequest) (graph.AdoptParentsResponse, error)
+}
+
 type unitOfWork interface {
 	Do(ctx context.Context, fn func(context.Context) error) error
 }
@@ -65,6 +69,7 @@ type Deps struct {
 	Pages      pageStore
 	Cards      cardAcceptor
 	Rows       rowMapper
+	Parents    parentAdopter
 	Places     sitePlaces
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher

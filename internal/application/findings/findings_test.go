@@ -163,6 +163,33 @@ func (s *store) MapRow(_ context.Context, req imports.MapRowRequest) (imports.Ma
 	return imports.MapRowResponse{}, s.Settle(context.Background(), req.FindingID, finding.Resolved, "mapped", req.By, at)
 }
 
+func (s *store) AdoptParents(_ context.Context, req graph.AdoptParentsRequest) (graph.AdoptParentsResponse, error) {
+	entity := strings.Join(req.EntityIDs, ",")
+	if !req.Apply {
+		s.calls = append(s.calls, "adopt:"+entity+":preview")
+		if entity == "e-loop" {
+			return graph.AdoptParentsResponse{Hash: "h-" + entity, Skipped: 1, Steps: paging.List[graph.AdoptionView]{
+				Items: []graph.AdoptionView{{EntityID: entity, Skip: "loop"}},
+			}}, nil
+		}
+		return graph.AdoptParentsResponse{Hash: "h-" + entity, Adopting: 1}, nil
+	}
+	s.calls = append(s.calls, "adopt:"+entity+":apply:"+req.Hash)
+	for id, held := range s.held {
+		if held.EntityID != nil && *held.EntityID == entity {
+			return graph.AdoptParentsResponse{Applied: true, Adopting: 1},
+				s.Settle(context.Background(), id, finding.Resolved, finding.ResolutionParentAdopted, finding.ResolvedByPerson, at)
+		}
+	}
+	return graph.AdoptParentsResponse{Applied: true, Adopting: 1}, nil
+}
+
+func disagreeing(entityID string) finding.Finding {
+	held := raised(finding.EntityParentDiffers, `{"entityId":"`+entityID+`","entity":"Beans","path":"/a/b/","graphIds":[],"graph":[],"treeEntityId":"e-coffee","tree":"Coffee","treePath":"/a/"}`)
+	held.EntityID, held.SubjectKey = new(entityID), finding.SubjectEntityParent(entityID)
+	return held
+}
+
 type unit struct{}
 
 func (unit) Do(ctx context.Context, fn func(context.Context) error) error {
@@ -265,7 +292,7 @@ func newCounted(t *testing.T, held ...finding.Finding) (*findings.Service, *stor
 	}
 	published := &counter{}
 	return findings.New(findings.Deps{
-		Findings: s, Fields: s, Bodies: bodies{s}, Pages: pageRows{s}, Cards: s, Rows: s, Places: places{},
+		Findings: s, Fields: s, Bodies: bodies{s}, Pages: pageRows{s}, Cards: s, Rows: s, Places: places{}, Parents: s,
 		UnitOfWork: unit{}, Publisher: published, Clock: clock.NewFake(at),
 	}), s, published
 }
@@ -333,6 +360,15 @@ func TestEachResolutionOptionPerCode(t *testing.T) {
 			req: findings.ResolveRequest{Option: "ignore"}, status: finding.Dismissed, settles: true,
 		},
 		{
+			name: "the page tree's parent is adopted through the graph", raised: disagreeing("e-beans"),
+			req: findings.ResolveRequest{Option: "adopt_tree"}, calls: []string{"adopt:e-beans:preview", "adopt:e-beans:apply:h-e-beans"},
+			status: finding.Resolved, settles: true,
+		},
+		{
+			name: "the graph's parent is kept", raised: disagreeing("e-beans"),
+			req: findings.ResolveRequest{Option: "keep_graph", By: finding.ResolvedByAgent}, status: finding.Resolved, settles: true,
+		},
+		{
 			name: "a field is rewritten by a run", raised: raised(finding.FieldChangedOnSite, `{"key":"excerpt"}`),
 			req: findings.ResolveRequest{Option: "rewrite_field"}, status: finding.Open,
 		},
@@ -396,6 +432,19 @@ func TestARunOptionOnlyPreparesTheStart(t *testing.T) {
 	rescan, err := service.Resolve(t.Context(), findings.ResolveRequest{FindingID: "f-render_redirected", Option: "rescan"})
 	if err != nil || rescan.Sync == nil || !rescan.Sync.Full || !rescan.Sync.RenderRescan || rescan.Sync.SiteID != siteID {
 		t.Errorf("rescan = %+v, %v; want a full walk that renders every page again", rescan.Sync, err)
+	}
+}
+
+func TestAnAdoptionTheGraphCannotTakeIsRefusedAndWritesNothing(t *testing.T) {
+	t.Parallel()
+
+	service, s := newService(t, disagreeing("e-loop"))
+	_, err := service.Resolve(t.Context(), findings.ResolveRequest{FindingID: "f-entity_parent_differs", Option: "adopt_tree"})
+	if !errors.IsCode(err, errors.Conflict) || !strings.Contains(err.Error(), "loop") {
+		t.Fatalf("an adoption that would loop answered %v", err)
+	}
+	if !slices.Equal(s.calls, []string{"adopt:e-loop:preview"}) || s.held["f-entity_parent_differs"].Status != finding.Open {
+		t.Errorf("a refused adoption made %v and left the finding %s", s.calls, s.held["f-entity_parent_differs"].Status)
 	}
 }
 

@@ -126,7 +126,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		imports: importsService,
 		findings: findings.New(findings.Deps{
 			Findings: stores.findings, Fields: stores.fields, Bodies: stores.bodies, Pages: stores.pages,
-			Cards: graphService, Rows: importsService, Places: writing.siteModel, UnitOfWork: stores.store, Publisher: c.Events,
+			Cards: graphService, Rows: importsService, Parents: graphService, Places: writing.siteModel, UnitOfWork: stores.store, Publisher: c.Events,
 			Clock: stores.now,
 		}),
 		models: models.New(llm.catalog, stores.overrides, llm.profiles, llm.ledger, stores.secrets, llm.client,
