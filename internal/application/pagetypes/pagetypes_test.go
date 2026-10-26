@@ -232,6 +232,46 @@ func TestASeededTypeCarriesItsPresetsTemplate(t *testing.T) {
 	}
 }
 
+func TestATypeCountsItsOverridesAndIsOfferedItsRolesBuiltIn(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	shipped := builtIns(t, h.store)
+
+	category := h.typeOf(t, h.siteID, pagetype.Category)
+	if category.TemplateID != nil || category.Suggested == nil || *category.Suggested != shipped["Hub"] {
+		t.Fatalf("a category type without a template = %+v, want Hub suggested", category)
+	}
+	if info := h.typeOf(t, h.siteID, pagetype.Info); info.Suggested == nil || *info.Suggested != shipped["Guide"] {
+		t.Errorf("an info type = %+v, want Guide suggested", info)
+	}
+	if store := h.typeOf(t, h.siteID, pagetype.StoreCategory); store.Suggested != nil {
+		t.Errorf("a store category = %+v, want nothing suggested for a type nothing writes", store)
+	}
+
+	pages := sqlite.NewPageRepo(h.store)
+	for i, path := range []string{"/peptides/", "/healing-peptides/"} {
+		page := sqlitetest.Page(t, h.store, h.siteID, path)
+		if err := pages.SetType(t.Context(), page.ID, category.ID, pagemap.TypeByUser, time.Now()); err != nil {
+			t.Fatalf("SetType: %v", err)
+		}
+		if i == 0 {
+			template := shipped["Guide"]
+			page.TemplateID = &template
+			if err := pages.Update(t.Context(), page); err != nil {
+				t.Fatalf("give the page its own template: %v", err)
+			}
+		}
+	}
+	if got := h.typeOf(t, h.siteID, pagetype.Category); got.Pages != 2 || got.Overrides != 1 {
+		t.Errorf("the category type = %d pages and %d overrides, want 2 and 1", got.Pages, got.Overrides)
+	}
+	template := shipped["Hub"]
+	saved, err := h.service.Save(t.Context(), pagetypes.SaveRequest{ID: category.ID, TemplateID: &template})
+	if err != nil || saved.Suggested != nil || saved.TemplateID == nil {
+		t.Fatalf("accepting the suggestion = %+v %v, want the template set and nothing more suggested", saved, err)
+	}
+}
+
 func TestATypeCreatedFromAPresetInheritsItsTemplate(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)

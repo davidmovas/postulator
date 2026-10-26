@@ -177,15 +177,28 @@ func (s *Service) views(ctx context.Context, siteID string) ([]Type, error) {
 		return nil, err
 	}
 	set := pagetype.NewSet(types, scopes)
-	counts := make(map[string]int, len(types))
+	counts := make(map[string]typeCounts, len(types))
 	for i := range pages {
-		if pages[i].Status != pagemap.StatusArchived {
-			counts[set.TypeOf(pages[i]).ID]++
+		if pages[i].Status == pagemap.StatusArchived {
+			continue
 		}
+		typeID := set.TypeOf(pages[i]).ID
+		held := counts[typeID]
+		held.pages++
+		if pages[i].TemplateID != nil {
+			held.overrides++
+		}
+		counts[typeID] = held
 	}
 	out := make([]Type, 0, len(types))
 	for i := range types {
-		out = append(out, typeView(types[i], set, scopes, counts[types[i].ID]))
+		var suggested *string
+		if types[i].TemplateID == nil && types[i].Preset.Writable() {
+			if suggested, err = s.builtIn(ctx, types[i].Preset); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, typeView(types[i], set, scopes, counts[types[i].ID], suggested))
 	}
 	return out, nil
 }

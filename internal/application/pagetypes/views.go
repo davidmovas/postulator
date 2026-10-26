@@ -14,7 +14,9 @@ type Type struct {
 	Role       string   `json:"role"`
 	Writable   bool     `json:"writable"`
 	TemplateID *string  `json:"templateId"`
+	Suggested  *string  `json:"suggestedTemplateId"`
 	Pages      int      `json:"pages"`
+	Overrides  int      `json:"overrides"`
 	Scopes     []Scope  `json:"scopes"`
 	CreatedAt  dto.Time `json:"createdAt"`
 	UpdatedAt  dto.Time `json:"updatedAt"`
@@ -156,7 +158,12 @@ func scopableKeys() []field.Key {
 	return out
 }
 
-func typeView(t pagetype.Type, set pagetype.Set, stored []field.Scope, pages int) Type {
+type typeCounts struct {
+	pages     int
+	overrides int
+}
+
+func typeView(t pagetype.Type, set pagetype.Set, stored []field.Scope, counts typeCounts, suggested *string) Type {
 	keys := scopableKeys()
 	scopes := make([]Scope, 0, len(stored)+len(keys))
 	for _, key := range keys {
@@ -170,7 +177,8 @@ func typeView(t pagetype.Type, set pagetype.Set, stored []field.Scope, pages int
 	}
 	return Type{
 		ID: t.ID, SiteID: t.SiteID, Name: t.Name, Preset: string(t.Preset), Role: string(t.Preset.Role()), Writable: t.Preset.Writable(),
-		TemplateID: t.TemplateID, Pages: pages, Scopes: scopes, CreatedAt: dto.NewTime(t.CreatedAt), UpdatedAt: dto.NewTime(t.UpdatedAt),
+		TemplateID: t.TemplateID, Suggested: suggested, Pages: counts.pages, Overrides: counts.overrides, Scopes: scopes,
+		CreatedAt: dto.NewTime(t.CreatedAt), UpdatedAt: dto.NewTime(t.UpdatedAt),
 	}
 }
 
