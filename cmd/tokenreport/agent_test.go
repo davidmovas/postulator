@@ -36,8 +36,8 @@ func TestTheAgentsRoundIsCountedPartByPart(t *testing.T) {
 		}
 	}
 
-	if len(measured.Schemas) != 92 {
-		t.Fatalf("%d schemas, want the registry's 92 tools", len(measured.Schemas))
+	if len(measured.Schemas) != 93 {
+		t.Fatalf("%d schemas, want the registry's 93 tools", len(measured.Schemas))
 	}
 	if !slices.IsSortedFunc(measured.Schemas, func(a, b measure) int { return b.Tokens - a.Tokens }) {
 		t.Error("the schemas are not sorted by tokens, the widest first")

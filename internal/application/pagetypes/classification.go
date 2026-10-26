@@ -24,6 +24,7 @@ import (
 
 const (
 	ApplyBatch          = 1000
+	PreviewSamples      = 5
 	reasonPreviewMoved  = "preview_moved"
 	reasonGroupDepends  = "group_depends"
 	previewStatusKept   = "kept"
@@ -103,6 +104,10 @@ func (s classified) groups() []PreviewGroup {
 	for i := range s.outcomes {
 		byPage[s.outcomes[i].PageID] = &s.outcomes[i]
 	}
+	paths := make(map[string]string, len(s.facts))
+	for i := range s.facts {
+		paths[s.facts[i].PageID] = s.facts[i].Path
+	}
 	held := make(map[GroupKey]*PreviewGroup)
 	rules := make(map[GroupKey]map[string]int)
 	needs := make(map[GroupKey]map[GroupKey]bool)
@@ -114,10 +119,13 @@ func (s classified) groups() []PreviewGroup {
 		key := keyOf(outcome)
 		group, known := held[key]
 		if !known {
-			group = &PreviewGroup{From: key.From, To: key.To, Retyped: key.From != key.To, Rules: []RuleCount{}, DependsOn: []GroupKey{}}
+			group = &PreviewGroup{
+				From: key.From, To: key.To, Retyped: key.From != key.To, Rules: []RuleCount{}, DependsOn: []GroupKey{}, Samples: []string{},
+			}
 			held[key], rules[key], needs[key] = group, map[string]int{}, map[GroupKey]bool{}
 		}
 		group.Pages++
+		group.Samples = append(group.Samples, paths[outcome.PageID])
 		rules[key][outcome.RuleID]++
 		for _, pageID := range outcome.Depends {
 			if above, found := byPage[pageID]; found && above.Changed() && keyOf(above) != key {
@@ -137,6 +145,8 @@ func (s classified) groups() []PreviewGroup {
 			group.DependsOn = append(group.DependsOn, need)
 		}
 		slices.SortFunc(group.DependsOn, compareKeys)
+		slices.Sort(group.Samples)
+		group.Samples = slices.Clip(group.Samples[:min(len(group.Samples), PreviewSamples)])
 		out = append(out, *group)
 	}
 	slices.SortFunc(out, func(a, b PreviewGroup) int {
@@ -230,22 +240,44 @@ func (c *Classification) PreviewPages(ctx context.Context, req PreviewPagesReque
 	return keyset.Page(rows, paging.Request{After: paging.Cursor(req.Cursor), Limit: dto.PageSize(req.Limit)})
 }
 
-func (c *Classification) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, error) {
+type applying struct {
+	chosen map[GroupKey]bool
+	groups []PreviewGroup
+	state  classified
+}
+
+func (c *Classification) applying(ctx context.Context, req ApplyRequest) (applying, error) {
 	state, err := c.classify(ctx, req.SiteID)
 	if err != nil {
-		return ApplyResponse{}, err
+		return applying{}, err
 	}
 	if req.Hash != state.hash() {
-		return ApplyResponse{}, errors.New(errors.Conflict, "the rules or the site changed since the preview; look at it again before applying").
+		return applying{}, errors.New(errors.Conflict, "the rules or the site changed since the preview; look at it again before applying").
 			WithDetail("field", "hash").WithDetail("reason", reasonPreviewMoved)
 	}
-	chosen, err := chosenGroups(state.groups(), req.Groups)
+	groups := state.groups()
+	chosen, err := chosenGroups(groups, req.Groups)
+	if err != nil {
+		return applying{}, err
+	}
+	groups = slices.DeleteFunc(groups, func(group PreviewGroup) bool { return !chosen[GroupKey{From: group.From, To: group.To}] })
+	return applying{chosen: chosen, groups: groups, state: state}, nil
+}
+
+func (c *Classification) Chosen(ctx context.Context, req ApplyRequest) ([]PreviewGroup, error) {
+	plan, err := c.applying(ctx, req)
+	return plan.groups, err
+}
+
+func (c *Classification) Apply(ctx context.Context, req ApplyRequest) (ApplyResponse, error) {
+	plan, err := c.applying(ctx, req)
 	if err != nil {
 		return ApplyResponse{}, err
 	}
+	state := plan.state
 	pending := make([]*pagetype.Outcome, 0)
 	for i := range state.outcomes {
-		if outcome := &state.outcomes[i]; outcome.Changed() && chosen[keyOf(outcome)] {
+		if outcome := &state.outcomes[i]; outcome.Changed() && plan.chosen[keyOf(outcome)] {
 			pending = append(pending, outcome)
 		}
 	}

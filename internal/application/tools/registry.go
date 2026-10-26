@@ -42,6 +42,7 @@ type Deps struct {
 	Graph       *graph.Service
 	Pages       *pages.Service
 	PageTypes   *pagetypes.Service
+	Classify    *pagetypes.Classification
 	Templates   *templates.Service
 	Runs        *runs.Service
 	Sync        *sync.Service

@@ -144,8 +144,14 @@ func TestThePreviewIsWhatTheApplyDoes(t *testing.T) {
 			fromCategory = &preview.Groups[i]
 		}
 	}
-	if fromCategory == nil || fromCategory.Pages != 1 || !fromCategory.Retyped {
+	if fromCategory == nil || fromCategory.Pages != 1 || !fromCategory.Retyped || !slices.Equal(fromCategory.Samples, []string{"/peptides/"}) {
 		t.Fatalf("groups = %+v, want the listing hub moving from Category to Landing", preview.Groups)
+	}
+	for i := range preview.Groups {
+		group := &preview.Groups[i]
+		if len(group.Samples) != min(group.Pages, pagetypes.PreviewSamples) || !slices.IsSorted(group.Samples) {
+			t.Errorf("group %s→%s samples %v for %d pages, want the first paths in order", group.From, group.To, group.Samples, group.Pages)
+		}
 	}
 
 	listed, err := c.classification.PreviewPages(t.Context(), pagetypes.PreviewPagesRequest{
@@ -233,6 +239,14 @@ func TestAnApplyRefusesAPreviewThatMovedAndAGroupWithoutTheOneItRestsOn(t *testi
 	_, err := c.classification.Apply(t.Context(), pagetypes.ApplyRequest{SiteID: c.siteID, Hash: split.Hash, Groups: []pagetypes.GroupKey{child}})
 	if name, reason := reasonOf(t, err); name != "groups" || reason != "group_depends" {
 		t.Fatalf("applying the child's group alone = %v (%s %s), want it refused", err, name, reason)
+	}
+	_, err = c.classification.Chosen(t.Context(), pagetypes.ApplyRequest{SiteID: c.siteID, Hash: split.Hash, Groups: []pagetypes.GroupKey{child}})
+	if name, reason := reasonOf(t, err); name != "groups" || reason != "group_depends" {
+		t.Fatalf("the groups an apply of the child's alone would write = %v, want the apply's own refusal", err)
+	}
+	chosen, err := c.classification.Chosen(t.Context(), pagetypes.ApplyRequest{SiteID: c.siteID, Hash: split.Hash, Groups: []pagetypes.GroupKey{child, group}})
+	if err != nil || len(chosen) != 2 {
+		t.Fatalf("the groups an apply of both would write = %+v %v", chosen, err)
 	}
 	if _, err = c.classification.Apply(t.Context(), pagetypes.ApplyRequest{SiteID: c.siteID, Hash: split.Hash, Groups: []pagetypes.GroupKey{child, group}}); err != nil {
 		t.Fatalf("applying both: %v", err)

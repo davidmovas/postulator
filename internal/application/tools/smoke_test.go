@@ -194,6 +194,10 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Graph:     graphService,
 		Pages:     pagesService,
 		PageTypes: types,
+		Classify: pagetypes.NewClassification(pagetypes.ClassificationDeps{
+			Facts: siteModel, Types: types, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store), UnitOfWork: store,
+			Publisher: bus, Clock: now,
+		}),
 		Templates: templateService,
 		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry(), pagesService),
 		Sync:      sync.New(stubEngine{}, siteRepo, stubProbe{}, stubPacker{}, now),

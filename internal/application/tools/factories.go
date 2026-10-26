@@ -44,6 +44,7 @@ func factories() []factory {
 		pagetypesSave,
 		pagetypesDelete,
 		pagetypesSetScope,
+		pagetypesClassify,
 		templatesList,
 		templatesGet,
 		templatesCreate,

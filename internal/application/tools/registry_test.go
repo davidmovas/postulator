@@ -65,6 +65,7 @@ func registered() []string {
 		"pagetypes_save",
 		"pagetypes_delete",
 		"pagetypes_set_scope",
+		"pagetypes_classify",
 		"templates_list",
 		"templates_get",
 		"templates_create",
@@ -167,8 +168,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 66631
-	schemaCeilingTokens = 14834
+	schemaCeilingBytes  = 67178
+	schemaCeilingTokens = 14958
 	widestLogged        = 8
 )
 

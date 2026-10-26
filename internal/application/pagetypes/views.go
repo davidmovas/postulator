@@ -68,6 +68,7 @@ type PreviewGroup struct {
 	Retyped   bool        `json:"retyped"`
 	Rules     []RuleCount `json:"rules"`
 	DependsOn []GroupKey  `json:"dependsOn"`
+	Samples   []string    `json:"samples"`
 }
 
 type PreviewResponse struct {
