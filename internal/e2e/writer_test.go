@@ -93,7 +93,7 @@ func writerStandOf(t *testing.T, env environment) writerStand {
 		return writerStand{
 			existing:   "/guide/setup/",
 			clientPage: "/guide/setup/",
-			preset:     pagetype.Entity,
+			preset:     pagetype.Guide,
 			empty:      "/guide/setup/grinding/",
 			child:      plannedChild{path: "/guide/setup/grinding/", name: "Grinding", keyword: "grinding coffee beans"},
 			edit: clientEditPlan{
@@ -108,7 +108,7 @@ func writerStandOf(t *testing.T, env environment) writerStand {
 		return writerStand{
 			existing:   "/peptides/",
 			clientPage: "/tb-500/",
-			preset:     pagetype.Hub,
+			preset:     pagetype.Landing,
 			empty:      "/healing-peptides/",
 			lists:      true,
 			child:      plannedChild{path: "/peptides/peptide-storage/", name: "Peptide Storage", keyword: "peptide storage"},
