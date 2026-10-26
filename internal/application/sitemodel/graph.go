@@ -100,11 +100,12 @@ func (s *Service) Entities(ctx context.Context, req EntitiesRequest) (paging.Lis
 			return err
 		}
 		query := graph.Key(strings.TrimSpace(req.Query))
-		rows := make([]EntityRow, 0)
-		for _, entity := range snapshot.Graph.Entities() {
-			row := entityRow(snapshot, entity)
+		entities := snapshot.Graph.Entities()
+		rows := make([]EntityRow, 0, len(entities))
+		for i := range entities {
+			row := entityRow(snapshot, entities[i])
 			switch {
-			case query != "" && !strings.Contains(graph.Key(entity.Name), query):
+			case query != "" && !strings.Contains(graph.Key(entities[i].Name), query):
 				continue
 			case req.Roots && row.Parent != nil && row.Parent.Status == string(graph.StatusApproved):
 				continue
@@ -211,8 +212,10 @@ func canonicalOf(snapshot contextpack.Snapshot, entity graph.Entity) (pagemap.Pa
 }
 
 func links(g graph.Graph, entityID string, kind graph.EdgeKind) []EntityLink {
-	out := make([]EntityLink, 0)
-	for _, held := range g.Edges() {
+	edges := g.Edges()
+	out := make([]EntityLink, 0, len(edges))
+	for i := range edges {
+		held := &edges[i]
 		if held.Kind != kind {
 			continue
 		}

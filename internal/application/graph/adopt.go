@@ -91,8 +91,8 @@ func (s *Service) AdoptParents(ctx context.Context, req AdoptParentsRequest) (Ad
 			return AdoptParentsResponse{}, errors.New(errors.Conflict, "the page tree or the graph moved since the preview; preview the adoption again").
 				WithDetail("hash", response.Hash)
 		}
-		if err = s.adoptParents(ctx, siteID, adopting); err != nil {
-			return AdoptParentsResponse{}, err
+		if adoptErr := s.adoptParents(ctx, siteID, adopting); adoptErr != nil {
+			return AdoptParentsResponse{}, adoptErr
 		}
 		response.Applied = true
 	}
@@ -100,7 +100,9 @@ func (s *Service) AdoptParents(ctx context.Context, req AdoptParentsRequest) (Ad
 	for i := range plan {
 		views = append(views, adoptionView(tree, plan[i]))
 	}
-	slices.SortFunc(views, func(a, b AdoptionView) int { return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.EntityID, b.EntityID)) })
+	slices.SortFunc(views, func(a, b AdoptionView) int {
+		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.EntityID, b.EntityID))
+	})
 	keyset := paging.Keyset[AdoptionView]{
 		IDColumn: "entity_id",
 		ID:       func(view AdoptionView) string { return view.EntityID },
@@ -125,8 +127,8 @@ func (s *Service) adoptParents(ctx context.Context, siteID string, steps []conte
 				return err
 			}
 			for i := range chunk {
-				if err = s.adoptOne(c, siteID, edges, chunk[i]); err != nil {
-					return err
+				if adoptErr := s.adoptOne(c, siteID, edges, chunk[i]); adoptErr != nil {
+					return adoptErr
 				}
 			}
 			return s.settleScopes(c, siteID)

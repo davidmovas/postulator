@@ -110,8 +110,8 @@ func (s *Service) tree(ctx context.Context, req TreeRequest) (TreeAnswer, error)
 		node := read.node(*asked)
 		answer.Node = &node
 	}
-	if err = s.whys(ctx, read, answer.Nodes.Items, answer.Node); err != nil {
-		return TreeAnswer{}, err
+	if whyErr := s.whys(ctx, read, answer.Nodes.Items, answer.Node); whyErr != nil {
+		return TreeAnswer{}, whyErr
 	}
 	return answer, s.bodiesOf(ctx, answer.Nodes.Items)
 }

@@ -123,8 +123,8 @@ func (s *Service) ConfirmPlan(ctx context.Context, req ConfirmPlanRequest) (Conf
 		}
 		plan.Steps[at].Args, plan.Steps[at].Summary = edited, check.Summary
 	}
-	if err = plan.Approve(chosen); err != nil {
-		return ConfirmPlanResponse{}, err
+	if approveErr := plan.Approve(chosen); approveErr != nil {
+		return ConfirmPlanResponse{}, approveErr
 	}
 	plan.UpdatedAt = s.now()
 	moved, err := s.deps.Plans.Transition(ctx, plan, domainagent.PlanProposed)
@@ -152,8 +152,8 @@ func (s *Service) RunEnded(ctx context.Context, outcome RunOutcome) error {
 		if _, waiting := running[i].WaitingOn(outcome.RunID); !waiting {
 			continue
 		}
-		if err = s.wake(ctx, running[i].ID, outcome); err != nil {
-			return err
+		if wakeErr := s.wake(ctx, running[i].ID, outcome); wakeErr != nil {
+			return wakeErr
 		}
 	}
 	return nil
@@ -195,8 +195,8 @@ func (s *Service) ResumePlans(ctx context.Context) error {
 		return err
 	}
 	for i := range running {
-		if err = s.resumePlan(ctx, running[i].ID); err != nil {
-			return err
+		if resumeErr := s.resumePlan(ctx, running[i].ID); resumeErr != nil {
+			return resumeErr
 		}
 	}
 	return nil
@@ -357,7 +357,8 @@ func planReport(plan domainagent.Plan) string {
 	} else {
 		report.WriteString("is under way:")
 	}
-	for i, held := range plan.Steps {
+	for i := range plan.Steps {
+		held := &plan.Steps[i]
 		report.WriteString("\n- step " + strconv.Itoa(i+1) + " (" + held.Summary + "): " + string(held.Status))
 		if held.RunID != "" {
 			report.WriteString(", run " + held.RunID)

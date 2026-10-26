@@ -38,8 +38,8 @@ func linkPlan(t *testing.T) agent.Plan {
 
 func statuses(plan agent.Plan) []agent.StepStatus {
 	out := make([]agent.StepStatus, 0, len(plan.Steps))
-	for _, held := range plan.Steps {
-		out = append(out, held.Status)
+	for i := range plan.Steps {
+		out = append(out, plan.Steps[i].Status)
 	}
 	return out
 }
@@ -141,7 +141,8 @@ func TestAnEditTouchesOnlyAFieldTheStepDeclares(t *testing.T) {
 	if err = json.Unmarshal(edited, &args); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if args["anchor"] != "face serums" || args["op"] != "add_edge" || args["nested"].(map[string]any)["goal"] != "teach" {
+	nested, isObject := args["nested"].(map[string]any)
+	if args["anchor"] != "face serums" || args["op"] != "add_edge" || !isObject || nested["goal"] != "teach" {
 		t.Errorf("the edited args = %s", edited)
 	}
 	if _, err = plan.Steps[0].Edited(map[string]string{"op": "delete_edge"}); !errors.IsCode(err, errors.Invalid) {

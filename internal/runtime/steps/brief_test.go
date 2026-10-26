@@ -91,7 +91,9 @@ func (p *pipeline) waitFor(t *testing.T, runID string) run.Item {
 func (p *pipeline) promptTo(t *testing.T, step string) string {
 	t.Helper()
 
-	for _, req := range p.llm.Requests() {
+	requests := p.llm.Requests()
+	for i := range requests {
+		req := &requests[i]
 		if req.Meta.Step != step {
 			continue
 		}

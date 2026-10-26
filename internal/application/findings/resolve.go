@@ -75,8 +75,8 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	}
 
 	if option == finding.AdoptTree {
-		if err = s.adoptTree(ctx, held); err != nil {
-			return ResolveResponse{}, err
+		if adoptErr := s.adoptTree(ctx, held); adoptErr != nil {
+			return ResolveResponse{}, adoptErr
 		}
 		return s.settled(ctx, held, places)
 	}

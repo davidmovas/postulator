@@ -66,7 +66,8 @@ func (e *Engine) EstimateRun(ctx context.Context, record run.Run, assigned map[s
 		return run.Estimate{}, err
 	}
 	byPage := directed(directives)
-	for targetID, target := range targets {
+	for targetID := range targets {
+		target := targets[targetID]
 		target.Brief, target.Directive = record.Brief, byPage[targetID]
 		targets[targetID] = target
 	}

@@ -447,10 +447,11 @@ func (r findingReader) CountOpen(_ context.Context, ids []string) (map[string]in
 }
 
 func (r mapReader) IDsUnder(_ context.Context, siteID, trail, typeID string) ([]string, error) {
-	out := make([]string, 0)
-	for _, row := range r.m.rows() {
-		if row.SiteID == siteID && strings.HasPrefix(row.Trail, trail) && (typeID == "" || row.TypeID == typeID) {
-			out = append(out, row.PageID)
+	rows := r.m.rows()
+	out := make([]string, 0, len(rows))
+	for i := range rows {
+		if rows[i].SiteID == siteID && strings.HasPrefix(rows[i].Trail, trail) && (typeID == "" || rows[i].TypeID == typeID) {
+			out = append(out, rows[i].PageID)
 		}
 	}
 	return out, nil

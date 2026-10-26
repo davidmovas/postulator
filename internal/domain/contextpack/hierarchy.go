@@ -28,7 +28,9 @@ func (m Map) ParentDisagreements(pageIDs []string) []ParentDisagreement {
 		chosen[pageID] = struct{}{}
 	}
 	out := make([]ParentDisagreement, 0)
-	for _, entity := range m.snapshot.Graph.Entities() {
+	entities := m.snapshot.Graph.Entities()
+	for i := range entities {
+		entity := &entities[i]
 		if entity.CanonicalPageID == nil {
 			continue
 		}
@@ -49,9 +51,7 @@ func (m Map) ParentDisagreements(pageIDs []string) []ParentDisagreement {
 			continue
 		}
 		disagreement := ParentDisagreement{EntityID: entity.ID, PageID: page.ID, Path: page.Path, Tree: tree}
-		for _, parent := range m.snapshot.Graph.Parents(entity.ID, 1) {
-			disagreement.GraphParents = append(disagreement.GraphParents, parent.ID)
-		}
+		disagreement.GraphParents = m.parentIDs(entity.ID)
 		out = append(out, disagreement)
 	}
 	slices.SortFunc(out, func(a, b ParentDisagreement) int {
@@ -123,9 +123,7 @@ func (m Map) Adoptions(pageIDs, entityIDs []string) []Adoption {
 	scopes := make(map[string]string, len(entities))
 	keys := make(map[string]string, len(entities))
 	for i := range entities {
-		for _, parent := range m.snapshot.Graph.Parents(entities[i].ID, 1) {
-			parents[entities[i].ID] = append(parents[entities[i].ID], parent.ID)
-		}
+		parents[entities[i].ID] = append(parents[entities[i].ID], m.parentIDs(entities[i].ID)...)
 		if entities[i].ScopeID != nil {
 			scopes[entities[i].ID] = *entities[i].ScopeID
 		}
@@ -208,7 +206,9 @@ func (m Map) pagedAncestors(entityID string) []string {
 	for len(frontier) > 0 {
 		next := make([]string, 0)
 		for _, at := range frontier {
-			for _, parent := range m.snapshot.Graph.Parents(at, 1) {
+			parents := m.snapshot.Graph.Parents(at, 1)
+			for i := range parents {
+				parent := &parents[i]
 				if _, twice := seen[parent.ID]; twice {
 					continue
 				}
@@ -221,6 +221,15 @@ func (m Map) pagedAncestors(entityID string) []string {
 			}
 		}
 		frontier = next
+	}
+	return out
+}
+
+func (m Map) parentIDs(entityID string) []string {
+	parents := m.snapshot.Graph.Parents(entityID, 1)
+	out := make([]string, 0, len(parents))
+	for i := range parents {
+		out = append(out, parents[i].ID)
 	}
 	return out
 }

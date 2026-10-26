@@ -28,7 +28,8 @@ func (s *Service) directed(ctx context.Context, req StartRequest, siteID string,
 		return nil, err
 	}
 	missing := make([]missingEdge, 0)
-	for _, directive := range req.Directives {
+	for i := range req.Directives {
+		directive := &req.Directives[i]
 		pageID := strings.TrimSpace(directive.PageID)
 		if !slices.Contains(targets, pageID) {
 			return nil, invalid("a directive is for a page the run writes, and "+pageID+" is not one of them", "directives.pageId").
@@ -78,7 +79,8 @@ func (s *Service) unlinked(ctx context.Context, fromID, toID string, adding bool
 }
 
 func (s *Service) addEdges(ctx context.Context, siteID string, missing []missingEdge) error {
-	for _, gap := range missing {
+	for i := range missing {
+		gap := &missing[i]
 		if _, err := s.edges.AddEdge(ctx, graph.AddEdgeRequest{
 			SiteID: siteID, FromEntityID: *gap.from.EntityID, ToEntityID: *gap.to.EntityID,
 			Kind: string(graphdomain.EdgeRelated), Weight: 1, Status: string(graphdomain.StatusApproved),

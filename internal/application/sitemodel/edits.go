@@ -229,8 +229,8 @@ func blockRows(body block.Body, written []block.Written) []BlockRow {
 
 func textRows(body block.Body, rows []BlockRow, site pagemap.Site, document string) []BlockRow {
 	out := make([]BlockRow, 0, len(rows))
-	for i, row := range rows {
-		held := body.Blocks[i]
+	for i := range rows {
+		row, held := rows[i], body.Blocks[i]
 		row.Excerpt = ""
 		row.Links = blockLinks(held, site, document)
 		runes := []rune(strings.Join(strings.Fields(held.Text()), " "))
@@ -255,7 +255,7 @@ func blockLinks(held block.Block, site pagemap.Site, document string) []BlockLin
 	if held.Dynamic || held.Kind == block.Shortcode {
 		return nil
 	}
-	doc, err := content.Parse(string(held.Raw))
+	doc, err := content.Parse(held.Raw)
 	if err != nil {
 		return nil
 	}

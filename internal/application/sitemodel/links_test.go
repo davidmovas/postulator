@@ -123,7 +123,7 @@ func TestASectionsLinkMapSaysWhoLinksToWhom(t *testing.T) {
 	if page.Page == nil || page.Page.Page.Path != "/serums/" || page.Inbound == nil {
 		t.Fatalf("the page's links = %+v", page)
 	}
-	from := make([]string, 0)
+	from := make([]string, 0, len(page.Inbound.Items))
 	for _, in := range page.Inbound.Items {
 		from = append(from, in.FromPath+" "+in.Anchor)
 	}

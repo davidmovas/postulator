@@ -36,17 +36,17 @@ func (s *Service) parentsMoved(ctx context.Context, siteID string) error {
 			return newErr
 		}
 		raised[record.SubjectKey] = struct{}{}
-		if err = s.findings.Upsert(ctx, record); err != nil {
-			return err
+		if upsertErr := s.findings.Upsert(ctx, record); upsertErr != nil {
+			return upsertErr
 		}
 	}
 	for i := range open {
 		if _, still := raised[open[i].SubjectKey]; still {
 			continue
 		}
-		if err = s.findings.Clear(ctx, siteID, finding.EntityParentDiffers, open[i].SubjectKey, finding.ResolvedByModel,
-			finding.ResolutionObservedClear, now); err != nil {
-			return err
+		if clearErr := s.findings.Clear(ctx, siteID, finding.EntityParentDiffers, open[i].SubjectKey, finding.ResolvedByModel,
+			finding.ResolutionObservedClear, now); clearErr != nil {
+			return clearErr
 		}
 	}
 	return nil

@@ -175,8 +175,8 @@ func (s *store) AdoptParents(_ context.Context, req graph.AdoptParentsRequest) (
 		return graph.AdoptParentsResponse{Hash: "h-" + entity, Adopting: 1}, nil
 	}
 	s.calls = append(s.calls, "adopt:"+entity+":apply:"+req.Hash)
-	for id, held := range s.held {
-		if held.EntityID != nil && *held.EntityID == entity {
+	for id := range s.held {
+		if held := s.held[id]; held.EntityID != nil && *held.EntityID == entity {
 			return graph.AdoptParentsResponse{Applied: true, Adopting: 1},
 				s.Settle(context.Background(), id, finding.Resolved, finding.ResolutionParentAdopted, finding.ResolvedByPerson, at)
 		}

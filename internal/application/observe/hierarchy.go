@@ -27,17 +27,18 @@ func (s *Service) parentsDiffer(ctx context.Context, tracked *findings, siteID s
 	for _, disagreement := range tree.ParentDisagreements(nil) {
 		subject := finding.SubjectEntityParent(disagreement.EntityID)
 		raised[subject] = struct{}{}
-		if err = tracked.raiseOn(ctx, finding.EntityParentDiffers, &disagreement.PageID, &disagreement.EntityID, subject,
-			tree.SubjectOf(disagreement)); err != nil {
-			return err
+		if raiseErr := tracked.raiseOn(ctx, finding.EntityParentDiffers, &disagreement.PageID, &disagreement.EntityID, subject,
+			tree.SubjectOf(disagreement)); raiseErr != nil {
+			return raiseErr
 		}
 	}
-	for _, open := range tracked.openFor(finding.EntityParentDiffers, "") {
-		if _, still := raised[open.SubjectKey]; still {
+	open := tracked.openFor(finding.EntityParentDiffers, "")
+	for i := range open {
+		if _, still := raised[open[i].SubjectKey]; still {
 			continue
 		}
-		if err = tracked.clear(ctx, finding.EntityParentDiffers, open.SubjectKey); err != nil {
-			return err
+		if clearErr := tracked.clear(ctx, finding.EntityParentDiffers, open[i].SubjectKey); clearErr != nil {
+			return clearErr
 		}
 	}
 	return nil

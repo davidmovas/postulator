@@ -275,19 +275,23 @@ func owedLinks(read section, missingOnly bool) []OwedLink {
 	out := make([]OwedLink, 0)
 	for i := range read.audited {
 		held := &read.audited[i]
-		for _, required := range held.Required {
+		for j := range held.Required {
+			required := &held.Required[j]
 			if missingOnly && required.State != string(reports.LinkMissing) {
 				continue
 			}
-			out = append(out, OwedLink{FromPageID: held.Page.PageID, FromPath: held.Page.Path, RequiredLink: required})
+			out = append(out, OwedLink{FromPageID: held.Page.PageID, FromPath: held.Page.Path, RequiredLink: *required})
 		}
 	}
 	return out
 }
 
 func suggestions(read section) []Suggestion {
-	out := make([]Suggestion, 0)
-	for _, disagreement := range read.snapshot.Map(nil).ParentDisagreements(read.ids) {
+	disagreements := read.snapshot.Map(nil).ParentDisagreements(read.ids)
+	owed := owedLinks(read, true)
+	out := make([]Suggestion, 0, len(disagreements)+len(owed))
+	for i := range disagreements {
+		disagreement := &disagreements[i]
 		entity, _ := read.snapshot.Graph.Entity(disagreement.EntityID)
 		suggestion := Suggestion{
 			Kind: SuggestParentEdge, EntityID: entity.ID, EntityName: entity.Name, GraphParents: disagreement.GraphParents,
@@ -299,17 +303,18 @@ func suggestions(read section) []Suggestion {
 		}
 		out = append(out, suggestion)
 	}
-	for _, owed := range owedLinks(read, true) {
+	for i := range owed {
+		held := &owed[i]
 		out = append(out, Suggestion{
-			Kind: SuggestLink, EntityID: owed.TargetEntityID, FromPageID: owed.FromPageID, FromPath: owed.FromPath,
-			ToPageID: owed.TargetPageID, ToPath: owed.TargetPath, Relation: owed.Relation, Anchors: owed.AnchorsAllowed,
-			BlockedReason: owed.BlockedReason,
+			Kind: SuggestLink, EntityID: held.TargetEntityID, FromPageID: held.FromPageID, FromPath: held.FromPath,
+			ToPageID: held.TargetPageID, ToPath: held.TargetPath, Relation: held.Relation, Anchors: held.AnchorsAllowed,
+			BlockedReason: held.BlockedReason,
 		})
 	}
 	return out
 }
 
-func byKey[T any](rows []T, key func(T) string, id func(T) string, page paging.Request) (paging.List[T], error) {
+func byKey[T any](rows []T, key, id func(T) string, page paging.Request) (paging.List[T], error) {
 	slices.SortFunc(rows, func(a, b T) int { return cmp.Or(cmp.Compare(key(a), key(b)), cmp.Compare(id(a), id(b))) })
 	keyset := paging.Keyset[T]{
 		IDColumn: "id",

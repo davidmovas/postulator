@@ -26,11 +26,9 @@ func tree(t *testing.T, m *sitemodeltest.Memory, req sitemodel.TreeRequest) site
 	return got
 }
 
-func walkAll(t *testing.T, m *sitemodeltest.Memory, req sitemodel.TreeRequest) ([]contextpack.MapNode, int) {
+func walkAll(t *testing.T, m *sitemodeltest.Memory, req sitemodel.TreeRequest) (nodes []contextpack.MapNode, calls int) {
 	t.Helper()
 
-	var nodes []contextpack.MapNode
-	calls := 0
 	for {
 		got := tree(t, m, req)
 		calls++

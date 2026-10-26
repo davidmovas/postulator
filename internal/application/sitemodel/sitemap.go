@@ -118,8 +118,8 @@ func (s *Service) siteMap(ctx context.Context, req MapRequest) (MapView, error) 
 		node := read.node(*parent)
 		view.Parent, view.Trail = &node, read.trail(*parent)
 	}
-	if err = s.whys(ctx, read, view.Nodes.Items, view.Parent); err != nil {
-		return MapView{}, err
+	if whyErr := s.whys(ctx, read, view.Nodes.Items, view.Parent); whyErr != nil {
+		return MapView{}, whyErr
 	}
 	return view, s.bodiesOf(ctx, view.Nodes.Items)
 }
