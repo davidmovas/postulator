@@ -3,6 +3,8 @@ export type EventType =
     | "agent.confirm.resolved"
     | "agent.delta"
     | "agent.done"
+    | "agent.plan.proposed"
+    | "agent.plan.updated"
     | "agent.titled"
     | "agent.tool.finished"
     | "agent.tool.started"
@@ -41,6 +43,8 @@ export const eventTypes = [
     "agent.confirm.resolved",
     "agent.delta",
     "agent.done",
+    "agent.plan.proposed",
+    "agent.plan.updated",
     "agent.titled",
     "agent.tool.finished",
     "agent.tool.started",
@@ -111,6 +115,21 @@ export interface AgentDonePayload {
     outputTokens: number;
     calls: number;
     usd: number;
+}
+
+export interface AgentPlanProposedPayload {
+    conversationId: string;
+    planId: string;
+    title: string;
+    steps: number;
+}
+
+export interface AgentPlanUpdatedPayload {
+    conversationId: string;
+    planId: string;
+    status: string;
+    stepId: string;
+    stepStatus: string;
 }
 
 export interface AgentTitledPayload {
@@ -306,6 +325,8 @@ export interface EventPayloads {
     "agent.confirm.resolved": AgentConfirmResolvedPayload;
     "agent.delta": AgentDeltaPayload;
     "agent.done": AgentDonePayload;
+    "agent.plan.proposed": AgentPlanProposedPayload;
+    "agent.plan.updated": AgentPlanUpdatedPayload;
     "agent.titled": AgentTitledPayload;
     "agent.tool.finished": AgentToolFinishedPayload;
     "agent.tool.started": AgentToolStartedPayload;

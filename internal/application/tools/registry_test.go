@@ -116,6 +116,7 @@ func registered() []string {
 		"schedules_enable",
 		"schedules_disable",
 		"schedules_run_now",
+		"plans",
 	}
 }
 
@@ -168,8 +169,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 67228
-	schemaCeilingTokens = 14970
+	schemaCeilingBytes  = 68327
+	schemaCeilingTokens = 15228
 	widestLogged        = 8
 )
 

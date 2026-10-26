@@ -56,7 +56,14 @@ type Tool struct {
 	Run       func(ctx context.Context, b Binding, args json.RawMessage) (any, error)
 	Confirm   func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
 	RiskOf    func(args json.RawMessage) Risk
+	Price     func(ctx context.Context, b Binding, args json.RawMessage) (Price, error)
+	Edits     []agent.EditField
 	Def       Def
+}
+
+type Price struct {
+	USD    float64
+	Tokens int
 }
 
 func (t Tool) risk(args json.RawMessage) Risk {

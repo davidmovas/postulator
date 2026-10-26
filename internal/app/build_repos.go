@@ -43,6 +43,7 @@ type repos struct {
 	mappings      *sqlite.ImportMappingRepo
 	schedules     *sqlite.ScheduleRepo
 	actions       *sqlite.PendingActionRepo
+	plans         *sqlite.PlanRepo
 	conversations *sqlite.ConversationRepo
 	messages      *sqlite.MessageRepo
 	toolCalls     *sqlite.ToolCallRepo
@@ -100,6 +101,7 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		mappings:      sqlite.NewImportMappingRepo(store),
 		schedules:     sqlite.NewScheduleRepo(store),
 		actions:       sqlite.NewPendingActionRepo(store),
+		plans:         sqlite.NewPlanRepo(store),
 		conversations: sqlite.NewConversationRepo(store),
 		messages:      sqlite.NewMessageRepo(store),
 		toolCalls:     sqlite.NewToolCallRepo(store),

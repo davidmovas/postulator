@@ -37,6 +37,12 @@ type actionStore interface {
 	Insert(ctx context.Context, action agent.PendingAction) error
 }
 
+type planStore interface {
+	Insert(ctx context.Context, plan agent.Plan) error
+	Get(ctx context.Context, id string) (agent.Plan, error)
+	ListByConversation(ctx context.Context, conversationID string) ([]agent.Plan, error)
+}
+
 type Deps struct {
 	Sites       *sites.Service
 	Graph       *graph.Service
@@ -55,8 +61,10 @@ type Deps struct {
 	SiteModel   *sitemodel.Service
 	ResultBytes func() int
 	Actions     actionStore
+	Plans       planStore
 	Publisher   application.Publisher
 	Clock       clock.Clock
+	steps       *Registry
 }
 
 type factory func(Deps) Tool
@@ -70,6 +78,7 @@ type Registry struct {
 func New(deps Deps) *Registry {
 	built := factories()
 	registry := &Registry{deps: deps, byName: make(map[string]factory, len(built)), order: make([]string, 0, len(built))}
+	registry.deps.steps = registry
 	for _, build := range built {
 		name := build(deps).Def.Name
 		registry.byName[name] = build

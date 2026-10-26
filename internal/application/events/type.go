@@ -14,6 +14,8 @@ const (
 	AgentToolFinished     Type = "agent.tool.finished"
 	AgentConfirmRequested Type = "agent.confirm.requested"
 	AgentConfirmResolved  Type = "agent.confirm.resolved"
+	AgentPlanProposed     Type = "agent.plan.proposed"
+	AgentPlanUpdated      Type = "agent.plan.updated"
 	AgentUsage            Type = "agent.usage"
 	AgentWaiting          Type = "agent.waiting"
 	AgentDone             Type = "agent.done"

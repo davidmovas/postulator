@@ -28,6 +28,7 @@ var groups = []Group{
 	{Name: "models", Description: "Language models: the catalog, role profiles, provider keys, probes and spend."},
 	{Name: "content", Description: "Grade a live page against its template and graph."},
 	{Name: "schedules", Description: "Schedules that start runs on a cron expression or an interval."},
+	{Name: "plans", Description: "Plans: an ordered set of writes put in front of the person as one card, run once approved."},
 }
 
 var orienting = []string{

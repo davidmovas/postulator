@@ -223,6 +223,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		SiteModel:   siteModel,
 		ResultBytes: func() int { return 16384 },
 		Actions:     sqlite.NewPendingActionRepo(store),
+		Plans:       sqlite.NewPlanRepo(store),
 		Publisher:   bus,
 		Clock:       now,
 	}), tools.Binding{SiteID: owner.ID, ConversationID: conversation.ID}, seeded

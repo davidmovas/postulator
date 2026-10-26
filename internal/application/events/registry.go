@@ -29,6 +29,8 @@ func NewRegistry() Registry {
 		{Type: AgentToolFinished, Payload: AgentToolFinishedPayload{}},
 		{Type: AgentConfirmRequested, Payload: AgentConfirmRequestedPayload{}},
 		{Type: AgentConfirmResolved, Payload: AgentConfirmResolvedPayload{}},
+		{Type: AgentPlanProposed, Payload: AgentPlanProposedPayload{}},
+		{Type: AgentPlanUpdated, Payload: AgentPlanUpdatedPayload{}},
 		{Type: AgentUsage, Payload: AgentUsagePayload{}},
 		{Type: AgentWaiting, Payload: AgentWaitingPayload{}},
 		{Type: AgentDone, Payload: AgentDonePayload{}},

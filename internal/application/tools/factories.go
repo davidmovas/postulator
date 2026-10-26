@@ -95,5 +95,6 @@ func factories() []factory {
 		schedulesEnable,
 		schedulesDisable,
 		schedulesRunNow,
+		plansTool,
 	}
 }
