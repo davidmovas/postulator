@@ -11,6 +11,7 @@ import type {
     LlmModels,
     ObserveModels,
     PagesModels,
+    PageTypeDomainModels,
     PageTypesModels,
     ReportsModels,
     RunDomainModels,
@@ -116,6 +117,20 @@ export type FieldScope = Wire<PageTypesModels.Scope>;
 export type CatalogField = Wire<PageTypesModels.Field>;
 export type PageTypeList = Wire<PageTypesModels.ListResponse>;
 export type SetScopeRequest = Wire<PageTypesModels.SetScopeRequest>;
+export type Rule = Wire<PageTypesModels.Rule>;
+export type RuleConditions = PageTypeDomainModels.Conditions;
+export type RuleURL = PageTypeDomainModels.URLMatch;
+export type RuleList = Wire<PageTypesModels.RulesResponse>;
+export type SaveRuleRequest = PageTypesModels.SaveRuleRequest;
+export type ClassificationPreview = Wire<PageTypesModels.PreviewResponse>;
+export type ClassificationGroup = Wire<PageTypesModels.PreviewGroup>;
+export type ClassificationGroupKey = PageTypesModels.GroupKey;
+export type ClassificationPage = Wire<PageTypesModels.PreviewPage>;
+export type ClassificationPagesFilter = ListFilter<PageTypesModels.PreviewPagesRequest>;
+export type ApplyClassificationResponse = Wire<PageTypesModels.ApplyResponse>;
+export type TestRuleRequest = PageTypesModels.TestRuleRequest;
+export type RuleTest = Wire<PageTypesModels.TestRuleResponse>;
+export type PageFacts = Wire<PageTypesModels.FactsView>;
 export type MetaRules = Wire<TemplateDomainModels.MetaRules>;
 export type KeywordRules = Wire<TemplateDomainModels.KeywordRules>;
 export type StepSpec = Wire<TemplateDomainModels.StepSpec>;

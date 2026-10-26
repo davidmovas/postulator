@@ -23,6 +23,7 @@ export const settings = {
     tabs: {
         models: "Models",
         types: "Page types",
+        classification: "Classification",
         runs: "Runs",
         agent: "Agent",
         browser: "Browser",

@@ -2,6 +2,7 @@ import type { Sort } from "../lib/paging.js";
 import { clampLimit } from "./call.js";
 import { sortSegment } from "./sorts.js";
 import type {
+    ClassificationPagesFilter,
     ConversationFilter,
     EdgeFilter,
     EntityFilter,
@@ -105,6 +106,16 @@ export const keys = {
         full: (siteId: string) => [scope, "graph", "full", siteId] as const,
         cardLists: () => [scope, "graph", "cards"] as const,
         cards: (siteId: string) => [scope, "graph", "cards", siteId] as const,
+    },
+    classification: {
+        root: () => [scope, "classification"] as const,
+        rules: (siteId: string) => [scope, "classification", "rules", siteId] as const,
+        previews: () => [scope, "classification", "preview"] as const,
+        preview: (siteId: string) => [scope, "classification", "preview", siteId] as const,
+        pages: (filter: ClassificationPagesFilter, limit?: number) =>
+            [scope, "classification", "preview", filter.siteId, "pages", filter, limitSegment(limit)] as const,
+        tests: () => [scope, "classification", "test"] as const,
+        test: (request: unknown) => [scope, "classification", "test", request] as const,
     },
     templates: {
         root: () => [scope, "templates"] as const,
