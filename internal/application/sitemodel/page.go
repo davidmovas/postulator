@@ -106,7 +106,7 @@ var pagedBy = map[string]string{
 	"fields":   "pages_fields get",
 	"blocks":   "pages_blocks list",
 	"findings": "findings list",
-	"children": "sites_explore tree",
+	"children": "pages_tree children",
 	"outbound": "sites_explore links",
 }
 
@@ -206,13 +206,14 @@ func pageModel(facts contextpack.Facts, page pagemap.Page, site pagemap.Site) Pa
 func bodySummary(raw string, written []string) BodySummary {
 	parsed := block.Parse(raw)
 	summary := BodySummary{Kind: string(parsed.Kind), Hash: block.BodyHash(raw), Blocks: len(parsed.Blocks)}
-	for _, row := range blockRows(parsed, writtenRows(written)) {
-		if row.Owner == OwnerOurs {
+	rows := blockRows(parsed, writtenRows(written))
+	for i := range rows {
+		if rows[i].Owner == OwnerOurs {
 			summary.Ours++
 		} else {
 			summary.Client++
 		}
-		if row.Dynamic {
+		if rows[i].Dynamic {
 			summary.Dynamic++
 		}
 	}

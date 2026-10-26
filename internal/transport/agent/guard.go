@@ -37,8 +37,8 @@ type guard struct {
 
 func newGuard(spec agentapp.RunSpec, built []tools.Tool, resultCap int) *guard {
 	byName := make(map[string]tools.Tool, len(built))
-	for _, tool := range built {
-		byName[tool.Def.Name] = tool
+	for i := range built {
+		byName[built[i].Def.Name] = built[i]
 	}
 	return &guard{
 		stream:  spec.Stream,

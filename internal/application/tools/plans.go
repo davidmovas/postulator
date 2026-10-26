@@ -56,6 +56,13 @@ func (r *Registry) Validate(ctx context.Context, b Binding, name string, args js
 		check.Summary = said
 	}
 	if check.Summary == "" {
+		said, err := sayOf(ctx, tool, b, args)
+		if err != nil {
+			return StepCheck{}, err
+		}
+		check.Summary = said
+	}
+	if check.Summary == "" {
 		check.Summary = Summary(tool.Def, args)
 	}
 	if tool.Price != nil {
@@ -118,7 +125,8 @@ type PlansResponse struct {
 
 func ViewOfPlan(plan agent.Plan) PlanView {
 	view := PlanView{ID: plan.ID, Title: plan.Title, Status: plan.Status, Steps: make([]PlanStepView, 0, len(plan.Steps))}
-	for i, held := range plan.Steps {
+	for i := range plan.Steps {
+		held := &plan.Steps[i]
 		dependsOn := make([]int, 0, len(held.DependsOn))
 		for _, at := range held.DependsOn {
 			dependsOn = append(dependsOn, at+1)
@@ -132,7 +140,7 @@ func ViewOfPlan(plan agent.Plan) PlanView {
 	return view
 }
 
-func editsOf(step agent.PlanStep) []EditView {
+func editsOf(step *agent.PlanStep) []EditView {
 	var args map[string]any
 	if json.Unmarshal(step.Args, &args) != nil {
 		args = map[string]any{}
@@ -150,8 +158,10 @@ func valueAt(args map[string]any, path []string) string {
 		return ""
 	}
 	if len(path) == 1 {
-		text, _ := held.(string)
-		return text
+		if text, isText := held.(string); isText {
+			return text
+		}
+		return ""
 	}
 	nested, object := held.(map[string]any)
 	if !object {
@@ -225,13 +235,13 @@ func proposePlan(ctx context.Context, deps Deps, b Binding, in plansArgs) (Plans
 	if err != nil {
 		return PlansResponse{}, err
 	}
-	if err = deps.Plans.Insert(ctx, plan); err != nil {
-		return PlansResponse{}, err
+	if insertErr := deps.Plans.Insert(ctx, plan); insertErr != nil {
+		return PlansResponse{}, insertErr
 	}
-	if err = deps.Publisher.Publish(events.AgentPlanProposed, events.AgentPlanProposedPayload{
+	if publishErr := deps.Publisher.Publish(events.AgentPlanProposed, events.AgentPlanProposedPayload{
 		ConversationID: b.ConversationID, PlanID: plan.ID, Title: plan.Title, Steps: len(plan.Steps),
-	}); err != nil {
-		return PlansResponse{}, err
+	}); publishErr != nil {
+		return PlansResponse{}, publishErr
 	}
 	view := ViewOfPlan(plan)
 	return PlansResponse{Status: PlanProposed, PlanID: plan.ID, Plan: &view}, nil

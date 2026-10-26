@@ -93,9 +93,25 @@ func (s *Service) exploreLinks(ctx context.Context, req ExploreRequest) (Explore
 }
 
 func (s *Service) explorePack(ctx context.Context, req ExploreRequest) (ExploreResponse, error) {
-	page, err := s.namedOutside(ctx, req)
+	text, err := s.PackText(ctx, PackTextRequest{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path, Field: req.Field, Budget: req.Budget})
 	if err != nil {
 		return ExploreResponse{}, err
+	}
+	return ExploreResponse{View: ViewPack, Pack: &text}, nil
+}
+
+type PackTextRequest struct {
+	SiteID string
+	PageID string
+	Path   string
+	Field  string
+	Budget int
+}
+
+func (s *Service) PackText(ctx context.Context, req PackTextRequest) (PackText, error) {
+	page, err := s.namedOutside(ctx, ExploreRequest{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path, View: ViewPack})
+	if err != nil {
+		return PackText{}, err
 	}
 	budget := req.Budget
 	if budget <= 0 {
@@ -103,13 +119,13 @@ func (s *Service) explorePack(ctx context.Context, req ExploreRequest) (ExploreR
 	}
 	picture, err := s.Picture(ctx, PackRequest{PageID: page.ID, Field: req.Field, Budget: budget})
 	if err != nil {
-		return ExploreResponse{}, err
+		return PackText{}, err
 	}
 	view := packView(picture)
-	return ExploreResponse{View: ViewPack, Pack: &PackText{
+	return PackText{
 		PageID: view.PageID, Path: view.Path, Field: view.Field, Budget: view.Budget, Tokens: view.Tokens,
 		Text: picture.Fitted.Text(), Dropped: view.Dropped,
-	}}, nil
+	}, nil
 }
 
 func (s *Service) exploreTree(ctx context.Context, req ExploreRequest) (ExploreResponse, error) {

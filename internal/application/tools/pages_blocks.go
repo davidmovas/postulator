@@ -28,6 +28,7 @@ type pagesBlocksArgs struct {
 	HTML     string `json:"html,omitempty" description:"The block's html; links only by place_link"`
 	TargetID string `json:"targetId,omitempty" description:"place_link: page id"`
 	Anchor   string `json:"anchor,omitempty" description:"place_link: text in the block"`
+	Text     bool   `json:"text,omitempty" description:"list: each block's whole text and links, a long block in parts"`
 	Cursor   string `json:"cursor,omitempty" description:"list: nextCursor of the last call"`
 	Limit    int    `json:"limit,omitempty" description:"list: default 50"`
 }
@@ -44,15 +45,19 @@ func pagesBlocks(deps Deps) Tool {
 			"runs_revert undoes; the owner's blocks stay unless the page type rewrites.",
 		Risk: RiskWrite,
 	}, func(ctx context.Context, b Binding, in pagesBlocksArgs) (PagesBlocksResponse, error) {
-		limit := in.Limit
-		if in.Op != opListBlocks {
-			limit = allBlocks
+		if in.Op == opListBlocks {
+			read, err := fitted(deps, in.Limit, func(limit int) (sitemodel.BlocksView, error) {
+				return deps.SiteModel.Blocks(ctx, sitemodel.BlocksRequest{
+					SiteID: b.SiteID, PageID: in.PageID, Path: in.Path, Cursor: in.Cursor, Limit: limit, Text: in.Text,
+				})
+			})
+			return PagesBlocksResponse{Blocks: &read}, err
 		}
 		read, err := deps.SiteModel.Blocks(ctx, sitemodel.BlocksRequest{
-			SiteID: b.SiteID, PageID: in.PageID, Path: in.Path, Cursor: in.Cursor, Limit: limit,
+			SiteID: b.SiteID, PageID: in.PageID, Path: in.Path, Limit: allBlocks,
 		})
-		if err != nil || in.Op == opListBlocks {
-			return PagesBlocksResponse{Blocks: &read}, err
+		if err != nil {
+			return PagesBlocksResponse{}, err
 		}
 		started, err := deps.Runs.StartEdit(ctx, runs.EditRequest{SiteID: b.SiteID, PageID: read.PageID, Edit: in.edit()})
 		if err != nil {

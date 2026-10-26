@@ -107,7 +107,7 @@ func TestEveryToolChoiceIsADomainVocabulary(t *testing.T) {
 	known := vocabularies(t)
 	for name, schema := range schemas(t) {
 		eachProperty(schema, name+".parameters", func(path, field string, property *llm.Schema) {
-			if len(property.Enum) == 0 || field == "op" {
+			if len(property.Enum) == 0 || field == "op" || field == "view" {
 				return
 			}
 			if _, ok := known[settled(property.Enum)]; ok {

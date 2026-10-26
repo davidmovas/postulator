@@ -50,7 +50,9 @@ func (s *Service) Find(ctx context.Context, req FindRequest) (paging.List[contex
 		if err != nil {
 			return err
 		}
-		slices.SortFunc(kept, func(a, b contextpack.MapRow) int { return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.PageID, b.PageID)) })
+		slices.SortFunc(kept, func(a, b contextpack.MapRow) int {
+			return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.PageID, b.PageID))
+		})
 		keyset := paging.Keyset[contextpack.MapRow]{
 			IDColumn: "page_id",
 			ID:       func(row contextpack.MapRow) string { return row.PageID },
@@ -67,8 +69,8 @@ func (s *Service) Find(ctx context.Context, req FindRequest) (paging.List[contex
 			return err
 		}
 		listed = paging.List[contextpack.MapNode]{Cursors: page.Cursors, HasMore: page.HasMore, Items: read.nodes}
-		if err = s.whys(c, read, listed.Items, nil); err != nil {
-			return err
+		if whyErr := s.whys(c, read, listed.Items, nil); whyErr != nil {
+			return whyErr
 		}
 		return s.bodiesOf(c, listed.Items)
 	})
@@ -130,9 +132,10 @@ func (s *Service) gapped(ctx context.Context, siteID string, gap contextpack.Gap
 		return nil, err
 	}
 	out := map[string]struct{}{}
-	for _, row := range snapshot.Gaps(linkFacts(audit)) {
-		if slices.Contains(row.Gaps, gap) {
-			out[row.Page.PageID] = struct{}{}
+	rows := snapshot.Gaps(linkFacts(audit))
+	for i := range rows {
+		if slices.Contains(rows[i].Gaps, gap) {
+			out[rows[i].Page.PageID] = struct{}{}
 		}
 	}
 	return out, nil

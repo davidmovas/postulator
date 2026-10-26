@@ -90,20 +90,26 @@ func TestThePageTypeToolsSaveTypesScopesAndAPagesType(t *testing.T) {
 		t.Fatalf("pagetypes_set_scope with a meta key = %+v, want a new custom field scope without links", custom)
 	}
 
-	typed := called[pages.UpdateResponse](t, registry, binding, "pages_update",
-		`{"id":"`+seeded.page+`","pageTypeId":"`+created.ID+`"}`)
+	typed := called[pages.UpdateResponse](t, registry, binding, "pages_manage",
+		`{"op":"update","pageId":"`+seeded.page+`","pageTypeId":"`+created.ID+`"}`)
 	if typed.Page.PageTypeID == nil || *typed.Page.PageTypeID != created.ID || typed.Page.TypeSource != "manual" || typed.Page.TypeReason != "ai" {
-		t.Fatalf("pages_update with a type = %+v, want the type recorded as the agent's", typed.Page)
+		t.Fatalf("pages_manage update with a type = %+v, want the type recorded as the agent's", typed.Page)
 	}
-	titled := called[pages.UpdateResponse](t, registry, binding, "pages_update",
-		`{"id":"`+seeded.page+`","title":"Coffee","pageTypeId":"`+hub.ID+`"}`)
+	titled := called[pages.UpdateResponse](t, registry, binding, "pages_manage",
+		`{"op":"update","pageId":"`+seeded.page+`","title":"Coffee","pageTypeId":"`+hub.ID+`"}`)
 	if titled.Page.Title != "Coffee" || titled.Page.PageTypeID == nil || *titled.Page.PageTypeID != hub.ID {
-		t.Fatalf("pages_update with a title and a type = %+v, want both", titled.Page)
+		t.Fatalf("pages_manage update with a title and a type = %+v, want both", titled.Page)
 	}
-
 	moved := called[pagetypes.DeleteResponse](t, registry, binding, "pagetypes_delete",
 		`{"id":"`+created.ID+`","reassignTo":"`+hub.ID+`"}`)
 	if moved.Moved != 0 {
 		t.Fatalf("pagetypes_delete = %+v, want no page moved, the page having left the type", moved)
+	}
+
+	other := called[pagetypes.Type](t, registry, binding, "pagetypes_save", `{"siteId":"`+seeded.site+`","name":"Second hub","preset":"hub"}`)
+	bulk := called[pages.SetTypesResponse](t, registry, binding, "pages_manage",
+		`{"op":"set_types","pageTypeId":"`+other.ID+`","select":{"pageIds":["`+seeded.page+`"]}}`)
+	if bulk.Typed != 1 || typeOfThePage(t, seeded) != other.ID {
+		t.Fatalf("pages_manage set_types = %+v, want the one page typed", bulk)
 	}
 }

@@ -55,6 +55,7 @@ type Tool struct {
 	Check     func(args json.RawMessage) error
 	Run       func(ctx context.Context, b Binding, args json.RawMessage) (any, error)
 	Confirm   func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
+	Describe  func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
 	RiskOf    func(args json.RawMessage) Risk
 	Price     func(ctx context.Context, b Binding, args json.RawMessage) (Price, error)
 	Edits     []agent.EditField
@@ -84,6 +85,32 @@ func readsOn(tool Tool, ops ...string) Tool {
 			return RiskRead
 		}
 		return tool.Def.Risk
+	}
+	return tool
+}
+
+func riskedBy(tool Tool, risks map[string]Risk) Tool {
+	tool.RiskOf = func(args json.RawMessage) Risk {
+		var in opOnly
+		if err := json.Unmarshal(args, &in); err == nil {
+			if risk, held := risks[in.Op]; held {
+				return risk
+			}
+		}
+		return tool.Def.Risk
+	}
+	return tool
+}
+
+func describing[In any](tool Tool, say func(ctx context.Context, b Binding, in In) (string, error)) Tool {
+	tool.Describe = func(ctx context.Context, b Binding, args json.RawMessage) (string, error) {
+		var in In
+		if len(args) > 0 {
+			if err := json.Unmarshal(args, &in); err != nil {
+				return "", refused(tool.Def.Name, err)
+			}
+		}
+		return say(ctx, b, in)
 	}
 	return tool
 }

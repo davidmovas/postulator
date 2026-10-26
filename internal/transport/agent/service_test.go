@@ -178,7 +178,7 @@ func TestAnActionThatMovedOnIsAConflict(t *testing.T) {
 
 	actions := sqlite.NewPendingActionRepo(h.store)
 	action, err := domainagent.NewPendingAction(domainagent.PendingAction{
-		ID: id.New(), ConversationID: conversation, Tool: "pages_delete", Summary: "delete a page",
+		ID: id.New(), ConversationID: conversation, Tool: "pages_manage", Summary: "delete a page",
 		Args: json.RawMessage(`{"id":"p1"}`), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	})
 	if err != nil {

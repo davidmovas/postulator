@@ -50,17 +50,13 @@ func registered() []string {
 		"graph_propose_from_keywords",
 		"graph_apply_proposals",
 		"graph_propose_cards",
-		"pages_list",
+		"pages_find",
+		"pages_tree",
 		"pages_get",
-		"pages_preview_link",
-		"pages_create",
-		"pages_update",
-		"pages_delete",
-		"pages_map_to_entity",
-		"pages_unmap",
-		"pages_set_canonical",
-		"pages_fields",
 		"pages_blocks",
+		"pages_fields",
+		"pages_manage",
+		"pages_judge",
 		"pagetypes_list",
 		"pagetypes_save",
 		"pagetypes_delete",
@@ -88,7 +84,6 @@ func registered() []string {
 		"sync_site",
 		"sync_check_plugin",
 		"reports_site_overview",
-		"reports_page",
 		"reports_run",
 		"reports_link_audit",
 		"imports_inspect",
@@ -107,7 +102,6 @@ func registered() []string {
 		"models_set_provider_key",
 		"models_test_provider",
 		"models_usage_summary",
-		"content_judge_page",
 		"schedules_create",
 		"schedules_update",
 		"schedules_delete",
@@ -169,8 +163,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 68327
-	schemaCeilingTokens = 15228
+	schemaCeilingBytes  = 68470
+	schemaCeilingTokens = 15294
 	widestLogged        = 8
 )
 
@@ -313,18 +307,21 @@ func TestAPreviewLinkIsApprovedBeforeItIsIssued(t *testing.T) {
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	for _, tool := range registry.Build(tools.Binding{Mode: agent.ModeAutonomous}) {
-		if tool.Def.Name != "pages_preview_link" {
+		if tool.Def.Name != "pages_manage" {
 			continue
 		}
-		if tool.Def.Risk != tools.RiskWrite {
-			t.Fatalf("pages_preview_link risk = %s, want write: it hands a draft to anyone holding the link", tool.Def.Risk)
+		if risk := tool.RiskOf(json.RawMessage(`{"op":"preview_link"}`)); risk != tools.RiskWrite {
+			t.Fatalf("preview_link risk = %s, want write: it hands a draft to anyone holding the link", risk)
+		}
+		if risk := tool.RiskOf(json.RawMessage(`{"op":"delete"}`)); risk != tools.RiskDangerous {
+			t.Fatalf("delete risk = %s, want dangerous", risk)
 		}
 		if tool.Def.Schema.Properties["pageId"] == nil {
-			t.Fatalf("pages_preview_link schema = %+v, want a pageId", tool.Def.Schema)
+			t.Fatalf("pages_manage schema = %+v, want a pageId", tool.Def.Schema)
 		}
 		return
 	}
-	t.Fatal("pages_preview_link is not registered")
+	t.Fatal("pages_manage is not registered")
 }
 
 func TestMovingAnEntityIsOneWriteTheModelCanMake(t *testing.T) {
@@ -381,9 +378,9 @@ func TestSchemaIsDerivedFromTheRequest(t *testing.T) {
 	t.Parallel()
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
-	def, known := registry.Lookup("pages_create")
+	def, known := registry.Lookup("pages_manage")
 	if !known {
-		t.Fatal("pages_create is not registered")
+		t.Fatal("pages_manage is not registered")
 	}
 
 	if def.Schema.Properties["path"] == nil || def.Schema.Properties["path"].Type != llm.SchemaString {
@@ -418,14 +415,12 @@ func TestThePageToolsOfferNoCanonical(t *testing.T) {
 	t.Parallel()
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
-	for _, name := range []string{"pages_create", "pages_update"} {
-		def, known := registry.Lookup(name)
-		if !known {
-			t.Fatalf("%s is not registered", name)
-		}
-		if def.Schema.Properties["canonical"] != nil {
-			t.Errorf("%s offers a canonical; a creation's comes from WordPress's link and an update never sends one", name)
-		}
+	def, known := registry.Lookup("pages_manage")
+	if !known {
+		t.Fatal("pages_manage is not registered")
+	}
+	if def.Schema.Properties["canonical"] != nil {
+		t.Error("pages_manage offers a canonical; a creation's comes from WordPress's link and an update never sends one")
 	}
 }
 
@@ -455,14 +450,14 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	var proposed, read tools.Tool
 	for _, tool := range registry.Build(binding) {
 		switch tool.Def.Name {
-		case "pages_delete":
+		case "graph_delete_entity":
 			proposed = tool
-		case "sites_explore":
+		case "pages_find":
 			read = tool
 		}
 	}
 
-	out, err := proposed.Run(t.Context(), binding, json.RawMessage(`{"id":"page-1"}`))
+	out, err := proposed.Run(t.Context(), binding, json.RawMessage(`{"id":"entity-1"}`))
 	if err != nil {
 		t.Fatalf("a proposed call = %v", err)
 	}
@@ -471,7 +466,7 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	if !ok || confirmation.Status != agent.ConfirmationRequired || confirmation.ActionID == "" {
 		t.Fatalf("a proposed call returned %+v", out)
 	}
-	if len(actions.actions) != 1 || actions.actions[0].Tool != "pages_delete" {
+	if len(actions.actions) != 1 || actions.actions[0].Tool != "graph_delete_entity" {
 		t.Fatalf("the stored actions are %+v", actions.actions)
 	}
 	if actions.actions[0].Summary != confirmation.Summary || confirmation.Summary == "" {
@@ -487,7 +482,7 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	}
 
 	if read.Authorize == nil {
-		t.Fatal("sites_explore is site scoped and must authorize")
+		t.Fatal("pages_find is site scoped and must authorize")
 	}
 	if len(actions.actions) != 1 {
 		t.Fatal("a read tool must not propose anything")
@@ -500,12 +495,9 @@ func TestAProposalNeedsItsConversation(t *testing.T) {
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	binding := tools.Binding{SiteID: "site-1", Mode: agent.ModeConfirm}
 
-	for _, tool := range registry.Build(binding) {
-		if tool.Def.Name != "pages_delete" {
-			continue
-		}
-		if _, err := tool.Run(t.Context(), binding, nil); !errors.IsCode(err, errors.Invalid) {
-			t.Fatalf("a proposal without a conversation = %v", err)
+	for _, name := range []string{"graph_delete_entity", "pages_manage"} {
+		if _, err := registry.Call(t.Context(), binding, name, nil); !errors.IsCode(err, errors.Invalid) {
+			t.Fatalf("a %s proposal without a conversation = %v", name, err)
 		}
 	}
 }

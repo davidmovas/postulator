@@ -217,6 +217,7 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 			Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
 			Sites: siteRepo, Specs: templateService,
 		}),
+		SiteModel: briefsOver(store, bus, now),
 		Actions:   actionRepo,
 		Plans:     sqlite.NewPlanRepo(store),
 		Publisher: bus,

@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/tiktoken-go/tokenizer"
+
+	"github.com/davidmovas/postulator/internal/application/tools"
 )
 
 func measuredAgent(t *testing.T) agentReport {
@@ -36,8 +38,8 @@ func TestTheAgentsRoundIsCountedPartByPart(t *testing.T) {
 		}
 	}
 
-	if len(measured.Schemas) != 93 {
-		t.Fatalf("%d schemas, want the registry's 93 tools", len(measured.Schemas))
+	if registered := len(tools.New(tools.Deps{}).Names()); len(measured.Schemas) != registered {
+		t.Fatalf("%d schemas, want the registry's %d tools", len(measured.Schemas), registered)
 	}
 	if !slices.IsSortedFunc(measured.Schemas, func(a, b measure) int { return b.Tokens - a.Tokens }) {
 		t.Error("the schemas are not sorted by tokens, the widest first")

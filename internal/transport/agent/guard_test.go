@@ -99,6 +99,7 @@ func newBareRunnerOver(t *testing.T, resultCap int, wrap func(*fake.Client) llmp
 			Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store), Rows: sqlite.NewPageMapRepo(store),
 			UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 		}),
+		SiteModel: briefsOver(store, bus, now),
 		Actions:   sqlite.NewPendingActionRepo(store),
 		Publisher: bus,
 		Clock:     now,
@@ -153,7 +154,7 @@ func TestAToolOutsideTheAllowListIsDenied(t *testing.T) {
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done",
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_find{}\nFAKE: done",
 		[]string{"sites_list"}, stream)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -173,7 +174,7 @@ func TestAnOversizedToolResultIsCappedBeforeItReachesTheModel(t *testing.T) {
 	b := newBareRunner(t, 120)
 	stream := &recordingStream{}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)); err != nil {
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_find{}\nFAKE: done", nil, stream)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -244,7 +245,7 @@ func TestASiteScopedToolInASiteLessConversationIsDenied(t *testing.T) {
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
 
-	spec := b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)
+	spec := b.spec("TOOL:pages_find{}\nFAKE: done", nil, stream)
 	spec.Binding.SiteID = ""
 
 	if _, err := b.runner.Run(t.Context(), spec); err != nil {
@@ -265,7 +266,7 @@ func TestALoopLimitEndsTheTurnAsAnExhaustedBudget(t *testing.T) {
 
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
-	script := strings.Repeat("TOOL:pages_list{}\n", 8)
+	script := strings.Repeat("TOOL:pages_find{}\n", 8)
 
 	_, err := b.runner.Run(t.Context(), b.spec(script+"FAKE: done", nil, stream))
 	if !errors.IsCode(err, errors.BudgetExceeded) {
@@ -282,7 +283,7 @@ func TestACappedListingStillDecodesAndSaysWhatWasDropped(t *testing.T) {
 	b := newBareRunner(t, 760)
 	stream := &recordingStream{}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)); err != nil {
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_find{}\nFAKE: done", nil, stream)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -315,7 +316,7 @@ func TestTheFenceWrapsTheModelCopyAndTheLedgerKeepsTheRaw(t *testing.T) {
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{}
 
-	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream)); err != nil {
+	if _, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_find{}\nFAKE: done", nil, stream)); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -365,7 +366,7 @@ func TestAStreamFailureKeepsTheAnswerAndSaysTheRecordIsIncomplete(t *testing.T) 
 	b := newBareRunner(t, 0)
 	stream := &recordingStream{err: errors.New(errors.External, "the bus is gone")}
 
-	result, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_list{}\nFAKE: done", nil, stream))
+	result, err := b.runner.Run(t.Context(), b.spec("TOOL:pages_find{}\nFAKE: done", nil, stream))
 	if err != nil {
 		t.Fatalf("a turn that answered must not fail because its audit could not be written: %v", err)
 	}

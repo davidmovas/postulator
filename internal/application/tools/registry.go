@@ -113,14 +113,26 @@ func (r *Registry) gated(tool Tool) func(context.Context, Binding, json.RawMessa
 				return nil, err
 			}
 			if summary != "" {
-				return r.proposal(tool.Def, risk, tool.Check, summary)(ctx, b, args)
+				return r.proposal(tool, risk, summary)(ctx, b, args)
 			}
 		}
 		if b.Mode == agent.ModeConfirm {
-			return r.proposal(tool.Def, risk, tool.Check, "")(ctx, b, args)
+			return r.proposal(tool, risk, "")(ctx, b, args)
 		}
 		return tool.Run(ctx, b, args)
 	}
+}
+
+func sayOf(ctx context.Context, tool Tool, b Binding, args json.RawMessage) (string, error) {
+	if tool.Describe == nil {
+		return "", nil
+	}
+	if tool.Check != nil {
+		if err := tool.Check(args); err != nil {
+			return "", err
+		}
+	}
+	return tool.Describe(ctx, b, args)
 }
 
 func asTheAgent(run func(context.Context, Binding, json.RawMessage) (any, error)) func(context.Context, Binding, json.RawMessage) (any, error) {
@@ -153,20 +165,27 @@ func (r *Registry) Lookup(name string) (Def, bool) {
 	return build(r.deps).Def, true
 }
 
-func (r *Registry) proposal(def Def, risk Risk, check func(json.RawMessage) error, said string) func(
-	context.Context, Binding, json.RawMessage) (any, error) {
+func (r *Registry) proposal(tool Tool, risk Risk, said string) func(context.Context, Binding, json.RawMessage) (any, error) {
+	def := tool.Def
 	return func(ctx context.Context, b Binding, args json.RawMessage) (any, error) {
 		if b.ConversationID == "" {
 			return nil, errors.New(errors.Invalid, "a confirmation needs the conversation that asked for it").
 				WithDetail("tool", def.Name)
 		}
-		if check != nil {
-			if err := check(args); err != nil {
+		if tool.Check != nil {
+			if err := tool.Check(args); err != nil {
 				return nil, err
 			}
 		}
 
 		summary := said
+		if summary == "" {
+			described, err := sayOf(ctx, tool, b, args)
+			if err != nil {
+				return nil, err
+			}
+			summary = described
+		}
 		if summary == "" {
 			summary = Summary(def, args)
 		}

@@ -9,10 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
-const (
-	sitesExploreName = "sites_explore"
-	bytesPerToken    = 4
-)
+const sitesExploreName = "sites_explore"
 
 type sitesExploreArgs struct {
 	View    string `json:"view" enum:"tree,links,gaps,pack" description:"tree lists a page's children, the top level without a page"`

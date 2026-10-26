@@ -170,9 +170,9 @@ func TestARefusedCallNamesTheFieldTheModelGotWrong(t *testing.T) {
 		},
 		{
 			name: "a field of the wrong shape",
-			tool: "pages_create",
-			args: `{"path":"/coffee/","title":42}`,
-			want: []string{"pages_create", "title", "number"},
+			tool: "pages_manage",
+			args: `{"op":"create","path":"/coffee/","title":42}`,
+			want: []string{"pages_manage", "title", "number"},
 		},
 	}
 

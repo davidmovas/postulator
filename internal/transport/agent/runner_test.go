@@ -70,7 +70,7 @@ func TestAToolCallIsFencedAuditedAndKept(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: the tree is empty")
+	h.send(t, conversation, "TOOL:pages_find{}\nFAKE: the tree is empty")
 
 	seen := h.seen()
 	started := slices.Index(seen, events.AgentToolStarted)
@@ -81,17 +81,17 @@ func TestAToolCallIsFencedAuditedAndKept(t *testing.T) {
 	}
 
 	outcome, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
-	if !ok || outcome.Tool != "pages_list" || outcome.Status != string(domainagent.CallOK) {
+	if !ok || outcome.Tool != "pages_find" || outcome.Status != string(domainagent.CallOK) {
 		t.Fatalf("the finished payload is %+v", h.payload(events.AgentToolFinished))
 	}
 
 	recorded, err := sqlite.NewToolCallRepo(h.store).ByConversation(t.Context(), conversation)
-	if err != nil || len(recorded) != 1 || recorded[0].Tool != "pages_list" {
+	if err != nil || len(recorded) != 1 || recorded[0].Tool != "pages_find" {
 		t.Fatalf("the tool call ledger holds %+v, %v", recorded, err)
 	}
 
 	stored := h.messages(t, conversation)
-	if len(stored) != 3 || stored[1].Role != "tool" || stored[1].Tool != "pages_list" {
+	if len(stored) != 3 || stored[1].Role != "tool" || stored[1].Tool != "pages_find" {
 		t.Fatalf("the transcript is %+v", stored)
 	}
 
@@ -110,10 +110,10 @@ func TestConfirmModeProposesAndTheApprovalSurvivesARestart(t *testing.T) {
 	doomed := sqlitetest.Page(t, h.store, h.siteID, "/coffee/doomed/")
 	conversation := h.conversation(t, domainagent.ModeConfirm)
 
-	h.send(t, conversation, `TOOL:pages_delete{"id":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
+	h.send(t, conversation, `TOOL:pages_manage{"op":"delete","pageId":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
 
 	requested, ok := h.payload(events.AgentConfirmRequested).(events.AgentConfirmRequestedPayload)
-	if !ok || requested.Tool != "pages_delete" || requested.ConversationID != conversation {
+	if !ok || requested.Tool != "pages_manage" || requested.ConversationID != conversation {
 		t.Fatalf("the confirmation payload is %+v", h.payload(events.AgentConfirmRequested))
 	}
 	if requested.Summary == "" || requested.Risk != "dangerous" {
@@ -149,7 +149,7 @@ func TestConfirmModeProposesAndTheApprovalSurvivesARestart(t *testing.T) {
 	}
 
 	resolved, ok := restarted.payload(events.AgentConfirmResolved).(events.AgentConfirmResolvedPayload)
-	if !ok || resolved.Status != string(domainagent.ActionExecuted) || resolved.Tool != "pages_delete" {
+	if !ok || resolved.Status != string(domainagent.ActionExecuted) || resolved.Tool != "pages_manage" {
 		t.Fatalf("the resolved payload is %+v", restarted.payload(events.AgentConfirmResolved))
 	}
 
@@ -167,7 +167,7 @@ func TestARejectedConfirmationNeverRuns(t *testing.T) {
 	h := newHarness(t)
 	doomed := sqlitetest.Page(t, h.store, h.siteID, "/coffee/spared/")
 	conversation := h.conversation(t, domainagent.ModeConfirm)
-	h.send(t, conversation, `TOOL:pages_delete{"id":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
+	h.send(t, conversation, `TOOL:pages_manage{"op":"delete","pageId":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
 
 	pending, err := h.service.ListPendingActions(t.Context(), agentapp.ListPendingActionsRequest{
 		ConversationID: conversation,
@@ -238,7 +238,7 @@ func TestEveryModelCallOfATurnIsItsOwnLedgerRow(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_list{}\nTOOL:pages_list{}\nFAKE: two reads and an answer")
+	h.send(t, conversation, "TOOL:pages_find{}\nTOOL:pages_find{}\nFAKE: two reads and an answer")
 
 	listed, err := h.calls.List(t.Context(), domainllm.CallQuery{ConversationID: conversation},
 		paging.Request{Limit: 50})
@@ -394,7 +394,7 @@ func TestAStoppedTurnKeepsTheRoundsItFinished(t *testing.T) {
 
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
 	if _, err := h.service.Send(t.Context(), agentapp.SendRequest{
-		ConversationID: conversation, Text: "TOOL:pages_list{}\nFAKE: never said",
+		ConversationID: conversation, Text: "TOOL:pages_find{}\nFAKE: never said",
 	}); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -425,7 +425,7 @@ func TestEveryRoundOfATurnAnnouncesWhatItSpent(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: one read and an answer")
+	h.send(t, conversation, "TOOL:pages_find{}\nFAKE: one read and an answer")
 
 	rounds := make([]events.AgentUsagePayload, 0, 2)
 	for _, event := range h.bus.Events() {
@@ -486,7 +486,7 @@ func TestTheConversationHistoryIsReplayedOnTheNextTurn(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: first")
+	h.send(t, conversation, "TOOL:pages_find{}\nFAKE: first")
 
 	held, body := loadHistory(t, h.store, conversation)
 	roles := make([]llmport.Role, 0, len(held.Items))
@@ -508,7 +508,7 @@ func TestTheConversationHistoryIsReplayedOnTheNextTurn(t *testing.T) {
 	if len(replayed) != len(held.Items)+2 {
 		t.Fatalf("the second turn sent %d messages, want the %d stored and its own two", len(replayed), len(held.Items))
 	}
-	if replayed[1].Text != "TOOL:pages_list{}\nFAKE: first" || replayed[3].Result == nil {
+	if replayed[1].Text != "TOOL:pages_find{}\nFAKE: first" || replayed[3].Result == nil {
 		t.Fatalf("the second turn did not replay the first: %+v", replayed)
 	}
 	if replayed[len(replayed)-2].Role != llmport.RoleDeveloper || replayed[len(replayed)-1].Text != "FAKE: second" {
@@ -551,7 +551,7 @@ func TestAStoredCallNeverCarriesACredential(t *testing.T) {
 	store := sqlitetest.Open(t)
 	owner := sqlitetest.Site(t, store, "shop")
 	model := fake.New(fake.WithScript(func(string) fake.Turn {
-		return fake.Turn{Tool: "pages_list", Args: json.RawMessage(`{"token":"` + secret + `"}`), Text: "refused"}
+		return fake.Turn{Tool: "pages_find", Args: json.RawMessage(`{"token":"` + secret + `"}`), Text: "refused"}
 	}))
 	h := build(t, store, model, &applicationtest.Recorder{})
 	h.siteID = owner.ID
@@ -596,10 +596,10 @@ func TestTheStoredHistoryReplaysAShorterToolResultThanTheTurnSaw(t *testing.T) {
 	h.siteID = owner.ID
 
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: forty pages")
+	h.send(t, conversation, "TOOL:pages_find{}\nFAKE: forty pages")
 
 	outcome, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
-	if !ok || outcome.Tool != "pages_list" || len(outcome.Result) == 0 {
+	if !ok || outcome.Tool != "pages_find" || len(outcome.Result) == 0 {
 		t.Fatalf("the finished payload is %+v", h.payload(events.AgentToolFinished))
 	}
 
@@ -651,7 +651,7 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeConfirm)
 	sqlitetest.Page(t, h.store, h.siteID, "/coffee/")
-	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: the tree")
+	h.send(t, conversation, "TOOL:pages_find{}\nFAKE: the tree")
 
 	sqlitetest.Page(t, h.store, h.siteID, "/coffee/fresh/")
 	h.bus.Reset()
@@ -723,7 +723,7 @@ func TestASavedToolRowCarriesTheStatusTheLedgerRecorded(t *testing.T) {
 	}
 	conversation := created.Conversation.ID
 
-	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: no site here")
+	h.send(t, conversation, "TOOL:pages_find{}\nFAKE: no site here")
 
 	live, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
 	if !ok || live.Status != string(domainagent.CallDenied) {
@@ -752,7 +752,7 @@ func TestASavedToolRowThatSucceededReadsAsDone(t *testing.T) {
 
 	h := newHarness(t)
 	conversation := h.conversation(t, domainagent.ModeAutonomous)
-	h.send(t, conversation, "TOOL:pages_list{}\nFAKE: the tree is empty")
+	h.send(t, conversation, "TOOL:pages_find{}\nFAKE: the tree is empty")
 
 	for _, message := range h.messages(t, conversation) {
 		if message.Role == "tool" && message.ToolStatus != string(domainagent.CallOK) {
@@ -837,7 +837,7 @@ func TestAConversationWithoutASiteStillAnswers(t *testing.T) {
 		t.Fatalf("CreateConversation: %v", err)
 	}
 
-	h.send(t, created.Conversation.ID, "TOOL:pages_list{}\nFAKE: no site here")
+	h.send(t, created.Conversation.ID, "TOOL:pages_find{}\nFAKE: no site here")
 
 	outcome, ok := h.payload(events.AgentToolFinished).(events.AgentToolFinishedPayload)
 	if !ok || outcome.Status != string(domainagent.CallDenied) {
@@ -890,14 +890,18 @@ func TestAFailedToolIsRecordedAsFailedOnTheAction(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
+	gone := sqlitetest.Page(t, h.store, h.siteID, "/coffee/gone/")
 	conversation := h.conversation(t, domainagent.ModeConfirm)
-	h.send(t, conversation, `TOOL:pages_delete{"id":"6fb0b1d6-1ad5-4a26-8f26-2f2b6d9e4b23"}`+"\nFAKE: waiting")
+	h.send(t, conversation, `TOOL:pages_manage{"op":"delete","pageId":"`+gone.ID+`"}`+"\nFAKE: waiting")
 
 	pending, err := h.service.ListPendingActions(t.Context(), agentapp.ListPendingActionsRequest{
 		ConversationID: conversation,
 	})
 	if err != nil || len(pending.Items) != 1 {
 		t.Fatalf("the pending actions are %+v, %v", pending, err)
+	}
+	if err = sqlite.NewPageRepo(h.store).Delete(t.Context(), gone.ID); err != nil {
+		t.Fatalf("take the page away before the approval: %v", err)
 	}
 
 	settled, err := h.service.Confirm(t.Context(), agentapp.ConfirmRequest{
