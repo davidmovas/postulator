@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../../../copy/index.js";
-import { actOf, familyOf, refusedText, resultSummary, toolLabel, truncationOf } from "./tools.js";
+import { actOf, familyOf, refusedText, resultSummary, riskOf, toolLabel, truncationOf } from "./tools.js";
 
 const folded = [
     "sites",
@@ -83,6 +83,21 @@ describe("toolLabel", () => {
             expect(toolLabel(tool)).not.toContain("_");
         }
         expect(toolLabel("mystery_move")).toBe("Mystery move");
+    });
+});
+
+describe("riskOf", () => {
+    it.each([
+        ["pages_manage", { op: "update" }, "dangerous", "write"],
+        ["pages_manage", { op: "delete" }, "dangerous", "dangerous"],
+        ["graph_edit", { op: "delete_edge" }, "dangerous", "dangerous"],
+        ["runs_control", { op: "revert" }, "dangerous", "dangerous"],
+        ["runs_control", { op: "start" }, "dangerous", "write"],
+        ["imports", { op: "apply" }, "dangerous", "dangerous"],
+        ["pages_manage", { op: "a_new_op" }, "dangerous", "dangerous"],
+        ["pages_fields", { op: "set" }, "write", "write"],
+    ])("reads %s %j, a %s tool, as %s", (tool, args, base, risk) => {
+        expect(riskOf(tool, args, base)).toBe(risk);
     });
 });
 

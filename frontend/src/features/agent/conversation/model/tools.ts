@@ -86,6 +86,38 @@ export function actOf(tool: string, args: unknown): string {
     return defaultActs[tool] ?? "";
 }
 
+const dangerous = "dangerous";
+const write = "write";
+
+const plainWrites: Readonly<Record<string, ReadonlySet<string>>> = {
+    sites_manage: new Set(["create", "update", "sync"]),
+    pages_manage: new Set(["create", "update", "map", "unmap", "canonical", "preview_link", "set_types", "set_templates"]),
+    graph_edit: new Set([
+        "create",
+        "update",
+        "anchors",
+        "add_edge",
+        "approve_edge",
+        "reject_edge",
+        "move",
+        "rescore",
+        "adopt_parents",
+        "apply_proposals",
+    ]),
+    pagetypes: new Set(["save", "scope"]),
+    templates: new Set(["create", "update", "override"]),
+    runs_control: new Set(["start", "pause", "resume", "cancel", "retry_step", "regenerate"]),
+    imports: new Set(["export", "save_mapping"]),
+    schedules: new Set(["create", "update", "enable", "disable", "run_now"]),
+};
+
+export function riskOf(tool: string, args: unknown, base: string): string {
+    if (base !== dangerous) {
+        return base;
+    }
+    return plainWrites[tool]?.has(actOf(tool, args)) === true ? write : dangerous;
+}
+
 export function toolLabel(tool: string, args?: unknown): string {
     const known = copy.agent.acts[tool];
     if (known === undefined) {
