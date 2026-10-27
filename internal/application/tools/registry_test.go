@@ -25,7 +25,6 @@ func registered() []string {
 	return []string{
 		"sites_list",
 		"sites_get",
-		"sites_explore",
 		"sites_create",
 		"sites_update",
 		"sites_delete",
@@ -57,6 +56,7 @@ func registered() []string {
 		"pages_fields",
 		"pages_manage",
 		"pages_judge",
+		"links",
 		"pagetypes_list",
 		"pagetypes_save",
 		"pagetypes_delete",
@@ -85,7 +85,6 @@ func registered() []string {
 		"sync_check_plugin",
 		"reports_site_overview",
 		"reports_run",
-		"reports_link_audit",
 		"imports_inspect",
 		"imports_preview",
 		"imports_apply",
@@ -163,8 +162,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 68470
-	schemaCeilingTokens = 15294
+	schemaCeilingBytes  = 68045
+	schemaCeilingTokens = 15198
 	widestLogged        = 8
 )
 
@@ -428,7 +427,7 @@ func TestASiteScopedToolRefusesAConversationWithoutASite(t *testing.T) {
 	t.Parallel()
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
-	_, err := registry.Call(t.Context(), tools.Binding{Mode: agent.ModeAutonomous}, "sites_explore", nil)
+	_, err := registry.Call(t.Context(), tools.Binding{Mode: agent.ModeAutonomous}, "links", nil)
 	if !errors.IsCode(err, errors.Unauthorized) {
 		t.Fatalf("Call without a site = %v, want unauthorized", err)
 	}

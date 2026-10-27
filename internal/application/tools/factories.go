@@ -4,7 +4,6 @@ func factories() []factory {
 	return []factory{
 		sitesList,
 		sitesGet,
-		sitesExplore,
 		sitesCreate,
 		sitesUpdate,
 		sitesDelete,
@@ -36,6 +35,7 @@ func factories() []factory {
 		pagesFields,
 		pagesManage,
 		pagesJudge,
+		linksTool,
 		pagetypesList,
 		pagetypesSave,
 		pagetypesDelete,
@@ -64,7 +64,6 @@ func factories() []factory {
 		syncCheckPlugin,
 		reportsSiteOverview,
 		reportsRun,
-		reportsLinkAudit,
 		importsInspect,
 		importsPreview,
 		importsApply,

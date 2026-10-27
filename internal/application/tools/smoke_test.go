@@ -235,45 +235,39 @@ func (wholeWindow) InputBudget(domainllm.Role) int {
 	return 0
 }
 
-func TestSitesExploreAnswersEveryViewOverTheStore(t *testing.T) {
+func TestLinksAnswersEveryViewOverTheStore(t *testing.T) {
 	t.Parallel()
 
 	registry, binding, seeded := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 	calls := map[string]string{
-		"tree":  `{"view":"tree"}`,
-		"links": `{"view":"links","pageId":"` + seeded.page + `"}`,
-		"gaps":  `{"view":"gaps","limit":10}`,
-		"pack":  `{"view":"pack","path":"/coffee/"}`,
+		"page":    `{"view":"page","pageId":"` + seeded.page + `"}`,
+		"section": `{"view":"section","pageId":"` + seeded.page + `"}`,
+		"map":     `{"view":"map"}`,
+		"owed":    `{"view":"owed","missing":true}`,
+		"orphans": `{"view":"orphans","limit":10}`,
+		"suggest": `{"view":"suggest"}`,
 	}
 	for view, args := range calls {
 		t.Run(view, func(t *testing.T) {
 			t.Parallel()
 
-			out, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(args))
+			out, err := registry.Call(t.Context(), binding, "links", json.RawMessage(args))
 			if err != nil {
-				t.Fatalf("sites_explore %s: %v", view, err)
+				t.Fatalf("links %s: %v", view, err)
 			}
-			answered, ok := out.(sitemodel.ExploreResponse)
+			answered, ok := out.(sitemodel.LinksAnswer)
 			if !ok || string(answered.View) != view {
-				t.Fatalf("sites_explore %s answered %+v", view, out)
+				t.Fatalf("links %s answered %+v", view, out)
 			}
 		})
 	}
-	tree, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(`{"view":"tree"}`))
-	if err != nil {
-		t.Fatalf("tree: %v", err)
+	section := called[sitemodel.LinksAnswer](t, registry, binding, "links", `{"view":"section"}`)
+	if section.Totals == nil || section.Totals.Pages != 1 || section.Pages == nil || section.Pages.Items[0].Path != "/coffee/" {
+		t.Errorf("the whole site's section = %+v, want the one seeded page", section)
 	}
-	listed, ok := tree.(sitemodel.ExploreResponse)
-	if !ok || len(listed.Tree.Nodes.Items) != 1 || listed.Tree.Nodes.Items[0].Page.Path != "/coffee/" {
-		t.Errorf("the tree's top = %+v, want the one seeded page", tree)
-	}
-	pack, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(`{"view":"pack","path":"/coffee/"}`))
-	if err != nil {
-		t.Fatalf("pack: %v", err)
-	}
-	if got, ok := pack.(sitemodel.ExploreResponse); !ok || got.Pack.Budget != 16384/4 || !strings.Contains(got.Pack.Text, "/coffee/") {
-		t.Errorf("pack = %+v, want the writer's pack fitted to a quarter of the tool-result cap in tokens", pack)
+	if _, err := registry.Call(t.Context(), binding, "links", json.RawMessage(`{"view":"page"}`)); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a page view naming no page = %v, want Invalid", err)
 	}
 }
 
@@ -491,8 +485,10 @@ func argumentsFor(name string) json.RawMessage {
 		return json.RawMessage(`{"name":"Guide","spec":` + minimalSpec + `}`)
 	case "templates_update":
 		return json.RawMessage(`{"id":"t1","spec":` + minimalSpec + `}`)
-	case "sites_explore":
-		return json.RawMessage(`{"view":"gaps"}`)
+	case "links":
+		return json.RawMessage(`{"view":"section"}`)
+	case "pages_tree":
+		return json.RawMessage(`{"view":"roots"}`)
 	case "findings":
 		return json.RawMessage(`{"op":"resolve","findingId":"f1","option":"ignore"}`)
 	default:

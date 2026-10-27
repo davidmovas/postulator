@@ -94,7 +94,7 @@ type BlocksView struct {
 func (s *Service) Fields(ctx context.Context, req FieldsRequest) (FieldsView, error) {
 	var view FieldsView
 	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
-		page, err := s.named(c, ExploreRequest{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path}, true)
+		page, err := s.named(c, pageName{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path})
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func fieldOwner(value field.Value, spec field.Spec) string {
 func (s *Service) Blocks(ctx context.Context, req BlocksRequest) (BlocksView, error) {
 	var view BlocksView
 	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
-		page, err := s.named(c, ExploreRequest{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path}, true)
+		page, err := s.named(c, pageName{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path})
 		if err != nil {
 			return err
 		}

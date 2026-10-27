@@ -107,13 +107,13 @@ var pagedBy = map[string]string{
 	"blocks":   "pages_blocks list",
 	"findings": "findings list",
 	"children": "pages_tree children",
-	"outbound": "sites_explore links",
+	"outbound": "links page",
 }
 
 func (s *Service) Page(ctx context.Context, req PageRequest) (PageModel, error) {
 	var model PageModel
 	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
-		page, err := s.named(c, ExploreRequest{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path, View: "page"}, true)
+		page, err := s.named(c, pageName(req))
 		if err != nil {
 			return err
 		}

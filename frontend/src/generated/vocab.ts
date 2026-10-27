@@ -322,8 +322,11 @@ export const packFieldKeys: readonly FieldKey[] = [
     "image_title",
 ];
 
-export const exploreViews = ["tree", "links", "gaps", "pack"] as const;
-export type ExploreView = (typeof exploreViews)[number];
+export const treeShapes = ["roots", "children", "subtree", "ancestors", "siblings", "walk"] as const;
+export type TreeShape = (typeof treeShapes)[number];
+
+export const linksShapes = ["page", "section", "map", "owed", "orphans", "suggest"] as const;
+export type LinksShape = (typeof linksShapes)[number];
 
 export const siteGaps = ["planned", "empty", "unmapped", "orphan", "missing_links", "findings"] as const;
 export type SiteGap = (typeof siteGaps)[number];
