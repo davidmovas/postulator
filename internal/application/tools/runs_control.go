@@ -155,7 +155,7 @@ func (deps Deps) startRequest(ctx context.Context, b Binding, in *runsControlArg
 	req := runs.StartRequest{
 		SiteID: b.SiteID, PageIDs: pageIDs, TemplateID: in.TemplateID, Recipe: recipeOf(in.Steps), PublishMode: in.PublishMode,
 		Kind: in.Kind, Budget: run.Budget{MaxUSD: in.MaxUSD, MaxTokens: in.MaxTokens}, Rewrite: in.Rewrite, Fields: in.Fields,
-		AddEdges: in.AddEdges,
+		AddEdges: in.AddEdges, Assumed: b.Assumed,
 	}
 	if in.Brief != nil {
 		req.Brief = &run.Brief{

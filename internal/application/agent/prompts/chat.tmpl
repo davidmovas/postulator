@@ -45,7 +45,7 @@ with plans op propose: each step names a write tool, its args as one JSON object
 dependsOn the earlier steps it needs. Each step is checked as its tool would check it, so a plan its tools would
 refuse is refused at once. The user approves it whole or in part, or edits a step's text, and you are told what ran.
 A page links only to a page the graph connects to it: add the related edge (graph_edit op add_edge) as an earlier
-step, or start the run with addEdges.
+step the run's start dependsOn, or start the run with addEdges.
 
 THE SITE'S MODEL
 - A page is any post, page, product or store category of the site, on the site or planned. Its page type is the

@@ -19,6 +19,12 @@ type StartRequest struct {
 	Brief       *run.Brief          `json:"brief,omitempty"`
 	Directives  []run.Directive     `json:"directives,omitempty"`
 	AddEdges    bool                `json:"addEdges,omitempty"`
+	Assumed     []AssumedEdge       `json:"-"`
+}
+
+type AssumedEdge struct {
+	FromEntityID string
+	ToEntityID   string
 }
 
 type StartResponse struct {

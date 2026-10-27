@@ -66,6 +66,73 @@ func TestRunsStartTakesAFieldScopeAndShowsItsEstimateOnTheCard(t *testing.T) {
 	}
 }
 
+func TestAPlansRunStartTakesTheEdgeAStepItDependsOnAdds(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, seeded := wired(t)
+	onTheSite(t, seeded)
+	other := called[pages.CreateResponse](t, registry, tools.Binding{SiteID: binding.SiteID, Mode: domainagent.ModeAutonomous},
+		"pages_manage", `{"op":"create","path":"/coffee/grinders/","entityId":"`+seeded.other+`"}`)
+	edge := `{"op":"add_edge","entityId":"` + seeded.entity + `","toEntityId":"` + seeded.other +
+		`","kind":"related","weight":1,"reason":"Grinders go with beans"`
+	start := `{"op":"start","pageIds":["` + seeded.page + `"],"directives":[{"pageId":"` + seeded.page +
+		`","mustLink":[{"pageId":"` + other.Page.ID + `","anchor":"grinders"}]}]}`
+	proposal := func(edgeArgs string, dependsOn []int) string {
+		encoded, err := json.Marshal(map[string]any{"op": "propose", "title": "Link the beans to the grinders", "steps": []map[string]any{
+			{"tool": "graph_edit", "args": edgeArgs, "reason": "The graph connects the two first"},
+			{"tool": "runs_control", "args": start, "reason": "The writer places the link", "dependsOn": dependsOn},
+		}})
+		if err != nil {
+			t.Fatalf("encode the proposal: %v", err)
+		}
+		return string(encoded)
+	}
+
+	cases := []struct {
+		name      string
+		edge      string
+		dependsOn []int
+		refused   bool
+	}{
+		{name: "after the approved edge it depends on", edge: edge + `}`, dependsOn: []int{1}},
+		{name: "beside an edge it does not depend on", edge: edge + `}`, refused: true},
+		{name: "after an edge left a proposal", edge: edge + `,"status":"proposed"}`, dependsOn: []int{1}, refused: true},
+	}
+	for _, tc := range cases {
+		_, err := planCall(t, registry, binding, proposal(tc.edge, tc.dependsOn))
+		switch {
+		case tc.refused && (!errors.IsCode(err, errors.Invalid) || !strings.Contains(err.Error(), "/coffee/grinders/")):
+			t.Errorf("%s: the proposal = %v, want the start refused naming the target", tc.name, err)
+		case !tc.refused && err != nil:
+			t.Errorf("%s: the proposal = %v, want the plan proposed", tc.name, err)
+		}
+	}
+}
+
+func TestAStepAssumesTheEdgesOfEveryStepItDependsOnThroughOthers(t *testing.T) {
+	t.Parallel()
+
+	registry := tools.New(tools.Deps{})
+	edge := func(from, to, status string) domainagent.PlanStep {
+		return domainagent.PlanStep{Tool: "graph_edit", Args: json.RawMessage(`{"op":"add_edge","entityId":"` + from +
+			`","toEntityId":"` + to + `","kind":"related","status":"` + status + `"}`)}
+	}
+	earlier := []domainagent.PlanStep{
+		edge("a", "b", ""),
+		{Tool: "pages_manage", Args: json.RawMessage(`{"op":"create","path":"/a/"}`), DependsOn: []int{0}},
+		edge("c", "d", "proposed"),
+		edge("e", "f", "approved"),
+		{Tool: "graph_edit", Args: json.RawMessage(`{"op":"create","name":"G"}`)},
+	}
+	got := registry.Assuming(tools.Binding{SiteID: "site-1"}, earlier, []int{1, 2, 4}).Assumed
+	if len(got) != 1 || got[0] != (runs.AssumedEdge{FromEntityID: "a", ToEntityID: "b"}) {
+		t.Errorf("the step assumes %+v, want only the approved edge it reaches through the page it depends on", got)
+	}
+	if none := registry.Assuming(tools.Binding{}, earlier, nil).Assumed; len(none) != 0 {
+		t.Errorf("a step that depends on nothing assumes %+v", none)
+	}
+}
+
 func TestARunStartInAPlanIsPricedAndOffersItsBriefAndDirectivesForEditing(t *testing.T) {
 	t.Parallel()
 

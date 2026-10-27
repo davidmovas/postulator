@@ -117,7 +117,8 @@ func (s *Service) ConfirmPlan(ctx context.Context, req ConfirmPlanRequest) (Conf
 		if editErr != nil {
 			return ConfirmPlanResponse{}, editErr
 		}
-		check, checkErr := s.deps.Registry.Validate(ctx, binding, plan.Steps[at].Tool, edited)
+		assuming := s.deps.Registry.Assuming(binding, plan.Steps[:at], plan.Steps[at].DependsOn)
+		check, checkErr := s.deps.Registry.Validate(ctx, assuming, plan.Steps[at].Tool, edited)
 		if checkErr != nil {
 			return ConfirmPlanResponse{}, checkErr
 		}
@@ -280,7 +281,7 @@ func (s *Service) runStep(ctx context.Context, b tools.Binding, plan *domainagen
 	s.planMoved(*plan, held.ID)
 
 	started := time.Now()
-	outcome, callErr := s.deps.Registry.Call(ctx, b, held.Tool, held.Args)
+	outcome, callErr := s.deps.Registry.Call(ctx, s.deps.Registry.Assuming(b, plan.Steps[:at], held.DependsOn), held.Tool, held.Args)
 	_, encoded, failure := settleCall(outcome, callErr)
 	encoded = capped(encoded, s.maxToolResult())
 	s.auditStep(ctx, plan.ConversationID, *held, failure, errors.IsCode(callErr, errors.Unauthorized), time.Since(started).Milliseconds())

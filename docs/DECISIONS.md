@@ -5603,7 +5603,7 @@ matrix and the task list are `docs/superpowers/plans/2026-10-26-phase-18-assista
   write says what it will do in one sentence (`Tool.Describe`), which the card, the proposal and the
   plan step show. A page addressed by id must belong to the conversation's site.
 - **Every schema** went from 68,310 bytes and 15,222 tokens (94 tools) to 48,543 bytes and 11,084
-  tokens; the instructions with the replica's brief from 1,929 to 2,127 tokens; a whole round on the
+  tokens; the instructions with the replica's brief from 1,929 to 2,133 tokens; a whole round on the
   replica from 17,194 to 13,254. Deferred loading stays off.
 - **The history format** moved to `responses/2`, so a conversation from 2.6 starts the model afresh
   and keeps its transcript; approving a card of a tool this version no longer has fails in plain

@@ -3,10 +3,12 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -80,6 +82,28 @@ func (r *Registry) Validate(ctx context.Context, b Binding, name string, args js
 		check.Price = price
 	}
 	return check, nil
+}
+
+func (r *Registry) Assuming(b Binding, earlier []agent.PlanStep, dependsOn []int) Binding {
+	assumed := make([]runs.AssumedEdge, 0)
+	seen := make(map[int]bool, len(earlier))
+	pending := slices.Clone(dependsOn)
+	for len(pending) > 0 {
+		at := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if at < 0 || at >= len(earlier) || seen[at] {
+			continue
+		}
+		seen[at] = true
+		pending = append(pending, earlier[at].DependsOn...)
+		if build, known := r.byName[earlier[at].Tool]; known {
+			if adds := build(r.deps).Adds; adds != nil {
+				assumed = append(assumed, adds(earlier[at].Args)...)
+			}
+		}
+	}
+	b.Assumed = assumed
+	return b
 }
 
 type planStepArgs struct {
@@ -231,13 +255,13 @@ func proposePlan(ctx context.Context, deps Deps, b Binding, in plansArgs) (Plans
 		if !json.Valid(args) {
 			return PlansResponse{}, errors.New(errors.Invalid, where+"'s args are not one JSON object").WithDetail("field", "steps.args")
 		}
-		check, err := deps.steps.Validate(ctx, b, strings.TrimSpace(raw.Tool), args)
-		if err != nil {
-			return PlansResponse{}, errors.Wrap(err, errors.CodeOf(err), where+" ("+raw.Tool+") would be refused: "+err.Error())
-		}
 		dependsOn := make([]int, 0, len(raw.DependsOn))
 		for _, number := range raw.DependsOn {
 			dependsOn = append(dependsOn, number-1)
+		}
+		check, err := deps.steps.Validate(ctx, deps.steps.Assuming(b, steps, dependsOn), strings.TrimSpace(raw.Tool), args)
+		if err != nil {
+			return PlansResponse{}, errors.Wrap(err, errors.CodeOf(err), where+" ("+raw.Tool+") would be refused: "+err.Error())
 		}
 		steps = append(steps, agent.PlanStep{
 			ID: id.New(), Tool: strings.TrimSpace(raw.Tool), Args: args, Reason: raw.Reason, Summary: check.Summary,

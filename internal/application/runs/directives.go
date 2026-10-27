@@ -46,36 +46,47 @@ func (s *Service) directed(ctx context.Context, req StartRequest, siteID string,
 			if _, owed := plan.ByPageID(link.PageID); owed {
 				continue
 			}
-			gap, gapErr := s.unlinked(ctx, pageID, link.PageID, req.AddEdges)
+			gap, open, gapErr := s.unlinked(ctx, req, pageID, link.PageID)
 			if gapErr != nil {
 				return nil, gapErr
 			}
-			missing = append(missing, gap)
+			if open {
+				missing = append(missing, gap)
+			}
 		}
 	}
 	return missing, nil
 }
 
-func (s *Service) unlinked(ctx context.Context, fromID, toID string, adding bool) (missingEdge, error) {
+func (s *Service) unlinked(ctx context.Context, req StartRequest, fromID, toID string) (missingEdge, bool, error) {
 	from, err := s.pages.Get(ctx, fromID)
 	if err != nil {
-		return missingEdge{}, err
+		return missingEdge{}, false, err
 	}
 	to, err := s.pages.Get(ctx, toID)
 	if err != nil {
-		return missingEdge{}, err
+		return missingEdge{}, false, err
 	}
 	if from.EntityID == nil || to.EntityID == nil {
-		return missingEdge{}, invalid(from.Path+" cannot be made to link to "+to.Path+
+		return missingEdge{}, false, invalid(from.Path+" cannot be made to link to "+to.Path+
 			": the entity graph links pages through their entities, and one of the two carries none", "directives.mustLink").
 			WithDetail("from", from.Path).WithDetail("to", to.Path)
 	}
-	if !adding {
-		return missingEdge{}, invalid(from.Path+" does not link to "+to.Path+
+	if assumes(req.Assumed, *from.EntityID, *to.EntityID) {
+		return missingEdge{}, false, nil
+	}
+	if !req.AddEdges {
+		return missingEdge{}, false, invalid(from.Path+" does not link to "+to.Path+
 			": no edge of the entity graph that the page's link policy follows connects their entities; add a related edge first, "+
 			"or start the run with addEdges", "directives.mustLink").WithDetail("from", from.Path).WithDetail("to", to.Path)
 	}
-	return missingEdge{from: from, to: to}, nil
+	return missingEdge{from: from, to: to}, true, nil
+}
+
+func assumes(assumed []AssumedEdge, a, b string) bool {
+	return slices.ContainsFunc(assumed, func(edge AssumedEdge) bool {
+		return edge.FromEntityID == a && edge.ToEntityID == b || edge.FromEntityID == b && edge.ToEntityID == a
+	})
 }
 
 func (s *Service) addEdges(ctx context.Context, siteID string, missing []missingEdge) error {

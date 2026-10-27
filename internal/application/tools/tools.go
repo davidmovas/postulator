@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -48,6 +49,7 @@ type Binding struct {
 	RunID          string
 	Mode           agent.Mode
 	Approved       bool
+	Assumed        []runs.AssumedEdge
 }
 
 type Tool struct {
@@ -59,6 +61,7 @@ type Tool struct {
 	RiskOf    func(args json.RawMessage) Risk
 	Price     func(ctx context.Context, b Binding, args json.RawMessage) (Price, error)
 	Edits     func(ctx context.Context, b Binding, args json.RawMessage) ([]agent.EditField, error)
+	Adds      func(args json.RawMessage) []runs.AssumedEdge
 	Def       Def
 }
 

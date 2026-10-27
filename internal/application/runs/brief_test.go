@@ -83,6 +83,49 @@ func TestAMustLinkTargetTheGraphDoesNotConnectIsRefusedOrBecomesAnEdge(t *testin
 	}
 }
 
+func TestAMustLinkAnEdgeAssumedFromAnEarlierStepConnectsIsNeitherRefusedNorAddedTwice(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		assumed func(pages []string) []runs.AssumedEdge
+		refused bool
+	}{
+		{name: "from the page to its target", assumed: func(pages []string) []runs.AssumedEdge {
+			return []runs.AssumedEdge{{FromEntityID: "entity-" + pages[0], ToEntityID: "entity-" + pages[1]}}
+		}},
+		{name: "from the target to the page", assumed: func(pages []string) []runs.AssumedEdge {
+			return []runs.AssumedEdge{{FromEntityID: "entity-" + pages[1], ToEntityID: "entity-" + pages[0]}}
+		}},
+		{name: "between two other entities", refused: true, assumed: func([]string) []runs.AssumedEdge {
+			return []runs.AssumedEdge{{FromEntityID: "entity-elsewhere", ToEntityID: "entity-nowhere"}}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := briefFixture(t)
+			req := runs.StartRequest{SiteID: f.siteID, PageIDs: f.pages, Assumed: tc.assumed(f.pages), Directives: []run.Directive{{
+				PageID: f.pages[0], MustLink: []run.MustLink{{PageID: f.pages[1], Anchor: "the child page"}},
+			}}}
+			_, err := f.service.Estimate(t.Context(), req)
+			if refused := errors.IsCode(err, errors.Invalid); refused != tc.refused {
+				t.Fatalf("Estimate = %v, want refused %v", err, tc.refused)
+			}
+			if tc.refused {
+				return
+			}
+			if _, err = f.service.Start(t.Context(), req); err != nil {
+				t.Fatalf("Start: %v", err)
+			}
+			if f.engine.queued.ID == "" || len(f.edges.added) != 0 {
+				t.Errorf("the start queued %q and added %+v, want it queued with no edge of its own", f.engine.queued.ID, f.edges.added)
+			}
+		})
+	}
+}
+
 func TestADirectiveTheRunCannotCarryIsRefused(t *testing.T) {
 	t.Parallel()
 

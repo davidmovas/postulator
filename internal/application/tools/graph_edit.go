@@ -2,10 +2,13 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/graph"
+	"github.com/davidmovas/postulator/internal/application/runs"
+	domaingraph "github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -71,6 +74,13 @@ func graphEdit(deps Deps) Tool {
 	tool = describing(tool, func(ctx context.Context, b Binding, in graphEditArgs) (string, error) {
 		return deps.graphChange(ctx, &in)
 	})
+	tool.Adds = func(args json.RawMessage) []runs.AssumedEdge {
+		var in graphEditArgs
+		if json.Unmarshal(args, &in) != nil || in.Op != opAddEdge || in.Status != "" && in.Status != string(domaingraph.StatusApproved) {
+			return nil
+		}
+		return []runs.AssumedEdge{{FromEntityID: in.EntityID, ToEntityID: in.ToEntityID}}
+	}
 	return riskedBy(tool, map[string]Risk{
 		opCreate: RiskWrite, opUpdate: RiskWrite, opAnchors: RiskWrite, opAddEdge: RiskWrite, opApproveEdge: RiskWrite,
 		opRejectEdge: RiskWrite, opMove: RiskWrite, opRescore: RiskWrite, opAdoptParents: RiskWrite, opApplyProposals: RiskWrite,
