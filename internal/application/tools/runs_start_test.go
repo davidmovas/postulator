@@ -7,7 +7,6 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/pages"
-	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
@@ -104,7 +103,7 @@ func TestARunStartInAPlanIsPricedAndOffersItsBriefAndDirectivesForEditing(t *tes
 	if err = repo.Update(t.Context(), target); err != nil {
 		t.Fatalf("put the target on the site: %v", err)
 	}
-	listed := called[pagetypes.ListResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
+	listed := called[tools.PageTypesResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
 	checks := map[string]struct {
 		tool, args, want string
 		choices          int

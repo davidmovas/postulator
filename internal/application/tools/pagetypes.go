@@ -17,8 +17,8 @@ const (
 )
 
 type pagetypesArgs struct {
-	Op          string            `json:"op" enum:"list,save,delete,scope" description:"list the types with their scopes and the field catalog; save creates one without pageTypeId or changes one; scope changes how one field of a type is written"`
-	PageTypeID  string            `json:"pageTypeId,omitempty" description:"save, delete, scope: the type"`
+	Op          string            `json:"op" enum:"list,get,save,delete,scope" description:"list the types in brief; get one whole with its scopes and the field catalog; save creates one without pageTypeId or changes one; scope changes how one field of a type is written"`
+	PageTypeID  string            `json:"pageTypeId,omitempty" description:"get, save, delete, scope: the type"`
 	Name        *string           `json:"name,omitempty" description:"save: its name; required to create"`
 	Preset      string            `json:"preset,omitempty" enum:"landing,category,guide,info,product,store_category,catalog,technical,hub,entity" description:"save: the role it takes; required to create, fixed after"`
 	TemplateID  *string           `json:"templateId,omitempty" description:"save: the template of its pages; empty clears"`
@@ -75,6 +75,38 @@ func (in *pagetypesArgs) over(current pagetypes.Scope) pagetypes.SetScopeRequest
 	return next
 }
 
+type PageTypeBrief struct {
+	ID                  string   `json:"id"`
+	Name                string   `json:"name"`
+	Preset              string   `json:"preset"`
+	Role                string   `json:"role"`
+	Writable            bool     `json:"writable"`
+	TemplateID          *string  `json:"templateId"`
+	SuggestedTemplateID *string  `json:"suggestedTemplateId"`
+	Pages               int      `json:"pages"`
+	Overrides           int      `json:"overrides"`
+	Writes              []string `json:"writes"`
+}
+
+type PageTypesResponse struct {
+	Types  []PageTypeBrief   `json:"types,omitempty"`
+	Type   *pagetypes.Type   `json:"type,omitempty"`
+	Fields []pagetypes.Field `json:"fields,omitempty"`
+}
+
+func briefOf(kind *pagetypes.Type) PageTypeBrief {
+	writes := make([]string, 0, len(kind.Scopes))
+	for i := range kind.Scopes {
+		if kind.Scopes[i].Enabled {
+			writes = append(writes, kind.Scopes[i].Field)
+		}
+	}
+	return PageTypeBrief{
+		ID: kind.ID, Name: kind.Name, Preset: kind.Preset, Role: kind.Role, Writable: kind.Writable, TemplateID: kind.TemplateID,
+		SuggestedTemplateID: kind.Suggested, Pages: kind.Pages, Overrides: kind.Overrides, Writes: writes,
+	}
+}
+
 func scopeOf(kind pagetypes.Type, key string) pagetypes.Scope {
 	for i := range kind.Scopes {
 		if kind.Scopes[i].Field == key {
@@ -106,7 +138,7 @@ func pagetypesTool(deps Deps) Tool {
 	tool = describing(tool, func(ctx context.Context, b Binding, in pagetypesArgs) (string, error) {
 		return deps.typeChange(ctx, b, &in)
 	})
-	return riskedBy(tool, map[string]Risk{opList: RiskRead, opSave: RiskWrite, opScope: RiskWrite})
+	return riskedBy(tool, map[string]Risk{opList: RiskRead, opGet: RiskRead, opSave: RiskWrite, opScope: RiskWrite})
 }
 
 func (deps Deps) ownType(ctx context.Context, b Binding, typeID string) (pagetypes.Type, error) {
@@ -122,8 +154,23 @@ func (deps Deps) ownType(ctx context.Context, b Binding, typeID string) (pagetyp
 
 func (deps Deps) managePageTypes(ctx context.Context, b Binding, in *pagetypesArgs) (any, error) {
 	switch in.Op {
-	case opList:
-		return deps.PageTypes.List(ctx, pagetypes.ListRequest{SiteID: b.SiteID})
+	case opList, opGet:
+		listed, err := deps.PageTypes.List(ctx, pagetypes.ListRequest{SiteID: b.SiteID})
+		if err != nil {
+			return nil, err
+		}
+		if in.Op == opGet {
+			kind, kindErr := deps.ownType(ctx, b, in.PageTypeID)
+			if kindErr != nil {
+				return nil, kindErr
+			}
+			return PageTypesResponse{Type: &kind, Fields: listed.Fields}, nil
+		}
+		briefs := make([]PageTypeBrief, 0, len(listed.Types))
+		for i := range listed.Types {
+			briefs = append(briefs, briefOf(&listed.Types[i]))
+		}
+		return PageTypesResponse{Types: briefs}, nil
 	case opSave:
 		if in.PageTypeID == "" {
 			return deps.PageTypes.Create(ctx, pagetypes.CreateRequest{
@@ -146,7 +193,7 @@ func (deps Deps) managePageTypes(ctx context.Context, b Binding, in *pagetypesAr
 		}
 		return deps.PageTypes.SetScope(ctx, in.over(scopeOf(kind, in.key())))
 	default:
-		return nil, errors.New(errors.Invalid, "pagetypes takes the op list, save, delete or scope").WithDetail("field", "op")
+		return nil, errors.New(errors.Invalid, "pagetypes takes the op list, get, save, delete or scope").WithDetail("field", "op")
 	}
 }
 

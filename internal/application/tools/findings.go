@@ -52,8 +52,10 @@ func findingsTool(deps Deps) Tool {
 			if status == "" {
 				status = string(finding.Open)
 			}
-			listed, err := deps.Findings.List(ctx, findings.ListRequest{
-				SiteID: b.SiteID, Status: status, Code: in.Code, PageID: in.PageID, Cursor: in.Cursor, Limit: in.Limit,
+			listed, err := fitted(deps, in.Limit, func(limit int) (paging.List[findings.Finding], error) {
+				return deps.Findings.List(ctx, findings.ListRequest{
+					SiteID: b.SiteID, Status: status, Code: in.Code, PageID: in.PageID, Cursor: in.Cursor, Limit: limit,
+				})
 			})
 			if err != nil {
 				return FindingsResponse{}, err

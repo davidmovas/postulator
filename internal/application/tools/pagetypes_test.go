@@ -2,6 +2,7 @@ package tools_test
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,19 +38,42 @@ func TestTheAgentCannotLetARunRewriteTheOwnersText(t *testing.T) {
 		t.Error("pagetypes offers rewrites, which only a person may switch on, in the page type's screen or the run start")
 	}
 	binding.Mode = domainagent.ModeAutonomous
-	listed := called[pagetypes.ListResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
+	listed := called[tools.PageTypesResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
 	for i := range listed.Types {
 		typeID := listed.Types[i].ID
 		_, err := registry.Call(t.Context(), binding, "pagetypes",
 			json.RawMessage(`{"op":"scope","pageTypeId":"`+typeID+`","field":"body","rewrites":true}`))
-		after := called[pagetypes.ListResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
-		for j := range after.Types {
-			for _, scope := range after.Types[j].Scopes {
+		for j := range listed.Types {
+			after := called[tools.PageTypesResponse](t, registry, binding, "pagetypes", `{"op":"get","pageTypeId":"`+listed.Types[j].ID+`"}`)
+			for _, scope := range after.Type.Scopes {
 				if scope.Rewrites {
-					t.Fatalf("after a call naming rewrites (%v) the %s scope of %s rewrites", err, scope.Field, after.Types[j].Name)
+					t.Fatalf("after a call naming rewrites (%v) the %s scope of %s rewrites", err, scope.Field, after.Type.Name)
 				}
 			}
 		}
+	}
+}
+
+func TestThePageTypesListInBriefAndOneIsReadWhole(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, _ := wired(t)
+	listed := called[tools.PageTypesResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
+	if len(listed.Types) == 0 || listed.Type != nil || len(listed.Fields) != 0 {
+		t.Fatalf("pagetypes list = %+v, want the types in brief and nothing else", listed)
+	}
+	var category tools.PageTypeBrief
+	for _, held := range listed.Types {
+		if held.Preset == "category" {
+			category = held
+		}
+	}
+	if category.ID == "" || category.Role != "hub" || !slices.Contains(category.Writes, "body") {
+		t.Errorf("the category type in brief = %+v, want its role and the fields it writes", category)
+	}
+	whole := called[tools.PageTypesResponse](t, registry, binding, "pagetypes", `{"op":"get","pageTypeId":"`+category.ID+`"}`)
+	if whole.Type == nil || whole.Type.ID != category.ID || len(whole.Type.Scopes) == 0 || len(whole.Fields) == 0 {
+		t.Errorf("pagetypes get = %+v, want the type with its scopes and the field catalog", whole)
 	}
 }
 
@@ -59,15 +83,15 @@ func TestThePageTypeToolsSaveTypesScopesAndAPagesType(t *testing.T) {
 	registry, binding, seeded := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 
-	listed := called[pagetypes.ListResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
-	var hub pagetypes.Type
+	listed := called[tools.PageTypesResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
+	var hub tools.PageTypeBrief
 	for i := range listed.Types {
 		if listed.Types[i].Preset == "category" {
 			hub = listed.Types[i]
 		}
 	}
-	if hub.ID == "" || len(listed.Fields) == 0 {
-		t.Fatalf("pagetypes list = %+v, want the seeded types and the field catalog", listed)
+	if hub.ID == "" {
+		t.Fatalf("pagetypes list = %+v, want the seeded types", listed)
 	}
 
 	created := called[pagetypes.Type](t, registry, binding, "pagetypes", `{"op":"save","name":"Pillar","preset":"hub"}`)
@@ -122,7 +146,7 @@ func TestTheRulesAreReadChangedOrderedAndTestedThroughTheClassification(t *testi
 	binding.Mode = domainagent.ModeAutonomous
 	onTheSite(t, seeded)
 	called[pages.UpdateResponse](t, registry, binding, "pages_manage", `{"op":"update","pageId":"`+seeded.page+`","status":"published"}`)
-	listed := called[pagetypes.ListResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
+	listed := called[tools.PageTypesResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
 	hub := listed.Types[0]
 
 	rules := called[tools.PagetypesClassifyResponse](t, registry, binding, "pagetypes_classify", `{"op":"rules"}`)

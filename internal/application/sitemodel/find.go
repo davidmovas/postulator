@@ -82,9 +82,14 @@ func (s *Service) found(ctx context.Context, req FindRequest) ([]contextpack.Map
 	if err != nil {
 		return nil, err
 	}
-	snapshot, err := s.base(ctx, req.SiteID)
-	if err != nil {
-		return nil, err
+	key := graph.Key(strings.TrimSpace(req.Query))
+	var index pagemap.Index
+	if key != "" || req.EntityID != "" || req.Status != "" {
+		pages, listErr := s.deps.Pages.ListBySite(ctx, req.SiteID)
+		if listErr != nil {
+			return nil, listErr
+		}
+		index = pagemap.NewIndex(pages)
 	}
 	var gapped map[string]struct{}
 	if req.Gap != "" {
@@ -100,7 +105,6 @@ func (s *Service) found(ctx context.Context, req FindRequest) ([]contextpack.Map
 		}
 		under, underID = row.Trail, row.PageID
 	}
-	key := graph.Key(strings.TrimSpace(req.Query))
 	kept := make([]contextpack.MapRow, 0)
 	for i := range rows {
 		row := rows[i]
@@ -113,9 +117,9 @@ func (s *Service) found(ctx context.Context, req FindRequest) ([]contextpack.Map
 			continue
 		case req.PageTypeID != "" && !row.Typed(req.PageTypeID):
 			continue
-		case key != "" && !row.Mentions(key) && !keywordMentions(snapshot, row.PageID, key):
+		case key != "" && !row.Mentions(key) && !keywordMentions(index, row.PageID, key):
 			continue
-		case !heldAs(snapshot, row.PageID, req.EntityID, req.Status):
+		case !heldAs(index, row.PageID, req.EntityID, req.Status):
 			continue
 		}
 		if _, gap := gapped[row.PageID]; gapped != nil && !gap {
@@ -141,11 +145,11 @@ func (s *Service) gapped(ctx context.Context, siteID string, gap contextpack.Gap
 	return out, nil
 }
 
-func heldAs(snapshot contextpack.Snapshot, pageID, entityID string, status pagemap.Status) bool {
+func heldAs(index pagemap.Index, pageID, entityID string, status pagemap.Status) bool {
 	if entityID == "" && status == "" {
 		return true
 	}
-	page, found := snapshot.Index.ByID(pageID)
+	page, found := index.ByID(pageID)
 	switch {
 	case !found:
 		return false
@@ -156,8 +160,8 @@ func heldAs(snapshot contextpack.Snapshot, pageID, entityID string, status pagem
 	}
 }
 
-func keywordMentions(snapshot contextpack.Snapshot, pageID, key string) bool {
-	page, found := snapshot.Index.ByID(pageID)
+func keywordMentions(index pagemap.Index, pageID, key string) bool {
+	page, found := index.ByID(pageID)
 	if !found {
 		return false
 	}
