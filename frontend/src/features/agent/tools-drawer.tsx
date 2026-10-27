@@ -15,7 +15,8 @@ function grouped(tools: readonly Tool[], query: string): [Family, Tool[]][] {
     const needle = query.trim().toLowerCase();
     const buckets = new Map<Family, Tool[]>();
     for (const tool of tools) {
-        if (needle !== "" && !tool.name.toLowerCase().includes(needle) && !tool.description.toLowerCase().includes(needle)) {
+        const said = `${tool.name} ${toolLabel(tool.name)} ${tool.description}`.toLowerCase();
+        if (needle !== "" && !said.includes(needle)) {
             continue;
         }
         const family = familyOf(tool.name);
