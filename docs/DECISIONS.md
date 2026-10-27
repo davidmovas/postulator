@@ -5490,3 +5490,159 @@ previewed a change. The task list is in `docs/superpowers/plans/2026-10-26-phase
   longer be a Product. A site rule types an article under a category as a Guide, as a person would on
   that site. `POSTULATOR_HARNESS_PAGES` (5,000 under `task ui:run`) seeds a third site for the shots
   at scale.
+
+## 2026-10-26 — phase 18: 2.7.0, the assistant reads, proposes and works; the writer takes a brief
+
+The client asked the assistant to design a section's links and it stopped on an empty `ParentId`.
+The graph read carried no parent, a parent being only an edge the instructions never sent it to; his
+graph was flat, because URL-less rows and proposals had left no parent edges; the page side answered
+a bare null with no reason, five causes stored as one `none`; nothing walked a subtree or the whole
+tree; a capped list kept its `nextCursor`, so following it skipped the rows the cap cut; a body read
+as 120-character excerpts; one card was one call; a run carried no brief. The plan, the capability
+matrix and the task list are `docs/superpowers/plans/2026-10-26-phase-18-assistant.md`.
+
+### The owner's answers at the plan
+
+1. **Must-link: the graph first.** A must-link target the graph does not connect is refused at the
+   start, naming the missing edge; the assistant's plan adds the related edge as an earlier step, and
+   the run start offers "add a related edge for each" (`addEdges`), written approved at the start.
+2. **The catalog's admin leaves the assistant**: `models_upsert`, `models_disable`,
+   `models_set_profile`, `models_test_provider` and `models_set_provider_key`. The assistant keeps the
+   model list, the profiles and the spend.
+3. **A plan card edits a step's text inline**: an anchor, a field's value, a run's brief and
+   directives, a type picked from a list. Anything else goes back to the assistant as a revised plan.
+4. **No critic**, from this phase on.
+
+### The read layer
+
+- **Every empty parent says why** (`contextpack.ParentWhy`, computed in the read layer from the facts
+  and the open findings, never stored): `root`, `planned`, `not_derived`, `render_failed`,
+  `crumb_unresolved` with the crumb, `crumb_ambiguous` with the candidates, `cycle_broken` with the
+  loop, `no_signal`, `parent_archived`. An entity with no parent says `no_parent_edge` or its open
+  `entity_parent_differs`.
+- **The tree by shape** (`sitemodel.Tree`): roots, children, a subtree to a depth (default 2, at most
+  32), ancestors, siblings and the whole walk, paged on `page_map (site_id, node, depth, path,
+  page_id)` (0081) breadth-first, so a parent comes before its children. Each answer carries
+  `page_map_sites.generation`; a walk whose generation moved between pages says `stale`, and the
+  assistant starts over rather than miss or repeat a page.
+- **Many pages in one call** (`sitemodel.Find`): by ids, words of a title, H1, path or keyword, type,
+  subtree, entity, state and gap, each with its key facts and its parent's reason.
+- **A body as text** (`BlocksRequest.Text`): each block's whole text and links, a long block in parts
+  of 3,000 runes paged by index and offset.
+- **Links by section** (`sitemodel.Links`): a page's in and out, a section's totals and pages, the
+  links between them, what the graph owes, the orphans, and `suggest`, the parent edges the tree
+  would add and the owed links still missing with their anchors. The audit is read through
+  `reports.LinkAuditPages`, never repeated.
+- **The graph with its parents** (`sitemodel.Entities`, `sitemodel.Entity`): each entity with its
+  parent edge or why none, its canonical page and that page's parent, its card, keywords, anchors,
+  parents, related and children.
+- **No result is cut silently.** A list tool asks for a page that fits (`tools.fitted` halves its
+  limit until the encoded page is within the result cap less a sixteenth), and the cursor is the one
+  issued for that shorter page. When the guard still cuts a list it drops `nextCursor`, sets
+  `hasMore` and says to ask again with a smaller limit (`cursorDropped`).
+
+### The two hierarchies
+
+- **`entity_parent_differs`** (Warning; `adopt_tree`, `keep_graph`, `ignore`) compares, over the
+  folded map (a store category counting as its hub), the entity of the canonical page's nearest
+  entity-bearing ancestor with the entity's page-bearing graph parents. The front page counts as the
+  root; a graph parent with no page is passed through, since the tree cannot speak for it. It is
+  raised by derive and re-raised or cleared by every graph writer after its commit
+  (`graph.parentsMoved`).
+- **Adoption** (`graph.AdoptParents`) previews, for the whole site or a subtree, each entity's move
+  from its graph parents to the tree's, depth-first, skipping a loop and a name already under the new
+  parent; it applies under the preview's hash in units of 1,000, settles the scopes and clears the
+  findings it answered (`parent_adopted`). `adopt_tree` on one finding is the same adoption for one
+  entity, refused with the reason when it would be skipped.
+- **Proposals take their parents from the tree** (`Map.ProposalParent`), and a model's proposal with
+  no parent gets the tree's.
+- **The import**: a matched row with no URL and no parent of its own takes its page's derived
+  parent; the workbook's levels still win.
+
+### The run brief
+
+- **`run.Brief`** (goal, focus, tone, avoid, reference, style sample) and **`run.Directive`** per page
+  (notes, sections to add, keywords, anchors, must-links, least and most words), with limits, are
+  validated at the start and kept by 0082 (`runs.brief`, `run_items.directive`, JSON). They enter a
+  step's input hash only when present, so a run without them hashes as before.
+- **The pack** carries them as a priority-1 section, "The run's brief", read first by the writer, the
+  judge and the linker, with the reference and the style sample at priority 2 after the card and the
+  current value; a must-link joins the link plan as a required target with its anchor
+  (`content.Insist`), and the writer's ceiling honours the directive's most words.
+- **Where it shows**: the run start drawer edits both, "What the writer will see" reads a draft or a
+  run's own (`PackRequest.Brief`, `Directive`, `RunID`), and the assistant passes them to
+  `runs_control op start`.
+
+### Plans
+
+- **A plan** (`domain/agent.Plan`, 0083, one table with the steps as JSON) is an ordered list of
+  writes, each with its tool and arguments, a reason, the earlier steps it rests on, the summary and
+  the price its tool gives, and the fields a person may edit. At most 50 steps.
+- **Proposing** checks each step as its own tool would check a confirmation (`Registry.Validate`):
+  decoding, authorization, the tool's check and summary and its price. A read is refused (it is
+  called directly), as is a plan inside a plan.
+- **Approving** (`AgentService.ConfirmPlan`) is whole, in part or declined; unticking a step unticks
+  what rests on it, in Go and in the card. An edit touches only a declared field, list items and a
+  choice from a list included, and the step is checked again.
+- **Running** goes step by step through the tool, approved, with the same audit and tool message as a
+  confirmation. A step that started a run waits for that run's end (the event relay's
+  `OnRunEnded`); a failure marks what rests on it skipped with why, and the conversation is told the
+  outcome in one message. A plan waits for the person in either mode.
+- **Restart**: a step running when the app closed is failed, never run twice; a waiting step re-reads
+  its run.
+
+### The toolset
+
+- **94 tools became 23**, by job: `sites` and `sites_manage`; `pages_find`, `pages_tree`, `pages_get`
+  (views model, pack, reports), `pages_blocks`, `pages_fields`, `pages_manage` (create, update,
+  delete, map, unmap, canonical, preview link, and set types and templates over a selection),
+  `pages_judge`; `links`; `graph_read`, `graph_edit` (adoption and proposals' write among its ops),
+  `graph_propose`; `findings` (with `resolve_many`); `runs` and `runs_control`; `pagetypes`,
+  `pagetypes_classify` (with the rules), `templates`; `imports`, `schedules`, `models`, `plans`.
+- **A read selects by `view`, a write by `op`**; a write's risk is its op's (`riskedBy`), and every
+  write says what it will do in one sentence (`Tool.Describe`), which the card, the proposal and the
+  plan step show. A page addressed by id must belong to the conversation's site.
+- **Every schema** went from 68,310 bytes and 15,222 tokens (94 tools) to 48,543 bytes and 11,084
+  tokens; the instructions with the replica's brief from 1,929 to 2,127 tokens; a whole round on the
+  replica from 17,194 to 13,254. Deferred loading stays off.
+- **The history format** moved to `responses/2`, so a conversation from 2.6 starts the model afresh
+  and keeps its transcript; approving a card of a tool this version no longer has fails in plain
+  words, nothing changed.
+- **The instructions** teach read, propose and act: read all a question covers and follow the
+  cursor, end an analysis with a write or a plan, act on approval, say why a fact is empty, read both
+  hierarchies and say where they disagree.
+
+### The support bundle
+
+`application/support` writes one JSON file (`postulator-support/1`) where the person chooses, from
+Settings, About and the dock's menu: the versions; the observation summary; per page its path, type
+and why, its derived parent with reason and method, its render state, its crumbs as paths, hrefs and
+statuses only, and its content root state; the graph's shape; the findings by code; the last
+conversation's tool calls with their statuses, durations and result sizes. Never a key, a password, a
+cookie, a body, a title, a crumb's name, an argument or an error's text: a test plants each in the
+store and proves the bundle holds none of them.
+
+### Scale
+
+- **Every read view of the assistant fits the 16 KB result cap at 5,003 pages**, and the tree (4,503
+  rows), every page found (4,503) and every entity (3,875) walk by cursor with none missed and none
+  twice (`internal/app/scale/views_test.go`); a two-step plan over the site is checked and stored in
+  2.1 s.
+- **What it found**: `pagetypes op list` answered 48 KB (every type with all its scopes) and
+  `findings op list` 112 KB, both past the cap, so the guard would have cut them; the list now answers
+  each type in brief and `op get` one whole, and the findings list is fitted. `pages_find` built the
+  site's whole snapshot on every call (1.3 to 1.9 s); it now reads the pages only for a filter that
+  needs them (0.3 s). The entity read scanned every edge of the site for each entity (3.2 s a page);
+  it indexes them once (1.5 s). `tools.fitted` asks again in proportion to what overflowed, not by
+  halves, so a page that fits takes two reads at most where it took four.
+- **Still slow, by design for now**: a section's links read the site's whole audit (2.8 to 4.8 s at
+  5,003 pages), and an entity page still reads the base snapshot (1.5 s); walking all 3,875 entities
+  takes three minutes, a read the assistant has little cause to make.
+
+### Deviations from the request
+
+- **One table for plans**, the steps as JSON, where the plan said two.
+- **Migrations 0081 to 0083**, renumbered past the existing 0080.
+- **The card text of the folded tools** landed in one frontend pass after the Go fold, not in each
+  group's commit; no test ties the frontend's tool names to Go, and the cards fell back to the
+  generic view in between.

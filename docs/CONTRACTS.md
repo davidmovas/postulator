@@ -29,7 +29,7 @@ the composition root binds the two.
 |---|---|
 | `HealthService` | `Ping` |
 | `SitesService` | `Create Update Delete Get List TestConnection` |
-| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard` |
+| `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard AdoptParents` |
 | `PagesService` | `Create Update Delete Get List Count Tree MapToEntity Unmap SetCanonical PreviewLink SetType ResolveSelection SetTypes SetTemplates Model ModelSummary WriterPack SiteMap` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope ListRules SaveRule DeleteRule ReorderRules TestRule PreviewClassification PreviewClassificationPages ApplyClassification` |
 | `RunsService` | `Start Estimate Parents Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
@@ -38,14 +38,27 @@ the composition root binds the two.
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
 | `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary SpendReport ListCalls` |
-| `AgentService` | `CreateConversation SetMode RenameConversation DeleteConversation Send Status Confirm Cancel ListConversations ListMessages ListPendingActions` |
+| `AgentService` | `CreateConversation SetMode RenameConversation DeleteConversation Send Status Confirm Cancel ListConversations ListMessages ListPendingActions ConfirmPlan ListPlans` |
 | `SchedulesService` | `Create Update Delete Get List Enable Disable RunNow` |
 | `ToolsService` | `List` |
 | `BrowserService` | `Open Locate` |
+| `SupportService` | `WriteBundle` |
 | `SettingsService` | `Schema Get Set SetProviderKey ProviderKeys DeleteProviderKey LockState Lock Unlock SetMasterPassword ExportBackup ImportBackup` |
 
-A hundred and thirty-seven methods in sixteen services since phase 15; the stage 4 and phase 15
-methods are described after this paragraph. Stage 2a took the six policy methods out and put five page-type
+A hundred and fifty-three methods in seventeen services since phase 18; the stage 4 to phase 18
+methods are described after this paragraph. Phase 18 adds `AgentService.ConfirmPlan{planId,
+steps: [{stepId, approve, edits?: {name: value}}]}` and `ListPlans{conversationId}`, both
+answering `tools.PlanView` (`{id, title, status, steps: [{number, id, tool, summary, reason,
+dependsOn (numbers from 1), status, estimateUsd?, estimateTokens?, error?, runId?, edits: [{name,
+value, choices: [{value, label}]}]}]}`); `GraphService.AdoptParents{siteId, under?, entityIds?,
+hash?, cursor?, limit?, apply?}`, a preview of `{steps: page of {entityId, name, path, from, to?,
+toPath?, skip?}, hash, adopting, skipped, applied}` that applies under its hash (a moved one is
+`CONFLICT`); `SupportService.WriteBundle{siteId, path}`, answering `{path, bytes}`;
+`RunsService.Start` and `Estimate` take `brief?`, `directives?` and `addEdges?`, a must-link the
+graph does not connect being `INVALID` on `directives.mustLink` with `{from, to}`; and
+`PagesService.WriterPack` takes `brief?`, `directive?` or `runId?`. `MapNode` and `PageModel`'s
+parent carry `parentId` and, when it is empty, `why: {reason, crumb?, candidates?, loop?, parent?,
+findingId?}`. Stage 2a took the six policy methods out and put five page-type
 methods and `PagesService.SetType` in, and 2b adds `PagesService.WriterPack{pageId, field?, budget?}`,
 exactly what the writer would be sent for a page and field (`application/sitemodel`'s pack: its
 sections in priority order with their token counts, as `Fit` left them under the role's input
@@ -417,7 +430,7 @@ The names and their payloads are the `EventType` union and the `EventPayloads` m
 registry rendered. Run events are the `run.* item.* step.*` families plus `llm.usage`;
 application events are `graph.changed pages.changed templates.changed sites.changed
 schedules.changed settings.changed app.locked app.unlocked files.dropped` and the agent family `agent.delta agent.tool.started agent.tool.finished
-agent.confirm.requested agent.confirm.resolved agent.titled agent.usage agent.waiting agent.done`, whose payloads all carry
+agent.confirm.requested agent.confirm.resolved agent.plan.proposed agent.plan.updated agent.titled agent.usage agent.waiting agent.done`, whose payloads all carry
 `conversationId` because a window may hold more than one conversation. The frontend
 subscribes with `on(type, handler)` from `frontend/src/lib/events.ts`, which narrows
 `payload` to the declared type. Events only travel Go → JS; every frontend-initiated
@@ -591,10 +604,10 @@ read with `ListConversations`, `ListMessages` and `ListPendingActions`, all of w
 survive a restart; `ToolsService.List` is the capability list the UI shows.
 
 What the model remembers of a conversation is stored apart from the transcript as
-`{"format":"responses/1","items":[…]}`: the port's messages, call arguments masked, tool results
+`{"format":"responses/2","items":[…]}`: the port's messages, call arguments masked, tool results
 shortened to `agent.historyToolResultBytes`, trimmed by whole turns. A body in any other shape loads
-empty, which is how a conversation from before 2026-10-03 keeps its transcript and starts the
-model afresh. Each round is sent at effort `none` on the default tier with the prompt cache key
+empty, which is how a conversation from before 2026-10-03, and one from 2.6 that called the tools
+before the fold (`responses/1`), keeps its transcript and starts the model afresh. Each round is sent at effort `none` on the default tier with the prompt cache key
 `chat:<mode>`, the instructions static per mode and the site's counts as the developer message
 that opens the turn. `agent.toolLoading` (`all` by default, or `deferred`) says whether every tool
 goes out on every round or only the orienting reads, with the rest found by tool search; a turn
@@ -617,31 +630,46 @@ sites, starts a run, follows the events and the catch-up, and sends an agent mes
 
 ## Agent tools
 
-A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Run}`,
-every tool lives in its own file and `Binding{SiteID, ConversationID, RunID, Mode}` scopes
-every call. Ninety-three tools since phase 17, `runs_revert` (`dangerous`), `graph_move_entity`
-(`write`), `graph_preview_from_pages` (`read`), `graph_propose_from_keywords` (`read`),
-`graph_apply_proposals` (`write`), stage 4's `pages_fields`, `pages_blocks` and `findings`, and phase
-17's `pagetypes_classify` (`preview` reads; `apply` writes the groups by their number in the preview
-its `hash` pins and waits for the person in either mode), each with an `op` enum, among them,
-measuring 67,165 bytes and 14,955 `o200k_base` tokens of schema resent on every round of every turn,
-which `TestTheToolSchemasFitTheirCeiling` holds against `schemaCeilingBytes` (67,178) and
-`schemaCeilingTokens` (14,958) and logs with the eight widest. `pages_list` takes its own arguments
-(the type, the subtree, a title sort).
+A tool is `{Def{Name, Description, Risk(read|write|dangerous), Schema}, Authorize, Check, Run,
+Confirm, Describe, RiskOf, Price, Edits}` and `Binding{SiteID, ConversationID, RunID, Mode, Approved}`
+scopes every call. Twenty-three tools since phase 18, one per job: `sites`, `sites_manage`,
+`graph_read`, `graph_edit`, `graph_propose`, `pages_find`, `pages_tree`, `pages_get`, `pages_blocks`,
+`pages_fields`, `pages_manage`, `pages_judge`, `links`, `pagetypes`, `pagetypes_classify`, `templates`,
+`runs`, `runs_control`, `imports`, `findings`, `models`, `schedules` and `plans`. A read selects by a
+`view` enum and a write by an `op` enum; `RiskOf` reads the op, so one tool reads, writes and deletes
+at the risk of what it is asked. They measure 48,543 bytes and 11,084 `o200k_base` tokens of schema
+resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds against
+`schemaCeilingBytes` (48,543) and `schemaCeilingTokens` (11,084) and logs with the eight widest.
+`Describe` says in one sentence what a write's op will do, the sentence a confirmation card, a
+pending action and a plan step carry; `Confirm` is the same with the meaning "ask the person whatever
+the mode" (the trash, a type that rewrites, an import into one, an adoption, a proposal's write).
+`Price` gives a run start's estimate and `Edits` the fields a person may change on a plan step (the
+brief's lines, each directive's notes and must-link anchors, a field's value, a link's anchor, a type
+from the site's types). A page addressed by id must belong to the conversation's site.
 Every agent write to a page is a one-item `edit` run that waits for the person in either mode, and
-so do `graph_apply_proposals` and `graph_propose_from_pages`; resolving a finding and starting a run
-follow the conversation's mode. A description names what a
-field takes, its default, its limits and the tool an id comes from, and no more; the chat
-instructions say once that an id is used as a read tool returned it and that a field left out
-keeps its value. `imports_preview` and `imports_apply` take `sheets: [{sheet, mappingId?,
-rowType?}]`.
+so do `graph_edit op apply_proposals`, `op adopt_parents` and `graph_propose op pages`; resolving a
+finding and starting a run follow the conversation's mode. A description names what a field takes,
+which op takes it, its default and its limits, and no more; the chat instructions say once that an id
+is used as a read tool returned it and that a field left out keeps its value.
 
-With `agent.toolLoading` set to `deferred`, a round sends ten orienting reads whole (`sites_list
-sites_get sites_explore reports_site_overview graph_list_entities pages_list pages_get runs_list
-runs_get templates_list`) and every other tool inside its group, the prefix of its name, as a
-namespace of `defer_loading` functions beside one `tool_search` tool, which a test in
-`registry_test.go` logs without a ceiling (`go run ./cmd/tokenreport` prints it). It stays off
-until it has been tried with a funded key.
+`plans op propose{title, steps: [{tool, args (one JSON object as a string), reason, dependsOn
+(numbers from 1)}]}` checks each step as its tool would check a confirmation (`Registry.Validate`),
+stores the plan, emits `agent.plan.proposed` and answers `{status: "planProposed", planId, plan}`;
+`op get` and `op list` read the conversation's plans. A plan waits for the person in either mode
+(`AgentService.ConfirmPlan`); its steps then run through the registry, approved, each step emitting
+`agent.plan.updated{conversationId, planId, status, stepId, stepStatus}`, and the conversation is
+told the outcome in one message.
+
+Every list a tool answers is fitted to the result cap before its cursor is issued (`tools.fitted`
+halves the limit until the encoded page fits within the cap less a sixteenth), so following
+`nextCursor` never skips a row; `internal/app/scale` walks the tree, the pages and the entities by
+cursor at 5,003 pages with none missed and none twice.
+
+With `agent.toolLoading` set to `deferred`, a round sends seven orienting reads whole (`sites
+graph_read pages_find pages_tree pages_get links runs`) and every other tool inside its group, the
+prefix of its name, as a namespace of `defer_loading` functions beside one `tool_search` tool, which
+a test in `registry_test.go` logs without a ceiling (`go run ./cmd/tokenreport` prints it). It stays
+off until it has been tried with a funded key.
 
 The guard chain runs in this order and the order matters: `fence` wraps tool output as
 untrusted data so a result cannot inject instructions into the model, `audit` writes the
@@ -657,7 +685,9 @@ A result over the ceiling is shortened, not truncated: `Cap` halves the widest l
 longest string at a rune boundary, and only when neither helps falls back to
 `{truncated, totalBytes, preview}`. The ordinary answer is
 `{truncated, totalBytes, droppedItems: {path: n}, shortenedText: n, result: <the document>}`,
-so a capped listing still decodes and still carries its `nextCursor` and `hasMore`. The
+so a capped listing still decodes; a list it halved loses its `nextCursor`, keeps `hasMore` and
+names its path in `cursorDropped`, so the model asks again with a smaller limit rather than skip the
+rows the cap cut. The
 in-turn ceiling is `agent.maxToolResultBytes`; what is replayed to the model on every later
 round is the smaller `agent.historyToolResultBytes` (int, default 4096, range 512–65536,
 group `agent`), read per turn so a change takes effect without a restart.
@@ -672,14 +702,12 @@ A field of a tool request is required only where its own schema says so, nested 
 list items included: the rule is that a field is required only when the use case refuses its
 absence, because the runner checks the arguments against the whole tree before the tool runs
 (`transport/agent/arguments.go`, the check gollem used to make) and its refusal teaches the model
-nothing. `dto.Sort.desc`, `graph.Anchor.weight` and `.source`,
-`graph.AddEdgeRequest.weight`, `graph.SetAnchorsRequest.anchors`, `pages.CreateRequest.title`
-and the eight prices and three capability flags of
-`models.UpsertModelRequest` are all optional. Where a tool's input reaches into
-`internal/domain/template` it takes a tool-owned argument struct instead of the window's DTO,
-so `templates_create` asks for a name, a page kind and one section with a heading rather than
-about thirty values. `runs_list_items` and `schedules_list` offer no `sort.field`, because
-their use cases read only `sort.desc`.
+nothing. In a folded tool only `op` or `view` is required at the top, each op saying in the field
+descriptions what it takes; a nested field is required where its parent's use case refuses its
+absence, which `TestEveryRequiredFieldIsOneTheUseCaseRefusesToDoWithout` proves by trying each op.
+Where a tool's input reaches into `internal/domain/template` it takes a tool-owned argument struct
+instead of the window's DTO, one specification shape serving create, update and an override's patch.
+No tool offers a sort: each list answers in its natural order (path, name, newest first).
 
 In `confirm` mode a `write` or `dangerous` tool does not execute: it writes a
 `PendingAction` row and returns `{status:"confirmationRequired", actionId, summary}`, so a
