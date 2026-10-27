@@ -5,30 +5,59 @@ export const families = [
     "sites",
     "graph",
     "pages",
+    "links",
     "pagetypes",
     "templates",
     "runs",
-    "sync",
-    "reports",
     "imports",
     "findings",
     "models",
-    "content",
     "schedules",
+    "plans",
 ] as const;
 
 export type Family = (typeof families)[number] | "other";
+
+const defaultActs: Readonly<Record<string, string>> = {
+    findings: "list",
+    plans: "list",
+    pages_get: "model",
+};
 
 const nouns: Readonly<Record<string, [string, string]>> = {
     sites: ["site", "sites"],
     graph: ["entity", "entities"],
     pages: ["page", "pages"],
+    links: ["link", "links"],
     pagetypes: ["page type", "page types"],
     templates: ["template", "templates"],
     runs: ["run", "runs"],
     imports: ["mapping", "mappings"],
+    findings: ["finding", "findings"],
     models: ["model", "models"],
     schedules: ["schedule", "schedules"],
+    plans: ["plan", "plans"],
+};
+
+const keyNouns: Readonly<Record<string, [string, string]>> = {
+    sites: ["site", "sites"],
+    runs: ["run", "runs"],
+    items: ["page", "pages"],
+    entities: ["entity", "entities"],
+    edges: ["edge", "edges"],
+    pages: ["page", "pages"],
+    links: ["link", "links"],
+    owed: ["link owed", "links owed"],
+    inbound: ["link in", "links in"],
+    suggestions: ["suggestion", "suggestions"],
+    plans: ["plan", "plans"],
+    rules: ["rule", "rules"],
+    mappings: ["mapping", "mappings"],
+    types: ["page type", "page types"],
+    templates: ["template", "templates"],
+    schedules: ["schedule", "schedules"],
+    models: ["model", "models"],
+    findings: ["finding", "findings"],
 };
 
 export function familyOf(tool: string): Family {
@@ -36,38 +65,34 @@ export function familyOf(tool: string): Family {
     return (families as readonly string[]).includes(prefix) ? (prefix as Family) : "other";
 }
 
-export function verbOf(tool: string): string {
-    const parts = tool.split("_").filter((part) => part !== "");
-    if (parts.length === 0) {
-        return tool;
-    }
-    if (familyOf(tool) === "other") {
-        return parts.join(" ");
-    }
-    return parts.slice(1).join(" ");
-}
-
-const plural: ReadonlySet<string> = new Set<string>(["list", "search"]);
-
-function capitalised(phrase: string): string {
-    return phrase === "" ? phrase : phrase[0].toUpperCase() + phrase.slice(1);
-}
-
-export function toolLabel(tool: string): string {
-    const verb = verbOf(tool);
-    const family = familyOf(tool);
-    if (family === "other" || verb.includes(" ")) {
-        return capitalised(verb);
-    }
-    const held = nouns[family];
-    if (held === undefined) {
-        return capitalised(verb);
-    }
-    return `${capitalised(verb)} ${plural.has(verb) ? held[1] : held[0]}`;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function words(name: string): string {
+    const spaced = name.split("_").filter((part) => part !== "").join(" ");
+    return spaced === "" ? spaced : spaced[0].toUpperCase() + spaced.slice(1);
+}
+
+export function actOf(tool: string, args: unknown): string {
+    if (isRecord(args)) {
+        for (const key of ["op", "view"] as const) {
+            const held = args[key];
+            if (typeof held === "string" && held !== "") {
+                return held;
+            }
+        }
+    }
+    return defaultActs[tool] ?? "";
+}
+
+export function toolLabel(tool: string, args?: unknown): string {
+    const known = copy.agent.acts[tool];
+    if (known === undefined) {
+        return words(tool);
+    }
+    const act = args === undefined ? "" : actOf(tool, args);
+    return known.acts[act] ?? known.label;
 }
 
 const refusalMark = "is not open to this conversation";
@@ -109,21 +134,23 @@ export function kilobytes(bytes: number): number {
     return Math.max(1, Math.round(bytes / 1000));
 }
 
-function nounFor(tool: string, count: number): string {
-    const held = nouns[familyOf(tool)];
-    const [one, many] = held ?? ["item", "items"];
-    if (tool.includes("edge")) {
-        return count === 1 ? "edge" : "edges";
-    }
-    return count === 1 ? one : many;
+function counted(noun: readonly [string, string], count: number): string {
+    return `${count} ${count === 1 ? noun[0] : noun[1]}`;
 }
 
-function listSummary(tool: string, items: readonly unknown[], hasMore: boolean): string {
+function listSummary(noun: readonly [string, string], items: readonly unknown[], hasMore: boolean): string {
     if (items.length === 0) {
-        return `no ${nounFor(tool, 0)}`;
+        return `no ${noun[1]}`;
     }
-    const counted = `${items.length} ${nounFor(tool, items.length)}`;
-    return hasMore ? `${counted}, more available` : counted;
+    const said = counted(noun, items.length);
+    return hasMore ? `${said}, more available` : said;
+}
+
+function nounOf(tool: string): readonly [string, string] {
+    if (tool.includes("edge")) {
+        return ["edge", "edges"];
+    }
+    return nouns[familyOf(tool)] ?? ["item", "items"];
 }
 
 const labelKeys = ["name", "path", "title", "label"] as const;
@@ -153,30 +180,50 @@ function countAt(record: Record<string, unknown> | null, key: string): number {
     return Array.isArray(held) ? held.length : 0;
 }
 
-function exploreSummary(result: Record<string, unknown>): string | null {
-    const said = copy.agent.transcript.tool.explore;
-    switch (result["view"]) {
-        case "tree": {
-            const tree = recordAt(result, "tree");
-            const nodes = recordAt(tree, "nodes");
-            return said.tree(countAt(nodes, "items"), textAt(recordAt(tree, "parent"), "path"), nodes?.["hasMore"] === true);
-        }
-        case "links": {
-            const links = recordAt(result, "links");
-            return said.links(textAt(recordAt(links, "page"), "path"), countAt(links, "required"));
-        }
-        case "gaps": {
-            const gaps = recordAt(result, "gaps");
-            return said.gaps(countAt(gaps, "items"), gaps?.["hasMore"] === true);
-        }
-        case "pack": {
-            const pack = recordAt(result, "pack");
-            const size = pack?.["tokens"];
-            return said.pack(textAt(pack, "path"), formatTokens(typeof size === "number" ? size : 0));
-        }
-        default:
-            return null;
+function listed(record: Record<string, unknown> | null): { items: readonly unknown[]; more: boolean } | null {
+    const items = record?.["items"];
+    return Array.isArray(items) ? { items, more: record?.["hasMore"] === true } : null;
+}
+
+function treeSummary(result: Record<string, unknown>): string | null {
+    const nodes = listed(recordAt(result, "nodes"));
+    if (nodes === null) {
+        return null;
     }
+    const under = textAt(recordAt(recordAt(result, "node"), "page"), "path");
+    return copy.agent.transcript.tool.explore.tree(nodes.items.length, under, nodes.more);
+}
+
+function pageSummary(result: Record<string, unknown>): string | null {
+    const said = copy.agent.transcript.tool.explore;
+    const pack = recordAt(result, "pack");
+    if (pack !== null) {
+        const size = pack["tokens"];
+        return said.pack(textAt(pack, "path"), formatTokens(typeof size === "number" ? size : 0));
+    }
+    const path = textAt(recordAt(recordAt(result, "page"), "page"), "path");
+    if (path !== "") {
+        return said.page(path);
+    }
+    return recordAt(result, "reports") === null ? null : said.reports;
+}
+
+function linksSummary(result: Record<string, unknown>): string | null {
+    const said = copy.agent.transcript.tool.explore;
+    const owed = listed(recordAt(result, "owed"));
+    if (owed !== null) {
+        return said.owed(owed.items.length, owed.more);
+    }
+    const suggestions = listed(recordAt(result, "suggestions"));
+    if (suggestions !== null) {
+        return said.suggestions(suggestions.items.length, suggestions.more);
+    }
+    const page = textAt(recordAt(result, "page"), "path");
+    if (page !== "") {
+        return said.links(page);
+    }
+    const root = textAt(recordAt(result, "root"), "path");
+    return said.section(root);
 }
 
 function cardsSummary(result: Record<string, unknown>): string | null {
@@ -193,20 +240,63 @@ function cardsSummary(result: Record<string, unknown>): string | null {
     return skipped === 0 ? done : `${done}, ${said.skipped(skipped)}`;
 }
 
-function pageSummary(result: Record<string, unknown>): string | null {
-    const path = textAt(recordAt(recordAt(result, "page"), "page"), "path");
-    return path === "" ? null : copy.agent.transcript.tool.explore.page(path);
+function adoptionSummary(result: Record<string, unknown>): string | null {
+    const adoption = recordAt(result, "adoption");
+    if (adoption === null) {
+        return null;
+    }
+    const adopting = adoption["adopting"];
+    return copy.agent.transcript.tool.adoption(typeof adopting === "number" ? adopting : 0);
+}
+
+function sitesSummary(result: Record<string, unknown>): string | null {
+    return recordAt(result, "overview") === null ? null : copy.agent.transcript.tool.overview;
+}
+
+function runsSummary(result: Record<string, unknown>): string | null {
+    const said = copy.agent.transcript.tool.runs;
+    const run = recordAt(result, "run");
+    if (run !== null) {
+        return said.run(textAt(run, "kind"), textAt(run, "status"));
+    }
+    const events = recordAt(result, "events");
+    if (events !== null) {
+        return said.events(countAt(events, "events"));
+    }
+    const artifact = recordAt(result, "artifact");
+    if (artifact !== null) {
+        return said.artifact;
+    }
+    return recordAt(result, "report") === null ? null : said.report;
 }
 
 const summaries: Readonly<Record<string, (result: Record<string, unknown>) => string | null>> = {
+    sites: sitesSummary,
     pages_get: pageSummary,
-    sites_explore: exploreSummary,
-    graph_propose_cards: cardsSummary,
+    pages_tree: treeSummary,
+    links: linksSummary,
+    graph_propose: cardsSummary,
+    graph_read: adoptionSummary,
+    runs: runsSummary,
 };
+
+function wrappedSummary(tool: string, result: Record<string, unknown>): string | null {
+    for (const [key, value] of Object.entries(result)) {
+        const noun = key === "list" ? nounOf(tool) : keyNouns[key];
+        const list = listed(isRecord(value) ? value : null);
+        if (noun !== undefined && list !== null) {
+            return listSummary(noun, list.items, list.more);
+        }
+        if (noun !== undefined && Array.isArray(value)) {
+            return listSummary(noun, value, false);
+        }
+    }
+    return null;
+}
 
 export function resultSummary(tool: string, result: unknown): string {
     if (Array.isArray(result)) {
-        return listSummary(tool, result, false);
+        return listSummary(nounOf(tool), result, false);
     }
     if (typeof result === "string") {
         return result.length > 80 ? `${result.slice(0, 77)}…` : result;
@@ -229,10 +319,14 @@ export function resultSummary(tool: string, result: unknown): string {
         return special;
     }
     if (Array.isArray(result["items"])) {
-        return listSummary(tool, result["items"], result["hasMore"] === true);
+        return listSummary(nounOf(tool), result["items"], result["hasMore"] === true);
     }
     if (typeof result["runId"] === "string") {
         return "run started";
+    }
+    const wrapped = wrappedSummary(tool, result);
+    if (wrapped !== null) {
+        return wrapped;
     }
     const keys = Object.keys(result);
     if (keys.length === 0) {

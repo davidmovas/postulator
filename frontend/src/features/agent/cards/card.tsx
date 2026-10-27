@@ -43,6 +43,7 @@ export interface ConfirmationCardProps {
     title: ReactNode;
     lines?: ReactNode;
     summary?: string | null;
+    label?: string;
     busy: CardBusy;
     focus?: boolean;
     keys?: CardKeys;
@@ -78,6 +79,7 @@ export function ConfirmationCard({
     title,
     lines,
     summary = null,
+    label,
     busy,
     focus = false,
     keys = "none",
@@ -184,7 +186,7 @@ export function ConfirmationCard({
                     </div>
                 ) : (
                     <div className="flex items-center justify-end gap-2 text-2xs text-ink-faint">
-                        <span className="truncate">{toolLabel(tool)}</span>
+                        <span className="truncate">{label ?? toolLabel(tool)}</span>
                     </div>
                 )}
             </div>

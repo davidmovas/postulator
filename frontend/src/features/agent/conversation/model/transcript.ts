@@ -15,6 +15,7 @@ export type Row =
           id: string;
           callId: string;
           tool: string;
+          args: unknown;
           status: ToolRowStatus;
           durationMs: number | null;
           result: unknown;
@@ -66,6 +67,7 @@ function savedRow(message: Message, turn: Turn): Row | null {
                 id: message.id,
                 callId: message.callId ?? "",
                 tool: message.tool ?? "",
+                args: null,
                 status: settledStatus(savedStatus(message), message.payload ?? null),
                 durationMs: null,
                 result: message.payload ?? null,
@@ -108,6 +110,7 @@ function liveRows(turn: Turn, saved: readonly Message[]): Row[] {
                 id: `live:${call.callId}`,
                 callId: call.callId,
                 tool: call.tool,
+                args: call.args ?? null,
                 status: call.status === "running" ? "running" : settledStatus(call.status, call.result ?? null),
                 durationMs: call.durationMs ?? null,
                 result: call.result ?? null,

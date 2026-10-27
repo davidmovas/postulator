@@ -24,7 +24,7 @@ import { choicesOf, costOf, dependentsOf, everyStep, stepsOf, ticked } from "./m
 
 const said = copy.plans;
 
-const longEdits: ReadonlySet<string> = new Set(["notes", "reference", "styleSample"]);
+const longEdits = /^(notes|reference|styleSample)\b/;
 const longValueRunes = 80;
 
 export type PlanBusy = "all" | "chosen" | "decline" | null;
@@ -106,7 +106,7 @@ function Edits({ step, draft, onEdit }: EditsProps): ReactElement {
             <span className="text-2xs text-ink-faint">{said.editsHint}</span>
             {(step.edits ?? []).map((edit) => {
                 const value = draft[edit.name] ?? edit.value;
-                const long = longEdits.has(edit.name) || [...edit.value].length > longValueRunes;
+                const long = longEdits.test(edit.name) || [...edit.value].length > longValueRunes;
                 const label = editLabel(edit.name);
                 const choices = edit.choices ?? [];
                 if (choices.length > 0) {

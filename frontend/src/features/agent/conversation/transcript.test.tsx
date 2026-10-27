@@ -13,7 +13,8 @@ function toolRow(overrides: Partial<Extract<Row, { kind: "tool" }>>): Row {
         kind: "tool",
         id: "m1",
         callId: "c1",
-        tool: "pages_list",
+        tool: "pages_find",
+        args: null,
         status: "ok",
         durationMs: 120,
         result: null,
@@ -39,7 +40,7 @@ function transcript(rows: readonly Row[]) {
 }
 
 function openTheOnlyRow(): void {
-    fireEvent.click(screen.getByRole("button", { name: /pages_list|Pages/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Find pages/ }));
 }
 
 describe("the transcript rows for a tool call", () => {
@@ -67,12 +68,12 @@ describe("the transcript rows for a tool call", () => {
     });
 
     it("says a denied call read and wrote nothing", () => {
-        transcript([toolRow({ status: "denied", error: "the conversation may not use graph_delete_entity" })]);
+        transcript([toolRow({ status: "denied", error: "the conversation may not use graph_edit" })]);
 
         expect(screen.getByText(words.denied)).toBeDefined();
 
         openTheOnlyRow();
-        expect(screen.getByText("the conversation may not use graph_delete_entity")).toBeDefined();
+        expect(screen.getByText("the conversation may not use graph_edit")).toBeDefined();
         expect(screen.getByText(words.deniedDetail)).toBeDefined();
     });
 
@@ -87,12 +88,22 @@ describe("the transcript rows for a tool call", () => {
     });
 
     it("keeps what a call answered folded away until it is asked for", () => {
-        transcript([toolRow({ status: "denied", error: "the conversation may not use graph_delete_entity" })]);
+        transcript([toolRow({ status: "denied", error: "the conversation may not use graph_edit" })]);
 
         expect(screen.queryByText(words.deniedDetail)).toBeNull();
 
         openTheOnlyRow();
         expect(screen.getByText(words.deniedDetail)).toBeDefined();
+    });
+
+    it("names a live call by what it does, and a saved one by its tool", () => {
+        transcript([
+            toolRow({ id: "live", tool: "pages_tree", args: { view: "subtree", pageId: "p1" }, live: true }),
+            toolRow({ id: "saved", tool: "pages_tree" }),
+        ]);
+
+        expect(screen.getByText(copy.agent.acts["pages_tree"]?.acts["subtree"] ?? "")).toBeDefined();
+        expect(screen.getByText(copy.agent.acts["pages_tree"]?.label ?? "")).toBeDefined();
     });
 
     it("tells a running call apart from one that finished", () => {

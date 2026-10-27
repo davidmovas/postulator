@@ -1,12 +1,12 @@
 import { copy } from "../../../../copy/index.js";
 import type { ToolSchema } from "../../../../data/types.js";
-import { verbOf } from "../../conversation/model/tools.js";
+import { toolLabel } from "../../conversation/model/tools.js";
 import type { Args, CardView, DescribeContext, Describer, Line } from "./card.js";
 import { clipped, isArgs, line, listed, masked } from "./card.js";
 import { describeBlocks, describeFields } from "./edits.js";
 import { describeFindings } from "./findings.js";
 import { describeGraph } from "./graph.js";
-import { describeContent, describeImports, describeModels, describeSchedules, describeSync } from "./operations.js";
+import { describeImports, describeSchedules } from "./operations.js";
 import { describePages } from "./pages.js";
 import { describePageTypes } from "./pagetypes.js";
 import { describeRuns } from "./runs.js";
@@ -23,12 +23,11 @@ const describers: readonly Describer[] = [
     describePageTypes,
     describeTemplates,
     describeRuns,
-    describeSync,
     describeImports,
-    describeModels,
-    describeContent,
     describeSchedules,
 ];
+
+const describedKeys: ReadonlySet<string> = new Set(["op", "view"]);
 
 function humanKey(key: string): string {
     return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase();
@@ -95,5 +94,6 @@ export function describeAction(tool: string, args: unknown, schema: ToolSchema |
             return described;
         }
     }
-    return { title: [verbOf(tool)], lines: genericLines(held, schema, 0), generic: true };
+    const shown = Object.fromEntries(Object.entries(held).filter(([key]) => !describedKeys.has(key)));
+    return { title: [context.summary ?? toolLabel(tool, held)], lines: genericLines(shown, schema, 0), generic: true };
 }

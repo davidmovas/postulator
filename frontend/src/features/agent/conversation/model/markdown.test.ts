@@ -78,7 +78,7 @@ describe("spansOf", () => {
     });
 
     it("never mistakes a snake case identifier for emphasis", () => {
-        expect(spansOf("call graph_list_entities first")).toEqual([text("call graph_list_entities first")]);
+        expect(spansOf("settle entity_parent_differs first")).toEqual([text("settle entity_parent_differs first")]);
         expect(spansOf("max_density and min_words")).toEqual([text("max_density and min_words")]);
     });
 

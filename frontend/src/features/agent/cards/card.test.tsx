@@ -8,7 +8,7 @@ const said = "The next run will rewrite these pages' own text: /espresso/.";
 function card(summary: string | null) {
     return render(
         <ConfirmationCard
-            tool="pagetypes_set_scope"
+            tool="pagetypes"
             risk="write"
             status="pending"
             createdAt="2026-10-22T09:00:00Z"

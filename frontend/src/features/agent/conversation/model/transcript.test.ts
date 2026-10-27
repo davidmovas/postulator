@@ -39,7 +39,7 @@ function action(id: string, status = "pending"): PendingAction {
     return {
         id,
         conversationId: "c1",
-        tool: "pages_delete",
+        tool: "pages_manage",
         args: { id: "p1" },
         summary: "delete a page",
         status,
@@ -52,14 +52,14 @@ describe("rows over the saved transcript", () => {
     it("turns saved messages into user, assistant and tool rows in sequence order", () => {
         const saved = [
             message(1, "user", "hello"),
-            message(2, "tool", "", { tool: "pages_list", callId: "k1", payload: { items: [] } }),
+            message(2, "tool", "", { tool: "pages_find", callId: "k1", payload: { items: [] } }),
             message(3, "assistant", "nothing there"),
         ];
         expect(rows(saved, idle, []).map((row) => row.kind)).toStrictEqual(["user", "tool", "assistant"]);
         expect(rows(saved, idle, [])[1]).toMatchObject({
             kind: "tool",
             callId: "k1",
-            tool: "pages_list",
+            tool: "pages_find",
             status: "ok",
             live: false,
         });
@@ -72,8 +72,8 @@ describe("rows over the saved transcript", () => {
 
     it("tells a saved refusal apart from a saved failure", () => {
         const saved = [
-            message(1, "tool", "the tool pages_delete is not open to this conversation", {
-                tool: "pages_delete",
+            message(1, "tool", "the tool pages_manage is not open to this conversation", {
+                tool: "pages_manage",
                 callId: "k1",
                 payload: null,
                 toolStatus: "denied",
@@ -85,14 +85,14 @@ describe("rows over the saved transcript", () => {
     it("takes the saved status from the ledger, whatever the refusal sentence reads like", () => {
         const cases: readonly { name: string; toolStatus: string; text: string; want: string }[] = [
             { name: "a refusal worded another way", toolStatus: "denied", text: "нельзя", want: "denied" },
-            { name: "a failure that mentions the refusal sentence", toolStatus: "error", text: "the tool pages_delete is not open to this conversation, it said", want: "error" },
+            { name: "a failure that mentions the refusal sentence", toolStatus: "error", text: "the tool pages_manage is not open to this conversation, it said", want: "error" },
             { name: "a call that worked and said nothing", toolStatus: "ok", text: "", want: "ok" },
         ];
 
         for (const tc of cases) {
             const saved = [
                 message(1, "tool", tc.text, {
-                    tool: "pages_delete",
+                    tool: "pages_manage",
                     callId: "k1",
                     payload: null,
                     toolStatus: tc.toolStatus,
@@ -104,8 +104,8 @@ describe("rows over the saved transcript", () => {
 
     it("falls back to the sentence for a row saved before the ledger was read back", () => {
         const saved = [
-            message(1, "tool", "the tool pages_delete is not open to this conversation", {
-                tool: "pages_delete",
+            message(1, "tool", "the tool pages_manage is not open to this conversation", {
+                tool: "pages_manage",
                 callId: "k1",
                 payload: null,
             }),
@@ -116,7 +116,7 @@ describe("rows over the saved transcript", () => {
     it("marks a saved answer that had to be shortened", () => {
         const saved = [
             message(1, "tool", "", {
-                tool: "pages_list",
+                tool: "pages_find",
                 callId: "k1",
                 payload: { truncated: true, totalBytes: 41_000, droppedItems: { items: 37 }, result: { items: [] } },
             }),
@@ -133,13 +133,13 @@ describe("rows over the saved transcript", () => {
 
     it("keeps a card where the call that raised it sits, before and after the answer lands", () => {
         const proposed = { untrustedContent: true, status: "confirmationRequired", actionId: "a1" };
-        const call = message(2, "tool", "", { tool: "pages_delete", callId: "k1", payload: proposed });
+        const call = message(2, "tool", "", { tool: "pages_manage", callId: "k1", payload: proposed });
 
         const live: Turn = {
             ...idle,
             status: "working",
             text: "Готовлю удаление",
-            tools: [{ callId: "k1", tool: "pages_delete", args: {}, status: "ok", result: proposed }],
+            tools: [{ callId: "k1", tool: "pages_manage", args: {}, status: "ok", result: proposed }],
         };
         const answering = rows([message(1, "user", "delete it")], live, [action("a1")]);
         expect(answering.map((row) => row.kind)).toStrictEqual(["user", "tool", "confirm", "streaming"]);
@@ -184,13 +184,13 @@ describe("rows over a live turn", () => {
             assistantMessageId: "a1",
             status: "working",
             tools: [
-                { callId: "k1", tool: "pages_list", args: {}, status: "ok", result: {}, durationMs: 5 },
+                { callId: "k1", tool: "pages_find", args: {}, status: "ok", result: {}, durationMs: 5 },
                 { callId: "k2", tool: "pages_get", args: {}, status: "running" },
             ],
         };
         const saved = [
             message(1, "user", "hi"),
-            message(2, "tool", "", { tool: "pages_list", callId: "k1", payload: {} }),
+            message(2, "tool", "", { tool: "pages_find", callId: "k1", payload: {} }),
         ];
         const listed = rows(saved, turn, []);
         expect(listed.map((row) => row.kind)).toStrictEqual(["user", "tool", "tool", "working"]);
@@ -205,14 +205,14 @@ describe("rows over a live turn", () => {
             tools: [
                 {
                     callId: "k1",
-                    tool: "pages_delete",
+                    tool: "pages_manage",
                     args: {},
                     status: "denied",
-                    error: "the tool pages_delete is not open to this conversation",
+                    error: "the tool pages_manage is not open to this conversation",
                 },
                 {
                     callId: "k2",
-                    tool: "pages_list",
+                    tool: "pages_find",
                     args: {},
                     status: "ok",
                     result: { truncated: true, totalBytes: 41_000, droppedItems: { items: 37 }, result: { items: [] } },
@@ -252,7 +252,7 @@ describe("rows over a live turn", () => {
             status: "awaiting-confirm",
             confirm: {
                 confirmationId: "a1",
-                tool: "pages_delete",
+                tool: "pages_manage",
                 args: {},
                 risk: "dangerous",
                 summary: "delete",

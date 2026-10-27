@@ -5,7 +5,7 @@ import { mergePatch } from "../../../../domain/merge-patch.js";
 import { sentencesOf } from "../../../templates/sentences.js";
 import { draftFromJson, isJsonObject, jsonOf } from "../../../templates/spec.js";
 import type { Args, Describer, Line } from "./card.js";
-import { line, object, ref, text, view } from "./card.js";
+import { line, object, opOf, ref, text, view } from "./card.js";
 
 const said = copy.agent.describe.templates;
 
@@ -87,17 +87,22 @@ function identityLines(args: Args): Line[] {
     return lines;
 }
 
+function template(args: Args) {
+    return ref("template", text(args, "templateId") ?? "");
+}
+
 export const describeTemplates: Describer = (tool, args, context) => {
-    switch (tool) {
-        case "templates_create": {
-            const lines: Line[] = [];
-            const site = text(args, "siteId");
-            lines.push(text(args, "scope") === "site" && site !== null ? line("target", [`${said.scopeSite} `, ref("site", site)]) : line("target", said.scopeGlobal));
+    if (tool !== "templates") {
+        return null;
+    }
+    switch (opOf(args)) {
+        case "create": {
+            const lines: Line[] = [line("target", text(args, "scope") === "site" ? said.scopeSite : said.scopeGlobal)];
             const spec = parsed(object(args, "spec"));
             lines.push(...(spec === null ? [line("warn", said.unreadableSpec, "warn")] : specLines(spec)));
             return view(said.create(text(args, "name") ?? ""), lines);
         }
-        case "templates_update": {
+        case "update": {
             const lines = identityLines(args);
             const raw = object(args, "spec");
             if (raw !== null) {
@@ -110,27 +115,27 @@ export const describeTemplates: Describer = (tool, args, context) => {
                     lines.push(line("note", said.replaces), ...specLines(spec));
                 }
             }
-            return view([`${said.update} `, ref("template", text(args, "id") ?? "")], lines);
+            return view([`${said.update} `, template(args)], lines);
         }
-        case "templates_delete":
-            return view([`${said.delete} `, ref("template", text(args, "id") ?? "")], [line("warn", said.deleteBody, "danger")]);
-        case "templates_set_override": {
-            const patch = parsed(object(args, "patch"));
+        case "delete":
+            return view([`${said.delete} `, template(args)], [line("warn", said.deleteBody, "danger")]);
+        case "override": {
+            const patch = parsed(object(args, "spec"));
             const base = context.currentTemplate === null ? draftFromJson({}) : draftFromJson(jsonOf(context.currentTemplate));
-            const lines = patch === null ? [line("warn", said.unreadableSpec, "warn")] : sentencesOf(base, patch).map((sentence) => line("rule", sentence));
-            const page = text(args, "scope") === "page";
+            const lines =
+                patch === null
+                    ? [line("warn", said.unreadableSpec, "warn")]
+                    : sentencesOf(base, patch).map((sentence) => line("rule", sentence));
+            const page = text(args, "pageId");
             return view(
-                [
-                    `${said.override} `,
-                    ref("template", text(args, "templateId") ?? ""),
-                    ` ${page ? said.forPage : said.forSite} `,
-                    ref(page ? "page" : "site", text(args, "targetId") ?? ""),
-                ],
+                page === null
+                    ? [`${said.override} `, template(args), ` ${said.forSite}`]
+                    : [`${said.override} `, template(args), ` ${said.forPage} `, ref("page", page)],
                 lines,
             );
         }
-        case "templates_delete_override":
-            return view([`${said.deleteOverride} `, ref("override", text(args, "id") ?? "")], []);
+        case "delete_override":
+            return view([`${said.deleteOverride} `, template(args)], [line("note", said.deleteOverrideBody)]);
         default:
             return null;
     }

@@ -65,7 +65,9 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
                 ) : (
                     <Icon size={14} className={cx("shrink-0", toneClasses[tone].ink)} />
                 )}
-                <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">{toolLabel(row.tool)}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">
+                    {toolLabel(row.tool, row.args === null ? undefined : row.args)}
+                </span>
                 {row.durationMs === null ? null : (
                     <span className="shrink-0 text-right font-mono text-2xs text-ink-faint">
                         {copy.agent.transcript.tool.duration(row.durationMs)}
