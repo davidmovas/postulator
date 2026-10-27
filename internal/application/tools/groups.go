@@ -12,7 +12,7 @@ type Group struct {
 
 var groups = []Group{
 	{Name: "sites", Description: "WordPress sites: register, change or delete one and set its defaults."},
-	{Name: "graph", Description: "The entity graph: entities, keywords, anchors, parent and related edges, " +
+	{Name: "graph", Description: "The entity graph: entities, keywords, anchors, parent and related edges, the page tree's parents, " +
 		"proposals from pages or keywords, authority scores."},
 	{Name: "pages", Description: "The pages: find them, walk the tree, read one whole with its blocks and fields; plan, " +
 		"change, map, retype or delete pages, write a field or a block, grade a page."},
@@ -32,7 +32,7 @@ var groups = []Group{
 }
 
 var orienting = []string{
-	"sites_list", "sites_get", "reports_site_overview", "graph_list_entities", "pages_find", "pages_tree",
+	"sites_list", "sites_get", "reports_site_overview", "graph_read", "pages_find", "pages_tree",
 	"pages_get", "links", "runs_list", "runs_get", "templates_list",
 }
 

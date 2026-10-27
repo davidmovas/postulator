@@ -29,7 +29,7 @@ func (f fixture) idFor(tool, field string) (string, bool) {
 		return f.site, true
 	case "entityId", "fromEntityId", "parentEntityId":
 		return f.entity, true
-	case "toEntityId", "newParentId":
+	case "toEntityId", "newParentId", "parentId":
 		return f.other, true
 	case "pageId":
 		return f.page, true
@@ -45,8 +45,6 @@ func (f fixture) idFor(tool, field string) (string, bool) {
 			return f.page, true
 		case strings.HasPrefix(tool, "templates_"):
 			return f.template, true
-		case strings.HasPrefix(tool, "graph_") && strings.Contains(tool, "entity"):
-			return f.entity, true
 		}
 	}
 	return "", false
@@ -158,15 +156,15 @@ func TestARefusedCallNamesTheFieldTheModelGotWrong(t *testing.T) {
 	}{
 		{
 			name: "a field the tool does not take",
-			tool: "graph_create_entity",
-			args: `{"name":"Creatine","shade":"blue"}`,
-			want: []string{"graph_create_entity", "shade", "only the fields its schema declares"},
+			tool: "graph_edit",
+			args: `{"op":"create","name":"Creatine","shade":"blue"}`,
+			want: []string{"graph_edit", "shade", "only the fields its schema declares"},
 		},
 		{
 			name: "a nested field the tool does not take",
-			tool: "graph_create_entity",
-			args: `{"name":"Creatine","anchors":[{"text":"c","hue":"blue"}]}`,
-			want: []string{"graph_create_entity", "hue"},
+			tool: "graph_edit",
+			args: `{"op":"create","name":"Creatine","anchors":[{"text":"c","hue":"blue"}]}`,
+			want: []string{"graph_edit", "hue"},
 		},
 		{
 			name: "a field of the wrong shape",
@@ -256,19 +254,36 @@ func TestEveryRequiredFieldIsOneTheUseCaseRefusesToDoWithout(t *testing.T) {
 
 		t.Run(tool.Def.Name, func(t *testing.T) {
 			for at, tokens := range wanted {
-				without := callOf(t, tool.Def.Name, tool.Def.Schema, true, seeded, strconv.Itoa(at))
-				drop(without, tokens)
+				refused := false
+				for _, op := range opsOf(tool.Def.Schema) {
+					without := callOf(t, tool.Def.Name, tool.Def.Schema, true, seeded, strconv.Itoa(at))
+					if op != "" {
+						without[opField] = op
+					}
+					drop(without, tokens)
 
-				_, err := registry.Call(t.Context(), binding, tool.Def.Name, encoded(t, without))
-				switch {
-				case err == nil:
-					t.Errorf("%s ran without %s, so the model is refused a call the use case would accept",
+					_, err := registry.Call(t.Context(), binding, tool.Def.Name, encoded(t, without))
+					if errors.IsCode(err, errors.Internal) {
+						t.Errorf("%s %s answered an internal error without %s rather than refusing it: %v",
+							tool.Def.Name, op, strings.Join(tokens, "."), err)
+					}
+					refused = refused || err != nil
+				}
+				if !refused {
+					t.Errorf("%s ran without %s under every op, so the model is refused a call the use case would accept",
 						tool.Def.Name, strings.Join(tokens, "."))
-				case errors.IsCode(err, errors.Internal):
-					t.Errorf("%s answered an internal error without %s rather than refusing it: %v",
-						tool.Def.Name, strings.Join(tokens, "."), err)
 				}
 			}
 		})
 	}
+}
+
+const opField = "op"
+
+func opsOf(schema *llm.Schema) []string {
+	held, found := schema.Properties[opField]
+	if !found || len(held.Enum) == 0 {
+		return []string{""}
+	}
+	return held.Enum
 }

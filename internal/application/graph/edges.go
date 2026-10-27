@@ -330,6 +330,18 @@ func (s *Service) DeleteEdge(ctx context.Context, req DeleteEdgeRequest) (Delete
 	return DeleteEdgeResponse{}, nil
 }
 
+func (s *Service) GetEdge(ctx context.Context, req GetEdgeRequest) (GetEdgeResponse, error) {
+	edgeID := strings.TrimSpace(req.ID)
+	if edgeID == "" {
+		return GetEdgeResponse{}, errors.New(errors.Invalid, "name the edge").WithDetail("field", "id")
+	}
+	held, err := s.edges.Get(ctx, edgeID)
+	if err != nil {
+		return GetEdgeResponse{}, err
+	}
+	return GetEdgeResponse{Edge: edgeView(held)}, nil
+}
+
 func (s *Service) ListEdges(ctx context.Context, req ListEdgesRequest) (paging.List[Edge], error) {
 	if err := requireSite(req.SiteID); err != nil {
 		return paging.List[Edge]{}, err

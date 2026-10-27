@@ -80,8 +80,8 @@ func TestAPlanIsProposedOnlyOfWritesTheirToolsWouldTake(t *testing.T) {
 	b := tools.Binding{SiteID: "site-1", ConversationID: "conv-1", Mode: agent.ModeAutonomous}
 
 	answer, err := planCall(t, registry, b, `{"op":"propose","title":"Tie the serums together","steps":[
-		{"tool":"graph_add_edge","args":"{\"fromEntityId\":\"e-retinol\",\"toEntityId\":\"e-vitc\",\"kind\":\"related\"}","reason":"Both are serums the page tree keeps side by side"},
-		{"tool":"graph_move_entity","args":"{\"entityId\":\"e-retinol\",\"newParentId\":\"e-serums\"}","reason":"The page tree puts it under Serums","dependsOn":[1]}
+		{"tool":"pages_manage","args":"{\"op\":\"create\",\"path\":\"/serums/\"}","reason":"The hub the section hangs from"},
+		{"tool":"pages_manage","args":"{\"op\":\"create\",\"path\":\"/serums/retinol/\"}","reason":"The page tree puts it under Serums","dependsOn":[1]}
 	]}`)
 	if err != nil {
 		t.Fatalf("propose: %v", err)
@@ -105,11 +105,11 @@ func TestAPlanIsProposedOnlyOfWritesTheirToolsWouldTake(t *testing.T) {
 
 	cases := map[string]string{
 		"a step that only reads":           `{"op":"propose","title":"t","steps":[{"tool":"sites_get","args":"{}","reason":"r"}]}`,
-		"a step its tool would refuse":     `{"op":"propose","title":"t","steps":[{"tool":"graph_add_edge","args":"{\"color\":\"red\"}","reason":"r"}]}`,
+		"a step its tool would refuse":     `{"op":"propose","title":"t","steps":[{"tool":"graph_edit","args":"{\"color\":\"red\"}","reason":"r"}]}`,
 		"a tool nobody registered":         `{"op":"propose","title":"t","steps":[{"tool":"graph_paint","args":"{}","reason":"r"}]}`,
-		"arguments that are no JSON":       `{"op":"propose","title":"t","steps":[{"tool":"graph_add_edge","args":"not json","reason":"r"}]}`,
+		"arguments that are no JSON":       `{"op":"propose","title":"t","steps":[{"tool":"graph_edit","args":"not json","reason":"r"}]}`,
 		"a plan inside a plan":             `{"op":"propose","title":"t","steps":[{"tool":"plans","args":"{}","reason":"r"}]}`,
-		"a dependency on a step not there": `{"op":"propose","title":"t","steps":[{"tool":"graph_move_entity","args":"{\"entityId\":\"a\",\"newParentId\":\"b\"}","reason":"r","dependsOn":[2]}]}`,
+		"a dependency on a step not there": `{"op":"propose","title":"t","steps":[{"tool":"pages_manage","args":"{\"op\":\"create\",\"path\":\"/a/\"}","reason":"r","dependsOn":[2]}]}`,
 	}
 	for name, args := range cases {
 		if _, err := planCall(t, registry, b, args); err == nil {

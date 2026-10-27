@@ -79,7 +79,7 @@ func TestThePromptFilesHoldWhatTheStepsWouldSend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the agent's round: %v", err)
 	}
-	for _, said := range []string{"=== DEVELOPER MESSAGE ===", "=== TOOLS (", "graph_preview_from_pages", "findings"} {
+	for _, said := range []string{"=== DEVELOPER MESSAGE ===", "=== TOOLS (", "graph_propose", "findings"} {
 		if !strings.Contains(string(agent), said) {
 			t.Errorf("the agent's round never says %q", said)
 		}

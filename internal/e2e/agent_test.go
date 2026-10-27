@@ -32,7 +32,7 @@ const (
 	agentRoot  = "/"
 	agentNotes = "/peptides/storage-notes/"
 
-	proposeTool  = "graph_propose_cards"
+	proposeTool  = "graph_propose"
 	briefOpening = "THE SITE WHEN THIS CONVERSATION BEGAN"
 
 	autonomousDefinition = "Peptides are short chains of amino acids, sold here for laboratory research only."
@@ -347,7 +347,7 @@ func treeHolds(tree sitemodel.TreeAnswer, path string) bool {
 }
 
 func cardsArgs(entityID, definition string) string {
-	encoded, err := json.Marshal(map[string]any{"cards": []map[string]any{{
+	encoded, err := json.Marshal(map[string]any{"op": "cards", "cards": []map[string]any{{
 		"entityId": entityID, "definition": definition, "reason": "Read from the hub's text and its products.",
 		"facts": []map[string]string{{"label": "Storage", "value": "Frozen, sealed under nitrogen"}},
 	}}})

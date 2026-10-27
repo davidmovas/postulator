@@ -63,6 +63,26 @@ func TestAddEdgeKeepsItsReason(t *testing.T) {
 	}
 }
 
+func TestAnEdgeIsReadByItsId(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	hub := h.entity(t, "Hub")
+	leaf := h.entity(t, "Leaf")
+	added := h.edge(t, leaf.ID, hub.ID, "parent", "proposed")
+
+	got, err := h.service.GetEdge(t.Context(), graph.GetEdgeRequest{ID: added.ID})
+	if err != nil || got.Edge.ID != added.ID || got.Edge.FromEntityID != leaf.ID || got.Edge.ToEntityID != hub.ID || got.Edge.Status != "proposed" {
+		t.Fatalf("GetEdge = %+v, %v, want the proposed parent edge", got, err)
+	}
+	if _, err = h.service.GetEdge(t.Context(), graph.GetEdgeRequest{ID: id.New()}); !errors.IsCode(err, errors.NotFound) {
+		t.Errorf("an edge that is not there = %v, want NotFound", err)
+	}
+	if _, err = h.service.GetEdge(t.Context(), graph.GetEdgeRequest{}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("no edge named = %v, want Invalid", err)
+	}
+}
+
 func TestAddEdgeAndCycles(t *testing.T) {
 	t.Parallel()
 

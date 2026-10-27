@@ -28,27 +28,9 @@ func registered() []string {
 		"sites_create",
 		"sites_update",
 		"sites_delete",
-		"graph_list_entities",
-		"graph_get_entity",
-		"graph_create_entity",
-		"graph_create_entities",
-		"graph_update_entity",
-		"graph_delete_entity",
-		"graph_set_anchors",
-		"graph_list_edges",
-		"graph_add_edge",
-		"graph_approve_edge",
-		"graph_reject_edge",
-		"graph_delete_edge",
-		"graph_move_entity",
-		"graph_load",
-		"graph_recompute_scores",
-		"graph_propose_from_pages",
-		"graph_propose_related",
-		"graph_preview_from_pages",
-		"graph_propose_from_keywords",
-		"graph_apply_proposals",
-		"graph_propose_cards",
+		"graph_read",
+		"graph_edit",
+		"graph_propose",
 		"pages_find",
 		"pages_tree",
 		"pages_get",
@@ -162,8 +144,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 68045
-	schemaCeilingTokens = 15198
+	schemaCeilingBytes  = 64696
+	schemaCeilingTokens = 14505
 	widestLogged        = 8
 )
 
@@ -327,30 +309,27 @@ func TestMovingAnEntityIsOneWriteTheModelCanMake(t *testing.T) {
 	t.Parallel()
 
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
-	def, known := registry.Lookup("graph_move_entity")
-	if !known {
-		t.Fatal("graph_move_entity is not registered")
-	}
-	if def.Risk != tools.RiskWrite {
-		t.Fatalf("risk = %s, want write: it rewrites the tree", def.Risk)
-	}
-
-	for _, field := range []string{"entityId", "newParentId", "keepBoth"} {
-		if def.Schema.Properties[field] == nil {
-			t.Errorf("the schema offers no %s: %+v", field, def.Schema)
+	for _, tool := range registry.Build(tools.Binding{Mode: agent.ModeAutonomous}) {
+		if tool.Def.Name != "graph_edit" {
+			continue
 		}
+		if risk := tool.RiskOf(json.RawMessage(`{"op":"move"}`)); risk != tools.RiskWrite {
+			t.Fatalf("move risk = %s, want write: it rewrites the tree", risk)
+		}
+		for _, field := range []string{"entityId", "parentId", "keepBoth"} {
+			if tool.Def.Schema.Properties[field] == nil {
+				t.Errorf("the schema offers no %s: %+v", field, tool.Def.Schema)
+			}
+		}
+		if tool.Def.Schema.Properties["siteId"] != nil {
+			t.Error("the tool takes its site from the conversation")
+		}
+		if !slices.Equal(tool.Def.Schema.Required, []string{"op"}) {
+			t.Fatalf("required = %v, want the op alone: each op says what it needs", tool.Def.Schema.Required)
+		}
+		return
 	}
-	if def.Schema.Properties["siteId"] != nil {
-		t.Error("the tool takes its site from the conversation")
-	}
-
-	want := []string{"entityId", "newParentId"}
-	got := slices.Clone(def.Schema.Required)
-	slices.Sort(got)
-	slices.Sort(want)
-	if !slices.Equal(got, want) {
-		t.Fatalf("required = %v, want %v: the use case refuses neither of those absent", got, want)
-	}
+	t.Fatal("graph_edit is not registered")
 }
 
 func TestEveryToolCarriesADefinitionAndASchema(t *testing.T) {
@@ -395,9 +374,9 @@ func TestSchemaIsDerivedFromTheRequest(t *testing.T) {
 		t.Error("the bound site must not be required of the model")
 	}
 
-	edge, known := registry.Lookup("graph_add_edge")
+	edge, known := registry.Lookup("graph_edit")
 	if !known {
-		t.Fatal("graph_add_edge is not registered")
+		t.Fatal("graph_edit is not registered")
 	}
 	if edge.Schema.Properties["reason"] == nil || edge.Schema.Properties["reason"].Type != llm.SchemaString {
 		t.Fatalf("the reason property is %+v", edge.Schema.Properties["reason"])
@@ -449,14 +428,14 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	var proposed, read tools.Tool
 	for _, tool := range registry.Build(binding) {
 		switch tool.Def.Name {
-		case "graph_delete_entity":
+		case "graph_edit":
 			proposed = tool
 		case "pages_find":
 			read = tool
 		}
 	}
 
-	out, err := proposed.Run(t.Context(), binding, json.RawMessage(`{"id":"entity-1"}`))
+	out, err := proposed.Run(t.Context(), binding, json.RawMessage(`{"op":"rescore"}`))
 	if err != nil {
 		t.Fatalf("a proposed call = %v", err)
 	}
@@ -465,7 +444,7 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	if !ok || confirmation.Status != agent.ConfirmationRequired || confirmation.ActionID == "" {
 		t.Fatalf("a proposed call returned %+v", out)
 	}
-	if len(actions.actions) != 1 || actions.actions[0].Tool != "graph_delete_entity" {
+	if len(actions.actions) != 1 || actions.actions[0].Tool != "graph_edit" {
 		t.Fatalf("the stored actions are %+v", actions.actions)
 	}
 	if actions.actions[0].Summary != confirmation.Summary || confirmation.Summary == "" {
@@ -476,8 +455,9 @@ func TestConfirmModeProposesInsteadOfWriting(t *testing.T) {
 	}
 
 	payload, ok := bus.payloads[0].(events.AgentConfirmRequestedPayload)
-	if !ok || payload.ConversationID != "conversation-1" || payload.Risk != string(tools.RiskDangerous) {
-		t.Fatalf("the payload is %+v", bus.payloads[0])
+	if !ok || payload.ConversationID != "conversation-1" || payload.Risk != string(tools.RiskWrite) ||
+		payload.Summary != "Recompute the authority score of every entity of the site" {
+		t.Fatalf("the payload is %+v, want the op's own risk and sentence", bus.payloads[0])
 	}
 
 	if read.Authorize == nil {
@@ -494,7 +474,7 @@ func TestAProposalNeedsItsConversation(t *testing.T) {
 	registry := newRegistry(&actionRecorder{}, &busRecorder{})
 	binding := tools.Binding{SiteID: "site-1", Mode: agent.ModeConfirm}
 
-	for _, name := range []string{"graph_delete_entity", "pages_manage"} {
+	for _, name := range []string{"graph_edit", "pages_manage"} {
 		if _, err := registry.Call(t.Context(), binding, name, nil); !errors.IsCode(err, errors.Invalid) {
 			t.Fatalf("a %s proposal without a conversation = %v", name, err)
 		}
@@ -550,8 +530,8 @@ func TestAnUnusableCallNeverBecomesAConfirmation(t *testing.T) {
 	}{
 		{
 			name: "a field the tool does not take",
-			tool: "graph_create_entity",
-			args: `{"name":"Creatine","shade":"blue"}`,
+			tool: "graph_edit",
+			args: `{"op":"create","name":"Creatine","shade":"blue"}`,
 		},
 		{
 			name: "a field of the wrong shape",

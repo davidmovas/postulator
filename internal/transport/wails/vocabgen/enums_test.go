@@ -11,11 +11,10 @@ import (
 )
 
 var narrowed = map[string]bool{
-	"graph_list_edges.parameters.sort.field": true,
-	"imports_export.parameters.format":       true,
-	"runs_pause.parameters.reason":           true,
-	"runs_get_artifact.parameters.kind":      true,
-	"pagetypes_set_scope.parameters.field":   true,
+	"imports_export.parameters.format":     true,
+	"runs_pause.parameters.reason":         true,
+	"runs_get_artifact.parameters.kind":    true,
+	"pagetypes_set_scope.parameters.field": true,
 }
 
 var choiceNames = []string{
@@ -29,9 +28,9 @@ var freeText = map[string]bool{
 }
 
 var prose = map[string]bool{
-	"graph_add_edge.parameters.reason":              true,
-	"graph_propose_cards.parameters.cards[].reason": true,
-	"plans.parameters.steps[].reason":               true,
+	"graph_edit.parameters.reason":            true,
+	"graph_propose.parameters.cards[].reason": true,
+	"plans.parameters.steps[].reason":         true,
 }
 
 func vocabularies(t *testing.T) map[string]string {

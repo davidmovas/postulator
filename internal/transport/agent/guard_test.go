@@ -202,17 +202,17 @@ func TestACallTheSchemaRefusesBecomesAFailedRowTheModelCanRead(t *testing.T) {
 	}{
 		{
 			name:   "a value outside the enum",
-			script: `TOOL:graph_add_edge{"fromEntityId":"a","toEntityId":"b","kind":"cousin","weight":0.5}`,
+			script: `TOOL:graph_edit{"op":"add_edge","entityId":"a","toEntityId":"b","kind":"cousin","weight":0.5}`,
 			reads:  "value not in enum",
 		},
 		{
 			name:   "a number over the maximum",
-			script: `TOOL:graph_add_edge{"fromEntityId":"a","toEntityId":"b","kind":"related","weight":5}`,
+			script: `TOOL:graph_edit{"op":"add_edge","entityId":"a","toEntityId":"b","kind":"related","weight":5}`,
 			reads:  "number too large",
 		},
 		{
 			name:   "a required field missing inside a list",
-			script: `TOOL:graph_set_anchors{"entityId":"e1","anchors":[{"source":"user"}]}`,
+			script: `TOOL:graph_edit{"op":"anchors","entityId":"e1","anchors":[{"source":"user"}]}`,
 			reads:  "required parameter missing",
 		},
 	}

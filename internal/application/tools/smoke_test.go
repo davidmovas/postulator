@@ -169,9 +169,17 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Rows: sqlite.NewPageMapRepo(store), Templates: templateRepo, UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	seeded.store, seeded.types, seeded.pages = store, types, pagesService
+	siteModel := sitemodel.New(sitemodel.Deps{
+		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
+		Sites: siteRepo, Pages: pageRepo,
+		Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
+		Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
+		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
+		Runs: runRepo, Items: itemRepo,
+	})
 	graphService := graph.New(graph.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store),
-		Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store), Maps: siteModel,
 		Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
 	})
 	importsService := imports.New(imports.Deps{
@@ -181,14 +189,6 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Mappings: sqlite.NewImportMappingRepo(store), Sites: siteRepo, UnitOfWork: store,
 		Findings: sqlite.NewFindingRepo(store), Terms: sqlite.NewPageIdentityRepo(store),
 		Publisher: bus, Clock: now,
-	})
-	siteModel := sitemodel.New(sitemodel.Deps{
-		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
-		Sites: siteRepo, Pages: pageRepo,
-		Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
-		Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
-		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
-		Runs: runRepo, Items: itemRepo,
 	})
 	return tools.New(tools.Deps{
 		Sites:     sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
@@ -356,10 +356,10 @@ func TestAToolCallActsAsTheAgent(t *testing.T) {
 	binding.Mode = domainagent.ModeAutonomous
 	asPerson := kctx.WithActor(t.Context(), kctx.ActorUser)
 
-	out, err := registry.Call(asPerson, binding, "graph_set_anchors",
-		json.RawMessage(`{"entityId":"`+seeded.entity+`","anchors":[{"text":"espresso","weight":1}]}`))
+	out, err := registry.Call(asPerson, binding, "graph_edit",
+		json.RawMessage(`{"op":"anchors","entityId":"`+seeded.entity+`","anchors":[{"text":"espresso","weight":1}]}`))
 	if err != nil {
-		t.Fatalf("graph_set_anchors: %v", err)
+		t.Fatalf("graph_edit anchors: %v", err)
 	}
 	set, ok := out.(graph.SetAnchorsResponse)
 	if !ok || len(set.Entity.Anchors) != 1 || set.Entity.Anchors[0].Source != "ai" {
@@ -371,10 +371,10 @@ func TestAProposedCardWaitsForAPersonUnlessTheCallWasApproved(t *testing.T) {
 	t.Parallel()
 
 	registry, binding, seeded := wired(t)
-	args := json.RawMessage(`{"cards":[{"entityId":"` + seeded.entity + `","definition":"Brewed from roasted beans.","reason":"the hub's text"}]}`)
+	args := json.RawMessage(`{"op":"cards","cards":[{"entityId":"` + seeded.entity + `","definition":"Brewed from roasted beans.","reason":"the hub's text"}]}`)
 
 	binding.Mode = domainagent.ModeAutonomous
-	filed, err := registry.Call(t.Context(), binding, "graph_propose_cards", args)
+	filed, err := registry.Call(t.Context(), binding, "graph_propose", args)
 	if err != nil {
 		t.Fatalf("propose: %v", err)
 	}
@@ -382,13 +382,13 @@ func TestAProposedCardWaitsForAPersonUnlessTheCallWasApproved(t *testing.T) {
 	if !ok || len(proposed.Proposals) != 1 || proposed.Proposals[0].Proposed.Definition != "Brewed from roasted beans." {
 		t.Fatalf("an autonomous call = %+v, want one proposal filed", filed)
 	}
-	read, err := registry.Call(t.Context(), binding, "graph_get_entity", json.RawMessage(`{"id":"`+seeded.entity+`"}`))
-	if held, isEntity := read.(graph.GetEntityResponse); err != nil || !isEntity || held.Entity.Definition != "" {
+	read, err := registry.Call(t.Context(), binding, "graph_read", json.RawMessage(`{"view":"entity","entityId":"`+seeded.entity+`"}`))
+	if held, isEntity := read.(tools.GraphReadResponse); err != nil || !isEntity || held.Entity == nil || held.Entity.Definition != "" {
 		t.Fatalf("the entity after a proposal = %+v, %v; want nothing written", read, err)
 	}
 
 	binding.Mode, binding.Approved = domainagent.ModeConfirm, true
-	written, err := registry.Call(t.Context(), binding, "graph_propose_cards", args)
+	written, err := registry.Call(t.Context(), binding, "graph_propose", args)
 	if err != nil {
 		t.Fatalf("an approved call: %v", err)
 	}
