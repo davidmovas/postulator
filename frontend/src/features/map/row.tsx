@@ -25,7 +25,7 @@ import {
     readOnlyReasonLabel,
     technicalReasonLabel,
 } from "../pages/model/labels.js";
-import { bodyStateLabel, bodyStateTone, bodyStateTooltip } from "./labels.js";
+import { bodyStateLabel, bodyStateTone, bodyStateTooltip, whyLabel, whySentence } from "./labels.js";
 import { useMapColumns } from "./layout.js";
 import type { MapColumn } from "./model/columns.js";
 
@@ -35,6 +35,13 @@ export const mapRowHeight = 28;
 export const indentStep = 14;
 
 function ParentCell({ node }: { node: SiteMapNode }): ReactElement {
+    if (node.parentId === "" && node.why !== undefined && node.why !== null) {
+        return (
+            <TableCell muted={true} title={whySentence(node.why) ?? undefined}>
+                <span data-map-why={node.why.reason}>{whyLabel(node.why)}</span>
+            </TableCell>
+        );
+    }
     const reason = parentReasonLabel(node.parentReason);
     const shown = node.parentMethod === "" ? reason : `${reason} · ${parentMethodName(node.parentMethod)}`;
     return (

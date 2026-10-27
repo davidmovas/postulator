@@ -180,6 +180,23 @@ describe("the site map", () => {
         expect(held.asked).toContainEqual({ siteId: "s1", search: "mug" });
     });
 
+    it("says why a page at the top has no parent", () => {
+        const lonely = aNode("p-lonely", "/lonely/", {
+            page: aRef("p-lonely", "/lonely/", { title: "Lonely" }),
+            parentReason: "none" as SiteMapNode["parentReason"],
+            parentMethod: "" as SiteMapNode["parentMethod"],
+            why: { reason: "crumb_unresolved" as NonNullable<SiteMapNode["why"]>["reason"], crumb: "/gone/" },
+        });
+        answer({}, [shop, lonely]);
+        siteMap();
+
+        const row = within(screen.getByText("Lonely").closest("[role=row]") as HTMLElement);
+        const cell = row.getByText(`${said.why.none} · ${said.why.labels.crumb_unresolved}`);
+        expect(cell.closest("[role=cell]")?.getAttribute("title")).toBe(
+            said.why.sentences.crumb_unresolved({ crumb: "/gone/" }),
+        );
+    });
+
     it("offers the page tree's parents for the whole site, and for the subtree it is rooted at", () => {
         answer({ parentId: "p-mugs" }, [], false, { parent: mugs, trail: [] });
         const whole = siteMap();
