@@ -391,6 +391,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if err != nil {
 		return err
 	}
+	if moveErr := misplaceAnEntity(ctx, core, entities); moveErr != nil {
+		return moveErr
+	}
 
 	pagesByPath, err := seedPages(ctx, core, siteID, entities)
 	if err != nil {
@@ -455,6 +458,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	}
 	if conversationErr := seedConversation(ctx, core, siteID); conversationErr != nil {
 		return conversationErr
+	}
+	if planErr := seedPlans(ctx, core, siteID, pagesByPath, entities); planErr != nil {
+		return planErr
 	}
 	return seedSpend(ctx, core, siteID)
 }

@@ -1978,5 +1978,159 @@
       { "wait": 400 },
       { "fits": "main" }
     ]
+  },
+  {
+    "name": "plan-card",
+    "route": "#/s/:siteId/agent",
+    "height": 1500,
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-plan][data-plan-status=proposed] [data-plan-edits]" },
+      { "expect": "[data-plan][data-plan-status=done]" },
+      { "wait": 400 },
+      { "fits": "[data-plan][data-plan-status=proposed]" },
+      { "fits": "[data-plan][data-plan-status=done]" }
+    ]
+  },
+  {
+    "name": "plan-card-chosen",
+    "route": "#/s/:siteId/agent",
+    "height": 1100,
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-plan][data-plan-status=proposed]" },
+      { "click": "[data-plan-status=proposed] li[data-plan-step]:nth-child(3) > label" },
+      { "expect": "[data-plan-status=proposed] button:has-text(\"Approve 2 chosen\"):not([disabled])" },
+      { "type": "label:has-text(\"Tone\")=Plain and practical" },
+      { "wait": 300 },
+      { "fits": "[data-plan][data-plan-status=proposed]" }
+    ]
+  },
+  {
+    "name": "run-start-brief",
+    "route": "#/s/:siteId/runs",
+    "height": 1300,
+    "wait": 1200,
+    "steps": [
+      { "click": "[data-run-start]" },
+      { "wait": 900 },
+      { "click": "[data-page-pick] label" },
+      { "wait": 300 },
+      { "click": "[data-run-brief-section] > button" },
+      { "type": "label:has-text(\"Goal\")=Help a first buyer choose a grinder before a machine" },
+      { "type": "label:has-text(\"Tone\")=Plain and practical, no brand talk" },
+      { "type": "label:has-text(\"Style sample\")=Short sentences. One idea each. Numbers where they help." },
+      { "click": "[data-run-directive-page] > button >> nth=0" },
+      { "type": "label:has-text(\"Notes for this page\")=Lead with the burr size, then the price." },
+      { "wait": 400 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "run-start-writer",
+    "route": "#/s/:siteId/runs",
+    "height": 1100,
+    "wait": 1200,
+    "steps": [
+      { "click": "[data-run-start]" },
+      { "wait": 900 },
+      { "click": "[data-page-pick] label" },
+      { "wait": 300 },
+      { "click": "[data-run-brief-section] > button" },
+      { "type": "label:has-text(\"Goal\")=Help a first buyer choose a grinder before a machine" },
+      { "click": "[data-run-directive-page] > button >> nth=0" },
+      { "type": "label:has-text(\"Notes for this page\")=Lead with the burr size, then the price." },
+      { "click": "[data-run-directive-page] button:has-text(\"What the writer will see\")" },
+      { "expect": "[data-pack-section=brief]", "timeout": 20000 },
+      { "wait": 500 },
+      { "fits": "[role=dialog]:has([data-pack-section=brief])" }
+    ]
+  },
+  {
+    "name": "adopt-graph",
+    "route": "#/s/:siteId/graph",
+    "wait": 1500,
+    "steps": [
+      { "click": "main button:has-text(\"Model\")" },
+      { "click": "[role=menuitem]:has-text(\"Take the page tree's parents\")" },
+      { "expect": "[role=dialog] [data-adoption]", "timeout": 20000 },
+      { "wait": 400 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "adopt-map-subtree",
+    "route": "#/s/:siteId/map",
+    "wait": 1500,
+    "steps": [
+      { "click": "[data-map-node]:has-text(\"Brewing technique\") button[aria-label=\"Show only under this page\"]" },
+      { "wait": 900 },
+      { "click": "[data-map-adopt]" },
+      { "expect": "[role=dialog] [data-adoption-counts]", "timeout": 20000 },
+      { "wait": 400 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "map-why",
+    "route": "#/s/:siteId/map",
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-map-why]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "map-why-detail",
+    "route": "#/s/:siteId/map",
+    "wait": 1500,
+    "steps": [
+      { "click": "[data-map-node]:has([data-map-why=no_signal]) button[title=\"Open the page\"] >> nth=0" },
+      { "wait": 900 },
+      { "click": "[role=dialog] [role=tab]:has-text(\"Model\")" },
+      { "expect": "[data-page-why]", "timeout": 20000 },
+      { "wait": 600 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "finding-entity-parent",
+    "route": "#/s/:siteId/findings?code=entity_parent_differs",
+    "wait": 1500,
+    "steps": [
+      { "expect": "button:has-text(\"Take the page tree's parent\")" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "support-about",
+    "route": "#/settings/about",
+    "wait": 1200,
+    "steps": [
+      { "expect": "[data-support-bundle] button:has-text(\"Save a support bundle\")" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "support-dock",
+    "route": "#/s/:siteId/overview",
+    "wait": 1200,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[data-agent-dock] button[title=\"Switch conversation\"]" },
+      { "expect": "[role=menuitem]:has-text(\"Save a support bundle\")" },
+      { "wait": 300 }
+    ]
+  },
+  {
+    "name": "plan-card-dock",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-agent-dock] [data-plan][data-plan-status=proposed]" },
+      { "wait": 400 },
+      { "fits": "[data-agent-dock] [data-plan][data-plan-status=proposed]" },
+      { "fits": "[data-agent-dock] [data-plan][data-plan-status=done]" }
+    ]
   }
 ]
