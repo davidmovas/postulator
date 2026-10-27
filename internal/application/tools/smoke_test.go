@@ -416,10 +416,10 @@ func TestATemplateToolSaysHowManyKeywordsThePageMustUse(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := strings.Replace(minimalSpec, `"maxDensity":0.02}`, `"maxDensity":0.02`+tc.rule+`}`, 1)
-			out, err := registry.Call(t.Context(), binding, "templates_create",
-				json.RawMessage(`{"name":"Keyed `+tc.name+`","spec":`+spec+`}`))
+			out, err := registry.Call(t.Context(), binding, "templates",
+				json.RawMessage(`{"op":"create","name":"Keyed `+tc.name+`","spec":`+spec+`}`))
 			if err != nil {
-				t.Fatalf("templates_create: %v", err)
+				t.Fatalf("templates create: %v", err)
 			}
 			encoded, err := json.Marshal(out)
 			if err != nil {
@@ -447,10 +447,10 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 	product := `,"product":{"shortDescription":{"enabled":true,"intent":"Say what it is","targetWords":40,` +
 		`"primaryKeyword":true}}}`
 	spec := strings.TrimSuffix(minimalSpec, "}") + product
-	out, err := registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"Product outputs","spec":`+spec+`}`))
+	out, err := registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"Product outputs","spec":`+spec+`}`))
 	if err != nil {
-		t.Fatalf("templates_create: %v", err)
+		t.Fatalf("templates create: %v", err)
 	}
 	encoded, err := json.Marshal(out)
 	if err != nil {
@@ -462,15 +462,15 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 		}
 	}
 	retired := strings.TrimSuffix(minimalSpec, "}") + `,"product":{"specifications":[{"name":"Form"}]}}`
-	if _, err = registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"Retired outputs","spec":`+retired+`}`)); err == nil {
+	if _, err = registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"Retired outputs","spec":`+retired+`}`)); err == nil {
 		t.Error("a template naming the retired specifications was taken; the store owns a product's attributes")
 	}
 
-	bare, err := registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"No product outputs","spec":`+minimalSpec+`}`))
+	bare, err := registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"No product outputs","spec":`+minimalSpec+`}`))
 	if err != nil {
-		t.Fatalf("templates_create: %v", err)
+		t.Fatalf("templates create: %v", err)
 	}
 	if encoded, err = json.Marshal(bare); err != nil || strings.Contains(string(encoded), `"product":{`) {
 		t.Errorf("a template that says nothing of products carries a product block: %s", encoded)
@@ -481,10 +481,8 @@ func argumentsFor(name string) json.RawMessage {
 	switch name {
 	case "imports_inspect", "imports_preview":
 		return json.RawMessage(`{"path":"C:/nowhere/absent.csv","mapping":{"columns":[]}}`)
-	case "templates_create":
-		return json.RawMessage(`{"name":"Guide","spec":` + minimalSpec + `}`)
-	case "templates_update":
-		return json.RawMessage(`{"id":"t1","spec":` + minimalSpec + `}`)
+	case "templates":
+		return json.RawMessage(`{"op":"create","name":"Guide","spec":` + minimalSpec + `}`)
 	case "links":
 		return json.RawMessage(`{"view":"section"}`)
 	case "pages_tree":

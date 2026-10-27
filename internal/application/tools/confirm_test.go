@@ -138,10 +138,10 @@ func TestReassigningPagesIntoARewritingTypeWaitsForAPerson(t *testing.T) {
 		t.Fatalf("type the page: %v", err)
 	}
 
-	out, err := registry.Call(t.Context(), binding, "pagetypes_delete",
-		json.RawMessage(`{"id":"`+leaving.ID+`","reassignTo":"`+rewriting.ID+`"}`))
+	out, err := registry.Call(t.Context(), binding, "pagetypes",
+		json.RawMessage(`{"op":"delete","pageTypeId":"`+leaving.ID+`","reassignTo":"`+rewriting.ID+`"}`))
 	if err != nil {
-		t.Fatalf("pagetypes_delete: %v", err)
+		t.Fatalf("pagetypes delete: %v", err)
 	}
 	waitsForAPerson(t, out)
 	if got := typeOfThePage(t, seeded); got != leaving.ID {
@@ -187,10 +187,10 @@ func TestEnablingAFieldUnderRewritesWaitsForAPerson(t *testing.T) {
 		t.Fatalf("let a person mark the excerpt as rewritten while it is off: %v", err)
 	}
 
-	out, err := registry.Call(t.Context(), binding, "pagetypes_set_scope",
-		json.RawMessage(`{"pageTypeId":"`+rewriting.ID+`","field":"excerpt","enabled":true}`))
+	out, err := registry.Call(t.Context(), binding, "pagetypes",
+		json.RawMessage(`{"op":"scope","pageTypeId":"`+rewriting.ID+`","field":"excerpt","enabled":true}`))
 	if err != nil {
-		t.Fatalf("pagetypes_set_scope: %v", err)
+		t.Fatalf("pagetypes scope: %v", err)
 	}
 	waitsForAPerson(t, out)
 }

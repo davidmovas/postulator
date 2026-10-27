@@ -43,8 +43,6 @@ func (f fixture) idFor(tool, field string) (string, bool) {
 			return f.site, true
 		case strings.HasPrefix(tool, "pages_"):
 			return f.page, true
-		case strings.HasPrefix(tool, "templates_"):
-			return f.template, true
 		}
 	}
 	return "", false

@@ -129,8 +129,8 @@ func (a productArgs) product() *template.Product {
 }
 
 type templateSpecArgs struct {
-	Sections      []sectionArgs      `json:"sections" description:"Sections in order, at least one"`
-	Tone          string             `json:"tone,omitempty" description:"Voice, one or two sentences"`
+	Sections      []sectionArgs      `json:"sections,omitempty" description:"Sections in order; a specification holds at least one"`
+	Tone          *string            `json:"tone,omitempty" description:"Voice, one or two sentences"`
 	Length        *lengthArgs        `json:"length,omitempty" description:"Word count window"`
 	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"Keyword placement and density"`
 	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"SEO title and description"`
@@ -143,7 +143,7 @@ type templateSpecArgs struct {
 func (a templateSpecArgs) spec() template.TemplateSpec {
 	built := template.TemplateSpec{
 		Sections:      sectionsOf(a.Sections),
-		Tone:          a.Tone,
+		Tone:          valueOf(a.Tone),
 		ModelProfiles: profilesOf(a.ModelProfiles),
 		Recipe:        recipeOfSteps(a.Recipe),
 	}
@@ -205,22 +205,10 @@ func paramsOf(step stepArgs) map[string]any {
 	return params
 }
 
-type templatePatchArgs struct {
-	Sections      *[]sectionArgs     `json:"sections,omitempty" description:"Whole new section list"`
-	Tone          *string            `json:"tone,omitempty" description:"New tone"`
-	Length        *lengthArgs        `json:"length,omitempty" description:"New word count window"`
-	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"New keyword rules"`
-	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"New meta rules"`
-	Images        *imagesArgs        `json:"images,omitempty" description:"New image settings"`
-	Product       *productArgs       `json:"product,omitempty" description:"New product outputs"`
-	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"Whole new model profile set"`
-	Recipe        []stepArgs         `json:"recipe,omitempty" description:"Whole new recipe in order"`
-}
-
-func (a templatePatchArgs) patch() (json.RawMessage, error) {
+func (a templateSpecArgs) patch() (json.RawMessage, error) {
 	written := map[string]any{}
-	if a.Sections != nil {
-		written["sections"] = sectionsOf(*a.Sections)
+	if len(a.Sections) > 0 {
+		written["sections"] = sectionsOf(a.Sections)
 	}
 	if a.Tone != nil {
 		written["tone"] = *a.Tone

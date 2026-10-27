@@ -33,7 +33,7 @@ var groups = []Group{
 
 var orienting = []string{
 	"sites_list", "sites_get", "reports_site_overview", "graph_read", "pages_find", "pages_tree",
-	"pages_get", "links", "runs", "templates_list",
+	"pages_get", "links", "runs",
 }
 
 func OnDemand(name string) (Group, bool) {

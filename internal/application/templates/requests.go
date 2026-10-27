@@ -61,7 +61,7 @@ type SetOverrideResponse struct {
 }
 
 type DeleteOverrideRequest struct {
-	ID string `json:"id" description:"Override id from templates_get"`
+	ID string `json:"id" description:"Override id"`
 }
 
 type DeleteOverrideResponse struct{}

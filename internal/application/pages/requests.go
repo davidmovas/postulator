@@ -72,7 +72,7 @@ type PageFilter struct {
 	IncludeDescendants bool   `json:"includeDescendants,omitempty" description:"With entityId, also the entities below it"`
 	Unmapped           bool   `json:"unmapped,omitempty" description:"Only pages with no entity"`
 	PathPrefix         string `json:"pathPrefix,omitempty" description:"Only paths starting with this"`
-	PageTypeID         string `json:"pageTypeId,omitempty" description:"Only pages of this type, from pagetypes_list"`
+	PageTypeID         string `json:"pageTypeId,omitempty" description:"Only pages of this type"`
 	Body               string `json:"body,omitempty" description:"with or without text of its own"`
 	Findings           bool   `json:"findings,omitempty" description:"Only pages with an open finding"`
 	Search             string `json:"search,omitempty" description:"Words in the title or path"`

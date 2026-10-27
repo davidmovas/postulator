@@ -11,10 +11,10 @@ import (
 )
 
 var narrowed = map[string]bool{
-	"imports_export.parameters.format":     true,
-	"runs_control.parameters.reason":       true,
-	"runs.parameters.artifact":             true,
-	"pagetypes_set_scope.parameters.field": true,
+	"imports_export.parameters.format": true,
+	"runs_control.parameters.reason":   true,
+	"runs.parameters.artifact":         true,
+	"pagetypes.parameters.field":       true,
 }
 
 var choiceNames = []string{

@@ -39,18 +39,9 @@ func registered() []string {
 		"pages_manage",
 		"pages_judge",
 		"links",
-		"pagetypes_list",
-		"pagetypes_save",
-		"pagetypes_delete",
-		"pagetypes_set_scope",
+		"pagetypes",
 		"pagetypes_classify",
-		"templates_list",
-		"templates_get",
-		"templates_create",
-		"templates_update",
-		"templates_delete",
-		"templates_set_override",
-		"templates_delete_override",
+		"templates",
 		"runs",
 		"runs_control",
 		"sync_site",
@@ -133,8 +124,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 65172
-	schemaCeilingTokens = 14647
+	schemaCeilingBytes  = 58880
+	schemaCeilingTokens = 13340
 	widestLogged        = 8
 )
 
@@ -524,13 +515,13 @@ func TestAnUnusableCallNeverBecomesAConfirmation(t *testing.T) {
 		},
 		{
 			name: "a field of the wrong shape",
-			tool: "templates_create",
-			args: `{"name":"Guide","spec":{"tone":{"voice":"warm"}}}`,
+			tool: "templates",
+			args: `{"op":"create","name":"Guide","spec":{"tone":{"voice":"warm"}}}`,
 		},
 		{
 			name: "a specification the domain refuses",
-			tool: "templates_create",
-			args: `{"name":"Guide","spec":{"sections":[],"tone":"plain"}}`,
+			tool: "templates",
+			args: `{"op":"create","name":"Guide","spec":{"sections":[],"tone":"plain"}}`,
 		},
 	}
 

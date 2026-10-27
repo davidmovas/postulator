@@ -82,7 +82,7 @@ func TestTheReportPrintsTheAgentsRound(t *testing.T) {
 	if err := measuredAgent(t).write(&table); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	for _, want := range []string{"THE AGENT, PER ROUND", "templates_create", "every schema", "deferred", "replica", "vanilla", "brief"} {
+	for _, want := range []string{"THE AGENT, PER ROUND", "templates", "every schema", "deferred", "replica", "vanilla", "brief"} {
 		if !strings.Contains(table.String(), want) {
 			t.Errorf("the table lacks %q:\n%s", want, table.String())
 		}
