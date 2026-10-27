@@ -32,9 +32,9 @@ func TestAPageIsAskedForAgainSmallerUntilItFitsTheCap(t *testing.T) {
 		lastSize int
 	}{
 		{name: "fits at once", cap: 16384, limit: 50, calls: 1, lastSize: 50},
-		{name: "halved twice", cap: 2048, limit: 50, calls: 3, lastSize: 12},
+		{name: "asked again in proportion to what overflowed", cap: 2048, limit: 50, calls: 2, lastSize: 16},
 		{name: "the default limit when none is asked", cap: 16384, limit: 0, calls: 1, lastSize: defaultPageLimit},
-		{name: "one row is the floor", cap: 64, limit: 8, calls: 4, lastSize: 1},
+		{name: "one row is the floor", cap: 64, limit: 8, calls: 2, lastSize: 1},
 		{name: "no cap asks once", cap: 0, limit: 500, calls: 1, lastSize: 500},
 	}
 	for _, tc := range cases {

@@ -26,6 +26,6 @@ func fitted[T any](deps Deps, limit int, page func(limit int) (T, error)) (T, er
 		if marshalErr != nil || len(encoded) <= room {
 			return answer, nil
 		}
-		limit /= 2
+		limit = max(1, min(limit-1, limit*room/len(encoded)))
 	}
 }
