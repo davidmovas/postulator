@@ -23,11 +23,8 @@ var stamp = time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC)
 
 func registered() []string {
 	return []string{
-		"sites_list",
-		"sites_get",
-		"sites_create",
-		"sites_update",
-		"sites_delete",
+		"sites",
+		"sites_manage",
 		"graph_read",
 		"graph_edit",
 		"graph_propose",
@@ -44,33 +41,10 @@ func registered() []string {
 		"templates",
 		"runs",
 		"runs_control",
-		"sync_site",
-		"sync_check_plugin",
-		"reports_site_overview",
-		"imports_inspect",
-		"imports_preview",
-		"imports_apply",
-		"imports_export",
-		"imports_save_mapping",
-		"imports_list_mappings",
-		"imports_delete_mapping",
+		"imports",
 		"findings",
-		"models_list",
-		"models_upsert",
-		"models_disable",
-		"models_set_profile",
-		"models_get_profiles",
-		"models_set_provider_key",
-		"models_test_provider",
-		"models_usage_summary",
-		"schedules_create",
-		"schedules_update",
-		"schedules_delete",
-		"schedules_get",
-		"schedules_list",
-		"schedules_enable",
-		"schedules_disable",
-		"schedules_run_now",
+		"models",
+		"schedules",
 		"plans",
 	}
 }
@@ -124,8 +98,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 58880
-	schemaCeilingTokens = 13340
+	schemaCeilingBytes  = 48510
+	schemaCeilingTokens = 11074
 	widestLogged        = 8
 )
 
@@ -556,9 +530,9 @@ func TestASecretNeverReachesTheSummaryOrTheEvent(t *testing.T) {
 	registry := newRegistry(actions, bus)
 	binding := tools.Binding{ConversationID: "conversation-1", Mode: agent.ModeConfirm}
 
-	args := json.RawMessage(`{"provider":"openai","apiKey":"sk-live-secret"}`)
+	args := json.RawMessage(`{"op":"create","name":"Shop","baseUrl":"https://shop.example.com","username":"admin","password":"sk-live-secret"}`)
 	for _, tool := range registry.Build(binding) {
-		if tool.Def.Name != "models_set_provider_key" {
+		if tool.Def.Name != "sites_manage" {
 			continue
 		}
 		if _, err := tool.Run(t.Context(), binding, args); err != nil {

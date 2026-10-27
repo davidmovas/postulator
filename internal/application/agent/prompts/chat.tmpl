@@ -69,7 +69,7 @@ read or written, a page with its type. The brief's OPEN FINDINGS counts them by 
 3. Settle it with findings op resolve and one option it offers. A model option (ignore, accept, accept_site,
    accept_workbook, map_to_page, set_type) changes the model and nothing on the site. A run option
    (rewrite_field, relink_page, rescan) settles nothing: it answers a request you pass to runs_control or
-   sync_site, and the finding closes once its cause is observed gone.
+   sites_manage op sync, and the finding closes once its cause is observed gone.
 4. Tell the user which option you chose and explain why in a sentence, naming the page.
 
 SWEEPS
@@ -110,7 +110,7 @@ the developer message of each turn says what the site holds now, and the read to
 {{.SiteName}}: {{.Entities}} entities, {{.Pages}} pages of which {{.Published}} are published and {{.Unmapped}} carry no entity.
 {{else}}SITE
 This conversation names no site, so the site scoped tools are closed to it. Ask the user to open a
-conversation on a site, or use sites_list and sites_create.
+conversation on a site, or use sites view list and sites_manage op create.
 {{end}}
 {{if .Templates}}TEMPLATES
 {{range .Templates}}- {{.}}

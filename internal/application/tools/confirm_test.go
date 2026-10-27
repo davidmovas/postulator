@@ -161,13 +161,13 @@ func TestAnImportTypingPagesIntoARewritingTypeWaitsForAPerson(t *testing.T) {
 	}
 	before := typeOfThePage(t, seeded)
 
-	args, err := json.Marshal(map[string]string{"path": sheet})
+	args, err := json.Marshal(map[string]string{"op": "apply", "path": sheet})
 	if err != nil {
 		t.Fatalf("encode the arguments: %v", err)
 	}
-	out, err := registry.Call(t.Context(), binding, "imports_apply", args)
+	out, err := registry.Call(t.Context(), binding, "imports", args)
 	if err != nil {
-		t.Fatalf("imports_apply: %v", err)
+		t.Fatalf("imports apply: %v", err)
 	}
 	waitsForAPerson(t, out)
 	if got := typeOfThePage(t, seeded); got != before {

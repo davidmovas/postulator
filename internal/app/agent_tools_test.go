@@ -70,7 +70,7 @@ func TestAChatTurnLoadsItsToolsOnDemandWhenTheSettingSaysSo(t *testing.T) {
 	server.Enqueue(
 		openaitest.Answer{
 			Searches: []openaitest.Search{{Arguments: `{"paths":["models"]}`}},
-			Calls:    []openaitest.Call{{ID: "call_models", Namespace: "models", Name: "models_list", Arguments: `{}`}},
+			Calls:    []openaitest.Call{{ID: "call_models", Namespace: "models", Name: "models", Arguments: `{"view":"list"}`}},
 		}.Stream(),
 		openaitest.Text("Two models are on file.").Stream(),
 	)
@@ -93,7 +93,7 @@ func TestAChatTurnLoadsItsToolsOnDemandWhenTheSettingSaysSo(t *testing.T) {
 		t.Fatalf("the provider saw %d rounds, want a search with a call and an answer", len(asked))
 	}
 	whole, namespaces, searchable := offeredTools(t, asked[0].Body)
-	if !searchable || !slices.Contains(whole, "sites_list") || slices.Contains(whole, "models_list") {
+	if !searchable || !slices.Contains(whole, "sites") || slices.Contains(whole, "models") {
 		t.Fatalf("the first round offers %v whole and tool search %t, want the orienting reads whole beside tool search",
 			whole, searchable)
 	}

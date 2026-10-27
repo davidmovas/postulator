@@ -11,7 +11,7 @@ import (
 type modelProfileArgs struct {
 	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler" description:"Model job"`
 	Provider string `json:"provider" description:"Provider, openai"`
-	Model    string `json:"model" description:"Name from models_list"`
+	Model    string `json:"model" description:"Name from the models list"`
 }
 
 type stepArgs struct {

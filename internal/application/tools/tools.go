@@ -134,12 +134,7 @@ type Confirmation struct {
 	Summary  string `json:"summary"`
 }
 
-const (
-	siteField       = "siteId"
-	sortField       = "sort"
-	fieldField      = "field"
-	sortByCreatedAt = "createdAt"
-)
+const siteField = "siteId"
 
 func NewTool[In, Out any](def Def, fn func(ctx context.Context, b Binding, in In) (Out, error)) Tool {
 	schema, schemaErr := llm.SchemaFor[In]()
@@ -237,33 +232,6 @@ func requireSite(_ context.Context, b Binding) error {
 	return nil
 }
 
-func sortedBy(tool Tool, fields ...string) Tool {
-	schema := tool.Def.Schema
-	if schema == nil || schema.Properties == nil {
-		return tool
-	}
-	ordering, ok := schema.Properties[sortField]
-	if !ok || ordering.Properties == nil {
-		return tool
-	}
-	key, ok := ordering.Properties[fieldField]
-	if !ok {
-		return tool
-	}
-
-	chosen := *key
-	chosen.Enum = fields
-	nested := *ordering
-	nested.Properties = maps.Clone(ordering.Properties)
-	nested.Properties[fieldField] = &chosen
-
-	widened := *schema
-	widened.Properties = maps.Clone(schema.Properties)
-	widened.Properties[sortField] = &nested
-	tool.Def.Schema = &widened
-	return tool
-}
-
 func enumOn(tool Tool, property string, values []string) Tool {
 	schema := tool.Def.Schema
 	if schema == nil || schema.Properties == nil {
@@ -278,31 +246,6 @@ func enumOn(tool Tool, property string, values []string) Tool {
 	widened := *schema
 	widened.Properties = maps.Clone(schema.Properties)
 	widened.Properties[property] = &closed
-	tool.Def.Schema = &widened
-	return tool
-}
-
-func orderedOnly(tool Tool) Tool {
-	schema := tool.Def.Schema
-	if schema == nil || schema.Properties == nil {
-		return tool
-	}
-	ordering, ok := schema.Properties[sortField]
-	if !ok || ordering.Properties == nil {
-		return tool
-	}
-
-	direction := *ordering
-	direction.Description = "Set desc to reverse"
-	direction.Properties = maps.Clone(ordering.Properties)
-	delete(direction.Properties, fieldField)
-	direction.Required = slices.DeleteFunc(slices.Clone(ordering.Required), func(name string) bool {
-		return name == fieldField
-	})
-
-	widened := *schema
-	widened.Properties = maps.Clone(schema.Properties)
-	widened.Properties[sortField] = &direction
 	tool.Def.Schema = &widened
 	return tool
 }

@@ -405,7 +405,7 @@ func TestAChatTurnTalksToTheProviderWithItsToolsAndNothingStored(t *testing.T) {
 
 	core, server := provided(t)
 	server.Enqueue(
-		openaitest.Calls(openaitest.Call{ID: "call_sites", Name: "sites_list", Arguments: `{}`}).Stream(),
+		openaitest.Calls(openaitest.Call{ID: "call_sites", Name: "sites", Arguments: `{"view":"list"}`}).Stream(),
 		openaitest.Answer{Text: "You have no sites yet.", Chunks: []string{"You have ", "no sites yet."}}.Stream(),
 	)
 
