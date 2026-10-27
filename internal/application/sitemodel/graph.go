@@ -101,9 +101,10 @@ func (s *Service) Entities(ctx context.Context, req EntitiesRequest) (paging.Lis
 		}
 		query := graph.Key(strings.TrimSpace(req.Query))
 		entities := snapshot.Graph.Entities()
+		index := indexEdges(snapshot.Graph)
 		rows := make([]EntityRow, 0, len(entities))
 		for i := range entities {
-			row := entityRow(snapshot, entities[i])
+			row := entityRow(snapshot, index, entities[i])
 			switch {
 			case query != "" && !strings.Contains(graph.Key(entities[i].Name), query):
 				continue
@@ -141,18 +142,33 @@ func (s *Service) Entity(ctx context.Context, req EntityRequest) (EntityDetail, 
 		if !found {
 			return errors.New(errors.NotFound, "the site holds no such entity").WithDetail("entityId", req.EntityID)
 		}
-		detail = entityDetail(snapshot, entity)
+		detail = entityDetail(snapshot, indexEdges(snapshot.Graph), entity)
 		return nil
 	})
 	return detail, err
 }
 
-func entityRow(snapshot contextpack.Snapshot, entity graph.Entity) EntityRow {
+type edgeIndex map[string][]graph.Edge
+
+func indexEdges(g graph.Graph) edgeIndex {
+	edges := g.Edges()
+	out := make(edgeIndex, len(edges))
+	for i := range edges {
+		held := edges[i]
+		out[held.FromEntityID] = append(out[held.FromEntityID], held)
+		if held.Kind == graph.EdgeRelated && held.ToEntityID != held.FromEntityID {
+			out[held.ToEntityID] = append(out[held.ToEntityID], held)
+		}
+	}
+	return out
+}
+
+func entityRow(snapshot contextpack.Snapshot, index edgeIndex, entity graph.Entity) EntityRow {
 	row := EntityRow{
 		ID: entity.ID, Name: entity.Name, Label: snapshot.Graph.Label(entity.ID),
 		Children: len(snapshot.Graph.Children(entity.ID)), Related: len(snapshot.Graph.Related(entity.ID, 0)),
 	}
-	parents := links(snapshot.Graph, entity.ID, graph.EdgeParent)
+	parents := index.links(snapshot.Graph, entity.ID, graph.EdgeParent)
 	for i := range parents {
 		if row.Parent == nil || parents[i].Status == string(graph.StatusApproved) && row.Parent.Status != string(graph.StatusApproved) {
 			row.Parent = &parents[i]
@@ -167,12 +183,12 @@ func entityRow(snapshot contextpack.Snapshot, entity graph.Entity) EntityRow {
 	return row
 }
 
-func entityDetail(snapshot contextpack.Snapshot, entity graph.Entity) EntityDetail {
+func entityDetail(snapshot contextpack.Snapshot, index edgeIndex, entity graph.Entity) EntityDetail {
 	detail := EntityDetail{
 		ID: entity.ID, Name: entity.Name, Label: snapshot.Graph.Label(entity.ID), Intent: entity.Intent, Definition: entity.Definition,
 		Facts: make([]EntityFact, 0, len(entity.Facts)), Notes: make([]EntityFact, 0, len(entity.Notes)),
 		Keywords: application.KeywordViews(entity.Keywords), Anchors: make([]string, 0, len(entity.Anchors)),
-		Parents: links(snapshot.Graph, entity.ID, graph.EdgeParent), Related: links(snapshot.Graph, entity.ID, graph.EdgeRelated),
+		Parents: index.links(snapshot.Graph, entity.ID, graph.EdgeParent), Related: index.links(snapshot.Graph, entity.ID, graph.EdgeRelated),
 		Children: len(snapshot.Graph.Children(entity.ID)),
 	}
 	for _, fact := range entity.Facts {
@@ -211,8 +227,8 @@ func canonicalOf(snapshot contextpack.Snapshot, entity graph.Entity) (pagemap.Pa
 	return snapshot.Index.ByID(*entity.CanonicalPageID)
 }
 
-func links(g graph.Graph, entityID string, kind graph.EdgeKind) []EntityLink {
-	edges := g.Edges()
+func (x edgeIndex) links(g graph.Graph, entityID string, kind graph.EdgeKind) []EntityLink {
+	edges := x[entityID]
 	out := make([]EntityLink, 0, len(edges))
 	for i := range edges {
 		held := &edges[i]
