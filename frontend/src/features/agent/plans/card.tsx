@@ -12,6 +12,7 @@ import {
     Input,
     OpenInNewIcon,
     PendingActionsIcon,
+    Select,
     Spinner,
     StatusBadge,
     Textarea,
@@ -107,6 +108,23 @@ function Edits({ step, draft, onEdit }: EditsProps): ReactElement {
                 const value = draft[edit.name] ?? edit.value;
                 const long = longEdits.has(edit.name) || [...edit.value].length > longValueRunes;
                 const label = editLabel(edit.name);
+                const choices = edit.choices ?? [];
+                if (choices.length > 0) {
+                    return (
+                        <div key={edit.name} className="flex flex-col gap-0.5" data-plan-edit={edit.name}>
+                            <span className="text-2xs font-medium text-ink-soft">{label}</span>
+                            <Select
+                                size="sm"
+                                aria-label={label}
+                                value={value === "" ? null : value}
+                                options={choices.map((choice) => ({ value: choice.value, label: choice.label }))}
+                                onValueChange={(next) => {
+                                    onEdit(edit.name, next);
+                                }}
+                            />
+                        </div>
+                    );
+                }
                 return (
                     <label key={edit.name} className="flex flex-col gap-0.5">
                         <span className="text-2xs font-medium text-ink-soft">{label}</span>

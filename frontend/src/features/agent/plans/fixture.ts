@@ -1,4 +1,8 @@
-import type { Plan, PlanStep } from "../../../data/types.js";
+import type { Plan, PlanStep, PlanStepEdit } from "../../../data/types.js";
+
+export function anEdit(name: string, value: string, choices: PlanStepEdit["choices"] = []): PlanStepEdit {
+    return { name, value, choices };
+}
 
 export function aStep(number: number, overrides: Partial<PlanStep> = {}): PlanStep {
     return {

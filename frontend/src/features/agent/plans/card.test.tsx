@@ -1,12 +1,12 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { copy } from "../../../copy/index.js";
 import type { Plan, PlanStepChoice } from "../../../data/types.js";
 import { renderScreen } from "../../../testing/render.js";
 import type { PlanBusy } from "./card.js";
 import { PlanCard } from "./card.js";
-import { aPlan, aStep, withStatus } from "./fixture.js";
+import { anEdit, aPlan, aStep, withStatus } from "./fixture.js";
 
 const said = copy.plans;
 
@@ -36,10 +36,16 @@ const proposed = aPlan([
         dependsOn: [1],
         estimateUsd: 0.42,
         estimateTokens: 12000,
-        edits: [{ name: "anchor", value: "peptide kits" }],
+        edits: [anEdit("anchor", "peptide kits")],
     }),
     aStep(3, { summary: "Relink /peptides/", dependsOn: [2] }),
 ]);
+
+beforeAll(() => {
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.releasePointerCapture = () => undefined;
+    Element.prototype.scrollIntoView = () => undefined;
+});
 
 function box(number: number): HTMLInputElement {
     return screen.getByRole("checkbox", { name: said.tick(number) });
@@ -95,6 +101,33 @@ describe("a proposed plan", () => {
             approve: true,
             edits: { anchor: "kits for peptides" },
         });
+    });
+
+    it("offers a value picked from a list when the step names its choices", () => {
+        const sent: Sent[] = [];
+        card(
+            aPlan([
+                aStep(1, {
+                    edits: [
+                        anEdit("pageTypeId", "t-guide", [
+                            { value: "t-guide", label: "Guide" },
+                            { value: "t-hub", label: "Hub" },
+                        ]),
+                    ],
+                }),
+            ]),
+            sent,
+        );
+
+        fireEvent.pointerDown(screen.getByRole("combobox", { name: said.editNames["pageTypeId"] }), {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse",
+        });
+        fireEvent.click(screen.getByRole("option", { name: "Hub" }));
+        fireEvent.click(screen.getByRole("button", { name: said.approveAll }));
+
+        expect(sent[0]?.choices).toStrictEqual([{ stepId: "s1", approve: true, edits: { pageTypeId: "t-hub" } }]);
     });
 
     it("declines every step", () => {

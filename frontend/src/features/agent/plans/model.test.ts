@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { aPlan, aStep } from "./fixture.js";
+import { anEdit, aPlan, aStep } from "./fixture.js";
 import {
     choicesOf,
     costOf,
@@ -55,13 +55,8 @@ describe("ticking and unticking", () => {
 
 describe("the choices sent to ConfirmPlan", () => {
     const edited = [
-        aStep(1, {
-            edits: [
-                { name: "anchor", value: "kits" },
-                { name: "goal", value: "Sell" },
-            ],
-        }),
-        aStep(2, { edits: [{ name: "anchor", value: "mugs" }] }),
+        aStep(1, { edits: [anEdit("anchor", "kits"), anEdit("goal", "Sell")] }),
+        aStep(2, { edits: [anEdit("anchor", "mugs")] }),
     ];
 
     it("sends only the values the person changed, and only for approved steps", () => {
