@@ -282,9 +282,15 @@ func stepRegistry(t *testing.T) *run.Registry {
 func (f *fixture) seedRun(t *testing.T, status run.Status) (run.Run, run.Item) {
 	t.Helper()
 
+	return f.seedRunOf(t, status, []template.StepSpec{{Name: "generate_body", Enabled: true}})
+}
+
+func (f *fixture) seedRunOf(t *testing.T, status run.Status, recipe []template.StepSpec) (run.Run, run.Item) {
+	t.Helper()
+
 	record := run.Run{
 		ID: id.New(), SiteID: f.siteID, Kind: run.KindGenerate, Status: status, Targets: f.pages,
-		Recipe:     []template.StepSpec{{Name: "generate_body", Enabled: true}},
+		Recipe:     recipe,
 		TemplateID: "template-1", TemplateVersion: 2, PublishMode: run.PublishDraft,
 		CreatedBy: kctx.ActorUser, DeadlineAt: sqlitetest.Stamp.Add(time.Hour), CreatedAt: sqlitetest.Stamp,
 	}
@@ -619,44 +625,72 @@ func TestListEventsPagesBySequence(t *testing.T) {
 	}
 }
 
-func TestGetArtifactReadsTheLatestOfItsKind(t *testing.T) {
+func TestGetArtifactReadsTheArtifactOfTheLastStepThatWroteItsKind(t *testing.T) {
 	t.Parallel()
 
-	fixture := newFixture(t)
-	record, item := fixture.seedRun(t, run.StatusCompleted)
-
-	first, err := run.NewArtifact(run.Artifact{
-		ID: id.New(), RunID: record.ID, ItemID: item.ID, Step: "generate_body",
-		Kind: run.ArtifactBodyHTML, Blob: []byte("<p>draft</p>"), CreatedAt: sqlitetest.Stamp,
-	})
-	if err != nil {
-		t.Fatalf("NewArtifact: %v", err)
+	recipe := []template.StepSpec{
+		{Name: "generate_body", Enabled: true}, {Name: "insert_links", Enabled: true}, {Name: "repair_links", Enabled: true},
 	}
-	second, err := run.NewArtifact(run.Artifact{
-		ID: id.New(), RunID: record.ID, ItemID: item.ID, Step: "insert_links",
-		Kind: run.ArtifactBodyHTML, Blob: []byte("<p>linked</p>"), CreatedAt: sqlitetest.Stamp.Add(time.Minute),
-	})
-	if err != nil {
-		t.Fatalf("NewArtifact: %v", err)
+	written := []struct {
+		step, id, body string
+		after          time.Duration
+	}{
+		{step: "repair_links", id: "00000000-0000-4000-8000-000000000001", body: "<p>repaired</p>", after: time.Minute},
+		{step: "generate_body", id: "00000000-0000-4000-8000-000000000002", body: "<p>draft</p>"},
+		{step: "insert_links", id: "00000000-0000-4000-8000-000000000003", body: "<p>linked</p>", after: time.Minute},
 	}
-	for _, artifact := range []run.Artifact{first, second} {
-		if err = fixture.blobs.ReplaceStep(t.Context(), item.ID, artifact.Step, []run.Artifact{artifact}); err != nil {
-			t.Fatalf("ReplaceStep: %v", err)
-		}
-	}
-
-	got, err := fixture.service.GetArtifact(t.Context(), runs.GetArtifactRequest{ItemID: item.ID, Kind: "body_html"})
-	if err != nil {
-		t.Fatalf("GetArtifact: %v", err)
-	}
-	if got.Artifact.Content != "<p>linked</p>" || got.Artifact.Step != "insert_links" {
-		t.Fatalf("GetArtifact = %+v", got.Artifact)
-	}
-	if got.Artifact.Hash != second.Hash || got.Artifact.Size != second.Size {
-		t.Fatalf("GetArtifact = %+v", got.Artifact)
-	}
-
 	cases := []struct {
+		name      string
+		recipe    []template.StepSpec
+		sameStamp bool
+		want      string
+	}{
+		{name: "a minute apart", recipe: recipe[:2], want: "insert_links"},
+		{name: "in the same second, whatever their ids", recipe: recipe, sameStamp: true, want: "repair_links"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newFixture(t)
+			record, item := fixture.seedRunOf(t, run.StatusCompleted, tc.recipe)
+			var want run.Artifact
+			for _, w := range written {
+				if !slices.ContainsFunc(tc.recipe, func(spec template.StepSpec) bool { return spec.Name == w.step }) {
+					continue
+				}
+				stamp := sqlitetest.Stamp
+				if !tc.sameStamp {
+					stamp = stamp.Add(w.after)
+				}
+				artifact, err := run.NewArtifact(run.Artifact{
+					ID: w.id, RunID: record.ID, ItemID: item.ID, Step: w.step,
+					Kind: run.ArtifactBodyHTML, Blob: []byte(w.body), CreatedAt: stamp,
+				})
+				if err != nil {
+					t.Fatalf("NewArtifact: %v", err)
+				}
+				if err = fixture.blobs.ReplaceStep(t.Context(), item.ID, w.step, []run.Artifact{artifact}); err != nil {
+					t.Fatalf("ReplaceStep: %v", err)
+				}
+				if w.step == tc.want {
+					want = artifact
+				}
+			}
+
+			got, err := fixture.service.GetArtifact(t.Context(), runs.GetArtifactRequest{ItemID: item.ID, Kind: "body_html"})
+			if err != nil {
+				t.Fatalf("GetArtifact: %v", err)
+			}
+			if got.Artifact.Step != tc.want || got.Artifact.Content != string(want.Blob) || got.Artifact.Hash != want.Hash {
+				t.Fatalf("GetArtifact = %+v, want the artifact of %s", got.Artifact, tc.want)
+			}
+		})
+	}
+
+	fixture := newFixture(t)
+	_, item := fixture.seedRun(t, run.StatusCompleted)
+	errorCases := []struct {
 		name    string
 		request runs.GetArtifactRequest
 		want    errors.Code
@@ -665,7 +699,7 @@ func TestGetArtifactReadsTheLatestOfItsKind(t *testing.T) {
 		{name: "unknown kind", request: runs.GetArtifactRequest{ItemID: item.ID, Kind: "poem"}, want: errors.Invalid},
 		{name: "absent kind", request: runs.GetArtifactRequest{ItemID: item.ID, Kind: "meta"}, want: errors.NotFound},
 	}
-	for _, tc := range cases {
+	for _, tc := range errorCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
