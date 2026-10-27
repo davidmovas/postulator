@@ -599,7 +599,8 @@ and the message says which. The turn runs under that deadline for every provider
 panic underneath it ends the turn with `INTERNAL` rather than the process. In `confirm` mode a `write` or
 `dangerous` tool does not run: it writes a pending action and emits
 `agent.confirm.requested{conversationId, confirmationId, tool, args, risk, summary}`, which
-`Confirm{actionId, approve}` settles and `agent.confirm.resolved` announces. History is
+`Confirm{actionId, approve}` settles and `agent.confirm.resolved` announces. A pending action keeps the
+`risk` of its op (0084), so a card read back after a restart is badged by what it will do. History is
 read with `ListConversations`, `ListMessages` and `ListPendingActions`, all of which
 survive a restart; `ToolsService.List` is the capability list the UI shows.
 
