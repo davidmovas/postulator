@@ -8,7 +8,8 @@ import { useSetting } from "../../data/hooks/settings.js";
 import type { Page, RunItem } from "../../data/types.js";
 import type { ArtifactKind } from "../../generated/vocab.js";
 import type { TabItem } from "../../ui/index.js";
-import { Banner, Drawer, SkeletonRows, StatusBadge, TabPanel, Tabs } from "../../ui/index.js";
+import { Banner, Button, Drawer, PreviewIcon, SkeletonRows, StatusBadge, TabPanel, Tabs } from "../../ui/index.js";
+import { WriterDrawer } from "../pages/writer/pane.js";
 import { dueMs, remainingMs, retryState, waitingUntil } from "./authority.js";
 import type { ItemView } from "./authority.js";
 import {
@@ -39,6 +40,8 @@ import {
 import { stepText } from "./step-cell.js";
 
 const drawerWidth = 688;
+
+const writtenByTheWriter: ReadonlySet<ArtifactKind> = new Set<ArtifactKind>(["link_context", "draft", "meta", "fields"]);
 
 function retentionOf(held: unknown): number | null {
     return typeof held === "number" && Number.isFinite(held) ? held : null;
@@ -87,6 +90,7 @@ export function ReviewDrawer({
     const regenerate = useRegenerate();
     const resume = useResumeRun();
     const [active, setActive] = useState<ArtifactKind | null>(null);
+    const [reading, setReading] = useState(false);
     const reviewing = item !== null && item.status === itemPaused && item.pauseReason === pauseAwaitingReview;
     const choice = useReviewChoice(itemId, reviewing);
     const accepting = acceptRequest(itemId, choice);
@@ -98,7 +102,10 @@ export function ReviewDrawer({
 
     useEffect(() => {
         setActive(null);
+        setReading(false);
     }, [itemId]);
+
+    const writerRan = kinds.some((kind) => writtenByTheWriter.has(kind));
 
     useEffect(() => {
         if (active === null && kinds.length > 0) {
@@ -147,6 +154,19 @@ export function ReviewDrawer({
             header={
                 item === null ? undefined : (
                     <span className="flex shrink-0 items-center gap-1.5">
+                        {writerRan ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                icon={PreviewIcon}
+                                data-run-writer-saw={true}
+                                onClick={() => {
+                                    setReading(true);
+                                }}
+                            >
+                                {copy.pages.writer.sawRun}
+                            </Button>
+                        ) : null}
                         {at === 0 ? null : (
                             <span className="font-mono text-2xs text-ink-faint">
                                 {copy.runs.review.position(at, siblings.length)}
@@ -292,6 +312,17 @@ export function ReviewDrawer({
                         </div>
                     )}
                 </div>
+            )}
+            {item === null || !reading ? null : (
+                <WriterDrawer
+                    pageId={item.targetId}
+                    path={path}
+                    directions={{ runId: item.runId }}
+                    context="run"
+                    onClose={() => {
+                        setReading(false);
+                    }}
+                />
             )}
         </Drawer>
     );

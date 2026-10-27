@@ -21,6 +21,22 @@ export const writer = {
         whole: "the whole section",
         items: (count: number) => (count === 1 ? "1 item from the end" : `${count} items from the end`),
     },
+    sectionTitles: {
+        brief: "The run's brief and this page's directions",
+        reference: "Reference text given for the run",
+        style: "Style sample given for the run",
+    } as Readonly<Record<string, string>>,
+    directed: {
+        draft: "With the brief and this page's directions as the run start holds them now.",
+        run: "With this run's brief and this page's directions, over the model as it stands now.",
+    },
+    drawer: {
+        draft: (path: string) => `What the writer will see for ${path}`,
+        run: (path: string) => `What this run's writer reads for ${path}`,
+        loading: "Reading the page",
+        close: "Close",
+    },
+    sawRun: "What the writer saw",
     tooSmall: (budget: string, needed: string) =>
         `The input budget of ${budget} tokens is smaller than the ${needed} every call about this page must carry, so a run would be refused before it starts. Raise the budget, or set it to 0 for the model's whole window.`,
 };

@@ -1,3 +1,4 @@
+import { copy } from "../../../copy/index.js";
 import type { PageType, WriterPackSection } from "../../../data/types.js";
 import { fieldLabel } from "../../settings/types/labels.js";
 import { linkField, orderedScopes } from "../../settings/types/model.js";
@@ -31,6 +32,10 @@ export function writerFields(type: PageType | null): WriterField[] {
 export function askedField(fields: readonly WriterField[], choice: string): string {
     const main = fields[0]?.key ?? "";
     return choice === main || !fields.some((field) => field.key === choice) ? "" : choice;
+}
+
+export function sectionTitle(section: WriterPackSection): string {
+    return copy.pages.writer.sectionTitles[section.name] ?? section.heading;
 }
 
 export function byPriority(sections: readonly WriterPackSection[]): WriterPackSection[] {

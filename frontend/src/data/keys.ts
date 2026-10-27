@@ -20,6 +20,7 @@ import type {
     SiteFilter,
     SiteMapFilter,
     TemplateFilter,
+    WriterDirections,
 } from "./types.js";
 
 const scope = "pc";
@@ -74,7 +75,8 @@ export const keys = {
         summaries: () => [scope, "pages", "summary"] as const,
         summary: (siteId: string) => [scope, "pages", "summary", siteId] as const,
         packs: () => [scope, "pages", "pack"] as const,
-        pack: (pageId: string, field: string) => [scope, "pages", "pack", pageId, field] as const,
+        pack: (pageId: string, field: string, directions: WriterDirections | null = null) =>
+            [scope, "pages", "pack", pageId, field, directions] as const,
         maps: () => [scope, "pages", "map"] as const,
         map: (filter: SiteMapFilter, limit?: number) => [scope, "pages", "map", filter, limitSegment(limit)] as const,
         counts: () => [scope, "pages", "count"] as const,

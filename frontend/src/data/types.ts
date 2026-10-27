@@ -91,6 +91,7 @@ export type SiteMapFilter = Omit<SiteModelModels.MapRequest, "cursor" | "limit">
 export type WriterPack = Wire<SiteModelModels.PackView>;
 export type WriterPackSection = Wire<SiteModelModels.Section>;
 export type WriterPackDrop = Wire<SiteModelModels.Drop>;
+export type WriterDirections = Pick<SiteModelModels.PackRequest, "brief" | "directive" | "runId">;
 
 export type Entity = Wire<GraphModels.Entity>;
 export type Edge = Wire<GraphModels.Edge>;

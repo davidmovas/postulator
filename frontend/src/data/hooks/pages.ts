@@ -26,7 +26,15 @@ import { keys } from "../keys.js";
 import { useLockGate } from "../lock.js";
 import { useUnlockedInfinite, useUnlockedQueries, useUnlockedQuery } from "../query.js";
 import type { PageSort } from "../sorts.js";
-import type { Page, PageCountRequest, PageFilter, PageSelection, SiteMapFilter, SiteMapView } from "../types.js";
+import type {
+    Page,
+    PageCountRequest,
+    PageFilter,
+    PageSelection,
+    SiteMapFilter,
+    SiteMapView,
+    WriterDirections,
+} from "../types.js";
 import type { Cursor } from "../../lib/paging.js";
 
 export const siteMapLimit = 100;
@@ -110,10 +118,10 @@ export function useModelSummary(siteId: string | null) {
     });
 }
 
-export function useWriterPack(pageId: string | null, field: string) {
+export function useWriterPack(pageId: string | null, field: string, directions: WriterDirections | null = null) {
     return useUnlockedQuery({
-        queryKey: keys.pages.pack(pageId ?? "", field),
-        queryFn: ({ signal }) => writerPack({ pageId: pageId ?? "", field, budget: 0 }, signal),
+        queryKey: keys.pages.pack(pageId ?? "", field, directions),
+        queryFn: ({ signal }) => writerPack({ pageId: pageId ?? "", field, budget: 0, ...(directions ?? {}) }, signal),
         enabled: pageId !== null && pageId !== "",
         quiet: ["INVALID"],
     });

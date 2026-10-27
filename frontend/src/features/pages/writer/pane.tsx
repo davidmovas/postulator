@@ -4,26 +4,48 @@ import { Link } from "react-router";
 
 import { copy } from "../../../copy/index.js";
 import { failure } from "../../../data/errors.js";
-import { useWriterPack } from "../../../data/hooks/pages.js";
+import { usePage, useWriterPack } from "../../../data/hooks/pages.js";
 import { usePageTypes } from "../../../data/hooks/templates.js";
-import type { Page, WriterPack, WriterPackDrop, WriterPackSection } from "../../../data/types.js";
+import type {
+    Page,
+    WriterDirections,
+    WriterPack,
+    WriterPackDrop,
+    WriterPackSection,
+} from "../../../data/types.js";
 import { tokens } from "../../../domain/format.js";
 import type { SelectOption } from "../../../ui/index.js";
-import { BudgetGauge, Field, Panel, PanelHeader, Select, SkeletonRows, StatusBadge } from "../../../ui/index.js";
+import {
+    BudgetGauge,
+    Drawer,
+    EditNoteIcon,
+    Field,
+    Panel,
+    PanelHeader,
+    Select,
+    SkeletonRows,
+    StatusBadge,
+} from "../../../ui/index.js";
 import { settingsHome } from "../../settings/tabs.js";
 import { fieldLabel } from "../../settings/types/labels.js";
 import { Note } from "../model/facts.js";
 import type { WriterField } from "./fields.js";
-import { askedField, budgetRefusal, byPriority, writerFields } from "./fields.js";
+import { askedField, budgetRefusal, byPriority, sectionTitle, writerFields } from "./fields.js";
 
 const said = copy.pages.writer;
+
+const drawerWidth = 640;
+
+export type WriterContext = "draft" | "run";
 
 export interface WriterTabProps {
     page: Page;
     siteId: string;
+    directions?: WriterDirections | null;
+    context?: WriterContext;
 }
 
-export function WriterTab({ page, siteId }: WriterTabProps): ReactElement {
+export function WriterTab({ page, siteId, directions = null, context }: WriterTabProps): ReactElement {
     const listed = usePageTypes(siteId);
     const type = listed.data?.types?.find((held) => held.id === page.pageTypeId) ?? null;
     const fields = useMemo(() => writerFields(type), [type]);
@@ -35,7 +57,7 @@ export function WriterTab({ page, siteId }: WriterTabProps): ReactElement {
     }, [page.id, main]);
 
     const asked = askedField(fields, choice);
-    const pack = useWriterPack(page.id, asked);
+    const pack = useWriterPack(page.id, asked, directions);
     const shown = fields.some((field) => field.key === choice) ? choice : main;
     const options: readonly SelectOption<string>[] = fields.map((field) => ({ value: field.key, label: field.label }));
 
@@ -43,7 +65,13 @@ export function WriterTab({ page, siteId }: WriterTabProps): ReactElement {
         <div className="flex flex-col gap-3 p-3" data-writer-pack={asked === "" ? main : asked}>
             <Panel>
                 <PanelHeader title={said.title} />
-                <div className="p-3">
+                <div className="flex flex-col gap-2 p-3">
+                    {context === undefined ? null : (
+                        <p className="flex items-start gap-2 text-xs text-ink-soft" data-writer-directed={context}>
+                            <EditNoteIcon size={14} className="mt-0.5 shrink-0 text-accent" />
+                            {said.directed[context]}
+                        </p>
+                    )}
                     <Field label={said.field} hint={said.fieldHint}>
                         {(control) => (
                             <Select
@@ -168,7 +196,7 @@ function PackSection({ section }: { section: WriterPackSection }): ReactElement 
             className="flex flex-col gap-1.5 border-b border-inset px-3 py-2 last:border-b-0"
         >
             <div className="flex min-w-0 items-center gap-2">
-                <h3 className="truncate text-xs font-semibold text-ink">{section.heading}</h3>
+                <h3 className="truncate text-xs font-semibold text-ink">{sectionTitle(section)}</h3>
                 <StatusBadge tone={section.priority === 1 ? "accent" : "muted"} dot={false}>
                     {said.priority(section.priority)}
                 </StatusBadge>
@@ -191,6 +219,47 @@ function PackSection({ section }: { section: WriterPackSection }): ReactElement 
                 </ul>
             )}
         </li>
+    );
+}
+
+export interface WriterDrawerProps {
+    pageId: string;
+    path: string;
+    directions: WriterDirections;
+    context: WriterContext;
+    onClose: () => void;
+}
+
+export function WriterDrawer({ pageId, path, directions, context, onClose }: WriterDrawerProps): ReactElement {
+    const read = usePage(pageId);
+    const page = read.data?.page;
+
+    return (
+        <Drawer
+            open={true}
+            onOpenChange={(next) => {
+                if (!next) {
+                    onClose();
+                }
+            }}
+            title={said.drawer[context](path)}
+            closeLabel={said.drawer.close}
+            width={drawerWidth}
+        >
+            {page === undefined ? (
+                read.isPending ? (
+                    <div className="p-3">
+                        <SkeletonRows rows={6} label={said.drawer.loading} />
+                    </div>
+                ) : (
+                    <div className="p-3">
+                        <Refused thrown={read.error} />
+                    </div>
+                )
+            ) : (
+                <WriterTab page={page} siteId={page.siteId} directions={directions} context={context} />
+            )}
+        </Drawer>
     );
 }
 
