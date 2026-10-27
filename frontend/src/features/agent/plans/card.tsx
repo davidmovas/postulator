@@ -311,7 +311,9 @@ export function PlanCard({ plan, siteId, busy, refusal, onConfirm }: PlanCardPro
                 <span className="shrink-0 font-mono text-2xs text-ink-faint">{said.steps(steps.length)}</span>
             </div>
             <div className="flex flex-col gap-3 p-3">
-                <span className="text-sm leading-snug font-semibold text-ink">{plan.title}</span>
+                <span data-plan-title={true} className="text-sm leading-snug font-semibold text-ink">
+                    {plan.title}
+                </span>
                 <ol className="flex flex-col">
                     {steps.map((step) => (
                         <StepRow

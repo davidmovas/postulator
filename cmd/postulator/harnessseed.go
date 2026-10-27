@@ -461,11 +461,8 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if scheduleErr := seedSchedule(ctx, core, siteID, guide); scheduleErr != nil {
 		return scheduleErr
 	}
-	if conversationErr := seedConversation(ctx, core, siteID); conversationErr != nil {
+	if conversationErr := seedConversation(ctx, core, siteID, pagesByPath, entities); conversationErr != nil {
 		return conversationErr
-	}
-	if planErr := seedPlans(ctx, core, siteID, pagesByPath, entities); planErr != nil {
-		return planErr
 	}
 	return seedSpend(ctx, core, siteID)
 }
@@ -816,7 +813,7 @@ func seedSchedule(ctx context.Context, core *app.Core, siteID, guide string) err
 	return err
 }
 
-func seedConversation(ctx context.Context, core *app.Core, siteID string) error {
+func seedConversation(ctx context.Context, core *app.Core, siteID string, byPath, entities map[string]string) error {
 	opened, err := core.Agent.CreateConversation(ctx, agent.CreateConversationRequest{SiteID: siteID, Mode: "confirm"})
 	if err != nil {
 		return err
@@ -825,6 +822,9 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 
 	if askErr := exchange(ctx, core, conversation, "Which entities still have no canonical page?"); askErr != nil {
 		return askErr
+	}
+	if planErr := seedPlans(ctx, core, siteID, byPath, entities); planErr != nil {
+		return planErr
 	}
 	if askErr := exchange(ctx, core, conversation,
 		"Open the page 00000000-0000-4000-8000-000000000000 and tell me what it links to."); askErr != nil {

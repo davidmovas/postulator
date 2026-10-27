@@ -1987,6 +1987,7 @@
     "steps": [
       { "expect": "[data-plan][data-plan-status=proposed] [data-plan-edits]" },
       { "expect": "[data-plan][data-plan-status=done]" },
+      { "click": "[data-plan][data-plan-status=done] [data-plan-title]" },
       { "wait": 400 },
       { "fits": "[data-plan][data-plan-status=proposed]" },
       { "fits": "[data-plan][data-plan-status=done]" }
@@ -2128,6 +2129,7 @@
     "wait": 1500,
     "steps": [
       { "expect": "[data-agent-dock] [data-plan][data-plan-status=proposed]" },
+      { "click": "[data-agent-dock] [data-plan][data-plan-status=proposed] [data-plan-title]" },
       { "wait": 400 },
       { "fits": "[data-agent-dock] [data-plan][data-plan-status=proposed]" },
       { "fits": "[data-agent-dock] [data-plan][data-plan-status=done]" }
