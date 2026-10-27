@@ -56,6 +56,30 @@ describe("a finding's subject in words", () => {
         ],
         ["parent_differs", { sheet: [], site: ["Peptides"] }, "The workbook places this page under other parents than the site shows."],
         [
+            "entity_parent_differs",
+            {
+                entityId: "e1",
+                entity: "Peptide kits",
+                path: "/kits/peptide-kits/",
+                graphIds: ["e2", "e3"],
+                graph: ["Kits", "Peptides"],
+                treeEntityId: "e4",
+                tree: "Starter kits",
+                treePath: "/kits/starter/",
+            },
+            "“Peptide kits” sits under “Kits” and “Peptides” in the entity graph, while the page tree puts its page under “Starter kits” at /kits/starter/.",
+        ],
+        [
+            "entity_parent_differs",
+            { entityId: "e1", entity: "Kits", graphIds: ["e2"], graph: ["Shop"], treeEntityId: "", tree: "", treePath: "" },
+            "“Kits” sits under “Shop” in the entity graph, while the page tree puts its page at the top.",
+        ],
+        [
+            "entity_parent_differs",
+            { entityId: "e1", entity: "Kits", graphIds: [], graph: [], treeEntityId: "e4", tree: "Shop", treePath: "/shop/" },
+            "“Kits” has no parent in the entity graph, while the page tree puts its page under “Shop” at /shop/.",
+        ],
+        [
             "row_ambiguous",
             { sheet: "Groups", rule: "title", candidates: ["/lab/guides/", "/shop/guides/"], pageIds: ["p1", "p2"] },
             "A row of the sheet Groups matches 2 pages: /lab/guides/, /shop/guides/.",
