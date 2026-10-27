@@ -7,9 +7,12 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
+	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -89,6 +92,38 @@ func TestARunStartInAPlanIsPricedAndOffersItsBriefAndDirectivesForEditing(t *tes
 	}
 	if !strings.Contains(check.Summary, "with a directive for 1 page") {
 		t.Errorf("the step says %q, want its directive named", check.Summary)
+	}
+
+	editable(t, seeded)
+	repo := sqlite.NewPageRepo(seeded.store)
+	target, err := repo.Get(t.Context(), other.Page.ID)
+	if err != nil {
+		t.Fatalf("read the target: %v", err)
+	}
+	target.WPID = new(int64(42))
+	if err = repo.Update(t.Context(), target); err != nil {
+		t.Fatalf("put the target on the site: %v", err)
+	}
+	listed := called[pagetypes.ListResponse](t, registry, binding, "pagetypes", `{"op":"list"}`)
+	checks := map[string]struct {
+		tool, args, want string
+		choices          int
+	}{
+		"a field's value": {"pages_fields", `{"op":"set","pageId":"` + seeded.page + `","key":"excerpt","value":"Fresh beans.","hash":"` +
+			field.Hash("The owner's excerpt.") + `"}`, "value=value", 0},
+		"a link's anchor": {"pages_blocks", `{"op":"place_link","pageId":"` + seeded.page + `","index":0,"hash":"` + block.BodyHash(coffeeBody) +
+			`","targetId":"` + target.ID + `","anchor":"coffee"}`, "anchor=anchor", 0},
+		"a type to choose": {"pages_manage", `{"op":"set_types","pageTypeId":"` + listed.Types[0].ID + `","select":{"pageIds":["` + seeded.page + `"]}}`,
+			"type=pageTypeId", len(listed.Types)},
+	}
+	for name, tc := range checks {
+		held, checkErr := registry.Validate(t.Context(), binding, tc.tool, json.RawMessage(tc.args))
+		if checkErr != nil {
+			t.Fatalf("%s: Validate: %v", name, checkErr)
+		}
+		if len(held.Editable) != 1 || held.Editable[0].Name+"="+held.Editable[0].Path != tc.want || len(held.Editable[0].Choices) != tc.choices {
+			t.Errorf("%s: the editable fields are %+v, want %s with %d choices", name, held.Editable, tc.want, tc.choices)
+		}
 	}
 
 	if _, err = registry.Call(t.Context(), tools.Binding{SiteID: binding.SiteID, ConversationID: binding.ConversationID, Mode: domainagent.ModeAutonomous},

@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -70,7 +71,7 @@ func pagesBlocks(deps Deps) Tool {
 		}
 		return deps.blockSummary(ctx, b, in)
 	})
-	return readsOn(tool, opListBlocks)
+	return editableOn(readsOn(tool, opListBlocks), string(run.EditPlaceLink), agent.EditField{Name: "anchor", Path: "anchor"})
 }
 
 func (in *pagesBlocksArgs) edit() run.Edit {

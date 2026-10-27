@@ -102,6 +102,17 @@ func riskedBy(tool Tool, risks map[string]Risk) Tool {
 	return tool
 }
 
+func editableOn(tool Tool, op string, fields ...agent.EditField) Tool {
+	tool.Edits = func(_ context.Context, _ Binding, args json.RawMessage) ([]agent.EditField, error) {
+		var in opOnly
+		if err := json.Unmarshal(args, &in); err != nil || in.Op != op {
+			return nil, nil
+		}
+		return slices.Clone(fields), nil
+	}
+	return tool
+}
+
 func describing[In any](tool Tool, say func(ctx context.Context, b Binding, in In) (string, error)) Tool {
 	tool.Describe = func(ctx context.Context, b Binding, args json.RawMessage) (string, error) {
 		var in In

@@ -2,11 +2,13 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/application/pagetypes"
 	"github.com/davidmovas/postulator/internal/application/templates"
+	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -59,6 +61,21 @@ func pagesManage(deps Deps) Tool {
 	tool = describing(tool, func(ctx context.Context, b Binding, in pagesManageArgs) (string, error) {
 		return deps.pageChange(ctx, b, &in)
 	})
+	tool.Edits = func(ctx context.Context, b Binding, args json.RawMessage) ([]agent.EditField, error) {
+		var in pagesManageArgs
+		if err := json.Unmarshal(args, &in); err != nil || in.PageTypeID == nil || (in.Op != opSetTypes && in.Op != opUpdate) {
+			return nil, nil
+		}
+		listed, err := deps.PageTypes.List(ctx, pagetypes.ListRequest{SiteID: b.SiteID})
+		if err != nil {
+			return nil, err
+		}
+		choices := make([]agent.EditChoice, 0, len(listed.Types))
+		for i := range listed.Types {
+			choices = append(choices, agent.EditChoice{Value: listed.Types[i].ID, Label: listed.Types[i].Name})
+		}
+		return []agent.EditField{{Name: "type", Path: "pageTypeId", Choices: choices}}, nil
+	}
 	return riskedBy(tool, map[string]Risk{
 		opCreate: RiskWrite, opUpdate: RiskWrite, opMap: RiskWrite, opUnmap: RiskWrite, opCanonical: RiskWrite,
 		opPreviewLink: RiskWrite, opSetTypes: RiskWrite, opSetTemplates: RiskWrite,
