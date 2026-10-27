@@ -475,7 +475,7 @@ func loadHistory(t *testing.T, store *sqlite.Store, conversation string) (held s
 	if unmarshalErr := json.Unmarshal(body, &held); unmarshalErr != nil {
 		t.Fatalf("decode the stored history: %v", unmarshalErr)
 	}
-	if held.Format != "responses/1" {
+	if held.Format != "responses/2" {
 		t.Fatalf("the stored history carries the format %q: %s", held.Format, body)
 	}
 	return held, body

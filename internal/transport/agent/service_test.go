@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -201,6 +202,33 @@ func TestAnActionThatMovedOnIsAConflict(t *testing.T) {
 	}
 	if _, err = h.service.Confirm(t.Context(), agentapp.ConfirmRequest{ActionID: action.ID}); !errors.IsCode(err, errors.Conflict) {
 		t.Fatalf("a rejection of a claimed action = %v", err)
+	}
+}
+
+func TestACardOfAToolThisVersionNoLongerHasFailsInPlainWords(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	conversation := h.conversation(t, domainagent.ModeConfirm)
+	actions := sqlite.NewPendingActionRepo(h.store)
+	action, err := domainagent.NewPendingAction(domainagent.PendingAction{
+		ID: id.New(), ConversationID: conversation, Tool: "pages_delete", Summary: "Delete /coffee/ from the page map",
+		Args: json.RawMessage(`{"id":"p1"}`), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("NewPendingAction: %v", err)
+	}
+	if insertErr := actions.Insert(t.Context(), action); insertErr != nil {
+		t.Fatalf("Insert: %v", insertErr)
+	}
+
+	settled, err := h.service.Confirm(t.Context(), agentapp.ConfirmRequest{ActionID: action.ID, Approve: true})
+	if err != nil {
+		t.Fatalf("Confirm: %v", err)
+	}
+	if settled.Action.Status != string(domainagent.ActionFailed) || !strings.Contains(settled.Action.Error, "no longer has") ||
+		!strings.Contains(settled.Action.Error, "nothing was changed") || strings.Contains(settled.Action.Error, "registered") {
+		t.Fatalf("the card of a retired tool settled as %+v, want a failure the person can read", settled.Action)
 	}
 }
 

@@ -175,7 +175,7 @@ func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
 	if err := held.save(t.Context(), written); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	if store.version != historyVersion || !strings.Contains(string(store.body), `"format":"responses/1"`) {
+	if store.version != historyVersion || !strings.Contains(string(store.body), `"format":"responses/2"`) {
 		t.Fatalf("the stored body is %s at version %d", store.body, store.version)
 	}
 
@@ -255,7 +255,8 @@ func TestAnyOtherHistoryLoadsEmpty(t *testing.T) {
 		body string
 	}{
 		{name: "gollem's history", body: `{"version":3,"llType":"openai","messages":[{"role":"user","contents":[]}]}`},
-		{name: "a newer format", body: `{"format":"responses/2","items":[{"role":"user","text":"hi"}]}`},
+		{name: "a newer format", body: `{"format":"responses/3","items":[{"role":"user","text":"hi"}]}`},
+		{name: "a history that called the tools of 2.6", body: `{"format":"responses/1","items":[{"role":"user","text":"hi"}]}`},
 		{name: "a body that is not JSON", body: `{"format":`},
 	}
 

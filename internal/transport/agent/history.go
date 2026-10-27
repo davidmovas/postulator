@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	historyFormat  = "responses/1"
+	historyFormat  = "responses/2"
 	historyVersion = 1
 )
 
