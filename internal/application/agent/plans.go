@@ -342,9 +342,15 @@ func dependedOn(plan domainagent.Plan, at int) bool {
 func runIDOf(result json.RawMessage) string {
 	var held struct {
 		RunID string `json:"runId"`
+		Edit  *struct {
+			RunID string `json:"runId"`
+		} `json:"edit"`
 	}
 	if json.Unmarshal(result, &held) != nil {
 		return ""
+	}
+	if held.RunID == "" && held.Edit != nil {
+		return held.Edit.RunID
 	}
 	return held.RunID
 }
