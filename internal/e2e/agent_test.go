@@ -147,8 +147,8 @@ func assertEveryViewAnswersFromTheModel(t *testing.T, core *app.Core, conversati
 		t.Errorf("the top of the tree is %+v, want a row for %s", top.Nodes.Items, agentRoot)
 	}
 	rootID := ""
-	for _, node := range top.Nodes.Items {
-		if node.Page.Path == agentRoot {
+	for i := range top.Nodes.Items {
+		if node := &top.Nodes.Items[i]; node.Page.Path == agentRoot {
 			rootID = node.Page.PageID
 		}
 	}
