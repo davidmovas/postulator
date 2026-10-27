@@ -78,6 +78,7 @@ func TestEveryPromptExecutes(t *testing.T) {
 		NameRepairLinks: repairPrompt{
 			Page: page, Entity: entity, Phrase: "home", Why: "the parent", Paragraph: "Peptides are short chains.",
 			Identity: "Peptides (/peptides/, Hub)", About: "Home (/): Entity for Home",
+			Brief: "THE RUN'S BRIEF\nGoal: Win the lab buyer\n",
 		},
 	}
 

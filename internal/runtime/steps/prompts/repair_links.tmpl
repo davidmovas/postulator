@@ -19,7 +19,8 @@ PHRASE TO INCLUDE
 
 WHY
 {{.Why}}
-{{if .About}}
+{{if .Brief}}
+{{.Brief}}{{end}}{{if .About}}
 WHERE THE LINK LEADS
 {{.About}}
 {{end}}

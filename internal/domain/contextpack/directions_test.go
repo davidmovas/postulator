@@ -110,6 +110,25 @@ func TestARunsBriefAndAPagesDirectiveBecomeTheWritersDirections(t *testing.T) {
 	}
 }
 
+func TestTheBriefReadsTheSameWhereNoPackCarriesIt(t *testing.T) {
+	t.Parallel()
+
+	facts := contextpack.Facts{Directions: &contextpack.Directions{
+		Goal: "Win the lab buyer", Notes: "Lead with how it is shipped.",
+		MustLink: []contextpack.MustLinkRef{{Path: "/peptides/", Anchor: "research peptides"}},
+	}}
+	text := facts.BriefText()
+	for _, want := range []string{"THE RUN'S BRIEF\n", "Goal: Win the lab buyer\n", "For this page: Lead with how it is shipped.\n",
+		"Link to /peptides/ with the anchor “research peptides”\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the brief's text lacks %q:\n%s", want, text)
+		}
+	}
+	if got := (contextpack.Facts{}).BriefText(); got != "" {
+		t.Errorf("a run without a brief reads %q, want nothing", got)
+	}
+}
+
 func TestNoBriefAddsNoSection(t *testing.T) {
 	t.Parallel()
 

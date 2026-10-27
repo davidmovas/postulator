@@ -82,6 +82,14 @@ func briefSection(f Facts) Section {
 	return section
 }
 
+func (f Facts) BriefText() string {
+	section := briefSection(f)
+	if len(section.Lines) == 0 {
+		return ""
+	}
+	return Fitted{Sections: []Section{section}}.Text()
+}
+
 func wordsRange(least, most int) string {
 	switch {
 	case least > 0 && most > 0:
