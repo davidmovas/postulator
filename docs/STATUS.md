@@ -4,56 +4,47 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.5.0` on 2026-10-24 (PR #31, notes under **Release 2.5.0**). 2.5.1, the client's
-first feedback (phase 16), was never merged or tagged: its pull request #32 goes from `dev` to
-`master`, so it now carries 2.6.0 too. **2.6.0 is built and waits in that pull request**, neither
-merged nor tagged: page classification by rules, templates per type and the Pages screen's three
-views (phase 17, 2026-10-26), its notes under **Release 2.6.0** below and in the pull request's body,
-which carries 2.5.1's as well. Its gate is under **The gate**.
-
-## Phase 18 in progress (2.7.0)
-
-The plan and the capability matrix are `docs/superpowers/plans/2026-10-26-phase-18-assistant.md`. Landed: W0 (the
-plan), W1 (the read layer: the tree by shape and depth with a reason for every empty parent, the graph read with
-parents, a body as text, a section's links, many pages in one call, a capped list that drops its cursor), W2 (the
-two hierarchies: `entity_parent_differs` raised by a sync and by every parent writer, `graph.AdoptParents` previewed
-and applied under its hash, `adopt_tree` and `keep_graph`, a model proposal's parent from the page tree, a URL-less
-row's parent from its page), W3 (the run brief: `run.Brief` and `run.Directive` kept by migration 0082, refused
-or made an approved edge at the start, a priority-1 pack section for the writer, the judge and the linker, the
-writer pane reads a draft or a run), W4 (plans: `agent_plans` by migration 0083, each step checked as its own tool
-would check it, `AgentService.ConfirmPlan` approving whole or in part with inline text edits, an executor that
-waits on runs, skips what a failure strands and resumes when the core opens) and W6 (the support bundle,
-`SupportService.WriteBundle`, with no secret and none of the client's text). Next: W5, the toolset fold and the
-instructions, with W7 (the screens) beside it; then W8, the capability suite. The tools that expose W1–W4 arrive
-with W5's fold; `internal/application/tools/fit.go` waits uncommitted for its first caller there.
+**Released:** `v2.5.0` on 2026-10-24 (PR #31, notes under **Release 2.5.0**). 2.5.1 (phase 16) and
+2.6.0 (phase 17) were never merged or tagged: pull request #32 goes from `dev` to `master` and now
+carries **2.7.0** as well, **built and waiting there**, neither merged nor tagged: the assistant reads
+the whole site, proposes plans and carries them out once approved, and a run takes a brief (phase 18,
+2026-10-26/27). Its notes are under **Release 2.7.0** below and in the pull request's body, which
+keeps 2.6.0's and 2.5.1's. Its gate is under **The gate**.
 
 ## Next, in order
 
-1. **The owed gate legs**, in sequence on a quiet machine, from the repository root under bash:
+1. **The owed gate legs**, one call each on a quiet machine (no stand up, nothing else holding
+   memory), from the repository root under bash:
    ```
-   go test -race -count=1 -p 2 -covermode=atomic -coverprofile=cov-app.out ./internal/application/...
+   go test -race -count=1 -covermode=atomic -coverprofile=cov-kd.out ./internal/kernel/... ./internal/domain/...
+   go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-app.out ./internal/application/...
    go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-runtime.out ./internal/runtime/...
    go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov-adapters.out ./internal/adapters/...
    go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-rest.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/... ./wp-plugin/...
-   go test -race -count=1 -covermode=atomic -coverprofile=cov-kd.out ./internal/kernel/... ./internal/domain/...
    (head -1 cov-kd.out; tail -q -n +2 cov-kd.out cov-app.out cov-runtime.out cov-adapters.out cov-rest.out) > coverage.out
    go run ./cmd/covergate
    ```
-   then delete the `cov-*.out` files, which no ignore rule covers.
-2. **The owner merges the pull request and tags `v2.6.0` on `master`** (2.5.1 ships inside it); the
-   tag's workflow builds and publishes the installer, the executable and the plugin zip.
-3. **The client installs 2.6.0 over 2.5.0.** The plugin did not change: 1.5.2 stays on his sites, no
-   new zip. Each site gains Landing, Category, Guide and Info and the default rules on first start;
-   no page moves until his next sync types the untyped ones, and the pages typed before 2.6 move only
-   when he applies a preview in Settings → Classification.
-4. **What to look at first on his site**: Settings → Classification's preview (what the rules would
-   change on the pages typed before 2.6), the Findings inbox's "typed by no rule", and the Page types
-   screen's counts and overrides.
+   then delete the `cov-*.out` files, which no ignore rule covers. The kernel and domain group passed
+   at the close; it runs again only for its coverage profile. A `0xc0000142` on a build is Windows
+   failing to start a process for lack of memory, not the code; after a stop, look for a leftover
+   `*.test.exe`.
+2. **The owner merges pull request #32 and tags `v2.7.0` on `master`** (2.5.1 and 2.6.0 ship inside
+   it); the tag's workflow builds and publishes the installer, the executable and the plugin zip.
+3. **The client installs 2.7.0 over 2.5.0.** The plugin did not change: 1.5.2 stays on his sites, no
+   new zip. Migrations 0075 to 0084 run on first start: 2.6.0's types and rules arrive as its notes
+   say, a chat from before starts the assistant afresh with its transcript kept, and his next sync
+   raises "entity parent differs" wherever his graph and his page tree disagree.
+4. **What to look at first on his site**: ask the assistant again to design a section's links (the
+   request that stopped on `ParentId`), and approve or edit the plan it proposes; the inbox's "entity
+   parent differs" and the Graph screen's preview of the tree's parents for his flat graph; a run
+   started with a brief, and its "What the writer will see"; Settings → About's support bundle if
+   anything reads wrong, which he can send as it is.
 5. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
-   `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24); settle the
-   output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and whether tools load on demand
-   (`agent.toolLoading: deferred`). Until then the owner judges the writer by hand from
-   `go run ./cmd/tokenreport -prompts out/prompts`.
+   `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24, a replica
+   round now 13,260 tokens); see what a real model calls for each of the matrix's jobs, which the
+   scripted suite cannot; settle the output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and
+   whether tools load on demand (`agent.toolLoading: deferred`). Until then the owner judges the
+   writer by hand from `go run ./cmd/tokenreport -prompts out/prompts`.
 
 ## What Postulator does
 
@@ -93,9 +84,47 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **Runs** generate, relink, sync and revert, scoped to chosen fields when asked, priced before they
   start, resumed after a crash, and reviewed by a person, whole or field by field, when they write a
   draft. A revert puts back per field and per block and hands back what the client changed since.
-- **The agent** in the dock works the same loop through the same use cases: it reads the model,
-  resolves findings, starts runs and edits a page field by field or block by block. Every write it
-  makes to a page waits for the person.
+- **The agent** in the dock works the same loop through the same use cases: it reads the whole model
+  page by page (the tree, the graph, bodies, links), ends an analysis with a plan of writes the person
+  approves whole or in part, resolves findings, starts runs with a brief and edits a page field by
+  field or block by block. Every write it makes to a page waits for the person.
+- **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
+  run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
+  writer, the linker and the judge.
+
+## Release 2.7.0
+
+The client's third request, in short:
+
+- **The assistant reads the whole site.** It walks the page tree to any depth (a section, a page's
+  ancestors and siblings, or the whole site page by page), and a page with no parent says why: the
+  front page, a planned page, a breadcrumb it could not resolve, two pages answering one crumb. It
+  reads the entity graph with every entity's parent and children, a page's body as text block by
+  block, a section's links in and out with what is owed and what is missing, and finds pages by
+  title, path or keyword. A long answer is never cut silently; the assistant reads the next page.
+- **It ends with a plan.** Once it has read enough, it proposes one card of ordered steps, each with
+  its reason and its estimate. He approves all of it, some steps or none, and edits a link's anchor,
+  a field's value, a run's brief or a page type picked from a list on the card itself. Nothing runs
+  before he approves; a step that fails stops the steps that rest on it; plans stay with the chat.
+- **A run takes a brief.** From the run drawer or through the assistant, a run carries a goal, a
+  focus, a tone, what to avoid, a reference text and a style sample, and for each page notes,
+  sections to add, keywords, anchors, links it must place and a length. The writer, the linker and
+  the judge read it first; "What the writer will see" and the run screen show it. A link the graph
+  does not connect is refused with the missing edge named, or added as a related edge when he ticks
+  "Add a related edge for each", or by an earlier step of the assistant's plan.
+- **The page tree against the entity graph.** Where an entity's parent in the graph differs from its
+  page's parent in the site's tree, the inbox lists it with "take the tree's parent", "keep the
+  graph's" or "ignore". The Graph screen and a Site map section take the tree's parents for many
+  entities at once, previewed first. New proposals and a workbook row without a URL take the parent
+  from the page tree, so a graph built from a flat import is flat no more.
+- **A support bundle.** Settings → About and the dock's menu save one file of what the app holds of a
+  site (counts, types, parents and their reasons, breadcrumb states, the graph's shape, findings by
+  kind, the last chat's tool calls and their sizes), to send when something looks wrong. It never
+  holds a password, a key, a cookie, a page's text or a title.
+- **23 assistant tools in place of 94**, so each round of a chat costs about a quarter fewer tokens.
+  A chat from 2.6 keeps its transcript and starts the assistant afresh; an approval card of a tool
+  that is gone says so in plain words and changes nothing.
+- **No new plugin.** 1.5.2 stays.
 
 ## Release 2.6.0
 
@@ -160,10 +189,19 @@ The notes as the pull request carries them, in short:
   code, and one page's Model tab and "What the writer will see".
 - **The known limits** are below; the first is that **no run has been made with a funded OpenAI key**.
 
-## Known limits at 2.6.0
+## Known limits at 2.7.0
 
-- **Four race groups and `covergate` are owed** for 2.6.0 (under **Next, in order**); every package
-  in them passed without `-race`.
+- **The race groups past `application/schedules` and `covergate` are owed** for 2.7.0 (item 1 of
+  **Next, in order**); every package in them passed without `-race`.
+- **The capability suite is scripted.** Each matrix row is a conversation whose tool calls a script
+  makes, so it proves the reads, the plans and the executor end to end over the replica, not which
+  calls a real model chooses; that waits for the funded key (under **Next, in order**).
+- **A plan step takes as given only the edges an approved `add_edge` step it depends on writes.** An
+  adoption or a proposal's write is not assumed, so a run start resting on one goes in a second plan
+  once the first has run.
+- **The assistant at 5,000 pages**: every view fits the result cap, but a section's links read the
+  site's whole audit (2.8 to 4.8 s a call), an entity's page reads the base snapshot (1.5 s), and
+  walking all 3,875 entities takes three minutes, a read it has little cause to make.
 - **Classification on a site of 5,000 pages**: a preview or a group's page reads in about half a
   second from a fresh site map, and about a second right after a change (the map is refreshed once);
   an apply of 2,750 pages takes 4 to 6 s in batches of 1,000. The Pages Tree shows its first rows in
@@ -191,6 +229,51 @@ The notes as the pull request carries them, in short:
 - **The rest** is under **Known gaps**, each with its reason.
 
 ## Where we are
+
+**2026-10-26/27, phase 18: 2.7.0, the assistant reads, proposes and works; the writer takes a
+brief.** The reasoning is under "phase 18" in `DECISIONS.md`; the task list and the capability
+matrix, every row proven with its test, are in `docs/superpowers/plans/2026-10-26-phase-18-assistant.md`.
+
+- **Why**: the client asked the assistant to design a section's links and it stopped on an empty
+  `ParentId`. The entity read carried no parent (a parent was an edge only), his graph is flat (URL-less
+  rows and proposals), the page side answered a bare null for five causes, and no tool walked a
+  subtree or the whole tree.
+- **The owner's answers at the plan**: a must-link the graph does not connect is refused, the plan adding
+  the edge as an earlier step or the run start adding it on request; the catalog's admin tools leave the
+  assistant; a plan card edits a step's text inline; no critic.
+- **The read layer** (`caedef0`, `c93468b`, `f097cbe`, `f07a5da`, `34497e1`, `8c17ea0`, `f02fbd0`): the
+  tree by shape and depth over `page_map` (0081) with its generation guard, every empty parent with
+  its reason (`contextpack.ParentWhy`, never stored), every entity with its parent edge or why it has
+  none, a body as text block by block, a section's links by page, map, owed, orphans and suggestions,
+  many pages found in one paged call; a capped list drops the cursor past the rows it cut (`f9c071f`).
+- **The two hierarchies** (`08c02d6`, `c4da6bb`, `84fbc5b`, `b315536`, `6a72f5a`, `17c7c47`):
+  `entity_parent_differs` raised by a sync and settled by every parent writer, `graph.AdoptParents`
+  previewed and applied under its hash, `adopt_tree` and `keep_graph`, a proposal's and a URL-less row's
+  parent from the page tree.
+- **The run brief** (`99ffc35`, `28cb864`, `d2aab58`, `19abcc9`): `run.Brief` and `run.Directive` kept by
+  0082 and in each step's input hash, refused or made an approved edge at the start, a priority-1 pack
+  section read by the writer, the judge and the linker; the writer pane reads a draft or a run.
+- **Plans** (`bbe0b0b`, `8fc71c7`, `851c2ab`, `5c6f24b`, `c758e60`): `agent_plans` (0083), each step
+  checked as its own tool would check it, `AgentService.ConfirmPlan` whole or in part with inline edits,
+  an executor that waits on runs, skips what a failure strands and resumes when the core opens.
+- **The fold** (`aed9814`, `17aa23b`, `fd4055d`, `a1dc8dc`, `69c8994`, `9cb666f`, `1deace0`, `f132695`):
+  94 tools to 23 by job, a read by `view` and a write by `op` with its own risk and sentence; schemas
+  from 68,310 B and 15,222 tokens to 48,543 B and 11,084, a replica round from 17,194 tokens to 13,260;
+  history format `responses/2`; the instructions teach read, propose and act; 0084 keeps a card's risk
+  (`6204849`).
+- **The support bundle** (`6aa5856`, `4636b8e`): `SupportService.WriteBundle`, one JSON file with no
+  secret, body, title or argument, which a test proves.
+- **Scale** (`25fe201`, `1573da6`, `ddd0857`): every read view fits the 16 KB cap at 5,003 pages; the
+  tree, the pages and the entities walk by cursor with no gap and no repeat.
+- **The screens** (agent F, `b7e9424` to `982fec8`): the plan card, the run drawer's brief, directives
+  and edge offer, the writer pane, the adoption dialog, the finding's copy, the bundle buttons, the
+  harness shots.
+- **The capability suite** (agent E, `6281db6`, `99a919b`): one scripted conversation per matrix row on
+  the replica and the four named tests. It found six defects, fixed test first: the linker's brief
+  (`600b1d2`), an edit run a plan step must wait on (`a417a48`), an entity's keywords in a search
+  (`6437a42`), an artifact's step within one second (`8e17a20`), an edge a plan's own run start needs
+  (`a06d2df`), two summaries (`7106ef2`).
+- **2.7.0** (`759edc6`) in the seven version files. Migrations to 0084; plugin 1.5.2, unchanged.
 
 **2026-10-26, phase 17: 2.6.0, page classification by rules, templates per type, the Pages views.**
 The reasoning is under "phase 17" in `DECISIONS.md`; the task list is in
@@ -849,6 +932,41 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
 
+**2026-10-27, on Windows, at the close of phase 18, for 2.7.0. On the final code (`7106ef2`), exit
+codes checked, one leg at a time; the race groups past `application/schedules` and `covergate` are
+owed, below.**
+
+- The comment check and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`, exit 0 each.
+- `golangci-lint run` over every package in four chunks and `--build-tags uiharness ./...`, then `task
+  lint:e2e` alone: 0 issues each.
+- **The race groups** (`-count=1`, coverage, `-p 1`): kernel and domain green in 21 s; the application
+  group's first 18 packages green, `schedules` the last. Then `sitemodel`, `sites`, `support`, `sync`,
+  `templates` and `tools` stopped at their build with Windows' `0xc0000142` (`compile.exe`,
+  `cover.exe` and `vet.exe` could not start with the machine short of memory), and Claude Code's
+  low-memory guard stopped the chain in the runtime group; its `go test` outlived the guard and was
+  stopped by hand. The rest of the application group, the runtime, adapters and last groups and
+  `covergate` are **owed** (the commands are item 1 of **Next, in order**); every package in them
+  passed without `-race` during the phase.
+- `go test -count=1 ./internal/app/scale/`: the view walk in 233 s (the tree's 4,503 rows in 4.6 s, the
+  pages in 40 s, the 3,875 entities in 2 min 4 s, none missed and none twice), the rest in 73 s.
+- `npm run typecheck` (14 s); `npm run test:run -- --maxWorkers=2`, 2,475 tests in 210 files (119 s);
+  `task ui:lint`, 0 issues and the harness tests (133 s).
+- `task build VERSION=2.7.0` (120 s) with no generated drift.
+- **Vanilla**, provisioned fresh: `task e2e:full -- -v -timeout 40m`, 13 passed and 13 skipped (the nine
+  replica-only capability tests and the four skipped by design), 368 s; `task e2e:full:noplugin`, 45 s;
+  taken down.
+- **The replica**, provisioned fresh: `task e2e:full -- -v -timeout 40m`, 24 passed, every capability
+  test among them, and 2 skipped by design, 966 s; taken down. Before it, the four tests the suite's
+  first run had left red passed alone in 200 s after their fixes.
+- The plugin did not change, so its lint and tests were not run.
+- `task package VERSION=2.7.0` (31 s): `bin/postulator-amd64-installer.exe`, 14,510,806 bytes,
+  product and file version 2.7.0; the executable's file version is 2.7.0.0.
+  `bin/postulator-companion.zip` is still plugin 1.5.2.
+- `go run ./cmd/tokenreport`: 23 tools, 48,543 bytes and 11,084 tokens of schema (68,310 and 15,222 for
+  94 tools at the phase's start); the autonomous instructions with the replica's brief 2,133 tokens; a
+  replica round 13,260 tokens (17,194 before).
+
 **2026-10-26, on Windows, at the close of phase 17, for 2.6.0. On the final code (`ed70209`), exit
 codes checked, one leg at a time; four race groups and `covergate` are owed, below.**
 
@@ -1374,6 +1492,9 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
 | 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | done, closed 2026-10-24 with the whole gate green on both stands |
 | 15 | The release (2026-10-24), two sessions in `2026-10-24-phase-15-release.md` | done on 2026-10-24: session 1 (the plugin's floors, pages without an entity, the input estimate, scale, the prompts) and session 2 (the polish, the docs, 2.5.0 built, the pull request open) |
+| 16 | 2.5.1, the client's first feedback (2026-10-25), `2026-10-25-phase-16-patch.md` | done; built, in PR #32 |
+| 17 | 2.6.0, classification by rules, templates per type, the Pages views (2026-10-26), `2026-10-26-phase-17-classification.md` | done; built, in PR #32 |
+| 18 | 2.7.0, the assistant reads, proposes and works; the run brief (2026-10-26/27), `2026-10-26-phase-18-assistant.md` | done, every matrix row proven; built, in PR #32 |
 
 ## Known gaps
 

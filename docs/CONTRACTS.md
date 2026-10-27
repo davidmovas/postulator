@@ -655,14 +655,17 @@ is used as a read tool returned it and that a field left out keeps its value.
 
 `plans op propose{title, steps: [{tool, args (one JSON object as a string), reason, dependsOn
 (numbers from 1)}]}` checks each step as its tool would check a confirmation (`Registry.Validate`),
-stores the plan, emits `agent.plan.proposed` and answers `{status: "planProposed", planId, plan}`;
+with the graph edges written by every step it depends on, directly or through others, taken as
+already there (an approved `graph_edit add_edge`, so a run start's must-link may rest on it), stores
+the plan, emits `agent.plan.proposed` and answers `{status: "planProposed", planId, plan}`;
 `op get` and `op list` read the conversation's plans. A plan waits for the person in either mode
 (`AgentService.ConfirmPlan`); its steps then run through the registry, approved, each step emitting
 `agent.plan.updated{conversationId, planId, status, stepId, stepStatus}`, and the conversation is
 told the outcome in one message.
 
 Every list a tool answers is fitted to the result cap before its cursor is issued (`tools.fitted`
-halves the limit until the encoded page fits within the cap less a sixteenth), so following
+asks again with the limit cut in proportion to the overflow until the encoded page fits within the
+cap less a sixteenth), so following
 `nextCursor` never skips a row; `internal/app/scale` walks the tree, the pages and the entities by
 cursor at 5,003 pages with none missed and none twice.
 

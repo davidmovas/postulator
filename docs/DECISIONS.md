@@ -5536,8 +5536,9 @@ matrix and the task list are `docs/superpowers/plans/2026-10-26-phase-18-assista
 - **The graph with its parents** (`sitemodel.Entities`, `sitemodel.Entity`): each entity with its
   parent edge or why none, its canonical page and that page's parent, its card, keywords, anchors,
   parents, related and children.
-- **No result is cut silently.** A list tool asks for a page that fits (`tools.fitted` halves its
-  limit until the encoded page is within the result cap less a sixteenth), and the cursor is the one
+- **No result is cut silently.** A list tool asks for a page that fits (`tools.fitted` cuts its
+  limit, in proportion to the overflow since the scale pass below, until the encoded page is within
+  the result cap less a sixteenth), and the cursor is the one
   issued for that shorter page. When the guard still cuts a list it drops `nextCursor`, sets
   `hasMore` and says to ask again with a smaller limit (`cursorDropped`).
 
@@ -5604,7 +5605,7 @@ matrix and the task list are `docs/superpowers/plans/2026-10-26-phase-18-assista
   plan step show. A page addressed by id must belong to the conversation's site.
 - **Every schema** went from 68,310 bytes and 15,222 tokens (94 tools) to 48,543 bytes and 11,084
   tokens; the instructions with the replica's brief from 1,929 to 2,133 tokens; a whole round on the
-  replica from 17,194 to 13,254. Deferred loading stays off.
+  replica from 17,194 to 13,260. Deferred loading stays off.
 - **The history format** moved to `responses/2`, so a conversation from 2.6 starts the model afresh
   and keeps its transcript; approving a card of a tool this version no longer has fails in plain
   words, nothing changed.
@@ -5639,10 +5640,46 @@ store and proves the bundle holds none of them.
   5,003 pages), and an entity page still reads the base snapshot (1.5 s); walking all 3,875 entities
   takes three minutes, a read the assistant has little cause to make.
 
+### A card keeps its op's risk
+
+- **A folded tool's risk is its op's**, so a card read back from `pending_actions` after a restart
+  would have been badged by the tool's widest risk (`pages_manage update` as dangerous). Migration
+  0084 adds `pending_actions.risk`, written with the card; a card stored before 2.7.0 has none and
+  falls back to the tool's own.
+
+### What the capability suite found
+
+The suite (agent E, `internal/e2e/capability_*_test.go`) drives each matrix row as a scripted
+conversation over the replica, through the same registry and executor the window uses. Five
+defects surfaced, each fixed test first in the package that owned it:
+
+- **The linker never read the run's brief** (`600b1d2`): the writer and the judge did, `repair_links`
+  did not, so a must-link's reason reached no linker prompt. It now renders the same section.
+- **A plan step that started an edit run did not wait on it** (`a417a48`): `pages_fields set` and the
+  block ops answer their run under `edit.runId`, not `runId`, so the executor marked the step done
+  while the run was still writing and its dependants ran early.
+- **A keyword the page takes from its entity did not find the page** (`6437a42`): `pages_find` looked
+  at the page's own keywords only; it now reads `pagemap.Keywords(page, entity)`, the list the writer
+  reads.
+- **An artifact read the wrong step's version** (`8e17a20`): `runs.GetArtifact` took the newest by
+  `created_at`, stored to the second, so three `body_html` versions written in one second came back
+  by whichever id sorted last. It now ranks by the step's place in the run's recipe, as the engine
+  does (`artifactsByKind`); one row per step and kind (`ReplaceStep`) makes that exact.
+- **A plan could not add the edge its own run start needs** (`a06d2df`): the owner's ruling was "the
+  plan adds the edge as an earlier step", but the start step was checked against today's graph and
+  refused. A step now reports the edges it writes (`Tool.Adds`, an approved `add_edge`); a later step
+  is checked, edited and run with the edges of every step it depends on, through others too
+  (`Registry.Assuming`, `runs.StartRequest.Assumed`, never JSON). Only `dependsOn` counts: a step
+  beside the edge, or after an edge left a proposal, is still refused, because the executor may
+  skip one without the other. The instructions say "an earlier step the run's start dependsOn".
+- **Two summaries said what the call does not do** (`7106ef2`): `add_edge` left a proposal read as
+  written, and an approved `graph_propose cards` said its cards waited for an acceptance when the
+  approval writes them.
+
 ### Deviations from the request
 
 - **One table for plans**, the steps as JSON, where the plan said two.
-- **Migrations 0081 to 0083**, renumbered past the existing 0080.
+- **Migrations 0081 to 0084**, renumbered past the existing 0080.
 - **The card text of the folded tools** landed in one frontend pass after the Go fold, not in each
   group's commit; no test ties the frontend's tool names to Go, and the cards fell back to the
   generic view in between.
