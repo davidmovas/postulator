@@ -552,5 +552,16 @@ export const settings = {
         commit: "Commit",
         built: "Built",
         recheck: "Check again",
+        support: {
+            title: "Support bundle",
+            site: "Site",
+            save: "Save a support bundle…",
+            saving: "Saving",
+            holds: "One file of what the model holds of the site: each page's address, type and parent with why, the graph's counts, the findings by kind and the assistant's recent tool calls. It holds no key, no password and no text of any page.",
+            saved: (path: string, size: string) => `Saved to ${path}, ${size}.`,
+            noSites: "A bundle describes one site, so add a site first.",
+            filter: "Support bundle",
+            dialogTitle: "Save a support bundle",
+        },
     },
 };

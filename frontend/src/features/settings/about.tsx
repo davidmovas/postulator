@@ -1,11 +1,73 @@
 import type { ReactElement } from "react";
+import { useState } from "react";
 
+import { readLastSite } from "../../app/site-memory.js";
 import { copy } from "../../copy/index.js";
+import { flatten } from "../../data/call.js";
 import { useBuildInfo } from "../../data/hooks/health.js";
-import { absoluteTime } from "../../domain/format.js";
-import { Button, Panel, PanelHeader, RefreshIcon, Skeleton } from "../../ui/index.js";
+import { useSites } from "../../data/hooks/sites.js";
+import { bundleRefusal, useSaveBundle } from "../../data/hooks/support.js";
+import { absoluteTime, bytes } from "../../domain/format.js";
+import { Banner, Button, Inventory2Icon, Panel, PanelHeader, RefreshIcon, Select, Skeleton } from "../../ui/index.js";
+import { pickSite } from "./types/model.js";
 
 const unknownBuild = "unknown";
+
+const said = copy.settings.about.support;
+
+function SupportPanel(): ReactElement {
+    const sites = useSites();
+    const rows = flatten(sites.data?.pages);
+    const [chosen, setChosen] = useState<string | null>(null);
+    const siteId = pickSite(chosen, readLastSite(), rows.map((site) => site.id));
+    const site = rows.find((held) => held.id === siteId) ?? null;
+    const save = useSaveBundle();
+    const saved = save.data ?? null;
+    const refusal = bundleRefusal(save.error);
+
+    return (
+        <Panel>
+            <PanelHeader title={said.title} />
+            <div className="flex flex-col gap-2 p-3" data-support-bundle={true}>
+                {sites.isPending ? (
+                    <Skeleton height={28} />
+                ) : site === null ? (
+                    <p className="text-xs text-ink-dim">{said.noSites}</p>
+                ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                        {rows.length > 1 ? (
+                            <div className="w-56">
+                                <Select
+                                    size="sm"
+                                    aria-label={said.site}
+                                    value={site.id}
+                                    options={rows.map((held) => ({ value: held.id, label: held.name }))}
+                                    onValueChange={(next) => {
+                                        setChosen(next);
+                                        save.reset();
+                                    }}
+                                />
+                            </div>
+                        ) : null}
+                        <Button
+                            variant="secondary"
+                            icon={Inventory2Icon}
+                            busy={save.isPending}
+                            onClick={() => {
+                                save.mutate({ siteId: site.id, siteName: site.name });
+                            }}
+                        >
+                            {save.isPending ? said.saving : said.save}
+                        </Button>
+                    </div>
+                )}
+                <p className="text-xs text-ink-dim">{said.holds}</p>
+                {saved === null ? null : <Banner tone="ok" title={said.saved(saved.path, bytes(saved.bytes))} />}
+                {refusal === null ? null : <Banner tone="danger" title={refusal} />}
+            </div>
+        </Panel>
+    );
+}
 
 function Row({ label, value }: { label: string; value: string }): ReactElement {
     return (
@@ -55,6 +117,7 @@ export function AboutScreen(): ReactElement {
                     </>
                 )}
             </Panel>
+            <SupportPanel />
         </div>
     );
 }
