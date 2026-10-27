@@ -14,7 +14,7 @@ function Entry({ entry }: { entry: NavEntry }): ReactElement {
             title={label}
             className={({ isActive }) =>
                 cx(
-                    "relative flex h-9 w-15 shrink-0 flex-col items-center justify-center rounded-md",
+                    "relative flex h-9 w-15 max-w-full shrink-0 flex-col items-center justify-center rounded-md",
                     "transition-colors duration-100 ease-out",
                     isActive ? "bg-accent-soft text-accent" : "text-ink-dim hover:bg-inset hover:text-ink-soft",
                 )
@@ -52,7 +52,7 @@ export function Rail({ siteId, pending }: RailProps): ReactElement {
     return (
         <nav
             aria-label={copy.shell.sections}
-            className="flex w-17 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-hairline bg-panel py-2"
+            className="flex w-17 shrink-0 flex-col items-center gap-1 overflow-x-hidden overflow-y-auto border-r border-hairline bg-panel py-2 [scrollbar-width:none]"
         >
             {sections.map((section, index) => (
                 <div

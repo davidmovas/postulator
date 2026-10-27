@@ -53,13 +53,13 @@ var fieldNames = map[field.Key]string{
 	field.ImageAlt: "Image alt text", field.ImageTitle: "Image title",
 }
 
-var roles = map[pagetype.Preset]string{
-	pagetype.Hub:           "a hub: it introduces its topic and links down to its children and sideways to related pages",
-	pagetype.Entity:        "an article about one entity: it links up to its parents and sideways to related pages",
-	pagetype.Product:       "a product page: its descriptions sell the product; it carries no children section",
-	pagetype.StoreCategory: "a store category archive the store generates; it is read, never written",
-	pagetype.Catalog:       "the shop or a listing root",
-	pagetype.Technical:     "a technical page; it carries no links and is never written",
+var roles = map[pagetype.Role]string{
+	pagetype.RoleHub:       "a hub: it introduces its topic and links down to its children and sideways to related pages",
+	pagetype.RoleEntity:    "an article about one entity: it links up to its parents and sideways to related pages",
+	pagetype.RoleProduct:   "a product page: its descriptions sell the product; it carries no children section",
+	pagetype.RoleArchive:   "a store category archive the store generates; it is read, never written",
+	pagetype.RoleCatalog:   "the shop or a listing root",
+	pagetype.RoleTechnical: "a technical page; it carries no links and is never written",
 }
 
 func FieldName(key field.Key) string {
@@ -76,8 +76,11 @@ func Build(f Facts, scope field.Scope) Pack {
 	sections := []Section{
 		pageSection(f),
 		rulesSection(f, scope),
+		briefSection(f),
 		cardSection(f),
 		currentSection(f, scope.Key),
+		referenceSection(f),
+		styleSection(f),
 		keywordsSection(f),
 		trailSection(f),
 		notesSection(f),
@@ -120,7 +123,7 @@ func pageSection(f Facts) Section {
 	if kind == "" {
 		kind = "untyped"
 	}
-	if role := roles[f.Page.Preset]; role != "" {
+	if role := roles[f.Page.Preset.Role()]; role != "" {
 		kind += ", " + role
 	}
 	lines = append(lines, "Page type: "+kind)
@@ -322,8 +325,8 @@ func keywordsSection(f Facts) Section {
 
 func trailSection(f Facts) Section {
 	items := make([]string, 0, len(f.Trail))
-	for _, ref := range f.Trail {
-		items = append(items, refLine(ref))
+	for i := range f.Trail {
+		items = append(items, refLine(&f.Trail[i]))
 	}
 	lines := make([]string, 0, 1)
 	if source := parentSources[f.ParentReason]; len(f.Trail) > 0 && source != "" {
@@ -373,7 +376,7 @@ func targetsSection(f Facts) Section {
 
 func productsSection(f Facts) Section {
 	priority := 6
-	if f.Page.Preset == pagetype.Hub || f.Page.Preset == pagetype.Catalog || f.Page.Preset == pagetype.StoreCategory {
+	if role := f.Page.Preset.Role(); role == pagetype.RoleHub || role == pagetype.RoleCatalog || role == pagetype.RoleArchive {
 		priority = 4
 	}
 	items := make([]string, 0, len(f.Products))
@@ -413,13 +416,13 @@ func productLine(product *Product) string {
 
 func refsSection(name SectionName, heading string, priority int, refs []Ref) Section {
 	items := make([]string, 0, len(refs))
-	for _, ref := range refs {
-		items = append(items, refLine(ref))
+	for i := range refs {
+		items = append(items, refLine(&refs[i]))
 	}
 	return Section{Name: name, Heading: heading, Priority: priority, Items: items}
 }
 
-func refLine(ref Ref) string {
+func refLine(ref *Ref) string {
 	line := "- " + ref.Title + " (" + ref.Path
 	if ref.Type != "" {
 		line += ", " + ref.Type

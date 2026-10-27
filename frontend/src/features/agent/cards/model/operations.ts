@@ -2,7 +2,7 @@ import { copy } from "../../../../copy/index.js";
 import { tokens, usd } from "../../../../domain/format.js";
 import { stepLabel } from "../../../templates/labels.js";
 import type { Args, Describer, Line } from "./card.js";
-import { flag, line, listed, num, record, records, ref, strings, text, view } from "./card.js";
+import { flag, line, listed, num, opOf, record, records, ref, strings, text, view } from "./card.js";
 
 const said = copy.agent.describe;
 
@@ -15,8 +15,14 @@ function mappingLines(mapping: Args | null): Line[] {
     if (mapping === null) {
         return [];
     }
+    const lines: Line[] = [];
+    const saved = text(mapping, "id");
     const columns = records(mapping, "columns");
-    const lines: Line[] = [line("list", said.imports.columns(columns.length))];
+    if (saved !== null && columns.length === 0) {
+        lines.push(line("rule", [`${said.imports.savedMapping} `, ref("mapping", saved)]));
+    } else {
+        lines.push(line("list", columns.length === 0 ? said.imports.detected : said.imports.columns(columns.length)));
+    }
     for (const column of columns) {
         lines.push(line("field", said.imports.column(text(column, "field") ?? "", text(column, "column") ?? "")));
     }
@@ -31,13 +37,22 @@ function mappingLines(mapping: Args | null): Line[] {
     return lines;
 }
 
-export const describeSync: Describer = (tool) => (tool === "sync_site" ? view(said.sync.site, [line("note", said.sync.body)]) : null);
+function sheetLines(args: Args): Line[] {
+    return records(args, "sheets").map((sheet) => {
+        const mapping = text(sheet, "mappingId");
+        const named = said.imports.sheet(text(sheet, "sheet") ?? "", text(sheet, "rowType") ?? "pages");
+        return mapping === null ? line("list", named) : line("list", [`${named} `, ref("mapping", mapping)]);
+    });
+}
 
 export const describeImports: Describer = (tool, args) => {
-    switch (tool) {
-        case "imports_apply": {
+    if (tool !== "imports") {
+        return null;
+    }
+    switch (opOf(args)) {
+        case "apply": {
             const path = text(args, "path") ?? "";
-            const lines: Line[] = [line("file", said.imports.file(path)), ...mappingLines(record(args, "mapping"))];
+            const lines: Line[] = [line("file", said.imports.file(path)), ...mappingLines(record(args, "mapping")), ...sheetLines(args)];
             const saveAs = text(args, "saveMappingAs");
             if (saveAs !== null) {
                 lines.push(line("note", said.imports.saveAs(saveAs)));
@@ -45,77 +60,21 @@ export const describeImports: Describer = (tool, args) => {
             lines.push(line("warn", said.imports.applyBody, "danger"));
             return view(said.imports.apply(fileName(path)), lines);
         }
-        case "imports_export":
+        case "export":
             return view(said.imports.export(text(args, "path") ?? ""), []);
-        case "imports_save_mapping":
-            return view(said.imports.saveMapping(text(args, "name") ?? ""), mappingLines(args));
-        case "imports_delete_mapping":
-            return view([`${said.imports.deleteMapping} `, ref("mapping", text(args, "id") ?? "")], []);
-        default:
-            return null;
-    }
-};
-
-function modelRef(args: Args): string {
-    return `${text(args, "provider") ?? ""}/${text(args, "model") ?? ""}`;
-}
-
-export const describeModels: Describer = (tool, args) => {
-    switch (tool) {
-        case "models_upsert": {
-            const lines: Line[] = [];
-            const context = num(args, "contextTokens");
-            if (context !== null) {
-                lines.push(line("rule", said.models.context(tokens(context))));
-            }
-            const output = num(args, "maxOutputTokens");
-            if (output !== null) {
-                lines.push(line("rule", said.models.output(tokens(output))));
-            }
-            const input = num(args, "inputUsdPerM");
-            const out = num(args, "outputUsdPerM");
-            if (input !== null && out !== null) {
-                lines.push(line("money", said.models.prices(usd(input), usd(out))));
-            }
-            const rpm = num(args, "rpm");
-            const tpm = num(args, "tpm");
-            if (rpm !== null && tpm !== null) {
-                lines.push(line("rule", said.models.limits(rpm, tokens(tpm))));
-            }
-            const capabilities = [
-                flag(args, "supportsStructured") === true ? said.models.structured : null,
-                flag(args, "supportsImages") === true ? said.models.images : null,
-                flag(args, "reasoning") === true ? said.models.reasoning : null,
-            ].filter((held): held is string => held !== null);
-            if (capabilities.length > 0) {
-                lines.push(line("list", listed(capabilities)));
-            }
-            return view(said.models.upsert(modelRef(args)), lines);
+        case "save_mapping": {
+            const mapping = record(args, "mapping");
+            return view(said.imports.saveMapping(mapping === null ? "" : (text(mapping, "name") ?? "")), mappingLines(mapping));
         }
-        case "models_disable":
-            return view(said.models.disable(modelRef(args)), []);
-        case "models_set_profile":
-            return view(said.models.setProfile(text(args, "role") ?? "", modelRef(args)), []);
-        case "models_set_provider_key":
-            return view(said.models.setKey(text(args, "provider") ?? ""), [line("key", said.models.setKeyBody)]);
-        case "models_test_provider":
-            return view(said.models.test(modelRef(args)), [line("money", said.models.testBody)]);
+        case "delete_mapping":
+            return view([`${said.imports.deleteMapping} `, ref("mapping", text(args, "mappingId") ?? "")], []);
         default:
             return null;
     }
 };
-
-export const describeContent: Describer = (tool, args) =>
-    tool === "content_judge_page"
-        ? view([`${said.content.judge} `, ref("page", text(args, "pageId") ?? "")], [line("money", said.content.body)])
-        : null;
 
 function scheduleLines(args: Args): Line[] {
     const lines: Line[] = [];
-    const name = text(args, "name");
-    if (name !== null) {
-        lines.push(line("field", said.schedules.renamed(name)));
-    }
     const cron = text(args, "cron");
     if (cron !== null) {
         lines.push(line("clock", said.schedules.cron(cron)));
@@ -132,9 +91,9 @@ function scheduleLines(args: Args): Line[] {
     if (status !== null) {
         lines.push(line("rule", said.schedules.status(status)));
     }
-    const limit = num(args, "limit");
-    if (limit !== null && limit > 0) {
-        lines.push(line("rule", said.schedules.limit(limit)));
+    const most = num(args, "maxPages");
+    if (most !== null && most > 0) {
+        lines.push(line("rule", said.schedules.limit(most)));
     }
     const template = text(args, "templateId");
     if (template !== null) {
@@ -146,7 +105,8 @@ function scheduleLines(args: Args): Line[] {
     }
     const publish = text(args, "publishMode");
     if (publish !== null) {
-        lines.push(line(publish === "publish" ? "warn" : "note", publish === "publish" ? said.runs.publishes : said.runs.drafts, publish === "publish" ? "warn" : "muted"));
+        const live = publish === "publish";
+        lines.push(line(live ? "warn" : "note", live ? said.runs.publishes : said.runs.drafts, live ? "warn" : "muted"));
     }
     const maxUsd = num(args, "maxUsd");
     if (maxUsd !== null && maxUsd > 0) {
@@ -156,27 +116,42 @@ function scheduleLines(args: Args): Line[] {
     if (maxTokens !== null && maxTokens > 0) {
         lines.push(line("money", said.runs.tokens(tokens(maxTokens))));
     }
-    const enabled = flag(args, "enabled");
-    if (enabled !== null) {
-        lines.push(line("clock", enabled ? said.schedules.enabled : said.schedules.paused));
-    }
     return lines;
 }
 
+function schedule(args: Args) {
+    return ref("schedule", text(args, "scheduleId") ?? "");
+}
+
 export const describeSchedules: Describer = (tool, args) => {
-    switch (tool) {
-        case "schedules_create":
-            return view(said.schedules.create(text(args, "name") ?? ""), scheduleLines(args).filter((held) => !(typeof held.parts[0] === "string" && held.parts[0].startsWith("Renamed"))));
-        case "schedules_update":
-            return view([`${said.schedules.update} `, ref("schedule", text(args, "id") ?? "")], scheduleLines(args));
-        case "schedules_delete":
-            return view([`${said.schedules.delete} `, ref("schedule", text(args, "id") ?? "")], []);
-        case "schedules_enable":
-            return view([`${said.schedules.enable} `, ref("schedule", text(args, "id") ?? "")], []);
-        case "schedules_disable":
-            return view([`${said.schedules.disable} `, ref("schedule", text(args, "id") ?? "")], []);
-        case "schedules_run_now":
-            return view([`${said.schedules.runNow} `, ref("schedule", text(args, "id") ?? "")], []);
+    if (tool !== "schedules") {
+        return null;
+    }
+    switch (opOf(args)) {
+        case "create": {
+            const lines = scheduleLines(args);
+            const armed = flag(args, "enabled");
+            if (armed !== null) {
+                lines.push(line("clock", armed ? said.schedules.enabled : said.schedules.paused));
+            }
+            return view(said.schedules.create(text(args, "name") ?? ""), lines);
+        }
+        case "update": {
+            const lines = scheduleLines(args);
+            const name = text(args, "name");
+            if (name !== null) {
+                lines.unshift(line("field", said.schedules.renamed(name)));
+            }
+            return view([`${said.schedules.update} `, schedule(args)], lines);
+        }
+        case "delete":
+            return view([`${said.schedules.delete} `, schedule(args)], []);
+        case "enable":
+            return view([`${said.schedules.enable} `, schedule(args)], []);
+        case "disable":
+            return view([`${said.schedules.disable} `, schedule(args)], []);
+        case "run_now":
+            return view([`${said.schedules.runNow} `, schedule(args)], []);
         default:
             return null;
     }

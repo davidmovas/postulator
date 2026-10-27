@@ -92,6 +92,9 @@ func (s *Service) CreateEntities(ctx context.Context, req CreateEntitiesRequest)
 	if doErr != nil {
 		return CreateEntitiesResponse{}, doErr
 	}
+	if movedErr := s.parentsMoved(ctx, req.SiteID); movedErr != nil {
+		return CreateEntitiesResponse{}, movedErr
+	}
 	if publishErr := s.changed(req.SiteID); publishErr != nil {
 		return CreateEntitiesResponse{}, publishErr
 	}

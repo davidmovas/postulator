@@ -1,5 +1,6 @@
 import { agent } from "./agent.js";
 import { app, empty, lock, nav, shell, toasts } from "./app.js";
+import { classification } from "./classification.js";
 import { errorMessages } from "./errors.js";
 import { findings } from "./findings.js";
 import { graph } from "./graph.js";
@@ -9,6 +10,7 @@ import { map } from "./map.js";
 import { overview, readiness } from "./overview.js";
 import { pages } from "./pages.js";
 import { palette } from "./palette.js";
+import { plans } from "./plans.js";
 import { reports } from "./reports.js";
 import { pageTypes } from "./pagetypes.js";
 import { templates } from "./templates.js";
@@ -34,6 +36,7 @@ export const copy = {
     reports,
     schedules,
     agent,
+    plans,
     pages,
     graph,
     links,
@@ -42,6 +45,7 @@ export const copy = {
     imports,
     templates,
     pageTypes,
+    classification,
     toasts,
     errors: errorMessages,
 };

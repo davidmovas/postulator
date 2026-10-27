@@ -12,6 +12,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -74,6 +75,8 @@ type stores struct {
 	renders       map[string]render.Record
 	links         map[string]map[pagemap.LinkSource][]pagemap.PageLink
 	findings      map[string]finding.Finding
+	entities      []graph.Entity
+	edges         []graph.Edge
 	published     []events.Type
 	bodyLists     int
 	bodyGets      int
@@ -121,7 +124,7 @@ func newStores(owner site.Site) *stores {
 		renders:    map[string]render.Record{},
 		links:      map[string]map[pagemap.LinkSource][]pagemap.PageLink{},
 		findings:   map[string]finding.Finding{},
-		types:      &typesFake{types: map[string][]pagetype.Type{}},
+		types:      &typesFake{types: map[string][]pagetype.Type{}, rules: map[string][]pagetype.Rule{}},
 	}
 }
 
@@ -211,23 +214,32 @@ func (p pageStore) Update(_ context.Context, page pagemap.Page) error {
 	return nil
 }
 
-func (p pageStore) AutoType(_ context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error {
+func (p pageStore) Classify(_ context.Context, pageID string, was, now pagetype.Assignment, at time.Time) (bool, error) {
 	p.s.mu.Lock()
 	defer p.s.mu.Unlock()
 	stored, ok := p.s.pages[pageID]
-	if !ok || stored.PageTypeID != nil {
-		return nil
+	if !ok || pagetype.AssignmentOf(stored) != was {
+		return false, nil
 	}
-	stored.PageTypeID, stored.TypeSource, stored.TypeReason, stored.UpdatedAt = &typeID, pagemap.TypeSourceAuto, reason, at
+	typeID := now.TypeID
+	stored.PageTypeID, stored.TypeSource, stored.TypeReason, stored.TypeRuleID, stored.UpdatedAt = &typeID, now.Source, now.Reason, now.RuleID, at
 	p.s.pages[pageID] = stored
-	return nil
+	return true, nil
 }
 
 func (s *stores) setType(pageID, typeID string, reason pagemap.TypeReason) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	stored := s.pages[pageID]
-	stored.PageTypeID, stored.TypeSource, stored.TypeReason = &typeID, pagemap.TypeSourceManual, reason
+	stored.PageTypeID, stored.TypeSource, stored.TypeReason, stored.TypeRuleID = &typeID, pagemap.TypeSourceManual, reason, ""
+	s.pages[pageID] = stored
+}
+
+func (s *stores) setLegacyType(pageID, typeID string, reason pagemap.TypeReason) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	stored := s.pages[pageID]
+	stored.PageTypeID, stored.TypeSource, stored.TypeReason, stored.TypeRuleID = &typeID, pagemap.TypeSourceAuto, reason, ""
 	s.pages[pageID] = stored
 }
 
@@ -235,6 +247,7 @@ type typesFake struct {
 	mu     sync.Mutex
 	types  map[string][]pagetype.Type
 	scopes []field.Scope
+	rules  map[string][]pagetype.Rule
 }
 
 func (f *typesFake) Seed(_ context.Context, siteID string) error {
@@ -243,7 +256,7 @@ func (f *typesFake) Seed(_ context.Context, siteID string) error {
 	if len(f.types[siteID]) > 0 {
 		return nil
 	}
-	for i, preset := range pagetype.Presets() {
+	for i, preset := range pagetype.Seeded() {
 		kind := pagetype.Type{
 			ID: siteID + "-" + string(preset), SiteID: siteID, Name: preset.DefaultName(), Preset: preset,
 			CreatedAt: earlier.Add(time.Duration(i) * time.Second), UpdatedAt: earlier,
@@ -251,7 +264,28 @@ func (f *typesFake) Seed(_ context.Context, siteID string) error {
 		f.types[siteID] = append(f.types[siteID], kind)
 		f.scopes = append(f.scopes, pagetype.DefaultScopes(preset, kind.ID)...)
 	}
+	next := 0
+	f.rules[siteID] = pagetype.DefaultRules(pagetype.NewSet(f.types[siteID], nil), siteID, earlier, func() string {
+		next++
+		return siteID + "-rule-" + strconv.Itoa(next)
+	})
 	return nil
+}
+
+func (f *typesFake) Rules(_ context.Context, siteID string) ([]pagetype.Rule, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.rules[siteID]), nil
+}
+
+func (f *typesFake) changeRule(siteID string, position int, change func(*pagetype.Rule)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.rules[siteID] {
+		if f.rules[siteID][i].Position == position {
+			change(&f.rules[siteID][i])
+		}
+	}
 }
 
 func (f *typesFake) Set(_ context.Context, siteID string) (pagetype.Set, error) {
@@ -278,6 +312,19 @@ func (p pageStore) UpdateDerived(_ context.Context, page pagemap.Page) error {
 	stored.TechnicalReason, stored.ReadOnlyReason = page.TechnicalReason, page.ReadOnlyReason
 	stored.Status, stored.UpdatedAt = page.Status, page.UpdatedAt
 	p.s.pages[page.ID] = stored
+	return nil
+}
+
+func (p pageStore) FollowObservedH1(_ context.Context, pageID, was, now string, at time.Time) error {
+	p.s.interleaved()
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	stored, ok := p.s.pages[pageID]
+	if !ok || stored.H1 != was || stored.H1 == now {
+		return nil
+	}
+	stored.H1, stored.UpdatedAt = now, at
+	p.s.pages[pageID] = stored
 	return nil
 }
 
@@ -536,6 +583,18 @@ func (r renderStore) ListBySite(_ context.Context, siteID string) ([]render.Reco
 	return out, nil
 }
 
+func (r renderStore) ListForPages(_ context.Context, pageIDs []string) ([]render.Record, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	out := make([]render.Record, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		if record, ok := r.s.renders[pageID]; ok {
+			out = append(out, record)
+		}
+	}
+	return out, nil
+}
+
 type linkStore struct{ s *stores }
 
 func (l linkStore) ReplaceForPage(_ context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error {
@@ -554,6 +613,30 @@ func (l linkStore) ListForPage(_ context.Context, pageID string) ([]pagemap.Page
 	out := make([]pagemap.PageLink, 0)
 	for _, source := range []pagemap.LinkSource{pagemap.SourceRaw, pagemap.SourceRender} {
 		out = append(out, l.s.links[pageID][source]...)
+	}
+	return out, nil
+}
+
+func (l linkStore) ListedProductsBySite(_ context.Context, siteID string) (map[string]int, error) {
+	l.s.mu.Lock()
+	defer l.s.mu.Unlock()
+	out := map[string]int{}
+	for pageID, sources := range l.s.links {
+		if l.s.pages[pageID].SiteID != siteID {
+			continue
+		}
+		seen := map[string]bool{}
+		rendered := sources[pagemap.SourceRender]
+		for i := range rendered {
+			link := &rendered[i]
+			if link.Type != pagemap.LinkListing || link.ToPageID == nil || seen[*link.ToPageID] {
+				continue
+			}
+			if target, held := l.s.pages[*link.ToPageID]; held && target.WPType == pagemap.WPProduct {
+				seen[*link.ToPageID] = true
+				out[pageID]++
+			}
+		}
 	}
 	return out, nil
 }
@@ -670,8 +753,24 @@ func (s *stores) deps(clk clock.Clock) observe.Deps {
 	return observe.Deps{
 		Sites: s, Pages: pageStore{s}, Identity: identityStore{s}, Fields: fieldStore{s}, Bodies: bodyStore{s},
 		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, Types: s.types, UnitOfWork: unit{s.guard}, Publisher: bus{s}, Clock: clk,
-		Maps: &s.maps,
+		Maps: &s.maps, Entities: graphStore{s}, Edges: edgeList{s},
 	}
+}
+
+type graphStore struct{ s *stores }
+
+func (g graphStore) ListBySite(context.Context, string) ([]graph.Entity, error) {
+	g.s.mu.Lock()
+	defer g.s.mu.Unlock()
+	return slices.Clone(g.s.entities), nil
+}
+
+type edgeList struct{ s *stores }
+
+func (e edgeList) ListBySite(context.Context, string) ([]graph.Edge, error) {
+	e.s.mu.Lock()
+	defer e.s.mu.Unlock()
+	return slices.Clone(e.s.edges), nil
 }
 
 type mapRefresher struct {

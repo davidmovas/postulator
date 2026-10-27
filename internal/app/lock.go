@@ -6,9 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.uber.org/zap"
+
 	"github.com/davidmovas/postulator/internal/adapters/secrets/export"
 	"github.com/davidmovas/postulator/internal/adapters/secrets/masterkey"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/application/agent"
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -261,6 +264,7 @@ func (c *Core) detach() (retired kit, key []byte) {
 	retired, key = c.kit, c.key
 	c.kit = kit{}
 	c.key = nil
+	c.Events.OnRunEnded(nil)
 	return retired, key
 }
 
@@ -273,5 +277,25 @@ func (c *Core) install(key []byte, built kit) bool {
 	}
 	c.key = key
 	c.kit = built
+	if built.Agent != nil {
+		c.Events.OnRunEnded(c.planWaker(built.Agent))
+		go c.planned(built.Agent)
+	}
 	return true
+}
+
+func (c *Core) planWaker(assistant *agent.Service) func(agent.RunOutcome) {
+	return func(outcome agent.RunOutcome) {
+		go func() {
+			if err := assistant.RunEnded(context.Background(), outcome); err != nil {
+				c.logger.Warn("a plan waiting on a run could not go on", zap.String("runId", outcome.RunID), zap.Error(err))
+			}
+		}()
+	}
+}
+
+func (c *Core) planned(assistant *agent.Service) {
+	if err := assistant.ResumePlans(context.Background()); err != nil {
+		c.logger.Warn("the plans under way could not be resumed", zap.Error(err))
+	}
 }

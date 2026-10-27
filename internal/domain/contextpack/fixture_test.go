@@ -40,7 +40,7 @@ func typeIDOf(preset pagetype.Preset) string {
 }
 
 func types() pagetype.Set {
-	presets := pagetype.Presets()
+	presets := []pagetype.Preset{pagetype.Hub, pagetype.Entity, pagetype.Product, pagetype.StoreCategory, pagetype.Catalog, pagetype.Technical}
 	kinds := make([]pagetype.Type, 0, len(presets))
 	scopes := make([]field.Scope, 0, len(presets)*4)
 	for _, preset := range presets {

@@ -68,10 +68,13 @@ func (s *Server) handlePublicPage(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	shown, found := s.publicItem(asked)
 	down := s.storefrontOff
-	var title, body string
+	var title, heading, body string
 	var crumbs []Crumb
 	if found {
-		title, body, crumbs = shown.Title, shown.Filtered, slices.Clone(shown.Crumbs)
+		title, heading, body, crumbs = shown.Title, shown.Title, shown.Filtered, slices.Clone(shown.Crumbs)
+		if shown.H1 != "" {
+			heading = shown.H1
+		}
 		if body == "" {
 			body = shown.Content
 		}
@@ -96,7 +99,7 @@ func (s *Server) handlePublicPage(w http.ResponseWriter, r *http.Request) {
 	site := s.http.URL
 	page := "<!doctype html><html><head><title>" + html.EscapeString(title) + "</title>" + structured + "</head><body>" +
 		`<header><nav aria-label="Primary"><a href="` + site + `/">Home</a><a href="` + site + `/shop/">Shop</a></nav></header>` +
-		"<main><article>" + s.breadcrumbNav(crumbs) + "<h1>" + html.EscapeString(title) + "</h1>" + body + "</article></main>" +
+		"<main><article>" + s.breadcrumbNav(crumbs) + "<h1>" + html.EscapeString(heading) + "</h1>" + body + "</article></main>" +
 		`<footer><nav><a href="` + site + `/privacy-policy/">Privacy Policy</a></nav></footer>` +
 		"</body></html>"
 	s.writePage(w, asked, page)

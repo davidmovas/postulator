@@ -259,6 +259,49 @@ func TestRunItemNoteRoundTrips(t *testing.T) {
 	}
 }
 
+func TestARunsBriefAndAnItemsDirectiveRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 2)
+	briefed := fixture.run
+	briefed.ID = id.New()
+	briefed.Brief = run.Brief{Goal: "Sell the lab kit", Tone: "plain", Reference: "Kept frozen at −20 °C."}
+	if err := fixture.runs.Insert(t.Context(), briefed); err != nil {
+		t.Fatalf("insert the briefed run: %v", err)
+	}
+	stored, err := fixture.runs.Get(t.Context(), briefed.ID)
+	if err != nil || stored.Brief != briefed.Brief {
+		t.Fatalf("the brief read back as %+v, %v", stored.Brief, err)
+	}
+	if plain, plainErr := fixture.runs.Get(t.Context(), fixture.run.ID); plainErr != nil || !plain.Brief.Empty() {
+		t.Fatalf("a run without a brief read back %+v, %v", plain.Brief, plainErr)
+	}
+
+	item := run.Item{
+		ID: id.New(), RunID: briefed.ID, SiteID: briefed.SiteID, TargetID: fixture.pages[0], Status: run.StatusPending,
+		CurrentStep: "generate_body", Checkpoint: run.NewCheckpoint(), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		Directive: run.Directive{
+			PageID: fixture.pages[0], Notes: "Lead with storage.", Keywords: []string{"bpc-157 storage"},
+			MustLink: []run.MustLink{{PageID: fixture.pages[1], Anchor: "TB-500"}}, MinWords: 600,
+		},
+	}
+	if err = fixture.items.Insert(t.Context(), item); err != nil {
+		t.Fatalf("insert the item: %v", err)
+	}
+	held, err := fixture.items.Get(t.Context(), item.ID)
+	if err != nil || held.Directive.Notes != "Lead with storage." || len(held.Directive.MustLink) != 1 ||
+		held.Directive.MustLink[0].Anchor != "TB-500" || held.Directive.MinWords != 600 {
+		t.Fatalf("the directive read back as %+v, %v", held.Directive, err)
+	}
+	held.Status, held.UpdatedAt = run.StatusRunning, sqlitetest.Stamp
+	if ok, persistErr := fixture.items.Persist(t.Context(), held, held.AdvanceSeq); persistErr != nil || !ok {
+		t.Fatalf("Persist = %v, %v", ok, persistErr)
+	}
+	if again, getErr := fixture.items.Get(t.Context(), item.ID); getErr != nil || again.Directive.Notes != "Lead with storage." {
+		t.Fatalf("a persisted item lost its directive: %+v, %v", again.Directive, getErr)
+	}
+}
+
 func TestAwaitingParentFindsAChildOnlyOnceItsParentIsOnTheSite(t *testing.T) {
 	t.Parallel()
 

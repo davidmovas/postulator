@@ -1,3 +1,4 @@
+import { copy } from "../../../../copy/index.js";
 import type { Finding, TemplateSpec } from "../../../../data/types.js";
 
 export type RefKind = "site" | "entity" | "page" | "template" | "pagetype" | "schedule" | "run" | "edge" | "mapping" | "item" | "override";
@@ -28,6 +29,7 @@ export interface CardView {
 export interface DescribeContext {
     currentTemplate: TemplateSpec | null;
     finding: Finding | null;
+    summary: string | null;
 }
 
 export type Args = Readonly<Record<string, unknown>>;
@@ -48,6 +50,33 @@ export function view(title: readonly Part[] | string, lines: readonly Line[]): C
 
 export function isArgs(value: unknown): value is Args {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+const writeRisk = "write";
+
+export function cardRisk(own: string | null | undefined, toolRisk: string | null | undefined): string {
+    if (own !== null && own !== undefined && own !== "") {
+        return own;
+    }
+    return toolRisk === null || toolRisk === undefined || toolRisk === "" ? writeRisk : toolRisk;
+}
+
+export function opOf(args: Args): string {
+    return text(args, "op") ?? "";
+}
+
+export function refs(kind: RefKind, ids: readonly string[], most: number): Part[] {
+    const out: Part[] = [];
+    ids.slice(0, most).forEach((id, index) => {
+        if (index > 0) {
+            out.push(", ");
+        }
+        out.push(ref(kind, id));
+    });
+    if (ids.length > most) {
+        out.push(` ${copy.agent.describe.more(ids.length - most)}`);
+    }
+    return out;
 }
 
 export function has(args: Args, key: string): boolean {

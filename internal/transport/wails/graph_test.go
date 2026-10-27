@@ -61,6 +61,10 @@ func (f graphFake) MoveEntity(context.Context, graph.MoveEntityRequest) (graph.M
 	return answer[graph.MoveEntityResponse](f.mode)
 }
 
+func (f graphFake) AdoptParents(context.Context, graph.AdoptParentsRequest) (graph.AdoptParentsResponse, error) {
+	return answer[graph.AdoptParentsResponse](f.mode)
+}
+
 func (f graphFake) ListEdges(context.Context, graph.ListEdgesRequest) (paging.List[graph.Edge], error) {
 	return answer[paging.List[graph.Edge]](f.mode)
 }
@@ -105,7 +109,7 @@ func TestGraphServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewGraphService(zap.NewNop(), ready[wails.GraphUseCase](graphFake{})), []string{
-		"AcceptCard", "AddEdge", "ApplyProposals", "ApproveEdge", "CardProposals", "CreateEntity", "DeleteEdge",
+		"AcceptCard", "AddEdge", "AdoptParents", "ApplyProposals", "ApproveEdge", "CardProposals", "CreateEntity", "DeleteEdge",
 		"DeleteEntity", "DismissCard", "GetEntity", "ListEdges", "ListEntities", "LoadGraph", "MoveEntity",
 		"PreviewFromPages", "ProposeFromKeywords", "ProposeFromPages", "ProposeRelated", "RecomputeScores", "RejectEdge",
 		"SetAnchors", "UpdateEntity",

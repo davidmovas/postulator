@@ -1,6 +1,6 @@
 import type { KeyboardEvent, ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
@@ -26,6 +26,7 @@ import type { CardBusy } from "./cards/card.js";
 import { outcomeOf } from "./cards/outcome.js";
 import type { InboxStatus } from "./model/inbox.js";
 import { groupActions, inboxStatuses } from "./model/inbox.js";
+import { conversationPath } from "./model/paths.js";
 import { agentTabs } from "./tabs.js";
 
 function emptyText(status: InboxStatus): string {
@@ -48,6 +49,7 @@ const filters: readonly SegmentedOption<InboxStatus>[] = inboxStatuses.map((held
 
 export function InboxScreen(): ReactElement {
     const navigate = useNavigate();
+    const siteId = useParams().siteId ?? null;
     const [status, setStatus] = useState<InboxStatus>("pending");
     const listed = usePendingActions({ status }, 100);
     const pendingOnly = usePendingActions({ status: "pending" }, 100);
@@ -140,7 +142,7 @@ export function InboxScreen(): ReactElement {
     return (
         <Screen
             title={copy.agent.title}
-            tabs={agentTabs("inbox", pendingCount, navigate)}
+            tabs={agentTabs("inbox", pendingCount, navigate, siteId)}
             actions={
                 status === "pending" && pendingCount > 0 ? (
                     <Button
@@ -190,7 +192,7 @@ export function InboxScreen(): ReactElement {
                             <section key={group.conversationId} className="flex flex-col gap-2">
                                 <div className="flex items-baseline justify-between gap-2">
                                     <Link
-                                        to={`/agent/${group.conversationId}`}
+                                        to={conversationPath(group.siteId, group.conversationId)}
                                         className="min-w-0 truncate text-xs font-semibold text-ink hover:text-accent"
                                     >
                                         {group.title === null
@@ -213,7 +215,7 @@ export function InboxScreen(): ReactElement {
                                             tool={action.tool}
                                             args={action.args}
                                             summary={action.summary}
-                                            risk={null}
+                                            risk={action.risk}
                                             status={action.status}
                                             createdAt={action.createdAt}
                                             outcome={outcomeOf(action)}

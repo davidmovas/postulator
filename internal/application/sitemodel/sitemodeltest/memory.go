@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/davidmovas/postulator/internal/application/reports"
@@ -17,6 +18,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -37,11 +39,15 @@ type Memory struct {
 	Findings []finding.Finding
 	Budgets  map[domainllm.Role]int
 	Audit    reports.LinkAuditResponse
+	Owed     map[string][]reports.RequiredLink
+	Runs     []run.Run
+	Items    []run.Item
 
 	mu      sync.Mutex
 	reads   int
 	sites   int
-	stale   bool
+	moved   int64
+	built   int64
 	written int
 	asked   [][]string
 }
@@ -49,7 +55,7 @@ type Memory struct {
 func (m *Memory) MarkStale() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.stale = true
+	m.moved++
 }
 
 func (m *Memory) Rebuilt() int {
@@ -69,8 +75,29 @@ func (m *Memory) Service() *sitemodel.Service {
 		Reader: m, UnitOfWork: m, Maps: mapReader{m}, Sites: siteReader{m}, Pages: pageReader{m}, Entities: entityReader{m},
 		Edges: edgeReader{m}, Types: typeReader{m}, Terms: termReader{m}, Fields: fieldReader{m}, Bodies: bodyReader{m},
 		Renders: renderReader{m}, Links: linkReader{m}, Findings: findingReader{m}, Budgets: budgetReader{m},
-		Audits: auditReader{m},
+		Audits: auditReader{m}, Runs: runReader{m}, Items: runReader{m},
 	})
+}
+
+type runReader struct{ m *Memory }
+
+func (r runReader) Get(_ context.Context, runID string) (run.Run, error) {
+	for i := range r.m.Runs {
+		if r.m.Runs[i].ID == runID {
+			return r.m.Runs[i], nil
+		}
+	}
+	return run.Run{}, errors.New(errors.NotFound, "run not found")
+}
+
+func (r runReader) ByRun(_ context.Context, runID string) ([]run.Item, error) {
+	out := make([]run.Item, 0)
+	for i := range r.m.Items {
+		if r.m.Items[i].RunID == runID {
+			out = append(out, r.m.Items[i])
+		}
+	}
+	return out, nil
 }
 
 func (m *Memory) Do(ctx context.Context, fn func(context.Context) error) error {
@@ -100,10 +127,7 @@ type mapReader struct{ m *Memory }
 func (r mapReader) State(context.Context, string) (generation, built int64, err error) {
 	r.m.mu.Lock()
 	defer r.m.mu.Unlock()
-	if r.m.stale {
-		return 2, 1, nil
-	}
-	return 1, 1, nil
+	return 1 + r.m.moved, 1 + r.m.built, nil
 }
 
 func (r mapReader) ListBySite(_ context.Context, siteID string) ([]contextpack.MapRow, error) {
@@ -114,7 +138,7 @@ func (r mapReader) ListBySite(_ context.Context, siteID string) ([]contextpack.M
 func (r mapReader) Write(context.Context, string, []contextpack.MapRow, []string, int64) error {
 	r.m.mu.Lock()
 	defer r.m.mu.Unlock()
-	r.m.stale = false
+	r.m.built = r.m.moved
 	r.m.written++
 	return nil
 }
@@ -151,6 +175,19 @@ func (r auditReader) LinkAudit(_ context.Context, req reports.LinkAuditRequest) 
 		return reports.LinkAuditResponse{}, errors.New(errors.NotFound, "no such site")
 	}
 	return r.m.Audit, nil
+}
+
+func (r auditReader) LinkAuditPages(_ context.Context, req reports.LinkAuditPagesRequest) (reports.LinkAuditPagesResponse, error) {
+	if req.SiteID != r.m.Site.ID {
+		return reports.LinkAuditPagesResponse{}, errors.New(errors.NotFound, "no such site")
+	}
+	out := reports.LinkAuditPagesResponse{Pages: make([]reports.PageLinks, 0, len(req.PageIDs))}
+	for i := range r.m.Audit.Pages {
+		if summary := r.m.Audit.Pages[i]; slices.Contains(req.PageIDs, summary.PageID) {
+			out.Pages = append(out.Pages, reports.PageLinks{Page: summary, Required: r.m.Owed[summary.PageID], Extra: []reports.ExtraLink{}})
+		}
+	}
+	return out, nil
 }
 
 func (r auditReader) LinkAuditPage(_ context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error) {
@@ -288,6 +325,14 @@ func (r renderReader) ListBySite(context.Context, string) ([]render.Record, erro
 	return slices.Clone(r.m.Renders), nil
 }
 
+func (r renderReader) ListRenderedBySite(context.Context, string) (map[string]pagetype.Rendered, error) {
+	out := make(map[string]pagetype.Rendered, len(r.m.Renders))
+	for i := range r.m.Renders {
+		out[r.m.Renders[i].PageID] = pagetype.RenderedOf(&r.m.Renders[i])
+	}
+	return out, nil
+}
+
 func (r renderReader) URLForms(context.Context, string) ([]string, error) {
 	out := make([]string, 0)
 	for i := range r.m.Renders {
@@ -334,6 +379,31 @@ func (r linkReader) ListBySite(context.Context, string) ([]pagemap.PageLink, err
 	return slices.Clone(r.m.Links), nil
 }
 
+func (r linkReader) ListedProductsBySite(context.Context, string) (map[string]int, error) {
+	products := make(map[string]bool)
+	for i := range r.m.Pages {
+		if r.m.Pages[i].WPType == pagemap.WPProduct {
+			products[r.m.Pages[i].ID] = true
+		}
+	}
+	seen := make(map[string]map[string]bool)
+	out := make(map[string]int)
+	for i := range r.m.Links {
+		link := &r.m.Links[i]
+		if link.Type != pagemap.LinkListing || link.ToPageID == nil || !products[*link.ToPageID] {
+			continue
+		}
+		if seen[link.FromPageID] == nil {
+			seen[link.FromPageID] = make(map[string]bool)
+		}
+		if !seen[link.FromPageID][*link.ToPageID] {
+			seen[link.FromPageID][*link.ToPageID] = true
+			out[link.FromPageID]++
+		}
+	}
+	return out, nil
+}
+
 type findingReader struct{ m *Memory }
 
 func (r findingReader) ListForPage(_ context.Context, pageID string) ([]finding.Finding, error) {
@@ -356,11 +426,32 @@ func (r findingReader) ListBySite(_ context.Context, _ string, status finding.St
 	return out, nil
 }
 
+func (r findingReader) ListOpenFor(_ context.Context, ids []string) ([]finding.Finding, error) {
+	out := make([]finding.Finding, 0)
+	for i := range r.m.Findings {
+		if held := &r.m.Findings[i]; held.Status == finding.Open && held.PageID != nil && slices.Contains(ids, *held.PageID) {
+			out = append(out, *held)
+		}
+	}
+	return out, nil
+}
+
 func (r findingReader) CountOpen(_ context.Context, ids []string) (map[string]int, error) {
 	out := map[string]int{}
 	for i := range r.m.Findings {
 		if held := &r.m.Findings[i]; held.Status == finding.Open && held.PageID != nil && slices.Contains(ids, *held.PageID) {
 			out[*held.PageID]++
+		}
+	}
+	return out, nil
+}
+
+func (r mapReader) IDsUnder(_ context.Context, siteID, trail, typeID string) ([]string, error) {
+	rows := r.m.rows()
+	out := make([]string, 0, len(rows))
+	for i := range rows {
+		if rows[i].SiteID == siteID && strings.HasPrefix(rows[i].Trail, trail) && (typeID == "" || rows[i].TypeID == typeID) {
+			out = append(out, rows[i].PageID)
 		}
 	}
 	return out, nil
@@ -372,16 +463,28 @@ func (r mapReader) ListByIDs(_ context.Context, ids []string) ([]contextpack.Map
 }
 
 func (r mapReader) List(_ context.Context, q contextpack.MapRowQuery, page paging.Request) (paging.List[contextpack.MapRow], error) {
-	rows := slices.DeleteFunc(r.m.rows(), func(row contextpack.MapRow) bool { return !q.Holds(row) })
+	every := r.m.rows()
+	rows := slices.DeleteFunc(slices.Clone(every), func(row contextpack.MapRow) bool {
+		return !q.Holds(row) || q.Within != "" && !row.Holding(every, q.Within)
+	})
 	slices.SortFunc(rows, func(a, b contextpack.MapRow) int {
+		if q.ByDepth && a.Depth != b.Depth {
+			return cmp.Compare(a.Depth, b.Depth)
+		}
 		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.PageID, b.PageID))
 	})
+	keys := []paging.SortKey[contextpack.MapRow]{
+		paging.TextKey[contextpack.MapRow]("path", "path", func(row contextpack.MapRow) any { return row.Path }),
+	}
+	if q.ByDepth {
+		keys = append([]paging.SortKey[contextpack.MapRow]{
+			paging.IntKey[contextpack.MapRow]("depth", "depth", func(row contextpack.MapRow) any { return row.Depth }),
+		}, keys...)
+	}
 	keyset := paging.Keyset[contextpack.MapRow]{
 		IDColumn: "page_id",
 		ID:       func(row contextpack.MapRow) string { return row.PageID },
-		Keys: []paging.SortKey[contextpack.MapRow]{
-			paging.TextKey[contextpack.MapRow]("path", "path", func(row contextpack.MapRow) any { return row.Path }),
-		},
+		Keys:     keys,
 	}
 	return keyset.Page(rows, page)
 }

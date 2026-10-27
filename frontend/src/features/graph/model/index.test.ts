@@ -57,8 +57,8 @@ describe("buildGraphIndex", () => {
     });
 
     it("takes each entity's type from its canonical page", () => {
-        expect(typeOf(typed, "mugs")).toStrictEqual({ id: "type-hub", name: "Hub", preset: "hub" });
-        expect(typeOf(typed, "care")).toStrictEqual({ id: "type-entity", name: "Guide", preset: "entity" });
+        expect(typeOf(typed, "mugs")).toStrictEqual({ id: "type-hub", name: "Hub", preset: "hub", role: "hub" });
+        expect(typeOf(typed, "care")).toStrictEqual({ id: "type-entity", name: "Guide", preset: "entity", role: "entity" });
         expect(presetOf(typed, "m350")).toBe("product");
         expect(presetOf(typed, "travel")).toBe("untyped");
         expect(typeOf(index, "mugs")).toBeNull();

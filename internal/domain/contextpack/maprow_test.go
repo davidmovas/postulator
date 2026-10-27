@@ -10,6 +10,30 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
+func TestARowHoldsATypeItCarriesOrOneBelowIt(t *testing.T) {
+	t.Parallel()
+
+	rows := []contextpack.MapRow{
+		{PageID: "home", SiteID: "s1", Trail: "home/", TypeID: "landing"},
+		{PageID: "hub", SiteID: "s1", Trail: "home/hub/", TypeID: "category", TwinID: "term", TwinTypeID: "store"},
+		{PageID: "guide", SiteID: "s1", Trail: "home/hub/guide/", TypeID: "guide"},
+		{PageID: "other", SiteID: "s2", Trail: "home/hub/other/", TypeID: "info"},
+	}
+	cases := []struct {
+		row    int
+		typeID string
+		want   bool
+	}{
+		{0, "landing", true}, {0, "guide", true}, {1, "guide", true}, {1, "store", true},
+		{2, "category", false}, {0, "info", false}, {1, "landing", false},
+	}
+	for _, tc := range cases {
+		if got := rows[tc.row].Holding(rows, tc.typeID); got != tc.want {
+			t.Errorf("%s holding %s = %t, want %t", rows[tc.row].PageID, tc.typeID, got, tc.want)
+		}
+	}
+}
+
 func rowsByID(rows []contextpack.MapRow) map[string]contextpack.MapRow {
 	out := make(map[string]contextpack.MapRow, len(rows))
 	for i := range rows {

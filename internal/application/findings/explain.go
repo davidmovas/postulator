@@ -129,6 +129,11 @@ func sentence(held []finding.Finding, option finding.Option, req ExplainRequest,
 	case finding.RelinkPage:
 		return "Open a relink run start for " + where +
 			": the start shows the estimate first, and the finding closes itself once the run has placed the links", nil
+	case finding.AdoptTree:
+		return "Give the entity behind " + about + " the parent its page has in the page tree: its old parent edge goes, " +
+			"the new one is approved, and a loop or a name already taken under that parent is refused" + unwritten, nil
+	case finding.KeepGraph:
+		return "Keep the entity graph's parent for " + about + ": it stays settled while what it names stands" + unwritten, nil
 	case finding.ProposeEntity:
 		return "Open the entity proposals named from the site for " + where +
 			": the model takes only the ones a person accepts, and each finding closes itself once an entity carries its page" +

@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
@@ -16,6 +16,7 @@ import {
 } from "../../ui/index.js";
 import type { SegmentedOption } from "../../ui/index.js";
 import { GraphActions } from "./actions.js";
+import { AdoptParentsDrawer } from "./actions/adopt-parents.js";
 import { CardProposalsDrawer } from "./cards/drawer.js";
 import { GraphEmpty } from "./empty.js";
 import { Inspector } from "./inspector/panel.js";
@@ -37,6 +38,7 @@ export function GraphScreen(): ReactElement {
     const screen = useGraphScreen();
     const { siteId, entityId, query, graph, index, fold, session, patchSession } = screen;
     const host = useRef<HTMLDivElement>(null);
+    const [adopting, setAdopting] = useState(false);
 
     const failure = graph.error === null ? null : react(graph.error);
     const empty = graph.data !== undefined && index.counts.total === 0;
@@ -161,6 +163,9 @@ export function GraphScreen(): ReactElement {
                         screen.setProposing("related");
                     }}
                     onRecompute={screen.recomputeScores}
+                    onAdopt={() => {
+                        setAdopting(true);
+                    }}
                 />
             }
             toolbar={
@@ -272,6 +277,7 @@ export function GraphScreen(): ReactElement {
                 }}
                 onReveal={screen.revealEntity}
             />
+            {adopting ? <AdoptParentsDrawer open={true} siteId={siteId} under={null} onOpenChange={setAdopting} /> : null}
         </Screen>
     );
 }

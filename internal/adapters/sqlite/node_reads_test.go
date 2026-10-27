@@ -85,4 +85,11 @@ func TestTheNodeReadsAnswerForThePagesTheyName(t *testing.T) {
 	if empty, emptyErr := repo.CountOpen(t.Context(), nil); emptyErr != nil || len(empty) != 0 {
 		t.Errorf("CountOpen of nothing = %v, %v", empty, emptyErr)
 	}
+	open, err := repo.ListOpenFor(t.Context(), []string{a.ID, c.ID})
+	if err != nil || len(open) != 2 || *open[0].PageID != a.ID || *open[1].PageID != a.ID {
+		t.Errorf("ListOpenFor = %+v, %v; want /a/'s two open findings and none of /c/'s cleared one", open, err)
+	}
+	if none, noneErr := repo.ListOpenFor(t.Context(), nil); noneErr != nil || len(none) != 0 {
+		t.Errorf("ListOpenFor of nothing = %v, %v", none, noneErr)
+	}
 }

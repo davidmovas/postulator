@@ -39,6 +39,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
+	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -104,12 +105,12 @@ func seeded(t *testing.T) *app.Core {
 func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
-	if len(listed.Items) != 1 {
-		t.Fatalf("seeded sites = %d, want 1", len(listed.Items))
+	if len(listed.Items) != 2 || listed.Items[0].Name != siteName || listed.Items[1].Name != secondSiteName {
+		t.Fatalf("seeded sites = %+v, want %s and then %s to switch to", listed.Items, siteName, secondSiteName)
 	}
 	siteID := listed.Items[0].ID
 
@@ -138,7 +139,7 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -275,8 +276,8 @@ func TestTheHarnessSeedsAScheduleAndAConversationWaitingOnApproval(t *testing.T)
 	if len(pending.Items) != 1 {
 		t.Fatalf("pending actions = %d, want the one write the agent proposed", len(pending.Items))
 	}
-	if pending.Items[0].Tool != "pages_update" {
-		t.Errorf("the pending action calls %q, want pages_update", pending.Items[0].Tool)
+	if pending.Items[0].Tool != "pages_manage" {
+		t.Errorf("the pending action calls %q, want pages_manage", pending.Items[0].Tool)
 	}
 }
 
@@ -372,7 +373,7 @@ func TestTheSeededRunsCoverEveryKindAScreenOffers(t *testing.T) {
 func TestTheHarnessSeedsAnEditItsReviewAndTheRevertOfAField(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -528,12 +529,12 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 		}
 	}
 
-	listed, err := reopened.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := reopened.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
-	if len(listed.Items) != 1 {
-		t.Fatalf("sites after the restart = %d, want the one that was seeded", len(listed.Items))
+	if len(listed.Items) != 2 || listed.Items[0].Name != siteName {
+		t.Fatalf("sites after the restart = %+v, want the two that were seeded, %s first", listed.Items, siteName)
 	}
 
 	loaded, err := reopened.Graph.LoadGraph(t.Context(), graph.LoadGraphRequest{SiteID: listed.Items[0].ID})
@@ -575,7 +576,7 @@ func TestTheHarnessOpensTheDevtoolsEndpointOnDemand(t *testing.T) {
 func TestTheSeededGraphIsATreeAndNotAFlatList(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -715,7 +716,7 @@ func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
 	}
 
 	var args struct {
-		ID        string `json:"id"`
+		ID        string `json:"pageId"`
 		MetaTitle string `json:"metaTitle"`
 	}
 	if unmarshalErr := json.Unmarshal(pending.Items[0].Args, &args); unmarshalErr != nil {
@@ -740,7 +741,7 @@ func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
 func TestTheHarnessSeedsAProductTheStoreLetsARunEdit(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -826,7 +827,7 @@ func TestTheCompletedRunSucceedsOnEveryItem(t *testing.T) {
 func TestTheSeededGraphCarriesScores(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -869,7 +870,7 @@ func TestTheSeededConversationIsNamedLikeAConversation(t *testing.T) {
 func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -948,7 +949,7 @@ func TestARestartPutsThePublishedPagesBackOnTheFakeSite(t *testing.T) {
 func TestARestorePutsBackTheBodiesTheSiteHeld(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1051,10 +1052,12 @@ func reopen(t *testing.T) (*app.Core, harness) {
 	return reopened, again
 }
 
+var seededSites = sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10, Sort: &dto.Sort{Field: string(site.SortName)}}}
+
 func publishedPage(t *testing.T, core *app.Core) pages.Page {
 	t.Helper()
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1139,7 +1142,7 @@ func TestARestartOfAnOpenHomeRestoresAtOnce(t *testing.T) {
 func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1191,7 +1194,7 @@ func TestASyncKeepsThePagesTheSiteStillHolds(t *testing.T) {
 func TestTheSeededSiteIsObservedIntoTheModel(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1229,7 +1232,7 @@ func TestTheSeededSiteIsObservedIntoTheModel(t *testing.T) {
 func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1247,7 +1250,7 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 		}
 		byPreset[preset] = typed.Types[index]
 	}
-	for _, preset := range pagetype.Presets() {
+	for _, preset := range pagetype.Seeded() {
 		if kind, held := byPreset[preset]; !held || kind.Name != preset.DefaultName() {
 			t.Errorf("the %s type is %+v, want it seeded as %q", preset, kind, preset.DefaultName())
 		}
@@ -1263,7 +1266,7 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 	for _, declared := range seedTypes() {
 		cases = append(cases, typedPage{declared.Path, declared.Preset, pagemap.TypeSourceManual, pagemap.TypeByUser})
 	}
-	cases = append(cases, typedPage{productPath, pagetype.Product, pagemap.TypeSourceAuto, pagemap.TypeByProduct})
+	cases = append(cases, typedPage{productPath, pagetype.Product, pagemap.TypeSourceAuto, pagemap.TypeByRule})
 
 	held := pagesByPath(t, core, siteID)
 	for _, want := range cases {
@@ -1281,15 +1284,24 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 				kind.Name, kind.ID, want.source, want.reason)
 		}
 	}
+	rules, err := core.PageTypes.ListRules(t.Context(), pagetypes.ListRulesRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("List rules: %v", err)
+	}
+	article := slices.IndexFunc(rules.Rules, func(rule pagetypes.Rule) bool { return rule.Name == articleRuleName })
+	if grind := held["/grinders/grind-size/"]; article < 0 || grind.PageTypeID == nil || *grind.PageTypeID != byPreset[pagetype.Guide].ID ||
+		grind.TypeRuleID != rules.Rules[article].ID {
+		t.Errorf("/grinders/grind-size/ is typed %+v by the rule %q, want Guide by the site's own %q", grind.PageTypeID, grind.TypeRuleID, articleRuleName)
+	}
 
-	hub := byPreset[pagetype.Hub]
+	hub := byPreset[pagetype.Category]
 	if body, found := scopeOf(hub, field.Body); !found || !body.Stored || !body.Enabled || !body.AIWrites || body.Links != harnessLinks() {
-		t.Errorf("the Hub type's body scope is %+v, want the harness's link rules with rotating anchors %+v", body, harnessLinks())
+		t.Errorf("the Category type's body scope is %+v, want the harness's link rules with rotating anchors %+v", body, harnessLinks())
 	}
 
 	custom, found := scopeOf(hub, field.Instance(field.Meta, subtitleKey))
 	if !found || !custom.Stored || !custom.Enabled || custom.AIWrites || custom.Label != subtitleLabel || custom.Provider != string(field.ProviderPlugin) {
-		t.Errorf("the Hub type's custom scope is %+v, want %s named %q, read through the plugin", custom, subtitleKey, subtitleLabel)
+		t.Errorf("the Category type's custom scope is %+v, want %s named %q, read through the plugin", custom, subtitleKey, subtitleLabel)
 	}
 	for path, subtitle := range seedSubtitles() {
 		model, modelErr := core.Observe.Page(t.Context(), held[path].ID)
@@ -1307,7 +1319,7 @@ func TestTheSeededSiteCarriesPageTypes(t *testing.T) {
 func TestTheSeededHubShowsTheWriterItsPictureAndTheGraphAProposal(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1430,7 +1442,7 @@ func TestTheHarnessRecordsSpendWorthReading(t *testing.T) {
 		}
 	}
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1493,7 +1505,7 @@ func openFindings(t *testing.T, core *app.Core, siteID, code string) []findings.
 func TestTheSeededWorkbookFillsTheInboxTheMapAndThePreview(t *testing.T) {
 	core := seeded(t)
 
-	listed, err := core.Sites.List(t.Context(), sites.ListRequest{ListRequest: dto.ListRequest{Limit: 10}})
+	listed, err := core.Sites.List(t.Context(), seededSites)
 	if err != nil {
 		t.Fatalf("List sites: %v", err)
 	}
@@ -1603,5 +1615,44 @@ func pagesByPath(t *testing.T, core *app.Core, siteID string) map[string]pages.P
 			return out
 		}
 		cursor = string(page.Next)
+	}
+}
+
+func TestTheScriptAnswersASiteQuestionAndAWriteWithTheirTools(t *testing.T) {
+	script := &assistantScript{}
+	script.naming("page-1")
+
+	cases := []struct {
+		prompt string
+		tool   string
+		args   map[string]any
+	}{
+		{prompt: "Explore the site's tree for me", tool: "pages_tree", args: map[string]any{"view": "roots"}},
+		{prompt: "Read the espresso machines hub in full", tool: "pages_get", args: map[string]any{"path": hubPath}},
+		{prompt: "Retitle the espresso page", tool: "pages_manage", args: map[string]any{
+			"op": "update", "pageId": "page-1", "metaTitle": "Espresso machines under $500: nine we would buy",
+		}},
+		{prompt: "How is the map?", tool: "", args: nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.prompt, func(t *testing.T) {
+			turn := script.answer(tc.prompt)
+			if turn.Tool != tc.tool {
+				t.Fatalf("answer(%q) called %q, want %q", tc.prompt, turn.Tool, tc.tool)
+			}
+			if turn.Text == "" {
+				t.Errorf("answer(%q) says nothing after its call", tc.prompt)
+			}
+			if tc.args == nil {
+				return
+			}
+			var got map[string]any
+			if err := json.Unmarshal(turn.Args, &got); err != nil {
+				t.Fatalf("answer(%q) args %s: %v", tc.prompt, turn.Args, err)
+			}
+			if !maps.Equal(got, tc.args) {
+				t.Errorf("answer(%q) args = %v, want %v", tc.prompt, got, tc.args)
+			}
+		})
 	}
 }

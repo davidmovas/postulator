@@ -1,4 +1,5 @@
 import type { Edge, Entity, EntityPage, PageType } from "../../../data/types.js";
+import { roleOfPreset } from "../../../testing/pagetypes.js";
 
 export interface EntitySeed {
     id: string;
@@ -52,8 +53,11 @@ export function pageType(preset: string, name = preset): PageType {
         siteId: "site",
         name,
         preset,
-        writable: preset === "hub" || preset === "entity" || preset === "product",
+        role: roleOfPreset(preset),
+        writable: ["hub", "entity", "product"].includes(roleOfPreset(preset)),
         templateId: null,
+        suggestedTemplateId: null,
+        overrides: 0,
         pages: 0,
         scopes: [],
         createdAt: "2026-09-19T10:00:00Z",

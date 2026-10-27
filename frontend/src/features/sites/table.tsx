@@ -82,6 +82,7 @@ export function SiteTable({
                     <TableRow
                         key={row.id}
                         data-site-id={row.id}
+                        data-site-name={row.name}
                         interactive={true}
                         selected={row.id === selectedId}
                         tabIndex={0}

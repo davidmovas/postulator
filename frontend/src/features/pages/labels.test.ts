@@ -1,7 +1,25 @@
 import { describe, expect, it } from "vitest";
 
 import { pageStatuses } from "../../generated/vocab.js";
-import { linkOwnerLabel, linkOwnerTone, pageStatusLabel, pageStatusTone } from "./labels.js";
+import { linkOwnerLabel, linkOwnerTone, observedH1Line, pageStatusLabel, pageStatusTone, titleBesideH1 } from "./labels.js";
+
+describe("the H1 a visitor sees", () => {
+    it("names the H1 and who prints it", () => {
+        expect(observedH1Line({ observedH1: "TB-500", h1Source: "theme" })).toBe(
+            "The site shows the H1 “TB-500”, printed by the theme",
+        );
+        expect(observedH1Line({ observedH1: "BPC-157 explained", h1Source: "content" })).toBe(
+            "The site shows the H1 “BPC-157 explained”, from the page’s content",
+        );
+        expect(observedH1Line({ observedH1: "", h1Source: "none" })).toBe("The site shows no H1");
+    });
+
+    it("adds the H1 to a title only where the two differ", () => {
+        expect(titleBesideH1({ title: "TB-500", observedH1: "TB-500" })).toBeNull();
+        expect(titleBesideH1({ title: "TB-500", observedH1: "" })).toBeNull();
+        expect(titleBesideH1({ title: "TB-500", observedH1: "TB-500 for research" })).toBe("TB-500 for research");
+    });
+});
 
 describe("the page vocabulary in words", () => {
     it("names every page status without printing the stored value", () => {

@@ -210,7 +210,7 @@ describe("a confirmation parks the turn", () => {
         applyConfirmRequested({
             conversationId,
             confirmationId: "p1",
-            tool: "pages_update",
+            tool: "pages_manage",
             args: {},
             risk: "write",
             summary: "update a page",
@@ -223,7 +223,7 @@ describe("a confirmation parks the turn", () => {
         applyConfirmRequested({
             conversationId,
             confirmationId: "p1",
-            tool: "pages_update",
+            tool: "pages_manage",
             args: {},
             risk: "write",
             summary: "update a page",
@@ -231,7 +231,7 @@ describe("a confirmation parks the turn", () => {
         applyConfirmResolved({
             conversationId,
             confirmationId: "p1",
-            tool: "pages_update",
+            tool: "pages_manage",
             status: "executed",
             result: null,
             error: "",
@@ -248,7 +248,7 @@ describe("a confirmation parks the turn", () => {
         applyConfirmRequested({
             conversationId,
             confirmationId: "p1",
-            tool: "pages_update",
+            tool: "pages_manage",
             args: {},
             risk: "write",
             summary: "update a page",
@@ -256,7 +256,7 @@ describe("a confirmation parks the turn", () => {
         applyConfirmResolved({
             conversationId,
             confirmationId: "p1",
-            tool: "pages_update",
+            tool: "pages_manage",
             status: "executed",
             result: null,
             error: "",
@@ -293,7 +293,7 @@ describe("a round held back by the provider", () => {
         startTurn(conversationId);
         attachAssistant(conversationId, "a1", getTurn(conversationId).turnSeq);
         waiting(20_000, Date.now());
-        applyToolStarted({ conversationId, callId: "c-1", tool: "sites_explore", args: { view: "tree" } });
+        applyToolStarted({ conversationId, callId: "c-1", tool: "pages_tree", args: { view: "roots" } });
         expect(getTurn(conversationId).waiting).toBeNull();
     });
 
@@ -358,11 +358,11 @@ describe("reconciling against the turn registry", () => {
 describe("tool calls and the lock", () => {
     test("tool events are applied by conversation and finish in place", () => {
         startTurn(conversationId);
-        applyToolStarted({ conversationId, callId: "t1", tool: "pages_list", args: {} });
+        applyToolStarted({ conversationId, callId: "t1", tool: "pages_find", args: {} });
         applyToolFinished({
             conversationId,
             callId: "t1",
-            tool: "pages_list",
+            tool: "pages_find",
             result: { items: [] },
             status: "ok",
             error: "",
@@ -376,14 +376,14 @@ describe("tool calls and the lock", () => {
 
     test("a refusal keeps its own status rather than reading as a failure", () => {
         startTurn(conversationId);
-        applyToolStarted({ conversationId, callId: "t1", tool: "pages_delete", args: {} });
+        applyToolStarted({ conversationId, callId: "t1", tool: "pages_manage", args: {} });
         applyToolFinished({
             conversationId,
             callId: "t1",
-            tool: "pages_delete",
+            tool: "pages_manage",
             result: null,
             status: "denied",
-            error: "the tool pages_delete is not open to this conversation",
+            error: "the tool pages_manage is not open to this conversation",
             durationMs: 3,
         });
         expect(getTurn(conversationId).tools[0]?.status).toBe("denied");

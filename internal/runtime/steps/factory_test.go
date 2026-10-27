@@ -87,7 +87,7 @@ func siteModelOf(store *sqlite.Store, types *pagetypes.Service) *sitemodel.Servi
 		Sites: sqlite.NewSiteRepo(store), Pages: sqlite.NewPageRepo(store), Entities: sqlite.NewEntityRepo(store),
 		Edges: sqlite.NewEdgeRepo(store), Types: types, Terms: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: sqlite.NewPageLinkRepo(store),
-		Findings: sqlite.NewFindingRepo(store),
+		Findings: sqlite.NewFindingRepo(store), Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store),
 	})
 }
 
@@ -120,7 +120,7 @@ func typedSite(t *testing.T, store *sqlite.Store, siteID string, rules field.Lin
 	t.Helper()
 
 	service := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: sqlite.NewPageRepo(store),
 		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: silentPublisher{}, Clock: clock.System{},
 	})
 	if err := service.Seed(t.Context(), siteID); err != nil {

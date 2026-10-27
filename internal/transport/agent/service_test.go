@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -178,7 +179,7 @@ func TestAnActionThatMovedOnIsAConflict(t *testing.T) {
 
 	actions := sqlite.NewPendingActionRepo(h.store)
 	action, err := domainagent.NewPendingAction(domainagent.PendingAction{
-		ID: id.New(), ConversationID: conversation, Tool: "pages_delete", Summary: "delete a page",
+		ID: id.New(), ConversationID: conversation, Tool: "pages_manage", Summary: "delete a page",
 		Args: json.RawMessage(`{"id":"p1"}`), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
 	})
 	if err != nil {
@@ -201,6 +202,53 @@ func TestAnActionThatMovedOnIsAConflict(t *testing.T) {
 	}
 	if _, err = h.service.Confirm(t.Context(), agentapp.ConfirmRequest{ActionID: action.ID}); !errors.IsCode(err, errors.Conflict) {
 		t.Fatalf("a rejection of a claimed action = %v", err)
+	}
+}
+
+func TestAWaitingCardKeepsTheRiskOfItsOp(t *testing.T) {
+	t.Parallel()
+
+	risks := map[string]bool{}
+	for _, op := range []string{`"op":"update","title":"Kept"`, `"op":"delete"`} {
+		h := newHarness(t)
+		page := sqlitetest.Page(t, h.store, h.siteID, "/coffee/kept/")
+		conversation := h.conversation(t, domainagent.ModeConfirm)
+		h.send(t, conversation, `TOOL:pages_manage{`+op+`,"pageId":"`+page.ID+`"}`+"\nFAKE: waiting")
+		pending, err := h.service.ListPendingActions(t.Context(), agentapp.ListPendingActionsRequest{ConversationID: conversation})
+		if err != nil || len(pending.Items) != 1 {
+			t.Fatalf("the pending actions are %+v, %v", pending, err)
+		}
+		risks[pending.Items[0].Risk] = true
+	}
+	if !risks["write"] || !risks["dangerous"] {
+		t.Errorf("the waiting cards carry the risks %v, want an update's write and a delete's dangerous", risks)
+	}
+}
+
+func TestACardOfAToolThisVersionNoLongerHasFailsInPlainWords(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	conversation := h.conversation(t, domainagent.ModeConfirm)
+	actions := sqlite.NewPendingActionRepo(h.store)
+	action, err := domainagent.NewPendingAction(domainagent.PendingAction{
+		ID: id.New(), ConversationID: conversation, Tool: "pages_delete", Summary: "Delete /coffee/ from the page map",
+		Args: json.RawMessage(`{"id":"p1"}`), CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	})
+	if err != nil {
+		t.Fatalf("NewPendingAction: %v", err)
+	}
+	if insertErr := actions.Insert(t.Context(), action); insertErr != nil {
+		t.Fatalf("Insert: %v", insertErr)
+	}
+
+	settled, err := h.service.Confirm(t.Context(), agentapp.ConfirmRequest{ActionID: action.ID, Approve: true})
+	if err != nil {
+		t.Fatalf("Confirm: %v", err)
+	}
+	if settled.Action.Status != string(domainagent.ActionFailed) || !strings.Contains(settled.Action.Error, "no longer has") ||
+		!strings.Contains(settled.Action.Error, "nothing was changed") || strings.Contains(settled.Action.Error, "registered") {
+		t.Fatalf("the card of a retired tool settled as %+v, want a failure the person can read", settled.Action)
 	}
 }
 

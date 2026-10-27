@@ -32,6 +32,7 @@ type Ref struct {
 	Title   string          `json:"title"`
 	Type    string          `json:"type"`
 	Preset  pagetype.Preset `json:"preset"`
+	Role    pagetype.Role   `json:"role"`
 	OnSite  bool            `json:"onSite"`
 	Summary Summary         `json:"summary,omitzero"`
 }
@@ -111,6 +112,7 @@ type Facts struct {
 	Generated    int                     `json:"generated"`
 	Notes        []note.Note             `json:"notes"`
 	Findings     []finding.Finding       `json:"findings"`
+	Directions   *Directions             `json:"directions,omitempty"`
 }
 
 func (f Facts) Field(key field.Key) (FieldFacts, bool) {
@@ -158,7 +160,7 @@ func (s Snapshot) Facts(pageID string, plan content.LinkContext) (Facts, error) 
 
 func (s Snapshot) beside(page pagemap.Page, pages []pagemap.Page) []pagemap.Page {
 	return slices.DeleteFunc(slices.Clone(pages), func(other pagemap.Page) bool {
-		technical := other.TechnicalReason != pagemap.TechnicalNone || s.typeOf(other).Preset == pagetype.Technical
+		technical := other.TechnicalReason != pagemap.TechnicalNone || s.typeOf(other).Preset.Role() == pagetype.RoleTechnical
 		return technical || (other.WPType.Term() && !page.WPType.Term())
 	})
 }
@@ -169,7 +171,7 @@ func (s Snapshot) Ref(page pagemap.Page) Ref {
 
 func (s Snapshot) ref(page pagemap.Page, summarized bool) Ref {
 	kind := s.typeOf(page)
-	ref := Ref{PageID: page.ID, Path: page.Path, Title: s.titleOf(page), Type: kind.Name, Preset: kind.Preset, OnSite: onSite(page)}
+	ref := Ref{PageID: page.ID, Path: page.Path, Title: s.titleOf(page), Type: kind.Name, Preset: kind.Preset, Role: kind.Preset.Role(), OnSite: onSite(page)}
 	if summarized {
 		ref.Summary = s.Summary(page)
 	}

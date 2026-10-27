@@ -5,10 +5,11 @@ import { useFinding } from "../../../data/hooks/findings.js";
 import { useTemplate } from "../../../data/hooks/templates.js";
 import { useTools } from "../../../data/hooks/tools.js";
 import type { Timestamp } from "../../../data/wire.js";
+import { toolLabel } from "../conversation/model/tools.js";
 import type { CardBusy, CardKeys } from "./card.js";
 import { ConfirmationCard } from "./card.js";
 import { Lines, Parts } from "./lines.js";
-import { isArgs, text } from "./model/card.js";
+import { cardRisk, isArgs, text } from "./model/card.js";
 import { describeAction } from "./model/describe.js";
 import { ownSummary } from "./model/summary.js";
 
@@ -18,18 +19,14 @@ function findingIdOf(tool: string, args: unknown): string | null {
     return tool === findingsTool && isArgs(args) ? text(args, "findingId") : null;
 }
 
+const templatesTool = "templates";
+const templateOps: ReadonlySet<string> = new Set(["update", "override"]);
+
 function templateIdOf(tool: string, args: unknown): string | null {
-    if (!isArgs(args)) {
+    if (tool !== templatesTool || !isArgs(args) || !templateOps.has(text(args, "op") ?? "")) {
         return null;
     }
-    switch (tool) {
-        case "templates_update":
-            return text(args, "id");
-        case "templates_set_override":
-            return text(args, "templateId");
-        default:
-            return null;
-    }
+    return text(args, "templateId");
 }
 
 export interface ActionCardProps {
@@ -70,21 +67,23 @@ export function ActionCard({
     const registered = listed.find((held) => held.name === tool) ?? null;
     const currentTemplate = current.data?.template.spec ?? null;
     const finding = read.data ?? null;
+    const said = ownSummary(summary, registered?.description ?? null);
     const view = useMemo(
-        () => describeAction(tool, args, registered?.schema ?? null, { currentTemplate, finding }),
-        [tool, args, registered, currentTemplate, finding],
+        () => describeAction(tool, args, registered?.schema ?? null, { currentTemplate, finding, summary: said }),
+        [tool, args, registered, currentTemplate, finding, said],
     );
 
     return (
         <ConfirmationCard
             tool={tool}
-            risk={risk ?? registered?.risk ?? "write"}
+            risk={cardRisk(risk, registered?.risk)}
             status={status}
             createdAt={createdAt}
             outcome={outcome}
             title={<Parts parts={view.title} />}
             lines={<Lines lines={view.lines} />}
-            summary={ownSummary(summary, registered?.description ?? null)}
+            summary={view.generic ? null : said}
+            label={toolLabel(tool, args)}
             busy={busy}
             focus={focus}
             keys={keys}

@@ -29,7 +29,22 @@ func (s *scenario) typeOf(t *testing.T, path string) (pagetype.Preset, pagemap.T
 	return kind.Preset, page.TypeSource, page.TypeReason
 }
 
-func TestTheFirstObservationSeedsTheTypesAndTypesEveryPage(t *testing.T) {
+func (s *scenario) ruleOf(t *testing.T, path string) int {
+	t.Helper()
+	page := s.pageAt(t, path)
+	rules, err := s.stores.types.Rules(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("Rules: %v", err)
+	}
+	for i := range rules {
+		if rules[i].ID == page.TypeRuleID {
+			return rules[i].Position
+		}
+	}
+	return 0
+}
+
+func TestTheFirstObservationTypesEveryPageByTheSitesRules(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
 	s.serveTheSite(false)
@@ -37,25 +52,25 @@ func TestTheFirstObservationSeedsTheTypesAndTypesEveryPage(t *testing.T) {
 	s.run(t, observe.Options{})
 
 	set, err := s.stores.types.Set(t.Context(), siteID)
-	if err != nil || len(set.Types()) != len(pagetype.Presets()) {
+	if err != nil || len(set.Types()) != len(pagetype.Seeded()) {
 		t.Fatalf("the site's types = %d %v, want the presets seeded", len(set.Types()), err)
 	}
 	want := map[string]struct {
 		preset pagetype.Preset
-		reason pagemap.TypeReason
+		rule   int
 	}{
-		"/product/bpc-157-peptide/":   {pagetype.Product, pagemap.TypeByProduct},
-		"/product-category/peptides/": {pagetype.StoreCategory, pagemap.TypeByStoreCategory},
-		"/shop/":                      {pagetype.Catalog, pagemap.TypeByShop},
-		"/account/":                   {pagetype.Technical, pagemap.TypeByTechnical},
-		"/peptides/":                  {pagetype.Hub, pagemap.TypeByListing},
-		"/tb-500/":                    {pagetype.Hub, pagemap.TypeByListing},
-		"/":                           {pagetype.Entity, pagemap.TypeByDefault},
+		"/account/":                   {pagetype.Technical, 1},
+		"/product/bpc-157-peptide/":   {pagetype.Product, 2},
+		"/product-category/peptides/": {pagetype.StoreCategory, 3},
+		"/shop/":                      {pagetype.Catalog, 4},
+		"/":                           {pagetype.Landing, 5},
+		"/peptides/":                  {pagetype.Landing, 6},
+		"/tb-500/":                    {pagetype.Category, 7},
 	}
 	for path, expected := range want {
 		preset, source, reason := s.typeOf(t, path)
-		if preset != expected.preset || source != pagemap.TypeSourceAuto || reason != expected.reason {
-			t.Errorf("%s = %s %s %s, want %s auto %s", path, preset, source, reason, expected.preset, expected.reason)
+		if preset != expected.preset || source != pagemap.TypeSourceAuto || reason != pagemap.TypeByRule || s.ruleOf(t, path) != expected.rule {
+			t.Errorf("%s = %s %s %s by rule %d, want %s by rule %d", path, preset, source, reason, s.ruleOf(t, path), expected.preset, expected.rule)
 		}
 	}
 }
@@ -77,32 +92,48 @@ func TestARegularPageWaitsForItsRenderBeforeItIsTyped(t *testing.T) {
 	delete(s.visitor.failed, baseURL+"/peptides/")
 	s.clock.Set(start.Add(time.Hour))
 	s.run(t, observe.Options{Full: true, RenderRescan: true})
-	if preset, _, reason := s.typeOf(t, "/peptides/"); preset != pagetype.Hub || reason != pagemap.TypeByListing {
-		t.Errorf("the hub once rendered = %s %s, want Hub by its listing", preset, reason)
+	if preset, _, reason := s.typeOf(t, "/peptides/"); preset != pagetype.Landing || reason != pagemap.TypeByRule || s.ruleOf(t, "/peptides/") != 6 {
+		t.Errorf("the hub once rendered = %s %s, want Landing by its listing at the top level", preset, reason)
 	}
 }
 
-func TestATypedPageIsNeverRetypedByTheObservation(t *testing.T) {
+func TestAPageTheRulesPlacedFollowsThemAndAPersonsOrAnOlderTypeStays(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
 	s.serveTheSite(false)
 	s.run(t, observe.Options{})
 
-	home := s.pageAt(t, "/")
-	tb500 := s.pageAt(t, "/tb-500/")
-	s.stores.setType(home.ID, siteID+"-hub", pagemap.TypeByUser)
+	home, shop := s.pageAt(t, "/"), s.pageAt(t, "/shop/")
+	s.stores.setType(home.ID, siteID+"-category", pagemap.TypeByUser)
+	s.stores.setLegacyType(shop.ID, siteID+"-catalog", pagemap.TypeByShop)
 	s.serve(publicPage{title: "TB-500", path: "/tb-500/", content: "<p>TB-500 is a synthetic fragment of thymosin beta-4.</p>"})
 
 	s.clock.Set(start.Add(time.Hour))
 	s.run(t, observe.Options{Full: true, RenderRescan: true})
-	if preset, source, reason := s.typeOf(t, "/"); preset != pagetype.Hub || source != pagemap.TypeSourceManual || reason != pagemap.TypeByUser {
+	if preset, source, reason := s.typeOf(t, "/"); preset != pagetype.Category || source != pagemap.TypeSourceManual || reason != pagemap.TypeByUser {
 		t.Errorf("the front page a person typed = %s %s %s, want it kept", preset, source, reason)
 	}
-	if preset, source, _ := s.typeOf(t, "/tb-500/"); preset != pagetype.Hub || source != pagemap.TypeSourceAuto {
-		t.Errorf("tb-500 typed before = %s %s, want its first type kept", preset, source)
+	if preset, _, reason := s.typeOf(t, "/shop/"); preset != pagetype.Catalog || reason != pagemap.TypeByShop {
+		t.Errorf("the shop typed before 2.6 = %s %s, want it left until a person applies the rules", preset, reason)
 	}
-	if tb500.PageTypeID == nil {
-		t.Fatal("tb-500 was not typed by the first walk")
+	tb500 := s.pageAt(t, "/tb-500/")
+	if preset, source, reason := s.typeOf(t, "/tb-500/"); preset != pagetype.Info || source != pagemap.TypeSourceAuto || reason != pagemap.TypeByUnmatched || tb500.TypeRuleID != "" {
+		t.Errorf("tb-500 without its listing = %s %s %s, want the rules to place it again: no rule matches, so Info", preset, source, reason)
+	}
+	if held, _ := s.finding(finding.TypeByDefault, finding.SubjectPage(tb500.ID)); held.Status != finding.Open {
+		t.Errorf("type_by_default on a page no rule matched = %+v, want it open for the client to review", held)
+	}
+
+	s.stores.types.changeRule(siteID, 10, func(rule *pagetype.Rule) {
+		rule.Conditions.URLs = append(rule.Conditions.URLs, pagetype.URLMatch{Mode: pagetype.URLSegment, Value: "tb"})
+	})
+	s.clock.Set(start.Add(2 * time.Hour))
+	s.run(t, observe.Options{Full: true})
+	if preset, _, reason := s.typeOf(t, "/tb-500/"); preset != pagetype.Guide || reason != pagemap.TypeByRule || s.ruleOf(t, "/tb-500/") != 10 {
+		t.Errorf("tb-500 after its rule changed = %s %s by rule %d, want the next sync to follow the rule", preset, reason, s.ruleOf(t, "/tb-500/"))
+	}
+	if held, _ := s.finding(finding.TypeByDefault, finding.SubjectPage(tb500.ID)); held.Status == finding.Open {
+		t.Errorf("type_by_default once a rule matched = %+v, want it closed", held)
 	}
 }
 
@@ -117,7 +148,7 @@ func TestAPageAPersonTypedAsRegularIsNeverDetectedTechnicalAgain(t *testing.T) {
 		t.Fatalf("the account page = %q, want it detected technical first", account.TechnicalReason)
 	}
 	shop := s.pageAt(t, "/shop/")
-	s.stores.setType(account.ID, siteID+"-entity", pagemap.TypeByUser)
+	s.stores.setType(account.ID, siteID+"-guide", pagemap.TypeByUser)
 	s.stores.setType(shop.ID, siteID+"-technical", pagemap.TypeByUser)
 
 	s.clock.Set(start.Add(time.Hour))
@@ -142,12 +173,12 @@ func TestAManualTypeSetDuringTheWalkSurvives(t *testing.T) {
 	tb500 := s.pageAt(t, "/tb-500/")
 	s.touch(tb500ID, start.Add(30*time.Minute))
 	s.stores.interleave = func() {
-		s.stores.setType(tb500.ID, siteID+"-entity", pagemap.TypeByUser)
+		s.stores.setType(tb500.ID, siteID+"-guide", pagemap.TypeByUser)
 	}
 	s.clock.Set(start.Add(time.Hour))
 	s.run(t, observe.Options{})
 
-	if preset, source, reason := s.typeOf(t, "/tb-500/"); preset != pagetype.Entity || source != pagemap.TypeSourceManual || reason != pagemap.TypeByUser {
+	if preset, source, reason := s.typeOf(t, "/tb-500/"); preset != pagetype.Guide || source != pagemap.TypeSourceManual || reason != pagemap.TypeByUser {
 		t.Errorf("tb-500 after a person typed it during the walk = %s %s %s, want the person's type", preset, source, reason)
 	}
 }
@@ -159,7 +190,7 @@ func TestACustomFieldAScopeNamesIsReadAndAnAbsentOneIsNotAskedAgain(t *testing.T
 	s.plugin.custom = map[int64]map[string]string{peptidesID: {"spec_sheet": "Lyophilized powder, 5 mg"}}
 	for _, key := range []string{"spec_sheet", "dosage"} {
 		s.stores.types.add(field.Scope{
-			PageTypeID: siteID + "-hub", Key: field.Instance(field.Meta, key), Enabled: true, Label: key,
+			PageTypeID: siteID + "-landing", Key: field.Instance(field.Meta, key), Enabled: true, Label: key,
 			Provider: field.ProviderPlugin, Links: field.NoLinks(),
 		})
 	}
@@ -187,7 +218,7 @@ func TestACustomFieldAScopeNamesIsReadAndAnAbsentOneIsNotAskedAgain(t *testing.T
 	}
 
 	s.stores.types.add(field.Scope{
-		PageTypeID: siteID + "-hub", Key: field.Instance(field.Meta, "storage"), Enabled: true, Label: "Storage",
+		PageTypeID: siteID + "-landing", Key: field.Instance(field.Meta, "storage"), Enabled: true, Label: "Storage",
 		Provider: field.ProviderStore, Links: field.NoLinks(),
 	})
 	s.plugin.custom[peptidesID]["storage"] = "Keep frozen"

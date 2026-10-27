@@ -1,14 +1,16 @@
 import type { ReactElement } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
 import { useSyncSite } from "../../data/hooks/sync.js";
 import { AccountTreeIcon, Button, EmptyState, Screen, UploadFileIcon } from "../../ui/index.js";
+import { AdoptParentsDrawer } from "../graph/index.js";
 import type { PageTab } from "../pages/index.js";
 import { PageDrawer, readTab, useEntityIndex, withTab } from "../pages/index.js";
 import { SubtreeCrumbs } from "./crumbs.js";
 import { FlatList } from "./flat.js";
+import { useBranch } from "./loader.js";
 import { defaultQuery, filterOf, flat, readQuery, searchOf, writeQuery } from "./model/params.js";
 import type { MapQuery } from "./model/params.js";
 import { MapToolbar } from "./toolbar.js";
@@ -27,6 +29,9 @@ export function SiteMapScreen(): ReactElement {
     const search = searchOf(query);
     const index = useEntityIndex(siteId);
     const sync = useSyncSite();
+    const [adopting, setAdopting] = useState(false);
+    const subtree = useBranch({ siteId, parentId: query.under }, query.under !== "");
+    const underPath = subtree.view?.parent?.page.path ?? query.under;
 
     const change = (next: MapQuery): void => {
         setSearchParams(writeQuery(next), { replace: true });
@@ -44,7 +49,16 @@ export function SiteMapScreen(): ReactElement {
         <Screen
             title={said.title}
             variant="full"
-            toolbar={<MapToolbar siteId={siteId} query={query} onChange={change} />}
+            toolbar={
+                <MapToolbar
+                    siteId={siteId}
+                    query={query}
+                    onChange={change}
+                    onAdopt={() => {
+                        setAdopting(true);
+                    }}
+                />
+            }
         >
             {query.under === "" ? null : <SubtreeCrumbs siteId={siteId} under={query.under} onUnder={under} />}
             {flat(query) ? (
@@ -111,6 +125,14 @@ export function SiteMapScreen(): ReactElement {
                     }}
                 />
             )}
+            {adopting ? (
+                <AdoptParentsDrawer
+                    open={true}
+                    siteId={siteId}
+                    under={query.under === "" ? null : { pageId: query.under, path: underPath }}
+                    onOpenChange={setAdopting}
+                />
+            ) : null}
         </Screen>
     );
 }

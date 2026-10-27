@@ -10,7 +10,7 @@ const said = copy.runs.start;
 
 const held: { recipe: StepSpec[] | null; priced: unknown[] } = { recipe: null, priced: [] };
 
-const answered = { estimate: { tokens: 1200, usd: 0.4, findings: [] }, added: [], runId: "r1" };
+const answered = { estimate: { tokens: 1200, usd: 0.4, findings: [] }, added: [], runId: "r1", fields: [] };
 
 function mutation(into: unknown[]) {
     return {

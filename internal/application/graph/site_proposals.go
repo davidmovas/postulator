@@ -53,13 +53,16 @@ func (s *Service) previewFromSite(ctx context.Context, rawSiteID string, pageIDs
 		byID[state.pages[i].ID] = state.pages[i]
 	}
 	prefix := strings.TrimSpace(pathPrefix)
-	response := PreviewFromPagesResponse{Entities: []ProposedEntity{}}
+	response := PreviewFromPagesResponse{Entities: []ProposedEntity{}, PageTypes: map[string]string{}}
 	proposals := tree.EntityProposals(chosen)
 	for i := range proposals {
 		if !strings.HasPrefix(proposals[i].Path, prefix) {
 			continue
 		}
 		response.Entities = append(response.Entities, proposedFromSite(&proposals[i], byID[proposals[i].PageID]))
+		if place, placed := tree.Place(proposals[i].PageID); placed && place.TypeID != "" {
+			response.PageTypes[proposals[i].PageID] = place.TypeID
+		}
 	}
 	response.Pages = len(response.Entities)
 	return response, nil

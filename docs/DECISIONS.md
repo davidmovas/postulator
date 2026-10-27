@@ -5132,3 +5132,554 @@ person, chosen by what SQLite allows at that size. It is the partial result (`b5
   - a refusal before anything was settled is shown as before.
 - **What it amends**: 4.3b's "A bulk over 1,000 findings is not one transaction" stands, and the
   person is now told what it left.
+
+## 2026-10-25 — phase 16: 2.5.1, the client's first feedback
+
+2.5.0 was released and the client came back with four things: pages with no H1 after a sync, an
+agent chat outside the selected site, a Proposed Entities dialog that forgot his selection, and the
+three layout faults the release had listed. The task list is in
+`docs/superpowers/plans/2026-10-25-phase-16-patch.md`.
+
+### The H1 a visitor sees
+
+- **Where it was lost.**
+  - The `h1` field was written only from the content's first `<h1>`: the plugin's `h1` from its
+    filtered content, or core's content through `headingOne`.
+  - On Blocksy (the client's theme, as on the replica) and on vanilla's block theme, the theme
+    prints the title as the page's H1, outside the content root. So the field stayed empty: 20 of 20
+    published pages on the replica and 11 of 11 on vanilla, reproduced on 2.5.0's code before the
+    fix.
+  - Stage 3's extraction saw that H1 (`ThemeH1Printed`, 0071) but kept only the flag, never the text.
+  - The stored extraction keeps the headings inside the root, not the public HTML, so no stored
+    render could give a theme's H1 back.
+- **The visible H1.**
+  - The extraction records `H1` and `H1Source`: the first visible `<h1>` in document order outside
+    the site's banner, navigation, sidebars and footer. A `<header>` or `<footer>` inside an article,
+    a section or `main` belongs to the page.
+  - The source is `content` when the h1 sits inside the content root and the client's own content
+    (raw or filtered) holds an h1 of that text, and `theme` otherwise.
+  - A text test was tried first and dropped: a one-word heading such as "Cart" matched loose words
+    of the raw.
+  - An empty render shows `none`. A visit that landed elsewhere keeps the source unknown.
+  - It does not depend on the root being located, since a visitor sees the h1 either way; the plan's
+    "unknown when the root was not located" was dropped.
+- **One rule, one value.**
+  - `render.VisibleH1(record, contentH1)`: a render with a known source wins; otherwise the content's
+    H1 is used as `content`; failing both, `none`. Never a guess.
+  - The content stage applies the rule with the page's stored render before `merge` and `fields`.
+    The render stage applies it after each extraction and writes the field itself. So no walk
+    flips the field between the two stages.
+- **The planned H1 stays apart.**
+  - `pages.h1` is both the workbook's H1 and a mirror of the observed one, and `hasPlan` reads
+    "planned" from the column differing from the field.
+  - So the render stage moves the column only through `PageRepo.FollowObservedH1(id, was, now)`,
+    which writes where the column still equals the previous observed value. A planned H1 is never
+    touched, and `page_h1_differs` tells the two apart on the next walk.
+- **A read-only field is always agreed.** The H1 is the catalog's one field with `Write: None` that
+  is not denied, and `observeFields` raised `field_changed_on_site` on it whenever it moved. It now
+  agrees it, as `CLAUDE.md` already stated the rule.
+- **Pages synced on 2.5.0.**
+  - 0075 adds `page_renders.h1` and `h1_source` and fills every render whose theme prints no H1 from
+    its stored headings (`content` or `none`).
+  - A render whose theme printed an H1, or whose root was unknown, keeps an unknown source. The
+    render stage's `stale()` fetches those again on the next ordinary sync, and only those: their
+    text was never stored. Renders that landed elsewhere are excluded.
+  - Proven by the migration test (0074 to 0075 with the backfill and the down) and by an
+    observation test whose incremental walk visits only the themed page, then nothing on the walk
+    after.
+  - On both stands, the e2e test takes the themed pages' rows back to what 2.5.0 stored, through the
+    repositories. The store exposes no migration control, and adding one for a test was not worth a
+    production API. An ordinary sync then fills every one of them again.
+- **What reads it.**
+  - `pages.View` gains `observedH1` and `h1Source` beside the planned `h1`, read in one pass per
+    call through two consumer-declared readers (fields and renders by page ids).
+  - The Pages list shows the H1 after the title where the two differ, with the H1 and its source on
+    hover. The drawer labels the editable field "Planned H1" and says under it what the site shows
+    and who prints it.
+  - The pack, `MatchRow`, crumb names and the agent's page view already read the field first. The
+    stand census proves each with the fixed value: a row naming a page's H1 finds it, or a store
+    category's hub twin, by `h1`.
+- **Two existing tests changed their fixtures**, not their claims:
+  - `TestACrumbFindsAPageByTheH1TheSiteShows` served a page whose render showed another H1 than the
+    content's, and now serves the H1 it is about;
+  - the observation's H1 tests strip the title from the filtered content, as Blocksy's
+    `the_content` never carries it.
+- **The fake site agreed with itself again.**
+  - `wptest`'s plugin reports an item's `H1` (the harness hands it the workbook's), while its
+    storefront printed the title. So the hub's visible H1 lost the name its store category shares,
+    and the Site map's twin went nil (`TestTheSeededWorkbookFillsTheInboxTheMapAndThePreview`).
+  - The storefront now prints the H1 the fake reports. The real plugin reports the first h1 of the
+    rendered content, so a real site cannot disagree that way.
+
+### One chat, in the selected site
+
+- **Where it went wrong.** The rail's Agent opened `/agent`, a screen that listed every
+  conversation and always started one with no site. A site-less conversation's site tools refuse
+  every call (`requireSite`), so the agent could not use the site's tools and its brief was empty.
+- **Now:**
+  - with a site selected, the rail and the palette open `/s/:siteId/agent` (and the conversation
+    and inbox paths under it);
+  - that screen lists only the site's conversations, starts new ones on the site and names the site
+    in its header ("Agent on …");
+  - it opens the conversation the dock holds for that site and writes back the one it opens, so the
+    two always show the same chat;
+  - the dock hides on agent routes, so one chat is never on screen twice;
+  - switching site from an agent route lands on the new site's chat.
+- **`/agent` holds only conversations with no site**, says plainly that site tools need a site,
+  and offers one button per site. The new-conversation dialog that let a person pick another site
+  is gone. No Go change: a conversation's tools already bind its site.
+- **Proven** by vitest on the paths, the screen and the rail, by
+  `TestTheScriptAnswersASiteQuestionAndAWriteWithTheirTools` (the harness's script answers
+  "explore" with `sites_explore` and a retitle with a confirmable write), and by walk shots from the
+  rail and from the dock that show the tool's outcome and the card.
+- **The harness seeds a second site** ("Tamper Supply") to prove the switch. Two sites created in
+  the same second list in either order, since sites sort by creation and then by a random id. So the
+  harness's restore and its tests find the seeded site by name, and the tests list by name. Before
+  that, the restart tests failed now and then with "the seed published nothing".
+
+### The Proposed Entities dialog
+
+- **The brief kept its redesign for a later session.** The owner opened it mid-session, found it
+  unchanged, small, and unable to untick a parent's children at once, and moved the whole redesign,
+  editing included, into 2.5.1.
+- **What it is now:**
+  - a sheet over nearly the whole window (`ui/workspace.tsx`);
+  - the proposals as a tree by their parent, with expand and collapse per node and for all;
+  - ticking a node ticks its whole subtree, and a parent with some children ticked shows a partial
+    state; keep all and keep none; a count of ticked out of total;
+  - filters (all, ticked, not ticked, blocked) and a search by name or path that keeps the ancestors
+    of every match;
+  - an inspector that edits a proposal's name, its parent (another proposal, an existing entity or
+    the top level, never a cycle) and its keywords, with "Undo my changes";
+  - clashes recomputed after an edit, so a name taken under the same parent stays unticked with its
+    reason.
+- **A ticked child whose parent is unticked is sent at the top level**, and its row says so, which
+  is what `ApplyProposals` does with a parent it cannot find. `ApplyProposals` takes the proposals
+  as the screen holds them, so no Go change was needed.
+- **Its state** (stage, selection, edits, search, filters, expanded nodes) lives in memory per site
+  and per opener (pages, keywords, a findings seed; `proposal-memory.ts`). It clears on accept, on
+  "Start over", on a different findings seed and on restart. The pick's page tree takes its search
+  and expanded nodes from outside for it.
+- **Proven** by 43 tests of the pure model (`graph/model/proposal-tree.ts`), the store's tests, 13
+  new drawer tests, and walk shots at 1280 and 960. The walk builds a selection, goes to Pages,
+  switches site and back, and finds it kept. The review shots open the dialog from Findings, since
+  the harness's fake model cannot answer a preview from pages.
+
+### Three screens at 960 × 600 with the dock open
+
+- One pure helper, `ui/collapse.ts`, picks the columns that fit the measured width, as the Site map
+  does.
+- The Runs table drops the duration, then the spend, then the start, all kept in the run's detail.
+  The Models spend and recent-call tables collapse the same way, and model and role names show whole
+  on hover.
+- The rail scrolls without a sideways bar.
+- `runs-960`, `settings-models-960` and `rail-site-960` carry a `fits` step, and the walk gained an
+  `expect` step.
+
+## 2026-10-26 — phase 17: 2.6.0, page classification by rules, templates per type, the Pages views
+
+The client's second request after 2.5.1: a sync should say what each page is, he wants to see the
+site by aggregates and give a whole aggregate one template, and the Pages screen should show the
+site's structure. Before it, `pagetype.Assign` was fixed code over six presets and everything that
+was not a product, a hub or technical fell into Entity; nothing retyped pages in bulk and nothing
+previewed a change. The task list is in `docs/superpowers/plans/2026-10-26-phase-17-classification.md`.
+
+### The owner's answers at the plan
+
+1. **A sync re-types the auto pages the rules placed** (reason `rule` or `unmatched`) as well as
+   the untyped ones. A page typed before 2.6 (reasons `listing`, `product`, `default` and the rest)
+   moves only when the person applies a classification, and a manual type is never touched. This
+   amends stage 2a's "the observation types only an untyped page".
+2. **A rule's conditions combine with AND only.** The brief's rules that read as an OR (its 8 and 9)
+   are seeded as separate rules, each with its own name.
+
+### The vocabulary
+
+- **A preset is a named starting point over a fixed role.** `pagetype.Role` is `hub`, `entity`,
+  `product`, `archive`, `catalog` or `technical`; `Preset.Role()` never changes. Every behavioural
+  switch (the link field, the writer's role sentence, the field defaults, the graph's orphan rule,
+  the last-of-its-kind guard, the import's synonyms) reads the role, never the preset.
+- **The presets**: Landing and Category (hub), Guide and Info (entity), Product, Store category
+  (archive), Catalog, Technical, and Hub and Entity, which sites from before 2.6 keep and a person may
+  still create. A new site is seeded with the first eight (`pagetype.Seeded()`).
+- **A lookup by role prefers an order**: hub takes Category, then Hub, then Landing; entity takes
+  Guide, then Entity, then Info. It answers the untyped page's guess in `Set.TypeOf`, the import's
+  synonyms and the delete guard, which became "the last type of its role" (`last_of_role`).
+- **Templates and scopes.** Landing and Category take the Hub built-in and Guide and Info the Guide
+  built-in, under 0066's rule (never on a site whose default template a person chose). Info enables
+  only the SEO title and description: its body is off.
+
+### Existing sites (0076)
+
+- The preset `CHECK` is widened by column swap (as 0063 did), and the index
+  `page_types_site_preset` and the 0074 trigger `page_map_type_moved` are dropped and recreated.
+- Every site that has types gains Landing, Category, Guide and Info once. A name already taken by a
+  type of the same role stands for the preset, so the rules point at that type; a name taken by
+  another role adds the preset as "<Name> pages", then "<Name> pages 2". No type is renamed or
+  deleted, and no page moves. `Seed` still fills only a site with no types.
+- The down maps landing and category back to hub, and guide and info to entity.
+
+### The rules
+
+- **A rule** is a position, a name, an enabled switch, a target type and conditions that all must
+  hold; a list inside one condition means any of its values. One fallback row per site
+  (`kind fallback`, a partial unique index) types what no rule matched.
+- **The conditions**: WordPress post types; the URL by prefix, segment or glob; slugs; an ancestor
+  (one page, or any page of a type); the level; a listing, present or absent, with a minimum of
+  products; the JSON-LD types (Article, BlogPosting, HowTo, FAQPage, AboutPage, ContactPage,
+  CollectionPage, ItemList); a word range; technical. Three that the brief's own rules needed were
+  added: "is the front page", "is the shop" and "at least N H2s".
+- **The URL's segment mode** matches a whole segment or a run of hyphenated words inside one, so
+  `guides` matches `/lab-guides/`. A glob is our own matcher (`*` inside a segment, `**` across),
+  compiled at save; no raw regex reaches the screen.
+- **The level counts from the front page**: the front page is 0, a root or a child of the front page
+  is 1, and each ancestor below adds one. The technical condition is every technical reason but the
+  shop's.
+- **Validate** refuses an empty rule, a bad glob, an unknown type or another site's, and an inverted
+  range, each on its field (`conditions.urls[0].value`). A site holds at most 100 rules.
+- **The defaults are fourteen rules and the fallback**, not the plan's fifteen (a miscount):
+  technical pages; products; store categories; the shop; the front page; a listing at the top level
+  (Landing); a listing below it (Category); blog posts; an article, a blog post or a how-to by its
+  schema; a guide's word in the address (blog, guide, guides, how-to, learn, research); under a
+  guide; an about, contact or FAQ page by its schema; one by its address (24 slugs, `refund_returns`
+  among them); a long article with sections (800 words, two H2s, no listing) as a Guide; then the
+  fallback, Info, "Anything no rule matched".
+- **0077** creates `page_type_rules` and seeds every site from a `rule_seeds` table with an `@guide`
+  placeholder for the ancestor condition, numbered by `row_number()`. A test proves the seed equals
+  `pagetype.DefaultRules` on a fresh site, an upgraded one and one whose type names were taken.
+- **0078** widens `pages.page_type_reason` with `rule` and `unmatched` and adds
+  `pages.page_type_rule_id`, with no foreign key, so a deleted rule leaves its pages' reason readable
+  ("a rule since removed") until the next walk. The down maps both reasons to `default`.
+
+### One classification, two callers
+
+- **`pagetype.Classify`** walks the folded tree root-first (`contextpack.Map`, by level then path),
+  so an ancestor's type is settled before its children's. The first enabled rule that matches wins.
+- **A page waits** when the next rule needs a render it lacks, and when a condition asks for an
+  ancestor's type and that ancestor waits; an unmet condition beats a waiting one. **The role guard**
+  (`Fits`) keeps a product to the product role and a term to the archive role, so no rule can put
+  either anywhere else.
+- **The facts** are one function over the Map (`Map.Facts`), the renders summarized in SQL (a listing
+  inside the root, the JSON-LD keys, the H2s not generated, the content's words) and the listed
+  products from `page_links`. A test proves the SQL summary equals `pagetype.RenderedOf` on the same
+  record.
+- **The walk** classifies inside derive's unit, over the Map it builds from its own pages after the
+  parents and before the map refresh, so the Site map ends the walk fresh. It writes through
+  `PageRepo.Classify`, guarded by the assignment it read. `type_by_default` is raised for a page the
+  fallback typed and cleared when a rule or a person types it.
+- **The preview** reads the same facts through `sitemodel` in a fixed number of statements, in
+  `ModePreview` (every auto page) where the walk uses `ModeWalk` (untyped and rule-placed pages).
+
+### Preview, apply and bulk
+
+- **The preview** groups the pages that would change by from-type and to-type, with the count per
+  rule, up to five sample paths, the groups each rests on, the kept (manual), waiting and by-default
+  counts, and a hash of the whole diff. A group's pages page by path through `Keyset.Page`.
+- **Apply** takes all groups or chosen ones. A choice must hold every group it rests on (a page whose
+  ancestor's rule moves with another group), refused as `group_depends`, and the screen ticks those
+  for the person; a moved hash is `preview_moved`. It writes in units of at most 1,000 pages, each row
+  guarded by the type, source, reason and rule it was read with, and answers what moved and what
+  changed since. `Classification.Chosen` is the same check without the write, which the agent's
+  confirmation reads.
+- **Bulk by hand.** `pages.Selection` takes ids, subtrees (optionally within a type), a filter with
+  the count the person saw (CONFLICT when it moved) or a rule's matches, less exceptions, at most
+  10,000 pages. `SetTypes(typeId)` is manual and role-guarded and clears the rule id; `SetTypes(null)`
+  ("Back to the rules") hands the pages back and classifies them at once; `SetTemplates` sets or
+  clears a page's own template in one statement per batch of 1,000, replacing `AssignTemplate`'s
+  row-by-row loop.
+- **Deletions.** Deleting a type repoints its rules, the fallback and the ancestor conditions that
+  name it to the reassignment, and refuses a fallback moved onto a role that cannot hold a page
+  (`fallback_role`). Every manual writer clears `page_type_rule_id`.
+- **The agent's tool, `pagetypes_classify`.** `preview` reads freely and answers each group with its
+  type names, its rules by name and its sample paths, numbered; `apply` names groups by those
+  numbers, which the hash pins, so a moved preview is refused before a number could mean another
+  group. Groups as `{from, to}` objects cost 767 bytes of schema; numbers cost 547 bytes and 124
+  tokens. An apply waits for the person in either mode, and its summary refuses what the apply would
+  refuse. Every schema went from 66,394 bytes and 14,779 tokens (92 tools, 2.5.1) to 67,165 bytes and
+  14,955 tokens (93 tools); `pages_list` took its own arguments (type and subtree filters, a title
+  sort) on the way.
+
+### Templates per aggregate
+
+- **A page type answers** its role, its pages, the pages that carry a template of their own
+  (`overrides`, with "Make them follow the type", which clears them) and `suggestedTemplateId`, the
+  role's built-in when the type has none.
+- **A run on auto** already resolved each item's template per page at claim time
+  (`runtime/claim.go`), so a run over Landing, Category and Guide pages takes Hub, Hub and Guide from
+  their types, and an estimate on auto writes no override.
+- **A type's body switch binds the run start** (`runs/body.go`). When every target's type has its
+  body off, the run is scoped to the fields those types write, as a person's field-scoped run is, and
+  the estimate and the start answer those fields so the screen can say why the run is cheaper. Types
+  that disagree on the body are refused with a run for each; a planned page of a body-off type is
+  refused, as no run can create it; a page with no type keeps the whole run. A field the template's
+  recipe has no step for is dropped, as a whole run would skip it.
+
+### The Pages screen and the dialog
+
+- **Three views**, List, Tree and By type, remembered per site, over one selection model
+  (`ui/selection.ts`: ids, a branch, a group, every page a filter matches less exceptions, a
+  shift-range) that Go resolves without loading the pages, and one set of bulk actions: set a type,
+  back to the rules, a template or follow the type, start a run, open in the agent.
+- **The reads page by cursor**: the List filters (type, body, open findings, a search), the title and
+  status sorts and `Count` on keyset indexes (0079, `pages(site_id, title, id)`), and
+  `MapRequest.Within(typeId)`, the folded tree pruned to the branches that hold the type (0080,
+  `page_map(site_id, type_id, trail)`).
+- **`@tanstack/react-virtual` was already in use** (`ui/virtual-rows.tsx`), so no library was chosen.
+- **The Proposed Entities dialog** gained a shift-range, "select all of one source page type" (the
+  preview names each source page's type, `PreviewFromPagesResponse.pageTypes`), the naming conflict
+  on its row before acceptance, the count on the accept button and keyboard control, over the
+  virtualised rows it already had. It was not redesigned.
+
+### What the stands said
+
+- **The replica** (Rank Math, Blocksy): the front page and `/peptides/` are Landing (the front page;
+  a listing at the top level); `/healing-peptides/`, `/bpc-157/` and `/tb-500/` Category (a listing
+  below it); `/lab-guides/`, `/reconstitution/` and `/sample-page/` Guide by their schema, because
+  Rank Math gives every plain page an Article schema and that rule comes before the guide's word;
+  `/hello-world/` Guide as a post; the cart, the checkout, the account, the privacy page and the
+  unpublished refund page (noindex) Technical; five products and three store categories by theirs;
+  **no page by default**. The plan expected `/refund_returns/` as Info by its slug and `/sample-page/`
+  by default; the technical rule and the schema rule come first, and the census is the truth.
+- **Vanilla** (no SEO plugin): `/guide/` and `/guide/setup/` Guide by the guide's word,
+  `/hello-world/` by its post type, and WordPress's `/sample-page/` the one page on either stand that
+  falls to Info by default, with its finding.
+- **Both**: every page on the site has a type after the first sync, nothing falls to Info that the
+  stand's table does not name, and the preview moves nothing after the first or the second sync.
+- **What they caught**: a workbook naming a type over a page the rules had typed kept the rule's id
+  under the import's reason, which the page refuses; four replica tests failed on it until the import
+  cleared the rule (`fix(imports)`). No unit test had imported over a rule-typed page.
+
+### Scale
+
+- **Flat**: every new read (the facts, the preview, a group's page, an apply of one block, the pages
+  list by type, search, title and subtree, the count, a selected subtree, the map within a type)
+  runs the same statements at 2,003 and 5,003 pages, the list reads the same rows, and EXPLAIN finds
+  no scan of a large table beyond the three by design.
+- **Two faults it found.** The pages list marked drifted bodies by reading every drifted body of the
+  site, one row per block of the generated site, so each page of the list grew with the site; it
+  now asks about the pages it shows. The classification folded the whole site again on every read
+  (1.4 s at 5,003 pages), against the ruling that the tree is read through `page_map`; it now reads
+  the stored map, and the differential test proves the facts equal the walk's at every step. The
+  facts went from 2.0 s to 0.39 s and the preview from 2.9–3.8 s to 0.48 s at 5,003 pages; a read
+  right after a change pays one refresh, about 1 s.
+- **An apply beside a second writer**: an apply of 2,753 pages at 5,003 took 4 to 6 s in batches of
+  1,000, and a second writer waited at most 484 ms uncontended (1.2 to 2.9 s with a stand
+  bootstrapping beside it), under SQLite's 5 s busy timeout.
+
+### The critic's findings, adopted at the plan
+
+- Lookups by role, never by preset, since a new site has no Hub and no Entity.
+- The classification inside derive's unit and before the map refresh, or the map would end the walk
+  stale.
+- Groups closed under their dependencies, rows guarded by what was read, and batches of 1,000, so a
+  second writer never waits past SQLite's 5 s busy timeout.
+- The level counted from the front page, not from the root of the tree.
+- Rules repointed when their type is deleted; the role guard; "Back to the rules".
+- `/sample-page/`, WordPress's placeholder, expected as the replica's one page typed by default.
+
+### Deviations from the request
+
+- **Fourteen default rules and the fallback**, where the plan said fifteen.
+- **Three conditions beyond the brief's list** (front page, shop, minimum H2s), which its own rules
+  needed.
+- **The agent's apply names groups by number**, not by type ids, to keep its schema small; the hash
+  keeps the numbers honest.
+- **A settled `type_by_default` resolves as `page_typed`**, by the person or the model that typed the
+  page.
+- **The UI harness.** The coffee site's four accessory pages are Guide, since a WordPress page can no
+  longer be a Product. A site rule types an article under a category as a Guide, as a person would on
+  that site. `POSTULATOR_HARNESS_PAGES` (5,000 under `task ui:run`) seeds a third site for the shots
+  at scale.
+
+## 2026-10-26 — phase 18: 2.7.0, the assistant reads, proposes and works; the writer takes a brief
+
+The client asked the assistant to design a section's links and it stopped on an empty `ParentId`.
+The graph read carried no parent, a parent being only an edge the instructions never sent it to; his
+graph was flat, because URL-less rows and proposals had left no parent edges; the page side answered
+a bare null with no reason, five causes stored as one `none`; nothing walked a subtree or the whole
+tree; a capped list kept its `nextCursor`, so following it skipped the rows the cap cut; a body read
+as 120-character excerpts; one card was one call; a run carried no brief. The plan, the capability
+matrix and the task list are `docs/superpowers/plans/2026-10-26-phase-18-assistant.md`.
+
+### The owner's answers at the plan
+
+1. **Must-link: the graph first.** A must-link target the graph does not connect is refused at the
+   start, naming the missing edge; the assistant's plan adds the related edge as an earlier step, and
+   the run start offers "add a related edge for each" (`addEdges`), written approved at the start.
+2. **The catalog's admin leaves the assistant**: `models_upsert`, `models_disable`,
+   `models_set_profile`, `models_test_provider` and `models_set_provider_key`. The assistant keeps the
+   model list, the profiles and the spend.
+3. **A plan card edits a step's text inline**: an anchor, a field's value, a run's brief and
+   directives, a type picked from a list. Anything else goes back to the assistant as a revised plan.
+4. **No critic**, from this phase on.
+
+### The read layer
+
+- **Every empty parent says why** (`contextpack.ParentWhy`, computed in the read layer from the facts
+  and the open findings, never stored): `root`, `planned`, `not_derived`, `render_failed`,
+  `crumb_unresolved` with the crumb, `crumb_ambiguous` with the candidates, `cycle_broken` with the
+  loop, `no_signal`, `parent_archived`. An entity with no parent says `no_parent_edge` or its open
+  `entity_parent_differs`.
+- **The tree by shape** (`sitemodel.Tree`): roots, children, a subtree to a depth (default 2, at most
+  32), ancestors, siblings and the whole walk, paged on `page_map (site_id, node, depth, path,
+  page_id)` (0081) breadth-first, so a parent comes before its children. Each answer carries
+  `page_map_sites.generation`; a walk whose generation moved between pages says `stale`, and the
+  assistant starts over rather than miss or repeat a page.
+- **Many pages in one call** (`sitemodel.Find`): by ids, words of a title, H1, path or keyword, type,
+  subtree, entity, state and gap, each with its key facts and its parent's reason.
+- **A body as text** (`BlocksRequest.Text`): each block's whole text and links, a long block in parts
+  of 3,000 runes paged by index and offset.
+- **Links by section** (`sitemodel.Links`): a page's in and out, a section's totals and pages, the
+  links between them, what the graph owes, the orphans, and `suggest`, the parent edges the tree
+  would add and the owed links still missing with their anchors. The audit is read through
+  `reports.LinkAuditPages`, never repeated.
+- **The graph with its parents** (`sitemodel.Entities`, `sitemodel.Entity`): each entity with its
+  parent edge or why none, its canonical page and that page's parent, its card, keywords, anchors,
+  parents, related and children.
+- **No result is cut silently.** A list tool asks for a page that fits (`tools.fitted` cuts its
+  limit, in proportion to the overflow since the scale pass below, until the encoded page is within
+  the result cap less a sixteenth), and the cursor is the one
+  issued for that shorter page. When the guard still cuts a list it drops `nextCursor`, sets
+  `hasMore` and says to ask again with a smaller limit (`cursorDropped`).
+
+### The two hierarchies
+
+- **`entity_parent_differs`** (Warning; `adopt_tree`, `keep_graph`, `ignore`) compares, over the
+  folded map (a store category counting as its hub), the entity of the canonical page's nearest
+  entity-bearing ancestor with the entity's page-bearing graph parents. The front page counts as the
+  root; a graph parent with no page is passed through, since the tree cannot speak for it. It is
+  raised by derive and re-raised or cleared by every graph writer after its commit
+  (`graph.parentsMoved`).
+- **Adoption** (`graph.AdoptParents`) previews, for the whole site or a subtree, each entity's move
+  from its graph parents to the tree's, depth-first, skipping a loop and a name already under the new
+  parent; it applies under the preview's hash in units of 1,000, settles the scopes and clears the
+  findings it answered (`parent_adopted`). `adopt_tree` on one finding is the same adoption for one
+  entity, refused with the reason when it would be skipped.
+- **Proposals take their parents from the tree** (`Map.ProposalParent`), and a model's proposal with
+  no parent gets the tree's.
+- **The import**: a matched row with no URL and no parent of its own takes its page's derived
+  parent; the workbook's levels still win.
+
+### The run brief
+
+- **`run.Brief`** (goal, focus, tone, avoid, reference, style sample) and **`run.Directive`** per page
+  (notes, sections to add, keywords, anchors, must-links, least and most words), with limits, are
+  validated at the start and kept by 0082 (`runs.brief`, `run_items.directive`, JSON). They enter a
+  step's input hash only when present, so a run without them hashes as before.
+- **The pack** carries them as a priority-1 section, "The run's brief", read first by the writer, the
+  judge and the linker, with the reference and the style sample at priority 2 after the card and the
+  current value; a must-link joins the link plan as a required target with its anchor
+  (`content.Insist`), and the writer's ceiling honours the directive's most words.
+- **Where it shows**: the run start drawer edits both, "What the writer will see" reads a draft or a
+  run's own (`PackRequest.Brief`, `Directive`, `RunID`), and the assistant passes them to
+  `runs_control op start`.
+
+### Plans
+
+- **A plan** (`domain/agent.Plan`, 0083, one table with the steps as JSON) is an ordered list of
+  writes, each with its tool and arguments, a reason, the earlier steps it rests on, the summary and
+  the price its tool gives, and the fields a person may edit. At most 50 steps.
+- **Proposing** checks each step as its own tool would check a confirmation (`Registry.Validate`):
+  decoding, authorization, the tool's check and summary and its price. A read is refused (it is
+  called directly), as is a plan inside a plan.
+- **Approving** (`AgentService.ConfirmPlan`) is whole, in part or declined; unticking a step unticks
+  what rests on it, in Go and in the card. An edit touches only a declared field, list items and a
+  choice from a list included, and the step is checked again.
+- **Running** goes step by step through the tool, approved, with the same audit and tool message as a
+  confirmation. A step that started a run waits for that run's end (the event relay's
+  `OnRunEnded`); a failure marks what rests on it skipped with why, and the conversation is told the
+  outcome in one message. A plan waits for the person in either mode.
+- **Restart**: a step running when the app closed is failed, never run twice; a waiting step re-reads
+  its run.
+
+### The toolset
+
+- **94 tools became 23**, by job: `sites` and `sites_manage`; `pages_find`, `pages_tree`, `pages_get`
+  (views model, pack, reports), `pages_blocks`, `pages_fields`, `pages_manage` (create, update,
+  delete, map, unmap, canonical, preview link, and set types and templates over a selection),
+  `pages_judge`; `links`; `graph_read`, `graph_edit` (adoption and proposals' write among its ops),
+  `graph_propose`; `findings` (with `resolve_many`); `runs` and `runs_control`; `pagetypes`,
+  `pagetypes_classify` (with the rules), `templates`; `imports`, `schedules`, `models`, `plans`.
+- **A read selects by `view`, a write by `op`**; a write's risk is its op's (`riskedBy`), and every
+  write says what it will do in one sentence (`Tool.Describe`), which the card, the proposal and the
+  plan step show. A page addressed by id must belong to the conversation's site.
+- **Every schema** went from 68,310 bytes and 15,222 tokens (94 tools) to 48,543 bytes and 11,084
+  tokens; the instructions with the replica's brief from 1,929 to 2,133 tokens; a whole round on the
+  replica from 17,194 to 13,260. Deferred loading stays off.
+- **The history format** moved to `responses/2`, so a conversation from 2.6 starts the model afresh
+  and keeps its transcript; approving a card of a tool this version no longer has fails in plain
+  words, nothing changed.
+- **The instructions** teach read, propose and act: read all a question covers and follow the
+  cursor, end an analysis with a write or a plan, act on approval, say why a fact is empty, read both
+  hierarchies and say where they disagree.
+
+### The support bundle
+
+`application/support` writes one JSON file (`postulator-support/1`) where the person chooses, from
+Settings, About and the dock's menu: the versions; the observation summary; per page its path, type
+and why, its derived parent with reason and method, its render state, its crumbs as paths, hrefs and
+statuses only, and its content root state; the graph's shape; the findings by code; the last
+conversation's tool calls with their statuses, durations and result sizes. Never a key, a password, a
+cookie, a body, a title, a crumb's name, an argument or an error's text: a test plants each in the
+store and proves the bundle holds none of them.
+
+### Scale
+
+- **Every read view of the assistant fits the 16 KB result cap at 5,003 pages**, and the tree (4,503
+  rows), every page found (4,503) and every entity (3,875) walk by cursor with none missed and none
+  twice (`internal/app/scale/views_test.go`); a two-step plan over the site is checked and stored in
+  2.1 s.
+- **What it found**: `pagetypes op list` answered 48 KB (every type with all its scopes) and
+  `findings op list` 112 KB, both past the cap, so the guard would have cut them; the list now answers
+  each type in brief and `op get` one whole, and the findings list is fitted. `pages_find` built the
+  site's whole snapshot on every call (1.3 to 1.9 s); it now reads the pages only for a filter that
+  needs them (0.3 s). The entity read scanned every edge of the site for each entity (3.2 s a page);
+  it indexes them once (1.5 s). `tools.fitted` asks again in proportion to what overflowed, not by
+  halves, so a page that fits takes two reads at most where it took four.
+- **Still slow, by design for now**: a section's links read the site's whole audit (2.8 to 4.8 s at
+  5,003 pages), and an entity page still reads the base snapshot (1.5 s); walking all 3,875 entities
+  takes three minutes, a read the assistant has little cause to make.
+
+### A card keeps its op's risk
+
+- **A folded tool's risk is its op's**, so a card read back from `pending_actions` after a restart
+  would have been badged by the tool's widest risk (`pages_manage update` as dangerous). Migration
+  0084 adds `pending_actions.risk`, written with the card; a card stored before 2.7.0 has none and
+  falls back to the tool's own.
+
+### What the capability suite found
+
+The suite (agent E, `internal/e2e/capability_*_test.go`) drives each matrix row as a scripted
+conversation over the replica, through the same registry and executor the window uses. Five
+defects surfaced, each fixed test first in the package that owned it:
+
+- **The linker never read the run's brief** (`600b1d2`): the writer and the judge did, `repair_links`
+  did not, so a must-link's reason reached no linker prompt. It now renders the same section.
+- **A plan step that started an edit run did not wait on it** (`a417a48`): `pages_fields set` and the
+  block ops answer their run under `edit.runId`, not `runId`, so the executor marked the step done
+  while the run was still writing and its dependants ran early.
+- **A keyword the page takes from its entity did not find the page** (`6437a42`): `pages_find` looked
+  at the page's own keywords only; it now reads `pagemap.Keywords(page, entity)`, the list the writer
+  reads.
+- **An artifact read the wrong step's version** (`8e17a20`): `runs.GetArtifact` took the newest by
+  `created_at`, stored to the second, so three `body_html` versions written in one second came back
+  by whichever id sorted last. It now ranks by the step's place in the run's recipe, as the engine
+  does (`artifactsByKind`); one row per step and kind (`ReplaceStep`) makes that exact.
+- **A plan could not add the edge its own run start needs** (`a06d2df`): the owner's ruling was "the
+  plan adds the edge as an earlier step", but the start step was checked against today's graph and
+  refused. A step now reports the edges it writes (`Tool.Adds`, an approved `add_edge`); a later step
+  is checked, edited and run with the edges of every step it depends on, through others too
+  (`Registry.Assuming`, `runs.StartRequest.Assumed`, never JSON). Only `dependsOn` counts: a step
+  beside the edge, or after an edge left a proposal, is still refused, because the executor may
+  skip one without the other. The instructions say "an earlier step the run's start dependsOn".
+- **Two summaries said what the call does not do** (`7106ef2`): `add_edge` left a proposal read as
+  written, and an approved `graph_propose cards` said its cards waited for an acceptance when the
+  approval writes them.
+
+### Deviations from the request
+
+- **One table for plans**, the steps as JSON, where the plan said two.
+- **Migrations 0081 to 0084**, renumbered past the existing 0080.
+- **The card text of the folded tools** landed in one frontend pass after the Go fold, not in each
+  group's commit; no test ties the frontend's tool names to Go, and the cards fell back to the
+  generic view in between.

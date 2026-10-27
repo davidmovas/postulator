@@ -44,7 +44,7 @@ func TestAConfirmedActionRunsThroughTheGuardChain(t *testing.T) {
 			proposer := newHarness(t)
 			doomed := sqlitetest.Page(t, proposer.store, proposer.siteID, "/coffee/doomed/")
 			conversation := proposer.conversation(t, domainagent.ModeConfirm)
-			proposer.send(t, conversation, `TOOL:pages_delete{"id":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
+			proposer.send(t, conversation, `TOOL:pages_manage{"op":"delete","pageId":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
 
 			pending, err := proposer.service.ListPendingActions(t.Context(), agentapp.ListPendingActionsRequest{
 				ConversationID: conversation, Status: string(domainagent.ActionPending),
@@ -80,8 +80,8 @@ func TestAConfirmedActionRunsThroughTheGuardChain(t *testing.T) {
 			if replayed == nil {
 				t.Fatalf("the replay wrote no audit row; the ledger holds %+v", recorded)
 			}
-			if replayed.Tool != "pages_delete" || replayed.Status != tc.wantCall {
-				t.Fatalf("the audit row is %+v, want pages_delete as %s", replayed, tc.wantCall)
+			if replayed.Tool != "pages_manage" || replayed.Status != tc.wantCall {
+				t.Fatalf("the audit row is %+v, want pages_manage as %s", replayed, tc.wantCall)
 			}
 			if !strings.Contains(string(replayed.Args), doomed.ID) {
 				t.Fatalf("the audit row lost the arguments it replayed: %s", replayed.Args)
@@ -100,7 +100,7 @@ func TestAnUndeliverableResumeIsWrittenOnTheAction(t *testing.T) {
 	proposer := newHarness(t)
 	doomed := sqlitetest.Page(t, proposer.store, proposer.siteID, "/coffee/stranded/")
 	conversation := proposer.conversation(t, domainagent.ModeConfirm)
-	proposer.send(t, conversation, `TOOL:pages_delete{"id":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
+	proposer.send(t, conversation, `TOOL:pages_manage{"op":"delete","pageId":"`+doomed.ID+`"}`+"\nFAKE: waiting for you")
 
 	pending, err := proposer.service.ListPendingActions(t.Context(), agentapp.ListPendingActionsRequest{
 		ConversationID: conversation, Status: string(domainagent.ActionPending),

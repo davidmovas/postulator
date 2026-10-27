@@ -11,9 +11,12 @@ type Type struct {
 	SiteID     string   `json:"siteId"`
 	Name       string   `json:"name"`
 	Preset     string   `json:"preset"`
+	Role       string   `json:"role"`
 	Writable   bool     `json:"writable"`
 	TemplateID *string  `json:"templateId"`
+	Suggested  *string  `json:"suggestedTemplateId"`
 	Pages      int      `json:"pages"`
+	Overrides  int      `json:"overrides"`
 	Scopes     []Scope  `json:"scopes"`
 	CreatedAt  dto.Time `json:"createdAt"`
 	UpdatedAt  dto.Time `json:"updatedAt"`
@@ -31,6 +34,101 @@ type Scope struct {
 	Rewrites    bool             `json:"rewrites"`
 	Links       field.LinkPolicy `json:"links"`
 	Stored      bool             `json:"stored"`
+}
+
+type Rule struct {
+	ID         string              `json:"id"`
+	SiteID     string              `json:"siteId"`
+	Kind       string              `json:"kind"`
+	Number     int                 `json:"number"`
+	Name       string              `json:"name"`
+	Enabled    bool                `json:"enabled"`
+	TypeID     string              `json:"typeId"`
+	Conditions pagetype.Conditions `json:"conditions"`
+	CreatedAt  dto.Time            `json:"createdAt"`
+	UpdatedAt  dto.Time            `json:"updatedAt"`
+}
+
+func ruleView(rule pagetype.Rule, number int) Rule {
+	return Rule{
+		ID: rule.ID, SiteID: rule.SiteID, Kind: string(rule.Kind), Number: number, Name: rule.Name, Enabled: rule.Enabled,
+		TypeID: rule.TypeID, Conditions: rule.Conditions, CreatedAt: dto.NewTime(rule.CreatedAt), UpdatedAt: dto.NewTime(rule.UpdatedAt),
+	}
+}
+
+type RuleCount struct {
+	RuleID string `json:"ruleId"`
+	Pages  int    `json:"pages"`
+}
+
+type PreviewGroup struct {
+	From      string      `json:"from"`
+	To        string      `json:"to"`
+	Pages     int         `json:"pages"`
+	Retyped   bool        `json:"retyped"`
+	Rules     []RuleCount `json:"rules"`
+	DependsOn []GroupKey  `json:"dependsOn"`
+	Samples   []string    `json:"samples"`
+}
+
+type PreviewResponse struct {
+	SiteID    string         `json:"siteId"`
+	Hash      string         `json:"hash"`
+	Groups    []PreviewGroup `json:"groups"`
+	Moving    int            `json:"moving"`
+	Refreshed int            `json:"refreshed"`
+	Kept      int            `json:"kept"`
+	Waiting   int            `json:"waiting"`
+	Unchanged int            `json:"unchanged"`
+	ByDefault int            `json:"byDefault"`
+}
+
+type PreviewPage struct {
+	PageID    string `json:"pageId"`
+	Path      string `json:"path"`
+	From      string `json:"from"`
+	To        string `json:"to"`
+	RuleID    string `json:"ruleId"`
+	Reason    string `json:"reason"`
+	Was       string `json:"was"`
+	WasRuleID string `json:"wasRuleId"`
+}
+
+type ApplyResponse struct {
+	Moved   int `json:"moved"`
+	Changed int `json:"changed"`
+}
+
+type FactsView struct {
+	PageID    string   `json:"pageId"`
+	Path      string   `json:"path"`
+	Slug      string   `json:"slug"`
+	PostType  string   `json:"postType"`
+	Technical string   `json:"technical"`
+	FrontPage bool     `json:"frontPage"`
+	Rendered  bool     `json:"rendered"`
+	Listing   bool     `json:"listing"`
+	Products  int      `json:"products"`
+	Schema    []string `json:"schema"`
+	Words     int      `json:"words"`
+	H2        int      `json:"h2"`
+	Level     int      `json:"level"`
+	Ancestors []string `json:"ancestors"`
+}
+
+type OutcomeView struct {
+	TypeID  string `json:"typeId"`
+	RuleID  string `json:"ruleId"`
+	Reason  string `json:"reason"`
+	Waiting bool   `json:"waiting"`
+	Kept    bool   `json:"kept"`
+}
+
+type TestRuleResponse struct {
+	Verdict    string                     `json:"verdict"`
+	Conditions []pagetype.ConditionResult `json:"conditions"`
+	Facts      FactsView                  `json:"facts"`
+	Outcome    OutcomeView                `json:"outcome"`
 }
 
 type Field struct {
@@ -61,7 +159,12 @@ func scopableKeys() []field.Key {
 	return out
 }
 
-func typeView(t pagetype.Type, set pagetype.Set, stored []field.Scope, pages int) Type {
+type typeCounts struct {
+	pages     int
+	overrides int
+}
+
+func typeView(t pagetype.Type, set pagetype.Set, stored []field.Scope, counts typeCounts, suggested *string) Type {
 	keys := scopableKeys()
 	scopes := make([]Scope, 0, len(stored)+len(keys))
 	for _, key := range keys {
@@ -74,8 +177,9 @@ func typeView(t pagetype.Type, set pagetype.Set, stored []field.Scope, pages int
 		}
 	}
 	return Type{
-		ID: t.ID, SiteID: t.SiteID, Name: t.Name, Preset: string(t.Preset), Writable: t.Preset.Writable(), TemplateID: t.TemplateID,
-		Pages: pages, Scopes: scopes, CreatedAt: dto.NewTime(t.CreatedAt), UpdatedAt: dto.NewTime(t.UpdatedAt),
+		ID: t.ID, SiteID: t.SiteID, Name: t.Name, Preset: string(t.Preset), Role: string(t.Preset.Role()), Writable: t.Preset.Writable(),
+		TemplateID: t.TemplateID, Suggested: suggested, Pages: counts.pages, Overrides: counts.overrides, Scopes: scopes,
+		CreatedAt: dto.NewTime(t.CreatedAt), UpdatedAt: dto.NewTime(t.UpdatedAt),
 	}
 }
 

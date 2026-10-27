@@ -54,7 +54,7 @@ func newHarness(t *testing.T) harness {
 	recorder := &applicationtest.Recorder{}
 	reach := &probeStub{reached: site.Reachability{Reach: site.ReachOK, Message: "the site answered", HasPlugin: true}}
 	types := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: sqlite.NewPageRepo(store),
 		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk,
 	})
 	return harness{
@@ -297,8 +297,8 @@ func TestCreateStoresTheSiteAndItsPassword(t *testing.T) {
 		t.Errorf("stored password = %q, %v", password, err)
 	}
 	types, err := sqlite.NewPageTypeRepo(h.store).ListBySite(t.Context(), got.ID)
-	if err != nil || len(types) != len(pagetype.Presets()) {
-		t.Errorf("the new site's page types = %d %v, want the %d presets seeded", len(types), err, len(pagetype.Presets()))
+	if err != nil || len(types) != len(pagetype.Seeded()) {
+		t.Errorf("the new site's page types = %d %v, want the %d presets seeded", len(types), err, len(pagetype.Seeded()))
 	}
 
 	encoded, err := json.Marshal(got)

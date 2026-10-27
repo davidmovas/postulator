@@ -103,6 +103,8 @@ describe("the page model lives under the page cache", () => {
         expect(isPrefix(keys.pages.root(), keys.pages.pack("p1", "seo_title"))).toBe(true);
         expect(isPrefix(keys.pages.models(), keys.pages.pack("p1", ""))).toBe(false);
         expect(keys.pages.pack("p1", "")).not.toEqual(keys.pages.pack("p1", "seo_title"));
+        expect(keys.pages.pack("p1", "")).not.toEqual(keys.pages.pack("p1", "", { runId: "r1" }));
+        expect(isPrefix(keys.pages.packs(), keys.pages.pack("p1", "", { brief: { goal: "Sell" } }))).toBe(true);
     });
 
     test("a model is not a page detail, so a detail refresh leaves it alone", () => {

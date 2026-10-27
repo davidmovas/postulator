@@ -135,6 +135,10 @@ func (s *Service) replay(ctx context.Context, conversation domainagent.Conversat
 	if err := Permit(s.deps.Allowed, action.Tool); err != nil {
 		return nil, err
 	}
+	if _, known := s.deps.Registry.Lookup(action.Tool); !known {
+		return nil, errors.New(errors.NotFound, "this card asked for "+action.Tool+", a tool this version of Postulator no longer "+
+			"has, so nothing was changed; ask the assistant again and it will use the tools it has now").WithDetail("tool", action.Tool)
+	}
 
 	return s.deps.Registry.Call(ctx, tools.Binding{
 		SiteID: siteOf(conversation), ConversationID: conversation.ID,

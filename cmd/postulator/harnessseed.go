@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -42,6 +43,9 @@ const (
 	pollEvery = 100 * time.Millisecond
 	pollFor   = 3 * time.Minute
 
+	secondSiteName = "Tamper Supply"
+	secondSiteURL  = "http://tamper-supply.invalid"
+
 	scriptedProviderKey = "sk-harness-scripted"
 
 	failingPath = "/grinders/single-dosing/"
@@ -61,6 +65,11 @@ const (
 	productName    = "Gaggia Classic Pro"
 	productKeyword = "gaggia classic pro"
 	productHub     = "Espresso machines"
+
+	articleRuleName = "An article under a category"
+
+	toolResultKey        = "agent.maxToolResultBytes"
+	shortenedResultBytes = 1024
 )
 
 var (
@@ -308,26 +317,14 @@ func metaOf(subject string) string {
 
 type assistantScript struct {
 	page atomic.Pointer[string]
-	site atomic.Pointer[string]
 }
 
 func (a *assistantScript) naming(pageID string) {
 	a.page.Store(&pageID)
 }
 
-func (a *assistantScript) onSite(siteID string) {
-	a.site.Store(&siteID)
-}
-
 func (a *assistantScript) pageID() string {
 	if held := a.page.Load(); held != nil {
-		return *held
-	}
-	return ""
-}
-
-func (a *assistantScript) siteID() string {
-	if held := a.site.Load(); held != nil {
 		return *held
 	}
 	return ""
@@ -351,17 +348,25 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 			Text: "There is no page with that id on this site. Give me the path instead and I will " +
 				"look it up in the map.",
 		}
-	case strings.Contains(lowered, "every page"):
+	case strings.Contains(lowered, "in full"):
 		return fake.Turn{
-			Tool: "pages_list",
-			Args: json.RawMessage(`{"siteId":"` + a.siteID() + `","limit":100}`),
-			Text: "The listing came back longer than one message can carry, so I read the opening of it. " +
-				"Ask me for one hub at a time and I will read each in full.",
+			Tool: "pages_get",
+			Args: json.RawMessage(`{"path":"` + hubPath + `"}`),
+			Text: "The page came back longer than one message can carry, so I read the opening of it. " +
+				"Ask me for its fields or its blocks a part at a time and I will read each whole.",
+		}
+	case strings.Contains(lowered, "explore"):
+		return fake.Turn{
+			Tool: "pages_tree",
+			Args: json.RawMessage(`{"view":"roots"}`),
+			Text: "The top of the site holds the six hubs and the journal. Grinders and Coffee beans carry " +
+				"the most children, and every hub page is mapped to its entity.",
 		}
 	case strings.Contains(lowered, "retitle") || strings.Contains(lowered, "rename"):
 		return fake.Turn{
-			Tool: "pages_update",
-			Args: json.RawMessage(`{"id":"` + a.pageID() + `","metaTitle":"Espresso machines under $500: nine we would buy"}`),
+			Tool: "pages_manage",
+			Args: json.RawMessage(`{"op":"update","pageId":"` + a.pageID() +
+				`","metaTitle":"Espresso machines under $500: nine we would buy"}`),
 			Text: "I have queued the retitle. The page keeps its path and its canonical, only the meta title " +
 				"changes, so the entry in the search results leads with the price the reader searched for.",
 		}
@@ -391,6 +396,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if err != nil {
 		return err
 	}
+	if moveErr := misplaceAnEntity(ctx, core, entities); moveErr != nil {
+		return moveErr
+	}
 
 	pagesByPath, err := seedPages(ctx, core, siteID, entities)
 	if err != nil {
@@ -400,7 +408,6 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 		return typeErr
 	}
 	script.naming(pagesByPath["/espresso-machines/under-500/"])
-	script.onSite(siteID)
 
 	guide, err := seedTemplates(ctx, core, siteID)
 	if err != nil {
@@ -427,6 +434,20 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if workbookErr := seedWorkbook(ctx, core, siteID, home); workbookErr != nil {
 		return workbookErr
 	}
+	if _, secondErr := core.Sites.Create(ctx, sites.CreateRequest{
+		Name: secondSiteName, BaseURL: secondSiteURL, Username: harnessUser, AllowInsecure: true,
+	}); secondErr != nil {
+		return secondErr
+	}
+	total, err := scalePages()
+	if err != nil {
+		return err
+	}
+	if total > 0 {
+		if scaleErr := seedScale(ctx, core, total); scaleErr != nil {
+			return scaleErr
+		}
+	}
 	if key != "" {
 		_, keyErr := core.Models.SetProviderKey(ctx, models.SetProviderKeyRequest{Provider: "openai", APIKey: key})
 		return keyErr
@@ -440,7 +461,7 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if scheduleErr := seedSchedule(ctx, core, siteID, guide); scheduleErr != nil {
 		return scheduleErr
 	}
-	if conversationErr := seedConversation(ctx, core, siteID); conversationErr != nil {
+	if conversationErr := seedConversation(ctx, core, siteID, pagesByPath, entities); conversationErr != nil {
 		return conversationErr
 	}
 	return seedSpend(ctx, core, siteID)
@@ -723,10 +744,16 @@ func seedPageTypes(ctx context.Context, core *app.Core, siteID string, byPath ma
 		}
 	}
 
-	hub := byPreset[pagetype.Hub]
+	hub := byPreset[pagetype.Category]
+	if _, err = core.PageTypes.SaveRule(ctx, pagetypes.SaveRuleRequest{
+		SiteID: siteID, Name: articleRuleName, Enabled: true, TypeID: byPreset[pagetype.Guide].ID,
+		Conditions: pagetype.Conditions{Ancestor: &pagetype.Ancestor{TypeID: hub.ID}},
+	}); err != nil {
+		return err
+	}
 	body, found := scopeOf(hub, field.Body)
 	if !found {
-		return errors.New(errors.NotFound, "the Hub type carries no body scope")
+		return errors.New(errors.NotFound, "the Category type carries no body scope")
 	}
 	if _, err = core.PageTypes.SetScope(ctx, pagetypes.SetScopeRequest{
 		PageTypeID: hub.ID, Field: body.Field, Enabled: body.Enabled, AIWrites: body.AIWrites, Instruction: body.Instruction,
@@ -786,7 +813,7 @@ func seedSchedule(ctx context.Context, core *app.Core, siteID, guide string) err
 	return err
 }
 
-func seedConversation(ctx context.Context, core *app.Core, siteID string) error {
+func seedConversation(ctx context.Context, core *app.Core, siteID string, byPath, entities map[string]string) error {
 	opened, err := core.Agent.CreateConversation(ctx, agent.CreateConversationRequest{SiteID: siteID, Mode: "confirm"})
 	if err != nil {
 		return err
@@ -796,11 +823,16 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 	if askErr := exchange(ctx, core, conversation, "Which entities still have no canonical page?"); askErr != nil {
 		return askErr
 	}
+	if planErr := seedPlans(ctx, core, siteID, byPath, entities); planErr != nil {
+		return planErr
+	}
 	if askErr := exchange(ctx, core, conversation,
 		"Open the page 00000000-0000-4000-8000-000000000000 and tell me what it links to."); askErr != nil {
 		return askErr
 	}
-	if askErr := exchange(ctx, core, conversation, "List every page on the site with its status."); askErr != nil {
+	if askErr := withToolResultCap(ctx, core, shortenedResultBytes, func() error {
+		return exchange(ctx, core, conversation, "Read the espresso machines hub in full, every field and link.")
+	}); askErr != nil {
 		return askErr
 	}
 	if askErr := exchange(ctx, core, conversation, deniedMessage); askErr != nil {
@@ -808,6 +840,33 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 	}
 	return exchange(ctx, core, conversation,
 		"Retitle the espresso machines under $500 page so the meta title leads with the price.")
+}
+
+func setSetting(ctx context.Context, core *app.Core, key string, value int) error {
+	raw := json.RawMessage(strconv.Itoa(value))
+	if err := core.Declarations.Validate(key, raw); err != nil {
+		return err
+	}
+	if err := core.SettingsStore.Set(ctx, key, raw); err != nil {
+		return err
+	}
+	stored, err := core.SettingsStore.All(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = core.Declarations.Apply(core.Settings, stored)
+	return err
+}
+
+func withToolResultCap(ctx context.Context, core *app.Core, bytes int, fn func() error) error {
+	if err := setSetting(ctx, core, toolResultKey, bytes); err != nil {
+		return err
+	}
+	ranErr := fn()
+	if err := setSetting(ctx, core, toolResultKey, agent.DefaultMaxToolResultBytes); err != nil {
+		return err
+	}
+	return ranErr
 }
 
 func exchange(ctx context.Context, core *app.Core, conversation, text string) error {

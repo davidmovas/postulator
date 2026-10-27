@@ -7,7 +7,7 @@ import { sheetIn, siteImportedOn, subscribeDrop } from "../data/drops.js";
 import { usePendingActions } from "../data/hooks/agent.js";
 import { dismissToast, pushToast, useToasts } from "../data/toasts.js";
 import type { ToastTone } from "../data/toasts.js";
-import { AgentDock, askAgent, openDock, toggleDock, useDock } from "../features/agent/index.js";
+import { AgentDock, askAgent, onAgentScreen, openDock, toggleDock, useDock } from "../features/agent/index.js";
 import { CommandPalette, openPalette, usePaletteOpen } from "../features/palette/index.js";
 import { Button, Toast, ToastRegion } from "../ui/index.js";
 import type { Tone } from "../ui/index.js";
@@ -72,6 +72,7 @@ export function Shell() {
     const navigate = useNavigate();
     const siteId = siteIdOf(location.pathname);
     const dock = useDock();
+    const chatting = onAgentScreen(location.pathname);
     const pending = usePendingActions({ status: "pending" }, 100);
     const awaiting = flatten(pending.data?.pages).length;
     const destinations = useMemo(() => goToEntries(siteId), [siteId]);
@@ -137,13 +138,13 @@ export function Shell() {
 
     return (
         <div className="flex h-full flex-col bg-canvas">
-            <TitleBar siteId={siteId} dockOpen={dock.open} onToggleDock={toggleDock} />
+            <TitleBar siteId={siteId} dockOpen={dock.open || chatting} onToggleDock={toggleDock} />
             <div className="flex min-h-0 flex-1">
                 <Rail siteId={siteId} pending={awaiting} />
                 <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
                     <Outlet />
                 </main>
-                {dock.open ? <AgentDock siteId={siteId} /> : null}
+                {dock.open && !chatting ? <AgentDock siteId={siteId} /> : null}
             </div>
             <StatusBar siteId={siteId} />
             <Toasts />

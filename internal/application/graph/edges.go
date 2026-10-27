@@ -240,6 +240,9 @@ func (s *Service) AddEdge(ctx context.Context, req AddEdgeRequest) (AddEdgeRespo
 	if doErr != nil {
 		return AddEdgeResponse{}, doErr
 	}
+	if movedErr := s.parentsMoved(ctx, edge.SiteID); movedErr != nil {
+		return AddEdgeResponse{}, movedErr
+	}
 	if publishErr := s.changed(edge.SiteID); publishErr != nil {
 		return AddEdgeResponse{}, publishErr
 	}
@@ -276,6 +279,9 @@ func (s *Service) setStatus(ctx context.Context, edgeID string, status graphdoma
 		return graphdomain.Edge{}, err
 	}
 	if changed {
+		if movedErr := s.parentsMoved(ctx, edge.SiteID); movedErr != nil {
+			return graphdomain.Edge{}, movedErr
+		}
 		if publishErr := s.changed(edge.SiteID); publishErr != nil {
 			return graphdomain.Edge{}, publishErr
 		}
@@ -315,10 +321,25 @@ func (s *Service) DeleteEdge(ctx context.Context, req DeleteEdgeRequest) (Delete
 	if err != nil {
 		return DeleteEdgeResponse{}, err
 	}
+	if movedErr := s.parentsMoved(ctx, siteID); movedErr != nil {
+		return DeleteEdgeResponse{}, movedErr
+	}
 	if publishErr := s.changed(siteID); publishErr != nil {
 		return DeleteEdgeResponse{}, publishErr
 	}
 	return DeleteEdgeResponse{}, nil
+}
+
+func (s *Service) GetEdge(ctx context.Context, req GetEdgeRequest) (GetEdgeResponse, error) {
+	edgeID := strings.TrimSpace(req.ID)
+	if edgeID == "" {
+		return GetEdgeResponse{}, errors.New(errors.Invalid, "name the edge").WithDetail("field", "id")
+	}
+	held, err := s.edges.Get(ctx, edgeID)
+	if err != nil {
+		return GetEdgeResponse{}, err
+	}
+	return GetEdgeResponse{Edge: edgeView(held)}, nil
 }
 
 func (s *Service) ListEdges(ctx context.Context, req ListEdgesRequest) (paging.List[Edge], error) {

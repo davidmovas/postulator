@@ -83,6 +83,29 @@ func (s *Service) LinkAuditPage(ctx context.Context, req LinkAuditPageRequest) (
 	}, nil
 }
 
+func (s *Service) LinkAuditPages(ctx context.Context, req LinkAuditPagesRequest) (LinkAuditPagesResponse, error) {
+	siteID := strings.TrimSpace(req.SiteID)
+	if siteID == "" {
+		return LinkAuditPagesResponse{}, invalid("an audit of pages needs their site", "siteId")
+	}
+	state, err := s.loadLinks(ctx, siteID)
+	if err != nil {
+		return LinkAuditPagesResponse{}, err
+	}
+	response := LinkAuditPagesResponse{Pages: make([]PageLinks, 0, len(req.PageIDs))}
+	for _, pageID := range req.PageIDs {
+		page, found := state.index.ByID(pageID)
+		if !found || page.Status == pagemap.StatusArchived {
+			continue
+		}
+		detail := auditPage(&state, page)
+		response.Pages = append(response.Pages, PageLinks{
+			Page: detail.summary, Rules: detail.rules, Required: detail.required, Extra: detail.extra,
+		})
+	}
+	return response, nil
+}
+
 func (s *Service) templateOf(ctx context.Context, page pagemap.Page) (string, error) {
 	if page.EntityID == nil {
 		return "", nil

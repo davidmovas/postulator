@@ -13,7 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
+func (e *Engine) Enqueue(ctx context.Context, record run.Run, directives ...run.Directive) (run.Run, error) {
 	if err := run.ValidateRecipe(e.registry, record.Recipe); err != nil {
 		return run.Run{}, err
 	}
@@ -40,7 +40,7 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 		if insertErr := e.deps.Runs.Insert(c, validated); insertErr != nil {
 			return insertErr
 		}
-		if insertErr := e.insertItems(c, validated, enabled[0].Name, pages, queueBehindParents, now); insertErr != nil {
+		if insertErr := e.insertItems(c, validated, enabled[0].Name, pages, directed(directives), queueBehindParents, now); insertErr != nil {
 			return insertErr
 		}
 		box.add(c, validated.ID, events.RunQueued, events.RunQueuedPayload{
@@ -56,13 +56,21 @@ func (e *Engine) Enqueue(ctx context.Context, record run.Run) (run.Run, error) {
 	return validated, nil
 }
 
+func directed(directives []run.Directive) map[string]run.Directive {
+	out := make(map[string]run.Directive, len(directives))
+	for i := range directives {
+		out[directives[i].PageID] = directives[i]
+	}
+	return out
+}
+
 func (e *Engine) insertItems(ctx context.Context, record run.Run, first string, pages map[string]pagemap.Page,
-	queueBehindParents bool, now time.Time) error {
+	directives map[string]run.Directive, queueBehindParents bool, now time.Time) error {
 	itemIDs := make(map[string]string, len(record.Targets))
 	for seq, targetID := range record.Targets {
 		item := run.Item{
 			ID: id.New(), RunID: record.ID, SiteID: record.SiteID, TargetID: targetID,
-			CurrentStep: first, Seq: seq, CreatedAt: now, UpdatedAt: now,
+			CurrentStep: first, Seq: seq, Directive: directives[targetID], CreatedAt: now, UpdatedAt: now,
 		}
 		if queueBehindParents {
 			item.BlockedBy = blockerOf(pages[targetID], pages, itemIDs)

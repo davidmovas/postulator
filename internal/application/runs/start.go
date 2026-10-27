@@ -17,10 +17,13 @@ import (
 )
 
 type planned struct {
-	record   run.Run
-	added    []AddedPage
-	assigned map[string]string
-	picked   []string
+	record     run.Run
+	added      []AddedPage
+	assigned   map[string]string
+	picked     []string
+	fields     []string
+	directives []run.Directive
+	missing    []missingEdge
 }
 
 func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, error) {
@@ -29,7 +32,7 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 		return StartResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned, plan.directives...)
 	if err != nil {
 		return StartResponse{}, err
 	}
@@ -40,13 +43,16 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 	if assignErr := s.assign(ctx, plan); assignErr != nil {
 		return StartResponse{}, assignErr
 	}
+	if edgeErr := s.addEdges(ctx, plan.record.SiteID, plan.missing); edgeErr != nil {
+		return StartResponse{}, edgeErr
+	}
 
 	plan.record.ID = id.New()
-	queued, err := s.engine.Enqueue(ctx, plan.record)
+	queued, err := s.engine.Enqueue(ctx, plan.record, plan.directives...)
 	if err != nil {
 		return StartResponse{}, err
 	}
-	return StartResponse{RunID: queued.ID, Estimate: estimate, Added: plan.added}, nil
+	return StartResponse{RunID: queued.ID, Estimate: estimate, Added: plan.added, Fields: plan.fields}, nil
 }
 
 func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateResponse, error) {
@@ -55,11 +61,11 @@ func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateRespo
 		return EstimateResponse{}, err
 	}
 
-	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned)
+	estimate, err := s.engine.EstimateRun(ctx, plan.record, plan.assigned, plan.directives...)
 	if err != nil {
 		return EstimateResponse{}, err
 	}
-	return EstimateResponse{Estimate: estimate, Added: plan.added}, nil
+	return EstimateResponse{Estimate: estimate, Added: plan.added, Fields: plan.fields}, nil
 }
 
 func refusedByPreflight(blocking []run.EstimateFinding) error {
@@ -135,10 +141,16 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	if recipe, err = withRewrite(recipe, req.Rewrite, chosen); err != nil {
 		return planned{}, err
 	}
-	if recipe, err = run.ScopeRecipe(recipe, req.Fields); err != nil {
+	fields := req.Fields
+	if _, owns := kind.Recipe(); len(fields) == 0 && kind.PageScoped() && !owns && slices.Contains(stepsOf(recipe), string(run.StepPublish)) {
+		if fields, err = s.bodySwitch(ctx, siteID, chosen, recipe); err != nil {
+			return planned{}, err
+		}
+	}
+	if recipe, err = run.ScopeRecipe(recipe, fields); err != nil {
 		return planned{}, err
 	}
-	bodyKept := len(req.Fields) > 0 && !run.WritesBody(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish))))
+	bodyKept := len(fields) > 0 && !run.WritesBody(run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish))))
 	if bodyKept {
 		if offSite := s.onTheSite(ctx, targets); offSite != nil {
 			return planned{}, offSite
@@ -167,6 +179,10 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 	}
 
 	assigned, assign := assignment(chosen, picked)
+	missing, err := s.directed(ctx, req, siteID, chosen)
+	if err != nil {
+		return planned{}, err
+	}
 
 	actor, ok := kctx.ActorFrom(ctx)
 	if !ok {
@@ -183,12 +199,25 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 			TemplateVersion: version,
 			PublishMode:     mode,
 			Budget:          req.Budget,
+			Brief:           briefOf(req),
 			CreatedBy:       actor,
 		},
-		added:    added,
-		assigned: assigned,
-		picked:   assign,
+		added:      added,
+		assigned:   assigned,
+		picked:     assign,
+		fields:     scopedFields(recipe),
+		directives: req.Directives,
+		missing:    missing,
 	}, nil
+}
+
+func scopedFields(recipe []template.StepSpec) []string {
+	keys := run.FieldsOf(run.ParamsFor(recipe, string(run.StepPublish)))
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, string(key))
+	}
+	return out
 }
 
 func assignment(chosen []string, templateID string) (assigned map[string]string, picked []string) {

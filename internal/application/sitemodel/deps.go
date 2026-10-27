@@ -13,6 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
@@ -56,6 +57,7 @@ type mapStore interface {
 	State(ctx context.Context, siteID string) (generation, built int64, err error)
 	ListBySite(ctx context.Context, siteID string) ([]contextpack.MapRow, error)
 	ListByIDs(ctx context.Context, pageIDs []string) ([]contextpack.MapRow, error)
+	IDsUnder(ctx context.Context, siteID, trail, typeID string) ([]string, error)
 	List(ctx context.Context, q contextpack.MapRowQuery, page paging.Request) (paging.List[contextpack.MapRow], error)
 	Write(ctx context.Context, siteID string, moved []contextpack.MapRow, gone []string, generation int64) error
 }
@@ -74,6 +76,7 @@ type bodyStore interface {
 type renderStore interface {
 	ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error)
 	ListBySite(ctx context.Context, siteID string) ([]render.Record, error)
+	ListRenderedBySite(ctx context.Context, siteID string) (map[string]pagetype.Rendered, error)
 	URLForms(ctx context.Context, siteID string) ([]string, error)
 }
 
@@ -82,12 +85,14 @@ type linkStore interface {
 	ListToPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 	ListContextual(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
+	ListedProductsBySite(ctx context.Context, siteID string) (map[string]int, error)
 	CountContextual(ctx context.Context, pageIDs []string) (inbound, outbound map[string]int, err error)
 }
 
 type findingStore interface {
 	ListForPage(ctx context.Context, pageID string) ([]finding.Finding, error)
 	ListBySite(ctx context.Context, siteID string, status finding.Status) ([]finding.Finding, error)
+	ListOpenFor(ctx context.Context, pageIDs []string) ([]finding.Finding, error)
 	CountOpen(ctx context.Context, pageIDs []string) (map[string]int, error)
 }
 
@@ -98,11 +103,22 @@ type budgets interface {
 type audits interface {
 	LinkAudit(ctx context.Context, req reports.LinkAuditRequest) (reports.LinkAuditResponse, error)
 	LinkAuditPage(ctx context.Context, req reports.LinkAuditPageRequest) (reports.LinkAuditPageResponse, error)
+	LinkAuditPages(ctx context.Context, req reports.LinkAuditPagesRequest) (reports.LinkAuditPagesResponse, error)
+}
+
+type runReader interface {
+	Get(ctx context.Context, id string) (run.Run, error)
+}
+
+type runItemReader interface {
+	ByRun(ctx context.Context, runID string) ([]run.Item, error)
 }
 
 type Deps struct {
 	Budgets    budgets
 	Audits     audits
+	Runs       runReader
+	Items      runItemReader
 	Reader     reader
 	UnitOfWork unitOfWork
 	Maps       mapStore

@@ -53,7 +53,7 @@ func modeProducts(rows []rowDraft, rowType importmap.RowType, state *siteState) 
 
 func (s *siteState) namesProduct(row *rowDraft) bool {
 	named, known := s.pageType(row.pageType, pagemap.WPPage)
-	return known && named.Preset == pagetype.Product
+	return known && named.Preset.Role() == pagetype.RoleProduct
 }
 
 func productsUnder(at int, rows []rowDraft, product func(int) bool, state *siteState) bool {

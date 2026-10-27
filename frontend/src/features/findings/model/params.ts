@@ -57,3 +57,7 @@ export function filterOf(siteId: string, query: FindingsQuery): FindingFilter {
 export function findingsAddress(siteId: string, under: string): string {
     return `/s/${siteId}/findings${searchOf({ ...defaultQuery, under })}`;
 }
+
+export function findingsOfCode(siteId: string, code: string): string {
+    return `/s/${siteId}/findings${searchOf({ ...defaultQuery, code })}`;
+}

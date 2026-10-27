@@ -1,8 +1,9 @@
 import type { ReactElement, ReactNode, UIEvent } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { absoluteTime } from "../../../domain/format.js";
+import type { Plan } from "../../../data/types.js";
 import type { Timestamp } from "../../../data/wire.js";
 import { ArrowDownwardIcon, Button, cx, SmartToyIcon, Spinner, toneClasses } from "../../../ui/index.js";
 import { ActionCard } from "../cards/action-card.js";
@@ -51,6 +52,7 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
         <div className="flex flex-col rounded-md border border-hairline bg-inset">
             <button
                 type="button"
+                data-tool={row.tool}
                 data-tool-status={row.status}
                 disabled={summary === null}
                 onClick={() => {
@@ -63,7 +65,9 @@ function ToolRow({ row }: ToolRowProps): ReactElement {
                 ) : (
                     <Icon size={14} className={cx("shrink-0", toneClasses[tone].ink)} />
                 )}
-                <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">{toolLabel(row.tool)}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-ink-soft">
+                    {toolLabel(row.tool, row.args === null ? undefined : row.args)}
+                </span>
                 {row.durationMs === null ? null : (
                     <span className="shrink-0 text-right font-mono text-2xs text-ink-faint">
                         {copy.agent.transcript.tool.duration(row.durationMs)}
@@ -97,12 +101,22 @@ export interface TranscriptProps {
     settling: { id: string; busy: CardBusy } | null;
     canRetry: boolean;
     header: ReactNode;
+    renderPlan: (plan: Plan) => ReactNode;
     onApprove: (actionId: string) => void;
     onReject: (actionId: string) => void;
     onRetry: () => void;
 }
 
-export function Transcript({ rows, settling, canRetry, header, onApprove, onReject, onRetry }: TranscriptProps): ReactElement {
+export function Transcript({
+    rows,
+    settling,
+    canRetry,
+    header,
+    renderPlan,
+    onApprove,
+    onReject,
+    onRetry,
+}: TranscriptProps): ReactElement {
     const scroller = useRef<HTMLDivElement>(null);
     const [pinned, setPinned] = useState(true);
     const pinnedRef = useRef(true);
@@ -200,7 +214,7 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
                                     tool={tool}
                                     args={row.action?.args ?? row.live?.args ?? null}
                                     summary={row.action?.summary ?? row.live?.summary ?? ""}
-                                    risk={row.live?.risk ?? null}
+                                    risk={row.action === null ? (row.live?.risk ?? null) : row.action.risk}
                                     status={row.action?.status ?? "pending"}
                                     createdAt={row.action?.createdAt ?? null}
                                     outcome={row.action === null ? null : outcomeOf(row.action)}
@@ -216,6 +230,8 @@ export function Transcript({ rows, settling, canRetry, header, onApprove, onReje
                                 />
                             );
                         }
+                        case "plan":
+                            return <Fragment key={row.id}>{renderPlan(row.plan)}</Fragment>;
                         case "stopped":
                             return <StoppedCard key={row.id} detail={row.detail} canRetry={canRetry} onRetry={onRetry} />;
                         case "failed":

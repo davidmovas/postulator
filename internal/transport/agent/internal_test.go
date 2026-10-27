@@ -36,7 +36,7 @@ func TestTrimKeepsTheNewestWholeTurns(t *testing.T) {
 		said(llm.RoleAssistant, strings.Repeat("b", 400)),
 		said(llm.RoleDeveloper, "the site holds four pages"),
 		said(llm.RoleUser, "the newest question"),
-		called("call-1", "pages_list", `{}`),
+		called("call-1", "pages_find", `{}`),
 		answered("call-1", `{"ok":true}`),
 		said(llm.RoleAssistant, "the newest answer"),
 	}
@@ -80,12 +80,12 @@ func TestTrimNeverSeparatesACallFromItsResult(t *testing.T) {
 	items := []llm.Message{
 		said(llm.RoleDeveloper, "context one"),
 		said(llm.RoleUser, "first"),
-		called("call-1", "pages_list", `{}`),
+		called("call-1", "pages_find", `{}`),
 		answered("call-1", `{"roots":["`+strings.Repeat("x", 300)+`"]}`),
 		said(llm.RoleAssistant, "one tree"),
 		said(llm.RoleDeveloper, "context two"),
 		said(llm.RoleUser, "second"),
-		called("call-2", "pages_list", `{}`),
+		called("call-2", "pages_find", `{}`),
 		answered("call-2", `{"roots":[]}`),
 	}
 
@@ -168,14 +168,14 @@ func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
 	written := []llm.Message{
 		said(llm.RoleDeveloper, "the site holds 128 pages"),
 		said(llm.RoleUser, "list the espresso pages"),
-		called("call-1", "pages_list", `{}`),
+		called("call-1", "pages_find", `{}`),
 		answered("call-1", fat),
 		said(llm.RoleAssistant, "a hundred and twenty pages"),
 	}
 	if err := held.save(t.Context(), written); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	if store.version != historyVersion || !strings.Contains(string(store.body), `"format":"responses/1"`) {
+	if store.version != historyVersion || !strings.Contains(string(store.body), `"format":"responses/2"`) {
 		t.Fatalf("the stored body is %s at version %d", store.body, store.version)
 	}
 
@@ -207,8 +207,8 @@ func TestAStoredToolResultReplaysShortenedAndStillDecodes(t *testing.T) {
 		t.Fatalf("the shortened result does not say it was shortened: %+v", document)
 	}
 	kept, ok := inner[agentapp.ResultKey].(map[string]any)
-	if !ok || kept["nextCursor"] != "c-42" || kept["hasMore"] != true {
-		t.Fatalf("the shortened result lost the fields that say how to ask for the rest: %+v", inner)
+	if dropped, said := inner["cursorDropped"].([]any); !ok || kept["nextCursor"] != nil || kept["hasMore"] != true || !said || len(dropped) != 1 {
+		t.Fatalf("the shortened result kept a cursor past the rows it cut, or did not say the list goes on: %+v", inner)
 	}
 	if rows, listed := kept["items"].([]any); !listed || len(rows) == 0 || len(rows) >= 128 {
 		t.Fatalf("the shortened result kept %v of 128 rows", kept["items"])
@@ -255,7 +255,8 @@ func TestAnyOtherHistoryLoadsEmpty(t *testing.T) {
 		body string
 	}{
 		{name: "gollem's history", body: `{"version":3,"llType":"openai","messages":[{"role":"user","contents":[]}]}`},
-		{name: "a newer format", body: `{"format":"responses/2","items":[{"role":"user","text":"hi"}]}`},
+		{name: "a newer format", body: `{"format":"responses/3","items":[{"role":"user","text":"hi"}]}`},
+		{name: "a history that called the tools of 2.6", body: `{"format":"responses/1","items":[{"role":"user","text":"hi"}]}`},
 		{name: "a body that is not JSON", body: `{"format":`},
 	}
 

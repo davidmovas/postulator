@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { useMemo } from "react";
 
 import { copy } from "../../copy/index.js";
 import type { Run } from "../../data/types.js";
@@ -12,8 +13,12 @@ import {
     TableHead,
     TableRow,
     VirtualRows,
+    useWidthOf,
 } from "../../ui/index.js";
+import { shown } from "../../ui/collapse.js";
 import type { RunSort } from "../../data/sorts.js";
+import type { RunLayout } from "./columns.js";
+import { runLayout } from "./columns.js";
 import {
     pauseReasonShort,
     pauseReasonText,
@@ -26,17 +31,17 @@ import {
 import { spanMs } from "./span.js";
 import { statusPaused } from "./statuses.js";
 
-const columns = "64px 192px minmax(150px,1.3fr) 80px 96px 72px";
 const rowHeight = 28;
 
 interface RunRowProps {
     run: Run;
     now: number;
     selected: boolean;
+    layout: RunLayout;
     onOpen: (runId: string) => void;
 }
 
-function RunRow({ run, now, selected, onOpen }: RunRowProps): ReactElement {
+function RunRow({ run, now, selected, layout, onOpen }: RunRowProps): ReactElement {
     const cap = run.budget.maxUsd;
     const paused = run.status === statusPaused && run.pauseReason !== "";
     const lasted = spanMs(run.startedAt, run.finishedAt, now);
@@ -99,15 +104,21 @@ function RunRow({ run, now, selected, onOpen }: RunRowProps): ReactElement {
                     )}
                 </span>
             </TableCell>
-            <TableCell mono={true} align="right" muted={true}>
-                {cap > 0 ? `${usd(run.stats.usd)} / ${usd(cap)}` : usd(run.stats.usd)}
-            </TableCell>
-            <TableCell mono={true} muted={true} title={absoluteTime(run.startedAt)}>
-                {relativeTime(run.startedAt)}
-            </TableCell>
-            <TableCell mono={true} align="right" muted={true}>
-                {lasted === null ? "" : duration(lasted)}
-            </TableCell>
+            {shown(layout, "spend") ? (
+                <TableCell mono={true} align="right" muted={true}>
+                    {cap > 0 ? `${usd(run.stats.usd)} / ${usd(cap)}` : usd(run.stats.usd)}
+                </TableCell>
+            ) : null}
+            {shown(layout, "started") ? (
+                <TableCell mono={true} muted={true} title={absoluteTime(run.startedAt)}>
+                    {relativeTime(run.startedAt)}
+                </TableCell>
+            ) : null}
+            {shown(layout, "lasted") ? (
+                <TableCell mono={true} align="right" muted={true}>
+                    {lasted === null ? "" : duration(lasted)}
+                </TableCell>
+            ) : null}
         </TableRow>
     );
 }
@@ -133,52 +144,59 @@ export function RunTable({
     onSortChange,
     onOpen,
 }: RunTableProps): ReactElement {
+    const [attach, width] = useWidthOf();
+    const layout = useMemo(() => runLayout(width), [width]);
     return (
-        <DenseTable columns={columns} label={copy.runs.title} className="min-h-0 flex-1">
-            <TableHead>
-                <div>{copy.runs.columns.kind}</div>
-                <SortableHeader
-                    active={sort?.field === "status"}
-                    direction={sort?.desc === true ? "desc" : "asc"}
-                    onToggle={() => {
-                        onSortChange("status");
+        <div ref={attach} data-runs-table={layout.columns.join(" ")} className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <DenseTable columns={layout.template} label={copy.runs.title} className="min-h-0 flex-1">
+                <TableHead>
+                    <div>{copy.runs.columns.kind}</div>
+                    <SortableHeader
+                        active={sort?.field === "status"}
+                        direction={sort?.desc === true ? "desc" : "asc"}
+                        onToggle={() => {
+                            onSortChange("status");
+                        }}
+                    >
+                        {copy.runs.columns.status}
+                    </SortableHeader>
+                    <div>{copy.runs.columns.progress}</div>
+                    {shown(layout, "spend") ? <div className="text-right">{copy.runs.columns.spend}</div> : null}
+                    {shown(layout, "started") ? (
+                        <SortableHeader
+                            active={sort?.field === "createdAt"}
+                            direction={sort?.desc === true ? "desc" : "asc"}
+                            onToggle={() => {
+                                onSortChange("createdAt");
+                            }}
+                        >
+                            {copy.runs.columns.started}
+                        </SortableHeader>
+                    ) : null}
+                    {shown(layout, "lasted") ? <div className="text-right">{copy.runs.columns.lasted}</div> : null}
+                </TableHead>
+                <VirtualRows
+                    count={rows.length}
+                    rowHeight={rowHeight}
+                    scrollKey={scrollKey}
+                    row={(position) => {
+                        const run = rows[position];
+                        if (run === undefined) {
+                            return null;
+                        }
+                        return (
+                            <RunRow
+                                run={run}
+                                now={now}
+                                selected={run.id === selectedId}
+                                layout={layout}
+                                onOpen={onOpen}
+                            />
+                        );
                     }}
-                >
-                    {copy.runs.columns.status}
-                </SortableHeader>
-                <div>{copy.runs.columns.progress}</div>
-                <div className="text-right">{copy.runs.columns.spend}</div>
-                <SortableHeader
-                    active={sort?.field === "createdAt"}
-                    direction={sort?.desc === true ? "desc" : "asc"}
-                    onToggle={() => {
-                        onSortChange("createdAt");
-                    }}
-                >
-                    {copy.runs.columns.started}
-                </SortableHeader>
-                <div className="text-right">{copy.runs.columns.lasted}</div>
-            </TableHead>
-            <VirtualRows
-                count={rows.length}
-                rowHeight={rowHeight}
-                scrollKey={scrollKey}
-                row={(position) => {
-                    const run = rows[position];
-                    if (run === undefined) {
-                        return null;
-                    }
-                    return (
-                        <RunRow
-                            run={run}
-                            now={now}
-                            selected={run.id === selectedId}
-                            onOpen={onOpen}
-                        />
-                    );
-                }}
-                footer={footer}
-            />
-        </DenseTable>
+                    footer={footer}
+                />
+            </DenseTable>
+        </div>
     );
 }

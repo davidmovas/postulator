@@ -6,6 +6,19 @@ import { fieldLabel } from "../settings/types/labels.js";
 
 const said = copy.runs.start;
 
+export interface TypeScopeProps {
+    fields: readonly string[];
+}
+
+export function TypeScope({ fields }: TypeScopeProps): ReactElement {
+    return (
+        <p data-run-type-scope={true} className="flex items-start gap-2 text-xs text-ink-soft">
+            <EditNoteIcon size={14} className="mt-0.5 shrink-0 text-ink-faint" />
+            {said.typeScope(fields.map((field) => fieldLabel(field)))}
+        </p>
+    );
+}
+
 export interface StartScopeProps {
     fields: readonly string[];
     rewritten: readonly string[];

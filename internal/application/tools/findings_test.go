@@ -54,7 +54,7 @@ func entityType(t *testing.T, seeded fixture) string {
 		t.Fatalf("list the page types: %v", err)
 	}
 	for i := range listed.Types {
-		if listed.Types[i].Preset == "entity" {
+		if listed.Types[i].Preset == "guide" {
 			return listed.Types[i].ID
 		}
 	}

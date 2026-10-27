@@ -68,7 +68,19 @@ func (d Deps) pictureOf(ctx context.Context, sc *run.StepContext, key field.Key,
 	if sc.Type.ID != "" || sc.Type.Name != "" {
 		claim.Type = &sc.Type
 	}
-	return d.Pictures.Picture(ctx, sitemodel.PackRequest{PageID: sc.Page.ID, Field: string(key), Budget: budget, Claim: claim})
+	return d.Pictures.Picture(ctx, directedRequest(sitemodel.PackRequest{
+		PageID: sc.Page.ID, Field: string(key), Budget: budget, Claim: claim,
+	}, sc.Run.Brief, sc.Item.Directive))
+}
+
+func directedRequest(req sitemodel.PackRequest, brief run.Brief, directive run.Directive) sitemodel.PackRequest {
+	if !brief.Empty() {
+		req.Brief = &brief
+	}
+	if !directive.Empty() {
+		req.Directive = &directive
+	}
+	return req
 }
 
 func (d Deps) fitted(ctx context.Context, sc *run.StepContext, call modelCall, key field.Key, links *content.LinkContext,
@@ -87,9 +99,9 @@ func packInput(deps Deps, role domainllm.Role, key func(page pagemap.Page) field
 		return nil
 	}
 	return func(ctx context.Context, target run.Target) (int, error) {
-		seen, err := deps.Pictures.Picture(ctx, sitemodel.PackRequest{
+		seen, err := deps.Pictures.Picture(ctx, directedRequest(sitemodel.PackRequest{
 			PageID: target.Page.ID, Field: string(key(target.Page)), Budget: deps.Tuning.InputBudget(role),
-		})
+		}, target.Brief, target.Directive))
 		if err != nil {
 			return 0, err
 		}
@@ -108,8 +120,10 @@ func inputPreflight(deps Deps, role domainllm.Role, key func(page pagemap.Page) 
 			return findings, nil
 		}
 		for _, targetID := range record.Targets {
-			page := targets[targetID].Page
-			_, err := deps.Pictures.Picture(ctx, sitemodel.PackRequest{PageID: page.ID, Field: string(key(page)), Budget: budget})
+			target := targets[targetID]
+			page := target.Page
+			_, err := deps.Pictures.Picture(ctx, directedRequest(sitemodel.PackRequest{PageID: page.ID, Field: string(key(page)), Budget: budget},
+				target.Brief, target.Directive))
 			if err == nil {
 				continue
 			}

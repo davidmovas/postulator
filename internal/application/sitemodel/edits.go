@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
@@ -21,6 +22,7 @@ const (
 	OwnerStore  = "store"
 
 	blockExcerptRunes = 120
+	blockTextRunes    = 3000
 )
 
 type FieldsRequest struct {
@@ -56,16 +58,27 @@ type BlocksRequest struct {
 	Path   string `json:"path,omitempty"`
 	Cursor string `json:"cursor,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
+	Text   bool   `json:"text,omitempty"`
+}
+
+type BlockLink struct {
+	Anchor string `json:"anchor"`
+	Href   string `json:"href"`
+	Path   string `json:"path,omitempty"`
 }
 
 type BlockRow struct {
-	Index   int    `json:"index"`
-	Kind    string `json:"kind"`
-	Name    string `json:"name,omitempty"`
-	Owner   string `json:"owner"`
-	Hash    string `json:"hash"`
-	Dynamic bool   `json:"dynamic,omitempty"`
-	Excerpt string `json:"excerpt"`
+	Index   int         `json:"index"`
+	Kind    string      `json:"kind"`
+	Name    string      `json:"name,omitempty"`
+	Owner   string      `json:"owner"`
+	Hash    string      `json:"hash"`
+	Dynamic bool        `json:"dynamic,omitempty"`
+	Excerpt string      `json:"excerpt,omitempty"`
+	Text    string      `json:"text,omitempty"`
+	From    int         `json:"from,omitempty"`
+	Runes   int         `json:"runes,omitempty"`
+	Links   []BlockLink `json:"links,omitempty"`
 }
 
 type BlocksView struct {
@@ -81,7 +94,7 @@ type BlocksView struct {
 func (s *Service) Fields(ctx context.Context, req FieldsRequest) (FieldsView, error) {
 	var view FieldsView
 	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
-		page, err := s.named(c, ExploreRequest{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path}, true)
+		page, err := s.named(c, pageName{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path})
 		if err != nil {
 			return err
 		}
@@ -138,7 +151,7 @@ func fieldOwner(value field.Value, spec field.Spec) string {
 func (s *Service) Blocks(ctx context.Context, req BlocksRequest) (BlocksView, error) {
 	var view BlocksView
 	err := s.deps.Reader.Read(ctx, func(c context.Context) error {
-		page, err := s.named(c, ExploreRequest{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path}, true)
+		page, err := s.named(c, pageName{SiteID: req.SiteID, PageID: req.PageID, Path: req.Path})
 		if err != nil {
 			return err
 		}
@@ -161,9 +174,19 @@ func (s *Service) Blocks(ctx context.Context, req BlocksRequest) (BlocksView, er
 		}
 		parsed := block.Parse(raw)
 		rows := blockRows(parsed, written)
+		if req.Text {
+			owner, ownerErr := s.deps.Sites.Get(c, req.SiteID)
+			if ownerErr != nil {
+				return ownerErr
+			}
+			rows = textRows(parsed, rows, pagemap.NewSite(owner.BaseURL), page.Path)
+		}
 		keyset := paging.Keyset[BlockRow]{
-			IDColumn: "block_index", ID: func(row BlockRow) string { return strconv.Itoa(row.Index) },
-			Keys: []paging.SortKey[BlockRow]{paging.IntKey("index", "block_index", func(row BlockRow) any { return row.Index })},
+			IDColumn: "block_part", ID: func(row BlockRow) string { return strconv.Itoa(row.Index) + ":" + strconv.Itoa(row.From) },
+			Keys: []paging.SortKey[BlockRow]{
+				paging.IntKey("index", "block_index", func(row BlockRow) any { return row.Index }),
+				paging.IntKey("from", "block_from", func(row BlockRow) any { return row.From }),
+			},
 		}
 		listed, err := keyset.Page(rows, paging.Request{After: paging.Cursor(req.Cursor), Limit: dto.PageSize(req.Limit)})
 		if err != nil {
@@ -202,6 +225,50 @@ func blockRows(body block.Body, written []block.Written) []BlockRow {
 		})
 	}
 	return rows
+}
+
+func textRows(body block.Body, rows []BlockRow, site pagemap.Site, document string) []BlockRow {
+	out := make([]BlockRow, 0, len(rows))
+	for i := range rows {
+		row, held := rows[i], body.Blocks[i]
+		row.Excerpt = ""
+		row.Links = blockLinks(held, site, document)
+		runes := []rune(strings.Join(strings.Fields(held.Text()), " "))
+		row.Runes = len(runes)
+		if len(runes) == 0 {
+			out = append(out, row)
+			continue
+		}
+		for from := 0; from < len(runes); from += blockTextRunes {
+			part := row
+			part.From, part.Text = from, string(runes[from:min(from+blockTextRunes, len(runes))])
+			if from > 0 {
+				part.Links = nil
+			}
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
+func blockLinks(held block.Block, site pagemap.Site, document string) []BlockLink {
+	if held.Dynamic || held.Kind == block.Shortcode {
+		return nil
+	}
+	doc, err := content.Parse(held.Raw)
+	if err != nil {
+		return nil
+	}
+	found := doc.Links()
+	out := make([]BlockLink, 0, len(found))
+	for _, link := range found {
+		row := BlockLink{Anchor: strings.Join(strings.Fields(link.Anchor), " "), Href: link.Href}
+		if path, kind := site.ResolveAt(document, link.Href); kind == pagemap.LinkPath {
+			row.Path = path
+		}
+		out = append(out, row)
+	}
+	return out
 }
 
 func blockExcerpt(text string) string {

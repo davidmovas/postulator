@@ -31,7 +31,7 @@ func samePage(a, b pagemap.Page) bool {
 		a.MetaDescription == b.MetaDescription && a.WPType == b.WPType &&
 		a.Keywords.Equal(b.Keywords) && slices.Equal(a.Notes, b.Notes) &&
 		sameRef(a.EntityID, b.EntityID) && sameRef(a.TemplateID, b.TemplateID) &&
-		sameRef(a.PageTypeID, b.PageTypeID) && a.TypeSource == b.TypeSource && a.TypeReason == b.TypeReason
+		sameRef(a.PageTypeID, b.PageTypeID) && a.TypeSource == b.TypeSource && a.TypeReason == b.TypeReason && a.TypeRuleID == b.TypeRuleID
 }
 
 func (b *builder) planPages() error {
@@ -81,7 +81,7 @@ func (b *builder) typeOf(draft *pageDraft, wpType pagemap.WPType) (pagetype.Type
 }
 
 func typedByImport(page *pagemap.Page, named pagetype.Type) {
-	page.PageTypeID, page.TypeSource, page.TypeReason = &named.ID, pagemap.TypeSourceManual, pagemap.TypeByImport
+	page.PageTypeID, page.TypeSource, page.TypeReason, page.TypeRuleID = &named.ID, pagemap.TypeSourceManual, pagemap.TypeByImport, ""
 }
 
 func (b *builder) retype(next *pagemap.Page, current pagemap.Page, draft *pageDraft) {

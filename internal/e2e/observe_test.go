@@ -26,7 +26,7 @@ type expectedParent struct {
 
 type expectedType struct {
 	preset pagetype.Preset
-	reason pagemap.TypeReason
+	rule   string
 }
 
 type standModel struct {
@@ -39,17 +39,23 @@ type standModel struct {
 	resolvedHubs    []string
 	redirected      map[string]string
 	types           map[string]expectedType
+	templates       map[string]string
 	custom          string
 	trailsResolved  int
 }
 
 var (
-	typedEntity        = expectedType{preset: pagetype.Entity, reason: pagemap.TypeByDefault}
-	typedHub           = expectedType{preset: pagetype.Hub, reason: pagemap.TypeByListing}
-	typedProduct       = expectedType{preset: pagetype.Product, reason: pagemap.TypeByProduct}
-	typedStoreCategory = expectedType{preset: pagetype.StoreCategory, reason: pagemap.TypeByStoreCategory}
-	typedCatalog       = expectedType{preset: pagetype.Catalog, reason: pagemap.TypeByShop}
-	typedTechnical     = expectedType{preset: pagetype.Technical, reason: pagemap.TypeByTechnical}
+	typedFront         = expectedType{preset: pagetype.Landing, rule: "The front page"}
+	typedLanding       = expectedType{preset: pagetype.Landing, rule: "A product listing at the top level"}
+	typedCategory      = expectedType{preset: pagetype.Category, rule: "A product listing below the top level"}
+	typedPost          = expectedType{preset: pagetype.Guide, rule: "Blog posts"}
+	typedBySchema      = expectedType{preset: pagetype.Guide, rule: "An article, a blog post or a how-to by its schema"}
+	typedGuideWord     = expectedType{preset: pagetype.Guide, rule: "A guide's word in the address"}
+	typedByDefault     = expectedType{preset: pagetype.Info}
+	typedProduct       = expectedType{preset: pagetype.Product, rule: "Products"}
+	typedStoreCategory = expectedType{preset: pagetype.StoreCategory, rule: "Store categories"}
+	typedCatalog       = expectedType{preset: pagetype.Catalog, rule: "The shop"}
+	typedTechnical     = expectedType{preset: pagetype.Technical, rule: "Technical pages, such as the cart, the checkout and the account"}
 )
 
 func modelOf(t *testing.T, env environment) standModel {
@@ -77,8 +83,12 @@ func modelOf(t *testing.T, env environment) standModel {
 			},
 			redirected: map[string]string{"/checkout/": "/cart/"},
 			types: map[string]expectedType{
-				"/guide/":                    typedEntity,
-				"/guide/setup/":              typedEntity,
+				"/guide/":                    typedGuideWord,
+				"/guide/setup/":              typedGuideWord,
+				"/hello-world/":              typedPost,
+				"/sample-page/":              typedByDefault,
+				"/privacy-policy/":           typedTechnical,
+				"/refund_returns/":           typedTechnical,
 				"/product/powder/":           typedProduct,
 				"/product/coffee-beans/":     typedProduct,
 				"/product-category/koffein/": typedStoreCategory,
@@ -87,6 +97,7 @@ func modelOf(t *testing.T, env environment) standModel {
 				"/checkout/":                 typedTechnical,
 				"/my-account/":               typedTechnical,
 			},
+			templates:      map[string]string{"/guide/": "Guide", "/guide/setup/": "Guide"},
 			custom:         "/guide/setup/",
 			trailsResolved: 1,
 		}
@@ -124,13 +135,17 @@ func modelOf(t *testing.T, env environment) standModel {
 			resolvedHubs: []string{"/peptides/", "/healing-peptides/", "/bpc-157/", "/tb-500/", "/reconstitution/"},
 			redirected:   map[string]string{"/checkout/": "/cart/"},
 			types: map[string]expectedType{
-				"/":                           typedEntity,
-				"/peptides/":                  typedHub,
-				"/healing-peptides/":          typedHub,
-				"/bpc-157/":                   typedHub,
-				"/tb-500/":                    typedHub,
-				"/lab-guides/":                typedEntity,
-				"/reconstitution/":            typedEntity,
+				"/":                           typedFront,
+				"/peptides/":                  typedLanding,
+				"/healing-peptides/":          typedCategory,
+				"/bpc-157/":                   typedCategory,
+				"/tb-500/":                    typedCategory,
+				"/lab-guides/":                typedBySchema,
+				"/reconstitution/":            typedBySchema,
+				"/hello-world/":               typedPost,
+				"/sample-page/":               typedBySchema,
+				"/refund_returns/":            typedTechnical,
+				"/privacy-policy/":            typedTechnical,
 				"/product/bpc-157-peptide/":   typedProduct,
 				"/product/bpc-157-capsules/":  typedProduct,
 				"/product-category/peptides/": typedStoreCategory,
@@ -140,6 +155,7 @@ func modelOf(t *testing.T, env environment) standModel {
 				"/checkout/":   typedTechnical,
 				"/my-account/": typedTechnical,
 			},
+			templates:      map[string]string{"/peptides/": "Hub", "/healing-peptides/": "Hub", "/lab-guides/": "Guide"},
 			custom:         "/tb-500/",
 			trailsResolved: 7,
 		}

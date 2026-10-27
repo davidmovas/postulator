@@ -1,4 +1,5 @@
 import { copy } from "../copy/index.js";
+import { agentHome } from "../features/agent/model/paths.js";
 import { settingsHome } from "../features/settings/index.js";
 import type { IconComponent } from "../ui/icons/index.js";
 import {
@@ -53,10 +54,10 @@ export function productionEntries(siteId: string): readonly NavEntry[] {
     ];
 }
 
-export function workspaceEntries(pending: number): readonly NavEntry[] {
+export function workspaceEntries(siteId: string | null, pending: number): readonly NavEntry[] {
     return [
         { key: "sites", label: copy.nav.sites, to: "/sites", Icon: PublicIcon },
-        { key: "agent", label: copy.nav.agent, to: "/agent", Icon: SmartToyIcon, badge: pending },
+        { key: "agent", label: copy.nav.agent, to: agentHome(siteId), Icon: SmartToyIcon, badge: pending },
     ];
 }
 
@@ -64,12 +65,12 @@ export function settingsEntry(): NavEntry {
     return { key: "settings", label: copy.nav.settings, to: settingsHome, Icon: SettingsIcon };
 }
 
-export function globalEntries(pending: number): readonly NavEntry[] {
-    return [...workspaceEntries(pending), settingsEntry()];
+export function globalEntries(siteId: string | null, pending: number): readonly NavEntry[] {
+    return [...workspaceEntries(siteId, pending), settingsEntry()];
 }
 
 export function railSections(siteId: string | null, pending: number): readonly NavSection[] {
-    const sections: NavSection[] = [{ key: "workspace", entries: workspaceEntries(pending) }];
+    const sections: NavSection[] = [{ key: "workspace", entries: workspaceEntries(siteId, pending) }];
     if (siteId !== null) {
         sections.push({ key: "site", entries: siteEntries(siteId) });
         sections.push({ key: "production", entries: productionEntries(siteId) });
@@ -80,5 +81,5 @@ export function railSections(siteId: string | null, pending: number): readonly N
 
 export function goToEntries(siteId: string | null): readonly NavEntry[] {
     const listed = siteId === null ? [] : [...siteEntries(siteId), ...productionEntries(siteId)];
-    return [...listed, ...globalEntries(0)];
+    return [...listed, ...globalEntries(siteId, 0)];
 }

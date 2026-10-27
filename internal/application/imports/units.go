@@ -199,8 +199,33 @@ func (b *builder) addRowUnit(draft *pageDraft) {
 		}
 	}
 	u.parent = b.rowParent(draft.sheetPath(), u.context)
+	if u.parent.kind == refNone && u.context < 0 && draft.url == "" && onSite {
+		u.parent = b.derivedParent(existing)
+	}
 	draft.unit = b.add(u)
 	b.absorbRows(draft)
+}
+
+func (b *builder) derivedParent(page pagemap.Page) parentRef {
+	seen := map[string]struct{}{page.ID: {}}
+	for at := page.ParentPageID; at != nil; {
+		if _, looped := seen[*at]; looped {
+			break
+		}
+		seen[*at] = struct{}{}
+		ancestor, known := b.state.byID[*at]
+		if !known || ancestor.Path == pagemap.RootPath {
+			break
+		}
+		if draft, planned := b.sheet.at(ancestor.Path); planned && draft.unit >= 0 {
+			return parentRef{kind: refUnit, unit: draft.unit, weak: true}
+		}
+		if ancestor.EntityID != nil && ancestor.Status != pagemap.StatusArchived {
+			return parentRef{kind: refSite, site: *ancestor.EntityID, weak: true}
+		}
+		at = ancestor.ParentPageID
+	}
+	return parentRef{}
 }
 
 func (b *builder) rowParent(path string, context int) parentRef {

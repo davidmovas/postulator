@@ -285,7 +285,7 @@ func TestOnlyTheRootLevelMakesAnEntityOfItsGroup(t *testing.T) {
 			name:  "a level cell names the page type",
 			sheet: "Root,Category,URL,Entity Level\nPeptides,,/peptides/,Topic\nPeptides,BPC-157,/peptides/bpc-157/,Compound/Product\n",
 			want:  []string{"Bpc 157", "Peptides"},
-			types: map[string]string{"/peptides/": "Entity", "/peptides/bpc-157/": "Product"},
+			types: map[string]string{"/peptides/": "Guide", "/peptides/bpc-157/": "Product"},
 		},
 		{
 			name:  "category columns alone make no entity",

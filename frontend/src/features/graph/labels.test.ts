@@ -41,7 +41,7 @@ describe("scored", () => {
 
 describe("entityTypeLabel", () => {
     it("names the type of the canonical page by the client's own name", () => {
-        expect(entityTypeLabel({ id: "t1", name: "Category", preset: "hub" })).toBe("Category");
+        expect(entityTypeLabel({ id: "t1", name: "Category", preset: "hub", role: "hub" })).toBe("Category");
     });
 
     it("says so when the canonical page carries no type", () => {

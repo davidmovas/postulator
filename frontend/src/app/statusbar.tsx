@@ -9,6 +9,7 @@ import { useRuns } from "../data/hooks/runs.js";
 import { usePluginState } from "../data/hooks/sync.js";
 import { useLockGate } from "../data/lock.js";
 import { usd } from "../domain/format.js";
+import { inboxPath } from "../features/agent/model/paths.js";
 import {
     ExtensionIcon,
     ExtensionOffIcon,
@@ -75,7 +76,7 @@ export function StatusBar({ siteId }: StatusBarProps): ReactElement {
                 </Item>
             )}
             {awaiting === 0 ? null : (
-                <Item to="/agent/inbox" tone="text-warn">
+                <Item to={inboxPath(siteId)} tone="text-warn">
                     <PendingActionsIcon size={13} />
                     {copy.agent.screen.awaiting(awaiting)}
                 </Item>

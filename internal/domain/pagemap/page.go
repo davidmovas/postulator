@@ -73,6 +73,7 @@ type Page struct {
 	PageTypeID      *string
 	TypeSource      TypeSource
 	TypeReason      TypeReason
+	TypeRuleID      string
 	TechnicalReason TechnicalReason
 	ReadOnlyReason  ReadOnlyReason
 	WPType          WPType
@@ -175,6 +176,10 @@ func NewPage(p Page) (Page, error) {
 		return Page{}, invalid("page type source or reason is not recognized", "typeReason")
 	case (p.PageTypeID == nil) != (p.TypeSource == TypeSourceNone):
 		return Page{}, invalid("a page type comes with its source", "typeSource")
+	case (p.TypeReason == TypeByRule) != (p.TypeRuleID != ""):
+		return Page{}, invalid("a type a rule gave names that rule, and only then", "typeRuleId")
+	case p.TypeReason.RulePlaced() && p.TypeSource != TypeSourceAuto:
+		return Page{}, invalid("a type the rules gave is set automatically", "typeSource")
 	case p.ParentReason != "" && !p.ParentReason.Valid():
 		return Page{}, invalid("parent reason is not recognized", "parentReason")
 	case !p.TechnicalReason.Valid():

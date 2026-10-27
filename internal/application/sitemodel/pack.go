@@ -14,6 +14,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
+	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -25,10 +26,17 @@ type Claim struct {
 }
 
 type PackRequest struct {
-	PageID string `json:"pageId"`
-	Field  string `json:"field"`
-	Budget int    `json:"budget"`
-	Claim  *Claim `json:"-"`
+	PageID    string         `json:"pageId"`
+	Field     string         `json:"field"`
+	Budget    int            `json:"budget"`
+	Brief     *run.Brief     `json:"brief,omitempty"`
+	Directive *run.Directive `json:"directive,omitempty"`
+	RunID     string         `json:"runId,omitempty"`
+	Claim     *Claim         `json:"-"`
+}
+
+func (r PackRequest) directed() bool {
+	return r.Brief != nil || r.Directive != nil
 }
 
 type Picture struct {
@@ -52,6 +60,11 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 		facts, scope, plan, err := s.read(c, req.PageID, req.Field, req.Claim)
 		if err != nil {
 			return err
+		}
+		if req.directed() {
+			if facts.Directions, err = s.directions(c, req); err != nil {
+				return err
+			}
 		}
 		pack := contextpack.Build(facts, scope)
 		fitted, err := contextpack.Fit(pack, req.Budget)
@@ -83,15 +96,67 @@ func (s *Service) read(ctx context.Context, pageID, fieldName string, claim *Cla
 		return contextpack.Facts{}, field.Scope{}, content.LinkContext{}, err
 	}
 	if claim != nil && claim.Type != nil {
-		facts.Page.Type, facts.Page.Preset = claim.Type.Name, claim.Type.Preset
+		facts.Page.Type, facts.Page.Preset, facts.Page.Role = claim.Type.Name, claim.Type.Preset, claim.Type.Preset.Role()
 	}
 	return facts, scope, plan, nil
+}
+
+func (s *Service) briefOfRun(ctx context.Context, req PackRequest) (PackRequest, error) {
+	page, err := s.deps.Pages.Get(ctx, req.PageID)
+	if err != nil {
+		return PackRequest{}, err
+	}
+	held, err := s.deps.Runs.Get(ctx, req.RunID)
+	if err != nil {
+		return PackRequest{}, err
+	}
+	if held.SiteID != page.SiteID {
+		return PackRequest{}, errors.New(errors.NotFound, "the page's site holds no such run").WithDetail("runId", req.RunID)
+	}
+	items, err := s.deps.Items.ByRun(ctx, req.RunID)
+	if err != nil {
+		return PackRequest{}, err
+	}
+	brief := held.Brief
+	req.Brief = &brief
+	for i := range items {
+		if items[i].TargetID == req.PageID {
+			directive := items[i].Directive
+			req.Directive = &directive
+		}
+	}
+	return req, nil
+}
+
+func (s *Service) directions(ctx context.Context, req PackRequest) (*contextpack.Directions, error) {
+	page, err := s.deps.Pages.Get(ctx, req.PageID)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := s.base(ctx, page.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	brief, directive := run.Brief{}, run.Directive{PageID: req.PageID}
+	if req.Brief != nil {
+		brief = *req.Brief
+	}
+	if req.Directive != nil {
+		directive = *req.Directive
+	}
+	return contextpack.DirectionsOf(brief, directive, snapshot.Index), nil
 }
 
 func (s *Service) Pack(ctx context.Context, req PackRequest) (PackView, error) {
 	req.Claim = nil
 	if req.Budget <= 0 {
 		req.Budget = s.deps.Budgets.InputBudget(roleOf(field.Key(req.Field)))
+	}
+	if req.RunID != "" {
+		var err error
+		if req, err = s.briefOfRun(ctx, req); err != nil {
+			return PackView{}, err
+		}
 	}
 	picture, err := s.Picture(ctx, req)
 	if err != nil {

@@ -39,7 +39,7 @@ func newHarnessWithRows(t *testing.T, maxRows int) harness {
 	owner := sqlitetest.Site(t, store, "shop")
 	recorder := &applicationtest.Recorder{}
 	seeder := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: sqlite.NewPageRepo(store),
 		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: &applicationtest.Recorder{},
 		Clock: clock.NewFake(sqlitetest.Stamp),
 	})

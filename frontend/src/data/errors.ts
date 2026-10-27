@@ -109,6 +109,18 @@ export function detailCodeOf(reported: TransportError): string | null {
     return typeof held === "string" && held !== "" ? held : null;
 }
 
+export function detailOf(thrown: unknown, key: string): unknown {
+    if (thrown === null || thrown === undefined || isCancellation(thrown)) {
+        return undefined;
+    }
+    return parseError(thrown).details?.[key];
+}
+
+export function reasonOf(thrown: unknown): string | null {
+    const held = detailOf(thrown, "reason");
+    return typeof held === "string" && held !== "" ? held : null;
+}
+
 export function isTorClosedToLinks(thrown: unknown): boolean {
     if (thrown === null || thrown === undefined || isCancellation(thrown)) {
         return false;

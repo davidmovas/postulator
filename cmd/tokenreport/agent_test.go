@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/tiktoken-go/tokenizer"
+
+	"github.com/davidmovas/postulator/internal/application/tools"
 )
 
 func measuredAgent(t *testing.T) agentReport {
@@ -36,8 +38,8 @@ func TestTheAgentsRoundIsCountedPartByPart(t *testing.T) {
 		}
 	}
 
-	if len(measured.Schemas) != 92 {
-		t.Fatalf("%d schemas, want the registry's 92 tools", len(measured.Schemas))
+	if registered := len(tools.New(tools.Deps{}).Names()); len(measured.Schemas) != registered {
+		t.Fatalf("%d schemas, want the registry's %d tools", len(measured.Schemas), registered)
 	}
 	if !slices.IsSortedFunc(measured.Schemas, func(a, b measure) int { return b.Tokens - a.Tokens }) {
 		t.Error("the schemas are not sorted by tokens, the widest first")
@@ -80,7 +82,7 @@ func TestTheReportPrintsTheAgentsRound(t *testing.T) {
 	if err := measuredAgent(t).write(&table); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	for _, want := range []string{"THE AGENT, PER ROUND", "templates_create", "every schema", "deferred", "replica", "vanilla", "brief"} {
+	for _, want := range []string{"THE AGENT, PER ROUND", "templates", "every schema", "deferred", "replica", "vanilla", "brief"} {
 		if !strings.Contains(table.String(), want) {
 			t.Errorf("the table lacks %q:\n%s", want, table.String())
 		}

@@ -12,6 +12,7 @@ export {
     SchedulesService as Schedules,
     SettingsService as Settings,
     SitesService as Sites,
+    SupportService as Support,
     SyncService as Sync,
     TemplatesService as Templates,
     ToolsService as Tools,
@@ -29,6 +30,7 @@ export type * as CatalogModels from "../../bindings/github.com/davidmovas/postul
 export type * as ObserveModels from "../../bindings/github.com/davidmovas/postulator/internal/application/observe/models.js";
 export type * as PagesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/pages/models.js";
 export type * as PageTypesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/pagetypes/models.js";
+export type * as PageTypeDomainModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/pagetype/models.js";
 export type * as ReportsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/reports/models.js";
 export type * as RunsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/runs/models.js";
 export type * as SchedulesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/schedules/models.js";
@@ -36,6 +38,7 @@ export type * as SiteModelModels from "../../bindings/github.com/davidmovas/post
 export type * as SitesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/sites/models.js";
 export type * as SyncModels from "../../bindings/github.com/davidmovas/postulator/internal/application/sync/models.js";
 export type * as TemplatesModels from "../../bindings/github.com/davidmovas/postulator/internal/application/templates/models.js";
+export type * as ToolsModels from "../../bindings/github.com/davidmovas/postulator/internal/application/tools/models.js";
 export type * as FieldModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/field/models.js";
 export type * as LlmModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/llm/models.js";
 export type * as RunDomainModels from "../../bindings/github.com/davidmovas/postulator/internal/domain/run/models.js";

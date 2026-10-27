@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -72,18 +73,39 @@ func ResolveContext(deps Deps) run.StepDef {
 				EntityID: entity.ID,
 				Absolute: absolute,
 			}, policy)
-			blob, err := encode(plan.Context, "link context")
+			must := make([]content.Must, 0, len(sc.Item.Directive.MustLink))
+			for _, link := range sc.Item.Directive.MustLink {
+				must = append(must, content.Must{PageID: link.PageID, Anchor: link.Anchor})
+			}
+			insisted, unplanned := content.Insist(plan.Context, must)
+			blob, err := encode(insisted, "link context")
 			if err != nil {
 				return run.Result{}, err
 			}
 
 			return run.Result{
 				Artifacts: []run.Artifact{{Kind: run.ArtifactLinkContext, Blob: blob}},
-				Message: "resolved " + plural(len(plan.Context.Targets)) + " for " + sc.Page.Path +
-					withheld(plan.Blocked),
+				Message: "resolved " + plural(len(insisted.Targets)) + " for " + sc.Page.Path +
+					withheld(plan.Blocked) + unconnected(unplanned, index),
 			}, nil
 		},
 	}
+}
+
+func unconnected(pageIDs []string, index pagemap.Index) string {
+	if len(pageIDs) == 0 {
+		return ""
+	}
+	paths := make([]string, 0, len(pageIDs))
+	for _, pageID := range pageIDs {
+		if page, found := index.ByID(pageID); found {
+			paths = append(paths, page.Path)
+		} else {
+			paths = append(paths, pageID)
+		}
+	}
+	return "; the directive asks for links to " + strings.Join(paths, ", ") +
+		", which the entity graph no longer connects, so they are not placed"
 }
 
 func plural(count int) string {

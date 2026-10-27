@@ -44,6 +44,7 @@ func (c *Core) Services(logger *log.Logger) []application.Service {
 		Findings:   live(c, func(c *Core) wails.FindingsUseCase { return c.Findings }),
 		Templates:  live(c, func(c *Core) wails.TemplatesUseCase { return c.Templates }),
 		PageTypes:  live(c, func(c *Core) wails.PageTypesUseCase { return c.PageTypes }),
+		Classify:   live(c, func(c *Core) wails.ClassificationUseCase { return c.Classification }),
 		Runs:       live(c, func(c *Core) wails.RunsUseCase { return c.Runs }),
 		Sync:       live(c, func(c *Core) wails.SyncUseCase { return c.Sync }),
 		Reports:    live(c, func(c *Core) wails.ReportsUseCase { return c.Reports }),
@@ -54,6 +55,7 @@ func (c *Core) Services(logger *log.Logger) []application.Service {
 		Schedules:  live(c, func(c *Core) wails.SchedulesUseCase { return c.Schedules }),
 		Tools:      live(c, func(c *Core) wails.ToolCatalog { return c.Tools }),
 		Browser:    live(c, func(c *Core) wails.BrowserUseCase { return c.Browser }),
+		Support:    live(c, func(c *Core) wails.SupportUseCase { return c.Support }),
 		Settings: wails.SettingsDeps{
 			Access: live(c, func(c *Core) wails.SettingsAccess {
 				return wails.SettingsAccess{

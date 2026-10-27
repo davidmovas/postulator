@@ -10,6 +10,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -76,21 +77,23 @@ func TestAPageTypeHasItsOwnWriters(t *testing.T) {
 	}
 	expect("a whole-row update", "", pagemap.TypeSourceNone, pagemap.TypeByNone)
 
-	if err = repo.AutoType(t.Context(), page.ID, "hub", pagemap.TypeByListing, at); err != nil {
-		t.Fatalf("AutoType: %v", err)
+	byRule := pagetype.Assignment{TypeID: "hub", Source: pagemap.TypeSourceAuto, Reason: pagemap.TypeByRule, RuleID: "rule-6"}
+	if _, err = repo.Classify(t.Context(), page.ID, pagetype.Assignment{}, byRule, at); err != nil {
+		t.Fatalf("Classify: %v", err)
 	}
-	expect("the first automatic type", "hub", pagemap.TypeSourceAuto, pagemap.TypeByListing)
-	if err = repo.AutoType(t.Context(), page.ID, "entity", pagemap.TypeByDefault, at); err != nil {
-		t.Fatalf("AutoType again: %v", err)
+	expect("the first automatic type", "hub", pagemap.TypeSourceAuto, pagemap.TypeByRule)
+	unmatched := pagetype.Assignment{TypeID: "entity", Source: pagemap.TypeSourceAuto, Reason: pagemap.TypeByUnmatched}
+	if _, err = repo.Classify(t.Context(), page.ID, pagetype.Assignment{}, unmatched, at); err != nil {
+		t.Fatalf("Classify again: %v", err)
 	}
-	expect("a second automatic type", "hub", pagemap.TypeSourceAuto, pagemap.TypeByListing)
+	expect("a second automatic type read before the first", "hub", pagemap.TypeSourceAuto, pagemap.TypeByRule)
 
 	if err = repo.SetType(t.Context(), page.ID, "pillar", pagemap.TypeByUser, at); err != nil {
 		t.Fatalf("SetType: %v", err)
 	}
 	expect("a person's type", "pillar", pagemap.TypeSourceManual, pagemap.TypeByUser)
-	if err = repo.AutoType(t.Context(), page.ID, "entity", pagemap.TypeByDefault, at); err != nil {
-		t.Fatalf("AutoType over a manual type: %v", err)
+	if _, err = repo.Classify(t.Context(), page.ID, byRule, unmatched, at); err != nil {
+		t.Fatalf("Classify over a manual type: %v", err)
 	}
 	expect("an automatic type over a person's", "pillar", pagemap.TypeSourceManual, pagemap.TypeByUser)
 	if err = repo.Update(t.Context(), snapshot); err != nil {
@@ -343,6 +346,41 @@ func TestPageRepoUpdatePublishedTouchesOnlyWhatAPublishOwns(t *testing.T) {
 	missing.ID = id.New()
 	if err = repo.UpdatePublished(t.Context(), missing); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("UpdatePublished of an unknown page code = %q, want NOT_FOUND", errors.CodeOf(err))
+	}
+}
+
+func TestPageRepoFollowsTheObservedH1OnlyWhereNoPlanHoldsIt(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageRepo(store)
+
+	mirrored := fullPage(owner.ID, "/bpc-157/", sqlitetest.Stamp)
+	mirrored.H1 = ""
+	planned := fullPage(owner.ID, "/tb-500/", sqlitetest.Stamp)
+	planned.H1 = "TB-500 Research Peptide"
+	for _, page := range []pagemap.Page{mirrored, planned} {
+		if err := repo.Insert(t.Context(), page); err != nil {
+			t.Fatalf("Insert: %v", err)
+		}
+	}
+
+	later := sqlitetest.Stamp.Add(time.Hour)
+	for _, page := range []pagemap.Page{mirrored, planned} {
+		if err := repo.FollowObservedH1(t.Context(), page.ID, "", page.Title, later); err != nil {
+			t.Fatalf("FollowObservedH1: %v", err)
+		}
+	}
+
+	got, err := repo.Get(t.Context(), mirrored.ID)
+	want := mirrored
+	want.H1, want.UpdatedAt = mirrored.Title, later
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("the mirrored page = %+v, %v\nwant %+v", got, err, want)
+	}
+	if got, err = repo.Get(t.Context(), planned.ID); err != nil || !reflect.DeepEqual(got, planned) {
+		t.Errorf("the planned page = %+v, %v\nwant it untouched %+v", got, err, planned)
 	}
 }
 

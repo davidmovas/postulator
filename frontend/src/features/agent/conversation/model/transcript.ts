@@ -1,7 +1,8 @@
 import type { AgentConfirmation, ToolCallStatus, Turn, TurnUsage } from "../../../../data/agent/turn.js";
 import { isActive, toolCallStatus } from "../../../../data/agent/turn.js";
-import type { Message, PendingAction } from "../../../../data/types.js";
+import type { Message, PendingAction, Plan } from "../../../../data/types.js";
 import type { Timestamp } from "../../../../data/wire.js";
+import { planIdOf, planTool, proposedPlanOf } from "../../plans/model.js";
 import { refusedText, truncationOf } from "./tools.js";
 
 export type ToolRowStatus = "running" | "ok" | "cut" | "denied" | "error";
@@ -14,6 +15,7 @@ export type Row =
           id: string;
           callId: string;
           tool: string;
+          args: unknown;
           status: ToolRowStatus;
           durationMs: number | null;
           result: unknown;
@@ -21,6 +23,7 @@ export type Row =
           live: boolean;
       }
     | { kind: "confirm"; id: string; action: PendingAction | null; live: AgentConfirmation | null }
+    | { kind: "plan"; id: string; plan: Plan }
     | { kind: "streaming"; id: string; text: string }
     | { kind: "working"; id: string }
     | { kind: "stopped"; id: string; detail: string }
@@ -64,6 +67,7 @@ function savedRow(message: Message, turn: Turn): Row | null {
                 id: message.id,
                 callId: message.callId ?? "",
                 tool: message.tool ?? "",
+                args: null,
                 status: settledStatus(savedStatus(message), message.payload ?? null),
                 durationMs: null,
                 result: message.payload ?? null,
@@ -106,6 +110,7 @@ function liveRows(turn: Turn, saved: readonly Message[]): Row[] {
                 id: `live:${call.callId}`,
                 callId: call.callId,
                 tool: call.tool,
+                args: call.args ?? null,
                 status: call.status === "running" ? "running" : settledStatus(call.status, call.result ?? null),
                 durationMs: call.durationMs ?? null,
                 result: call.result ?? null,
@@ -201,7 +206,49 @@ function placed(base: readonly Row[], waiting: readonly Row[]): Row[] {
     return [...out, ...trailing];
 }
 
-export function rows(saved: readonly Message[], turn: Turn, pending: readonly PendingAction[]): Row[] {
+export interface PlanSource {
+    listed: readonly Plan[];
+    complete: boolean;
+}
+
+const noPlans: PlanSource = { listed: [], complete: false };
+
+function planned(base: readonly Row[], source: PlanSource): Row[] {
+    const byId = new Map(source.listed.map((plan): [string, Plan] => [plan.id, plan]));
+    const shown = new Set<string>();
+    const out: Row[] = [];
+    for (const row of base) {
+        out.push(row);
+        if (row.kind !== "tool" || row.tool !== planTool) {
+            continue;
+        }
+        const planId = planIdOf(row.result);
+        if (planId === null || shown.has(planId)) {
+            continue;
+        }
+        const plan = byId.get(planId) ?? proposedPlanOf(row.result);
+        if (plan === null) {
+            continue;
+        }
+        shown.add(planId);
+        out.push({ kind: "plan", id: `plan:${planId}`, plan });
+    }
+    if (source.complete) {
+        for (const plan of source.listed) {
+            if (!shown.has(plan.id)) {
+                out.push({ kind: "plan", id: `plan:${plan.id}`, plan });
+            }
+        }
+    }
+    return out;
+}
+
+export function rows(
+    saved: readonly Message[],
+    turn: Turn,
+    pending: readonly PendingAction[],
+    plans: PlanSource = noPlans,
+): Row[] {
     const base: Row[] = [];
     for (const message of saved) {
         const row = savedRow(message, turn);
@@ -210,7 +257,7 @@ export function rows(saved: readonly Message[], turn: Turn, pending: readonly Pe
         }
     }
     base.push(...liveRows(turn, saved));
-    return placed(base, cards(turn, pending));
+    return placed(planned(base, plans), cards(turn, pending));
 }
 
 export function lastUserText(list: readonly Row[]): string | null {

@@ -62,7 +62,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 
 	types := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo,
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: pageRepo,
 		Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: &applicationtest.Recorder{},
 		Clock: clock.NewFake(sqlitetest.Stamp),
 	})
@@ -73,7 +73,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatalf("read the page types: %v", err)
 	}
-	hubType, _ := set.ByPreset(pagetype.Hub)
+	hubType, _ := set.ByPreset(pagetype.Category)
 
 	f := &fixture{
 		store: store, siteID: owner.ID, templateID: hub.ID, hubType: hubType.ID, types: types,

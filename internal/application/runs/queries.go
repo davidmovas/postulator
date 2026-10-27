@@ -220,12 +220,10 @@ func (s *Service) GetArtifact(ctx context.Context, req GetArtifactRequest) (GetA
 		return GetArtifactResponse{}, invalid("artifact kind is not recognized", "kind")
 	}
 
-	stored, err := s.artifacts.ByItem(ctx, itemID)
+	latest, err := s.latestOf(ctx, itemID, kind)
 	if err != nil {
 		return GetArtifactResponse{}, err
 	}
-
-	latest := latestOf(stored, kind)
 	if latest == nil {
 		return GetArtifactResponse{}, errors.New(errors.NotFound, "the run item has no artifact of this kind").
 			WithDetail("itemId", itemID).WithDetail("kind", req.Kind)
@@ -233,15 +231,39 @@ func (s *Service) GetArtifact(ctx context.Context, req GetArtifactRequest) (GetA
 	return GetArtifactResponse{Artifact: artifactView(*latest)}, nil
 }
 
-func latestOf(stored []run.Artifact, kind run.ArtifactKind) *run.Artifact {
+func (s *Service) latestOf(ctx context.Context, itemID string, kind run.ArtifactKind) (*run.Artifact, error) {
+	stored, err := s.artifacts.ByItem(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	item, err := s.items.Get(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	record, err := s.runs.Get(ctx, item.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	order := make(map[string]int, len(record.Recipe))
+	for i, spec := range run.Enabled(record.Recipe) {
+		order[spec.Name] = i + 1
+	}
 	var latest *run.Artifact
 	for i := range stored {
 		if stored[i].Kind != kind {
 			continue
 		}
-		if latest == nil || !stored[i].CreatedAt.Before(latest.CreatedAt) {
+		if latest == nil || laterStep(order, stored[i], *latest) {
 			latest = &stored[i]
 		}
 	}
-	return latest
+	return latest, nil
+}
+
+func laterStep(order map[string]int, a, b run.Artifact) bool {
+	if order[a.Step] != order[b.Step] {
+		return order[a.Step] > order[b.Step]
+	}
+	return !a.CreatedAt.Before(b.CreatedAt)
 }

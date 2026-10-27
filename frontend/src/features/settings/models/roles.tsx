@@ -44,7 +44,10 @@ export function RoleTable(): ReactElement {
                             role="listitem"
                             className="flex h-9 items-center gap-3 border-b border-hairline px-3 last:border-b-0"
                         >
-                            <span className="min-w-0 flex-1 truncate text-sm text-ink-soft">
+                            <span
+                                title={roleLabels[row.role] ?? row.role}
+                                className="min-w-0 flex-1 truncate text-sm text-ink-soft"
+                            >
                                 {roleLabels[row.role] ?? row.role}
                             </span>
                             {row.source === "global" ? (
@@ -52,9 +55,16 @@ export function RoleTable(): ReactElement {
                                     {said.sourceGlobal}
                                 </StatusBadge>
                             ) : null}
-                            <div className="w-64 shrink-0">
+                            <div className="w-64 min-w-0 shrink">
                                 <Select
                                     aria-label={`${roleLabels[row.role] ?? row.role} ${said.choice}`}
+                                    title={
+                                        row.chosen !== null
+                                            ? refText(row.chosen)
+                                            : row.effective === null
+                                              ? said.sourceNone
+                                              : refText(row.effective)
+                                    }
                                     value={row.chosen === null ? null : refText(row.chosen)}
                                     placeholder={row.effective === null ? said.sourceNone : refText(row.effective)}
                                     options={options}

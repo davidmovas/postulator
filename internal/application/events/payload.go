@@ -93,6 +93,21 @@ type AgentConfirmRequestedPayload struct {
 	Summary        string          `json:"summary"`
 }
 
+type AgentPlanProposedPayload struct {
+	ConversationID string `json:"conversationId"`
+	PlanID         string `json:"planId"`
+	Title          string `json:"title"`
+	Steps          int    `json:"steps"`
+}
+
+type AgentPlanUpdatedPayload struct {
+	ConversationID string `json:"conversationId"`
+	PlanID         string `json:"planId"`
+	Status         string `json:"status"`
+	StepID         string `json:"stepId"`
+	StepStatus     string `json:"stepStatus"`
+}
+
 type AgentConfirmResolvedPayload struct {
 	ConversationID string          `json:"conversationId"`
 	ConfirmationID string          `json:"confirmationId"`

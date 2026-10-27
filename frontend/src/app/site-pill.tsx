@@ -1,12 +1,13 @@
 import * as Popover from "@radix-ui/react-popover";
 import type { ReactElement } from "react";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { copy } from "../copy/index.js";
 import { flatten } from "../data/call.js";
 import { useSites } from "../data/hooks/sites.js";
 import type { Site } from "../data/types.js";
+import { switchedSitePath } from "../features/agent/model/paths.js";
 import { siteStatusTone } from "../features/sites/index.js";
 import { AddIcon, CheckIcon, PublicIcon, UnfoldMoreIcon, cx, noDrag, toneClasses } from "../ui/index.js";
 
@@ -53,6 +54,7 @@ export interface SitePillProps {
 
 export function SitePill({ siteId }: SitePillProps): ReactElement {
     const navigate = useNavigate();
+    const location = useLocation();
     const sites = useSites();
     const [open, setOpen] = useState(false);
     const rows = flatten(sites.data?.pages);
@@ -102,7 +104,7 @@ export function SitePill({ siteId }: SitePillProps): ReactElement {
                             site={site}
                             current={site.id === siteId}
                             onPick={(id) => {
-                                leave(`/s/${id}/overview`);
+                                leave(switchedSitePath(location.pathname, id));
                             }}
                         />
                     ))}

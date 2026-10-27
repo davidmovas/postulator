@@ -11,27 +11,26 @@ type Group struct {
 }
 
 var groups = []Group{
-	{Name: "sites", Description: "WordPress sites: register, change or delete one and set its defaults, and explore a site's model."},
-	{Name: "graph", Description: "The entity graph: entities, keywords, anchors, parent and related edges, " +
+	{Name: "sites", Description: "WordPress sites: read one or its live overview, register, change or delete one, observe it, probe its plugin."},
+	{Name: "graph", Description: "The entity graph: entities, keywords, anchors, parent and related edges, the page tree's parents, " +
 		"proposals from pages or keywords, authority scores."},
-	{Name: "pages", Description: "The page map: plan, change or delete pages, map them to entities, " +
-		"name an entity's canonical page, preview a page."},
-	{Name: "pagetypes", Description: "Page types: the client's types over presets, their field scopes and link policies."},
+	{Name: "pages", Description: "The pages: find them, walk the tree, read one whole with its blocks and fields; plan, " +
+		"change, map, retype or delete pages, write a field or a block, grade a page."},
+	{Name: "links", Description: "The contextual links: a page's or a section's, what the graph owes, the orphans and what to add."},
+	{Name: "pagetypes", Description: "Page types: the client's types over presets, their field scopes and link policies, " +
+		"and the rules that classify pages, previewed before they apply."},
 	{Name: "templates", Description: "Content templates, and their overrides for one site or one page."},
-	{Name: "runs", Description: "Runs that write, relink, audit, repair or revert pages: start, pause, resume, " +
-		"cancel, retry, regenerate and revert them, and read their items, events and artifacts."},
-	{Name: "sync", Description: "Pull the live WordPress content into the page map and probe the companion plugin."},
-	{Name: "reports", Description: "Reports on a page or a run, and link audits."},
+	{Name: "runs", Description: "Runs that write, relink, audit, repair or revert pages: start or price one with its brief, " +
+		"pause, resume, cancel, retry, regenerate and revert them, and read their items, events, artifacts and reports."},
 	{Name: "imports", Description: "Spreadsheet import and export, and saved column mappings."},
 	{Name: "findings", Description: "What the model found that disagrees with the site or the workbook, and its resolution."},
-	{Name: "models", Description: "Language models: the catalog, role profiles, provider keys, probes and spend."},
-	{Name: "content", Description: "Grade a live page against its template and graph."},
+	{Name: "models", Description: "Language models: the list, the model of each job on this site, and spend."},
 	{Name: "schedules", Description: "Schedules that start runs on a cron expression or an interval."},
+	{Name: "plans", Description: "Plans: an ordered set of writes put in front of the person as one card, run once approved."},
 }
 
 var orienting = []string{
-	"sites_list", "sites_get", "sites_explore", "reports_site_overview", "graph_list_entities", "pages_list", "pages_get",
-	"runs_list", "runs_get", "templates_list",
+	"sites", "graph_read", "pages_find", "pages_tree", "pages_get", "links", "runs",
 }
 
 func OnDemand(name string) (Group, bool) {

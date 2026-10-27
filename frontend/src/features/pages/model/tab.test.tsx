@@ -10,8 +10,18 @@ const held: { model: PageModel | undefined } = { model: hubModel };
 
 const reverted: unknown[] = [];
 
+const orphan = {
+    page: { pageId: "p-orphan", path: "/lonely/", title: "Lonely" },
+    parentId: "",
+    why: { reason: "crumb_unresolved", crumb: "/gone/", findingId: "f1" },
+};
+
 vi.mock("../../../data/hooks/pages.js", () => ({
     usePageModel: () => ({ data: held.model, isPending: held.model === undefined, error: null }),
+    useSiteMap: (filter: { search?: string }) => ({
+        data: filter.search === "/lonely/" ? { pages: [{ nodes: { items: [orphan] } }] } : undefined,
+        isPending: false,
+    }),
 }));
 
 vi.mock("../../../data/hooks/runs.js", () => ({
@@ -185,5 +195,29 @@ describe("the page model tab", () => {
 
         expect(screen.getByText(said.hierarchy.front)).toBeDefined();
         expect(screen.getByText("Made with elementor, read only")).toBeDefined();
+    });
+
+    it("says why a page has no parent, with a way to its finding", () => {
+        tab({
+            ...unrenderedModel,
+            pageId: "p-orphan",
+            path: "/lonely/",
+            hierarchy: { parentId: "", parentPath: "", parentTitle: "", reason: "none", method: "" },
+        });
+
+        const parent = within(pane(said.hierarchy.title));
+        expect(parent.getByText(copy.map.why.sentences.crumb_unresolved({ crumb: "/gone/" }))).toBeDefined();
+        expect(parent.getByRole("link", { name: copy.map.why.finding }).getAttribute("href")).toContain("under=p-orphan");
+    });
+
+    it("keeps the plain sentence when the map says nothing of the page", () => {
+        tab({
+            ...unrenderedModel,
+            pageId: "p-other",
+            path: "/other/",
+            hierarchy: { parentId: "", parentPath: "", parentTitle: "", reason: "none", method: "" },
+        });
+
+        expect(within(pane(said.hierarchy.title)).getByText(said.hierarchy.top)).toBeDefined();
     });
 });

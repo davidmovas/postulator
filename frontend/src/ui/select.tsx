@@ -28,6 +28,7 @@ export interface SelectProps<T extends string> {
     invalid?: boolean;
     size?: ControlSize;
     quiet?: boolean;
+    title?: string;
     "aria-label"?: string;
     "aria-describedby"?: string;
 }

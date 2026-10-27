@@ -22,6 +22,7 @@ export interface VirtualRowsProps {
     scrollKey?: string;
     footer?: ReactNode;
     onReachEnd?: () => void;
+    reveal?: number;
     className?: string;
 }
 
@@ -32,6 +33,7 @@ export function VirtualRows({
     scrollKey,
     footer,
     onReachEnd,
+    reveal,
     className,
 }: VirtualRowsProps): ReactElement {
     const viewport = useRef<HTMLDivElement>(null);
@@ -66,6 +68,13 @@ export function VirtualRows({
     const last = items.length === 0 ? -1 : items[items.length - 1].index;
 
     useEffect(() => {
+        if (reveal === undefined || reveal < 0 || reveal >= count) {
+            return;
+        }
+        virtualizer.scrollToIndex(reveal, { align: "auto" });
+    }, [reveal, virtualizer]);
+
+    useEffect(() => {
         if (onReachEnd === undefined || !nearingEnd(last, count, reachThreshold) || asked.current === count) {
             return;
         }
@@ -76,6 +85,7 @@ export function VirtualRows({
     return (
         <div
             ref={viewport}
+            data-virtual-rows={true}
             onScroll={remember}
             className={cx("min-h-0 flex-1 overflow-auto", className)}
         >

@@ -1,11 +1,12 @@
 import type { InfiniteData, QueryClient, QueryKey } from "@tanstack/react-query";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { Cursor, List } from "../../lib/paging.js";
 import { quietMeta } from "../client.js";
 import {
     acceptCard,
     addEdge,
+    adoptParents,
     applyProposals,
     approveEdge,
     createEntity,
@@ -26,9 +27,10 @@ import {
     updateEntity,
 } from "../endpoints/graph.js";
 import { keys } from "../keys.js";
+import { useLockGate } from "../lock.js";
 import { useUnlockedInfinite, useUnlockedQuery } from "../query.js";
 import type { EntitySort } from "../sorts.js";
-import type { CardProposal, Edge, EdgeFilter, Entity, EntityFilter } from "../types.js";
+import type { AdoptParentsResponse, CardProposal, Edge, EdgeFilter, Entity, EntityFilter } from "../types.js";
 
 type EdgePages = InfiniteData<List<Edge>, Cursor | undefined>;
 type FullGraph = Awaited<ReturnType<typeof loadGraph>>;
@@ -241,6 +243,55 @@ export function useApplyProposals() {
 
 export function useRecomputeScores() {
     return useGraphBatch((request: Parameters<typeof recomputeScores>[0], signal?: AbortSignal) => recomputeScores(request, signal));
+}
+
+export const adoptionLimit = 100;
+
+export function useAdoptionPreview(siteId: string, under: string, enabled: boolean) {
+    const gate = useLockGate();
+    return useInfiniteQuery({
+        queryKey: keys.graph.adoption(siteId, under),
+        enabled: enabled && siteId !== "" && gate.ready && !gate.locked,
+        initialPageParam: undefined as Cursor | undefined,
+        queryFn: ({ pageParam, signal }) =>
+            adoptParents(
+                {
+                    siteId,
+                    limit: adoptionLimit,
+                    ...(under === "" ? {} : { under }),
+                    ...(pageParam === undefined ? {} : { cursor: pageParam }),
+                },
+                signal,
+            ),
+        getNextPageParam: (last: AdoptParentsResponse) =>
+            last.steps.hasMore && last.steps.nextCursor !== undefined ? last.steps.nextCursor : undefined,
+        getPreviousPageParam: () => undefined,
+        refetchOnWindowFocus: false,
+        gcTime: 0,
+    });
+}
+
+export function useAdoptParents() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: { siteId: string; under: string; hash: string }) =>
+            adoptParents({
+                siteId: request.siteId,
+                hash: request.hash,
+                apply: true,
+                limit: 1,
+                ...(request.under === "" ? {} : { under: request.under }),
+            }),
+        meta: quietMeta(["CONFLICT"]),
+        onSettled: (_answered, _thrown, request) => {
+            void client.invalidateQueries({ queryKey: keys.graph.root() });
+            void client.invalidateQueries({ queryKey: keys.pages.lists() });
+            void client.invalidateQueries({ queryKey: keys.reports.site(request.siteId) });
+            for (const key of mappingMoves) {
+                void client.invalidateQueries({ queryKey: key });
+            }
+        },
+    });
 }
 
 export const cardProposalsLimit = 100;

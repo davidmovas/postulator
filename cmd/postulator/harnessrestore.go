@@ -62,10 +62,12 @@ func repopulate(ctx context.Context, core *app.Core, site *wptest.Server) error 
 	if err != nil {
 		return err
 	}
-	if len(listed.Items) == 0 {
-		return nil
+	for i := range listed.Items {
+		if listed.Items[i].Name == siteName {
+			return placeOnSite(ctx, core, site, listed.Items[i].ID)
+		}
 	}
-	return placeOnSite(ctx, core, site, listed.Items[0].ID)
+	return nil
 }
 
 func placeOnSite(ctx context.Context, core *app.Core, site *wptest.Server, siteID string) error {

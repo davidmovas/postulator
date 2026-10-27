@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultQuery, filterOf, narrowed, readQuery, readTab, searchOf, withTab, writeQuery } from "./params.js";
+import { activeFilters, defaultQuery, facetsOf, filterOf, narrowed, readQuery, readTab, searchOf, withTab, writeQuery } from "./params.js";
 
 describe("readQuery", () => {
     it("reads every filter the list endpoint supports", () => {
@@ -11,8 +11,19 @@ describe("readQuery", () => {
             descendants: true,
             unmapped: true,
             pathPrefix: "/shop/",
+            typeId: "",
+            body: "",
+            findings: false,
+            branch: "",
+            search: "",
             sort: { field: "path", desc: true },
         });
+    });
+
+    it("reads the type, the text, the findings, the branch and the search", () => {
+        const query = readQuery(new URLSearchParams("type=t1&text=without&findings=1&branch=p1&q=mugs"));
+        expect(query).toMatchObject({ typeId: "t1", body: "without", findings: true, branch: "p1", search: "mugs" });
+        expect(readQuery(new URLSearchParams("text=maybe")).body).toBe("");
     });
 
     it("drops a status that is not in the vocabulary", () => {
@@ -41,6 +52,11 @@ describe("writeQuery", () => {
             descendants: true,
             unmapped: true,
             pathPrefix: "/a/",
+            typeId: "t1",
+            body: "with" as const,
+            findings: true,
+            branch: "p1",
+            search: "mugs",
             sort: { field: "createdAt" as const, desc: false },
         };
         expect(readQuery(writeQuery(query))).toStrictEqual(query);
@@ -53,6 +69,7 @@ describe("writeQuery", () => {
 
     it("writes every filter under its own key, in the order the address has always had", () => {
         const query = {
+            ...defaultQuery,
             status: "published",
             entityId: "e1",
             descendants: true,
@@ -83,6 +100,17 @@ describe("filterOf", () => {
         });
         expect(filterOf("site", { ...defaultQuery, descendants: true })).toStrictEqual({ siteId: "site" });
     });
+
+    it("carries the type, the text, the findings, the branch and a trimmed search", () => {
+        expect(
+            filterOf("site", { ...defaultQuery, typeId: "t1", body: "without", findings: true, branch: "p1", search: "  mugs " }),
+        ).toStrictEqual({ siteId: "site", pageTypeId: "t1", body: "without", findings: true, under: "p1", search: "mugs" });
+        expect(filterOf("site", { ...defaultQuery, search: "   " })).toStrictEqual({ siteId: "site" });
+    });
+
+    it("hands the facets of a filter to a selection without its site", () => {
+        expect(facetsOf({ siteId: "site", status: "planned", findings: true })).toStrictEqual({ status: "planned", findings: true });
+    });
 });
 
 describe("narrowed", () => {
@@ -90,6 +118,11 @@ describe("narrowed", () => {
         expect(narrowed(defaultQuery)).toBe(false);
         expect(narrowed({ ...defaultQuery, unmapped: true })).toBe(true);
         expect(narrowed({ ...defaultQuery, sort: { field: "path", desc: true } })).toBe(false);
+    });
+
+    it("counts the filters in use, never the sort", () => {
+        expect(activeFilters(defaultQuery)).toBe(0);
+        expect(activeFilters({ ...defaultQuery, typeId: "t1", findings: true, search: "mug", sort: { field: "path", desc: true } })).toBe(3);
     });
 });
 

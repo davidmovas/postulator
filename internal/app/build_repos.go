@@ -30,6 +30,7 @@ type repos struct {
 	findings      *sqlite.FindingRepo
 	pageTypes     *sqlite.PageTypeRepo
 	scopes        *sqlite.FieldScopeRepo
+	rules         *sqlite.PageTypeRuleRepo
 	templates     *sqlite.TemplateRepo
 	overrides     *sqlite.ModelCatalogRepo
 	profiles      *sqlite.ModelProfileRepo
@@ -42,6 +43,7 @@ type repos struct {
 	mappings      *sqlite.ImportMappingRepo
 	schedules     *sqlite.ScheduleRepo
 	actions       *sqlite.PendingActionRepo
+	plans         *sqlite.PlanRepo
 	conversations *sqlite.ConversationRepo
 	messages      *sqlite.MessageRepo
 	toolCalls     *sqlite.ToolCallRepo
@@ -86,6 +88,7 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		findings:      sqlite.NewFindingRepo(store),
 		pageTypes:     sqlite.NewPageTypeRepo(store),
 		scopes:        sqlite.NewFieldScopeRepo(store),
+		rules:         sqlite.NewPageTypeRuleRepo(store),
 		templates:     sqlite.NewTemplateRepo(store),
 		overrides:     sqlite.NewModelCatalogRepo(store),
 		profiles:      sqlite.NewModelProfileRepo(store),
@@ -98,6 +101,7 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		mappings:      sqlite.NewImportMappingRepo(store),
 		schedules:     sqlite.NewScheduleRepo(store),
 		actions:       sqlite.NewPendingActionRepo(store),
+		plans:         sqlite.NewPlanRepo(store),
 		conversations: sqlite.NewConversationRepo(store),
 		messages:      sqlite.NewMessageRepo(store),
 		toolCalls:     sqlite.NewToolCallRepo(store),

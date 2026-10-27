@@ -11,6 +11,7 @@ import type {
     LlmModels,
     ObserveModels,
     PagesModels,
+    PageTypeDomainModels,
     PageTypesModels,
     ReportsModels,
     RunDomainModels,
@@ -23,6 +24,7 @@ import type {
     SyncModels,
     TemplateDomainModels,
     TemplatesModels,
+    ToolsModels,
     TransportModels,
 } from "../lib/api.js";
 import type { Wire } from "./wire.js";
@@ -44,6 +46,14 @@ export type PageLink = Wire<PagesModels.PageLink>;
 export type PageTreeNode = Wire<PagesModels.TreeNode>;
 export type PreviewLink = Wire<PagesModels.PreviewLinkResponse>;
 export type PageFilter = ListFilter<PagesModels.ListRequest>;
+export type PageCountRequest = PagesModels.CountRequest;
+export type PageSelection = PagesModels.Selection;
+export type PageFacets = PagesModels.PageFilter;
+export type PageSubtree = PagesModels.Subtree;
+export type SetTypesRequest = PagesModels.SetTypesRequest;
+export type SetTypesResponse = Wire<PagesModels.SetTypesResponse>;
+export type SetTemplatesRequest = PagesModels.SetTemplatesRequest;
+export type SetTemplatesResponse = Wire<PagesModels.SetTemplatesResponse>;
 
 export type PageModel = Wire<ObserveModels.ModelView>;
 export type ModelIdentity = Wire<ObserveModels.IdentityView>;
@@ -75,11 +85,13 @@ export type ResolveFindingsResponse = Wire<FindingsModels.ResolveManyResponse>;
 export type SiteMapView = Wire<SiteModelModels.MapView>;
 export type SiteMapNode = Wire<ContextPackModels.MapNode>;
 export type SiteMapRef = Wire<ContextPackModels.Ref>;
+export type ParentWhy = Wire<ContextPackModels.ParentWhy>;
 export type SiteMapFilter = Omit<SiteModelModels.MapRequest, "cursor" | "limit">;
 
 export type WriterPack = Wire<SiteModelModels.PackView>;
 export type WriterPackSection = Wire<SiteModelModels.Section>;
 export type WriterPackDrop = Wire<SiteModelModels.Drop>;
+export type WriterDirections = Pick<SiteModelModels.PackRequest, "brief" | "directive" | "runId">;
 
 export type Entity = Wire<GraphModels.Entity>;
 export type Edge = Wire<GraphModels.Edge>;
@@ -95,6 +107,9 @@ export type EdgeFilter = ListFilter<GraphModels.ListEdgesRequest>;
 export type CardProposal = Wire<GraphModels.CardProposal>;
 export type ProposedCard = Wire<GraphModels.Card>;
 export type CardFact = Wire<GraphModels.Fact>;
+export type Adoption = Wire<GraphModels.AdoptionView>;
+export type AdoptParentsRequest = GraphModels.AdoptParentsRequest;
+export type AdoptParentsResponse = Wire<GraphModels.AdoptParentsResponse>;
 
 export type Template = Wire<TemplatesModels.Template>;
 export type TemplateOverride = Wire<TemplatesModels.Override>;
@@ -108,6 +123,20 @@ export type FieldScope = Wire<PageTypesModels.Scope>;
 export type CatalogField = Wire<PageTypesModels.Field>;
 export type PageTypeList = Wire<PageTypesModels.ListResponse>;
 export type SetScopeRequest = Wire<PageTypesModels.SetScopeRequest>;
+export type Rule = Wire<PageTypesModels.Rule>;
+export type RuleConditions = PageTypeDomainModels.Conditions;
+export type RuleURL = PageTypeDomainModels.URLMatch;
+export type RuleList = Wire<PageTypesModels.RulesResponse>;
+export type SaveRuleRequest = PageTypesModels.SaveRuleRequest;
+export type ClassificationPreview = Wire<PageTypesModels.PreviewResponse>;
+export type ClassificationGroup = Wire<PageTypesModels.PreviewGroup>;
+export type ClassificationGroupKey = PageTypesModels.GroupKey;
+export type ClassificationPage = Wire<PageTypesModels.PreviewPage>;
+export type ClassificationPagesFilter = ListFilter<PageTypesModels.PreviewPagesRequest>;
+export type ApplyClassificationResponse = Wire<PageTypesModels.ApplyResponse>;
+export type TestRuleRequest = PageTypesModels.TestRuleRequest;
+export type RuleTest = Wire<PageTypesModels.TestRuleResponse>;
+export type PageFacts = Wire<PageTypesModels.FactsView>;
 export type MetaRules = Wire<TemplateDomainModels.MetaRules>;
 export type KeywordRules = Wire<TemplateDomainModels.KeywordRules>;
 export type StepSpec = Wire<TemplateDomainModels.StepSpec>;
@@ -121,6 +150,9 @@ export type RunEventRow = Wire<RunsModels.Event>;
 export type RunFilter = ListFilter<RunsModels.ListRequest>;
 export type RunItemFilter = ListFilter<RunsModels.ListItemsRequest>;
 export type RunStartRequest = RunsModels.StartRequest;
+export type RunBrief = RunDomainModels.Brief;
+export type RunDirective = RunDomainModels.Directive;
+export type RunMustLink = RunDomainModels.MustLink;
 export type Budget = Wire<RunDomainModels.Budget>;
 export type Estimate = Wire<RunDomainModels.Estimate>;
 export type RunTotals = Wire<RunDomainModels.Stats>;
@@ -131,6 +163,10 @@ export type PendingAction = Wire<AgentModels.PendingAction>;
 export type ConversationFilter = ListFilter<AgentModels.ListConversationsRequest>;
 export type MessageFilter = ListFilter<AgentModels.ListMessagesRequest>;
 export type PendingActionFilter = ListFilter<AgentModels.ListPendingActionsRequest>;
+export type Plan = Wire<ToolsModels.PlanView>;
+export type PlanStep = Wire<ToolsModels.PlanStepView>;
+export type PlanStepEdit = Wire<ToolsModels.EditView>;
+export type PlanStepChoice = AgentModels.StepChoice;
 
 export type Schedule = Wire<SchedulesModels.Schedule>;
 export type ScheduleFilter = ListFilter<SchedulesModels.ListRequest>;

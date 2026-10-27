@@ -11,9 +11,20 @@ export function pageTypesOf(siteId: string): string {
     return `${pageTypesPath}?site=${encodeURIComponent(siteId)}`;
 }
 
+export function pageTypeOf(siteId: string, typeId: string): string {
+    return `${pageTypesOf(siteId)}&type=${encodeURIComponent(typeId)}`;
+}
+
+export const classificationPath = "/settings/classification";
+
+export function classificationOf(siteId: string): string {
+    return `${classificationPath}?site=${encodeURIComponent(siteId)}`;
+}
+
 export const settingsTabs: readonly TabItem<SettingsTabKey>[] = [
     { key: "models", label: copy.settings.tabs.models, to: settingsHome },
     { key: "types", label: copy.settings.tabs.types, to: pageTypesPath },
+    { key: "classification", label: copy.settings.tabs.classification, to: classificationPath },
     { key: "runs", label: copy.settings.tabs.runs, to: "/settings/runs" },
     { key: "agent", label: copy.settings.tabs.agent, to: "/settings/agent" },
     { key: "browser", label: copy.settings.tabs.browser, to: browserSettingsPath },

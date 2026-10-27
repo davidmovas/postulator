@@ -10,11 +10,15 @@ const usage = `postulator ui screenshots
       [--width 1280] [--height 820] [--wait 800] [--site <id>]
       [--clip "<x>,<y>,<w>,<h>"]
       [--click "<css>"] [--type "<css>=<text>"] [--key "<Key>"] [--fits "<css>"]
+      [--expect "<css>"]
 
   node scripts/shot.mjs --port 9222 --routes scripts/routes.json --out-dir shots
+      [--from <name>] [--until <name>] [--dock]
 
 A walk closes the agent dock and reloads once before its first shot, so the
-set does not depend on what the last session left open.
+set does not depend on what the last session left open. --from starts the walk
+at the named shot and --until stops it after the named one, and --dock opens
+the dock after that reload, for a walk started past the shots that open it.
 
 The window is the one "task ui:run" started; it is reached over the DevTools
 protocol and never launched here. --click, --type and --key are applied in the
@@ -22,7 +26,15 @@ order they are written on the command line, after the route has settled.
 
 A route containing :siteId is resolved from --site when it is given. Otherwise
 the script opens #/sites and reads the first [data-site-id] row of the table,
-so the seeded site does not have to be known in advance.
+so the seeded site does not have to be known in advance. A routes.json entry
+with "siteName" takes the row whose [data-site-name] is that name instead.
+
+An entry with "timed": "<css>" reports how long the window took from the
+route's navigation to the first visible match, and a step
+{"timed": "<label>", "click": "<css>", "until": "<css>"} reports how long a
+click took to show its first match. A step {"scroll": "<css>", "label"} scrolls
+the named list through 60 frames and reports the average and the worst frame.
+Neither is asserted: the numbers are printed as "timed" and "scroll" lines.
 
 --clip writes the named rectangle of the viewport at 1:1 instead of the whole
 window, which is how a strip is judged at pixel scale.
@@ -31,10 +43,17 @@ window, which is how a strip is judged at pixel scale.
 scrolls, holds content wider than itself: the proof that a screen fits its
 panel rather than scrolling sideways.
 
+--expect waits up to 15 s for the named element and fails the shot when it
+never appears; in routes.json an expect step may add "count", the exact number
+of matches to wait for, and "timeout" in milliseconds.
+
 routes.json is an array of
-  { "name", "route", "width", "height", "wait", "site", "clip",
+  { "name", "route", "width", "height", "wait", "site", "siteName", "clip", "timed",
     "steps": [ {"click": "<css>"}, {"type": "<css>=<text>"},
-               {"key": "Control+K"}, {"wait": 500}, {"fits": "<css>"} ] }
+               {"key": "Control+K"}, {"wait": 500}, {"fits": "<css>"},
+               {"expect": "<css>", "count": 2, "timeout": 15000},
+               {"timed": "<label>", "click": "<css>", "until": "<css>"},
+               {"scroll": "<css>", "label": "<label>"} ] }
 and each name becomes <out-dir>/<name>.png.`;
 
 const flags = new Set([
@@ -52,6 +71,9 @@ const flags = new Set([
     "--type",
     "--key",
     "--fits",
+    "--expect",
+    "--from",
+    "--until",
 ]);
 
 function parse(argv) {
@@ -60,6 +82,10 @@ function parse(argv) {
         const flag = argv[index];
         if (flag === "--help" || flag === "-h") {
             return { help: true, steps: [] };
+        }
+        if (flag === "--dock") {
+            options.dock = true;
+            continue;
         }
         if (!flags.has(flag)) {
             throw new Error(`unknown flag ${flag}`);
@@ -111,6 +137,15 @@ function parse(argv) {
                 break;
             case "--fits":
                 options.steps.push({ fits: value });
+                break;
+            case "--expect":
+                options.steps.push({ expect: value });
+                break;
+            case "--from":
+                options.from = value;
+                break;
+            case "--until":
+                options.until = value;
                 break;
             default:
                 throw new Error(`unhandled flag ${flag}`);
@@ -181,6 +216,60 @@ async function resolveSite(page, wait) {
     return id;
 }
 
+async function resolveNamed(page, name, wait) {
+    await go(page, "#/sites", wait);
+    const row = page.locator(`[data-site-id][data-site-name=${JSON.stringify(name)}]`).first();
+    await row.waitFor({ state: "attached", timeout: 15000 }).catch(() => {
+        throw new Error(`no site named ${name} is listed`);
+    });
+    const id = await row.getAttribute("data-site-id");
+    if (id === null || id === "") {
+        throw new Error(`the site named ${name} has no id`);
+    }
+    return id;
+}
+
+async function timedUntil(page, css, started, label) {
+    await page
+        .locator(css)
+        .first()
+        .waitFor({ state: "visible", timeout: 120000 })
+        .catch(() => {
+            throw new Error(`nothing matched ${css} within 120 s for ${label}`);
+        });
+    process.stdout.write(`timed ${label}: ${Date.now() - started} ms\n`);
+}
+
+async function scrolled(page, css, label) {
+    const measured = await page.evaluate(async (selector) => {
+        const list = document.querySelector(selector);
+        if (list === null) {
+            return null;
+        }
+        const gaps = [];
+        let last = performance.now();
+        for (let frame = 0; frame < 60; frame += 1) {
+            list.scrollTop += 240;
+            await new Promise((done) => {
+                requestAnimationFrame(() => {
+                    done(undefined);
+                });
+            });
+            const now = performance.now();
+            gaps.push(now - last);
+            last = now;
+        }
+        const total = gaps.reduce((sum, gap) => sum + gap, 0);
+        return { frames: gaps.length, average: total / gaps.length, worst: Math.max(...gaps), reached: list.scrollTop };
+    }, css);
+    if (measured === null) {
+        throw new Error(`nothing matched ${css} to scroll for ${label}`);
+    }
+    process.stdout.write(
+        `scroll ${label}: ${measured.frames} frames, ${measured.average.toFixed(1)} ms on average, ${measured.worst.toFixed(1)} ms at worst, ${Math.round(measured.reached)} px down\n`,
+    );
+}
+
 async function fits(page, css) {
     const sideways = await page.evaluate((selector) => {
         const root = document.querySelector(selector);
@@ -204,8 +293,45 @@ async function fits(page, css) {
     }
 }
 
+async function expectIn(page, step) {
+    const timeout = step.timeout ?? 15000;
+    const matches = page.locator(step.expect);
+    if (step.count === undefined) {
+        await matches
+            .first()
+            .waitFor({ state: "attached", timeout })
+            .catch(() => {
+                throw new Error(`nothing matched ${step.expect} within ${timeout} ms`);
+            });
+        return;
+    }
+    const deadline = Date.now() + timeout;
+    let found = await matches.count();
+    while (found !== step.count && Date.now() < deadline) {
+        await page.waitForTimeout(200);
+        found = await matches.count();
+    }
+    if (found !== step.count) {
+        throw new Error(`${found} elements matched ${step.expect} after ${timeout} ms, want ${step.count}`);
+    }
+}
+
 async function apply(page, steps) {
     for (const step of steps) {
+        if (step.timed !== undefined) {
+            if (step.click === undefined || step.until === undefined) {
+                throw new Error(`a timed step needs a click and an until: ${JSON.stringify(step)}`);
+            }
+            await page.bringToFront();
+            const started = Date.now();
+            await page.click(step.click);
+            await timedUntil(page, step.until, started, step.timed);
+            continue;
+        }
+        if (step.scroll !== undefined) {
+            await scrolled(page, step.scroll, step.label ?? step.scroll);
+            continue;
+        }
         if (step.click !== undefined) {
             await page.bringToFront();
             await page.click(step.click);
@@ -231,7 +357,11 @@ async function apply(page, steps) {
             await fits(page, step.fits);
             continue;
         }
-        throw new Error(`a step names none of click, type, key, wait or fits: ${JSON.stringify(step)}`);
+        if (step.expect !== undefined) {
+            await expectIn(page, step);
+            continue;
+        }
+        throw new Error(`a step names none of timed, scroll, click, type, key, wait, fits or expect: ${JSON.stringify(step)}`);
     }
 }
 
@@ -249,13 +379,20 @@ async function rest(page) {
     await page.waitForTimeout(1200);
 }
 
-async function shoot(page, shot, resolveSiteId) {
+async function shoot(page, shot, resolveSiteId, resolveNamedId) {
     await page.keyboard.press("Escape");
     await page.waitForTimeout(200);
-    const route = shot.route.includes(":siteId")
-        ? shot.route.replaceAll(":siteId", shot.site ?? (await resolveSiteId(shot.wait)))
-        : shot.route;
+    const siteId = () =>
+        shot.site ?? (shot.siteName === undefined ? resolveSiteId(shot.wait) : resolveNamedId(shot.siteName, shot.wait));
+    const route = shot.route.includes(":siteId") ? shot.route.replaceAll(":siteId", await siteId()) : shot.route;
     await page.setViewportSize({ width: shot.width, height: shot.height });
+    if (shot.timed !== undefined) {
+        const started = Date.now();
+        await page.evaluate((hash) => {
+            window.location.hash = hash;
+        }, hashOf(route));
+        await timedUntil(page, shot.timed, started, shot.name);
+    }
     await go(page, route, shot.wait);
     await apply(page, shot.steps);
     await mkdir(dirname(shot.out), { recursive: true });
@@ -272,6 +409,7 @@ async function planned(options) {
         }
         return [
             {
+                name: options.out,
                 route: options.route,
                 out: options.out,
                 width: options.width,
@@ -286,21 +424,33 @@ async function planned(options) {
     if (options.outDir === undefined) {
         throw new Error("--routes needs --out-dir");
     }
-    const listed = JSON.parse(await readFile(resolve(options.routes), "utf8"));
-    if (!Array.isArray(listed)) {
+    const read = JSON.parse(await readFile(resolve(options.routes), "utf8"));
+    if (!Array.isArray(read)) {
         throw new Error(`${options.routes} must hold an array of routes`);
     }
+    const first = options.from === undefined ? 0 : read.findIndex((entry) => entry.name === options.from);
+    if (first < 0) {
+        throw new Error(`no route in ${options.routes} is named ${options.from}`);
+    }
+    const last = options.until === undefined ? read.length - 1 : read.findIndex((entry) => entry.name === options.until);
+    if (last < 0) {
+        throw new Error(`no route in ${options.routes} is named ${options.until}`);
+    }
+    const listed = read.slice(first, last + 1);
     return listed.map((entry) => {
         if (typeof entry.name !== "string" || typeof entry.route !== "string") {
             throw new Error(`a route entry needs a name and a route: ${JSON.stringify(entry)}`);
         }
         return {
+            name: entry.name,
             route: entry.route,
             out: join(options.outDir, `${entry.name}.png`),
             width: entry.width ?? options.width,
             height: entry.height ?? options.height,
             wait: entry.wait ?? options.wait,
             site: entry.site ?? options.site,
+            siteName: entry.siteName,
+            timed: entry.timed,
             clip: entry.clip ?? options.clip,
             steps: entry.steps ?? [],
         };
@@ -320,12 +470,29 @@ async function main() {
         seeded ??= await resolveSite(page, wait);
         return seeded;
     };
+    const named = new Map();
+    const resolverByName = async (name, wait) => {
+        if (!named.has(name)) {
+            named.set(name, await resolveNamed(page, name, wait));
+        }
+        return named.get(name);
+    };
     try {
         if (options.routes !== undefined) {
             await rest(page);
+            if (options.dock === true) {
+                await go(page, "#/sites", 800);
+                const expand = page.locator('[aria-label="Expand the agent dock"]');
+                if ((await expand.count()) > 0) {
+                    await page.bringToFront();
+                    await expand.first().click();
+                }
+                await expectIn(page, { expect: "[data-agent-dock]" });
+                await page.waitForTimeout(900);
+            }
         }
         for (const shot of shots) {
-            await shoot(page, shot, resolver);
+            await shoot(page, shot, resolver, resolverByName);
         }
     } finally {
         await browser.close();

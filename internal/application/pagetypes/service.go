@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	reasonLastOfPreset     = "last_of_preset"
+	reasonLastOfRole       = "last_of_role"
 	reasonReadOnlyRole     = "role_read_only"
 	reasonExcerptOnProduct = "excerpt_is_short_description"
 	reasonPersonOnly       = "field_not_ai_written"
@@ -39,6 +39,7 @@ type scopeStore interface {
 }
 
 type pageStore interface {
+	Get(ctx context.Context, id string) (pagemap.Page, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
 	ReassignType(ctx context.Context, fromTypeID, toTypeID string, reason pagemap.TypeReason, at time.Time) (int64, error)
 }
@@ -59,6 +60,7 @@ type unitOfWork interface {
 type Deps struct {
 	Types      typeStore
 	Scopes     scopeStore
+	Rules      ruleStore
 	Pages      pageStore
 	Templates  templateReader
 	Sites      siteReader
@@ -94,7 +96,7 @@ func (s *Service) Seed(ctx context.Context, siteID string) error {
 			return err
 		}
 		now := s.now()
-		for i, preset := range pagetype.Presets() {
+		for i, preset := range pagetype.Seeded() {
 			var templateID *string
 			if owner.Defaults.TemplateID == nil {
 				if templateID, err = s.builtIn(c, preset); err != nil {
@@ -109,7 +111,7 @@ func (s *Service) Seed(ctx context.Context, siteID string) error {
 				return insertErr
 			}
 		}
-		return nil
+		return s.seedRules(c, siteID)
 	})
 }
 
@@ -175,15 +177,28 @@ func (s *Service) views(ctx context.Context, siteID string) ([]Type, error) {
 		return nil, err
 	}
 	set := pagetype.NewSet(types, scopes)
-	counts := make(map[string]int, len(types))
+	counts := make(map[string]typeCounts, len(types))
 	for i := range pages {
-		if pages[i].Status != pagemap.StatusArchived {
-			counts[set.TypeOf(pages[i]).ID]++
+		if pages[i].Status == pagemap.StatusArchived {
+			continue
 		}
+		typeID := set.TypeOf(pages[i]).ID
+		held := counts[typeID]
+		held.pages++
+		if pages[i].TemplateID != nil {
+			held.overrides++
+		}
+		counts[typeID] = held
 	}
 	out := make([]Type, 0, len(types))
 	for i := range types {
-		out = append(out, typeView(types[i], set, scopes, counts[types[i].ID]))
+		var suggested *string
+		if types[i].TemplateID == nil && types[i].Preset.Writable() {
+			if suggested, err = s.builtIn(ctx, types[i].Preset); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, typeView(types[i], set, scopes, counts[types[i].ID], suggested))
 	}
 	return out, nil
 }
@@ -313,12 +328,15 @@ func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse
 			return listErr
 		}
 		if !hasAnother(siblings, kind) {
-			return errors.New(errors.Invalid, "the last type of the "+kind.Preset.DefaultName()+" preset cannot be deleted").
-				WithDetail("field", "id").WithDetail("reason", reasonLastOfPreset)
+			return errors.New(errors.Invalid, "the last type of the "+string(kind.Preset.Role())+" role cannot be deleted").
+				WithDetail("field", "id").WithDetail("reason", reasonLastOfRole)
 		}
 		var reassignErr error
 		if moved, reassignErr = s.deps.Pages.ReassignType(c, kind.ID, target.ID, pagemap.TypeByUser, s.now()); reassignErr != nil {
 			return reassignErr
+		}
+		if repointErr := s.repointRules(c, kind.SiteID, kind.ID, target); repointErr != nil {
+			return repointErr
 		}
 		return s.deps.Types.Delete(c, kind.ID)
 	})
@@ -336,7 +354,7 @@ func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse
 
 func hasAnother(types []pagetype.Type, kind pagetype.Type) bool {
 	for i := range types {
-		if types[i].ID != kind.ID && types[i].Preset == kind.Preset {
+		if types[i].ID != kind.ID && types[i].Preset.Role() == kind.Preset.Role() {
 			return true
 		}
 	}
@@ -367,7 +385,7 @@ func (s *Service) SetScope(ctx context.Context, req SetScopeRequest) (Scope, err
 			return errors.New(errors.Invalid, "the "+string(scope.Key)+" is set by the site or a person, never written by the AI").
 				WithDetail("field", "aiWrites").WithDetail("reason", reasonPersonOnly)
 		}
-		if scope.Key == field.Excerpt && kind.Preset == pagetype.Product {
+		if scope.Key == field.Excerpt && kind.Preset.Role() == pagetype.RoleProduct {
 			return errors.New(errors.Invalid, "a product's excerpt is its short description, which has a scope of its own").
 				WithDetail("field", "field").WithDetail("reason", reasonExcerptOnProduct)
 		}

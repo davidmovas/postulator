@@ -121,6 +121,14 @@ type MoveEntityResponse struct {
 	RemovedEdgeIDs []string `json:"removedEdgeIds"`
 }
 
+type GetEdgeRequest struct {
+	ID string `json:"id" description:"Edge id"`
+}
+
+type GetEdgeResponse struct {
+	Edge Edge `json:"edge"`
+}
+
 type DeleteEdgeRequest struct {
 	ID string `json:"id" description:"Edge id"`
 }

@@ -190,7 +190,30 @@ func (s *Service) previewFromPages(ctx context.Context, rawSiteID string, pageID
 			})
 		}
 	}
-	return response, nil
+	return response, s.treeParents(ctx, siteID, response.Entities)
+}
+
+func (s *Service) treeParents(ctx context.Context, siteID string, proposals []ProposedEntity) error {
+	if s.maps == nil {
+		return nil
+	}
+	tree, err := s.maps.Map(ctx, siteID)
+	if err != nil {
+		return err
+	}
+	inBatch := make(map[string]struct{}, len(proposals))
+	for i := range proposals {
+		inBatch[proposals[i].PageID] = struct{}{}
+	}
+	for i := range proposals {
+		if proposals[i].Parent != "" || proposals[i].ParentEntityID != "" {
+			continue
+		}
+		if parent, found := tree.ProposalParent(proposals[i].PageID, inBatch); found {
+			proposals[i].Parent, proposals[i].ParentEntityID = parent.Path, parent.EntityID
+		}
+	}
+	return nil
 }
 
 func proposedKeywords(own keyword.List, primary string, secondary []string) []dto.Keyword {

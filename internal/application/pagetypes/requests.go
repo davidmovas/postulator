@@ -1,6 +1,69 @@
 package pagetypes
 
-import "github.com/davidmovas/postulator/internal/domain/field"
+import (
+	"github.com/davidmovas/postulator/internal/domain/field"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/kernel/dto"
+)
+
+type ListRulesRequest struct {
+	SiteID string `json:"siteId"`
+}
+
+type RulesResponse struct {
+	Rules    []Rule `json:"rules"`
+	Fallback *Rule  `json:"fallback"`
+}
+
+type SaveRuleRequest struct {
+	ID         string              `json:"id,omitempty"`
+	SiteID     string              `json:"siteId"`
+	Name       string              `json:"name"`
+	Enabled    bool                `json:"enabled"`
+	TypeID     string              `json:"typeId"`
+	Conditions pagetype.Conditions `json:"conditions"`
+}
+
+type DeleteRuleRequest struct {
+	ID string `json:"id"`
+}
+
+type DeleteRuleResponse struct{}
+
+type PreviewRequest struct {
+	SiteID string `json:"siteId"`
+}
+
+type PreviewPagesRequest struct {
+	SiteID string `json:"siteId"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Status string `json:"status"`
+	dto.ListRequest
+}
+
+type GroupKey struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+type ApplyRequest struct {
+	SiteID string     `json:"siteId"`
+	Hash   string     `json:"hash"`
+	Groups []GroupKey `json:"groups"`
+}
+
+type TestRuleRequest struct {
+	SiteID string           `json:"siteId"`
+	PageID string           `json:"pageId"`
+	RuleID string           `json:"ruleId,omitempty"`
+	Rule   *SaveRuleRequest `json:"rule,omitempty"`
+}
+
+type ReorderRulesRequest struct {
+	SiteID  string   `json:"siteId"`
+	RuleIDs []string `json:"ruleIds"`
+}
 
 type ListRequest struct {
 	SiteID string `json:"siteId"`

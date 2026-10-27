@@ -88,6 +88,8 @@ export const findingCodes = [
     "row_ambiguous",
     "row_without_page",
     "page_without_entity",
+    "type_by_default",
+    "entity_parent_differs",
 ] as const;
 export type FindingCode = (typeof findingCodes)[number];
 
@@ -108,6 +110,8 @@ export const findingOptions = [
     "relink_page",
     "rescan",
     "propose_entity",
+    "adopt_tree",
+    "keep_graph",
 ] as const;
 export type FindingOption = (typeof findingOptions)[number];
 
@@ -117,6 +121,7 @@ export const findingBulkOptions: readonly FindingOption[] = [
     "accept_workbook",
     "set_type",
     "propose_entity",
+    "keep_graph",
 ];
 
 export const findingOptionKinds = ["model", "run", "proposal"] as const;
@@ -130,6 +135,22 @@ export type BodyState = (typeof bodyStates)[number];
 
 export const proposalClashes = ["", "no_name", "name_in_batch", "name_carried"] as const;
 export type ProposalClash = (typeof proposalClashes)[number];
+
+export const parentWhyReasons = [
+    "root",
+    "parent_archived",
+    "cycle_broken",
+    "crumb_ambiguous",
+    "crumb_unresolved",
+    "planned",
+    "render_failed",
+    "not_derived",
+    "no_signal",
+] as const;
+export type ParentWhyReason = (typeof parentWhyReasons)[number];
+
+export const adoptionSkips = ["loop", "name_taken"] as const;
+export type AdoptionSkip = (typeof adoptionSkips)[number];
 
 export const proposalSources = ["model", "site"] as const;
 export type ProposalSource = (typeof proposalSources)[number];
@@ -166,14 +187,58 @@ export const cannibalizationReasons = [
 export type CannibalizationReason = (typeof cannibalizationReasons)[number];
 
 export const pageTypePresets = [
-    "hub",
-    "entity",
+    "landing",
+    "category",
+    "guide",
+    "info",
     "product",
     "store_category",
     "catalog",
     "technical",
+    "hub",
+    "entity",
 ] as const;
 export type PageTypePreset = (typeof pageTypePresets)[number];
+
+export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
+export type PageTypeRole = (typeof pageTypeRoles)[number];
+
+export const ruleKinds = ["rule", "fallback"] as const;
+export type RuleKind = (typeof ruleKinds)[number];
+
+export const urlModes = ["prefix", "segment", "glob"] as const;
+export type URLMode = (typeof urlModes)[number];
+
+export const schemaTypes = [
+    "Article",
+    "BlogPosting",
+    "HowTo",
+    "FAQPage",
+    "AboutPage",
+    "ContactPage",
+    "CollectionPage",
+    "ItemList",
+] as const;
+export type SchemaType = (typeof schemaTypes)[number];
+
+export const ruleConditions = [
+    "postType",
+    "url",
+    "slug",
+    "ancestor",
+    "level",
+    "listing",
+    "schema",
+    "words",
+    "h2",
+    "technical",
+    "frontPage",
+    "shop",
+] as const;
+export type RuleCondition = (typeof ruleConditions)[number];
+
+export const ruleVerdicts = ["met", "unmet", "waiting", "blocked"] as const;
+export type RuleVerdict = (typeof ruleVerdicts)[number];
 
 export const pageTypeSources = ["", "auto", "manual"] as const;
 export type PageTypeSource = (typeof pageTypeSources)[number];
@@ -190,6 +255,8 @@ export const pageTypeReasons = [
     "user",
     "ai",
     "import",
+    "rule",
+    "unmatched",
 ] as const;
 export type PageTypeReason = (typeof pageTypeReasons)[number];
 
@@ -255,8 +322,11 @@ export const packFieldKeys: readonly FieldKey[] = [
     "image_title",
 ];
 
-export const exploreViews = ["tree", "links", "gaps", "pack"] as const;
-export type ExploreView = (typeof exploreViews)[number];
+export const treeShapes = ["roots", "children", "subtree", "ancestors", "siblings", "walk"] as const;
+export type TreeShape = (typeof treeShapes)[number];
+
+export const linksShapes = ["page", "section", "map", "owed", "orphans", "suggest"] as const;
+export type LinksShape = (typeof linksShapes)[number];
 
 export const siteGaps = ["planned", "empty", "unmapped", "orphan", "missing_links", "findings"] as const;
 export type SiteGap = (typeof siteGaps)[number];
@@ -442,6 +512,21 @@ export const toolRisksNeedingConfirmation: readonly ToolRisk[] = ["write", "dang
 export const toolCallStatuses = ["ok", "denied", "error"] as const;
 export type ToolCallStatus = (typeof toolCallStatuses)[number];
 
+export const planStatuses = ["proposed", "running", "done", "declined"] as const;
+export type PlanStatus = (typeof planStatuses)[number];
+
+export const planStepStatuses = [
+    "proposed",
+    "declined",
+    "pending",
+    "running",
+    "waiting",
+    "done",
+    "failed",
+    "skipped",
+] as const;
+export type PlanStepStatus = (typeof planStepStatuses)[number];
+
 export const importFields = [
     "path",
     "title",
@@ -534,7 +619,7 @@ export type SettingGroup = (typeof settingGroups)[number];
 export const entitySortFields = ["createdAt", "name"] as const;
 export type EntitySortField = (typeof entitySortFields)[number];
 
-export const pageSortFields = ["createdAt", "path"] as const;
+export const pageSortFields = ["createdAt", "path", "title"] as const;
 export type PageSortField = (typeof pageSortFields)[number];
 
 export const runSortFields = ["createdAt", "status"] as const;

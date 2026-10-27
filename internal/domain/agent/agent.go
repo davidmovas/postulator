@@ -176,6 +176,7 @@ type PendingAction struct {
 	Tool           string
 	Args           json.RawMessage
 	Summary        string
+	Risk           string
 	Status         ActionStatus
 	Result         json.RawMessage
 	Error          string

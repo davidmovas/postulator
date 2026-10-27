@@ -83,6 +83,9 @@ func (s *Service) CreateEntity(ctx context.Context, req CreateEntityRequest) (Cr
 	if doErr != nil {
 		return CreateEntityResponse{}, doErr
 	}
+	if movedErr := s.parentsMoved(ctx, entity.SiteID); movedErr != nil {
+		return CreateEntityResponse{}, movedErr
+	}
 	if publishErr := s.changed(entity.SiteID); publishErr != nil {
 		return CreateEntityResponse{}, publishErr
 	}
@@ -207,6 +210,9 @@ func (s *Service) DeleteEntity(ctx context.Context, req DeleteEntityRequest) (De
 	})
 	if err != nil {
 		return DeleteEntityResponse{}, err
+	}
+	if movedErr := s.parentsMoved(ctx, siteID); movedErr != nil {
+		return DeleteEntityResponse{}, movedErr
 	}
 	if publishErr := s.changed(siteID); publishErr != nil {
 		return DeleteEntityResponse{}, publishErr

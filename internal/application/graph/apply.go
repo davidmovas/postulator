@@ -62,6 +62,9 @@ func (s *Service) ApplyProposals(ctx context.Context, req ApplyProposalsRequest)
 	if len(response.Entities) == 0 && len(response.Edges) == 0 && response.Mapped == 0 {
 		return response, nil
 	}
+	if movedErr := s.parentsMoved(ctx, siteID); movedErr != nil {
+		return ApplyProposalsResponse{}, movedErr
+	}
 	if changedErr := s.changed(siteID); changedErr != nil {
 		return ApplyProposalsResponse{}, changedErr
 	}

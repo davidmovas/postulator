@@ -6,7 +6,7 @@ import { useTools } from "../../data/hooks/tools.js";
 import type { Tool } from "../../data/types.js";
 import { Drawer, EmptyState, Input, SearchIcon, SectionLabel, SkeletonRows, StatusBadge, toneClasses } from "../../ui/index.js";
 import type { Family } from "./conversation/model/tools.js";
-import { families, familyOf, verbOf } from "./conversation/model/tools.js";
+import { families, familyOf, toolLabel } from "./conversation/model/tools.js";
 import { familyIcon, familyLabel, riskLabel, riskTone } from "./labels.js";
 
 const familyOrder: readonly Family[] = [...families, "other"];
@@ -15,7 +15,8 @@ function grouped(tools: readonly Tool[], query: string): [Family, Tool[]][] {
     const needle = query.trim().toLowerCase();
     const buckets = new Map<Family, Tool[]>();
     for (const tool of tools) {
-        if (needle !== "" && !tool.name.toLowerCase().includes(needle) && !tool.description.toLowerCase().includes(needle)) {
+        const said = `${tool.name} ${toolLabel(tool.name)} ${tool.description}`.toLowerCase();
+        if (needle !== "" && !said.includes(needle)) {
             continue;
         }
         const family = familyOf(tool.name);
@@ -94,7 +95,7 @@ export function ToolsDrawer({ onClose }: ToolsDrawerProps): ReactElement {
                                             {held.map((tool) => (
                                                 <li key={tool.name} className="flex flex-col gap-0.5 px-2.5 py-1.5">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-semibold text-ink">{verbOf(tool.name)}</span>
+                                                        <span className="text-xs font-semibold text-ink">{toolLabel(tool.name)}</span>
                                                         <span className={`text-2xs font-semibold tracking-label uppercase ${toneClasses[riskTone(tool.risk)].ink}`}>
                                                             {riskLabel(tool.risk)}
                                                         </span>

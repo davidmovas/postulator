@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -27,12 +28,14 @@ type pageStore interface {
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
 	UpdateDerived(ctx context.Context, page pagemap.Page) error
-	AutoType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+	FollowObservedH1(ctx context.Context, pageID, was, now string, at time.Time) error
+	Classify(ctx context.Context, pageID string, was, now pagetype.Assignment, at time.Time) (bool, error)
 }
 
 type typeSet interface {
 	Seed(ctx context.Context, siteID string) error
 	Set(ctx context.Context, siteID string) (pagetype.Set, error)
+	Rules(ctx context.Context, siteID string) ([]pagetype.Rule, error)
 }
 
 type identityStore interface {
@@ -67,12 +70,14 @@ type renderStore interface {
 	Put(ctx context.Context, record render.Record) error
 	Get(ctx context.Context, pageID string) (render.Record, error)
 	ListBySite(ctx context.Context, siteID string) ([]render.Record, error)
+	ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error)
 }
 
 type linkStore interface {
 	ReplaceForPage(ctx context.Context, pageID string, source pagemap.LinkSource, links []pagemap.PageLink) error
 	ListForPage(ctx context.Context, pageID string) ([]pagemap.PageLink, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.PageLink, error)
+	ListedProductsBySite(ctx context.Context, siteID string) (map[string]int, error)
 }
 
 type findingStore interface {
@@ -91,6 +96,14 @@ type mapRefresher interface {
 	Refresh(ctx context.Context, siteID string) error
 }
 
+type entityReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]graph.Entity, error)
+}
+
+type edgeReader interface {
+	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
+}
+
 type Deps struct {
 	Sites      siteStore
 	Pages      pageStore
@@ -102,6 +115,8 @@ type Deps struct {
 	Findings   findingStore
 	Types      typeSet
 	Maps       mapRefresher
+	Entities   entityReader
+	Edges      edgeReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

@@ -24,12 +24,13 @@ import (
 )
 
 type authoring struct {
-	templates *templates.Service
-	pageTypes *pagetypes.Service
-	siteModel *sitemodel.Service
-	reports   *reports.Service
-	wordpress *registry.Registry
-	content   *content.Service
+	templates      *templates.Service
+	pageTypes      *pagetypes.Service
+	classification *pagetypes.Classification
+	siteModel      *sitemodel.Service
+	reports        *reports.Service
+	wordpress      *registry.Registry
+	content        *content.Service
 }
 
 type useCases struct {
@@ -51,7 +52,7 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 		stores.store, c.Events, stores.now)
 	wordpress := registry.New(stores.sites, stores.secrets, append(wp.FromSettings(stores.values), c.cfg.WordPress...)...)
 	pageTypes := pagetypes.New(pagetypes.Deps{
-		Types: stores.pageTypes, Scopes: stores.scopes, Pages: stores.pages, Templates: stores.templates,
+		Types: stores.pageTypes, Scopes: stores.scopes, Rules: stores.rules, Pages: stores.pages, Templates: stores.templates,
 		Sites: stores.sites, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
 	})
 
@@ -65,11 +66,16 @@ func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 		Sites: stores.sites, Pages: stores.pages,
 		Entities: stores.entities, Edges: stores.edges, Types: pageTypes, Terms: stores.identities, Fields: stores.fields,
 		Bodies: stores.bodies, Renders: stores.renders, Links: stores.links, Findings: stores.findings,
+		Runs: stores.runs, Items: stores.items,
 	})
 
 	return authoring{
 		templates: templateService,
 		pageTypes: pageTypes,
+		classification: pagetypes.NewClassification(pagetypes.ClassificationDeps{
+			Facts: siteModel, Types: pageTypes, Pages: stores.pages, Findings: stores.findings, UnitOfWork: stores.store,
+			Publisher: c.Events, Clock: stores.now,
+		}),
 		siteModel: siteModel,
 		reports:   reportsService,
 		wordpress: wordpress,
@@ -84,17 +90,18 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	values := stores.values
 	pagesService := pages.New(pages.Deps{
 		Pages: stores.pages, Types: stores.pageTypes, Links: stores.links, Entities: stores.entities, Edges: stores.edges,
-		Sites: stores.sites, Bodies: stores.bodies, Findings: stores.findings, UnitOfWork: stores.store, Publisher: c.Events,
-		Clock: stores.now, Preview: previewIssuer{clients: writing.wordpress},
+		Sites: stores.sites, Bodies: stores.bodies, Fields: stores.fields, Renders: stores.renders, Findings: stores.findings,
+		Maps: writing.siteModel, Rows: stores.pageMaps, Classifier: writing.classification, Templates: stores.templates,
+		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now, Preview: previewIssuer{clients: writing.wordpress},
 	})
-	runsService := runs.New(running.engine, stores.runs, stores.items, stores.artifacts, stores.runEvents,
-		writing.templates, stores.pages, running.steps, pagesService)
 	graphService := graph.New(graph.Deps{
 		Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
 		Maps: writing.siteModel, Identities: stores.identities, Fields: stores.fields, Work: stores.items, Profiles: llm.profiles,
 		LLM: llm.client, UnitOfWork: stores.store,
 		Publisher: c.Events, Clock: stores.now,
 	})
+	runsService := runs.New(running.engine, stores.runs, stores.items, stores.artifacts, stores.runEvents,
+		writing.templates, stores.pages, writing.pageTypes, running.steps, pagesService, writing.siteModel, graphService)
 	importsService := imports.New(imports.Deps{
 		Tables:     importer.New(),
 		Entities:   stores.entities,
@@ -120,7 +127,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		imports: importsService,
 		findings: findings.New(findings.Deps{
 			Findings: stores.findings, Fields: stores.fields, Bodies: stores.bodies, Pages: stores.pages,
-			Cards: graphService, Rows: importsService, Places: writing.siteModel, UnitOfWork: stores.store, Publisher: c.Events,
+			Cards: graphService, Rows: importsService, Parents: graphService, Places: writing.siteModel, UnitOfWork: stores.store, Publisher: c.Events,
 			Clock: stores.now,
 		}),
 		models: models.New(llm.catalog, stores.overrides, llm.profiles, llm.ledger, stores.secrets, llm.client,

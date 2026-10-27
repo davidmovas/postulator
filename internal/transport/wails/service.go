@@ -49,6 +49,7 @@ type Deps struct {
 	Findings   Source[FindingsUseCase]
 	Templates  Source[TemplatesUseCase]
 	PageTypes  Source[PageTypesUseCase]
+	Classify   Source[ClassificationUseCase]
 	Runs       Source[RunsUseCase]
 	Sync       Source[SyncUseCase]
 	Reports    Source[ReportsUseCase]
@@ -59,6 +60,7 @@ type Deps struct {
 	Schedules  Source[SchedulesUseCase]
 	Tools      Source[ToolCatalog]
 	Browser    Source[BrowserUseCase]
+	Support    Source[SupportUseCase]
 	Settings   SettingsDeps
 }
 
@@ -69,7 +71,7 @@ func Services(logger *zap.Logger, build BuildInfo, deps Deps) []application.Serv
 		bind(NewGraphService(logger, deps.Graph)),
 		bind(NewPagesService(logger, deps.Pages, deps.PageModels, deps.SiteModel)),
 		bind(NewFindingsService(logger, deps.Findings)),
-		bind(NewTemplatesService(logger, deps.Templates, deps.PageTypes)),
+		bind(NewTemplatesService(logger, deps.Templates, deps.PageTypes, deps.Classify)),
 		bind(NewRunsService(logger, deps.Runs)),
 		bind(NewSyncService(logger, deps.Sync)),
 		bind(NewReportsService(logger, deps.Reports, deps.Judge)),
@@ -79,6 +81,7 @@ func Services(logger *zap.Logger, build BuildInfo, deps Deps) []application.Serv
 		bind(NewSchedulesService(logger, deps.Schedules)),
 		bind(NewToolsService(logger, deps.Tools)),
 		bind(NewBrowserService(logger, deps.Browser)),
+		bind(NewSupportService(logger, deps.Support)),
 		bind(NewSettingsService(logger, deps.Settings)),
 	}
 }

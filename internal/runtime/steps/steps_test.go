@@ -162,6 +162,43 @@ func TestAMissingAnchorIsRepairedByTheLinker(t *testing.T) {
 	}
 }
 
+func TestTheLinkerReadsTheRunsBrief(t *testing.T) {
+	t.Parallel()
+
+	f := newFactory(t, anchorlessDraft)
+	engine := f.engine(t)
+	queued, err := engine.Enqueue(t.Context(), run.Run{
+		ID: newID(), SiteID: f.siteID, Kind: run.KindGenerate, Targets: []string{f.pageID},
+		Recipe: recipe(), TemplateID: "template", TemplateVersion: 1, PublishMode: run.PublishDraft,
+		Brief: run.Brief{Goal: "Win the home barista", Avoid: "brand names"},
+	}, run.Directive{PageID: f.pageID, Notes: "Open with the dose."})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	f.waitForRun(t, queued.ID, run.StatusCompleted)
+
+	asked := 0
+	requests := f.llm.Requests()
+	for i := range requests {
+		if requests[i].Meta.Step != steps.NameRepairLinks {
+			continue
+		}
+		asked++
+		var held strings.Builder
+		for _, message := range requests[i].Messages {
+			held.WriteString(message.Text)
+		}
+		for _, want := range []string{"THE RUN'S BRIEF", "Goal: Win the home barista", "Avoid: brand names", "For this page: Open with the dose."} {
+			if !strings.Contains(held.String(), want) {
+				t.Errorf("the linker's request lacks %q:\n%s", want, held.String())
+			}
+		}
+	}
+	if asked == 0 {
+		t.Fatal("the linker was never asked, so nothing proves what it reads")
+	}
+}
+
 func TestAPageWithNoEntityFailsItsItem(t *testing.T) {
 	t.Parallel()
 

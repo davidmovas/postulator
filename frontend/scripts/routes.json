@@ -32,7 +32,7 @@
     "wait": 1400,
     "steps": [
       {
-        "click": "[data-entity-row=hub]"
+        "click": "[data-entity-row=category]"
       },
       {
         "wait": 900
@@ -62,6 +62,207 @@
       },
       {
         "wait": 900
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-picked",
+    "route": "#/s/:siteId/graph",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "main button:has-text(\"Model\")"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Propose entities from the pages\")"
+      },
+      {
+        "expect": "[role=dialog] [data-page-pick] input:not([disabled])"
+      },
+      {
+        "click": ":nth-match([role=dialog] [data-page-pick] label:has(input:not([disabled])), 1)"
+      },
+      {
+        "click": ":nth-match([role=dialog] [data-page-pick] label:has(input:not([disabled])), 2)"
+      },
+      {
+        "expect": "[role=dialog] [data-page-pick] input:checked",
+        "count": 2
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-kept",
+    "route": "#/s/:siteId/graph",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Pages\"]"
+      },
+      {
+        "expect": "[data-page-row]"
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Tamper Supply\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Crema Bench\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Graph\"]"
+      },
+      {
+        "wait": 1500
+      },
+      {
+        "click": "main button:has-text(\"Model\")"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Propose entities from the pages\")"
+      },
+      {
+        "expect": "[role=dialog] [data-page-pick] input:checked",
+        "count": 2
+      },
+      {
+        "expect": "[role=dialog] button:has-text(\"Start over\")"
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-review",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "button:has-text(\"Propose entities for all\")"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]",
+        "timeout": 20000
+      },
+      {
+        "click": ":nth-match([data-workspace] [data-proposal-at]:has(button[aria-expanded]), 1)"
+      },
+      {
+        "type": "[data-proposal-inspector] input=Field notes"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]:has-text(\"Field notes\")"
+      },
+      {
+        "click": ":nth-match([data-workspace] [data-proposal-at]:has(button[aria-expanded]) label, 1)"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-state=off]"
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-review-960",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "width": 960,
+    "height": 600,
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "click": "button:has-text(\"Propose entities for all\")"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]:has-text(\"Field notes\")",
+        "timeout": 20000
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "propose-entities-review-kept",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "wait": 1500,
+    "steps": [
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Pages\"]"
+      },
+      {
+        "expect": "[data-page-row]"
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Tamper Supply\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Crema Bench\")"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Findings\"]"
+      },
+      {
+        "click": "main nav button:has-text(\"Page without an entity\")"
+      },
+      {
+        "click": "button:has-text(\"Propose entities for all\")"
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-at]:has-text(\"Field notes\")",
+        "timeout": 20000
+      },
+      {
+        "expect": "[data-workspace] [data-proposal-state=off]"
+      },
+      {
+        "expect": "[data-proposal-inspector] input"
+      },
+      {
+        "fits": "[data-workspace]"
+      },
+      {
+        "wait": 400
       }
     ]
   },
@@ -365,7 +566,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -385,7 +586,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -411,7 +612,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -437,7 +638,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -462,7 +663,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -487,7 +688,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -512,7 +713,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -531,7 +732,10 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-page-open]"
+        "click": "[data-page-row]"
+      },
+      {
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -556,7 +760,7 @@
         "wait": 600
       },
       {
-        "click": "[data-page-open]"
+        "expect": "[role=dialog]"
       },
       {
         "wait": 900
@@ -807,12 +1011,22 @@
   },
   {
     "name": "agent",
-    "route": "#/agent",
+    "route": "#/s/:siteId/agent",
     "wait": 1200
   },
   {
-    "name": "agent-tool-outcomes",
+    "name": "agent-nosite",
     "route": "#/agent",
+    "wait": 1200,
+    "steps": [
+      {
+        "expect": "[role=note] button[aria-label=\"Talk about Crema Bench\"]"
+      }
+    ]
+  },
+  {
+    "name": "agent-tool-outcomes",
+    "route": "#/s/:siteId/agent",
     "wait": 1800,
     "steps": [
       {
@@ -834,6 +1048,166 @@
     "route": "#/agent/inbox"
   },
   {
+    "name": "agent-site-explore",
+    "route": "#/s/:siteId/overview",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "nav[aria-label=\"Sections\"] a[title=\"Agent\"]"
+      },
+      {
+        "expect": "h1:has-text(\"Agent on Crema Bench\")"
+      },
+      {
+        "expect": "[data-agent-dock]",
+        "count": 0
+      },
+      {
+        "click": "button:has-text(\"New conversation\")"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "type": "main textarea=Explore the site's tree for me"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "main [data-tool=pages_tree][data-tool-status=ok]",
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
+    "name": "agent-site-card",
+    "route": "#/s/:siteId/agent",
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "main [data-tool=pages_tree][data-tool-status=ok]"
+      },
+      {
+        "expect": "main >> text=The top of the site holds the six hubs",
+        "timeout": 30000
+      },
+      {
+        "expect": "main button:has-text(\"Stop\")",
+        "count": 0,
+        "timeout": 60000
+      },
+      {
+        "type": "main textarea=Retitle the espresso machines under $500 page"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "main [data-card-tool=pages_manage][data-card-status=pending]",
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
+    "name": "agent-site-switch",
+    "route": "#/s/:siteId/agent",
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Tamper Supply\")"
+      },
+      {
+        "expect": "h1:has-text(\"Agent on Tamper Supply\")"
+      },
+      {
+        "click": "[aria-label=\"Switch site\"]"
+      },
+      {
+        "click": "[role=dialog] button:has-text(\"Crema Bench\")"
+      },
+      {
+        "expect": "main [data-card-tool=pages_manage][data-card-status=pending]"
+      }
+    ]
+  },
+  {
+    "name": "agent-dock-explore",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "[data-agent-dock] [data-card-tool=pages_manage][data-card-status=pending]"
+      },
+      {
+        "click": "[data-agent-dock] [data-card-status=pending] button:has-text(\"Reject\")"
+      },
+      {
+        "expect": "[data-agent-dock] [data-card-status=pending]",
+        "count": 0,
+        "timeout": 30000
+      },
+      {
+        "expect": "[data-agent-dock] button:has-text(\"Stop\")",
+        "count": 0,
+        "timeout": 60000
+      },
+      {
+        "type": "[data-agent-dock] textarea=Explore the tree once more"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "[data-agent-dock] [data-tool=pages_tree][data-tool-status=ok]",
+        "count": 2,
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
+    "name": "agent-dock-card",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      {
+        "expect": "[data-agent-dock] >> text=The top of the site holds the six hubs",
+        "count": 2,
+        "timeout": 30000
+      },
+      {
+        "expect": "[data-agent-dock] button:has-text(\"Stop\")",
+        "count": 0,
+        "timeout": 60000
+      },
+      {
+        "type": "[data-agent-dock] textarea=Retitle that page after all"
+      },
+      {
+        "key": "Enter"
+      },
+      {
+        "expect": "[data-agent-dock] [data-card-tool=pages_manage][data-card-status=pending]",
+        "timeout": 30000
+      },
+      {
+        "wait": 800
+      }
+    ]
+  },
+  {
     "name": "settings-models",
     "route": "#/settings/models"
   },
@@ -849,7 +1223,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-page-type-row=hub]"
+        "click": "[data-page-type-row=category]"
       },
       {
         "wait": 900
@@ -912,7 +1286,25 @@
     "name": "settings-models-960",
     "route": "#/settings/models",
     "width": 960,
-    "height": 600
+    "height": 600,
+    "wait": 1200,
+    "steps": [
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "fits": "main"
+      },
+      {
+        "fits": "[data-spend-models]"
+      },
+      {
+        "fits": "[data-recent-calls]"
+      },
+      {
+        "fits": "nav[aria-label=\"Sections\"]"
+      }
+    ]
   },
   {
     "name": "palette",
@@ -1055,7 +1447,11 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[aria-label=\"Collapse the agent dock\"]"
+        "expect": "[data-agent-dock]",
+        "count": 0
+      },
+      {
+        "key": "Control+J"
       },
       {
         "wait": 800
@@ -1095,11 +1491,28 @@
     "route": "#/s/:siteId/runs",
     "width": 960,
     "height": 600,
-    "wait": 1200
+    "wait": 1200,
+    "steps": [
+      {
+        "click": "[aria-label=\"Expand the agent dock\"]"
+      },
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "wait": 900
+      },
+      {
+        "fits": "[data-runs-table]"
+      },
+      {
+        "fits": "main"
+      }
+    ]
   },
   {
     "name": "agent-960",
-    "route": "#/agent",
+    "route": "#/s/:siteId/agent",
     "width": 960,
     "height": 600,
     "wait": 1200
@@ -1109,7 +1522,15 @@
     "route": "#/s/:siteId/graph",
     "width": 960,
     "height": 600,
-    "wait": 1400
+    "wait": 1400,
+    "steps": [
+      {
+        "expect": "[data-agent-dock]"
+      },
+      {
+        "fits": "nav[aria-label=\"Sections\"]"
+      }
+    ]
   },
   {
     "name": "palette-960",
@@ -1152,5 +1573,566 @@
     "width": 960,
     "height": 600,
     "wait": 1800
+  },
+  {
+    "name": "pages-list-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-list-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-tree-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"Tree\")" },
+      { "expect": "[data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-map-table]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-tree-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-map-table]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"By type\")" },
+      { "click": "[role=radiogroup][aria-label=\"Show its pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-type-open] [data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-type-open] [data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-tree-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show its pages as\"] [role=radio]:has-text(\"Tree\")" },
+      { "expect": "[data-type-open] [data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-types-tree-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-type-open] [data-map-node]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-bulk-960",
+    "route": "#/s/:siteId/pages",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-page-row]" },
+      { "click": "[data-page-row] label >> nth=0" },
+      { "click": "[data-page-row] label >> nth=2" },
+      { "click": "[data-page-row] label >> nth=3" },
+      { "expect": "[data-bulk-bar] [data-bulk-count=\"3\"]" },
+      { "wait": 500 },
+      { "fits": "[data-bulk-bar]" },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "pages-bulk-wide",
+    "route": "#/s/:siteId/pages",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-bulk-bar] [data-bulk-count=\"3\"]" },
+      { "wait": 500 },
+      { "fits": "[data-bulk-bar]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-classification-960",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-rule-row]" },
+      { "expect": "[data-rule-fallback]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-classification-wide",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-rule-row]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-rule-drawer-960",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[data-rule-row] button[aria-label^=\"Edit\"] >> nth=1" },
+      { "expect": "[data-rule-drawer]" },
+      { "wait": 700 },
+      { "fits": "[data-rule-drawer]" }
+    ]
+  },
+  {
+    "name": "settings-rule-drawer-wide",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "click": "[data-rule-row] button[aria-label^=\"Edit\"] >> nth=1" },
+      { "expect": "[data-rule-drawer]" },
+      { "wait": 700 },
+      { "fits": "[data-rule-drawer]" }
+    ]
+  },
+  {
+    "name": "settings-classification-preview-960",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-rule-row][data-rule-enabled=true] [aria-label=\"Use An article under a category\"]" },
+      { "click": "label:has([aria-label=\"Use An article under a category\"])" },
+      { "expect": "[data-rule-row][data-rule-enabled=false] [aria-label=\"Use An article under a category\"]" },
+      { "click": "button:has-text(\"Preview the changes\")" },
+      { "expect": "[data-workspace]" },
+      { "expect": "[data-workspace] [data-preview-group]", "timeout": 30000 },
+      { "wait": 700 },
+      { "fits": "[data-workspace]" }
+    ]
+  },
+  {
+    "name": "settings-classification-preview-wide",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "click": "button:has-text(\"Preview the changes\")" },
+      { "expect": "[data-workspace] [data-preview-group]", "timeout": 30000 },
+      { "click": "[data-workspace] [data-preview-group] button[aria-expanded] >> nth=0" },
+      { "wait": 900 },
+      { "fits": "[data-workspace]" }
+    ]
+  },
+  {
+    "name": "settings-classification-rule-on",
+    "route": "#/settings/classification?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-rule-row][data-rule-enabled=false] [aria-label=\"Use An article under a category\"]" },
+      { "click": "label:has([aria-label=\"Use An article under a category\"])" },
+      { "expect": "[data-rule-row][data-rule-enabled=true] [aria-label=\"Use An article under a category\"]" },
+      { "wait": 500 },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-page-types-960",
+    "route": "#/settings/types?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-page-type-row]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-page-types-wide",
+    "route": "#/settings/types?site=:siteId",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-page-type-row]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-list-wide",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "timed": "[data-page-row]",
+    "steps": [
+      { "scroll": "[data-page-list] [data-virtual-rows]", "label": "large list" },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-tree-wide",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      {
+        "timed": "large tree",
+        "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"Tree\")",
+        "until": "[data-map-node]"
+      },
+      { "wait": 600 },
+      { "fits": "[data-map-table]" }
+    ]
+  },
+  {
+    "name": "large-pages-types-wide",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1400,
+    "steps": [
+      {
+        "timed": "large by type",
+        "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"By type\")",
+        "until": "[data-type-group]"
+      },
+      {
+        "timed": "large by type, the products",
+        "click": "[aria-label=\"Show the Product pages\"]",
+        "until": "[data-type-open] [data-page-row]"
+      },
+      { "scroll": "[data-type-open] [data-virtual-rows]", "label": "large by type, the products" },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-types-960",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-type-open] [data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-type-open]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-pages-list-960",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"List\")" },
+      { "expect": "[data-page-row]" },
+      { "wait": 600 },
+      { "fits": "[data-page-list]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "large-proposals-wide",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 1440,
+    "height": 900,
+    "wait": 1500,
+    "steps": [
+      {
+        "timed": "large proposals",
+        "click": "button:has-text(\"Propose entities for all\")",
+        "until": "[data-workspace] [data-proposal-at]"
+      },
+      { "wait": 600 },
+      { "scroll": "[data-workspace] [data-virtual-rows]", "label": "large proposals" },
+      { "fits": "[data-workspace]" }
+    ]
+  },
+  {
+    "name": "large-proposals-960",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "button:has-text(\"Propose entities for all\")" },
+      { "expect": "[data-workspace] [data-proposal-at]", "timeout": 30000 },
+      { "wait": 600 },
+      { "fits": "[data-workspace]" }
+    ]
+  },
+  {
+    "name": "large-bulk-type-960",
+    "route": "#/s/:siteId/pages",
+    "siteName": "Kiln and Co. Wholesale",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[role=radiogroup][aria-label=\"Show the pages as\"] [role=radio]:has-text(\"By type\")" },
+      { "click": "[aria-label=\"Show the Info pages\"]" },
+      { "click": "[data-type-group]:has([aria-label=\"Show the Info pages\"]) label" },
+      { "expect": "[data-bulk-bar]" },
+      { "click": "[data-bulk-bar] button:has-text(\"Set type\")" },
+      { "click": "[role=menuitem]:has-text(\"Guide\")" },
+      { "click": "[role=dialog] button:has-text(\"Apply\")" },
+      { "expect": "[role=status]:has-text(\"Guide now\")", "timeout": 30000 },
+      { "wait": 400 },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "plan-card",
+    "route": "#/s/:siteId/agent",
+    "height": 1500,
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-plan][data-plan-status=proposed] [data-plan-edits]" },
+      { "expect": "[data-plan][data-plan-status=done]" },
+      { "click": "[data-plan][data-plan-status=done] [data-plan-title]" },
+      { "wait": 400 },
+      { "fits": "[data-plan][data-plan-status=proposed]" },
+      { "fits": "[data-plan][data-plan-status=done]" }
+    ]
+  },
+  {
+    "name": "plan-card-chosen",
+    "route": "#/s/:siteId/agent",
+    "height": 1100,
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-plan][data-plan-status=proposed]" },
+      { "click": "[data-plan-status=proposed] li[data-plan-step]:nth-child(3) > label" },
+      { "expect": "[data-plan-status=proposed] button:has-text(\"Approve 2 chosen\"):not([disabled])" },
+      { "type": "label:has-text(\"Tone\")=Plain and practical" },
+      { "wait": 300 },
+      { "fits": "[data-plan][data-plan-status=proposed]" }
+    ]
+  },
+  {
+    "name": "run-start-brief",
+    "route": "#/s/:siteId/runs",
+    "height": 1300,
+    "wait": 1200,
+    "steps": [
+      { "click": "[data-run-start]" },
+      { "wait": 900 },
+      { "click": "[data-page-pick] label" },
+      { "wait": 300 },
+      { "click": "[data-run-brief-section] > button" },
+      { "type": "label:has-text(\"Goal\")=Help a first buyer choose a grinder before a machine" },
+      { "type": "label:has-text(\"Tone\")=Plain and practical, no brand talk" },
+      { "type": "label:has-text(\"Style sample\")=Short sentences. One idea each. Numbers where they help." },
+      { "click": "[data-run-directive-page] > button >> nth=0" },
+      { "type": "label:has-text(\"Notes for this page\")=Lead with the burr size, then the price." },
+      { "wait": 400 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "run-start-writer",
+    "route": "#/s/:siteId/runs",
+    "height": 1100,
+    "wait": 1200,
+    "steps": [
+      { "click": "[data-run-start]" },
+      { "wait": 900 },
+      { "click": "[data-page-pick] label" },
+      { "wait": 300 },
+      { "click": "[data-run-brief-section] > button" },
+      { "type": "label:has-text(\"Goal\")=Help a first buyer choose a grinder before a machine" },
+      { "click": "[data-run-directive-page] > button >> nth=0" },
+      { "type": "label:has-text(\"Notes for this page\")=Lead with the burr size, then the price." },
+      { "click": "[data-run-directive-page] button:has-text(\"What the writer will see\")" },
+      { "expect": "[data-pack-section=brief]", "timeout": 20000 },
+      { "wait": 500 },
+      { "fits": "[role=dialog]:has([data-pack-section=brief])" }
+    ]
+  },
+  {
+    "name": "adopt-graph",
+    "route": "#/s/:siteId/graph",
+    "wait": 1500,
+    "steps": [
+      { "click": "main button:has-text(\"Model\")" },
+      { "click": "[role=menuitem]:has-text(\"Take the page tree's parents\")" },
+      { "expect": "[role=dialog] [data-adoption]", "timeout": 20000 },
+      { "wait": 400 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "adopt-map-subtree",
+    "route": "#/s/:siteId/map",
+    "wait": 1500,
+    "steps": [
+      { "click": "[data-map-node]:has-text(\"Brewing technique\") button[aria-label=\"Show only under this page\"]" },
+      { "wait": 900 },
+      { "click": "[data-map-adopt]" },
+      { "expect": "[role=dialog] [data-adoption-counts]", "timeout": 20000 },
+      { "wait": 400 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "map-why",
+    "route": "#/s/:siteId/map",
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-map-why]" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "map-why-detail",
+    "route": "#/s/:siteId/map",
+    "wait": 1500,
+    "steps": [
+      { "click": "[data-map-node]:has([data-map-why=no_signal]) button[title=\"Open the page\"] >> nth=0" },
+      { "wait": 900 },
+      { "click": "[role=dialog] [role=tab]:has-text(\"Model\")" },
+      { "expect": "[data-page-why]", "timeout": 20000 },
+      { "wait": 600 },
+      { "fits": "[role=dialog]" }
+    ]
+  },
+  {
+    "name": "finding-entity-parent",
+    "route": "#/s/:siteId/findings?code=entity_parent_differs",
+    "wait": 1500,
+    "steps": [
+      { "expect": "button:has-text(\"Take the page tree's parent\")" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "support-about",
+    "route": "#/settings/about",
+    "wait": 1200,
+    "steps": [
+      { "expect": "[data-support-bundle] button:has-text(\"Save a support bundle\")" },
+      { "fits": "main" }
+    ]
+  },
+  {
+    "name": "support-dock",
+    "route": "#/s/:siteId/overview",
+    "wait": 1200,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "click": "[data-agent-dock] button[title=\"Switch conversation\"]" },
+      { "expect": "[role=menuitem]:has-text(\"Save a support bundle\")" },
+      { "wait": 300 }
+    ]
+  },
+  {
+    "name": "plan-card-dock",
+    "route": "#/s/:siteId/overview",
+    "wait": 1500,
+    "steps": [
+      { "expect": "[data-agent-dock] [data-plan][data-plan-status=proposed]" },
+      { "click": "[data-agent-dock] [data-plan][data-plan-status=proposed] [data-plan-title]" },
+      { "wait": 400 },
+      { "fits": "[data-agent-dock] [data-plan][data-plan-status=proposed]" },
+      { "fits": "[data-agent-dock] [data-plan][data-plan-status=done]" }
+    ]
   }
 ]

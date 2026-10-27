@@ -123,11 +123,10 @@ type reviewedPlan struct {
 }
 
 func (s *Service) reviewedFields(ctx context.Context, itemID string) ([]field.Key, error) {
-	stored, err := s.artifacts.ByItem(ctx, itemID)
+	latest, err := s.latestOf(ctx, itemID, run.ArtifactEditPlan)
 	if err != nil {
 		return nil, err
 	}
-	latest := latestOf(stored, run.ArtifactEditPlan)
 	if latest == nil {
 		return nil, invalid("the page holds no review to accept field by field", "fields")
 	}

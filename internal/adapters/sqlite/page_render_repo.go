@@ -4,22 +4,25 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"slices"
+	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 const (
-	renderColumns = `page_id, render_hash, content_root, regions, jsonld, trail, headings, word_count_content, word_count_generated, builder, url_form, robots, theme_h1, final_path, extracted_at`
-	upsertRender  = `INSERT INTO page_renders (` + renderColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	renderColumns = `page_id, render_hash, content_root, regions, jsonld, trail, headings, word_count_content, word_count_generated, builder, url_form, robots, theme_h1, h1, h1_source, final_path, extracted_at`
+	upsertRender  = `INSERT INTO page_renders (` + renderColumns + `) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (page_id) DO UPDATE SET render_hash = excluded.render_hash, content_root = excluded.content_root, regions = excluded.regions,
 		jsonld = excluded.jsonld, trail = excluded.trail, headings = excluded.headings, word_count_content = excluded.word_count_content,
 		word_count_generated = excluded.word_count_generated, builder = excluded.builder, url_form = excluded.url_form, robots = excluded.robots,
-		theme_h1 = excluded.theme_h1, final_path = excluded.final_path, extracted_at = excluded.extracted_at`
+		theme_h1 = excluded.theme_h1, h1 = excluded.h1, h1_source = excluded.h1_source, final_path = excluded.final_path, extracted_at = excluded.extracted_at`
 	selectRender        = `SELECT ` + renderColumns + ` FROM page_renders WHERE page_id = ?`
 	selectRendersBySite = `SELECT r.page_id, r.render_hash, r.content_root, r.regions, r.jsonld, r.trail, r.headings, r.word_count_content,
-		r.word_count_generated, r.builder, r.url_form, r.robots, r.theme_h1, r.final_path, r.extracted_at
+		r.word_count_generated, r.builder, r.url_form, r.robots, r.theme_h1, r.h1, r.h1_source, r.final_path, r.extracted_at
 		FROM page_renders AS r JOIN pages AS p ON p.id = r.page_id WHERE p.site_id = ? ORDER BY r.page_id`
 	selectRendersForPages = `SELECT ` + renderColumns + ` FROM page_renders WHERE page_id IN `
 	orderRenders          = ` ORDER BY page_id`
@@ -87,7 +90,7 @@ func (r *PageRenderRepo) Put(ctx context.Context, record render.Record) error {
 	}
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), upsertRender, []any{
 		record.PageID, record.Hash, string(record.Root), encoded.regions, encoded.jsonld, encoded.trails, encoded.headings,
-		record.WordsContent, record.WordsGenerated, record.Builder, record.URLForm, record.Robots, string(record.ThemeH1), record.FinalPath,
+		record.WordsContent, record.WordsGenerated, record.Builder, record.URLForm, record.Robots, string(record.ThemeH1), record.H1, string(record.H1Source), record.FinalPath,
 		formatTime(record.ExtractedAt),
 	}, nil, "store the page render")
 	return err
@@ -99,6 +102,45 @@ func (r *PageRenderRepo) Get(ctx context.Context, pageID string) (render.Record,
 
 func (r *PageRenderRepo) ListBySite(ctx context.Context, siteID string) ([]render.Record, error) {
 	return selectAll(ctx, r.store.execFrom(ctx), selectRendersBySite, []any{siteID}, scanRender, "list the site renders")
+}
+
+const selectRenderedBySite = `SELECT r.page_id,
+		EXISTS (SELECT 1 FROM json_each(r.regions) WHERE json_extract(value, '$.kind') = 'listing' AND json_extract(value, '$.inside') = 1),
+		coalesce((SELECT group_concat(key, char(10)) FROM json_each(r.jsonld)), ''),
+		r.word_count_content,
+		(SELECT count(*) FROM json_each(r.headings) WHERE json_extract(value, '$.level') = 2 AND json_extract(value, '$.generated') = 0)
+		FROM page_renders AS r JOIN pages AS p ON p.id = r.page_id WHERE p.site_id = ? ORDER BY r.page_id`
+
+type renderedRow struct {
+	pageID   string
+	rendered pagetype.Rendered
+}
+
+func (r *PageRenderRepo) ListRenderedBySite(ctx context.Context, siteID string) (map[string]pagetype.Rendered, error) {
+	rows, err := selectAll(ctx, r.store.execFrom(ctx), selectRenderedBySite, []any{siteID}, scanRendered, "summarize the site's renders")
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]pagetype.Rendered, len(rows))
+	for i := range rows {
+		out[rows[i].pageID] = rows[i].rendered
+	}
+	return out, nil
+}
+
+func scanRendered(rows *sql.Rows) (renderedRow, error) {
+	var (
+		row    renderedRow
+		schema string
+	)
+	if err := rows.Scan(&row.pageID, &row.rendered.Listing, &schema, &row.rendered.Words, &row.rendered.H2); err != nil {
+		return renderedRow{}, err
+	}
+	if schema != "" {
+		row.rendered.Schema = strings.Split(schema, "\n")
+		slices.Sort(row.rendered.Schema)
+	}
+	return row, nil
 }
 
 func (r *PageRenderRepo) URLForms(ctx context.Context, siteID string) ([]string, error) {
@@ -118,16 +160,18 @@ func (r *PageRenderRepo) ListForPages(ctx context.Context, pageIDs []string) ([]
 func scanRender(rows *sql.Rows) (render.Record, error) {
 	var (
 		record                            render.Record
-		root, themeH1                     string
+		root, themeH1, h1Source           string
 		regions, jsonld, trails, headings string
 		extractedAt                       string
 	)
 	if err := rows.Scan(&record.PageID, &record.Hash, &root, &regions, &jsonld, &trails, &headings,
-		&record.WordsContent, &record.WordsGenerated, &record.Builder, &record.URLForm, &record.Robots, &themeH1, &record.FinalPath, &extractedAt); err != nil {
+		&record.WordsContent, &record.WordsGenerated, &record.Builder, &record.URLForm, &record.Robots, &themeH1,
+		&record.H1, &h1Source, &record.FinalPath, &extractedAt); err != nil {
 		return render.Record{}, err
 	}
 	record.Root = render.RootState(root)
 	record.ThemeH1 = render.ThemeH1(themeH1)
+	record.H1Source = render.H1Source(h1Source)
 	for _, column := range []struct {
 		raw     string
 		into    any

@@ -285,6 +285,19 @@ function handlersFor(client: QueryClient): Handlers {
         "agent.waiting": (envelope) => {
             applyWaiting(envelope.payload);
         },
+        "agent.plan.proposed": (envelope) => {
+            invalidate(client, keys.agent.plans(envelope.payload.conversationId));
+        },
+        "agent.plan.updated": (envelope) => {
+            const conversationId = envelope.payload.conversationId;
+            coalesce(
+                `plan:${envelope.payload.planId}`,
+                () => {
+                    invalidateAll(client, keys.agent.plans(conversationId), keys.agent.messagesOf(conversationId));
+                },
+                itemCoalesceMs,
+            );
+        },
         "agent.usage": (envelope) => {
             const conversationId = envelope.payload.conversationId;
             applyUsage(envelope.payload);

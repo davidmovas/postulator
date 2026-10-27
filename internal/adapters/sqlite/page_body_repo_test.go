@@ -244,7 +244,7 @@ func TestPageBodyRepoDriftedNamesTheBodiesThatMovedFromTheirBase(t *testing.T) {
 	ours := sqlitetest.Page(t, store, owner.ID, "/ours/")
 	oursEdited := sqlitetest.Page(t, store, owner.ID, "/ours-edited/")
 	untouched := sqlitetest.Page(t, store, owner.ID, "/untouched/")
-	sqlitetest.Page(t, store, owner.ID, "/no-body/")
+	bodiless := sqlitetest.Page(t, store, owner.ID, "/no-body/")
 	elsewhere := sqlitetest.Page(t, store, other.ID, "/elsewhere/")
 	repo := sqlite.NewPageBodyRepo(store)
 	later := sqlitetest.Stamp.Add(time.Hour)
@@ -282,17 +282,20 @@ func TestPageBodyRepoDriftedNamesTheBodiesThatMovedFromTheirBase(t *testing.T) {
 		}
 	}
 
-	got, err := repo.Drifted(t.Context(), owner.ID)
+	got, err := repo.Drifted(t.Context(), []string{edited.ID, ours.ID, oursEdited.ID, untouched.ID, bodiless.ID})
 	if err != nil {
 		t.Fatalf("Drifted: %v", err)
 	}
 	want := []string{edited.ID, oursEdited.ID}
 	slices.Sort(want)
 	if !slices.Equal(got, want) {
-		t.Errorf("Drifted = %v, want the two bodies that moved from their base on this site, %v", got, want)
+		t.Errorf("Drifted = %v, want the two bodies that moved from their base, %v", got, want)
 	}
-	if got, err = repo.Drifted(t.Context(), "no-such-site"); err != nil || len(got) != 0 {
-		t.Errorf("Drifted of no site = %v, %v; want none", got, err)
+	if got, err = repo.Drifted(t.Context(), []string{untouched.ID, bodiless.ID}); err != nil || len(got) != 0 {
+		t.Errorf("Drifted of pages that did not move = %v, %v; want none", got, err)
+	}
+	if got, err = repo.Drifted(t.Context(), nil); err != nil || len(got) != 0 {
+		t.Errorf("Drifted of no page = %v, %v; want none", got, err)
 	}
 }
 

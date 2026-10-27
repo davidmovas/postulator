@@ -14,7 +14,7 @@ import (
 )
 
 type engine interface {
-	Enqueue(ctx context.Context, record run.Run) (run.Run, error)
+	Enqueue(ctx context.Context, record run.Run, directives ...run.Directive) (run.Run, error)
 }
 
 type siteStore interface {

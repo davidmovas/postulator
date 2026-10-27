@@ -15,7 +15,12 @@ export interface SiteMapFake {
 export const siteMapFake: SiteMapFake = { answers: new Map(), asked: [], more: [], stable: new Map() };
 
 function keyOf(filter: SiteMapFilter): string {
-    return JSON.stringify({ parentId: filter.parentId ?? "", search: filter.search ?? "", pageTypeId: filter.pageTypeId ?? "" });
+    return JSON.stringify({
+        parentId: filter.parentId ?? "",
+        search: filter.search ?? "",
+        pageTypeId: filter.pageTypeId ?? "",
+        within: filter.within ?? "",
+    });
 }
 
 export function resetSiteMap(): void {

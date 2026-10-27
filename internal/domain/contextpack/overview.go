@@ -94,7 +94,7 @@ func (s Snapshot) Empty(page pagemap.Page) bool {
 
 func (s Snapshot) writable(page pagemap.Page) bool {
 	return live(page) && !page.WPType.Term() && page.TechnicalReason == pagemap.TechnicalNone &&
-		s.typeOf(page).Preset != pagetype.Technical
+		s.typeOf(page).Preset.Role() != pagetype.RoleTechnical
 }
 
 func (s Snapshot) codes() []CodeCount {
@@ -115,7 +115,7 @@ func (s Snapshot) codes() []CodeCount {
 }
 
 func hubLike(preset pagetype.Preset) bool {
-	return preset == pagetype.Hub || preset == pagetype.Catalog
+	return preset.Role() == pagetype.RoleHub || preset.Role() == pagetype.RoleCatalog
 }
 
 func (s Snapshot) hubs() []Hub {

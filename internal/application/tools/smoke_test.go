@@ -64,13 +64,13 @@ func (stubPreview) TrashItem(context.Context, string, int64, string) error {
 
 type stubEngine struct{}
 
-func (stubEngine) Enqueue(_ context.Context, record domainrun.Run) (domainrun.Run, error) {
+func (stubEngine) Enqueue(_ context.Context, record domainrun.Run, _ ...domainrun.Directive) (domainrun.Run, error) {
 	record.ID = id.New()
 	record.Status = domainrun.StatusPending
 	return record, nil
 }
 
-func (stubEngine) EstimateRun(context.Context, domainrun.Run, map[string]string) (domainrun.Estimate, error) {
+func (stubEngine) EstimateRun(context.Context, domainrun.Run, map[string]string, ...domainrun.Directive) (domainrun.Estimate, error) {
 	return domainrun.Estimate{}, nil
 }
 
@@ -150,7 +150,8 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 	modelProfiles := profiles.New(sqlite.NewModelProfileRepo(store), siteRepo, built, now)
 	templateService := templates.New(templateRepo, pageRepo, entityRepo, siteRepo, sqlite.NewPageTypeRepo(store), store, bus, now)
 	types := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: pageRepo, Templates: templateRepo,
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
+		Pages: pageRepo, Templates: templateRepo,
 		Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now,
 	})
 	if seedErr := types.Seed(t.Context(), owner.ID); seedErr != nil {
@@ -164,12 +165,21 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 
 	pagesService := pages.New(pages.Deps{
 		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Types: sqlite.NewPageTypeRepo(store),
-		Bodies: sqlite.NewPageBodyRepo(store), UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+		Bodies: sqlite.NewPageBodyRepo(store), Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),
+		Rows: sqlite.NewPageMapRepo(store), Templates: templateRepo, UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
 	})
 	seeded.store, seeded.types, seeded.pages = store, types, pagesService
+	siteModel := sitemodel.New(sitemodel.Deps{
+		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
+		Sites: siteRepo, Pages: pageRepo,
+		Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
+		Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
+		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
+		Runs: runRepo, Items: itemRepo,
+	})
 	graphService := graph.New(graph.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store),
-		Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
+		Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store), Maps: siteModel,
 		Profiles: modelProfiles, LLM: book, UnitOfWork: store, Publisher: bus, Clock: now,
 	})
 	importsService := imports.New(imports.Deps{
@@ -180,26 +190,23 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Findings: sqlite.NewFindingRepo(store), Terms: sqlite.NewPageIdentityRepo(store),
 		Publisher: bus, Clock: now,
 	})
-	siteModel := sitemodel.New(sitemodel.Deps{
-		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
-		Sites: siteRepo, Pages: pageRepo,
-		Entities: entityRepo, Edges: edgeRepo, Types: types, Terms: sqlite.NewPageIdentityRepo(store),
-		Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
-		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
-	})
 	return tools.New(tools.Deps{
 		Sites:     sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
 		Graph:     graphService,
 		Pages:     pagesService,
 		PageTypes: types,
+		Classify: pagetypes.NewClassification(pagetypes.ClassificationDeps{
+			Facts: siteModel, Types: types, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store), UnitOfWork: store,
+			Publisher: bus, Clock: now,
+		}),
 		Templates: templateService,
-		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry(), pagesService),
+		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, types, domainrun.NewRegistry(), pagesService, siteModel, graphService),
 		Sync:      sync.New(stubEngine{}, siteRepo, stubProbe{}, stubPacker{}, now),
 		Reports:   reportsService,
 		Imports:   importsService,
 		Findings: findings.New(findings.Deps{
 			Findings: sqlite.NewFindingRepo(store), Fields: sqlite.NewPageFieldRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
-			Pages: pageRepo, Cards: graphService, Rows: importsService, Places: siteModel,
+			Pages: pageRepo, Cards: graphService, Rows: importsService, Parents: graphService, Places: siteModel,
 			UnitOfWork: store, Publisher: bus, Clock: now,
 		}),
 		Models: models.New(built, modelRepo, modelProfiles, book,
@@ -210,12 +217,13 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		}),
 		Schedules: schedules.New(schedules.Deps{
 			Schedules: sqlite.NewScheduleRepo(store), Pages: pageRepo, Sites: siteRepo,
-			Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, domainrun.NewRegistry(), pagesService),
+			Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, types, domainrun.NewRegistry(), pagesService, siteModel, graphService),
 			RunReader: runRepo, Publisher: bus, Clock: now,
 		}),
 		SiteModel:   siteModel,
 		ResultBytes: func() int { return 16384 },
 		Actions:     sqlite.NewPendingActionRepo(store),
+		Plans:       sqlite.NewPlanRepo(store),
 		Publisher:   bus,
 		Clock:       now,
 	}), tools.Binding{SiteID: owner.ID, ConversationID: conversation.ID}, seeded
@@ -227,45 +235,39 @@ func (wholeWindow) InputBudget(domainllm.Role) int {
 	return 0
 }
 
-func TestSitesExploreAnswersEveryViewOverTheStore(t *testing.T) {
+func TestLinksAnswersEveryViewOverTheStore(t *testing.T) {
 	t.Parallel()
 
 	registry, binding, seeded := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 	calls := map[string]string{
-		"tree":  `{"view":"tree"}`,
-		"links": `{"view":"links","pageId":"` + seeded.page + `"}`,
-		"gaps":  `{"view":"gaps","limit":10}`,
-		"pack":  `{"view":"pack","path":"/coffee/"}`,
+		"page":    `{"view":"page","pageId":"` + seeded.page + `"}`,
+		"section": `{"view":"section","pageId":"` + seeded.page + `"}`,
+		"map":     `{"view":"map"}`,
+		"owed":    `{"view":"owed","missing":true}`,
+		"orphans": `{"view":"orphans","limit":10}`,
+		"suggest": `{"view":"suggest"}`,
 	}
 	for view, args := range calls {
 		t.Run(view, func(t *testing.T) {
 			t.Parallel()
 
-			out, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(args))
+			out, err := registry.Call(t.Context(), binding, "links", json.RawMessage(args))
 			if err != nil {
-				t.Fatalf("sites_explore %s: %v", view, err)
+				t.Fatalf("links %s: %v", view, err)
 			}
-			answered, ok := out.(sitemodel.ExploreResponse)
+			answered, ok := out.(sitemodel.LinksAnswer)
 			if !ok || string(answered.View) != view {
-				t.Fatalf("sites_explore %s answered %+v", view, out)
+				t.Fatalf("links %s answered %+v", view, out)
 			}
 		})
 	}
-	tree, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(`{"view":"tree"}`))
-	if err != nil {
-		t.Fatalf("tree: %v", err)
+	section := called[sitemodel.LinksAnswer](t, registry, binding, "links", `{"view":"section"}`)
+	if section.Totals == nil || section.Totals.Pages != 1 || section.Pages == nil || section.Pages.Items[0].Path != "/coffee/" {
+		t.Errorf("the whole site's section = %+v, want the one seeded page", section)
 	}
-	listed, ok := tree.(sitemodel.ExploreResponse)
-	if !ok || len(listed.Tree.Nodes.Items) != 1 || listed.Tree.Nodes.Items[0].Page.Path != "/coffee/" {
-		t.Errorf("the tree's top = %+v, want the one seeded page", tree)
-	}
-	pack, err := registry.Call(t.Context(), binding, "sites_explore", json.RawMessage(`{"view":"pack","path":"/coffee/"}`))
-	if err != nil {
-		t.Fatalf("pack: %v", err)
-	}
-	if got, ok := pack.(sitemodel.ExploreResponse); !ok || got.Pack.Budget != 16384/4 || !strings.Contains(got.Pack.Text, "/coffee/") {
-		t.Errorf("pack = %+v, want the writer's pack fitted to a quarter of the tool-result cap in tokens", pack)
+	if _, err := registry.Call(t.Context(), binding, "links", json.RawMessage(`{"view":"page"}`)); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a page view naming no page = %v, want Invalid", err)
 	}
 }
 
@@ -354,10 +356,10 @@ func TestAToolCallActsAsTheAgent(t *testing.T) {
 	binding.Mode = domainagent.ModeAutonomous
 	asPerson := kctx.WithActor(t.Context(), kctx.ActorUser)
 
-	out, err := registry.Call(asPerson, binding, "graph_set_anchors",
-		json.RawMessage(`{"entityId":"`+seeded.entity+`","anchors":[{"text":"espresso","weight":1}]}`))
+	out, err := registry.Call(asPerson, binding, "graph_edit",
+		json.RawMessage(`{"op":"anchors","entityId":"`+seeded.entity+`","anchors":[{"text":"espresso","weight":1}]}`))
 	if err != nil {
-		t.Fatalf("graph_set_anchors: %v", err)
+		t.Fatalf("graph_edit anchors: %v", err)
 	}
 	set, ok := out.(graph.SetAnchorsResponse)
 	if !ok || len(set.Entity.Anchors) != 1 || set.Entity.Anchors[0].Source != "ai" {
@@ -369,10 +371,10 @@ func TestAProposedCardWaitsForAPersonUnlessTheCallWasApproved(t *testing.T) {
 	t.Parallel()
 
 	registry, binding, seeded := wired(t)
-	args := json.RawMessage(`{"cards":[{"entityId":"` + seeded.entity + `","definition":"Brewed from roasted beans.","reason":"the hub's text"}]}`)
+	args := json.RawMessage(`{"op":"cards","cards":[{"entityId":"` + seeded.entity + `","definition":"Brewed from roasted beans.","reason":"the hub's text"}]}`)
 
 	binding.Mode = domainagent.ModeAutonomous
-	filed, err := registry.Call(t.Context(), binding, "graph_propose_cards", args)
+	filed, err := registry.Call(t.Context(), binding, "graph_propose", args)
 	if err != nil {
 		t.Fatalf("propose: %v", err)
 	}
@@ -380,13 +382,13 @@ func TestAProposedCardWaitsForAPersonUnlessTheCallWasApproved(t *testing.T) {
 	if !ok || len(proposed.Proposals) != 1 || proposed.Proposals[0].Proposed.Definition != "Brewed from roasted beans." {
 		t.Fatalf("an autonomous call = %+v, want one proposal filed", filed)
 	}
-	read, err := registry.Call(t.Context(), binding, "graph_get_entity", json.RawMessage(`{"id":"`+seeded.entity+`"}`))
-	if held, isEntity := read.(graph.GetEntityResponse); err != nil || !isEntity || held.Entity.Definition != "" {
+	read, err := registry.Call(t.Context(), binding, "graph_read", json.RawMessage(`{"view":"entity","entityId":"`+seeded.entity+`"}`))
+	if held, isEntity := read.(tools.GraphReadResponse); err != nil || !isEntity || held.Entity == nil || held.Entity.Definition != "" {
 		t.Fatalf("the entity after a proposal = %+v, %v; want nothing written", read, err)
 	}
 
 	binding.Mode, binding.Approved = domainagent.ModeConfirm, true
-	written, err := registry.Call(t.Context(), binding, "graph_propose_cards", args)
+	written, err := registry.Call(t.Context(), binding, "graph_propose", args)
 	if err != nil {
 		t.Fatalf("an approved call: %v", err)
 	}
@@ -414,10 +416,10 @@ func TestATemplateToolSaysHowManyKeywordsThePageMustUse(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := strings.Replace(minimalSpec, `"maxDensity":0.02}`, `"maxDensity":0.02`+tc.rule+`}`, 1)
-			out, err := registry.Call(t.Context(), binding, "templates_create",
-				json.RawMessage(`{"name":"Keyed `+tc.name+`","spec":`+spec+`}`))
+			out, err := registry.Call(t.Context(), binding, "templates",
+				json.RawMessage(`{"op":"create","name":"Keyed `+tc.name+`","spec":`+spec+`}`))
 			if err != nil {
-				t.Fatalf("templates_create: %v", err)
+				t.Fatalf("templates create: %v", err)
 			}
 			encoded, err := json.Marshal(out)
 			if err != nil {
@@ -445,10 +447,10 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 	product := `,"product":{"shortDescription":{"enabled":true,"intent":"Say what it is","targetWords":40,` +
 		`"primaryKeyword":true}}}`
 	spec := strings.TrimSuffix(minimalSpec, "}") + product
-	out, err := registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"Product outputs","spec":`+spec+`}`))
+	out, err := registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"Product outputs","spec":`+spec+`}`))
 	if err != nil {
-		t.Fatalf("templates_create: %v", err)
+		t.Fatalf("templates create: %v", err)
 	}
 	encoded, err := json.Marshal(out)
 	if err != nil {
@@ -460,15 +462,15 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 		}
 	}
 	retired := strings.TrimSuffix(minimalSpec, "}") + `,"product":{"specifications":[{"name":"Form"}]}}`
-	if _, err = registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"Retired outputs","spec":`+retired+`}`)); err == nil {
+	if _, err = registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"Retired outputs","spec":`+retired+`}`)); err == nil {
 		t.Error("a template naming the retired specifications was taken; the store owns a product's attributes")
 	}
 
-	bare, err := registry.Call(t.Context(), binding, "templates_create",
-		json.RawMessage(`{"name":"No product outputs","spec":`+minimalSpec+`}`))
+	bare, err := registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"No product outputs","spec":`+minimalSpec+`}`))
 	if err != nil {
-		t.Fatalf("templates_create: %v", err)
+		t.Fatalf("templates create: %v", err)
 	}
 	if encoded, err = json.Marshal(bare); err != nil || strings.Contains(string(encoded), `"product":{`) {
 		t.Errorf("a template that says nothing of products carries a product block: %s", encoded)
@@ -479,12 +481,12 @@ func argumentsFor(name string) json.RawMessage {
 	switch name {
 	case "imports_inspect", "imports_preview":
 		return json.RawMessage(`{"path":"C:/nowhere/absent.csv","mapping":{"columns":[]}}`)
-	case "templates_create":
-		return json.RawMessage(`{"name":"Guide","spec":` + minimalSpec + `}`)
-	case "templates_update":
-		return json.RawMessage(`{"id":"t1","spec":` + minimalSpec + `}`)
-	case "sites_explore":
-		return json.RawMessage(`{"view":"gaps"}`)
+	case "templates":
+		return json.RawMessage(`{"op":"create","name":"Guide","spec":` + minimalSpec + `}`)
+	case "links":
+		return json.RawMessage(`{"view":"section"}`)
+	case "pages_tree":
+		return json.RawMessage(`{"view":"roots"}`)
 	case "findings":
 		return json.RawMessage(`{"op":"resolve","findingId":"f1","option":"ignore"}`)
 	default:

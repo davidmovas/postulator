@@ -80,7 +80,11 @@ export function ResolveDialog({ siteId, resolving, onClose, onGone }: ResolveDia
         () =>
             finding === null
                 ? null
-                : describeAction(findingsTool, { op: "resolve", findingId: finding.id, option, ...picks }, null, { currentTemplate: null, finding }),
+                : describeAction(findingsTool, { op: "resolve", findingId: finding.id, option, ...picks }, null, {
+                      currentTemplate: null,
+                      finding,
+                      summary: null,
+                  }),
         [finding, option, picks.pageId, picks.pageTypeId],
     );
     const thrown = resolve.error ?? explanation.error;

@@ -7,6 +7,7 @@ import {
     fieldProviders,
     pageTypePresets,
     pageTypeReasons,
+    pageTypeRoles,
     pageTypeSources,
 } from "../../../generated/vocab.js";
 import {
@@ -20,12 +21,14 @@ import {
     presetTone,
     providerLabel,
     reasonLabel,
+    roleLabel,
     roleOf,
     sourceLabel,
 } from "./labels.js";
 
 const tables: readonly { name: string; values: readonly string[]; label: (value: string) => string }[] = [
     { name: "pageTypePresets", values: pageTypePresets, label: presetLabel },
+    { name: "pageTypeRoles", values: pageTypeRoles, label: roleLabel },
     { name: "pageTypeSources", values: pageTypeSources, label: sourceLabel },
     { name: "pageTypeReasons", values: pageTypeReasons, label: reasonLabel },
     { name: "fieldKeys", values: fieldKeys, label: (value) => fieldLabel(value) },
@@ -55,7 +58,8 @@ describe("presets as roles", () => {
     it("treats an untyped page and an unknown preset as untyped", () => {
         expect(roleOf(null)).toBe("untyped");
         expect(roleOf("")).toBe("untyped");
-        expect(roleOf("landing")).toBe("untyped");
+        expect(roleOf("pillar")).toBe("untyped");
+        expect(roleOf("landing")).toBe("landing");
         expect(roleOf("hub")).toBe("hub");
         expect(presetLabel("")).toBe(copy.pageTypes.untyped);
     });

@@ -66,6 +66,15 @@ export function findingSentence(code: string, subject: Subject): string {
             return said.cardProposed(subjectText(subject, "name"));
         case "page_without_entity":
             return said.withoutEntity(subjectText(subject, "path"));
+        case "type_by_default":
+            return said.typeByDefault(subjectText(subject, "path"), subjectText(subject, "type"));
+        case "entity_parent_differs":
+            return said.entityParent(
+                subjectText(subject, "entity"),
+                listed(subject, "graph").filter((name): name is string => typeof name === "string"),
+                subjectText(subject, "tree"),
+                subjectText(subject, "treePath"),
+            );
         default:
             return said.generic;
     }

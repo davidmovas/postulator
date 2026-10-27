@@ -36,6 +36,7 @@ type PendingAction struct {
 	Tool           string          `json:"tool"`
 	Args           json.RawMessage `json:"args"`
 	Summary        string          `json:"summary"`
+	Risk           string          `json:"risk"`
 	Status         string          `json:"status"`
 	Result         json.RawMessage `json:"result,omitempty"`
 	Error          string          `json:"error,omitempty"`
@@ -61,7 +62,7 @@ func messageView(m domainagent.Message, status string) Message {
 func actionView(a domainagent.PendingAction) PendingAction {
 	return PendingAction{
 		ID: a.ID, ConversationID: a.ConversationID, Tool: a.Tool, Args: tools.Redact(a.Args), Summary: a.Summary,
-		Status: string(a.Status), Result: a.Result, Error: a.Error,
+		Risk: a.Risk, Status: string(a.Status), Result: a.Result, Error: a.Error,
 		CreatedAt: dto.NewTime(a.CreatedAt), UpdatedAt: dto.NewTime(a.UpdatedAt),
 	}
 }

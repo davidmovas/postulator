@@ -2,6 +2,7 @@ package graph_test
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"testing"
 
@@ -147,6 +148,9 @@ func TestASitePreviewProposesFromThePagesWithoutAModel(t *testing.T) {
 	}
 	if !slices.Equal(paths, []string{"/about/", "/product/beans/"}) || out.Pages != 2 {
 		t.Fatalf("proposals = %v over %d pages, want /about/ and the product", paths, out.Pages)
+	}
+	if !maps.Equal(out.PageTypes, map[string]string{out.Entities[0].PageID: string(pagetype.Guide), beans.ID: string(pagetype.Product)}) {
+		t.Errorf("the source pages' types = %v, want each proposal's page by its type", out.PageTypes)
 	}
 	product := out.Entities[1]
 	want := appgraph.ProposedEntity{

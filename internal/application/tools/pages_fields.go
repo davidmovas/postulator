@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
+	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -62,7 +63,7 @@ func pagesFields(deps Deps) Tool {
 		}
 		return deps.fieldSummary(ctx, b, in)
 	})
-	return readsOn(tool, opGet)
+	return editableOn(readsOn(tool, opGet), opSet, agent.EditField{Name: "value", Path: "value"})
 }
 
 func (in *pagesFieldsArgs) edit() run.Edit {

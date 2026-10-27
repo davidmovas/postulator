@@ -233,3 +233,38 @@ describe("the page model follows the observation", () => {
         expect(refreshed(client)).toEqual(["pack"]);
     });
 });
+
+describe("a plan's card follows its plan", () => {
+    function planned(): QueryClient {
+        const client = bridged();
+        client.setQueryData(keys.agent.plans("c1"), { plans: [] });
+        client.setQueryData(keys.agent.plans("c2"), { plans: [] });
+        return client;
+    }
+
+    function staleOf(client: QueryClient): boolean[] {
+        return ["c1", "c2"].map(
+            (conversationId) => client.getQueryState(keys.agent.plans(conversationId))?.isInvalidated === true,
+        );
+    }
+
+    it("reads the plans of the conversation again when one is proposed there", () => {
+        const client = planned();
+
+        fire("agent.plan.proposed", { conversationId: "c1", planId: "p1", title: "Link the kits", steps: 3 });
+
+        expect(staleOf(client)).toEqual([true, false]);
+    });
+
+    it("reads them again once a burst of step updates settles", () => {
+        const client = planned();
+
+        const moved = { conversationId: "c1", planId: "p1", status: "running", stepId: "s1" };
+        fire("agent.plan.updated", { ...moved, stepStatus: "running" });
+        fire("agent.plan.updated", { ...moved, stepStatus: "done" });
+        expect(staleOf(client)).toEqual([false, false]);
+
+        vi.advanceTimersByTime(usageCoalesceMs);
+        expect(staleOf(client)).toEqual([true, false]);
+    });
+});

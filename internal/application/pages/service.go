@@ -6,11 +6,15 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/application/events"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
+	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/paging"
@@ -22,8 +26,32 @@ type pageStore interface {
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, id string) (pagemap.Page, error)
 	List(ctx context.Context, q pagemap.Query, page paging.Request) (paging.List[pagemap.Page], error)
+	Count(ctx context.Context, q pagemap.Query) (int, error)
+	IDs(ctx context.Context, q pagemap.Query) ([]string, error)
 	ListBySite(ctx context.Context, siteID string) ([]pagemap.Page, error)
+	ListByIDs(ctx context.Context, ids []string) ([]pagemap.Page, error)
 	SetType(ctx context.Context, pageID, typeID string, reason pagemap.TypeReason, at time.Time) error
+	SetTypes(ctx context.Context, siteID string, pageIDs []string, typeID string, reason pagemap.TypeReason, at time.Time) (int64, error)
+	ClearTypes(ctx context.Context, siteID string, pageIDs []string, at time.Time) (int64, error)
+	SetTemplates(ctx context.Context, siteID string, pageIDs []string, templateID *string, at time.Time) (int64, error)
+}
+
+type mapRefresher interface {
+	Refresh(ctx context.Context, siteID string) error
+}
+
+type mapRows interface {
+	ListByIDs(ctx context.Context, pageIDs []string) ([]contextpack.MapRow, error)
+	IDsUnder(ctx context.Context, siteID, trail, typeID string) ([]string, error)
+}
+
+type classifier interface {
+	Matching(ctx context.Context, siteID, ruleID string) ([]string, error)
+	Reclassify(ctx context.Context, siteID string, pageIDs []string) (int, error)
+}
+
+type templateReader interface {
+	Get(ctx context.Context, id string) (template.Template, error)
 }
 
 type typeReader interface {
@@ -49,7 +77,15 @@ type siteReader interface {
 }
 
 type bodyReader interface {
-	Drifted(ctx context.Context, siteID string) ([]string, error)
+	Drifted(ctx context.Context, pageIDs []string) ([]string, error)
+}
+
+type fieldReader interface {
+	ListForPages(ctx context.Context, pageIDs []string) (map[string][]field.Value, error)
+}
+
+type renderReader interface {
+	ListForPages(ctx context.Context, pageIDs []string) ([]render.Record, error)
 }
 
 type unitOfWork interface {
@@ -68,7 +104,13 @@ type Deps struct {
 	Edges      edgeReader
 	Sites      siteReader
 	Bodies     bodyReader
+	Fields     fieldReader
+	Renders    renderReader
 	Findings   findingClearer
+	Maps       mapRefresher
+	Rows       mapRows
+	Classifier classifier
+	Templates  templateReader
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock
@@ -76,24 +118,32 @@ type Deps struct {
 }
 
 type Service struct {
-	pages     pageStore
-	types     typeReader
-	links     linkReader
-	entities  entityStore
-	edges     edgeReader
-	sites     siteReader
-	bodies    bodyReader
-	findings  findingClearer
-	uow       unitOfWork
-	publisher application.Publisher
-	clock     clock.Clock
-	preview   previewIssuer
+	pages      pageStore
+	types      typeReader
+	links      linkReader
+	entities   entityStore
+	edges      edgeReader
+	sites      siteReader
+	bodies     bodyReader
+	fields     fieldReader
+	renders    renderReader
+	findings   findingClearer
+	maps       mapRefresher
+	rows       mapRows
+	classifier classifier
+	templates  templateReader
+	uow        unitOfWork
+	publisher  application.Publisher
+	clock      clock.Clock
+	preview    previewIssuer
 }
 
 func New(deps Deps) *Service {
 	return &Service{
 		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
-		bodies: deps.Bodies, findings: deps.Findings, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock, preview: deps.Preview,
+		bodies: deps.Bodies, fields: deps.Fields, renders: deps.Renders, findings: deps.Findings, maps: deps.Maps, rows: deps.Rows,
+		classifier: deps.Classifier, templates: deps.Templates, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock,
+		preview: deps.Preview,
 	}
 }
 
@@ -105,24 +155,71 @@ func (s *Service) carried(ctx context.Context, page pagemap.Page) error {
 		finding.ResolvedByModel, finding.ResolutionPageMapped, s.now())
 }
 
-func (s *Service) drifted(ctx context.Context, siteID string) (map[string]bool, error) {
-	ids, err := s.bodies.Drifted(ctx, siteID)
+type observedH1 struct {
+	text   string
+	source render.H1Source
+}
+
+type annotations struct {
+	drifted map[string]bool
+	h1s     map[string]observedH1
+}
+
+func (a annotations) h1(pageID string) observedH1 {
+	if seen, ok := a.h1s[pageID]; ok {
+		return seen
+	}
+	return observedH1{source: render.H1None}
+}
+
+func (s *Service) annotate(ctx context.Context, pages []pagemap.Page) (annotations, error) {
+	out := annotations{drifted: make(map[string]bool), h1s: make(map[string]observedH1, len(pages))}
+	ids := make([]string, 0, len(pages))
+	for i := range pages {
+		ids = append(ids, pages[i].ID)
+	}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	drifted, err := s.bodies.Drifted(ctx, ids)
 	if err != nil {
-		return nil, err
+		return annotations{}, err
 	}
-	drifted := make(map[string]bool, len(ids))
+	for _, pageID := range drifted {
+		out.drifted[pageID] = true
+	}
+	stored, err := s.fields.ListForPages(ctx, ids)
+	if err != nil {
+		return annotations{}, err
+	}
+	records, err := s.renders.ListForPages(ctx, ids)
+	if err != nil {
+		return annotations{}, err
+	}
+	byPage := make(map[string]*render.Record, len(records))
+	for i := range records {
+		byPage[records[i].PageID] = &records[i]
+	}
 	for _, pageID := range ids {
-		drifted[pageID] = true
+		content := ""
+		values := stored[pageID]
+		for i := range values {
+			if values[i].Key == field.H1 {
+				content = values[i].Current
+			}
+		}
+		text, source := render.VisibleH1(byPage[pageID], content)
+		out.h1s[pageID] = observedH1{text: text, source: source}
 	}
-	return drifted, nil
+	return out, nil
 }
 
 func (s *Service) viewOf(ctx context.Context, page pagemap.Page) (Page, error) {
-	drifted, err := s.drifted(ctx, page.SiteID)
+	shown, err := s.annotate(ctx, []pagemap.Page{page})
 	if err != nil {
 		return Page{}, err
 	}
-	return view(page, drifted[page.ID]), nil
+	return view(page, shown), nil
 }
 
 func (s *Service) now() time.Time {

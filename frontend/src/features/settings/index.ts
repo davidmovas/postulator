@@ -1,9 +1,10 @@
 export { SettingsScreen } from "./screen.js";
 export { ModelSettingsScreen } from "./models/screen.js";
 export { PageTypesScreen } from "./types/screen.js";
+export { ClassificationScreen } from "./classification/screen.js";
 export { RunSettingsScreen } from "./runs.js";
 export { AgentSettingsScreen } from "./agent.js";
 export { BrowserSettingsScreen } from "./browser.js";
 export { SecurityScreen } from "./security/screen.js";
 export { AboutScreen } from "./about.js";
-export { pageTypesOf, settingsHome } from "./tabs.js";
+export { classificationOf, pageTypeOf, pageTypesOf, settingsHome } from "./tabs.js";

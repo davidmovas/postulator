@@ -31,6 +31,7 @@ type siteState struct {
 	trails   pagemap.TrailSite
 	byName   map[string][]graph.Entity
 	byPath   map[string]pagemap.Page
+	byID     map[string]pagemap.Page
 	edgeKeys map[string]struct{}
 	types    map[pagemap.WPType]struct{}
 }
@@ -42,6 +43,7 @@ func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pa
 		trails:   pagemap.NewTrailSite(pagemap.NewIndexNamed(pages, pagemap.Names(facts.fields)), facts.terms, facts.termParents),
 		byName:   make(map[string][]graph.Entity, len(entities)),
 		byPath:   make(map[string]pagemap.Page, len(pages)),
+		byID:     make(map[string]pagemap.Page, len(pages)),
 		edgeKeys: make(map[string]struct{}, len(edges)),
 		types: map[pagemap.WPType]struct{}{
 			pagemap.WPPage: {}, pagemap.WPPost: {}, pagemap.WPProduct: {}, pagemap.WPProductCategory: {},
@@ -51,6 +53,7 @@ func newSiteState(siteID string, entities []graph.Entity, edges []graph.Edge, pa
 		state.byName[graph.Key(entities[i].Name)] = append(state.byName[graph.Key(entities[i].Name)], entities[i])
 	}
 	for i := range pages {
+		state.byID[pages[i].ID] = pages[i]
 		state.byPath[pages[i].Path] = pages[i]
 		state.types[pages[i].WPType] = struct{}{}
 	}

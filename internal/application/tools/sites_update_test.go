@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/application/sites"
+	"github.com/davidmovas/postulator/internal/application/tools"
 	domainagent "github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -15,11 +16,11 @@ func updateSite(t *testing.T, call func(json.RawMessage) (any, error), args map[
 
 	out, err := call(encoded(t, args))
 	if err != nil {
-		t.Fatalf("sites_update %v: %v", args, err)
+		t.Fatalf("sites_manage update %v: %v", args, err)
 	}
 	answered, ok := out.(sites.UpdateResponse)
 	if !ok {
-		t.Fatalf("sites_update answered %T", out)
+		t.Fatalf("sites_manage update answered %T", out)
 	}
 	return answered.Site
 }
@@ -30,7 +31,7 @@ func TestSitesUpdateCarriesTheSettings(t *testing.T) {
 	registry, binding, seeded := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 	call := func(args json.RawMessage) (any, error) {
-		return registry.Call(t.Context(), binding, "sites_update", args)
+		return registry.Call(t.Context(), binding, "sites_manage", args)
 	}
 
 	steps := []struct {
@@ -64,7 +65,7 @@ func TestSitesUpdateCarriesTheSettings(t *testing.T) {
 	}
 
 	for _, step := range steps {
-		step.args["id"] = seeded.site
+		step.args["op"], step.args["siteId"] = "update", seeded.site
 		got := updateSite(t, call, step.args)
 		settings := got.Settings
 		if settings.UserAgent != step.agent || settings.Observe.RenderConcurrency != step.concurrency ||
@@ -76,20 +77,20 @@ func TestSitesUpdateCarriesTheSettings(t *testing.T) {
 		}
 	}
 
-	read, err := registry.Call(t.Context(), binding, "sites_get", encoded(t, map[string]any{"id": seeded.site}))
+	read, err := registry.Call(t.Context(), binding, "sites", encoded(t, map[string]any{"view": "get"}))
 	if err != nil {
-		t.Fatalf("sites_get: %v", err)
+		t.Fatalf("sites get: %v", err)
 	}
-	held, ok := read.(sites.GetResponse)
-	if !ok {
-		t.Fatalf("sites_get answered %T", read)
+	held, ok := read.(tools.SitesResponse)
+	if !ok || held.Site == nil {
+		t.Fatalf("sites get answered %+v", read)
 	}
 	if held.Site.Defaults.TemplateID == nil || *held.Site.Defaults.TemplateID != seeded.template || held.Site.Name != "Shop Two" {
 		t.Fatalf("the settings merge lost the defaults or the name: %+v", held.Site)
 	}
 
 	detected := updateSite(t, call, map[string]any{
-		"id": seeded.site, "technicalShortcodes": []string{"vc_row", "member_area"}, "technicalBlocks": []string{"acme/form"},
+		"op": "update", "technicalShortcodes": []string{"vc_row", "member_area"}, "technicalBlocks": []string{"acme/form"},
 		"builders": []map[string]any{{"name": "Acme Builder", "classPrefixes": []string{"acme-"}}},
 	}).Settings
 	if !slices.Equal(detected.TechnicalShortcodes, []string{"vc_row", "member_area"}) || !slices.Equal(detected.TechnicalBlocks, []string{"acme/form"}) ||
@@ -99,7 +100,7 @@ func TestSitesUpdateCarriesTheSettings(t *testing.T) {
 	if detected.Observe.FullWalkEvery != 3 || string(detected.LinkURLForm) != "relative" {
 		t.Fatalf("setting the detection lost the rest: %+v", detected)
 	}
-	reset := updateSite(t, call, map[string]any{"id": seeded.site, "technicalShortcodes": []string{}}).Settings
+	reset := updateSite(t, call, map[string]any{"op": "update", "technicalShortcodes": []string{}}).Settings
 	if len(reset.TechnicalShortcodes) == 0 || slices.Contains(reset.TechnicalShortcodes, "member_area") {
 		t.Fatalf("an empty shortcode list = %v, want the defaults back", reset.TechnicalShortcodes)
 	}
@@ -117,7 +118,7 @@ func TestSitesUpdateCarriesTheSettings(t *testing.T) {
 
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.args["id"] = seeded.site
+			tc.args["op"] = "update"
 			if _, refusedErr := call(encoded(t, tc.args)); !errors.IsCode(refusedErr, errors.Invalid) {
 				t.Fatalf("code = %q, want INVALID (err %v)", errors.CodeOf(refusedErr), refusedErr)
 			}

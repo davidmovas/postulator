@@ -9,10 +9,12 @@ import (
 )
 
 var synonyms = map[string]Preset{
-	"hub": Hub, "hubs": Hub, "category": Hub, "categories": Hub, "commercial taxonomy": Hub, "taxonomy": Hub,
+	"hub": Hub, "hubs": Hub, "commercial taxonomy": Hub, "taxonomy": Hub,
 	"root": Hub, "root entity": Hub, "pillar": Hub, "store category": StoreCategory, "product category": StoreCategory,
+	"category": Category, "categories": Category, "landing": Landing, "landing page": Landing,
 	"entity": Entity, "entities": Entity, "topic": Entity, "custom": Entity, "geo": Entity, "geographic": Entity,
-	"geographic entity": Entity, "guide": Entity, "comparison": Entity, "article": Entity,
+	"geographic entity": Entity, "guide": Guide, "guides": Guide, "comparison": Guide, "article": Guide,
+	"info": Info, "information": Info, "informational": Info,
 	"product": Product, "products": Product, "compound": Product, "compound product": Product,
 	"product compound": Product, "product owner": Product,
 	"catalog": Catalog, "shop": Catalog, "technical": Technical,
@@ -20,7 +22,7 @@ var synonyms = map[string]Preset{
 
 func Match(cell string, types []Type, wpType pagemap.WPType) (Type, bool) {
 	if wpType.Term() {
-		return ByPreset(types, StoreCategory)
+		return ByRole(types, RoleArchive)
 	}
 	key := graph.Key(cell)
 	if key == "" {
@@ -37,16 +39,28 @@ func Match(cell string, types []Type, wpType pagemap.WPType) (Type, bool) {
 	}
 	found, ok := ByPreset(types, preset)
 	if !ok {
+		found, ok = ByRole(types, preset.Role())
+	}
+	if !ok {
 		return Type{}, false
 	}
 	return onPage(types, found)
 }
 
 func onPage(types []Type, named Type) (Type, bool) {
-	if named.Preset == StoreCategory {
-		return ByPreset(types, Hub)
+	if named.Preset.Role() == RoleArchive {
+		return ByRole(types, RoleHub)
 	}
 	return named, true
+}
+
+func ByRole(types []Type, role Role) (Type, bool) {
+	for _, preset := range rolePresets[role] {
+		if kind, found := ByPreset(types, preset); found {
+			return kind, true
+		}
+	}
+	return Type{}, false
 }
 
 func ByPreset(types []Type, preset Preset) (Type, bool) {
@@ -63,6 +77,10 @@ func ByPreset(types []Type, preset Preset) (Type, bool) {
 		return Type{}, false
 	}
 	return *oldest, true
+}
+
+func sameName(a, b string) bool {
+	return graph.Key(a) == graph.Key(b)
 }
 
 func words(text string) string {

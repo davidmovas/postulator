@@ -33,6 +33,14 @@ func (f agentFake) Confirm(context.Context, agent.ConfirmRequest) (agent.Confirm
 	return answer[agent.ConfirmResponse](f.mode)
 }
 
+func (f agentFake) ConfirmPlan(context.Context, agent.ConfirmPlanRequest) (agent.ConfirmPlanResponse, error) {
+	return answer[agent.ConfirmPlanResponse](f.mode)
+}
+
+func (f agentFake) ListPlans(context.Context, agent.ListPlansRequest) (agent.ListPlansResponse, error) {
+	return answer[agent.ListPlansResponse](f.mode)
+}
+
 func (f agentFake) Cancel(context.Context, agent.CancelRequest) (agent.CancelResponse, error) {
 	return answer[agent.CancelResponse](f.mode)
 }
@@ -61,8 +69,8 @@ func TestAgentServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewAgentService(zap.NewNop(), ready[wails.AgentUseCase](agentFake{})), []string{
-		"Cancel", "Confirm", "CreateConversation", "DeleteConversation", "ListConversations", "ListMessages",
-		"ListPendingActions", "RenameConversation", "Send", "SetMode", "Status",
+		"Cancel", "Confirm", "ConfirmPlan", "CreateConversation", "DeleteConversation", "ListConversations", "ListMessages",
+		"ListPendingActions", "ListPlans", "RenameConversation", "Send", "SetMode", "Status",
 	})
 	assertEveryMethodConverts(t, wails.NewAgentService(zap.NewNop(), ready[wails.AgentUseCase](agentFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewAgentService(zap.NewNop(), ready[wails.AgentUseCase](agentFake{mode: panicking})), panicBody)

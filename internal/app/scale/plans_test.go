@@ -188,7 +188,8 @@ func TestThePlanCheckSeesWhatALargeReadScans(t *testing.T) {
 		{statement: "SELECT id FROM pages WHERE title = ?", faults: 1},
 		{statement: "SELECT f.id FROM findings AS f WHERE f.subject = ?", faults: 1},
 		{statement: "SELECT id FROM pages WHERE id = ?", faults: 0},
-		{statement: "SELECT id FROM pages WHERE site_id = ? ORDER BY title LIMIT 10", faults: 1},
+		{statement: "SELECT id FROM pages WHERE site_id = ? ORDER BY h1 LIMIT 10", faults: 1},
+		{statement: "SELECT id FROM pages WHERE site_id = ? ORDER BY title, id LIMIT 10", faults: 0},
 		{statement: "SELECT id FROM findings WHERE site_id = ? AND code = ? ORDER BY created_at, id LIMIT 21", faults: 0},
 		{statement: "SELECT key, value FROM settings", faults: 0},
 	}

@@ -23,6 +23,7 @@ import (
 	domainllm "github.com/davidmovas/postulator/internal/domain/llm"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/paging"
 )
 
 const (
@@ -31,8 +32,7 @@ const (
 	agentRoot  = "/"
 	agentNotes = "/peptides/storage-notes/"
 
-	exploreTool  = "sites_explore"
-	proposeTool  = "graph_propose_cards"
+	proposeTool  = "graph_propose"
 	briefOpening = "THE SITE WHEN THIS CONVERSATION BEGAN"
 
 	autonomousDefinition = "Peptides are short chains of amino acids, sold here for laboratory research only."
@@ -141,37 +141,44 @@ func assertEveryViewAnswersFromTheModel(t *testing.T, core *app.Core, conversati
 		t.Errorf("the page model of %s is %+v, want its products from its listing or its twin's term", agentHub, page)
 	}
 
-	top := explore(t, core, conversation, `{"view":"tree"}`).Tree
-	if top == nil || !treeHolds(top, agentRoot) {
-		t.Errorf("the top of the tree is %+v, want a row for %s", top, agentRoot)
+	hubID := read.Page.Page.PageID
+	top := readTool[sitemodel.TreeAnswer](t, core, conversation, "pages_tree", `{"view":"roots"}`)
+	if !treeHolds(top, agentRoot) {
+		t.Errorf("the top of the tree is %+v, want a row for %s", top.Nodes.Items, agentRoot)
 	}
-	underRoot := explore(t, core, conversation, `{"view":"tree","path":"`+agentRoot+`"}`).Tree
-	if underRoot == nil || !treeHolds(underRoot, agentHub) {
-		t.Errorf("the tree under %s is %+v, want a row for %s", agentRoot, underRoot, agentHub)
+	rootID := ""
+	for i := range top.Nodes.Items {
+		if node := &top.Nodes.Items[i]; node.Page.Path == agentRoot {
+			rootID = node.Page.PageID
+		}
 	}
-	underHub := explore(t, core, conversation, `{"view":"tree","path":"`+agentHub+`"}`).Tree
-	if underHub == nil || underHub.Parent == nil || underHub.Parent.Path != agentHub || !treeHolds(underHub, agentChild) {
+	underRoot := readTool[sitemodel.TreeAnswer](t, core, conversation, "pages_tree", `{"view":"children","pageId":"`+rootID+`"}`)
+	if !treeHolds(underRoot, agentHub) {
+		t.Errorf("the tree under %s is %+v, want a row for %s", agentRoot, underRoot.Nodes.Items, agentHub)
+	}
+	underHub := readTool[sitemodel.TreeAnswer](t, core, conversation, "pages_tree", `{"view":"children","pageId":"`+hubID+`"}`)
+	if underHub.Node == nil || underHub.Node.Page.Path != agentHub || !treeHolds(underHub, agentChild) {
 		t.Errorf("the tree under %s is %+v, want a row for %s", agentHub, underHub, agentChild)
 	}
 
-	links := explore(t, core, conversation, `{"view":"links","path":"`+agentHub+`"}`).Links
+	links := readTool[sitemodel.LinksAnswer](t, core, conversation, "links", `{"view":"page","pageId":"`+hubID+`"}`).Page
 	if links == nil || links.Page.Path != agentHub || !slices.ContainsFunc(links.Required, func(owed reports.RequiredLink) bool {
 		return owed.TargetPath == agentChild
 	}) {
-		t.Errorf("the links view of %s is %+v, want the link it owes %s", agentHub, links, agentChild)
+		t.Errorf("the links of %s are %+v, want the link it owes %s", agentHub, links, agentChild)
 	}
 
-	gaps := explore(t, core, conversation, `{"view":"gaps"}`).Gaps
-	if gaps == nil || len(gaps.Items) == 0 || !slices.ContainsFunc(gaps.Items, func(row contextpack.GapRow) bool { return len(row.Gaps) > 0 }) {
-		t.Errorf("the gaps view is %+v, want the pages with a gap", gaps)
+	gapped := readTool[paging.List[contextpack.MapNode]](t, core, conversation, "pages_find", `{"gap":"empty"}`)
+	if len(gapped.Items) == 0 {
+		t.Errorf("pages_find found no page holding no text on the replica: %+v", gapped)
 	}
 
-	pack := explore(t, core, conversation, `{"view":"pack","path":"`+agentHub+`"}`).Pack
+	pack := readTool[tools.PagesGetResponse](t, core, conversation, "pages_get", `{"view":"pack","path":"`+agentHub+`"}`).Pack
 	if pack == nil || pack.Path != agentHub || pack.Tokens == 0 || !namesProducts(pack.Text) {
 		t.Fatalf("the pack view of %s is %+v, want the writer's pack with its products", agentHub, pack)
 	}
-	t.Logf("the replica's %s %s pack through %s, %d tokens of a %d-token budget, dropped %+v:\n%s",
-		pack.Path, pack.Field, exploreTool, pack.Tokens, pack.Budget, pack.Dropped, pack.Text)
+	t.Logf("the replica's %s %s pack through pages_get, %d tokens of a %d-token budget, dropped %+v:\n%s",
+		pack.Path, pack.Field, pack.Tokens, pack.Budget, pack.Dropped, pack.Text)
 }
 
 func assertACardWaitsForAPerson(t *testing.T, core *app.Core, conversation, siteID, entityID string) {
@@ -318,13 +325,13 @@ func callTool(t *testing.T, core *app.Core, conversation, tool, args string) jso
 	return message.Payload
 }
 
-func explore(t *testing.T, core *app.Core, conversation, args string) sitemodel.ExploreResponse {
+func readTool[T any](t *testing.T, core *app.Core, conversation, tool, args string) T {
 	t.Helper()
 
-	payload := callTool(t, core, conversation, exploreTool, args)
-	var answered sitemodel.ExploreResponse
+	payload := callTool(t, core, conversation, tool, args)
+	var answered T
 	if err := json.Unmarshal(payload, &answered); err != nil {
-		t.Fatalf("decode what %s%s answered: %v: %s", exploreTool, args, err, payload)
+		t.Fatalf("decode what %s%s answered: %v: %s", tool, args, err, payload)
 	}
 	return answered
 }
@@ -335,12 +342,12 @@ func namesProducts(text string) bool {
 	return listed || twin
 }
 
-func treeHolds(tree *sitemodel.TreeView, path string) bool {
-	return slices.ContainsFunc(tree.Nodes.Items, func(node contextpack.Node) bool { return node.Page.Path == path })
+func treeHolds(tree sitemodel.TreeAnswer, path string) bool {
+	return slices.ContainsFunc(tree.Nodes.Items, func(node contextpack.MapNode) bool { return node.Page.Path == path })
 }
 
 func cardsArgs(entityID, definition string) string {
-	encoded, err := json.Marshal(map[string]any{"cards": []map[string]any{{
+	encoded, err := json.Marshal(map[string]any{"op": "cards", "cards": []map[string]any{{
 		"entityId": entityID, "definition": definition, "reason": "Read from the hub's text and its products.",
 		"facts": []map[string]string{{"label": "Storage", "value": "Frozen, sealed under nitrogen"}},
 	}}})

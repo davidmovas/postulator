@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/llm"
+	"github.com/davidmovas/postulator/internal/application/runs"
 	"github.com/davidmovas/postulator/internal/domain/agent"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -48,6 +49,7 @@ type Binding struct {
 	RunID          string
 	Mode           agent.Mode
 	Approved       bool
+	Assumed        []runs.AssumedEdge
 }
 
 type Tool struct {
@@ -55,8 +57,17 @@ type Tool struct {
 	Check     func(args json.RawMessage) error
 	Run       func(ctx context.Context, b Binding, args json.RawMessage) (any, error)
 	Confirm   func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
+	Describe  func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
 	RiskOf    func(args json.RawMessage) Risk
+	Price     func(ctx context.Context, b Binding, args json.RawMessage) (Price, error)
+	Edits     func(ctx context.Context, b Binding, args json.RawMessage) ([]agent.EditField, error)
+	Adds      func(args json.RawMessage) []runs.AssumedEdge
 	Def       Def
+}
+
+type Price struct {
+	USD    float64
+	Tokens int
 }
 
 func (t Tool) risk(args json.RawMessage) Risk {
@@ -81,6 +92,43 @@ func readsOn(tool Tool, ops ...string) Tool {
 	return tool
 }
 
+func riskedBy(tool Tool, risks map[string]Risk) Tool {
+	tool.RiskOf = func(args json.RawMessage) Risk {
+		var in opOnly
+		if err := json.Unmarshal(args, &in); err == nil {
+			if risk, held := risks[in.Op]; held {
+				return risk
+			}
+		}
+		return tool.Def.Risk
+	}
+	return tool
+}
+
+func editableOn(tool Tool, op string, fields ...agent.EditField) Tool {
+	tool.Edits = func(_ context.Context, _ Binding, args json.RawMessage) ([]agent.EditField, error) {
+		var in opOnly
+		if err := json.Unmarshal(args, &in); err != nil || in.Op != op {
+			return nil, nil
+		}
+		return slices.Clone(fields), nil
+	}
+	return tool
+}
+
+func describing[In any](tool Tool, say func(ctx context.Context, b Binding, in In) (string, error)) Tool {
+	tool.Describe = func(ctx context.Context, b Binding, args json.RawMessage) (string, error) {
+		var in In
+		if len(args) > 0 {
+			if err := json.Unmarshal(args, &in); err != nil {
+				return "", refused(tool.Def.Name, err)
+			}
+		}
+		return say(ctx, b, in)
+	}
+	return tool
+}
+
 func confirming[In any](tool Tool, ask func(ctx context.Context, b Binding, in In) (string, error)) Tool {
 	tool.Confirm = func(ctx context.Context, b Binding, args json.RawMessage) (string, error) {
 		var in In
@@ -100,12 +148,7 @@ type Confirmation struct {
 	Summary  string `json:"summary"`
 }
 
-const (
-	siteField       = "siteId"
-	sortField       = "sort"
-	fieldField      = "field"
-	sortByCreatedAt = "createdAt"
-)
+const siteField = "siteId"
 
 func NewTool[In, Out any](def Def, fn func(ctx context.Context, b Binding, in In) (Out, error)) Tool {
 	schema, schemaErr := llm.SchemaFor[In]()
@@ -203,33 +246,6 @@ func requireSite(_ context.Context, b Binding) error {
 	return nil
 }
 
-func sortedBy(tool Tool, fields ...string) Tool {
-	schema := tool.Def.Schema
-	if schema == nil || schema.Properties == nil {
-		return tool
-	}
-	ordering, ok := schema.Properties[sortField]
-	if !ok || ordering.Properties == nil {
-		return tool
-	}
-	key, ok := ordering.Properties[fieldField]
-	if !ok {
-		return tool
-	}
-
-	chosen := *key
-	chosen.Enum = fields
-	nested := *ordering
-	nested.Properties = maps.Clone(ordering.Properties)
-	nested.Properties[fieldField] = &chosen
-
-	widened := *schema
-	widened.Properties = maps.Clone(schema.Properties)
-	widened.Properties[sortField] = &nested
-	tool.Def.Schema = &widened
-	return tool
-}
-
 func enumOn(tool Tool, property string, values []string) Tool {
 	schema := tool.Def.Schema
 	if schema == nil || schema.Properties == nil {
@@ -244,31 +260,6 @@ func enumOn(tool Tool, property string, values []string) Tool {
 	widened := *schema
 	widened.Properties = maps.Clone(schema.Properties)
 	widened.Properties[property] = &closed
-	tool.Def.Schema = &widened
-	return tool
-}
-
-func orderedOnly(tool Tool) Tool {
-	schema := tool.Def.Schema
-	if schema == nil || schema.Properties == nil {
-		return tool
-	}
-	ordering, ok := schema.Properties[sortField]
-	if !ok || ordering.Properties == nil {
-		return tool
-	}
-
-	direction := *ordering
-	direction.Description = "Set desc to reverse"
-	direction.Properties = maps.Clone(ordering.Properties)
-	delete(direction.Properties, fieldField)
-	direction.Required = slices.DeleteFunc(slices.Clone(ordering.Required), func(name string) bool {
-		return name == fieldField
-	})
-
-	widened := *schema
-	widened.Properties = maps.Clone(schema.Properties)
-	widened.Properties[sortField] = &direction
 	tool.Def.Schema = &widened
 	return tool
 }

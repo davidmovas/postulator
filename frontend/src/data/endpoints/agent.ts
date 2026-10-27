@@ -10,6 +10,8 @@ export const sendMessage = one(Agent.Send);
 export const confirmAction = one(Agent.Confirm);
 export const cancelTurn = one(Agent.Cancel);
 export const turnStatus = one(Agent.Status);
+export const listPlans = one(Agent.ListPlans);
+export const confirmPlan = one(Agent.ConfirmPlan);
 export const listConversations = listed<Parameters<typeof Agent.ListConversations>[0], Conversation>(
     Agent.ListConversations,
 );

@@ -6,7 +6,7 @@ import {
     carriesLinks,
     customScope,
     draftOf,
-    lastOfPreset,
+    lastOfRole,
     lengthProblem,
     linkField,
     metaField,
@@ -115,8 +115,8 @@ describe("the types of a site", () => {
     });
 
     it("knows the last type of a role, which cannot be deleted", () => {
-        expect(lastOfPreset(types, hub)).toBe(false);
-        expect(lastOfPreset(types, guide)).toBe(true);
+        expect(lastOfRole(types, hub)).toBe(false);
+        expect(lastOfRole(types, guide)).toBe(true);
     });
 
     it("offers the types of the same role first as the place the pages move to", () => {

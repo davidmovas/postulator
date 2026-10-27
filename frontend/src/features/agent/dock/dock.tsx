@@ -5,7 +5,11 @@ import { useNavigate } from "react-router";
 import { copy } from "../../../copy/index.js";
 import { flatten } from "../../../data/call.js";
 import { useConversations, useStartConversation } from "../../../data/hooks/agent.js";
+import { useSite } from "../../../data/hooks/sites.js";
+import { bundleRefusal, useSaveBundle } from "../../../data/hooks/support.js";
+import { pushToast } from "../../../data/toasts.js";
 import type { Conversation } from "../../../data/types.js";
+import { bytes } from "../../../domain/format.js";
 import type { MenuEntry, SegmentedOption } from "../../../ui/index.js";
 import {
     AddCommentIcon,
@@ -15,6 +19,7 @@ import {
     EditIcon,
     ForumIcon,
     IconButton,
+    Inventory2Icon,
     KeyboardArrowDownIcon,
     Menu,
     OpenInFullIcon,
@@ -24,6 +29,8 @@ import {
     SmartToyIcon,
 } from "../../../ui/index.js";
 import { ConversationView } from "../conversation/view.js";
+import { inScope } from "../model/conversations.js";
+import { agentHome, conversationPath } from "../model/paths.js";
 import { RenameDialog } from "../rename-dialog.js";
 import type { DockMode } from "./state.js";
 import {
@@ -64,13 +71,15 @@ function useWindowWidth(): number {
 interface SwitcherProps {
     current: Conversation | null;
     recent: readonly Conversation[];
+    saving: boolean;
     onPick: (id: string) => void;
     onNew: () => void;
     onRename: () => void;
     onAll: () => void;
+    onBundle: (() => void) | null;
 }
 
-function Switcher({ current, recent, onPick, onNew, onRename, onAll }: SwitcherProps): ReactElement {
+function Switcher({ current, recent, saving, onPick, onNew, onRename, onAll, onBundle }: SwitcherProps): ReactElement {
     const label =
         current === null
             ? copy.agent.header.newConversation
@@ -105,6 +114,16 @@ function Switcher({ current, recent, onPick, onNew, onRename, onAll }: SwitcherP
     }
     items.push({ kind: "separator", key: "all-separator" });
     items.push({ key: "all", label: copy.agent.header.more, icon: ForumIcon, onSelect: onAll });
+    if (onBundle !== null) {
+        items.push({ kind: "separator", key: "bundle-separator" });
+        items.push({
+            key: "bundle",
+            label: saving ? copy.settings.about.support.saving : copy.settings.about.support.save,
+            icon: Inventory2Icon,
+            disabled: saving,
+            onSelect: onBundle,
+        });
+    }
 
     return (
         <Menu
@@ -143,7 +162,31 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
     const windowWidth = useWindowWidth();
     const listed = useConversations(siteId === null ? {} : { siteId }, 50);
     const start = useStartConversation();
-    const conversations = useMemo(() => flatten(listed.data?.pages), [listed.data]);
+    const site = useSite(siteId);
+    const bundle = useSaveBundle();
+    const conversations = useMemo(() => inScope(flatten(listed.data?.pages), siteId, ""), [listed.data, siteId]);
+
+    const saveBundle = (): void => {
+        if (siteId === null) {
+            return;
+        }
+        bundle.mutate(
+            { siteId, siteName: site.data?.site.name ?? "" },
+            {
+                onSuccess: (saved) => {
+                    if (saved !== null) {
+                        pushToast("info", copy.settings.about.support.saved(saved.path, bytes(saved.bytes)));
+                    }
+                },
+                onError: (thrown) => {
+                    const said = bundleRefusal(thrown);
+                    if (said !== null) {
+                        pushToast("danger", said);
+                    }
+                },
+            },
+        );
+    };
     const [fresh, setFresh] = useState(false);
     const [started, setStarted] = useState<Conversation | null>(null);
     const [renaming, setRenaming] = useState<Conversation | null>(null);
@@ -180,6 +223,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
     return (
         <aside
             aria-label={copy.shell.agentDock}
+            data-agent-dock={true}
             className="relative flex shrink-0 flex-col border-l border-hairline bg-panel"
             style={{ width: `${width}px` }}
         >
@@ -198,6 +242,8 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                 <Switcher
                     current={current}
                     recent={conversations.slice(0, recentInSwitcher)}
+                    saving={bundle.isPending}
+                    onBundle={siteId === null ? null : saveBundle}
                     onPick={(id) => {
                         setFresh(false);
                         rememberConversation(siteId, id);
@@ -209,7 +255,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                         setRenaming(current);
                     }}
                     onAll={() => {
-                        void navigate("/agent");
+                        void navigate(agentHome(siteId));
                     }}
                 />
                 <Segmented
@@ -226,7 +272,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                            void navigate(`/agent/${current.id}`);
+                            void navigate(conversationPath(siteId, current.id));
                         }}
                     />
                 )}
@@ -265,7 +311,7 @@ export function AgentDock({ siteId }: AgentDockProps): ReactElement {
                     }}
                     onOpenTools={() => {
                         if (current !== null) {
-                            void navigate(`/agent/${current.id}?tools=1`);
+                            void navigate(`${conversationPath(siteId, current.id)}?tools=1`);
                         }
                     }}
                 />

@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
-import type { PageType, WriterPack } from "../../../data/types.js";
+import type { PageType, WriterDirections, WriterPack } from "../../../data/types.js";
 import { aPage } from "../../../testing/pages.js";
 import { aPageType, aScope } from "../../../testing/pagetypes.js";
 import { renderScreen } from "../../../testing/render.js";
@@ -14,14 +14,16 @@ interface Held {
     pack: WriterPack | undefined;
     error: unknown;
     asked: string[];
+    directions: (WriterDirections | null)[];
     types: PageType[];
 }
 
-const held: Held = { pack: undefined, error: null, asked: [], types: [] };
+const held: Held = { pack: undefined, error: null, asked: [], directions: [], types: [] };
 
 vi.mock("../../../data/hooks/pages.js", () => ({
-    useWriterPack: (_pageId: string | null, field: string) => {
+    useWriterPack: (_pageId: string | null, field: string, directions: WriterDirections | null = null) => {
         held.asked.push(field);
+        held.directions.push(directions);
         return { data: held.pack, isPending: held.pack === undefined && held.error === null, error: held.error };
     },
 }));
@@ -118,6 +120,74 @@ beforeEach(() => {
     held.pack = fitted();
     held.error = null;
     held.asked = [];
+    held.directions = [];
+});
+
+describe("what the writer will see with a run's directions", () => {
+    const directed = fitted({
+        sections: [
+            {
+                name: "brief",
+                heading: "The run's brief",
+                priority: 1,
+                lines: ["Goal: Sell the starter kit", "Link to /kits/ with the anchor “peptide kits”"],
+                items: [],
+                tokens: 30,
+            },
+            {
+                name: "reference",
+                heading: "Reference text the person gave for this run",
+                priority: 2,
+                lines: [],
+                items: ["Kits ship within two days."],
+                tokens: 12,
+            },
+            {
+                name: "style",
+                heading: "A sample of the style to write in",
+                priority: 2,
+                lines: ["Short sentences. No jargon."],
+                items: [],
+                tokens: 8,
+            },
+        ],
+    });
+
+    it("asks for the pack with the draft brief and directive and says so", () => {
+        held.pack = directed;
+        held.types = [hubType()];
+        const directions = { brief: { goal: "Sell the starter kit" }, directive: { pageId: "p1", notes: "Lead with it" } };
+        renderScreen(
+            <WriterTab
+                page={aPage("p1", "/peptides/", { pageTypeId: "t-hub" })}
+                siteId="s1"
+                directions={directions}
+                context="draft"
+            />,
+        );
+
+        expect(held.directions.at(-1)).toStrictEqual(directions);
+        expect(screen.getByText(said.directed.draft)).toBeDefined();
+    });
+
+    it("titles the brief, the reference and the style sample in plain words", () => {
+        held.pack = directed;
+        held.types = [hubType()];
+        renderScreen(
+            <WriterTab
+                page={aPage("p1", "/peptides/", { pageTypeId: "t-hub" })}
+                siteId="s1"
+                directions={{ runId: "r1" }}
+                context="run"
+            />,
+        );
+
+        expect(within(sectionNamed("brief")).getByRole("heading", { name: said.sectionTitles["brief"] })).toBeDefined();
+        expect(within(sectionNamed("brief")).getByText("Goal: Sell the starter kit")).toBeDefined();
+        expect(within(sectionNamed("reference")).getByRole("heading", { name: said.sectionTitles["reference"] })).toBeDefined();
+        expect(within(sectionNamed("style")).getByText("Short sentences. No jargon.")).toBeDefined();
+        expect(screen.getByText(said.directed.run)).toBeDefined();
+    });
 });
 
 describe("what the writer will see", () => {

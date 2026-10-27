@@ -59,6 +59,22 @@ func (f pagesFake) SetType(context.Context, pages.SetTypeRequest) (pages.SetType
 	return answer[pages.SetTypeResponse](f.mode)
 }
 
+func (f pagesFake) Count(context.Context, pages.CountRequest) (pages.CountResponse, error) {
+	return answer[pages.CountResponse](f.mode)
+}
+
+func (f pagesFake) Resolve(context.Context, pages.Selection) (pages.ResolveResponse, error) {
+	return answer[pages.ResolveResponse](f.mode)
+}
+
+func (f pagesFake) SetTypes(context.Context, pages.SetTypesRequest) (pages.SetTypesResponse, error) {
+	return answer[pages.SetTypesResponse](f.mode)
+}
+
+func (f pagesFake) SetTemplates(context.Context, pages.SetTemplatesRequest) (pages.SetTemplatesResponse, error) {
+	return answer[pages.SetTemplatesResponse](f.mode)
+}
+
 type pageModelsFake struct{ mode failure }
 
 func (f pageModelsFake) Model(context.Context, observe.ModelRequest) (observe.ModelView, error) {
@@ -88,8 +104,8 @@ func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, pagesService(missing), []string{
-		"Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "SetCanonical",
-		"SetType", "SiteMap", "Tree", "Unmap", "Update", "WriterPack",
+		"Count", "Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "ResolveSelection",
+		"SetCanonical", "SetTemplates", "SetType", "SetTypes", "SiteMap", "Tree", "Unmap", "Update", "WriterPack",
 	})
 	assertEveryMethodConverts(t, pagesService(missing), missingBody)
 	assertEveryMethodConverts(t, pagesService(panicking), panicBody)

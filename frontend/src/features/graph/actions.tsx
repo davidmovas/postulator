@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
 import {
+    AccountTreeIcon,
     AddIcon,
     AddLinkIcon,
     Button,
@@ -32,6 +33,7 @@ export interface GraphActionsProps {
     onProposeFromKeywords: () => void;
     onProposeRelated: () => void;
     onRecompute: () => void;
+    onAdopt: () => void;
 }
 
 export function GraphActions({
@@ -50,6 +52,7 @@ export function GraphActions({
     onProposeFromKeywords,
     onProposeRelated,
     onRecompute,
+    onAdopt,
 }: GraphActionsProps): ReactElement {
     const proposed = index.counts.proposedEdges;
     const selectedName = selectedId === null ? null : (index.byId.get(selectedId)?.name ?? null);
@@ -64,6 +67,7 @@ export function GraphActions({
         },
         { kind: "separator", key: "s1" },
         { key: "recompute", label: copy.graph.ai.recompute, icon: CalculateIcon, disabled: recomputing, onSelect: onRecompute },
+        { key: "adopt", label: copy.graph.adopt.open, icon: AccountTreeIcon, onSelect: onAdopt },
     ];
 
     return (

@@ -8,7 +8,7 @@ import type { Keyword, Page } from "../../data/types.js";
 import { absoluteTime, relativeTime } from "../../domain/format.js";
 import { keywordList, sameKeywords } from "../../domain/keywords.js";
 import { pageStatuses, pageWpTypes } from "../../generated/vocab.js";
-import { pageStatusLabel } from "./labels.js";
+import { observedH1Line, pageStatusLabel } from "./labels.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Banner, Button, Field, Input, KeywordInput, Select, SyncProblemIcon, Textarea } from "../../ui/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
@@ -166,7 +166,7 @@ export function PageDetails({ page, siteId, search }: PageDetailsProps): ReactEl
                     />
                 )}
             </Field>
-            <Field label={copy.pages.detail.h1} error={fieldErrorOf(update.error, "h1")}>
+            <Field label={copy.pages.detail.h1} hint={observedH1Line(page)} error={fieldErrorOf(update.error, "h1")}>
                 {(control) => (
                     <Input
                         id={control.id}

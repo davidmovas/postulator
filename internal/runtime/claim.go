@@ -157,8 +157,8 @@ func (e *Engine) gather(ctx context.Context, held *claim) error {
 
 	held.artifacts = artifactsByKind(held.def, held.index, stored)
 	held.params = run.ParamsFor(held.record.Recipe, held.step.Name)
-	held.inputHash, err = run.InputHash(held.step.Name, held.params, required(held.step, held.params, held.artifacts),
-		held.version, held.item.Checkpoint)
+	held.inputHash, err = run.InputHash(held.step.Name, run.HashedParams(held.params, held.record.Brief, held.item.Directive),
+		required(held.step, held.params, held.artifacts), held.version, held.item.Checkpoint)
 	return err
 }
 

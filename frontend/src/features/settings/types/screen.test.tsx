@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
+import { readToasts } from "../../../data/toasts.js";
 import type { CatalogField, PageType } from "../../../data/types.js";
 import { aPageType, aScope, hubLinks } from "../../../testing/pagetypes.js";
 import { renderScreen } from "../../../testing/render.js";
@@ -14,9 +15,10 @@ interface Calls {
     saved: unknown[];
     deleted: unknown[];
     scoped: unknown[];
+    followed: unknown[];
 }
 
-const calls: Calls = { created: [], saved: [], deleted: [], scoped: [] };
+const calls: Calls = { created: [], saved: [], deleted: [], scoped: [], followed: [] };
 
 function mutation(record: unknown[]) {
     return () => ({
@@ -32,6 +34,7 @@ function mutation(record: unknown[]) {
 const hub = aPageType("t-hub", "hub", {
     name: "Hub",
     pages: 12,
+    overrides: 2,
     templateId: "tpl-hub",
     scopes: [
         aScope("title"),
@@ -48,7 +51,12 @@ function aField(key: string, aiWritable: boolean): CatalogField {
 
 const catalog: CatalogField[] = [aField("title", true), aField("body", true), aField("seo_title", true), aField("seo_canonical", false)];
 
-const category = aPageType("t-cat", "hub", { name: "Category", pages: 3, scopes: [aScope("body", { enabled: true, links: hubLinks() })] });
+const category = aPageType("t-cat", "category", {
+    name: "Category",
+    pages: 3,
+    suggestedTemplateId: "tpl-hub",
+    scopes: [aScope("body", { enabled: true, links: hubLinks() })],
+});
 
 const guide = aPageType("t-guide", "entity", { name: "Guide", pages: 1 });
 
@@ -78,6 +86,18 @@ vi.mock("../../../data/hooks/templates.js", () => ({
     useSetScope: mutation(calls.scoped),
 }));
 
+vi.mock("../../../data/hooks/pages.js", () => ({
+    useSetPageTemplates: () => ({
+        mutate: (request: unknown, options?: { onSuccess?: (answered: { changed: number }) => void }) => {
+            calls.followed.push(request);
+            options?.onSuccess?.({ changed: 2 });
+        },
+        reset: () => undefined,
+        isPending: false,
+        error: null,
+    }),
+}));
+
 const { PageTypesScreen } = await import("./screen.js");
 
 function rowOf(name: string): HTMLElement {
@@ -90,17 +110,51 @@ function expand(field: string): void {
 }
 
 describe("Settings, Page types", () => {
-    it("lists the site's types by role with their pages and template", () => {
+    it("lists the site's types by role with what each preset means, its pages and its template", () => {
         renderScreen(<PageTypesScreen />, "/settings/types?site=s1");
 
-        const names = screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0]?.textContent);
+        const names = [...document.querySelectorAll("[data-type-name]")].map((held) => held.textContent);
         expect(names).toStrictEqual(["Category", "Hub", "Guide", "Store category"]);
-        const cells = within(rowOf("Hub"))
-            .getAllByRole("cell")
-            .map((cell) => cell.textContent);
-        expect(cells).toStrictEqual(["Hub", said.presets.hub, "12", "Hub page"]);
-        expect(within(rowOf("Category")).getByText(said.screen.siteDefault)).toBeDefined();
+        const hubRow = within(rowOf("Hub"));
+        expect(hubRow.getByText(said.presetHints.hub)).toBeDefined();
+        expect(rowOf("Hub").querySelector("[data-type-role]")?.textContent).toBe(said.roles.hub);
+        expect(hubRow.getByText("12")).toBeDefined();
+        expect(rowOf("Hub").querySelector("[data-type-template]")?.textContent).toBe("Hub page");
+        expect(within(rowOf("Category")).getByText(said.presetHints.category)).toBeDefined();
+        expect(rowOf("Category").querySelector("[data-type-template]")?.textContent).toBe(said.screen.siteDefault);
+        expect(rowOf("Store category").querySelector("[data-type-role]")?.textContent).toBe(said.roles.archive);
         expect(within(rowOf("Store category")).getByText(said.screen.readOnly)).toBeDefined();
+    });
+
+    it("offers a type without a template its role's built-in, and sets it with one click", () => {
+        calls.saved.length = 0;
+        renderScreen(<PageTypesScreen />, "/settings/types?site=s1");
+
+        const offer = within(rowOf("Category"));
+        expect(offer.getByText(said.screen.suggested("Hub page"))).toBeDefined();
+        expect(within(rowOf("Hub")).queryByText(said.screen.useSuggested)).toBeNull();
+        fireEvent.click(offer.getByRole("button", { name: said.screen.useSuggested }));
+
+        expect(calls.saved).toStrictEqual([{ id: "t-cat", templateId: "tpl-hub" }]);
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("makes the pages that keep their own template follow the type, once the person confirms", () => {
+        calls.followed.length = 0;
+        renderScreen(<PageTypesScreen />, "/settings/types?site=s1");
+
+        const hubRow = within(rowOf("Hub"));
+        expect(hubRow.getByText(said.screen.overrides(2))).toBeDefined();
+        expect(within(rowOf("Guide")).queryByText(said.screen.follow)).toBeNull();
+        fireEvent.click(hubRow.getByRole("button", { name: said.screen.follow }));
+
+        const dialog = within(screen.getByRole("dialog"));
+        expect(dialog.getByText(said.follow.body(2, "Hub page"))).toBeDefined();
+        expect(calls.followed).toHaveLength(0);
+        fireEvent.click(dialog.getByRole("button", { name: said.follow.confirm }));
+
+        expect(calls.followed).toStrictEqual([{ selection: { siteId: "s1", filter: { pageTypeId: "t-hub" } }, templateId: null }]);
+        expect(readToasts().map((toast) => toast.message)).toContain(said.follow.done(2));
     });
 
     it("opens a type's fields and saves a scope's instruction through SetScope", () => {
@@ -229,6 +283,6 @@ describe("Settings, Page types", () => {
         const dialog = screen.getByRole("dialog");
         fireEvent.change(within(dialog).getByRole("textbox", { name: new RegExp(`^${said.form.name}`) }), { target: { value: "Category" } });
         fireEvent.click(within(dialog).getByRole("button", { name: said.form.create }));
-        expect(calls.created[0]).toStrictEqual({ siteId: "s1", name: "Category", preset: "hub", templateId: undefined });
+        expect(calls.created[0]).toStrictEqual({ siteId: "s1", name: "Category", preset: "landing", templateId: undefined });
     });
 });

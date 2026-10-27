@@ -16,6 +16,8 @@ type AgentUseCase interface {
 	Send(ctx context.Context, req agent.SendRequest) (agent.SendResponse, error)
 	Status(ctx context.Context, req agent.StatusRequest) (agent.StatusResponse, error)
 	Confirm(ctx context.Context, req agent.ConfirmRequest) (agent.ConfirmResponse, error)
+	ConfirmPlan(ctx context.Context, req agent.ConfirmPlanRequest) (agent.ConfirmPlanResponse, error)
+	ListPlans(ctx context.Context, req agent.ListPlansRequest) (agent.ListPlansResponse, error)
 	Cancel(ctx context.Context, req agent.CancelRequest) (agent.CancelResponse, error)
 	RenameConversation(ctx context.Context, req agent.RenameConversationRequest) (agent.RenameConversationResponse, error)
 	DeleteConversation(ctx context.Context, req agent.DeleteConversationRequest) (agent.DeleteConversationResponse, error)
@@ -30,6 +32,8 @@ type AgentService struct {
 	send               middleware.Handler[agent.SendRequest, agent.SendResponse]
 	status             middleware.Handler[agent.StatusRequest, agent.StatusResponse]
 	confirm            middleware.Handler[agent.ConfirmRequest, agent.ConfirmResponse]
+	confirmPlan        middleware.Handler[agent.ConfirmPlanRequest, agent.ConfirmPlanResponse]
+	listPlans          middleware.Handler[agent.ListPlansRequest, agent.ListPlansResponse]
 	cancel             middleware.Handler[agent.CancelRequest, agent.CancelResponse]
 	renameConversation middleware.Handler[agent.RenameConversationRequest, agent.RenameConversationResponse]
 	deleteConversation middleware.Handler[agent.DeleteConversationRequest, agent.DeleteConversationResponse]
@@ -45,6 +49,8 @@ func NewAgentService(logger *zap.Logger, useCase Source[AgentUseCase]) *AgentSer
 		send:               Wrap(logger, "agent.send", call(useCase, AgentUseCase.Send)),
 		status:             Wrap(logger, "agent.status", call(useCase, AgentUseCase.Status)),
 		confirm:            Wrap(logger, "agent.confirm", call(useCase, AgentUseCase.Confirm)),
+		confirmPlan:        Wrap(logger, "agent.confirmPlan", call(useCase, AgentUseCase.ConfirmPlan)),
+		listPlans:          Wrap(logger, "agent.listPlans", call(useCase, AgentUseCase.ListPlans)),
 		cancel:             Wrap(logger, "agent.cancel", call(useCase, AgentUseCase.Cancel)),
 		renameConversation: Wrap(logger, "agent.renameConversation", call(useCase, AgentUseCase.RenameConversation)),
 		deleteConversation: Wrap(logger, "agent.deleteConversation", call(useCase, AgentUseCase.DeleteConversation)),
@@ -72,6 +78,14 @@ func (s *AgentService) Status(c context.Context, req agent.StatusRequest) (agent
 
 func (s *AgentService) Confirm(c context.Context, req agent.ConfirmRequest) (agent.ConfirmResponse, error) {
 	return s.confirm(c, req)
+}
+
+func (s *AgentService) ConfirmPlan(c context.Context, req agent.ConfirmPlanRequest) (agent.ConfirmPlanResponse, error) {
+	return s.confirmPlan(c, req)
+}
+
+func (s *AgentService) ListPlans(c context.Context, req agent.ListPlansRequest) (agent.ListPlansResponse, error) {
+	return s.listPlans(c, req)
 }
 
 func (s *AgentService) Cancel(c context.Context, req agent.CancelRequest) (agent.CancelResponse, error) {

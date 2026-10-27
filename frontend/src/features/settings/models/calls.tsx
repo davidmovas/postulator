@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { useMemo } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { flatten } from "../../../data/call.js";
@@ -15,27 +16,38 @@ import {
     SkeletonRows,
     StatusBadge,
     TableHead,
+    useWidthOf,
 } from "../../../ui/index.js";
+import type { ColumnLayout } from "../../../ui/collapse.js";
+import { shown } from "../../../ui/collapse.js";
+import type { CallColumn } from "./columns.js";
+import { callLayout } from "./columns.js";
 import { callStep, failureText, purposeLabel, tierLabel } from "./spend-labels.js";
 
 const said = copy.settings.models.spend.recent;
 
 export const recentPageSize = 25;
 
-const callColumns = "6.5rem minmax(9rem,1.4fr) minmax(8rem,1fr) 5rem 9rem 4.5rem";
+interface CallRowProps {
+    call: ModelCall;
+    layout: ColumnLayout<CallColumn>;
+}
 
-function CallRow({ call }: { call: ModelCall }): ReactElement {
+function CallRow({ call, layout }: CallRowProps): ReactElement {
     const step = callStep(call.purpose, call.step);
+    const when = shown(layout, "when");
     return (
         <div
             role="row"
-            style={{ gridTemplateColumns: callColumns }}
+            style={{ gridTemplateColumns: layout.template }}
             className="grid items-center gap-x-3 gap-y-1 border-b border-inset px-3 py-1.5 text-sm last:border-b-0"
         >
-            <div role="cell" title={absoluteTime(call.createdAt)} className="truncate text-xs text-ink-dim">
-                {relativeTime(call.createdAt)}
-            </div>
-            <div role="cell" className="min-w-0 truncate">
+            {when ? (
+                <div role="cell" title={absoluteTime(call.createdAt)} className="truncate text-xs text-ink-dim">
+                    {relativeTime(call.createdAt)}
+                </div>
+            ) : null}
+            <div role="cell" title={when ? undefined : absoluteTime(call.createdAt)} className="min-w-0 truncate">
                 <span className="text-ink">{purposeLabel(call.purpose)}</span>
                 {step === "" ? null : <span className="text-ink-dim">{` · ${step}`}</span>}
             </div>
@@ -46,16 +58,20 @@ function CallRow({ call }: { call: ModelCall }): ReactElement {
             >
                 {call.model}
             </div>
-            <div role="cell" className="truncate text-xs">
-                <span className={call.tier === "flex" ? "text-accent" : "text-ink-dim"}>{tierLabel(call.tier)}</span>
-            </div>
-            <div
-                role="cell"
-                title={said.inside(tokens(call.cachedInput), tokens(call.reasoning))}
-                className="truncate text-right font-mono text-xs text-ink-soft"
-            >
-                {said.flow(tokens(call.input), tokens(call.output))}
-            </div>
+            {shown(layout, "tier") ? (
+                <div role="cell" className="truncate text-xs">
+                    <span className={call.tier === "flex" ? "text-accent" : "text-ink-dim"}>{tierLabel(call.tier)}</span>
+                </div>
+            ) : null}
+            {shown(layout, "tokens") ? (
+                <div
+                    role="cell"
+                    title={said.inside(tokens(call.cachedInput), tokens(call.reasoning))}
+                    className="truncate text-right font-mono text-xs text-ink-soft"
+                >
+                    {said.flow(tokens(call.input), tokens(call.output))}
+                </div>
+            ) : null}
             <div role="cell" className="truncate text-right font-mono text-xs text-ink">
                 {usd(call.usd)}
             </div>
@@ -71,6 +87,8 @@ function CallRow({ call }: { call: ModelCall }): ReactElement {
 
 export function RecentCalls(): ReactElement {
     const listed = useModelCalls({}, recentPageSize);
+    const [attach, width] = useWidthOf();
+    const layout = useMemo(() => callLayout(width), [width]);
     const calls = flatten(listed.data?.pages);
     const failure = listed.error === null ? null : react(listed.error);
     const shownFailure =
@@ -100,18 +118,18 @@ export function RecentCalls(): ReactElement {
             ) : calls.length === 0 ? (
                 <p className="p-3 text-xs text-ink-dim">{said.empty}</p>
             ) : (
-                <div className="overflow-x-auto">
-                    <DenseTable columns={callColumns} label={said.title} className="min-w-[46rem]">
+                <div ref={attach} data-recent-calls={layout.columns.join(" ")} className="min-w-0">
+                    <DenseTable columns={layout.template} label={said.title}>
                         <TableHead>
-                            <span>{said.when}</span>
+                            {shown(layout, "when") ? <span>{said.when}</span> : null}
                             <span>{said.what}</span>
                             <span>{said.model}</span>
-                            <span>{said.tier}</span>
-                            <span className="text-right">{said.tokens}</span>
+                            {shown(layout, "tier") ? <span>{said.tier}</span> : null}
+                            {shown(layout, "tokens") ? <span className="text-right">{said.tokens}</span> : null}
                             <span className="text-right">{said.spent}</span>
                         </TableHead>
                         {calls.map((call) => (
-                            <CallRow key={call.id} call={call} />
+                            <CallRow key={call.id} call={call} layout={layout} />
                         ))}
                     </DenseTable>
                 </div>

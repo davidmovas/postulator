@@ -10,9 +10,12 @@ import (
 )
 
 const (
-	ResultKey    = "result"
-	droppedKey   = "droppedItems"
-	shortenedKey = "shortenedText"
+	ResultKey        = "result"
+	droppedKey       = "droppedItems"
+	shortenedKey     = "shortenedText"
+	cursorDroppedKey = "cursorDropped"
+	nextCursorKey    = "nextCursor"
+	hasMoreKey       = "hasMore"
 
 	minTextBytes = 160
 	cutMarker    = "…"
@@ -43,36 +46,44 @@ func Cap(result map[string]any, limit int) (map[string]any, bool) {
 		return preview(string(encoded), total, limit), true
 	}
 
-	dropped := map[string]int{}
-	shortened := 0
+	cutting := capping{dropped: map[string]int{}}
 	for range capRounds {
-		if measured(report(document, total, dropped, shortened)) <= limit {
+		if measured(cutting.report(document, total)) <= limit {
 			break
 		}
-		if thinned(document, dropped) {
+		if cutting.thinned(document) {
 			continue
 		}
 		if cut(document) {
-			shortened++
+			cutting.shortened++
 			continue
 		}
 		break
 	}
 
-	capped := report(document, total, dropped, shortened)
+	capped := cutting.report(document, total)
 	if measured(capped) <= limit {
 		return capped, true
 	}
 	return preview(string(encoded), total, limit), true
 }
 
-func report(document any, total int, dropped map[string]int, shortened int) map[string]any {
+type capping struct {
+	dropped   map[string]int
+	cursors   []string
+	shortened int
+}
+
+func (c *capping) report(document any, total int) map[string]any {
 	out := map[string]any{TruncatedKey: true, TotalBytesKey: total, ResultKey: document}
-	if len(dropped) > 0 {
-		out[droppedKey] = dropped
+	if len(c.dropped) > 0 {
+		out[droppedKey] = c.dropped
 	}
-	if shortened > 0 {
-		out[shortenedKey] = shortened
+	if len(c.cursors) > 0 {
+		out[cursorDroppedKey] = c.cursors
+	}
+	if c.shortened > 0 {
+		out[shortenedKey] = c.shortened
 	}
 	return out
 }
@@ -108,6 +119,7 @@ type arrayAt struct {
 	path  string
 	items []any
 	set   func([]any)
+	owner map[string]any
 }
 
 type textAt struct {
@@ -123,7 +135,7 @@ func arrays(value any, path string, into *[]arrayAt) {
 			if items, ok := child.([]any); ok {
 				owner, name := held, key
 				*into = append(*into, arrayAt{
-					path: next, items: items, set: func(kept []any) { owner[name] = kept },
+					path: next, items: items, set: func(kept []any) { owner[name] = kept }, owner: owner,
 				})
 			}
 			arrays(child, next, into)
@@ -171,7 +183,7 @@ func join(path, key string) string {
 	return path + "." + key
 }
 
-func thinned(document any, dropped map[string]int) bool {
+func (c *capping) thinned(document any) bool {
 	var found []arrayAt
 	arrays(document, "", &found)
 
@@ -188,7 +200,14 @@ func thinned(document any, dropped map[string]int) bool {
 	held := found[widest]
 	keep := len(held.items) / 2
 	held.set(held.items[:keep])
-	dropped[held.path] += len(held.items) - keep
+	c.dropped[held.path] += len(held.items) - keep
+	if _, paged := held.owner[nextCursorKey]; paged {
+		delete(held.owner, nextCursorKey)
+		held.owner[hasMoreKey] = true
+		if !slices.Contains(c.cursors, held.path) {
+			c.cursors = append(c.cursors, held.path)
+		}
+	}
 	return true
 }
 

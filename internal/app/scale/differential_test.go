@@ -5,6 +5,7 @@ package scale_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -91,8 +92,9 @@ func (s *scaled) agrees(t *testing.T, step string) {
 				t.Errorf("%s: the stored row of %s = %+v, the model's node %+v", step, node.Page.Path, row, node)
 			}
 			trail := make([]string, 0)
-			for _, ref := range tree.Trail(node.Page.PageID) {
-				trail = append(trail, ref.PageID)
+			refs := tree.Trail(node.Page.PageID)
+			for i := range refs {
+				trail = append(trail, refs[i].PageID)
 			}
 			if !slices.Equal(row.Ancestors(), trail) {
 				t.Errorf("%s: the stored trail of %s = %v, the model's %v", step, node.Page.Path, row.Ancestors(), trail)
@@ -133,7 +135,7 @@ func (s *scaled) agrees(t *testing.T, step string) {
 	hub := s.id(t, "/c001/")
 	for _, q := range []contextpack.MapQuery{
 		{Text: "Article 001 0"}, {Text: "product-category"}, {TypeID: s.typeOf(t, pagetype.Product)},
-		{TypeID: s.typeOf(t, pagetype.StoreCategory)}, {Under: hub, Text: "item"}, {Under: hub, TypeID: s.typeOf(t, pagetype.Entity)},
+		{TypeID: s.typeOf(t, pagetype.StoreCategory)}, {Under: hub, Text: "item"}, {Under: hub, TypeID: s.typeOf(t, pagetype.Guide)},
 	} {
 		query := contextpack.MapRowQuery{Text: graph.Key(q.Text), TypeID: q.TypeID}
 		if q.Under != "" {
@@ -142,6 +144,31 @@ func (s *scaled) agrees(t *testing.T, step string) {
 		if got, want := s.stored(t, query), refPaths(tree.Matches(q)); !slices.Equal(got, want) {
 			t.Errorf("%s: the stored map finds %v for %+v, the model %v", step, got, q, want)
 		}
+	}
+	s.factsAgree(t, step, tree)
+}
+
+func (s *scaled) factsAgree(t *testing.T, step string, tree contextpack.Map) {
+	t.Helper()
+
+	stored, err := s.core.SiteModel.ClassificationFacts(t.Context(), s.siteID)
+	if err != nil {
+		t.Fatalf("%s: the classification's facts: %v", step, err)
+	}
+	rendered, err := sqlite.NewPageRenderRepo(s.core.Store).ListRenderedBySite(t.Context(), s.siteID)
+	if err != nil {
+		t.Fatalf("%s: summarize the renders: %v", step, err)
+	}
+	products, err := sqlite.NewPageLinkRepo(s.core.Store).ListedProductsBySite(t.Context(), s.siteID)
+	if err != nil {
+		t.Fatalf("%s: count the listed products: %v", step, err)
+	}
+	modeled := tree.Facts(rendered, products)
+	byPage := func(a, b pagetype.Facts) int { return strings.Compare(a.PageID, b.PageID) }
+	slices.SortFunc(stored, byPage)
+	slices.SortFunc(modeled, byPage)
+	if !reflect.DeepEqual(stored, modeled) {
+		t.Errorf("%s: the preview's facts over the stored map differ from the walk's over the model (%d against %d)", step, len(stored), len(modeled))
 	}
 }
 

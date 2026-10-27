@@ -41,6 +41,7 @@ type repairPrompt struct {
 	Paragraph string
 	Identity  string
 	About     string
+	Brief     string
 }
 
 type owedPhrase struct {
@@ -299,7 +300,7 @@ func (w *sentenceWriter) write(ctx context.Context, doc *content.Document, owed 
 
 		request, renderErr := stepRequest(w.sc, w.call, repairPrompt{
 			Page: w.sc.Page, Entity: w.entity, Phrase: owed.text, Why: owed.why, Paragraph: contextParagraph(doc, owed.index),
-			Identity: identityOf(seen.Facts), About: aboutOf(seen.Facts, owed.url),
+			Identity: identityOf(seen.Facts), About: aboutOf(seen.Facts, owed.url), Brief: seen.Facts.BriefText(),
 		}, repairTokens)
 		if renderErr != nil {
 			return "", used, renderErr

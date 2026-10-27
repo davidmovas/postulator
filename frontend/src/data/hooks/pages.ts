@@ -1,6 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
+    countPages,
     createPage,
     deletePage,
     getPage,
@@ -10,8 +11,11 @@ import {
     pageModel,
     pageTree,
     previewLink,
+    resolveSelection,
     setCanonicalPage,
+    setPageTemplates,
     setPageType,
+    setPageTypes,
     siteMap,
     unmapPage,
     updatePage,
@@ -22,7 +26,15 @@ import { keys } from "../keys.js";
 import { useLockGate } from "../lock.js";
 import { useUnlockedInfinite, useUnlockedQueries, useUnlockedQuery } from "../query.js";
 import type { PageSort } from "../sorts.js";
-import type { Page, PageFilter, SiteMapFilter, SiteMapView } from "../types.js";
+import type {
+    Page,
+    PageCountRequest,
+    PageFilter,
+    PageSelection,
+    SiteMapFilter,
+    SiteMapView,
+    WriterDirections,
+} from "../types.js";
 import type { Cursor } from "../../lib/paging.js";
 
 export const siteMapLimit = 100;
@@ -106,10 +118,10 @@ export function useModelSummary(siteId: string | null) {
     });
 }
 
-export function useWriterPack(pageId: string | null, field: string) {
+export function useWriterPack(pageId: string | null, field: string, directions: WriterDirections | null = null) {
     return useUnlockedQuery({
-        queryKey: keys.pages.pack(pageId ?? "", field),
-        queryFn: ({ signal }) => writerPack({ pageId: pageId ?? "", field, budget: 0 }, signal),
+        queryKey: keys.pages.pack(pageId ?? "", field, directions),
+        queryFn: ({ signal }) => writerPack({ pageId: pageId ?? "", field, budget: 0, ...(directions ?? {}) }, signal),
         enabled: pageId !== null && pageId !== "",
         quiet: ["INVALID"],
     });
@@ -170,6 +182,60 @@ export function useSetPageType() {
             void client.invalidateQueries({ queryKey: keys.sites.types(answered.page.siteId) });
             void client.invalidateQueries({ queryKey: keys.templates.resolved(answered.page.id) });
             void client.invalidateQueries({ queryKey: keys.graph.full(answered.page.siteId) });
+        },
+    });
+}
+
+export function usePageCount(request: PageCountRequest | null) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.count(request ?? { siteId: "" }),
+        queryFn: ({ signal }) => countPages(request ?? { siteId: "" }, signal),
+        enabled: request !== null && request.siteId !== "",
+    });
+}
+
+export function useSelectionCount(request: PageSelection | null) {
+    return useUnlockedQuery({
+        queryKey: keys.pages.selection(request ?? { siteId: "" }),
+        queryFn: ({ signal }) => resolveSelection(request ?? { siteId: "" }, signal),
+        enabled: request !== null && request.siteId !== "",
+        quiet: ["CONFLICT", "INVALID"],
+        refetchOnWindowFocus: false,
+    });
+}
+
+export function useResolveSelection() {
+    return useMutation({
+        mutationFn: (request: Parameters<typeof resolveSelection>[0]) => resolveSelection(request),
+        meta: quietMeta(["CONFLICT", "INVALID"]),
+    });
+}
+
+export function useSetPageTypes() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof setPageTypes>[0]) => setPageTypes(request),
+        meta: quietMeta(["CONFLICT", "INVALID"]),
+        onSuccess: () => {
+            void client.invalidateQueries({ queryKey: keys.pages.root() });
+            void client.invalidateQueries({ queryKey: keys.sites.typesAll() });
+            void client.invalidateQueries({ queryKey: keys.classification.root() });
+            void client.invalidateQueries({ queryKey: keys.findings.root() });
+            void client.invalidateQueries({ queryKey: keys.graph.fulls() });
+            void client.invalidateQueries({ queryKey: keys.templates.resolvedAll() });
+        },
+    });
+}
+
+export function useSetPageTemplates() {
+    const client = useQueryClient();
+    return useMutation({
+        mutationFn: (request: Parameters<typeof setPageTemplates>[0]) => setPageTemplates(request),
+        meta: quietMeta(["CONFLICT"]),
+        onSuccess: () => {
+            void client.invalidateQueries({ queryKey: keys.pages.root() });
+            void client.invalidateQueries({ queryKey: keys.sites.typesAll() });
+            void client.invalidateQueries({ queryKey: keys.templates.resolvedAll() });
         },
     });
 }

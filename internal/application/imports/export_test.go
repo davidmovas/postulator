@@ -112,7 +112,7 @@ func TestExportAndImportRoundTripTheWholeSite(t *testing.T) {
 
 	source := newHarness(t)
 	source.apply(t, source.file(t, "rich.csv", richSheet), richMapping(source))
-	if typed := source.typeNames(t); !maps.Equal(typed, map[string]string{"/hosting/": "Hub", "/domains/": "Entity"}) {
+	if typed := source.typeNames(t); !maps.Equal(typed, map[string]string{"/hosting/": "Category", "/domains/": "Guide"}) {
 		t.Fatalf("the source typed its pages %v, want the two pages its rows name and none for the entity-only row", typed)
 	}
 
@@ -274,7 +274,7 @@ func TestTheExportWritesThePageTypeByName(t *testing.T) {
 	t.Parallel()
 
 	h := newHarness(t)
-	h.rename(t, pagetype.Hub, "Collection")
+	h.rename(t, pagetype.Category, "Collection")
 	mapping := h.mapping(map[string]string{
 		string(importmap.FieldPath): "path", string(importmap.FieldEntity): "entity", string(importmap.FieldPageType): "page type",
 	})

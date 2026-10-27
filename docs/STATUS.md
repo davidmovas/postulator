@@ -4,27 +4,47 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.4.0` on 2026-10-04 (PR #30: the client's workbooks, the WooCommerce products,
-OpenAI only and the spend in view, the categories taken out again). **2.5.0 is built and waits in
-pull request #31 from `dev` to `master`** (https://github.com/davidmovas/postulator/pull/31), neither
-merged nor tagged: the site-model redesign (phase 14,
-2026-10-17 to 24) and the release work (phase 15, 2026-10-24), its notes under **Release 2.5.0**
-below and in the pull request's body. Its gate is under **The gate**.
+**Released:** `v2.5.0` on 2026-10-24 (PR #31, notes under **Release 2.5.0**). 2.5.1 (phase 16) and
+2.6.0 (phase 17) were never merged or tagged: pull request #32 goes from `dev` to `master` and now
+carries **2.7.0** as well, **built and waiting there**, neither merged nor tagged: the assistant reads
+the whole site, proposes plans and carries them out once approved, and a run takes a brief (phase 18,
+2026-10-26/27). Its notes are under **Release 2.7.0** below and in the pull request's body, which
+keeps 2.6.0's and 2.5.1's. Its gate is under **The gate**.
 
 ## Next, in order
 
-1. **The owner merges the pull request and tags `v2.5.0` on `master`**; the tag's workflow builds and
-   publishes the installer, the executable and the plugin zip.
-2. **Plugin 1.5.2 on the client's sites**, uploaded over the old one ("Replace current with
-   uploaded"); it installs on PHP 7.2 and WordPress 5.7, and 2.5.0 writes nothing through a plugin
-   below 1.5.1.
-3. **The first sync on a real site**, then the client's workbook, then typing and scoping; what to look
-   at first is under **Release 2.5.0**.
-4. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
-   `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24); settle the
-   output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and whether tools load on demand
-   (`agent.toolLoading: deferred`). Until then the owner judges the writer by hand from
-   `go run ./cmd/tokenreport -prompts out/prompts`.
+1. **The owed gate legs**, one call each on a quiet machine (no stand up, nothing else holding
+   memory), from the repository root under bash:
+   ```
+   go test -race -count=1 -covermode=atomic -coverprofile=cov-kd.out ./internal/kernel/... ./internal/domain/...
+   go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-app.out ./internal/application/...
+   go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-runtime.out ./internal/runtime/...
+   go test -race -count=1 -p 1 -timeout 30m -covermode=atomic -coverprofile=cov-adapters.out ./internal/adapters/...
+   go test -race -count=1 -p 1 -covermode=atomic -coverprofile=cov-rest.out ./internal/app/... ./internal/transport/... ./cmd/... ./frontend/... ./wp-plugin/...
+   (head -1 cov-kd.out; tail -q -n +2 cov-kd.out cov-app.out cov-runtime.out cov-adapters.out cov-rest.out) > coverage.out
+   go run ./cmd/covergate
+   ```
+   then delete the `cov-*.out` files, which no ignore rule covers. The kernel and domain group passed
+   at the close; it runs again only for its coverage profile. A `0xc0000142` on a build is Windows
+   failing to start a process for lack of memory, not the code; after a stop, look for a leftover
+   `*.test.exe`.
+2. **The owner merges pull request #32 and tags `v2.7.0` on `master`** (2.5.1 and 2.6.0 ship inside
+   it); the tag's workflow builds and publishes the installer, the executable and the plugin zip.
+3. **The client installs 2.7.0 over 2.5.0.** The plugin did not change: 1.5.2 stays on his sites, no
+   new zip. Migrations 0075 to 0084 run on first start: 2.6.0's types and rules arrive as its notes
+   say, a chat from before starts the assistant afresh with its transcript kept, and his next sync
+   raises "entity parent differs" wherever his graph and his page tree disagree.
+4. **What to look at first on his site**: ask the assistant again to design a section's links (the
+   request that stopped on `ParentId`), and approve or edit the plan it proposes; the inbox's "entity
+   parent differs" and the Graph screen's preview of the tree's parents for his flat graph; a run
+   started with a brief, and its "What the writer will see"; Settings → About's support bundle if
+   anything reads wrong, which he can send as it is.
+5. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+   `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24, a replica
+   round now 13,260 tokens); see what a real model calls for each of the matrix's jobs, which the
+   scripted suite cannot; settle the output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and
+   whether tools load on demand (`agent.toolLoading: deferred`). Until then the owner judges the
+   writer by hand from `go run ./cmd/tokenreport -prompts out/prompts`.
 
 ## What Postulator does
 
@@ -38,9 +58,12 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   descriptions, custom fields by key), its body as blocks, what its public render adds (regions,
   breadcrumbs, product grids, JSON-LD), its links by type, and a parent derived from its breadcrumbs
   with the reason. Later syncs read only what changed; every tenth walks the whole site.
-- **Page types and field scopes.** The client names his types over six presets (Hub, Store category,
-  Catalog, Product, Entity, Technical) and enables, per type, the fields the writer may write, each
-  with an instruction, limits, a switch for rewriting his own text, and the link policy.
+- **Page types, rules and field scopes.** The client names his types over presets (Landing,
+  Category, Guide, Info, Product, Store category, Catalog, Technical, each over a fixed role) and
+  enables, per type, the fields the writer may write, each with an instruction, limits, a switch for
+  rewriting his own text, and the link policy. A site's ordered rules give each page its type and
+  say why; a preview shows what a change of rules would move before he applies it, and he retypes
+  any selection by hand. A run on auto takes each page's template from its type.
 - **The workbook, reconciled through findings.** Each row of his xlsx workbooks finds its page by
   URL, slug, entity, title, H1 or SKU. What disagrees becomes a finding in the inbox (a row two
   pages answer, a row no page answers, a parent the sheet and the site disagree on, a field changed
@@ -61,9 +84,92 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **Runs** generate, relink, sync and revert, scoped to chosen fields when asked, priced before they
   start, resumed after a crash, and reviewed by a person, whole or field by field, when they write a
   draft. A revert puts back per field and per block and hands back what the client changed since.
-- **The agent** in the dock works the same loop through the same use cases: it reads the model,
-  resolves findings, starts runs and edits a page field by field or block by block. Every write it
-  makes to a page waits for the person.
+- **The agent** in the dock works the same loop through the same use cases: it reads the whole model
+  page by page (the tree, the graph, bodies, links), ends an analysis with a plan of writes the person
+  approves whole or in part, resolves findings, starts runs with a brief and edits a page field by
+  field or block by block. Every write it makes to a page waits for the person.
+- **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
+  run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
+  writer, the linker and the judge.
+
+## Release 2.7.0
+
+The client's third request, in short:
+
+- **The assistant reads the whole site.** It walks the page tree to any depth (a section, a page's
+  ancestors and siblings, or the whole site page by page), and a page with no parent says why: the
+  front page, a planned page, a breadcrumb it could not resolve, two pages answering one crumb. It
+  reads the entity graph with every entity's parent and children, a page's body as text block by
+  block, a section's links in and out with what is owed and what is missing, and finds pages by
+  title, path or keyword. A long answer is never cut silently; the assistant reads the next page.
+- **It ends with a plan.** Once it has read enough, it proposes one card of ordered steps, each with
+  its reason and its estimate. He approves all of it, some steps or none, and edits a link's anchor,
+  a field's value, a run's brief or a page type picked from a list on the card itself. Nothing runs
+  before he approves; a step that fails stops the steps that rest on it; plans stay with the chat.
+- **A run takes a brief.** From the run drawer or through the assistant, a run carries a goal, a
+  focus, a tone, what to avoid, a reference text and a style sample, and for each page notes,
+  sections to add, keywords, anchors, links it must place and a length. The writer, the linker and
+  the judge read it first; "What the writer will see" and the run screen show it. A link the graph
+  does not connect is refused with the missing edge named, or added as a related edge when he ticks
+  "Add a related edge for each", or by an earlier step of the assistant's plan.
+- **The page tree against the entity graph.** Where an entity's parent in the graph differs from its
+  page's parent in the site's tree, the inbox lists it with "take the tree's parent", "keep the
+  graph's" or "ignore". The Graph screen and a Site map section take the tree's parents for many
+  entities at once, previewed first. New proposals and a workbook row without a URL take the parent
+  from the page tree, so a graph built from a flat import is flat no more.
+- **A support bundle.** Settings → About and the dock's menu save one file of what the app holds of a
+  site (counts, types, parents and their reasons, breadcrumb states, the graph's shape, findings by
+  kind, the last chat's tool calls and their sizes), to send when something looks wrong. It never
+  holds a password, a key, a cookie, a page's text or a title.
+- **23 assistant tools in place of 94**, so each round of a chat costs about a quarter fewer tokens.
+  A chat from 2.6 keeps its transcript and starts the assistant afresh; an approval card of a tool
+  that is gone says so in plain words and changes nothing.
+- **No new plugin.** 1.5.2 stays.
+
+## Release 2.6.0
+
+The client's second request, in short:
+
+- **The types**: Landing and Category (hubs), Guide (articles), Info (about, contact, shipping,
+  returns: only the SEO title and description are ever written), Product, Store category, Catalog and
+  Technical. A site from 2.5 keeps its types and gains the four new ones; nothing is renamed or
+  deleted and no page moves on upgrade.
+- **How pages get them**: an ordered list of rules per site (Settings → Classification), the first
+  match winning, each page saying which rule placed it; a page no rule matches becomes Info and is
+  listed in the inbox as typed by no rule. A sync types new pages and re-types those the rules
+  placed; a type set by hand never moves.
+- **Preview and bulk**: a change of rules moves nothing until he applies its preview, whole or by
+  groups, in one confirmed action. On the Pages screen he selects pages (one by one, a branch, a type,
+  or every page a filter matches) and sets their type by hand, hands them back to the rules, sets or
+  clears their template, starts a run or asks the agent. The agent previews and applies too, always
+  waiting for him.
+- **Templates per type**: each type shows its pages, its template, the pages that keep a template of
+  their own and a suggestion; a run on auto takes each page's template from its type, and a run over
+  Info pages writes only their SEO pair.
+- **The Pages screen** in three views (List, Tree, By type), remembered per site, one selection and
+  one set of bulk actions, fast at 5,000 pages. **The Proposed Entities dialog** gained shift-click
+  ranges, a whole source type at once, conflicts shown before accepting, the count on the button and
+  the keyboard.
+- **No new plugin.** 1.5.2 stays.
+
+## Release 2.5.1
+
+The client's first feedback on 2.5.0, in short:
+
+- **The H1 is back.** A page whose theme prints its title as the H1 (Blocksy, the client's theme, and
+  block themes) came out of a sync with no H1, which also broke matching a workbook row by its H1.
+  The model now keeps the H1 a visitor sees and says who prints it: the theme or the page's content.
+  Pages synced on 2.5.0 get theirs on the next ordinary sync, which fetches only those pages again.
+- **One chat, in the selected site.** The rail's Agent opened a chat outside the site, where the
+  agent could not use the site's tools. It now opens the same chat as the dock, bound to the selected
+  site; a chat with no site exists only when no site is selected, and says so.
+- **The Proposed Entities dialog**, rebuilt: nearly full-window, the proposals as a tree where
+  unticking a parent unticks its children, select all and none, search, and editing a proposal's
+  name, parent and keywords before accepting. What the person built stays while he looks elsewhere or
+  switches site, until he accepts, starts over or restarts the app.
+- **Three screens fit the smallest window with the dock open**: the Runs table, the Models tables
+  and the left rail.
+- **No new plugin.** 1.5.2 stays.
 
 ## Release 2.5.0
 
@@ -83,8 +189,26 @@ The notes as the pull request carries them, in short:
   code, and one page's Model tab and "What the writer will see".
 - **The known limits** are below; the first is that **no run has been made with a funded OpenAI key**.
 
-## Known limits at 2.5.0
+## Known limits at 2.7.0
 
+- **The race groups past `application/schedules` and `covergate` are owed** for 2.7.0 (item 1 of
+  **Next, in order**); every package in them passed without `-race`.
+- **The capability suite is scripted.** Each matrix row is a conversation whose tool calls a script
+  makes, so it proves the reads, the plans and the executor end to end over the replica, not which
+  calls a real model chooses; that waits for the funded key (under **Next, in order**).
+- **A plan step takes as given only the edges an approved `add_edge` step it depends on writes.** An
+  adoption or a proposal's write is not assumed, so a run start resting on one goes in a second plan
+  once the first has run.
+- **The assistant at 5,000 pages**: every view fits the result cap, but a section's links read the
+  site's whole audit (2.8 to 4.8 s a call), an entity's page reads the base snapshot (1.5 s), and
+  walking all 3,875 entities takes three minutes, a read it has little cause to make.
+- **Classification on a site of 5,000 pages**: a preview or a group's page reads in about half a
+  second from a fresh site map, and about a second right after a change (the map is refreshed once);
+  an apply of 2,750 pages takes 4 to 6 s in batches of 1,000. The Pages Tree shows its first rows in
+  0.9 s there, the List and By type in under 0.35 s.
+- **Rank Math gives every plain page an Article schema**, so on the client's sites the schema rule
+  types such pages as Guide (the replica's `/sample-page/` included) before the guide's word does;
+  he reorders or disables the rule in Settings → Classification if that is wrong for a site.
 - **No live smoke test yet.** No run has been made with a funded key, so nothing a model call costs
   has been compared with a bill. The input side of the estimate was adopted from offline
   `o200k_base` counts (every measured input within ±25%); the output side stays conservative on
@@ -100,12 +224,118 @@ The notes as the pull request carries them, in short:
   (0.7 s at 2,000 pages, 4.6 s at 5,000), and a first walk is paced by the site's request limit.
 - **Bulk resolution** settles 1,000 findings per transaction; a refused batch stops the action and the
   dialog says what was settled and what was not.
-- **At the window's least width with the dock open** the Site map fits; the Runs table still scrolls
-  sideways, the Models table cuts a model's name, and the rail shows a horizontal scrollbar at 600 px
-  high.
+- **At the window's least width with the dock open** every screen the walk measures fits (2.5.1
+  fixed the Runs table, the Models tables and the rail).
 - **The rest** is under **Known gaps**, each with its reason.
 
 ## Where we are
+
+**2026-10-26/27, phase 18: 2.7.0, the assistant reads, proposes and works; the writer takes a
+brief.** The reasoning is under "phase 18" in `DECISIONS.md`; the task list and the capability
+matrix, every row proven with its test, are in `docs/superpowers/plans/2026-10-26-phase-18-assistant.md`.
+
+- **Why**: the client asked the assistant to design a section's links and it stopped on an empty
+  `ParentId`. The entity read carried no parent (a parent was an edge only), his graph is flat (URL-less
+  rows and proposals), the page side answered a bare null for five causes, and no tool walked a
+  subtree or the whole tree.
+- **The owner's answers at the plan**: a must-link the graph does not connect is refused, the plan adding
+  the edge as an earlier step or the run start adding it on request; the catalog's admin tools leave the
+  assistant; a plan card edits a step's text inline; no critic.
+- **The read layer** (`caedef0`, `c93468b`, `f097cbe`, `f07a5da`, `34497e1`, `8c17ea0`, `f02fbd0`): the
+  tree by shape and depth over `page_map` (0081) with its generation guard, every empty parent with
+  its reason (`contextpack.ParentWhy`, never stored), every entity with its parent edge or why it has
+  none, a body as text block by block, a section's links by page, map, owed, orphans and suggestions,
+  many pages found in one paged call; a capped list drops the cursor past the rows it cut (`f9c071f`).
+- **The two hierarchies** (`08c02d6`, `c4da6bb`, `84fbc5b`, `b315536`, `6a72f5a`, `17c7c47`):
+  `entity_parent_differs` raised by a sync and settled by every parent writer, `graph.AdoptParents`
+  previewed and applied under its hash, `adopt_tree` and `keep_graph`, a proposal's and a URL-less row's
+  parent from the page tree.
+- **The run brief** (`99ffc35`, `28cb864`, `d2aab58`, `19abcc9`): `run.Brief` and `run.Directive` kept by
+  0082 and in each step's input hash, refused or made an approved edge at the start, a priority-1 pack
+  section read by the writer, the judge and the linker; the writer pane reads a draft or a run.
+- **Plans** (`bbe0b0b`, `8fc71c7`, `851c2ab`, `5c6f24b`, `c758e60`): `agent_plans` (0083), each step
+  checked as its own tool would check it, `AgentService.ConfirmPlan` whole or in part with inline edits,
+  an executor that waits on runs, skips what a failure strands and resumes when the core opens.
+- **The fold** (`aed9814`, `17aa23b`, `fd4055d`, `a1dc8dc`, `69c8994`, `9cb666f`, `1deace0`, `f132695`):
+  94 tools to 23 by job, a read by `view` and a write by `op` with its own risk and sentence; schemas
+  from 68,310 B and 15,222 tokens to 48,543 B and 11,084, a replica round from 17,194 tokens to 13,260;
+  history format `responses/2`; the instructions teach read, propose and act; 0084 keeps a card's risk
+  (`6204849`).
+- **The support bundle** (`6aa5856`, `4636b8e`): `SupportService.WriteBundle`, one JSON file with no
+  secret, body, title or argument, which a test proves.
+- **Scale** (`25fe201`, `1573da6`, `ddd0857`): every read view fits the 16 KB cap at 5,003 pages; the
+  tree, the pages and the entities walk by cursor with no gap and no repeat.
+- **The screens** (agent F, `b7e9424` to `982fec8`): the plan card, the run drawer's brief, directives
+  and edge offer, the writer pane, the adoption dialog, the finding's copy, the bundle buttons, the
+  harness shots.
+- **The capability suite** (agent E, `6281db6`, `99a919b`): one scripted conversation per matrix row on
+  the replica and the four named tests. It found six defects, fixed test first: the linker's brief
+  (`600b1d2`), an edit run a plan step must wait on (`a417a48`), an entity's keywords in a search
+  (`6437a42`), an artifact's step within one second (`8e17a20`), an edge a plan's own run start needs
+  (`a06d2df`), two summaries (`7106ef2`).
+- **2.7.0** (`759edc6`) in the seven version files. Migrations to 0084; plugin 1.5.2, unchanged.
+
+**2026-10-26, phase 17: 2.6.0, page classification by rules, templates per type, the Pages views.**
+The reasoning is under "phase 17" in `DECISIONS.md`; the task list is in
+`docs/superpowers/plans/2026-10-26-phase-17-classification.md`.
+
+- **The owner's answers at the plan**: a sync re-types the auto pages the rules placed as well as
+  the untyped ones (a page typed before 2.6 moves only on an apply); a rule's conditions are AND
+  only, so the brief's OR rules are seeded as separate ones.
+- **Roles and presets** (`34ccddd`): a preset over a fixed role, every switch by role, Landing,
+  Category, Guide and Info added; 0076 gave every existing site the four, a same-role name standing
+  for the preset.
+- **Rules** (`7f36f91`, `02074b2`): the model, `Validate`, our glob matcher, `Classify` and
+  `Explain` root-first over the folded tree; 0077 seeds fourteen rules and the fallback per site,
+  equal to Go's; 0078 the reasons and `page_type_rule_id`; CRUD, reorder, deletions repointed.
+- **The walk** (`595c307`): derive classifies untyped and rule-placed pages inside its unit, before
+  the map refresh, and raises `type_by_default`.
+- **Preview, apply, bulk** (`a8b2743`, `9edb27e`, `3a48cde`): the preview's groups, hash and
+  dependencies, apply in batches of 1,000 guarded per row; `pages.Selection` resolved in Go with each
+  page's path, `SetTypes`, Back to the rules, `SetTemplates`; the List filters, sorts and `Count`
+  (0079), `MapRequest.Within` (`c93ef71`, 0080).
+- **Templates per type** (`bfa2967`): a type's role, overrides and suggested template. **The body
+  switch** (`0f857c4`): a run over Info pages writes their SEO pair alone, and says so.
+- **The agent** (`7d5bbc0`): `pagetypes_classify`, preview and a confirmed apply by group number;
+  schemas 66,394 B and 14,779 tokens before, 67,165 B and 14,955 after (93 tools).
+- **The proposals** name their source page's type (`7997d37`); the dialog's shift-range, a type at
+  once, conflicts on the row, the count and the keyboard (`c336ad4`, agent F).
+- **The screens** (agent F): the shared selection (`868906f`, `b7320aa`), Settings → Classification
+  with the rules, the test on a page and the preview (`1739f62`, `f095024`), Page types (`6491850`),
+  the run start's line (`9041e9d`), the Pages screen's List, Tree and By type (`10cb9f8`).
+- **Scale** (`7863691`, `30f4dff`, `2b55a29`): the pages list marks the drifted bodies of the pages
+  it shows, not the site's, so its reads stay flat; the classification reads the stored site map
+  instead of folding the site per request (the facts at 5,003 pages from 2.0 s to 0.39 s, the preview
+  from 2.9–3.8 s to 0.48 s); every new read holds its statements from 2,003 to 5,003 pages.
+- **The stands** (`9d1477c`, `1c9796a`): each page typed by the rule its census names, the preview
+  empty after either sync, a run on auto taking Hub, Hub and Guide by type. The replica's whole suite
+  found that a workbook typing a rule-placed page kept the rule's id; the import clears it now
+  (`d46da00`).
+- **The harness** (`9ac5913`, `74bfbd4`): a third site of 5,000 pages under `task ui:run`, flagging its
+  pages without an entity for the proposal dialog; the coffee site typed as 2.6 types a site; the
+  walk's shots and timings (agent F, `94d832e`, `5e5f448`, `b4154a0`).
+- **2.6.0** (`d803ddc`) in the seven version files. Migrations to 0080; plugin 1.5.2, unchanged.
+
+**2026-10-25, phase 16: 2.5.1, the client's first feedback.** The reasoning is under "phase 16" in
+`DECISIONS.md`; the task list is in `docs/superpowers/plans/2026-10-25-phase-16-patch.md`.
+
+- **The visible H1** (`de68e5a`, `edee058`, `e46a764`, `07a7c56`, `655f5f3`):
+  - the extraction keeps the first visible h1 and its source;
+  - 0075 stores both on the render;
+  - one rule (`render.VisibleH1`) feeds the `h1` field from both observation stages;
+  - the planned H1 follows only where no plan holds it, and a read-only field is always agreed;
+  - `pages.View` carries `observedH1` and `h1Source`.
+  Reproduced on 2.5.0's code (20 of 20 published pages on the replica, 11 of 11 on vanilla without
+  an H1), then green on both stands with the census and the upgrade proof.
+- **One chat per site** (`f90967d`, `548deaa`): `/s/:siteId/agent`, shared with the dock; `/agent`
+  for site-less chats only.
+- **The proposal dialog** (`c802a6e`): the near full-window tree with cascading ticks, search,
+  filters and an inspector that edits name, parent and keywords, its state kept per site and opener.
+- **Three layouts at 960** (`1fdb6b4`): runs, models and the rail, each with a `fits` shot.
+- **The harness** (`18a6b38`): the fake storefront prints the H1 its plugin reports; the second
+  seeded site is found by name.
+- **2.5.1** (`869dfa9`) in the seven version files.
+- Schemas unchanged (66,394 bytes and 14,779 tokens, 92 tools); migrations to 0075; plugin 1.5.2.
 
 **2026-10-24, phase 15 session 2: the polish, the docs, the build and the pull request.** The
 reasoning is under "phase 15, session 2" in `DECISIONS.md`; the task list is in the phase plan.
@@ -702,6 +932,104 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
 
+**2026-10-27, on Windows, at the close of phase 18, for 2.7.0. On the final code (`7106ef2`), exit
+codes checked, one leg at a time; the race groups past `application/schedules` and `covergate` are
+owed, below.**
+
+- The comment check and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`, exit 0 each.
+- `golangci-lint run` over every package in four chunks and `--build-tags uiharness ./...`, then `task
+  lint:e2e` alone: 0 issues each.
+- **The race groups** (`-count=1`, coverage, `-p 1`): kernel and domain green in 21 s; the application
+  group's first 18 packages green, `schedules` the last. Then `sitemodel`, `sites`, `support`, `sync`,
+  `templates` and `tools` stopped at their build with Windows' `0xc0000142` (`compile.exe`,
+  `cover.exe` and `vet.exe` could not start with the machine short of memory), and Claude Code's
+  low-memory guard stopped the chain in the runtime group; its `go test` outlived the guard and was
+  stopped by hand. The rest of the application group, the runtime, adapters and last groups and
+  `covergate` are **owed** (the commands are item 1 of **Next, in order**); every package in them
+  passed without `-race` during the phase.
+- `go test -count=1 ./internal/app/scale/`: the view walk in 233 s (the tree's 4,503 rows in 4.6 s, the
+  pages in 40 s, the 3,875 entities in 2 min 4 s, none missed and none twice), the rest in 73 s.
+- `npm run typecheck` (14 s); `npm run test:run -- --maxWorkers=2`, 2,475 tests in 210 files (119 s);
+  `task ui:lint`, 0 issues and the harness tests (133 s).
+- `task build VERSION=2.7.0` (120 s) with no generated drift.
+- **Vanilla**, provisioned fresh: `task e2e:full -- -v -timeout 40m`, 13 passed and 13 skipped (the nine
+  replica-only capability tests and the four skipped by design), 368 s; `task e2e:full:noplugin`, 45 s;
+  taken down.
+- **The replica**, provisioned fresh: `task e2e:full -- -v -timeout 40m`, 24 passed, every capability
+  test among them, and 2 skipped by design, 966 s; taken down. Before it, the four tests the suite's
+  first run had left red passed alone in 200 s after their fixes.
+- The plugin did not change, so its lint and tests were not run.
+- `task package VERSION=2.7.0` (31 s): `bin/postulator-amd64-installer.exe`, 14,510,806 bytes,
+  product and file version 2.7.0; the executable's file version is 2.7.0.0.
+  `bin/postulator-companion.zip` is still plugin 1.5.2.
+- `go run ./cmd/tokenreport`: 23 tools, 48,543 bytes and 11,084 tokens of schema (68,310 and 15,222 for
+  94 tools at the phase's start); the autonomous instructions with the replica's brief 2,133 tokens; a
+  replica round 13,260 tokens (17,194 before).
+
+**2026-10-26, on Windows, at the close of phase 17, for 2.6.0. On the final code (`ed70209`), exit
+codes checked, one leg at a time; four race groups and `covergate` are owed, below.**
+
+- The comment check and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`.
+- `golangci-lint run` over every package in four chunks, `--build-tags uiharness`, then `task
+  lint:e2e` alone: 0 issues each.
+- **The race groups**: kernel and domain, 28 packages, `-count=1` with coverage, green in 109 s. The
+  application group at `-p 2` was stopped by Claude Code's low-memory guard after seven packages had
+  passed, while another job on the machine held several gigabytes, so the application, runtime,
+  adapters and the last group and `covergate` are **owed** (the commands are under **Next, in
+  order**). Every package of those groups passed without `-race` during the phase.
+- `go test -count=1 ./internal/app/scale/`, 322 s, after the plan check's sample moved off the title
+  sort 0079 now indexes.
+- `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 2,326 tests in 201 files; `task
+  ui:lint`, 0 issues and the harness tests in 379 s. Agent F's whole walk: 128 of 128 shots from one
+  reset, the Pages views, Classification and Page types at 960 × 600 with the dock and wide with
+  `fits`, a bulk type change from By type and the proposal dialog over 439 proposals on the 5,000-page
+  site.
+- `task build VERSION=2.6.0` (127 s) with no generated drift.
+- **The replica**, provisioned fresh: `task e2e:full -- -v`, 15 passed and 2 skipped by design, 594 s,
+  after the import fix its first run found; taken down.
+- **Vanilla**, the same: `task e2e:full -- -v`, 13 passed and 4 skipped by design, 354 s; `task
+  e2e:full:noplugin`, 54 s; taken down.
+- The plugin did not change, so its lint and tests were not run.
+- `task package VERSION=2.6.0` (122 s): `bin/postulator-amd64-installer.exe`, 14,238,551 bytes,
+  product and file version 2.6.0; the executable's file version is 2.6.0.0.
+  `bin/postulator-companion.zip` is still plugin 1.5.2.
+- `go run ./cmd/tokenreport`: 93 tools, 67,165 bytes and 14,955 tokens of schema (66,394 and 14,779
+  at 2.5.1); `pagetypes_classify` 547 bytes and 124 tokens; the instructions with the replica's brief
+  1,929 tokens, unchanged.
+
+**2026-10-25, on Windows, at the close of phase 16, for 2.5.1. Green on the final code (`743e4e4`),
+every leg, exit codes checked:**
+
+- The comment check and `gofmt -l .`, silent.
+- `go vet` plain, `-tags e2e` and `-tags uiharness`.
+- `golangci-lint run ./...` and `--build-tags uiharness`, then `task lint:e2e` alone: 0 issues each.
+- **The race groups**, `-count=1` with coverage, in sequence:
+  - kernel and domain (57 s);
+  - application at `-p 2` (1,069 s);
+  - runtime at `-p 1` (301 s);
+  - adapters at `-p 1 -timeout 30m` (643 s);
+  - every package that uses `wptest`, again after its storefront changed (330 s);
+  - app, transport, cmd and frontend at `-p 1` (365 s).
+- `covergate` over the merged profiles: domain and application 88.06% of 17,915 statements (gate
+  80%), total 87.67% of 35,848 (gate 70%).
+- `go test -count=1 ./internal/app/scale/`, 129 s.
+- `npm run typecheck`; `npm run test:run -- --maxWorkers=2`, 2,090 tests in 195 files (245 s);
+  `task ui:lint`, the harness tests in 168 s. Agent F's walk: 101 routes, the new `fits` shots
+  included.
+- `task build VERSION=2.5.1` with no generated drift; the executable's file version is 2.5.1.0.
+- **The replica**, provisioned fresh: `task e2e:full -- -v`, 15 passed and 2 skipped by design, 674 s;
+  taken down.
+- **Vanilla**, the same: `task e2e:full -- -v`, 13 passed and 4 skipped by design, 338 s; then `task
+  e2e:full:noplugin`, 32 s; taken down.
+- Before the fix, a throwaway test on 2.5.0's code, run on both stands, found 20 of 20 published pages
+  on the replica and 11 of 11 on vanilla without the H1 their render shows.
+- The plugin did not change, so its lint and tests were not run.
+- `task package VERSION=2.5.1`: `bin/postulator-amd64-installer.exe`, 14,006,773 bytes, product and
+  file version 2.5.1. `bin/postulator-companion.zip` is still plugin 1.5.2.
+- `go run ./cmd/tokenreport`: 92 tools, 66,394 bytes and 14,779 tokens of schema, unchanged.
+
 **2026-10-24, on Windows, at the close of phase 15 session 2, for 2.5.0. Green on the final code
 (`03265bc`), every leg, exit codes checked, one leg at a time:**
 
@@ -1164,11 +1492,14 @@ not only `npm run typecheck`: only the build regenerates the gitignored bindings
 | — | 2026-10-03/04: OpenAI only on our own client, the spend in view, the whole workbook, the refactor; WordPress categories built and removed | done, gate green after the removal |
 | 14 | The site model (2026-10-17): stage 0 audit, contract, design and plan; stages 1 to 4 in `2026-10-17-phase-14-site-model.md` | done, closed 2026-10-24 with the whole gate green on both stands |
 | 15 | The release (2026-10-24), two sessions in `2026-10-24-phase-15-release.md` | done on 2026-10-24: session 1 (the plugin's floors, pages without an entity, the input estimate, scale, the prompts) and session 2 (the polish, the docs, 2.5.0 built, the pull request open) |
+| 16 | 2.5.1, the client's first feedback (2026-10-25), `2026-10-25-phase-16-patch.md` | done; built, in PR #32 |
+| 17 | 2.6.0, classification by rules, templates per type, the Pages views (2026-10-26), `2026-10-26-phase-17-classification.md` | done; built, in PR #32 |
+| 18 | 2.7.0, the assistant reads, proposes and works; the run brief (2026-10-26/27), `2026-10-26-phase-18-assistant.md` | done, every matrix row proven; built, in PR #32 |
 
 ## Known gaps
 
 - **Phase 15 left these:**
-  - **No funded key has run**: see **Known limits at 2.5.0**.
+  - **No funded key has run**: see **Known limits at 2.6.0**.
   - **The UI at the window's least width with the dock open**: the Runs table scrolls sideways
     inside its panel (the walk's `fits` step names it: 726 px of content in 288 px), the Models
     table shows about ten characters of a model's name, and the rail shows a horizontal scrollbar

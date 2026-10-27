@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { copy } from "../../../copy/index.js";
 import { errorMessageOf } from "../../../data/errors.js";
 import type { SiteMapNode } from "../../../data/types.js";
-import { Button, Input, SectionLabel, Skeleton, SkeletonRows, VirtualRows, useDebounced } from "../../../ui/index.js";
+import { Button, Input, SectionLabel, Skeleton, SkeletonRows, VirtualRows, cx, useDebounced } from "../../../ui/index.js";
 import type { Loaded } from "../../map/loader.js";
 import { BranchLoader, useBranch } from "../../map/loader.js";
 import { flattenTree, openBranches } from "../../map/model/tree.js";
@@ -34,12 +34,24 @@ export interface PageTreeProps {
     noteOf?: (node: SiteMapNode) => string | null;
     filter?: ReactNode;
     problem?: string | null;
+    view?: TreeView;
+    onView?: (next: TreeView) => void;
+    fill?: boolean;
 }
+
+export interface TreeView {
+    search: string;
+    expanded: ReadonlySet<string>;
+}
+
+export const blankTreeView: TreeView = Object.freeze({ search: "", expanded: new Set<string>() });
 
 const noRequired: ReadonlyMap<string, string> = new Map();
 
 function foundRows(nodes: readonly SiteMapNode[], keep: Keep, more: boolean): TreeRow[] {
-    const rows: TreeRow[] = nodes.filter(keep).map((node) => ({ kind: "node", key: `found:${node.page.pageId}`, node, depth: 0, expanded: false }));
+    const rows: TreeRow[] = nodes
+        .filter(keep)
+        .map((node) => ({ kind: "node", key: `found:${node.page.pageId}`, node, depth: 0, expanded: false, ancestors: [] }));
     return more ? [...rows, { kind: "more", key: "more:found", parentId: rootParent, depth: 0 }] : rows;
 }
 
@@ -56,11 +68,17 @@ export function PageTree({
     noteOf,
     filter,
     problem,
+    view,
+    onView,
+    fill = false,
 }: PageTreeProps): ReactElement {
-    const [typed, setTyped] = useState("");
+    const [own, setOwn] = useState<TreeView>(blankTreeView);
+    const held = view ?? own;
+    const setView = onView ?? setOwn;
+    const typed = held.search;
+    const expanded = held.expanded;
     const search = useDebounced(typed.trim(), searchDelayMs);
     const searching = search !== "";
-    const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
     const [loaded, setLoaded] = useState<ReadonlyMap<string, Loaded>>(new Map());
     const found = useBranch({ siteId, search }, searching);
 
@@ -121,14 +139,14 @@ export function PageTree({
                     onChange(toggled(selected, [id], !selected.has(id)), [{ id, path: node.page.path }]);
                 }}
                 onExpand={() => {
-                    setExpanded((held) => toggled(held, [id], !held.has(id)));
+                    setView({ search: typed, expanded: toggled(expanded, [id], !expanded.has(id)) });
                 }}
             />
         );
     };
 
     return (
-        <div className="flex flex-col gap-1.5">
+        <div className={cx("flex flex-col gap-1.5", fill && "min-h-0 flex-1")}>
             {open.map((parentId) => (
                 <BranchLoader key={parentId} siteId={siteId} parentId={parentId} onLoaded={onLoaded} />
             ))}
@@ -144,15 +162,15 @@ export function PageTree({
                         placeholder={copy.pages.pick.searchHint}
                         aria-label={copy.pages.pick.search}
                         onChange={(event) => {
-                            setTyped(event.target.value);
+                            setView({ search: event.target.value, expanded });
                         }}
                     />
                 </div>
                 {filter}
             </div>
             <div
-                className="flex flex-col overflow-hidden rounded-md border border-hairline bg-inset p-1"
-                style={{ height: Math.min(maxHeight, Math.max(minHeight, rows.length * rowHeight + framing)) }}
+                className={cx("flex flex-col overflow-hidden rounded-md border border-hairline bg-inset p-1", fill && "min-h-0 flex-1")}
+                style={fill ? undefined : { height: Math.min(maxHeight, Math.max(minHeight, rows.length * rowHeight + framing)) }}
             >
                 {failed !== null ? (
                     <p className="p-1 text-xs text-danger">{failed}</p>

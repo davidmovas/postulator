@@ -33,9 +33,9 @@ func newHarness(t *testing.T) harness {
 	other := sqlitetest.Site(t, store, "other")
 	recorder := &applicationtest.Recorder{}
 	service := pagetypes.New(pagetypes.Deps{
-		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Pages: sqlite.NewPageRepo(store),
-		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: recorder,
-		Clock: clock.NewFake(time.Date(2026, time.October, 18, 9, 0, 0, 0, time.UTC)),
+		Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
+		Pages: sqlite.NewPageRepo(store), Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store,
+		Publisher: recorder, Clock: clock.NewFake(time.Date(2026, time.October, 18, 9, 0, 0, 0, time.UTC)),
 	})
 	h := harness{service: service, store: store, recorder: recorder, siteID: owner.ID, otherID: other.ID}
 	for _, site := range []string{owner.ID, other.ID} {
@@ -115,12 +115,19 @@ func TestSeedingGivesASiteThePresetsOnce(t *testing.T) {
 	for _, kind := range listed.Types {
 		names = append(names, kind.Name)
 	}
-	if !slices.Equal(names, []string{"Hub", "Entity", "Product", "Store category", "Catalog", "Technical"}) {
-		t.Fatalf("types = %v, want the six presets once and in order", names)
+	if !slices.Equal(names, []string{"Landing", "Category", "Guide", "Info", "Product", "Store category", "Catalog", "Technical"}) {
+		t.Fatalf("types = %v, want the client's eight presets once and in order", names)
 	}
-	hub := h.typeOf(t, h.siteID, pagetype.Hub)
+	hub := h.typeOf(t, h.siteID, pagetype.Category)
 	if body := scopeOf(hub, field.Body); !body.Enabled || !body.Stored || !body.Links.Links || body.Links.Rules.MaxLinks != 20 {
-		t.Errorf("the hub's body = %+v, want it on with the hub's rules", body)
+		t.Errorf("the category's body = %+v, want it on with the hub's rules", body)
+	}
+	if hub.Role != "hub" || h.typeOf(t, h.siteID, pagetype.Guide).Role != "entity" || h.typeOf(t, h.siteID, pagetype.StoreCategory).Role != "archive" {
+		t.Error("the types do not show their roles")
+	}
+	info := h.typeOf(t, h.siteID, pagetype.Info)
+	if body, title := scopeOf(info, field.Body), scopeOf(info, field.SEOTitle); body.Enabled || body.Stored || !title.Enabled || !title.Stored {
+		t.Errorf("an info page's body = %+v and SEO title = %+v, want the body off and the SEO meta on", body, title)
 	}
 	if excerpt := scopeOf(hub, field.Excerpt); excerpt.Enabled || excerpt.Stored || excerpt.Field != string(field.Excerpt) {
 		t.Errorf("the hub's excerpt = %+v, want it listed and off", excerpt)
@@ -156,7 +163,7 @@ func TestEachTypeCountsItsPagesTheUntypedByTheirIdentity(t *testing.T) {
 	h := newHarness(t)
 
 	pages := sqlite.NewPageRepo(h.store)
-	hub := h.typeOf(t, h.siteID, pagetype.Hub)
+	hub := h.typeOf(t, h.siteID, pagetype.Category)
 	typed := sqlitetest.Page(t, h.store, h.siteID, "/peptides/")
 	if err := pages.SetType(t.Context(), typed.ID, hub.ID, pagemap.TypeByUser, time.Now()); err != nil {
 		t.Fatalf("SetType: %v", err)
@@ -168,8 +175,8 @@ func TestEachTypeCountsItsPagesTheUntypedByTheirIdentity(t *testing.T) {
 	for _, kind := range listed.Types {
 		counts[kind.Preset] = kind.Pages
 	}
-	if counts["hub"] != 1 || counts["entity"] != 1 {
-		t.Errorf("pages per type = %v, want the typed hub and the untyped page read as an entity", counts)
+	if counts["category"] != 1 || counts["guide"] != 1 {
+		t.Errorf("pages per type = %v, want the typed category and the untyped page read as a guide", counts)
 	}
 }
 
@@ -199,7 +206,8 @@ func TestASeededTypeCarriesItsPresetsTemplate(t *testing.T) {
 	}
 
 	want := map[pagetype.Preset]string{
-		pagetype.Hub: shipped["Hub"], pagetype.Entity: shipped["Guide"], pagetype.Product: shipped["Product"],
+		pagetype.Landing: shipped["Hub"], pagetype.Category: shipped["Hub"], pagetype.Guide: shipped["Guide"],
+		pagetype.Info: shipped["Guide"], pagetype.Product: shipped["Product"],
 		pagetype.StoreCategory: "", pagetype.Catalog: "", pagetype.Technical: "",
 	}
 	for preset, templateID := range want {
@@ -207,7 +215,7 @@ func TestASeededTypeCarriesItsPresetsTemplate(t *testing.T) {
 			t.Errorf("the seeded %s type's template = %q, want %q", preset, got, templateID)
 		}
 	}
-	if got := templateOf(h.typeOf(t, h.siteID, pagetype.Hub)); got != "" {
+	if got := templateOf(h.typeOf(t, h.siteID, pagetype.Category)); got != "" {
 		t.Errorf("a site seeded before the built-ins existed got %q", got)
 	}
 
@@ -219,8 +227,48 @@ func TestASeededTypeCarriesItsPresetsTemplate(t *testing.T) {
 	if err := h.service.Seed(t.Context(), chosen.ID); err != nil {
 		t.Fatalf("Seed the site with a default: %v", err)
 	}
-	if got := templateOf(h.typeOf(t, chosen.ID, pagetype.Hub)); got != "" {
-		t.Errorf("a site whose default is chosen seeded its Hub type with %q, which would win over that default", got)
+	if got := templateOf(h.typeOf(t, chosen.ID, pagetype.Category)); got != "" {
+		t.Errorf("a site whose default is chosen seeded its Category type with %q, which would win over that default", got)
+	}
+}
+
+func TestATypeCountsItsOverridesAndIsOfferedItsRolesBuiltIn(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	shipped := builtIns(t, h.store)
+
+	category := h.typeOf(t, h.siteID, pagetype.Category)
+	if category.TemplateID != nil || category.Suggested == nil || *category.Suggested != shipped["Hub"] {
+		t.Fatalf("a category type without a template = %+v, want Hub suggested", category)
+	}
+	if info := h.typeOf(t, h.siteID, pagetype.Info); info.Suggested == nil || *info.Suggested != shipped["Guide"] {
+		t.Errorf("an info type = %+v, want Guide suggested", info)
+	}
+	if store := h.typeOf(t, h.siteID, pagetype.StoreCategory); store.Suggested != nil {
+		t.Errorf("a store category = %+v, want nothing suggested for a type nothing writes", store)
+	}
+
+	pages := sqlite.NewPageRepo(h.store)
+	for i, path := range []string{"/peptides/", "/healing-peptides/"} {
+		page := sqlitetest.Page(t, h.store, h.siteID, path)
+		if err := pages.SetType(t.Context(), page.ID, category.ID, pagemap.TypeByUser, time.Now()); err != nil {
+			t.Fatalf("SetType: %v", err)
+		}
+		if i == 0 {
+			template := shipped["Guide"]
+			page.TemplateID = &template
+			if err := pages.Update(t.Context(), page); err != nil {
+				t.Fatalf("give the page its own template: %v", err)
+			}
+		}
+	}
+	if got := h.typeOf(t, h.siteID, pagetype.Category); got.Pages != 2 || got.Overrides != 1 {
+		t.Errorf("the category type = %d pages and %d overrides, want 2 and 1", got.Pages, got.Overrides)
+	}
+	template := shipped["Hub"]
+	saved, err := h.service.Save(t.Context(), pagetypes.SaveRequest{ID: category.ID, TemplateID: &template})
+	if err != nil || saved.Suggested != nil || saved.TemplateID == nil {
+		t.Fatalf("accepting the suggestion = %+v %v, want the template set and nothing more suggested", saved, err)
 	}
 }
 
@@ -238,6 +286,8 @@ func TestATypeCreatedFromAPresetInheritsItsTemplate(t *testing.T) {
 		{name: "Article", preset: "entity", want: shipped["Guide"]},
 		{name: "Item", preset: "product", want: shipped["Product"]},
 		{name: "Archive", preset: "store_category", want: ""},
+		{name: "Top", preset: "landing", want: shipped["Hub"]},
+		{name: "Policies", preset: "info", want: shipped["Guide"]},
 		{name: "Plain", preset: "hub", requested: new(""), want: ""},
 		{name: "Chosen", preset: "hub", requested: new(shipped["Category"]), want: shipped["Category"]},
 	}
@@ -257,7 +307,7 @@ func TestATypeCreatedFromAPresetInheritsItsTemplate(t *testing.T) {
 func TestACanonicalScopeIsNeverAIWritten(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	hub := h.typeOf(t, h.siteID, pagetype.Hub)
+	hub := h.typeOf(t, h.siteID, pagetype.Category)
 
 	_, err := h.service.SetScope(t.Context(), pagetypes.SetScopeRequest{
 		PageTypeID: hub.ID, Field: string(field.SEOCanonical), Enabled: true, AIWrites: true, Links: field.NoLinks(),
@@ -287,15 +337,15 @@ func TestATypeIsCreatedFromAPresetAndRenamed(t *testing.T) {
 	if _, err = h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "pillar", Preset: "entity"}); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("a second Pillar = %q, want CONFLICT", errors.CodeOf(err))
 	}
-	if _, err = h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Cat", Preset: "category"}); !errors.IsCode(err, errors.Invalid) {
-		t.Errorf("the preset category = %q, want INVALID", errors.CodeOf(err))
+	if _, err = h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Cat", Preset: "pillar"}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an unknown preset = %q, want INVALID", errors.CodeOf(err))
 	}
 
-	hub := h.typeNamed(t, h.siteID, "Hub")
-	name := "Category"
+	hub := h.typeNamed(t, h.siteID, "Landing")
+	name := "Top level"
 	renamed, err := h.service.Save(t.Context(), pagetypes.SaveRequest{ID: hub.ID, Name: &name})
-	if err != nil || renamed.Name != "Category" || renamed.Preset != "hub" {
-		t.Fatalf("Save = %+v %v, want the hub renamed Category", renamed, err)
+	if err != nil || renamed.Name != "Top level" || renamed.Preset != "landing" {
+		t.Fatalf("Save = %+v %v, want the landing type renamed", renamed, err)
 	}
 	foreign := sqlitetest.Template(t, h.store, "Global writer").ID
 	if renamed, err = h.service.Save(t.Context(), pagetypes.SaveRequest{ID: hub.ID, TemplateID: &foreign}); err != nil || renamed.TemplateID == nil {
@@ -327,8 +377,8 @@ func TestDeletingATypeReassignsItsPages(t *testing.T) {
 	if err = pages.SetType(t.Context(), page.ID, pillar.ID, pagemap.TypeByAI, time.Now()); err != nil {
 		t.Fatalf("SetType: %v", err)
 	}
-	hub := h.typeNamed(t, h.siteID, "Hub")
-	otherHub := h.typeOf(t, h.otherID, pagetype.Hub)
+	hub := h.typeNamed(t, h.siteID, "Category")
+	otherHub := h.typeOf(t, h.otherID, pagetype.Category)
 
 	for name, req := range map[string]pagetypes.DeleteRequest{
 		"no type to take the pages": {ID: pillar.ID},
@@ -349,9 +399,13 @@ func TestDeletingATypeReassignsItsPages(t *testing.T) {
 		t.Fatalf("the page after the delete = %+v %v, want the hub set by a person", moved, err)
 	}
 
-	_, err = h.service.Delete(t.Context(), pagetypes.DeleteRequest{ID: hub.ID, ReassignTo: h.typeOf(t, h.siteID, pagetype.Entity).ID})
-	if name, reason := reasonOf(t, err); !errors.IsCode(err, errors.Invalid) || name != "id" || reason != "last_of_preset" {
-		t.Errorf("deleting the last hub = %v (%s %s), want INVALID last_of_preset", err, name, reason)
+	landing := h.typeOf(t, h.siteID, pagetype.Landing)
+	if _, err = h.service.Delete(t.Context(), pagetypes.DeleteRequest{ID: landing.ID, ReassignTo: hub.ID}); err != nil {
+		t.Fatalf("deleting Landing while Category holds the hub role: %v", err)
+	}
+	_, err = h.service.Delete(t.Context(), pagetypes.DeleteRequest{ID: hub.ID, ReassignTo: h.typeOf(t, h.siteID, pagetype.Guide).ID})
+	if name, reason := reasonOf(t, err); !errors.IsCode(err, errors.Invalid) || name != "id" || reason != "last_of_role" {
+		t.Errorf("deleting the last hub-like type = %v (%s %s), want INVALID last_of_role", err, name, reason)
 	}
 }
 
@@ -359,8 +413,8 @@ func TestAScopeIsRefusedWhenTheDenyListOrTheRoleForbidsIt(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 
-	hub := h.typeOf(t, h.siteID, pagetype.Hub)
-	links := pagetype.DefaultScope(pagetype.Hub, field.Body, hub.ID).Links
+	hub := h.typeOf(t, h.siteID, pagetype.Category)
+	links := pagetype.DefaultScope(pagetype.Category, field.Body, hub.ID).Links
 	links.Rules.MaxLinks = 8
 	set, err := h.service.SetScope(t.Context(), pagetypes.SetScopeRequest{
 		PageTypeID: hub.ID, Field: "body", Enabled: true, AIWrites: true, Instruction: "Lead with the products the hub lists.",
@@ -398,7 +452,7 @@ func TestAScopeIsRefusedWhenTheDenyListOrTheRoleForbidsIt(t *testing.T) {
 	if err != nil || custom.Label != "Spec sheet" || custom.Provider != "plugin" {
 		t.Fatalf("a custom field = %+v %v", custom, err)
 	}
-	if got := scopeOf(h.typeOf(t, h.siteID, pagetype.Hub), field.Instance(field.Meta, "spec_sheet")); !got.Enabled {
+	if got := scopeOf(h.typeOf(t, h.siteID, pagetype.Category), field.Instance(field.Meta, "spec_sheet")); !got.Enabled {
 		t.Errorf("the custom field is not listed on its type: %+v", got)
 	}
 }
@@ -407,7 +461,7 @@ func TestTheSetResolvesAPagesPolicy(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 
-	hub := h.typeOf(t, h.siteID, pagetype.Hub)
+	hub := h.typeOf(t, h.siteID, pagetype.Category)
 	set, err := h.service.Set(t.Context(), h.siteID)
 	if err != nil {
 		t.Fatalf("Set: %v", err)

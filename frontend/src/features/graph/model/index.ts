@@ -7,6 +7,7 @@ export interface EntityType {
     id: string;
     name: string;
     preset: string;
+    role: string;
 }
 
 export type NodeState = "mismatch" | "working" | "published" | "exists" | "planned" | "archived" | "noPage";
@@ -82,7 +83,7 @@ function canonicalTypes(
 ): Map<string, EntityType> {
     const known = new Map<string, EntityType>();
     for (const held of pageTypes) {
-        known.set(held.id, { id: held.id, name: held.name, preset: held.preset });
+        known.set(held.id, { id: held.id, name: held.name, preset: held.preset, role: held.role });
     }
     const out = new Map<string, EntityType>();
     for (const page of pages) {
@@ -322,7 +323,7 @@ export function buildGraphIndex(
         const approved = approvedParents.get(held.id) ?? [];
         const flags: EntityProblems = {
             noPage: held.canonicalPageId === null,
-            orphan: approved.length === 0 && types.get(held.id)?.preset !== "hub",
+            orphan: approved.length === 0 && types.get(held.id)?.role !== "hub",
             proposed: proposedTouches.get(held.id) ?? 0,
             multiParent: approved.length > 1,
         };

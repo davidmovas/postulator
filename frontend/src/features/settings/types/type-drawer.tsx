@@ -5,8 +5,8 @@ import { copy } from "../../../copy/index.js";
 import type { CatalogField, PageType } from "../../../data/types.js";
 import { Banner, Button, DeleteIcon, Drawer, EditNoteIcon, SectionLabel, StatusBadge, toneClasses } from "../../../ui/index.js";
 import { CustomFieldForm } from "./custom-field.js";
-import { presetHint, presetIcon, presetLabel, presetTone } from "./labels.js";
-import { aiWritableOf, lastOfPreset, orderedScopes, usualFor } from "./model.js";
+import { presetHint, presetIcon, presetTone, roleLabel } from "./labels.js";
+import { aiWritableOf, lastOfRole, orderedScopes, usualFor } from "./model.js";
 import { ScopeCard } from "./scope-card.js";
 import type { TemplateChoice } from "./type-dialogs.js";
 import { DeleteTypeDialog, TypeFormDialog } from "./type-dialogs.js";
@@ -29,10 +29,10 @@ export function TypeDrawer({ siteId, type, types, catalog, templates, templateNa
     const [showOthers, setShowOthers] = useState(false);
     const Icon = presetIcon(type.preset);
     const scopes = orderedScopes(type.scopes ?? []);
-    const usual = scopes.filter((scope) => usualFor(scope, type.preset));
-    const others = scopes.filter((scope) => !usualFor(scope, type.preset));
-    const last = lastOfPreset(types, type);
-    const role = presetLabel(type.preset);
+    const usual = scopes.filter((scope) => usualFor(scope, type.role));
+    const others = scopes.filter((scope) => !usualFor(scope, type.role));
+    const last = lastOfRole(types, type);
+    const role = roleLabel(type.role);
 
     return (
         <Drawer
@@ -82,7 +82,7 @@ export function TypeDrawer({ siteId, type, types, catalog, templates, templateNa
                             variant="ghost"
                             icon={DeleteIcon}
                             disabled={last}
-                            title={last ? copy.pageTypes.remove.lastOfPreset : undefined}
+                            title={last ? copy.pageTypes.remove.lastOfRole : undefined}
                             data-type-delete={true}
                             onClick={() => {
                                 setDeleting(true);

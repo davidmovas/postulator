@@ -41,13 +41,14 @@ func TestCapKeepsTheAnswerReadableAndSaysWhatItDropped(t *testing.T) {
 	}
 
 	var decoded struct {
-		Truncated  bool           `json:"truncated"`
-		TotalBytes int            `json:"totalBytes"`
-		Dropped    map[string]int `json:"droppedItems"`
-		Result     struct {
+		Truncated     bool           `json:"truncated"`
+		TotalBytes    int            `json:"totalBytes"`
+		Dropped       map[string]int `json:"droppedItems"`
+		CursorDropped []string       `json:"cursorDropped"`
+		Result        struct {
 			Items      []map[string]any `json:"items"`
 			HasMore    bool             `json:"hasMore"`
-			NextCursor string           `json:"nextCursor"`
+			NextCursor *string          `json:"nextCursor"`
 		} `json:"result"`
 	}
 	if unmarshalErr := json.Unmarshal(encoded, &decoded); unmarshalErr != nil {
@@ -57,8 +58,10 @@ func TestCapKeepsTheAnswerReadableAndSaysWhatItDropped(t *testing.T) {
 	switch {
 	case !decoded.Truncated || decoded.TotalBytes == 0:
 		t.Fatalf("the capped result is %s", encoded)
-	case decoded.Result.NextCursor != "c-0001" || !decoded.Result.HasMore:
-		t.Fatalf("the cap lost the paging of the listing: %s", encoded)
+	case decoded.Result.NextCursor != nil:
+		t.Fatalf("the cap kept a cursor that starts after the rows it dropped: %s", encoded)
+	case !decoded.Result.HasMore || len(decoded.CursorDropped) != 1 || decoded.CursorDropped[0] != "items":
+		t.Fatalf("the cap did not say the listing goes on past a cursor it dropped: %s", encoded)
 	case len(decoded.Result.Items) == 0 || len(decoded.Result.Items) >= 200:
 		t.Fatalf("the cap kept %d of 200 rows", len(decoded.Result.Items))
 	case decoded.Dropped["items"] != 200-len(decoded.Result.Items):

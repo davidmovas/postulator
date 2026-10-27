@@ -1,5 +1,27 @@
 import type { FieldScope, LinkPolicy, PageType } from "../data/types.js";
+import type { PageTypeRole } from "../generated/vocab.js";
 import { noLinks } from "../features/settings/types/model.js";
+
+const presetRoles: Readonly<Record<string, PageTypeRole>> = {
+    landing: "hub",
+    category: "hub",
+    hub: "hub",
+    guide: "entity",
+    info: "entity",
+    entity: "entity",
+    product: "product",
+    store_category: "archive",
+    catalog: "catalog",
+    technical: "technical",
+};
+
+export function roleOfPreset(preset: string): PageTypeRole {
+    return presetRoles[preset] ?? "entity";
+}
+
+function writableRole(role: PageTypeRole): boolean {
+    return role === "hub" || role === "entity" || role === "product";
+}
 
 export function hubLinks(): LinkPolicy {
     return {
@@ -42,8 +64,11 @@ export function aPageType(id: string, preset: string, overrides: Partial<PageTyp
         siteId: "s1",
         name: preset,
         preset,
-        writable: preset === "hub" || preset === "entity" || preset === "product",
+        role: roleOfPreset(preset),
+        writable: writableRole(roleOfPreset(preset)),
         templateId: null,
+        suggestedTemplateId: null,
+        overrides: 0,
         pages: 0,
         scopes: [],
         createdAt: "2026-10-18T09:00:00Z",

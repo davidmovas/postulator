@@ -8,6 +8,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -80,7 +81,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CreateResponse
 	if publishErr := s.changed(page.SiteID); publishErr != nil {
 		return CreateResponse{}, publishErr
 	}
-	return CreateResponse{Page: view(page, false)}, nil
+	return CreateResponse{Page: view(page, annotations{})}, nil
 }
 
 func (s *Service) adopt(ctx context.Context, parent pagemap.Page, siblings []pagemap.Page) error {
@@ -219,13 +220,17 @@ func (s *Service) SetType(ctx context.Context, req SetTypeRequest) (SetTypeRespo
 			return errors.New(errors.Invalid, "the type "+kind.Name+" belongs to another site").
 				WithDetail("field", "pageTypeId").WithDetail("pageId", page.ID)
 		}
+		if !pagetype.Fits(kind.Preset.Role(), page.WPType) {
+			return errors.New(errors.Invalid, "a "+string(page.WPType)+" cannot take the type "+kind.Name).
+				WithDetail("field", "pageTypeId").WithDetail("reason", reasonRoleMismatch)
+		}
 		at := s.now()
 		if setErr := s.pages.SetType(c, page.ID, kind.ID, by, at); setErr != nil {
 			return setErr
 		}
-		page.PageTypeID, page.TypeSource, page.TypeReason, page.UpdatedAt = &kind.ID, pagemap.TypeSourceManual, by, at
+		page.PageTypeID, page.TypeSource, page.TypeReason, page.TypeRuleID, page.UpdatedAt = &kind.ID, pagemap.TypeSourceManual, by, "", at
 		updated = page
-		return nil
+		return s.clearDefaults(c, page.SiteID, []string{page.ID})
 	})
 	if err != nil {
 		return SetTypeResponse{}, err
@@ -247,30 +252,16 @@ func (s *Service) AssignTemplate(ctx context.Context, req AssignTemplateRequest)
 			WithDetail("field", "templateId")
 	}
 
-	changed := 0
-	err := s.uow.Do(ctx, func(c context.Context) error {
-		for _, pageID := range req.PageIDs {
-			current, getErr := s.pages.Get(c, pageID)
-			if getErr != nil {
-				return getErr
-			}
-			if current.SiteID != req.SiteID {
-				return errors.New(errors.Invalid, "the page "+current.Path+" belongs to another site").
-					WithDetail("field", "pageIds").WithDetail("pageId", current.ID)
-			}
-			if current.TemplateID != nil && *current.TemplateID == templateID {
-				continue
-			}
-			next := current
-			next.TemplateID = &templateID
-			next.UpdatedAt = s.now()
-			if updateErr := s.pages.Update(c, next); updateErr != nil {
-				return updateErr
-			}
-			changed++
+	ids, err := s.resolve(ctx, Selection{SiteID: req.SiteID, PageIDs: req.PageIDs})
+	if err != nil {
+		return AssignTemplateResponse{}, err
+	}
+	for _, pageID := range req.PageIDs {
+		if _, found := slices.BinarySearch(ids, pageID); !found {
+			return AssignTemplateResponse{}, errors.New(errors.NotFound, "page not found").WithDetail("pageId", pageID)
 		}
-		return nil
-	})
+	}
+	changed, err := s.setTemplates(ctx, req.SiteID, ids, &templateID)
 	if err != nil {
 		return AssignTemplateResponse{}, err
 	}
@@ -346,22 +337,10 @@ func pageSort(sort *dto.Sort) (key pagemap.Sort, desc bool, err error) {
 }
 
 func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page], error) {
-	if err := requireSite(req.SiteID); err != nil {
-		return paging.List[Page]{}, err
-	}
-	q := pagemap.Query{SiteID: req.SiteID, Unmapped: req.Unmapped, PathPrefix: strings.ToLower(req.PathPrefix)}
-	if req.Status != "" {
-		status := pagemap.Status(req.Status)
-		if !status.Valid() {
-			return paging.List[Page]{}, errors.New(errors.Invalid, "page status is not recognized").WithDetail("field", "status")
-		}
-		q.Status = &status
-	}
-	entityIDs, err := s.entityFilter(ctx, req)
+	q, err := s.query(ctx, req.SiteID, req.PageFilter)
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
-	q.EntityIDs = entityIDs
 	key, desc, err := pageSort(req.Sort)
 	if err != nil {
 		return paging.List[Page]{}, err
@@ -372,28 +351,89 @@ func (s *Service) List(ctx context.Context, req ListRequest) (paging.List[Page],
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
-	drifted, err := s.drifted(ctx, req.SiteID)
+	shown, err := s.annotate(ctx, list.Items)
 	if err != nil {
 		return paging.List[Page]{}, err
 	}
-	return application.MapList(list, func(p pagemap.Page) Page { return view(p, drifted[p.ID]) }), nil
+	return application.MapList(list, func(p pagemap.Page) Page { return view(p, shown) }), nil
 }
 
-func (s *Service) entityFilter(ctx context.Context, req ListRequest) ([]string, error) {
+func (s *Service) Count(ctx context.Context, req CountRequest) (CountResponse, error) {
+	q, err := s.query(ctx, req.SiteID, req.PageFilter)
+	if err != nil {
+		return CountResponse{}, err
+	}
+	count, err := s.pages.Count(ctx, q)
+	return CountResponse{Pages: count}, err
+}
+
+func (s *Service) query(ctx context.Context, siteID string, filter PageFilter) (pagemap.Query, error) {
+	if err := requireSite(siteID); err != nil {
+		return pagemap.Query{}, err
+	}
+	q := pagemap.Query{
+		SiteID: siteID, Unmapped: filter.Unmapped, PathPrefix: strings.ToLower(filter.PathPrefix), PageTypeID: strings.TrimSpace(filter.PageTypeID),
+		Body: pagemap.BodyFilter(filter.Body), Findings: filter.Findings, Search: graph.Key(filter.Search),
+	}
+	if !q.Body.Valid() {
+		return pagemap.Query{}, errors.New(errors.Invalid, "a page's text is asked with or without").WithDetail("field", "body")
+	}
+	if filter.Status != "" {
+		status := pagemap.Status(filter.Status)
+		if !status.Valid() {
+			return pagemap.Query{}, errors.New(errors.Invalid, "page status is not recognized").WithDetail("field", "status")
+		}
+		q.Status = &status
+	}
+	entityIDs, err := s.entityFilter(ctx, siteID, filter)
+	if err != nil {
+		return pagemap.Query{}, err
+	}
+	q.EntityIDs = entityIDs
+	if under := strings.TrimSpace(filter.Under); under != "" {
+		if q.Trail, err = s.trailOf(ctx, siteID, under); err != nil {
+			return pagemap.Query{}, err
+		}
+	}
+	if q.ReadsMap() && s.maps != nil {
+		if refreshErr := s.maps.Refresh(ctx, siteID); refreshErr != nil {
+			return pagemap.Query{}, refreshErr
+		}
+	}
+	return q, nil
+}
+
+func (s *Service) trailOf(ctx context.Context, siteID, pageID string) (string, error) {
+	if s.maps != nil {
+		if err := s.maps.Refresh(ctx, siteID); err != nil {
+			return "", err
+		}
+	}
+	rows, err := s.rows.ListByIDs(ctx, []string{pageID})
+	if err != nil {
+		return "", err
+	}
+	if len(rows) == 0 || rows[0].SiteID != siteID || rows[0].Trail == "" {
+		return "", errors.New(errors.Invalid, "the page to look under is not on the site's map").WithDetail("field", "under")
+	}
+	return rows[0].Trail, nil
+}
+
+func (s *Service) entityFilter(ctx context.Context, siteID string, filter PageFilter) ([]string, error) {
 	switch {
-	case req.EntityID == "" && req.IncludeDescendants:
+	case filter.EntityID == "" && filter.IncludeDescendants:
 		return nil, errors.New(errors.Invalid, "the pages under an entity need the entity").WithDetail("field", "entityId")
-	case req.EntityID == "":
+	case filter.EntityID == "":
 		return nil, nil
-	case !req.IncludeDescendants:
-		return []string{req.EntityID}, nil
+	case !filter.IncludeDescendants:
+		return []string{filter.EntityID}, nil
 	}
 
-	entities, err := s.entities.ListBySite(ctx, req.SiteID)
+	entities, err := s.entities.ListBySite(ctx, siteID)
 	if err != nil {
 		return nil, err
 	}
-	edges, err := s.edges.ListBySite(ctx, req.SiteID)
+	edges, err := s.edges.ListBySite(ctx, siteID)
 	if err != nil {
 		return nil, err
 	}
@@ -401,9 +441,9 @@ func (s *Service) entityFilter(ctx context.Context, req ListRequest) ([]string, 
 	if err != nil {
 		return nil, err
 	}
-	below := g.Descendants(req.EntityID)
+	below := g.Descendants(filter.EntityID)
 	out := make([]string, 0, len(below)+1)
-	out = append(out, req.EntityID)
+	out = append(out, filter.EntityID)
 	for i := range below {
 		out = append(out, below[i].ID)
 	}
@@ -558,9 +598,9 @@ func (s *Service) Tree(ctx context.Context, req TreeRequest) (TreeResponse, erro
 	if err != nil {
 		return TreeResponse{}, err
 	}
-	drifted, err := s.drifted(ctx, req.SiteID)
+	shown, err := s.annotate(ctx, all)
 	if err != nil {
 		return TreeResponse{}, err
 	}
-	return TreeResponse{Roots: nodeViews(pagemap.BuildTree(all), drifted)}, nil
+	return TreeResponse{Roots: nodeViews(pagemap.BuildTree(all), shown)}, nil
 }

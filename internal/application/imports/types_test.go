@@ -29,6 +29,9 @@ func (h harness) typedPage(t *testing.T, path string, typed *pagetype.Type, sour
 	if typed != nil {
 		held.PageTypeID = &typed.ID
 	}
+	if reason == pagemap.TypeByRule {
+		held.TypeRuleID = "rule-guides"
+	}
 	built, err := pagemap.NewPage(held)
 	if err != nil {
 		t.Fatalf("build the page: %v", err)
@@ -52,6 +55,8 @@ func TestThePageTypeOfAPageOnTheSiteFollowsTheSheetUnlessAPersonOrTheAgentChoseI
 		{name: "an untyped page", source: pagemap.TypeSourceNone, reason: pagemap.TypeByNone},
 		{name: "a page the site typed", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByDefault},
 		{name: "a page a listing typed", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByListing},
+		{name: "a page a rule typed", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByRule},
+		{name: "a page no rule matched", typed: true, source: pagemap.TypeSourceAuto, reason: pagemap.TypeByUnmatched},
 		{name: "a page an earlier import typed", typed: true, source: pagemap.TypeSourceManual, reason: pagemap.TypeByImport},
 		{name: "a page a person typed", typed: true, source: pagemap.TypeSourceManual, reason: pagemap.TypeByUser, kept: true},
 		{name: "a page the agent typed", typed: true, source: pagemap.TypeSourceManual, reason: pagemap.TypeByAI, kept: true},
@@ -65,8 +70,8 @@ func TestThePageTypeOfAPageOnTheSiteFollowsTheSheetUnlessAPersonOrTheAgentChoseI
 			types := h.types(t)
 			var current *pagetype.Type
 			if tc.typed {
-				entity := types[pagetype.Entity]
-				current = &entity
+				guide := types[pagetype.Guide]
+				current = &guide
 			}
 			held := h.typedPage(t, "/mugs/", current, tc.source, tc.reason)
 			path := h.file(t, "types.csv", "url,page type\n/mugs/,Pillar\n")
@@ -82,8 +87,8 @@ func TestThePageTypeOfAPageOnTheSiteFollowsTheSheetUnlessAPersonOrTheAgentChoseI
 			applied := h.apply(t, path, typeMapping(h))
 			after, _ := h.pageAt(t, held.Path)
 			if tc.kept {
-				if view.PageType != "Entity" || len(kept) != 1 || !strings.Contains(kept[0].Message, "Entity") ||
-					!strings.Contains(kept[0].Message, "Hub") || kept[0].Field != string(importmap.FieldPageType) {
+				if view.PageType != "Guide" || len(kept) != 1 || !strings.Contains(kept[0].Message, "Guide") ||
+					!strings.Contains(kept[0].Message, "Category") || kept[0].Field != string(importmap.FieldPageType) {
 					t.Fatalf("the preview shows %+v with %+v, want the chosen type kept and both types named", view, kept)
 				}
 				if !sameType(after.PageTypeID, held.PageTypeID) || after.TypeReason != tc.reason {
@@ -91,13 +96,13 @@ func TestThePageTypeOfAPageOnTheSiteFollowsTheSheetUnlessAPersonOrTheAgentChoseI
 				}
 				return
 			}
-			if view.PageType != "Hub" || view.Action != string(imports.ActionUpdate) || len(kept) != 0 {
-				t.Fatalf("the preview shows %+v with %+v, want the sheet's Hub", view, kept)
+			if view.PageType != "Category" || view.Action != string(imports.ActionUpdate) || len(kept) != 0 {
+				t.Fatalf("the preview shows %+v with %+v, want the sheet's pillar as the site's Category", view, kept)
 			}
-			hub := types[pagetype.Hub]
+			hub := types[pagetype.Category]
 			if !sameType(after.PageTypeID, &hub.ID) || after.TypeSource != pagemap.TypeSourceManual ||
-				after.TypeReason != pagemap.TypeByImport {
-				t.Fatalf("the apply typed the page %+v, want the Hub set by the import", after)
+				after.TypeReason != pagemap.TypeByImport || after.TypeRuleID != "" {
+				t.Fatalf("the apply typed the page %+v, want the Category set by the import", after)
 			}
 			if applied.Counts.PagesUpdated != 1 {
 				t.Fatalf("counts = %+v, want the retyped page counted as updated", applied.Counts)
@@ -122,7 +127,8 @@ func TestAPlannedPageIsInsertedWithTheSheetsType(t *testing.T) {
 		preset pagetype.Preset
 		typed  bool
 	}{
-		{name: "a hub", cell: "Hub", preset: pagetype.Hub, typed: true},
+		{name: "a hub", cell: "Hub", preset: pagetype.Category, typed: true},
+		{name: "a landing", cell: "Landing", preset: pagetype.Landing, typed: true},
 		{name: "a synonym of a product", cell: "Compound", preset: pagetype.Product, typed: true},
 		{name: "an empty cell", cell: ""},
 		{name: "a type the site does not hold", cell: "Sprocket"},
@@ -166,7 +172,7 @@ func TestARowWithoutAURLTypesThePageItPlans(t *testing.T) {
 	if applied.Counts.EntitiesCreated != 2 || applied.Counts.PagesCreated != 2 {
 		t.Fatalf("counts = %+v, want a page planned for each title and its entity", applied.Counts)
 	}
-	if typed := h.typeNames(t); len(typed) != 1 || typed["/coffee/"] != "Hub" {
+	if typed := h.typeNames(t); len(typed) != 1 || typed["/coffee/"] != "Category" {
 		t.Fatalf("types = %v, want the coffee page typed by its cell and the tea page left untyped", typed)
 	}
 }

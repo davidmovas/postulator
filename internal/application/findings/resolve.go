@@ -9,6 +9,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/runs"
 	syncsite "github.com/davidmovas/postulator/internal/application/sync"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
@@ -73,6 +74,13 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 		return ResolveResponse{Finding: placed(held, places), Proposals: proposals}, nil
 	}
 
+	if option == finding.AdoptTree {
+		if adoptErr := s.adoptTree(ctx, held); adoptErr != nil {
+			return ResolveResponse{}, adoptErr
+		}
+		return s.settled(ctx, held, places)
+	}
+
 	chosen := choice{option: option, pageID: req.PageID, pageTypeID: req.PageTypeID, proposalHash: req.ProposalHash, by: by}
 	if refused := s.applicable(ctx, held.SiteID, chosen); refused != nil {
 		return ResolveResponse{}, refused
@@ -87,6 +95,10 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 	if err != nil {
 		return ResolveResponse{}, err
 	}
+	return s.settled(ctx, held, places)
+}
+
+func (s *Service) settled(ctx context.Context, held finding.Finding, places map[string]contextpack.Place) (ResolveResponse, error) {
 	settled, err := s.deps.Findings.Get(ctx, held.ID)
 	if err != nil {
 		return ResolveResponse{}, err
@@ -95,6 +107,34 @@ func (s *Service) Resolve(ctx context.Context, req ResolveRequest) (ResolveRespo
 		return ResolveResponse{}, err
 	}
 	return ResolveResponse{Finding: placed(settled, places)}, nil
+}
+
+func (s *Service) adoptTree(ctx context.Context, held finding.Finding) error {
+	if held.EntityID == nil {
+		return invalid("the finding names no entity", "findingId")
+	}
+	req := graph.AdoptParentsRequest{SiteID: held.SiteID, EntityIDs: []string{*held.EntityID}}
+	preview, err := s.deps.Parents.AdoptParents(ctx, req)
+	if err != nil {
+		return err
+	}
+	if preview.Adopting == 0 {
+		why := "the graph already agrees with the page tree; the next sync closes the finding"
+		if len(preview.Steps.Items) > 0 && preview.Steps.Items[0].Skip != "" {
+			why = "the graph cannot take the page tree's parent here: " + skipped(preview.Steps.Items[0].Skip)
+		}
+		return errors.New(errors.Conflict, why).WithDetail("findingId", held.ID)
+	}
+	req.Apply, req.Hash = true, preview.Hash
+	_, err = s.deps.Parents.AdoptParents(ctx, req)
+	return err
+}
+
+func skipped(reason string) string {
+	if reason == string(contextpack.AdoptionLoop) {
+		return "the parent sits under the entity in the graph, so it would make a loop"
+	}
+	return "an entity of the same name already sits under that parent"
 }
 
 func (s *Service) applicable(ctx context.Context, siteID string, chosen choice) error {
@@ -137,6 +177,8 @@ func (s *Service) change(ctx context.Context, held finding.Finding, chosen choic
 	switch chosen.option {
 	case finding.Ignore:
 		return s.deps.Findings.Settle(ctx, held.ID, finding.Dismissed, string(chosen.option), chosen.by, s.now())
+	case finding.KeepGraph:
+		return s.deps.Findings.Settle(ctx, held.ID, finding.Resolved, string(chosen.option), chosen.by, s.now())
 	case finding.Accept:
 		_, err := s.deps.Cards.AcceptCard(ctx, graph.AcceptCardRequest{FindingID: held.ID, ProposalHash: chosen.proposalHash, By: chosen.by})
 		return err

@@ -122,7 +122,9 @@ export function CatalogDrawer({ onClose }: CatalogDrawerProps): ReactElement {
                     </TableHead>
                     {models.map((model) => (
                         <TableRow key={`${model.provider}/${model.model}`}>
-                            <TableCell mono={true}>{model.model}</TableCell>
+                            <TableCell mono={true} title={`${model.provider}/${model.model}`}>
+                                {model.model}
+                            </TableCell>
                             <TableCell align="right" mono={true} title={said.standardOrder}>
                                 {standardOf(model)}
                             </TableCell>

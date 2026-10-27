@@ -85,27 +85,41 @@ func (m Map) proposable(pageIDs []string) []pagemap.Page {
 }
 
 func (m Map) proposalFor(page pagemap.Page, inBatch map[string]struct{}) EntityProposal {
-	proposal := EntityProposal{PageID: page.ID, Path: page.Path, Name: m.snapshot.siteName(page), Facts: m.snapshot.storeFacts(page)}
-	seen := map[string]struct{}{page.ID: {}}
-	for at := m.parent[page.ID]; at != ""; at = m.parent[at] {
+	proposal := EntityProposal{
+		PageID: page.ID, Path: page.Path, Name: m.snapshot.siteName(page), Facts: m.snapshot.storeFacts(page), depth: m.depthOf(page.ID),
+	}
+	if parent, found := m.ProposalParent(page.ID, inBatch); found {
+		proposal.Parent, proposal.ParentEntityID = parent.Path, parent.EntityID
+		if parent.EntityID == "" {
+			proposal.parentPageID = parent.PageID
+		}
+	}
+	return proposal
+}
+
+func (m Map) ProposalParent(pageID string, inBatch map[string]struct{}) (TreeParent, bool) {
+	start := pageID
+	if hub, folded := m.folded[pageID]; folded {
+		start = hub
+	}
+	seen := map[string]struct{}{start: {}}
+	for at := m.parent[start]; at != ""; at = m.parent[at] {
 		if _, looped := seen[at]; looped {
 			break
 		}
 		seen[at] = struct{}{}
-		proposal.depth++
 		ancestor, found := m.snapshot.Index.ByID(at)
-		if !found || proposal.Parent != "" {
-			continue
+		if !found || ancestor.Path == pagemap.RootPath {
+			break
 		}
 		if _, proposed := inBatch[at]; proposed {
-			proposal.Parent, proposal.parentPageID = ancestor.Path, ancestor.ID
-			continue
+			return TreeParent{PageID: ancestor.ID, Path: ancestor.Path}, true
 		}
 		if ancestor.EntityID != nil {
-			proposal.Parent, proposal.ParentEntityID = ancestor.Path, *ancestor.EntityID
+			return TreeParent{PageID: ancestor.ID, Path: ancestor.Path, EntityID: *ancestor.EntityID}, true
 		}
 	}
-	return proposal
+	return TreeParent{}, false
 }
 
 func (p EntityProposal) scope() string {

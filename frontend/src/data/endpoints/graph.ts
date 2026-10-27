@@ -22,3 +22,4 @@ export const applyProposals = one(Graph.ApplyProposals);
 export const listCardProposals = listed<Parameters<typeof Graph.CardProposals>[0], CardProposal>(Graph.CardProposals);
 export const acceptCard = one(Graph.AcceptCard);
 export const dismissCard = one(Graph.DismissCard);
+export const adoptParents = one(Graph.AdoptParents);

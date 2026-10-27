@@ -1,7 +1,12 @@
-import type { InputHTMLAttributes, ReactElement } from "react";
+import type { ChangeEvent, InputHTMLAttributes, ReactElement } from "react";
 
 import { cx } from "./cx.js";
 import { CheckIcon, RemoveIcon } from "./icons/index.js";
+
+export function shiftHeld(event: ChangeEvent<HTMLInputElement>): boolean {
+    const native = event.nativeEvent;
+    return native instanceof MouseEvent && native.shiftKey;
+}
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "children"> {
     label?: string;

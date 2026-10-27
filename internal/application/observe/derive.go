@@ -6,6 +6,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -18,7 +19,7 @@ type timeStamp = time.Time
 var deriveCodes = []finding.Code{
 	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentAmbiguous, finding.ParentCycle,
 	finding.ParentNameTwin, finding.ParentDiffers, finding.URLFormMixed, finding.RenderUnreachable, finding.RenderRedirected,
-	finding.PageWithoutEntity,
+	finding.PageWithoutEntity, finding.TypeByDefault, finding.EntityParentDiffers,
 }
 
 func (s *Service) derive(ctx context.Context, state *State, readers Readers) error {
@@ -96,7 +97,7 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		if page.Status != pagemap.StatusArchived {
 			continue
 		}
-		for _, code := range []finding.Code{finding.RenderUnreachable, finding.RenderRedirected, finding.ParentCycle, finding.ParentDiffers} {
+		for _, code := range []finding.Code{finding.RenderUnreachable, finding.RenderRedirected, finding.ParentCycle, finding.ParentDiffers, finding.TypeByDefault} {
 			if err := tracked.clear(ctx, code, finding.SubjectPage(page.ID)); err != nil {
 				return err
 			}
@@ -107,9 +108,22 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 		return err
 	}
 
-	typed := untyped(m, changed, set)
-	state.Counts.Typed += len(typed)
+	rules, err := s.deps.Types.Rules(ctx, state.SiteID)
+	if err != nil {
+		return err
+	}
+	products, err := s.deps.Links.ListedProductsBySite(ctx, state.SiteID)
+	if err != nil {
+		return err
+	}
+	typed := retyped(m, set, rules, products)
+	if err := s.byDefault(ctx, tracked, m, typed, set); err != nil {
+		return err
+	}
 	if err := s.entityless(ctx, tracked, m, changed, typed, set); err != nil {
+		return err
+	}
+	if err := s.parentsDiffer(ctx, tracked, state.SiteID, m, set); err != nil {
 		return err
 	}
 
@@ -121,9 +135,18 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 				return updateErr
 			}
 		}
-		for _, t := range typed {
-			if typeErr := s.deps.Pages.AutoType(c, t.pageID, t.typeID, t.reason, now); typeErr != nil {
+		for i := range typed {
+			outcome := &typed[i]
+			if !outcome.Changed() {
+				continue
+			}
+			placed := pagetype.Assignment{TypeID: outcome.TypeID, Source: pagemap.TypeSourceAuto, Reason: outcome.Reason, RuleID: outcome.RuleID}
+			moved, typeErr := s.deps.Pages.Classify(c, outcome.PageID, outcome.Current, placed, now)
+			if typeErr != nil {
 				return typeErr
+			}
+			if moved {
+				state.Counts.Typed++
 			}
 		}
 		return s.resolveLinks(c, state.SiteID, pagemap.NewIndex(m.pages))
@@ -164,7 +187,7 @@ func typedRegular(page pagemap.Page, set pagetype.Set) bool {
 		return false
 	}
 	kind, found := set.ByID(*page.PageTypeID)
-	return found && kind.Preset != pagetype.Technical
+	return found && kind.Preset.Role() != pagetype.RoleTechnical
 }
 
 func (s *Service) classify(ctx context.Context, tracked *findings, page *pagemap.Page, m siteModel, set pagetype.Set, settings site.Settings, technical site.TechnicalPages) error {
@@ -236,41 +259,46 @@ func technicalReason(page pagemap.Page, body block.Snapshot, record render.Recor
 	return pagemap.TechnicalNone
 }
 
-type typing struct {
-	pageID string
-	typeID string
-	reason pagemap.TypeReason
+func retyped(m siteModel, set pagetype.Set, rules []pagetype.Rule, products map[string]int) []pagetype.Outcome {
+	rendered := make(map[string]pagetype.Rendered, len(m.renders))
+	for id := range m.renders {
+		record := m.renders[id]
+		rendered[id] = pagetype.RenderedOf(&record)
+	}
+	tree := contextpack.Snapshot{Index: m.index, Types: set, Fields: m.fields}.Map(nil)
+	return pagetype.NewClassifier(rules, set).Classify(tree.Facts(rendered, products), pagetype.ModeWalk)
 }
 
-func untyped(m siteModel, changed map[string]pagemap.Page, set pagetype.Set) []typing {
-	out := make([]typing, 0)
-	for i := range m.pages {
-		page := m.pages[i]
-		if moved, held := changed[page.ID]; held {
-			page = moved
+func (s *Service) byDefault(ctx context.Context, tracked *findings, m siteModel, typed []pagetype.Outcome, set pagetype.Set) error {
+	for i := range typed {
+		outcome := &typed[i]
+		reason, typeID := outcome.Current.Reason, outcome.Current.TypeID
+		if outcome.Changed() {
+			reason, typeID = outcome.Reason, outcome.TypeID
 		}
-		if page.WPID == nil || page.PageTypeID != nil || page.Status == pagemap.StatusArchived {
+		subject := finding.SubjectPage(outcome.PageID)
+		if reason != pagemap.TypeByUnmatched {
+			if err := tracked.clear(ctx, finding.TypeByDefault, subject); err != nil {
+				return err
+			}
 			continue
 		}
-		var record *render.Record
-		if held, rendered := m.renders[page.ID]; rendered {
-			record = &held
-		}
-		preset, reason, assigned := pagetype.Assign(pagetype.FactsOf(page, record))
-		if !assigned {
-			continue
-		}
-		if kind, found := set.ByPreset(preset); found {
-			out = append(out, typing{pageID: page.ID, typeID: kind.ID, reason: reason})
+		kind, _ := set.ByID(typeID)
+		if err := tracked.raise(ctx, finding.TypeByDefault, &outcome.PageID, subject, map[string]string{
+			"path": m.pathOf(outcome.PageID), "type": kind.Name,
+		}); err != nil {
+			return err
 		}
 	}
-	return out
+	return nil
 }
 
-func (s *Service) entityless(ctx context.Context, tracked *findings, m siteModel, changed map[string]pagemap.Page, typed []typing, set pagetype.Set) error {
+func (s *Service) entityless(ctx context.Context, tracked *findings, m siteModel, changed map[string]pagemap.Page, typed []pagetype.Outcome, set pagetype.Set) error {
 	assigned := make(map[string]string, len(typed))
-	for _, t := range typed {
-		assigned[t.pageID] = t.typeID
+	for i := range typed {
+		if typed[i].Changed() {
+			assigned[typed[i].PageID] = typed[i].TypeID
+		}
 	}
 	for i := range m.pages {
 		page := m.pages[i]

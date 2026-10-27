@@ -2,6 +2,7 @@ import type { Sort } from "../lib/paging.js";
 import { clampLimit } from "./call.js";
 import { sortSegment } from "./sorts.js";
 import type {
+    ClassificationPagesFilter,
     ConversationFilter,
     EdgeFilter,
     EntityFilter,
@@ -10,13 +11,16 @@ import type {
     FindingFilter,
     MessageFilter,
     ModelCallFilter,
+    PageCountRequest,
     PageFilter,
+    PageSelection,
     PendingActionFilter,
     RunFilter,
     ScheduleFilter,
     SiteFilter,
     SiteMapFilter,
     TemplateFilter,
+    WriterDirections,
 } from "./types.js";
 
 const scope = "pc";
@@ -71,9 +75,14 @@ export const keys = {
         summaries: () => [scope, "pages", "summary"] as const,
         summary: (siteId: string) => [scope, "pages", "summary", siteId] as const,
         packs: () => [scope, "pages", "pack"] as const,
-        pack: (pageId: string, field: string) => [scope, "pages", "pack", pageId, field] as const,
+        pack: (pageId: string, field: string, directions: WriterDirections | null = null) =>
+            [scope, "pages", "pack", pageId, field, directions] as const,
         maps: () => [scope, "pages", "map"] as const,
         map: (filter: SiteMapFilter, limit?: number) => [scope, "pages", "map", filter, limitSegment(limit)] as const,
+        counts: () => [scope, "pages", "count"] as const,
+        count: (request: PageCountRequest) => [scope, "pages", "count", request] as const,
+        selections: () => [scope, "pages", "selection"] as const,
+        selection: (request: PageSelection) => [scope, "pages", "selection", request] as const,
     },
     findings: {
         root: () => [scope, "findings"] as const,
@@ -105,6 +114,17 @@ export const keys = {
         full: (siteId: string) => [scope, "graph", "full", siteId] as const,
         cardLists: () => [scope, "graph", "cards"] as const,
         cards: (siteId: string) => [scope, "graph", "cards", siteId] as const,
+        adoption: (siteId: string, under: string) => [scope, "graph", "adoption", siteId, under] as const,
+    },
+    classification: {
+        root: () => [scope, "classification"] as const,
+        rules: (siteId: string) => [scope, "classification", "rules", siteId] as const,
+        previews: () => [scope, "classification", "preview"] as const,
+        preview: (siteId: string) => [scope, "classification", "preview", siteId] as const,
+        pages: (filter: ClassificationPagesFilter, limit?: number) =>
+            [scope, "classification", "preview", filter.siteId, "pages", filter, limitSegment(limit)] as const,
+        tests: () => [scope, "classification", "test"] as const,
+        test: (request: unknown) => [scope, "classification", "test", request] as const,
     },
     templates: {
         root: () => [scope, "templates"] as const,
@@ -154,6 +174,7 @@ export const keys = {
         pendingAll: () => [scope, "agent", "pending"] as const,
         pending: (filter: PendingActionFilter, limit?: number) =>
             [scope, "agent", "pending", filter, limitSegment(limit)] as const,
+        plans: (conversationId: string) => [scope, "agent", "plans", conversationId] as const,
     },
     models: {
         root: () => [scope, "models"] as const,
