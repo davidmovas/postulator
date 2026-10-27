@@ -215,7 +215,7 @@ export function InboxScreen(): ReactElement {
                                             tool={action.tool}
                                             args={action.args}
                                             summary={action.summary}
-                                            risk={null}
+                                            risk={action.risk}
                                             status={action.status}
                                             createdAt={action.createdAt}
                                             outcome={outcomeOf(action)}

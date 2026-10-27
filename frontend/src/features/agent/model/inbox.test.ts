@@ -4,7 +4,17 @@ import type { Conversation, PendingAction } from "../../../data/types.js";
 import { groupActions, statusCounts } from "./inbox.js";
 
 function action(id: string, conversationId: string, createdAt: string, status = "pending"): PendingAction {
-    return { id, conversationId, tool: "pages_manage", args: { op: "delete", pageId: "p1" }, summary: "x", status, createdAt, updatedAt: createdAt };
+    return {
+        id,
+        conversationId,
+        tool: "pages_manage",
+        args: { op: "delete", pageId: "p1" },
+        summary: "x",
+        risk: "dangerous",
+        status,
+        createdAt,
+        updatedAt: createdAt,
+    };
 }
 
 function conversation(id: string, title: string, siteId: string | null): Conversation {

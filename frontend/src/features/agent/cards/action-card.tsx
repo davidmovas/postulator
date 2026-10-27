@@ -5,11 +5,11 @@ import { useFinding } from "../../../data/hooks/findings.js";
 import { useTemplate } from "../../../data/hooks/templates.js";
 import { useTools } from "../../../data/hooks/tools.js";
 import type { Timestamp } from "../../../data/wire.js";
-import { riskOf, toolLabel } from "../conversation/model/tools.js";
+import { toolLabel } from "../conversation/model/tools.js";
 import type { CardBusy, CardKeys } from "./card.js";
 import { ConfirmationCard } from "./card.js";
 import { Lines, Parts } from "./lines.js";
-import { isArgs, text } from "./model/card.js";
+import { cardRisk, isArgs, text } from "./model/card.js";
 import { describeAction } from "./model/describe.js";
 import { ownSummary } from "./model/summary.js";
 
@@ -76,7 +76,7 @@ export function ActionCard({
     return (
         <ConfirmationCard
             tool={tool}
-            risk={risk ?? riskOf(tool, args, registered?.risk ?? "write")}
+            risk={cardRisk(risk, registered?.risk)}
             status={status}
             createdAt={createdAt}
             outcome={outcome}

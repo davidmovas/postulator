@@ -214,7 +214,7 @@ export function Transcript({
                                     tool={tool}
                                     args={row.action?.args ?? row.live?.args ?? null}
                                     summary={row.action?.summary ?? row.live?.summary ?? ""}
-                                    risk={row.live?.risk ?? null}
+                                    risk={row.action === null ? (row.live?.risk ?? null) : row.action.risk}
                                     status={row.action?.status ?? "pending"}
                                     createdAt={row.action?.createdAt ?? null}
                                     outcome={row.action === null ? null : outcomeOf(row.action)}

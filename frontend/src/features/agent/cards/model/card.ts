@@ -52,6 +52,15 @@ export function isArgs(value: unknown): value is Args {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const writeRisk = "write";
+
+export function cardRisk(own: string | null | undefined, toolRisk: string | null | undefined): string {
+    if (own !== null && own !== undefined && own !== "") {
+        return own;
+    }
+    return toolRisk === null || toolRisk === undefined || toolRisk === "" ? writeRisk : toolRisk;
+}
+
 export function opOf(args: Args): string {
     return text(args, "op") ?? "";
 }
