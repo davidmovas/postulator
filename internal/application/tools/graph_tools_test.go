@@ -58,6 +58,9 @@ func TestEveryGraphChangeIsSaidInOneSentence(t *testing.T) {
 		"delete":        {"graph_edit", `{"op":"delete","entityId":"` + seeded.entity + `"}`, "Delete the entity Coffee and the edges that touch it"},
 		"anchors":       {"graph_edit", `{"op":"anchors","entityId":"` + seeded.entity + `","anchors":[{"text":"fresh beans"}]}`, "Let pages link to Coffee with “fresh beans”"},
 		"a parent":      {"graph_edit", `{"op":"add_edge","entityId":"` + seeded.other + `","toEntityId":"` + seeded.entity + `","kind":"parent","weight":1}`, "Put Espresso under Coffee"},
+		"a relation":    {"graph_edit", `{"op":"add_edge","entityId":"` + seeded.entity + `","toEntityId":"` + seeded.other + `","kind":"related"}`, "Relate Coffee to Espresso in the graph"},
+		"a proposal":    {"graph_edit", `{"op":"add_edge","entityId":"` + seeded.other + `","toEntityId":"` + seeded.entity + `","kind":"parent","status":"proposed"}`, "Propose putting Espresso under Coffee, the edge left for a person to approve"},
+		"a refusal":     {"graph_edit", `{"op":"add_edge","entityId":"` + seeded.entity + `","toEntityId":"` + seeded.other + `","kind":"related","status":"rejected"}`, "Record relating Coffee to Espresso as rejected"},
 		"approve":       {"graph_edit", `{"op":"approve_edge","edgeId":"` + added.Edge.ID + `"}`, "Approve the related edge between"},
 		"reject":        {"graph_edit", `{"op":"reject_edge","edgeId":"` + added.Edge.ID + `"}`, "Reject the related edge between"},
 		"delete edge":   {"graph_edit", `{"op":"delete_edge","edgeId":"` + added.Edge.ID + `"}`, "Delete the related edge between"},
@@ -65,7 +68,7 @@ func TestEveryGraphChangeIsSaidInOneSentence(t *testing.T) {
 		"second":        {"graph_edit", `{"op":"move","entityId":"` + seeded.other + `","parentId":"` + seeded.entity + `","keepBoth":true}`, "Give Espresso a second parent, Coffee"},
 		"rescore":       {"graph_edit", `{"op":"rescore"}`, "Recompute the authority score"},
 		"related":       {"graph_propose", `{"op":"related","entityId":"` + seeded.entity + `"}`, "related edges around Coffee"},
-		"cards":         {"graph_propose", `{"op":"cards","cards":[{"entityId":"` + seeded.entity + `","definition":"Roasted beans."}]}`, "Propose 1 entity cards"},
+		"cards":         {"graph_propose", `{"op":"cards","cards":[{"entityId":"` + seeded.entity + `","definition":"Roasted beans."}]}`, "Write the entity card of Coffee"},
 		"from pages":    {"graph_propose", `{"op":"pages","pathPrefix":"/coffee/"}`, "the pages without an entity under /coffee/"},
 		"adopt parents": {"graph_edit", `{"op":"adopt_parents","hash":"` + adoptionHash(t, registry, binding) + `"}`, "the parent the page tree shows"},
 	}

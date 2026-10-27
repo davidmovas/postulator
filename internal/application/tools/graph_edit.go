@@ -216,10 +216,18 @@ func (deps Deps) graphChange(ctx context.Context, in *graphEditArgs) (string, er
 		if otherErr != nil {
 			return "", otherErr
 		}
-		if in.Kind == "parent" {
-			return "Put " + name + " under " + other + " in the graph", nil
+		said, saying := "Relate "+name+" to "+other, "relating "+name+" to "+other
+		if in.Kind == string(domaingraph.EdgeParent) {
+			said, saying = "Put "+name+" under "+other, "putting "+name+" under "+other
 		}
-		return "Relate " + name + " to " + other + " in the graph", nil
+		switch domaingraph.EdgeStatus(in.Status) {
+		case domaingraph.StatusProposed:
+			return "Propose " + saying + ", the edge left for a person to approve", nil
+		case domaingraph.StatusRejected:
+			return "Record " + saying + " as rejected", nil
+		default:
+			return said + " in the graph", nil
+		}
 	default:
 		parent, parentErr := deps.entityName(ctx, in.ParentID)
 		if parentErr != nil {

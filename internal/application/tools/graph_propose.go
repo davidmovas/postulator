@@ -106,7 +106,7 @@ func graphPropose(deps Deps) Tool {
 			}
 			return "Ask the model to propose related edges around " + name + ", each left for a person to approve", nil
 		default:
-			return "Propose " + strconv.Itoa(len(in.Cards)) + " entity cards, each written only once a person accepts it", nil
+			return deps.cardsSummary(ctx, &in)
 		}
 	})
 	return readsOn(tool, opPreview, opFromKeywords)
@@ -121,6 +121,25 @@ func proposedPages(in *graphProposeArgs) string {
 	default:
 		return "every page without an entity"
 	}
+}
+
+func (deps Deps) cardsSummary(ctx context.Context, in *graphProposeArgs) (string, error) {
+	named := make([]string, 0, proposalsNamed)
+	for i := range in.Cards[:min(len(in.Cards), proposalsNamed)] {
+		name, err := deps.entityName(ctx, in.Cards[i].EntityID)
+		if err != nil {
+			return "", err
+		}
+		named = append(named, name)
+	}
+	said := "Write the entity card of " + strings.Join(named, ", ")
+	if len(in.Cards) > 1 {
+		said = "Write the entity cards of " + strings.Join(named, ", ")
+	}
+	if more := len(in.Cards) - len(named); more > 0 {
+		said += " and " + strconv.Itoa(more) + " more"
+	}
+	return said + "; a card that already says this is left as it is", nil
 }
 
 func proposalsSummary(in graph.ApplyProposalsRequest) (string, error) {
