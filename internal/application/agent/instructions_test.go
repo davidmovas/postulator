@@ -13,7 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
-const instructionsCeilingTokens = 1965
+const instructionsCeilingTokens = 2127
 
 func TestTheInstructionsAndTheReplicasBriefFitTheirCeiling(t *testing.T) {
 	t.Parallel()
@@ -66,7 +66,8 @@ func TestTheInstructionsTeachTheModelsVocabulary(t *testing.T) {
 	words = append(words, "page type", "field", "scope", "rewrites", "trail", "twin", "orphan", "card", "finding", "pack", "pages_get",
 		"FINDINGS", "op list", "op resolve", "option", "explain", "SWEEPS", "fields", "runs_control", "EDITING A PAGE", "pages_fields",
 		"pages_blocks", "place_link", "bodyHash", "CONFIRMATION", "confirms", "view get", "op revert",
-		"pages_tree", "pages_find", "links", "view pack")
+		"pages_tree", "pages_find", "links", "view pack", "READ, PROPOSE, ACT", "plans op propose", "dependsOn",
+		"graph_read", "view adoption", "parentWhy", "resolve_many", "addEdges", "nextCursor", "planProposed", "brief")
 	for _, gap := range contextpack.Gaps() {
 		words = append(words, string(gap))
 	}
