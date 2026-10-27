@@ -170,12 +170,12 @@ func theAgentSweepsTheMeta(t *testing.T, core *app.Core, script *fake.Scripted, 
 		bodies[swept[i].ID] = held.Content
 		ids = append(ids, `"`+swept[i].ID+`"`)
 	}
-	asked := decoded[tools.Confirmation](t, callTool(t, core, conversation, "runs_start",
-		`{"pageIds":[`+strings.Join(ids, ",")+`],"fields":["seo_description"],"publishMode":"publish"}`))
+	asked := decoded[tools.Confirmation](t, callTool(t, core, conversation, "runs_control",
+		`{"op":"start","pageIds":[`+strings.Join(ids, ",")+`],"fields":["seo_description"],"publishMode":"publish"}`))
 	if !strings.Contains(asked.Summary, "seo_description") || !strings.Contains(asked.Summary, "estimated") {
 		t.Fatalf("the sweep's card = %+v, want the scope and the estimate on it", asked)
 	}
-	started := decoded[map[string]json.RawMessage](t, approveTheCard(t, core, conversation, "runs_start").Result)
+	started := decoded[map[string]json.RawMessage](t, approveTheCard(t, core, conversation, "runs_control").Result)
 	runID := decoded[string](t, started["runId"])
 	awaitRun(t, core.Runs, runID)
 	t.Logf("step 5: the agent starts a meta sweep over %d pages, the person confirms the card with its estimate (%s)",

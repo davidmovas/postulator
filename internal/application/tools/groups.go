@@ -23,7 +23,7 @@ var groups = []Group{
 	{Name: "runs", Description: "Runs that write, relink, audit, repair or revert pages: start, pause, resume, " +
 		"cancel, retry, regenerate and revert them, and read their items, events and artifacts."},
 	{Name: "sync", Description: "Pull the live WordPress content into the page map and probe the companion plugin."},
-	{Name: "reports", Description: "The site's totals and a run's report."},
+	{Name: "reports", Description: "The site's totals."},
 	{Name: "imports", Description: "Spreadsheet import and export, and saved column mappings."},
 	{Name: "findings", Description: "What the model found that disagrees with the site or the workbook, and its resolution."},
 	{Name: "models", Description: "Language models: the catalog, role profiles, provider keys, probes and spend."},
@@ -33,7 +33,7 @@ var groups = []Group{
 
 var orienting = []string{
 	"sites_list", "sites_get", "reports_site_overview", "graph_read", "pages_find", "pages_tree",
-	"pages_get", "links", "runs_list", "runs_get", "templates_list",
+	"pages_get", "links", "runs", "templates_list",
 }
 
 func OnDemand(name string) (Group, bool) {

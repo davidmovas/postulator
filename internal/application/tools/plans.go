@@ -47,7 +47,14 @@ func (r *Registry) Validate(ctx context.Context, b Binding, name string, args js
 			return StepCheck{}, err
 		}
 	}
-	check := StepCheck{Editable: tool.Edits}
+	check := StepCheck{Editable: []agent.EditField{}}
+	if tool.Edits != nil {
+		editable, err := tool.Edits(ctx, b, args)
+		if err != nil {
+			return StepCheck{}, err
+		}
+		check.Editable = editable
+	}
 	if tool.Confirm != nil {
 		said, err := tool.Confirm(ctx, b, args)
 		if err != nil {
@@ -105,8 +112,9 @@ type PlanStepView struct {
 }
 
 type EditView struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name    string             `json:"name"`
+	Value   string             `json:"value"`
+	Choices []agent.EditChoice `json:"choices"`
 }
 
 type PlanView struct {
@@ -141,33 +149,40 @@ func ViewOfPlan(plan agent.Plan) PlanView {
 }
 
 func editsOf(step *agent.PlanStep) []EditView {
-	var args map[string]any
+	var args any
 	if json.Unmarshal(step.Args, &args) != nil {
 		args = map[string]any{}
 	}
 	out := make([]EditView, 0, len(step.Editable))
 	for _, field := range step.Editable {
-		out = append(out, EditView{Name: field.Name, Value: valueAt(args, strings.Split(field.Path, "."))})
+		choices := field.Choices
+		if choices == nil {
+			choices = []agent.EditChoice{}
+		}
+		out = append(out, EditView{Name: field.Name, Value: valueAt(args, strings.Split(field.Path, ".")), Choices: choices})
 	}
 	return out
 }
 
-func valueAt(args map[string]any, path []string) string {
-	held, found := args[path[0]]
-	if !found {
-		return ""
-	}
-	if len(path) == 1 {
-		if text, isText := held.(string); isText {
+func valueAt(node any, path []string) string {
+	if len(path) == 0 {
+		if text, isText := node.(string); isText {
 			return text
 		}
 		return ""
 	}
-	nested, object := held.(map[string]any)
-	if !object {
+	switch held := node.(type) {
+	case map[string]any:
+		return valueAt(held[path[0]], path[1:])
+	case []any:
+		at, err := strconv.Atoi(path[0])
+		if err != nil || at < 0 || at >= len(held) {
+			return ""
+		}
+		return valueAt(held[at], path[1:])
+	default:
 		return ""
 	}
-	return valueAt(nested, path[1:])
 }
 
 func plansTool(deps Deps) Tool {

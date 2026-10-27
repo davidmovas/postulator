@@ -58,7 +58,7 @@ type Tool struct {
 	Describe  func(ctx context.Context, b Binding, args json.RawMessage) (string, error)
 	RiskOf    func(args json.RawMessage) Risk
 	Price     func(ctx context.Context, b Binding, args json.RawMessage) (Price, error)
-	Edits     []agent.EditField
+	Edits     func(ctx context.Context, b Binding, args json.RawMessage) ([]agent.EditField, error)
 	Def       Def
 }
 

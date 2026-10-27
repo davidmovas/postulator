@@ -149,3 +149,42 @@ func TestAnEditTouchesOnlyAFieldTheStepDeclares(t *testing.T) {
 		t.Errorf("editing an undeclared field = %v, want INVALID", err)
 	}
 }
+
+func TestAnEditReachesAListItemAndKeepsToItsChoices(t *testing.T) {
+	t.Parallel()
+
+	plan := linkPlan(t)
+	plan.Steps[0].Args = json.RawMessage(`{"op":"start","directives":[{"pageId":"p1","notes":"old"},{"pageId":"p2","mustLink":[{"pageId":"p3","anchor":"a"}]}],"pageTypeId":"hub"}`)
+	plan.Steps[0].Editable = []agent.EditField{
+		{Name: "notes 1", Path: "directives.0.notes"},
+		{Name: "anchor 2.1", Path: "directives.1.mustLink.0.anchor"},
+		{Name: "type", Path: "pageTypeId", Choices: []agent.EditChoice{{Value: "hub", Label: "Hub"}, {Value: "guide", Label: "Guide"}}},
+	}
+	edited, err := plan.Steps[0].Edited(map[string]string{"notes 1": "new", "anchor 2.1": "face serums", "type": "guide"})
+	if err != nil {
+		t.Fatalf("Edited: %v", err)
+	}
+	var args struct {
+		Directives []struct {
+			Notes    string `json:"notes"`
+			MustLink []struct {
+				Anchor string `json:"anchor"`
+			} `json:"mustLink"`
+		} `json:"directives"`
+		PageTypeID string `json:"pageTypeId"`
+	}
+	if err = json.Unmarshal(edited, &args); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(args.Directives) != 2 || args.Directives[0].Notes != "new" || args.Directives[1].MustLink[0].Anchor != "face serums" ||
+		args.PageTypeID != "guide" {
+		t.Errorf("the edited args = %s", edited)
+	}
+	if _, err = plan.Steps[0].Edited(map[string]string{"type": "landing"}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a value outside the choices = %v, want INVALID", err)
+	}
+	plan.Steps[0].Editable = append(plan.Steps[0].Editable, agent.EditField{Name: "far", Path: "directives.7.notes"})
+	if _, err = plan.Steps[0].Edited(map[string]string{"far": "x"}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("an edit past the end of a list = %v, want INVALID", err)
+	}
+}

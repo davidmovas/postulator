@@ -73,7 +73,7 @@ func TestOnDemandNamesTheGroupOfEveryToolButTheOrientingReads(t *testing.T) {
 		{name: "an orienting read is sent whole", tool: "pages_find"},
 		{name: "the overview is sent whole although its group is not", tool: "reports_site_overview"},
 		{name: "a write loads on demand", tool: "pages_manage", group: "pages", found: true},
-		{name: "a read outside the orienting set loads on demand", tool: "reports_run", group: "reports", found: true},
+		{name: "a read outside the orienting set loads on demand", tool: "models_list", group: "models", found: true},
 		{name: "a name of an unknown group", tool: "weather_today"},
 		{name: "a tool named after its group alone", tool: "findings", group: "findings", found: true},
 		{name: "a bare name of no group", tool: "weather"},

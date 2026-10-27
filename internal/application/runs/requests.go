@@ -81,7 +81,7 @@ type ListEventsResponse struct {
 }
 
 type GetArtifactRequest struct {
-	ItemID string `json:"itemId" description:"Item id from runs_list_items"`
+	ItemID string `json:"itemId" description:"Item id"`
 	Kind   string `json:"kind" enum:"link_context,draft,body_html,meta,fields,images,validation_report,judge_report,publish_result,relink_result,sync_result,final_report,revert_result" description:"Artifact to read"`
 }
 
@@ -90,7 +90,7 @@ type GetArtifactResponse struct {
 }
 
 type ListArtifactsRequest struct {
-	ItemID string `json:"itemId" description:"Item id from runs_list_items"`
+	ItemID string `json:"itemId" description:"Item id"`
 }
 
 type ListArtifactsResponse struct {
@@ -127,7 +127,7 @@ type RevertResponse struct {
 }
 
 type RetryStepRequest struct {
-	ItemID         string   `json:"itemId" description:"Stopped item id from runs_list_items"`
+	ItemID         string   `json:"itemId" description:"Stopped item id"`
 	AcceptFindings bool     `json:"acceptFindings,omitempty" description:"Let a page held at validate go on as it is"`
 	Fields         []string `json:"fields,omitempty"`
 }

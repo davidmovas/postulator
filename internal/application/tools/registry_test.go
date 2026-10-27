@@ -51,22 +51,11 @@ func registered() []string {
 		"templates_delete",
 		"templates_set_override",
 		"templates_delete_override",
-		"runs_start",
-		"runs_get",
-		"runs_list",
-		"runs_list_items",
-		"runs_list_events",
-		"runs_get_artifact",
-		"runs_pause",
-		"runs_resume",
-		"runs_cancel",
-		"runs_retry_step",
-		"runs_regenerate",
-		"runs_revert",
+		"runs",
+		"runs_control",
 		"sync_site",
 		"sync_check_plugin",
 		"reports_site_overview",
-		"reports_run",
 		"imports_inspect",
 		"imports_preview",
 		"imports_apply",
@@ -144,8 +133,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 64696
-	schemaCeilingTokens = 14505
+	schemaCeilingBytes  = 65172
+	schemaCeilingTokens = 14647
 	widestLogged        = 8
 )
 

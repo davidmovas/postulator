@@ -12,8 +12,8 @@ import (
 
 var narrowed = map[string]bool{
 	"imports_export.parameters.format":     true,
-	"runs_pause.parameters.reason":         true,
-	"runs_get_artifact.parameters.kind":    true,
+	"runs_control.parameters.reason":       true,
+	"runs.parameters.artifact":             true,
 	"pagetypes_set_scope.parameters.field": true,
 }
 

@@ -37,9 +37,22 @@ const (
 	maxPlanTitle = 160
 )
 
+type EditChoice struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
 type EditField struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name    string       `json:"name"`
+	Path    string       `json:"path"`
+	Choices []EditChoice `json:"choices,omitempty"`
+}
+
+func (f EditField) allows(value string) bool {
+	if len(f.Choices) == 0 {
+		return true
+	}
+	return slices.ContainsFunc(f.Choices, func(choice EditChoice) bool { return choice.Value == value })
 }
 
 type PlanStep struct {
@@ -218,7 +231,14 @@ func (s PlanStep) Edited(edits map[string]string) (json.RawMessage, error) {
 		if at < 0 {
 			return nil, invalid("the step offers no edit of "+name, "steps.edits").WithDetail("stepId", s.ID).WithDetail("edit", name)
 		}
-		set(args, strings.Split(s.Editable[at].Path, "."), value)
+		if !s.Editable[at].allows(value) {
+			return nil, invalid(name+" takes one of the choices the step offers", "steps.edits").WithDetail("stepId", s.ID).
+				WithDetail("edit", name)
+		}
+		if !set(args, strings.Split(s.Editable[at].Path, "."), value) {
+			return nil, invalid("the step holds nothing at "+s.Editable[at].Path, "steps.edits").WithDetail("stepId", s.ID).
+				WithDetail("edit", name)
+		}
 	}
 	encoded, err := json.Marshal(args)
 	if err != nil {
@@ -227,15 +247,26 @@ func (s PlanStep) Edited(edits map[string]string) (json.RawMessage, error) {
 	return encoded, nil
 }
 
-func set(into map[string]any, path []string, value string) {
-	if len(path) == 1 {
-		into[path[0]] = value
-		return
+func set(into any, path []string, value string) bool {
+	switch node := into.(type) {
+	case map[string]any:
+		if len(path) == 1 {
+			node[path[0]] = value
+			return true
+		}
+		next, held := node[path[0]]
+		if !held {
+			next = map[string]any{}
+			node[path[0]] = next
+		}
+		return set(next, path[1:], value)
+	case []any:
+		at, err := strconv.Atoi(path[0])
+		if err != nil || at < 0 || at >= len(node) || len(path) == 1 {
+			return false
+		}
+		return set(node[at], path[1:], value)
+	default:
+		return false
 	}
-	next, held := into[path[0]].(map[string]any)
-	if !held {
-		next = map[string]any{}
-		into[path[0]] = next
-	}
-	set(next, path[1:], value)
 }
