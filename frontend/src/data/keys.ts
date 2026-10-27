@@ -114,6 +114,7 @@ export const keys = {
         full: (siteId: string) => [scope, "graph", "full", siteId] as const,
         cardLists: () => [scope, "graph", "cards"] as const,
         cards: (siteId: string) => [scope, "graph", "cards", siteId] as const,
+        adoption: (siteId: string, under: string) => [scope, "graph", "adoption", siteId, under] as const,
     },
     classification: {
         root: () => [scope, "classification"] as const,

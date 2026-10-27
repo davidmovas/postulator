@@ -506,6 +506,37 @@ export const graph = {
         notComputedHint: "The ranking is worked out from the approved edges, on demand.",
         compute: "Compute the scores",
     },
+    adopt: {
+        open: "Take the page tree's parents",
+        openUnder: "Take the page tree's parents here",
+        title: "Take the page tree's parents",
+        body: "Each entity listed takes, in the entity graph, the parent its page has in the page tree. Nothing is written to the site.",
+        whole: "Every entity of the site",
+        under: (path: string) => `The entities of the pages under ${path}`,
+        loading: "Comparing the page tree with the graph",
+        counts: (adopting: number, skipped: number) => {
+            const moving = adopting === 1 ? "1 entity takes a new parent" : `${adopting} entities take a new parent`;
+            return skipped === 0 ? moving : `${moving}; ${skipped} ${skipped === 1 ? "is" : "are"} left as they are`;
+        },
+        none: "The graph already agrees with the page tree",
+        noneBody: "Every entity here sits under the entity of its page's parent, so there is nothing to take.",
+        from: "In the graph now",
+        to: "From the page tree",
+        noParent: "no parent",
+        top: "the top of the graph",
+        skipped: "Left as it is",
+        skips: {
+            loop: "Taking this parent would make the graph loop back on itself.",
+            name_taken: "The new parent already has a child of the same name.",
+        },
+        more: "Show more",
+        apply: (count: number) => (count === 1 ? "Give 1 entity its parent" : `Give ${count} entities their parents`),
+        applying: "Writing the parents",
+        cancel: "Cancel",
+        moved: "The page tree or the graph moved since this preview, so it was read again. Check it and apply again.",
+        applied: (count: number) =>
+            count === 1 ? "1 entity took its page tree's parent." : `${count} entities took their page tree's parents.`,
+    },
     outline: {
         columns: { name: "Entity", type: "Page type", score: "Score", page: "Page", attention: "Attention" },
         page: "page",

@@ -57,6 +57,12 @@ vi.mock("../../data/hooks/sync.js", () => ({
     useSyncSite: () => ({ mutate: () => undefined, isPending: false }),
 }));
 
+vi.mock("../graph/index.js", () => ({
+    AdoptParentsDrawer: ({ under }: { under: { pageId: string; path: string } | null }) => (
+        <div data-adopt-under={under === null ? "" : `${under.pageId} ${under.path}`} />
+    ),
+}));
+
 vi.mock("../pages/index.js", () => ({
     PageDrawer: ({ pageId }: { pageId: string }) => <div data-drawer-page={pageId} />,
     useEntityIndex: () => ({ entities: [], labels: new Map() }),
@@ -172,6 +178,20 @@ describe("the site map", () => {
 
         expect(await screen.findByText(said.trail(["Shop"]))).toBeDefined();
         expect(held.asked).toContainEqual({ siteId: "s1", search: "mug" });
+    });
+
+    it("offers the page tree's parents for the whole site, and for the subtree it is rooted at", () => {
+        answer({ parentId: "p-mugs" }, [], false, { parent: mugs, trail: [] });
+        const whole = siteMap();
+        fireEvent.click(screen.getByRole("button", { name: copy.graph.adopt.open }));
+        expect(whole.container.querySelector("[data-adopt-under]")?.getAttribute("data-adopt-under")).toBe("");
+        whole.unmount();
+
+        const rooted = siteMap("/s/s1/map?under=p-mugs");
+        fireEvent.click(screen.getByRole("button", { name: copy.graph.adopt.openUnder }));
+        expect(rooted.container.querySelector("[data-adopt-under]")?.getAttribute("data-adopt-under")).toBe(
+            "p-mugs /shop/mugs/",
+        );
     });
 
     it("explains an empty map and offers a sync and an import", () => {

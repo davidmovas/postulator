@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { copy } from "../../copy/index.js";
 import { usePageTypes } from "../../data/hooks/templates.js";
 import type { SelectOption } from "../../ui/index.js";
-import { Input, Select, Toolbar, useDebounced } from "../../ui/index.js";
+import { AccountTreeIcon, Button, Input, Select, Toolbar, useDebounced } from "../../ui/index.js";
 import type { MapQuery } from "./model/params.js";
 
 const said = copy.map;
@@ -16,9 +16,10 @@ export interface MapToolbarProps {
     siteId: string;
     query: MapQuery;
     onChange: (next: MapQuery) => void;
+    onAdopt: () => void;
 }
 
-export function MapToolbar({ siteId, query, onChange }: MapToolbarProps): ReactElement {
+export function MapToolbar({ siteId, query, onChange, onAdopt }: MapToolbarProps): ReactElement {
     const types = usePageTypes(siteId);
     const [typed, setTyped] = useState(query.search);
     const settled = useDebounced(typed, searchDelayMs);
@@ -62,6 +63,17 @@ export function MapToolbar({ siteId, query, onChange }: MapToolbarProps): ReactE
                     }}
                 />
             </div>
+            <span className="flex-1" />
+            <Button
+                size="sm"
+                variant="ghost"
+                icon={AccountTreeIcon}
+                data-map-adopt={true}
+                title={copy.graph.adopt.body}
+                onClick={onAdopt}
+            >
+                {query.under === "" ? copy.graph.adopt.open : copy.graph.adopt.openUnder}
+            </Button>
         </Toolbar>
     );
 }
