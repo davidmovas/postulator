@@ -7,6 +7,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -81,6 +82,24 @@ func TestManyPagesAreFoundInOneCallWithTheirKeyFacts(t *testing.T) {
 
 	if _, err := m.Service().Find(t.Context(), sitemodel.FindRequest{SiteID: m.Site.ID, Gap: "everything"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("an unknown gap answered %v", err)
+	}
+}
+
+func TestAPageIsFoundByTheKeywordsItTakesFromItsEntity(t *testing.T) {
+	t.Parallel()
+
+	m := wide()
+	for i := range m.Pages {
+		if m.Pages[i].ID == "page-04-02" {
+			m.Pages[i].EntityID = new("entity-grinder")
+		}
+	}
+	m.Entities = append(m.Entities, graph.Entity{
+		ID: "entity-grinder", SiteID: siteID, Name: "Grinder", Keywords: keyword.New([]keyword.Keyword{{Text: "Conical Burr Grinder"}}),
+	})
+	got := findAll(t, m, sitemodel.FindRequest{Query: "burr grinder"})
+	if len(got) != 1 || got[0].Page.PageID != "page-04-02" {
+		t.Fatalf("found %+v, want the page whose entity carries the keyword", got)
 	}
 }
 

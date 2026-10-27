@@ -91,6 +91,16 @@ func (s *Service) found(ctx context.Context, req FindRequest) ([]contextpack.Map
 		}
 		index = pagemap.NewIndex(pages)
 	}
+	entities := map[string]graph.Entity{}
+	if key != "" {
+		held, listErr := s.deps.Entities.ListBySite(ctx, req.SiteID)
+		if listErr != nil {
+			return nil, listErr
+		}
+		for i := range held {
+			entities[held[i].ID] = held[i]
+		}
+	}
 	var gapped map[string]struct{}
 	if req.Gap != "" {
 		if gapped, err = s.gapped(ctx, req.SiteID, req.Gap); err != nil {
@@ -117,7 +127,7 @@ func (s *Service) found(ctx context.Context, req FindRequest) ([]contextpack.Map
 			continue
 		case req.PageTypeID != "" && !row.Typed(req.PageTypeID):
 			continue
-		case key != "" && !row.Mentions(key) && !keywordMentions(index, row.PageID, key):
+		case key != "" && !row.Mentions(key) && !keywordMentions(index, entities, row.PageID, key):
 			continue
 		case !heldAs(index, row.PageID, req.EntityID, req.Status):
 			continue
@@ -160,13 +170,17 @@ func heldAs(index pagemap.Index, pageID, entityID string, status pagemap.Status)
 	}
 }
 
-func keywordMentions(index pagemap.Index, pageID, key string) bool {
+func keywordMentions(index pagemap.Index, entities map[string]graph.Entity, pageID, key string) bool {
 	page, found := index.ByID(pageID)
 	if !found {
 		return false
 	}
-	for _, held := range page.Keywords {
-		if strings.Contains(graph.Key(held.Text), key) {
+	var entity graph.Entity
+	if page.EntityID != nil {
+		entity = entities[*page.EntityID]
+	}
+	for _, text := range pagemap.Keywords(page, entity).Texts() {
+		if strings.Contains(graph.Key(text), key) {
 			return true
 		}
 	}
