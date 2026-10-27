@@ -192,7 +192,7 @@ func (r *Registry) proposal(tool Tool, risk Risk, said string) func(context.Cont
 		now := r.now()
 		action, err := agent.NewPendingAction(agent.PendingAction{
 			ID: id.New(), ConversationID: b.ConversationID, Tool: def.Name, Args: args,
-			Summary: summary, CreatedAt: now, UpdatedAt: now,
+			Summary: summary, Risk: string(risk), CreatedAt: now, UpdatedAt: now,
 		})
 		if err != nil {
 			return nil, err

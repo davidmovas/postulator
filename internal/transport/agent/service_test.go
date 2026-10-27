@@ -205,6 +205,26 @@ func TestAnActionThatMovedOnIsAConflict(t *testing.T) {
 	}
 }
 
+func TestAWaitingCardKeepsTheRiskOfItsOp(t *testing.T) {
+	t.Parallel()
+
+	risks := map[string]bool{}
+	for _, op := range []string{`"op":"update","title":"Kept"`, `"op":"delete"`} {
+		h := newHarness(t)
+		page := sqlitetest.Page(t, h.store, h.siteID, "/coffee/kept/")
+		conversation := h.conversation(t, domainagent.ModeConfirm)
+		h.send(t, conversation, `TOOL:pages_manage{`+op+`,"pageId":"`+page.ID+`"}`+"\nFAKE: waiting")
+		pending, err := h.service.ListPendingActions(t.Context(), agentapp.ListPendingActionsRequest{ConversationID: conversation})
+		if err != nil || len(pending.Items) != 1 {
+			t.Fatalf("the pending actions are %+v, %v", pending, err)
+		}
+		risks[pending.Items[0].Risk] = true
+	}
+	if !risks["write"] || !risks["dangerous"] {
+		t.Errorf("the waiting cards carry the risks %v, want an update's write and a delete's dangerous", risks)
+	}
+}
+
 func TestACardOfAToolThisVersionNoLongerHasFailsInPlainWords(t *testing.T) {
 	t.Parallel()
 

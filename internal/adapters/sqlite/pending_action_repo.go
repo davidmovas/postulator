@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	pendingActionColumns = `id, conversation_id, tool, args, summary, status, result, error, created_at, updated_at`
+	pendingActionColumns = `id, conversation_id, tool, args, summary, status, result, error, created_at, updated_at, risk`
 	insertPendingAction  = `INSERT INTO pending_actions (` + pendingActionColumns + `)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	selectPendingAction     = `SELECT ` + pendingActionColumns + ` FROM pending_actions WHERE id = ?`
 	transitionPendingAction = `UPDATE pending_actions SET status = ?, result = ?, error = ?, updated_at = ?
 		WHERE id = ? AND status = ?`
@@ -37,7 +37,7 @@ func pendingActionNotFound(id string) *errors.Error {
 func (r *PendingActionRepo) Insert(ctx context.Context, a agent.PendingAction) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertPendingAction, []any{
 		a.ID, a.ConversationID, a.Tool, string(payloadOf(a.Args)), a.Summary, string(a.Status),
-		string(a.Result), a.Error, formatTime(a.CreatedAt), formatTime(a.UpdatedAt),
+		string(a.Result), a.Error, formatTime(a.CreatedAt), formatTime(a.UpdatedAt), a.Risk,
 	}, errors.New(errors.Conflict, "a pending action with this id already exists"), "insert the pending action")
 	return err
 }
@@ -88,7 +88,7 @@ func scanPendingAction(rows *sql.Rows) (agent.PendingAction, error) {
 		createdAt, updatedAt string
 	)
 	if err := rows.Scan(&a.ID, &a.ConversationID, &a.Tool, &args, &a.Summary, &status, &result, &a.Error,
-		&createdAt, &updatedAt); err != nil {
+		&createdAt, &updatedAt, &a.Risk); err != nil {
 		return agent.PendingAction{}, err
 	}
 
