@@ -276,8 +276,8 @@ func TestTheHarnessSeedsAScheduleAndAConversationWaitingOnApproval(t *testing.T)
 	if len(pending.Items) != 1 {
 		t.Fatalf("pending actions = %d, want the one write the agent proposed", len(pending.Items))
 	}
-	if pending.Items[0].Tool != "pages_update" {
-		t.Errorf("the pending action calls %q, want pages_update", pending.Items[0].Tool)
+	if pending.Items[0].Tool != "pages_manage" {
+		t.Errorf("the pending action calls %q, want pages_manage", pending.Items[0].Tool)
 	}
 }
 
@@ -716,7 +716,7 @@ func TestTheSeededConfirmationNamesARealPage(t *testing.T) {
 	}
 
 	var args struct {
-		ID        string `json:"id"`
+		ID        string `json:"pageId"`
 		MetaTitle string `json:"metaTitle"`
 	}
 	if unmarshalErr := json.Unmarshal(pending.Items[0].Args, &args); unmarshalErr != nil {
@@ -1627,9 +1627,10 @@ func TestTheScriptAnswersASiteQuestionAndAWriteWithTheirTools(t *testing.T) {
 		tool   string
 		args   map[string]any
 	}{
-		{prompt: "Explore the site's tree for me", tool: "sites_explore", args: map[string]any{"view": "tree"}},
-		{prompt: "Retitle the espresso page", tool: "pages_update", args: map[string]any{
-			"id": "page-1", "metaTitle": "Espresso machines under $500: nine we would buy",
+		{prompt: "Explore the site's tree for me", tool: "pages_tree", args: map[string]any{"view": "roots"}},
+		{prompt: "Read the espresso machines hub in full", tool: "pages_get", args: map[string]any{"path": hubPath}},
+		{prompt: "Retitle the espresso page", tool: "pages_manage", args: map[string]any{
+			"op": "update", "pageId": "page-1", "metaTitle": "Espresso machines under $500: nine we would buy",
 		}},
 		{prompt: "How is the map?", tool: "", args: nil},
 	}

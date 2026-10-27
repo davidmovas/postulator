@@ -1075,7 +1075,7 @@
         "key": "Enter"
       },
       {
-        "expect": "main [data-tool=sites_explore][data-tool-status=ok]",
+        "expect": "main [data-tool=pages_tree][data-tool-status=ok]",
         "timeout": 30000
       },
       {
@@ -1089,7 +1089,7 @@
     "wait": 1500,
     "steps": [
       {
-        "expect": "main [data-tool=sites_explore][data-tool-status=ok]"
+        "expect": "main [data-tool=pages_tree][data-tool-status=ok]"
       },
       {
         "expect": "main >> text=The top of the site holds the six hubs",
@@ -1107,7 +1107,7 @@
         "key": "Enter"
       },
       {
-        "expect": "main [data-card-tool=pages_update][data-card-status=pending]",
+        "expect": "main [data-card-tool=pages_manage][data-card-status=pending]",
         "timeout": 30000
       },
       {
@@ -1136,7 +1136,7 @@
         "click": "[role=dialog] button:has-text(\"Crema Bench\")"
       },
       {
-        "expect": "main [data-card-tool=pages_update][data-card-status=pending]"
+        "expect": "main [data-card-tool=pages_manage][data-card-status=pending]"
       }
     ]
   },
@@ -1146,7 +1146,7 @@
     "wait": 1500,
     "steps": [
       {
-        "expect": "[data-agent-dock] [data-card-tool=pages_update][data-card-status=pending]"
+        "expect": "[data-agent-dock] [data-card-tool=pages_manage][data-card-status=pending]"
       },
       {
         "click": "[data-agent-dock] [data-card-status=pending] button:has-text(\"Reject\")"
@@ -1168,7 +1168,7 @@
         "key": "Enter"
       },
       {
-        "expect": "[data-agent-dock] [data-tool=sites_explore][data-tool-status=ok]",
+        "expect": "[data-agent-dock] [data-tool=pages_tree][data-tool-status=ok]",
         "count": 2,
         "timeout": 30000
       },
@@ -1199,7 +1199,7 @@
         "key": "Enter"
       },
       {
-        "expect": "[data-agent-dock] [data-card-tool=pages_update][data-card-status=pending]",
+        "expect": "[data-agent-dock] [data-card-tool=pages_manage][data-card-status=pending]",
         "timeout": 30000
       },
       {

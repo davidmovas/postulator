@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -66,6 +67,9 @@ const (
 	productHub     = "Espresso machines"
 
 	articleRuleName = "An article under a category"
+
+	toolResultKey        = "agent.maxToolResultBytes"
+	shortenedResultBytes = 1024
 )
 
 var (
@@ -344,24 +348,25 @@ func (a *assistantScript) answer(prompt string) fake.Turn {
 			Text: "There is no page with that id on this site. Give me the path instead and I will " +
 				"look it up in the map.",
 		}
-	case strings.Contains(lowered, "every page"):
+	case strings.Contains(lowered, "in full"):
 		return fake.Turn{
-			Tool: "pages_list",
-			Args: json.RawMessage(`{"limit":100}`),
-			Text: "The listing came back longer than one message can carry, so I read the opening of it. " +
-				"Ask me for one hub at a time and I will read each in full.",
+			Tool: "pages_get",
+			Args: json.RawMessage(`{"path":"` + hubPath + `"}`),
+			Text: "The page came back longer than one message can carry, so I read the opening of it. " +
+				"Ask me for its fields or its blocks a part at a time and I will read each whole.",
 		}
 	case strings.Contains(lowered, "explore"):
 		return fake.Turn{
-			Tool: "sites_explore",
-			Args: json.RawMessage(`{"view":"tree"}`),
+			Tool: "pages_tree",
+			Args: json.RawMessage(`{"view":"roots"}`),
 			Text: "The top of the site holds the six hubs and the journal. Grinders and Coffee beans carry " +
 				"the most children, and every hub page is mapped to its entity.",
 		}
 	case strings.Contains(lowered, "retitle") || strings.Contains(lowered, "rename"):
 		return fake.Turn{
-			Tool: "pages_update",
-			Args: json.RawMessage(`{"id":"` + a.pageID() + `","metaTitle":"Espresso machines under $500: nine we would buy"}`),
+			Tool: "pages_manage",
+			Args: json.RawMessage(`{"op":"update","pageId":"` + a.pageID() +
+				`","metaTitle":"Espresso machines under $500: nine we would buy"}`),
 			Text: "I have queued the retitle. The page keeps its path and its canonical, only the meta title " +
 				"changes, so the entry in the search results leads with the price the reader searched for.",
 		}
@@ -825,7 +830,9 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 		"Open the page 00000000-0000-4000-8000-000000000000 and tell me what it links to."); askErr != nil {
 		return askErr
 	}
-	if askErr := exchange(ctx, core, conversation, "List every page on the site with its status."); askErr != nil {
+	if askErr := withToolResultCap(ctx, core, shortenedResultBytes, func() error {
+		return exchange(ctx, core, conversation, "Read the espresso machines hub in full, every field and link.")
+	}); askErr != nil {
 		return askErr
 	}
 	if askErr := exchange(ctx, core, conversation, deniedMessage); askErr != nil {
@@ -833,6 +840,33 @@ func seedConversation(ctx context.Context, core *app.Core, siteID string) error 
 	}
 	return exchange(ctx, core, conversation,
 		"Retitle the espresso machines under $500 page so the meta title leads with the price.")
+}
+
+func setSetting(ctx context.Context, core *app.Core, key string, value int) error {
+	raw := json.RawMessage(strconv.Itoa(value))
+	if err := core.Declarations.Validate(key, raw); err != nil {
+		return err
+	}
+	if err := core.SettingsStore.Set(ctx, key, raw); err != nil {
+		return err
+	}
+	stored, err := core.SettingsStore.All(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = core.Declarations.Apply(core.Settings, stored)
+	return err
+}
+
+func withToolResultCap(ctx context.Context, core *app.Core, bytes int, fn func() error) error {
+	if err := setSetting(ctx, core, toolResultKey, bytes); err != nil {
+		return err
+	}
+	ranErr := fn()
+	if err := setSetting(ctx, core, toolResultKey, agent.DefaultMaxToolResultBytes); err != nil {
+		return err
+	}
+	return ranErr
 }
 
 func exchange(ctx context.Context, core *app.Core, conversation, text string) error {

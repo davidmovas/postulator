@@ -73,34 +73,39 @@ func proposedPlan(conversation, siteID string, byPath, entities map[string]strin
 		Title: "Link the grinders hub and the grind size guide",
 		Steps: []domainagent.PlanStep{
 			{
-				ID: id.New(), Tool: "graph",
+				ID: id.New(), Tool: "graph_edit",
 				Args: argsOf(map[string]any{
-					"op": "add_edge", "fromEntityId": entities["Grinders"], "toEntityId": entities["Grind size for espresso"],
+					"op": "add_edge", "entityId": entities["Grinders"], "toEntityId": entities["Grind size for espresso"],
 					"kind": "related",
 				}),
 				Summary: "Add a related edge from Grinders to Grind size for espresso",
 				Reason:  "The hub must link to the guide, and no edge of the entity graph joins the two yet.",
 			},
 			{
-				ID: id.New(), Tool: "runs",
+				ID: id.New(), Tool: "runs_control",
 				Args: argsOf(map[string]any{
 					"op": "start", "pageIds": []string{hub},
 					"brief": map[string]any{
 						"goal": "Help a first buyer choose a grinder before a machine",
 						"tone": "Plain and practical, no brand talk",
 					},
-					"directives": []map[string]any{{"pageId": hub, "mustLink": []map[string]any{{"pageId": guide}}}},
+					"directives": []map[string]any{{
+						"pageId": hub, "notes": "Lead with the burr size, then the price.",
+						"mustLink": []map[string]any{{"pageId": guide, "anchor": "grind size"}},
+					}},
 				}),
 				Summary:   "Write /grinders/ again with a brief, linking it to /grinders/grind-size/",
 				Reason:    "The hub reads like a price list; a brief turns it into a buying guide that sends readers on.",
 				DependsOn: []int{0},
 				Editable: []domainagent.EditField{
 					{Name: "goal", Path: "brief.goal"}, {Name: "tone", Path: "brief.tone"},
+					{Name: "notes for /grinders/", Path: "directives.0.notes"},
+					{Name: "anchor from /grinders/ to /grinders/grind-size/", Path: "directives.0.mustLink.0.anchor"},
 				},
 				EstimateUSD: 0.42, EstimateTokens: 18400,
 			},
 			{
-				ID: id.New(), Tool: "runs",
+				ID: id.New(), Tool: "runs_control",
 				Args:      argsOf(map[string]any{"op": "start", "kind": "relink", "pageIds": []string{guide}}),
 				Summary:   "Place the owed links on /grinders/grind-size/",
 				Reason:    "Once the hub is written, the guide owes it a link back.",
@@ -116,27 +121,36 @@ func finishedPlan(conversation, siteID string, byPath map[string]string, runID s
 		Title: "Tidy the espresso machine titles",
 		Steps: []domainagent.PlanStep{
 			{
-				ID: id.New(), Tool: "pages", Args: argsOf(map[string]any{"op": "set", "pageId": byPath["/espresso-machines/"]}),
+				ID: id.New(), Tool: "pages_manage",
+				Args: argsOf(map[string]any{
+					"op": "update", "pageId": byPath["/espresso-machines/"], "title": "Espresso machines, type by type",
+				}),
 				Summary: "Retitle /espresso-machines/ so it leads with the types",
 				Reason:  "The hub's title buries the word readers search for.",
 			},
 			{
-				ID: id.New(), Tool: "runs", Args: argsOf(map[string]any{"op": "start", "pageIds": []string{byPath[completedRun[0]]}}),
+				ID: id.New(), Tool: "runs_control",
+				Args:    argsOf(map[string]any{"op": "start", "pageIds": []string{byPath[completedRun[0]]}, "fields": []string{"seo_description"}}),
 				Summary: "Write the meta of the pre-infusion guide again",
 				Reason:  "Its description repeats the title word for word.",
 			},
 			{
-				ID: id.New(), Tool: "runs", Args: argsOf(map[string]any{"op": "start", "pageIds": []string{byPath[failingPath]}}),
+				ID: id.New(), Tool: "runs_control",
+				Args:    argsOf(map[string]any{"op": "start", "pageIds": []string{byPath[failingPath]}, "fields": []string{"seo_title"}}),
 				Summary: "Write the single dosing guide's title again",
 				Reason:  "The planned title is longer than a search result shows.",
 			},
 			{
-				ID: id.New(), Tool: "runs", Args: argsOf(map[string]any{"op": "start", "kind": "relink", "pageIds": []string{byPath[failingPath]}}),
+				ID: id.New(), Tool: "runs_control",
+				Args:    argsOf(map[string]any{"op": "start", "kind": "relink", "pageIds": []string{byPath[failingPath]}}),
 				Summary: "Place the owed links on the single dosing guide", Reason: "Its new title changes the anchor others use.",
 				DependsOn: []int{2},
 			},
 			{
-				ID: id.New(), Tool: "pages", Args: argsOf(map[string]any{"op": "set", "pageId": byPath["/espresso-machines/dual-boiler/"]}),
+				ID: id.New(), Tool: "pages_manage",
+				Args: argsOf(map[string]any{
+					"op": "update", "pageId": byPath["/espresso-machines/dual-boiler/"], "title": "Dual boiler machines",
+				}),
 				Summary: "Retitle /espresso-machines/dual-boiler/", Reason: "The title says boilers twice.",
 			},
 		},
