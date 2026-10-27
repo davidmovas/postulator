@@ -6,11 +6,25 @@ import { flatten } from "../../data/call.js";
 import { usePagePaths } from "../../data/hooks/pages.js";
 import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
 import { useResolvedTemplate, useTemplates } from "../../data/hooks/templates.js";
-import type { AddedPage, Estimate } from "../../data/types.js";
+import type { AddedPage, Estimate, WriterDirections } from "../../data/types.js";
 import { publishModes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../../ui/index.js";
+import { WriterDrawer } from "../pages/writer/pane.js";
 import { publishModeLabel, runKindLabel } from "./labels.js";
+import { BriefSection } from "./start-brief.js";
+import { DirectiveList } from "./start-directives.js";
+import type { BriefDraft, DirectiveDraft, Directives } from "./start-directions.js";
+import {
+    blockedByDrafts,
+    briefOf,
+    directiveOf,
+    directivesOf,
+    emptyBrief,
+    mustLinkRefusal,
+} from "./start-directions.js";
+import { MustLinkNotice } from "./start-mustlink.js";
+import type { StartForm } from "./start-model.js";
 import {
     blockingFindings,
     capOf,
@@ -35,6 +49,8 @@ const templateAutoValue = "auto";
 const listSize = 100;
 const defaultCap = "5.00";
 const defaultTokenCap = "0";
+
+type Asked = "estimate" | "start" | null;
 
 export interface StartRunDrawerProps {
     open: boolean;
@@ -68,6 +84,11 @@ export function StartRunDrawer({
     const [scoped, setScoped] = useState<readonly string[]>([]);
     const [rewrite, setRewrite] = useState<ReadonlySet<string>>(new Set());
     const [named, setNamed] = useState<ReadonlyMap<string, string>>(new Map());
+    const [brief, setBrief] = useState<BriefDraft>(emptyBrief);
+    const [directives, setDirectives] = useState<Directives>(new Map());
+    const [addEdges, setAddEdges] = useState(false);
+    const [last, setLast] = useState<Asked>(null);
+    const [previewing, setPreviewing] = useState<string | null>(null);
 
     const priced = useEstimateRun();
     const start = useStartRun();
@@ -80,8 +101,9 @@ export function StartRunDrawer({
     const offersRewrite =
         takesATemplate(kind) && (seededPages.length > 0 || (resolved.data !== undefined && writesBody(resolved.data.spec.recipe)));
     const rewritten = offersRewrite ? rewriteOf(rewrite, selected) : [];
+    const directed = takesATemplate(kind);
     const unnamed = useMemo(() => [...selected].filter((id) => !named.has(id)), [selected, named]);
-    const fetched = usePagePaths(unnamed, open && (offersRewrite || fields.length > 0));
+    const fetched = usePagePaths(unnamed, open && (offersRewrite || fields.length > 0 || directed));
     const pathOf = (id: string): string => named.get(id) ?? fetched.get(id) ?? id;
 
     useEffect(() => {
@@ -99,6 +121,11 @@ export function StartRunDrawer({
         setScoped([]);
         setRewrite(new Set(seed?.rewrite ?? []));
         setNamed(new Map(paths ?? []));
+        setBrief(emptyBrief);
+        setDirectives(new Map());
+        setAddEdges(false);
+        setLast(null);
+        setPreviewing(null);
         priced.reset();
         start.reset();
     }, [open, siteId, seed]);
@@ -120,14 +147,69 @@ export function StartRunDrawer({
         ...flatten(globalTemplates.data?.pages).map((template) => ({ value: template.id, label: template.name })),
     ];
 
-    const request = () =>
-        startRequestOf({ siteId, pageIds: [...selected], publishMode, kind, templateId, cap, tokenCap, rewrite: rewritten, fields });
+    const chosen = [...selected];
+    const sentDirectives = directed ? directivesOf(directives, chosen) : [];
+    const asksForLinks = sentDirectives.some((held) => (held.mustLink ?? []).length > 0);
+
+    const request = (overrides: Partial<StartForm> = {}) =>
+        startRequestOf({
+            siteId,
+            pageIds: chosen,
+            publishMode,
+            kind,
+            templateId,
+            cap,
+            tokenCap,
+            rewrite: rewritten,
+            fields,
+            brief: directed ? briefOf(brief) : undefined,
+            directives: sentDirectives,
+            addEdges: asksForLinks && addEdges,
+            ...overrides,
+        });
+
+    const price = (overrides: Partial<StartForm> = {}): void => {
+        setLast("estimate");
+        start.reset();
+        priced.mutate(request(overrides), {
+            onSuccess: (answered) => {
+                setEstimate(answered.estimate);
+                setAdded(answered.added ?? []);
+                setScoped(answered.fields ?? []);
+            },
+        });
+    };
+
+    const begin = (overrides: Partial<StartForm> = {}): void => {
+        setLast("start");
+        start.mutate(request(overrides), {
+            onSuccess: (answered) => {
+                onStarted(answered.runId);
+            },
+        });
+    };
+
+    const directions = (pageId: string): WriterDirections => {
+        const out: WriterDirections = {};
+        const held = briefOf(brief);
+        const directive = directiveOf(pageId, directives.get(pageId));
+        if (held !== undefined) {
+            out.brief = held;
+        }
+        if (directive !== null) {
+            out.directive = directive;
+        }
+        return out;
+    };
 
     const capValue = capOf(cap);
     const ready = selected.size > 0;
+    const drafted = directed && blockedByDrafts(brief, directives, chosen);
     const over = estimate !== null && capValue > 0 && estimate.usd > capValue;
     const blocked = blockingFindings(estimate);
-    const refusal = startRefusal(start.error ?? priced.error);
+    const thrown = start.error ?? priced.error;
+    const refusal = startRefusal(thrown);
+    const linkRefusal = mustLinkRefusal(thrown);
 
     return (
         <Drawer
@@ -149,17 +231,11 @@ export function StartRunDrawer({
                     <Button
                         data-run-estimate={true}
                         icon={CalculateIcon}
-                        disabled={!ready}
+                        disabled={!ready || drafted}
                         busy={priced.isPending}
-                        title={ready ? undefined : copy.runs.start.noPages}
+                        title={!ready ? copy.runs.start.noPages : drafted ? copy.runs.start.overLimits : undefined}
                         onClick={() => {
-                            priced.mutate(request(), {
-                                onSuccess: (answered) => {
-                                    setEstimate(answered.estimate);
-                                    setAdded(answered.added ?? []);
-                                    setScoped(answered.fields ?? []);
-                                },
-                            });
+                            price();
                         }}
                     >
                         {copy.runs.start.estimate}
@@ -167,21 +243,19 @@ export function StartRunDrawer({
                     <Button
                         variant="primary"
                         icon={PlayArrowIcon}
-                        disabled={estimate === null || blocked > 0}
+                        disabled={estimate === null || blocked > 0 || drafted}
                         busy={start.isPending}
                         title={
                             estimate === null
                                 ? copy.runs.start.estimateFirst
                                 : blocked > 0
                                   ? copy.runs.start.blocked
-                                  : undefined
+                                  : drafted
+                                    ? copy.runs.start.overLimits
+                                    : undefined
                         }
                         onClick={() => {
-                            start.mutate(request(), {
-                                onSuccess: (answered) => {
-                                    onStarted(answered.runId);
-                                },
-                            });
+                            begin();
                         }}
                     >
                         {copy.runs.start.confirm}
@@ -249,6 +323,29 @@ export function StartRunDrawer({
 
                 {fields.length === 0 ? null : <StartScope fields={fields} rewritten={rewritten.map(pathOf)} />}
 
+                {directed ? (
+                    <BriefSection
+                        draft={brief}
+                        onChange={(next) => {
+                            setBrief(next);
+                            forget();
+                        }}
+                    />
+                ) : null}
+
+                {directed && selected.size > 0 ? (
+                    <DirectiveList
+                        siteId={siteId}
+                        pages={chosen.map((id) => ({ id, path: pathOf(id) }))}
+                        drafts={directives}
+                        onChange={(pageId: string, next: DirectiveDraft) => {
+                            setDirectives((held) => new Map([...held, [pageId, next]]));
+                            forget();
+                        }}
+                        onPreview={setPreviewing}
+                    />
+                ) : null}
+
                 {offersRewrite && selected.size > 0 ? (
                     <RewriteSwitch
                         pages={[...selected].map((id) => ({ id, path: pathOf(id) }))}
@@ -277,8 +374,38 @@ export function StartRunDrawer({
 
                 {fields.length === 0 && scoped.length > 0 ? <TypeScope fields={scoped} /> : null}
 
+                <MustLinkNotice
+                    refusal={linkRefusal}
+                    addEdges={addEdges}
+                    asked={asksForLinks}
+                    busy={priced.isPending || start.isPending}
+                    onAddEdges={(on) => {
+                        setAddEdges(on);
+                        if (!on) {
+                            forget();
+                            return;
+                        }
+                        if (last === "start") {
+                            begin({ addEdges: true });
+                            return;
+                        }
+                        price({ addEdges: true });
+                    }}
+                />
+
                 <StartPrice estimate={estimate} added={added} over={over} refusal={refusal.banner} />
             </div>
+            {previewing === null ? null : (
+                <WriterDrawer
+                    pageId={previewing}
+                    path={pathOf(previewing)}
+                    directions={directions(previewing)}
+                    context="draft"
+                    onClose={() => {
+                        setPreviewing(null);
+                    }}
+                />
+            )}
         </Drawer>
     );
 }

@@ -1,7 +1,8 @@
 import { copy } from "../../copy/index.js";
 import { react } from "../../data/errors.js";
-import type { RunStartRequest } from "../../data/types.js";
+import type { RunBrief, RunDirective, RunStartRequest } from "../../data/types.js";
 import { runKindsWithTheirOwnRecipe, startableRunKinds } from "../../generated/vocab.js";
+import { mustLinkField } from "./start-directions.js";
 
 export const templateAuto = "";
 
@@ -61,6 +62,9 @@ export function startRefusal(thrown: unknown): StartRefusal {
     if (reaction.kind === "field" && reaction.field === "pageIds") {
         return { targets: reaction.message, banner: null };
     }
+    if (reaction.kind === "field" && reaction.field === mustLinkField) {
+        return { targets: null, banner: null };
+    }
     return { targets: null, banner: reaction.message };
 }
 
@@ -74,6 +78,9 @@ export interface StartForm {
     tokenCap: string;
     rewrite: readonly string[];
     fields: readonly string[];
+    brief?: RunBrief;
+    directives?: readonly RunDirective[];
+    addEdges?: boolean;
 }
 
 export function startRequestOf(form: StartForm): RunStartRequest {
@@ -92,6 +99,15 @@ export function startRequestOf(form: StartForm): RunStartRequest {
     }
     if (form.fields.length > 0) {
         built.fields = [...form.fields];
+    }
+    if (form.brief !== undefined) {
+        built.brief = form.brief;
+    }
+    if (form.directives !== undefined && form.directives.length > 0) {
+        built.directives = [...form.directives];
+        if (form.addEdges === true) {
+            built.addEdges = true;
+        }
     }
     return built;
 }
