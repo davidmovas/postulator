@@ -94,12 +94,12 @@ func TestThePageTypeToolsSaveTypesScopesAndAPagesType(t *testing.T) {
 		t.Fatalf("pagetypes list = %+v, want the seeded types", listed)
 	}
 
-	created := called[pagetypes.Type](t, registry, binding, "pagetypes", `{"op":"save","name":"Pillar","preset":"hub"}`)
-	if created.Name != "Pillar" || created.Preset != "hub" || created.SiteID != seeded.site {
+	created := called[pagetypes.Type](t, registry, binding, "pagetypes", `{"op":"save","name":"Pillar","preset":"landing"}`)
+	if created.Name != "Pillar" || created.Preset != "landing" || created.SiteID != seeded.site {
 		t.Fatalf("pagetypes save without an id = %+v, want a new hub type of the conversation's site", created)
 	}
 	renamed := called[pagetypes.Type](t, registry, binding, "pagetypes", `{"op":"save","pageTypeId":"`+created.ID+`","name":"Pillars"}`)
-	if renamed.ID != created.ID || renamed.Name != "Pillars" || renamed.Preset != "hub" {
+	if renamed.ID != created.ID || renamed.Name != "Pillars" || renamed.Preset != "landing" {
 		t.Fatalf("pagetypes save with an id = %+v, want the same type renamed", renamed)
 	}
 
@@ -131,7 +131,7 @@ func TestThePageTypeToolsSaveTypesScopesAndAPagesType(t *testing.T) {
 		t.Fatalf("pagetypes delete = %+v, want no page moved, the page having left the type", moved)
 	}
 
-	other := called[pagetypes.Type](t, registry, binding, "pagetypes", `{"op":"save","name":"Second hub","preset":"hub"}`)
+	other := called[pagetypes.Type](t, registry, binding, "pagetypes", `{"op":"save","name":"Second hub","preset":"category"}`)
 	bulk := called[pages.SetTypesResponse](t, registry, binding, "pages_manage",
 		`{"op":"set_types","pageTypeId":"`+other.ID+`","select":{"pageIds":["`+seeded.page+`"]}}`)
 	if bulk.Typed != 1 || typeOfThePage(t, seeded) != other.ID {

@@ -4,8 +4,10 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/pagetypes"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
@@ -139,6 +141,57 @@ func TestTheFallbackKeepsNoConditionAndAnOrdinaryType(t *testing.T) {
 	}
 }
 
+func TestEachRuleCountsThePagesItPlacedAndTheListCountsThoseTypedBeforeTheRules(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	listed := h.rules(t, h.siteID)
+	posts := listed.Rules[7]
+	guide, info, landing := h.typeOf(t, h.siteID, pagetype.Guide), h.typeOf(t, h.siteID, pagetype.Info), h.typeOf(t, h.siteID, pagetype.Landing)
+	repo := sqlite.NewPageRepo(h.store)
+	typed := func(path, typeID string, source pagemap.TypeSource, reason pagemap.TypeReason, ruleID string, status pagemap.Status) {
+		t.Helper()
+		page := sqlitetest.Page(t, h.store, h.siteID, path)
+		page.Status = status
+		if err := repo.Update(t.Context(), page); err != nil {
+			t.Fatalf("archive %s: %v", path, err)
+		}
+		var err error
+		if source == pagemap.TypeSourceManual {
+			err = repo.SetType(t.Context(), page.ID, typeID, reason, page.UpdatedAt)
+		} else {
+			_, err = repo.Classify(t.Context(), page.ID, pagetype.Assignment{},
+				pagetype.Assignment{TypeID: typeID, Source: source, Reason: reason, RuleID: ruleID}, page.UpdatedAt)
+		}
+		if err != nil {
+			t.Fatalf("type %s: %v", path, err)
+		}
+	}
+	typed("/blog/first/", guide.ID, pagemap.TypeSourceAuto, pagemap.TypeByRule, posts.ID, pagemap.StatusExists)
+	typed("/blog/second/", guide.ID, pagemap.TypeSourceAuto, pagemap.TypeByRule, posts.ID, pagemap.StatusExists)
+	typed("/blog/gone/", guide.ID, pagemap.TypeSourceAuto, pagemap.TypeByRule, posts.ID, pagemap.StatusArchived)
+	typed("/about/", info.ID, pagemap.TypeSourceAuto, pagemap.TypeByUnmatched, "", pagemap.StatusExists)
+	typed("/old-hub/", landing.ID, pagemap.TypeSourceAuto, pagemap.TypeByListing, "", pagemap.StatusExists)
+	typed("/old-page/", info.ID, pagemap.TypeSourceAuto, pagemap.TypeByDefault, "", pagemap.StatusExists)
+	typed("/mine/", info.ID, pagemap.TypeSourceManual, pagemap.TypeByUser, "", pagemap.StatusExists)
+
+	listed = h.rules(t, h.siteID)
+	for i := range listed.Rules {
+		want := 0
+		if listed.Rules[i].ID == posts.ID {
+			want = 2
+		}
+		if listed.Rules[i].Pages != want {
+			t.Errorf("rule %d counts %d pages, want %d", listed.Rules[i].Number, listed.Rules[i].Pages, want)
+		}
+	}
+	if listed.Fallback == nil || listed.Fallback.Pages != 1 {
+		t.Errorf("the fallback = %+v, want the one page no rule matched", listed.Fallback)
+	}
+	if listed.BeforeRules != 2 {
+		t.Errorf("pages typed before the rules = %d, want the listing and the default one", listed.BeforeRules)
+	}
+}
+
 func TestDeletingATypeMovesItsRulesToTheTypeItsPagesMoveTo(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
@@ -157,7 +210,7 @@ func TestDeletingATypeMovesItsRulesToTheTypeItsPagesMoveTo(t *testing.T) {
 		t.Errorf("the rule under a guide = %+v, want it under the type the guides moved to", listed.Rules[10])
 	}
 
-	notes, err := h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Notes", Preset: string(pagetype.Entity)})
+	notes, err := h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Notes", Preset: string(pagetype.Guide)})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

@@ -81,6 +81,10 @@ func (r TypeReason) RulePlaced() bool {
 	return r == TypeByRule || r == TypeByUnmatched
 }
 
+func (r TypeReason) BeforeRules() bool {
+	return r != TypeByNone && !r.Manual() && !r.RulePlaced()
+}
+
 type TechnicalReason string
 
 const (

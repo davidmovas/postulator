@@ -40,16 +40,43 @@ func (s *Service) ListRules(ctx context.Context, req ListRulesRequest) (RulesRes
 	if err != nil {
 		return RulesResponse{}, err
 	}
-	out := RulesResponse{Rules: make([]Rule, 0, len(rules))}
+	pages, err := s.deps.Pages.ListBySite(ctx, req.SiteID)
+	if err != nil {
+		return RulesResponse{}, err
+	}
+	placed, unmatched, before := census(pages)
+	out := RulesResponse{Rules: make([]Rule, 0, len(rules)), BeforeRules: before}
 	for i := range rules {
 		if rules[i].Kind == pagetype.KindFallback {
 			view := ruleView(rules[i], 0)
+			view.Pages = unmatched
 			out.Fallback = &view
 			continue
 		}
-		out.Rules = append(out.Rules, ruleView(rules[i], len(out.Rules)+1))
+		view := ruleView(rules[i], len(out.Rules)+1)
+		view.Pages = placed[rules[i].ID]
+		out.Rules = append(out.Rules, view)
 	}
 	return out, nil
+}
+
+func census(pages []pagemap.Page) (placed map[string]int, unmatched, before int) {
+	placed = make(map[string]int)
+	for i := range pages {
+		page := &pages[i]
+		if page.Status == pagemap.StatusArchived || page.TypeSource != pagemap.TypeSourceAuto {
+			continue
+		}
+		switch {
+		case page.TypeReason == pagemap.TypeByRule:
+			placed[page.TypeRuleID]++
+		case page.TypeReason == pagemap.TypeByUnmatched:
+			unmatched++
+		case page.TypeReason.BeforeRules():
+			before++
+		}
+	}
+	return placed, unmatched, before
 }
 
 func (s *Service) SaveRule(ctx context.Context, req SaveRuleRequest) (Rule, error) {

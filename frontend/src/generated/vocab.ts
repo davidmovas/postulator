@@ -200,6 +200,17 @@ export const pageTypePresets = [
 ] as const;
 export type PageTypePreset = (typeof pageTypePresets)[number];
 
+export const creatablePageTypePresets: readonly PageTypePreset[] = [
+    "landing",
+    "category",
+    "guide",
+    "info",
+    "product",
+    "store_category",
+    "catalog",
+    "technical",
+];
+
 export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
 export type PageTypeRole = (typeof pageTypeRoles)[number];
 

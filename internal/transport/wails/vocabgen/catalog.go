@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -65,7 +66,12 @@ func catalog() []vocabulary {
 			export: "cannibalizationReasons", tsType: "CannibalizationReason", pkg: "internal/domain/pagemap",
 			typeName: "Reason",
 		},
-		{export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset"},
+		{
+			export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset",
+			derived: []derivation{
+				{export: "creatablePageTypePresets", keep: func(value string) bool { return !pagetype.Preset(value).Legacy() }},
+			},
+		},
 		{export: "pageTypeRoles", tsType: "PageTypeRole", pkg: "internal/domain/pagetype", typeName: "Role"},
 		{export: "ruleKinds", tsType: "RuleKind", pkg: "internal/domain/pagetype", typeName: "RuleKind"},
 		{export: "urlModes", tsType: "URLMode", pkg: "internal/domain/pagetype", typeName: "URLMode"},

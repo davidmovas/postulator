@@ -19,7 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 85
+const latestMigration = 86
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -107,6 +107,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0083_agent_plans.sql",
 		"0084_pending_action_risk.sql",
 		"0085_one_sync_per_site.sql",
+		"0086_entity_type_named_article.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1961,6 +1962,59 @@ func TestASiteKeepsItsOldestSyncAndHoldsOneAtATime(t *testing.T) {
 	}
 	if insertErr := insertRun("sync-twin", "s1", "sync", "pending", "2026-10-28T09:40:00Z"); insertErr != nil {
 		t.Fatalf("the down kept the one-sync index: %v", insertErr)
+	}
+}
+
+func TestTheTypeNamedEntityBecomesArticleSoItIsNotTakenForTheGraph(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 85)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-28T08:00:00Z"
+	for _, owner := range []string{"s1", "s2", "s3"} {
+		must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+			owner, owner, "https://"+owner, "site:"+owner+":wp_password", at, at)
+	}
+	for _, seeded := range []struct{ id, site, name, preset string }{
+		{"s1-entity", "s1", "Entity", "entity"},
+		{"s1-hub", "s1", "Hub", "hub"},
+		{"s2-entity", "s2", "Entity", "entity"},
+		{"s2-article", "s2", "Article", "guide"},
+		{"s3-entity", "s3", "Entity", "hub"},
+	} {
+		must(`INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+			seeded.id, seeded.site, seeded.name, seeded.preset, at, at)
+	}
+
+	if _, err = provider.UpTo(t.Context(), 86); err != nil {
+		t.Fatalf("up to 86: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, name, preset FROM page_types ORDER BY id`); !slices.Equal(got, []string{
+		"s1-entity | Article | entity", "s1-hub | Hub | hub", "s2-article | Article | guide",
+		"s2-entity | Article (2.5) | entity", "s3-entity | Entity | hub",
+	}) {
+		t.Fatalf("the types after 86 = %v, want the entity preset's Entity renamed and nothing else", got)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 85); err != nil {
+		t.Fatalf("down to 85: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, name FROM page_types ORDER BY id`); !slices.Equal(got, []string{
+		"s1-entity | Entity", "s1-hub | Hub", "s2-article | Article", "s2-entity | Entity", "s3-entity | Entity",
+	}) {
+		t.Fatalf("the down left the types as %v", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
 	}
 }
 

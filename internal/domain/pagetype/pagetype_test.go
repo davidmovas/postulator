@@ -37,6 +37,12 @@ func TestThePresetsTheirNamesAndTheirRoles(t *testing.T) {
 	if got := pagetype.Seeded(); !slices.Equal(got, want[:8]) {
 		t.Fatalf("Seeded = %v, want the client's eight, without Hub and Entity", got)
 	}
+	for _, preset := range want {
+		if legacy := preset == pagetype.Hub || preset == pagetype.Entity; preset.Legacy() != legacy {
+			t.Errorf("%s Legacy = %t, want %t: only a site from before 2.6 holds Hub and Entity, and no new type starts from them",
+				preset, preset.Legacy(), legacy)
+		}
+	}
 	cases := map[pagetype.Preset]struct {
 		name     string
 		role     pagetype.Role
