@@ -175,8 +175,14 @@ the landing, and every crumb whose internal link names no modelled page is looke
 (offline: technical and read-only reasons, the parent with its reason and method through
 `pagemap.DeriveParent`, a parent loop broken, the findings, the archive after a full walk, the
 site's observation state; it writes only the derived page columns and the settings' observation
-keys) — and keeps the `observe.State` in its checkpoint, so a crash resumes at the
-batch. The first observation, one asked for with `full`, every Nth (`fullWalkEvery`) and every
+keys) — and keeps the `observe.State` in its checkpoint (`observe.Progress` under
+`observe.CheckpointKey`, which `SyncService.Progress` reads back for the screens), so a crash, a
+retry and "Resume the sync" all start again at the batch. The content stage reads a batch's pages
+(50 by default, `sync.batchSize`) at the render concurrency under the client's one limiter: the
+plugin's list already carries every post's terms, and a body whose list hash is the empty body's is
+that body, so a page costs a `/raw` call only when its body is new and not empty. A site holds one
+active sync, by `runs_one_active_sync` (0085) and the sync service's own check; the per-site slot
+(`runs.perSite`) still interleaves a sync's batches with the site's other runs. The first observation, one asked for with `full`, every Nth (`fullWalkEvery`) and every
 one without the plugin walk the whole site; the others pass `since`. The step's adapters in
 `observe_readers.go` are the only place `*wp.Client` meets the observation's reader
 interfaces, which the use case declares over its own item types. Writes go the other way through

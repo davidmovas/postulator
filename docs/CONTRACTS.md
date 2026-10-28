@@ -34,7 +34,7 @@ the composition root binds the two.
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope ListRules SaveRule DeleteRule ReorderRules TestRule PreviewClassification PreviewClassificationPages ApplyClassification` |
 | `RunsService` | `Start Estimate Parents Get List ListItems ListEvents GetArtifact ListArtifacts Pause Resume Cancel RetryStep Regenerate RevertRun` |
 | `FindingsService` | `List Get Counts Explain Resolve ResolveMany` |
-| `SyncService` | `SyncSite CheckPlugin SavePluginPackage` |
+| `SyncService` | `SyncSite CheckPlugin Progress SavePluginPackage` |
 | `ReportsService` | `SiteOverview LinkAudit LinkAuditPage PageReport RunReport JudgePage` |
 | `ImportService` | `Inspect Preview Apply Export SaveMapping ListMappings DeleteMapping` |
 | `ModelsService` | `ListModels UpsertModel DisableModel GetProfiles SetProfile TestProvider UsageSummary SpendReport ListCalls` |
@@ -135,7 +135,27 @@ observation's own bookkeeping, and `Get` answers them normalized as `settings`; 
 registry sends for that site carries its `userAgent`, the connection test of a saved site
 included. `SyncService.SyncSite{siteId, full?, renderRescan?}` walks the whole site or fetches
 every published render again; without either the walk is incremental and reads only what changed
-since the previous one.
+since the previous one. A site holds one sync at a time (phase 19): a second answers `CONFLICT`
+with `details.runId`, the sync under way, before the engine and again when two starts race to the
+index `runs_one_active_sync` (0085), and `RunsService.Start` refuses the kind `sync` altogether,
+since a sync over picked pages walked the whole site once per page. `SyncService.Progress{siteId,
+runId?}` answers the site's sync under way, or the sync run named, as `{found, runId, status,
+stage, source, full, batches, pulled, created, updated, products, rendered, unreachable, archived,
+attempts, error, wakeAt, startedAt, createdAt}`, read from the run, its item and the observation's
+checkpoint; `stage` is a `syncStages` value and nothing found is `found: false`, never an error.
+
+A failure carries what the site answered: `wp` puts the status, the method, the route and
+WordPress's own message and code in the message ("WordPress answered 500 on GET /wp-json/…: … (code)",
+a 403 as the site's user refused, an unreachable site naming the request), the observation prefixes
+the page or the stage it was reading, keeping the code, the details and the retry, a step past its
+own time limit says so instead of blaming the request it cut off, and a run whose every item failed
+carries the reason in `error`.
+
+`TemplatesService.ListRules{siteId}` counts, beside each rule, the pages it placed (`pages`), under
+the fallback the pages no rule matched, and in `beforeRules` the auto pages a type from before the
+rules still holds, which an applied preview retypes. `CreatePageType` refuses the presets `hub` and
+`entity` (`preset_before_rules`); a site from 2.5 keeps its Hub, and its Entity is named Article by
+0086.
 
 `GraphService.MoveEntity{entityId, newParentId, keepBoth?}` adds the parent edge, checks the
 graph is still acyclic and drops the approved parent edges it replaces inside one unit of
