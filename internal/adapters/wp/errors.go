@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	stderrors "errors"
+	"html"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -41,8 +43,9 @@ func decodeError(body []byte) wpError {
 
 func classify(resp *http.Response, body []byte) error {
 	failure := decodeError(body)
+	answered := answer(resp, failure, body)
 
-	base := errors.New(errors.External, "the WordPress site returned an unexpected status").
+	base := errors.New(errors.External, "the WordPress site returned an unexpected status: "+answered).
 		WithDetail("status", resp.StatusCode).
 		WithDetail("method", resp.Request.Method).
 		WithDetail("path", resp.Request.URL.Path)
@@ -54,12 +57,14 @@ func classify(resp *http.Response, body []byte) error {
 	}
 
 	switch {
-	case resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusForbidden:
-		return recode(base, errors.Unauthorized, "WordPress rejected the application password")
+	case resp.StatusCode == http.StatusUnauthorized:
+		return recode(base, errors.Unauthorized, "WordPress rejected the application password: "+answered)
+	case resp.StatusCode == http.StatusForbidden:
+		return recode(base, errors.Unauthorized, "WordPress refused this request to the site's user: "+answered)
 	case resp.StatusCode == http.StatusNotFound:
-		return recode(base, errors.NotFound, "WordPress has no such resource")
+		return recode(base, errors.NotFound, "WordPress has no such resource: "+answered)
 	case resp.StatusCode == http.StatusConflict:
-		conflict := recode(base, errors.Conflict, "the WordPress content changed since it was read")
+		conflict := recode(base, errors.Conflict, "the WordPress content changed since it was read: "+answered)
 		if failure.CurrentHash != "" {
 			conflict = conflict.WithDetail("currentHash", failure.CurrentHash)
 		}
@@ -68,16 +73,80 @@ func classify(resp *http.Response, body []byte) error {
 		}
 		return conflict
 	case resp.StatusCode == http.StatusTooManyRequests:
-		return recode(base, errors.RateLimited, "WordPress is rate limiting this site").
+		return recode(base, errors.RateLimited, "WordPress is rate limiting this site: "+answered).
 			WithRetry(retryAfter(resp.Header.Get("Retry-After")))
 	case resp.StatusCode >= http.StatusInternalServerError:
-		return recode(base, errors.External, "the WordPress site returned a server error").
+		return recode(base, errors.External, "the WordPress site failed on its side: "+answered).
 			WithRetry(retryAfter(resp.Header.Get("Retry-After")))
 	case resp.StatusCode >= http.StatusBadRequest:
-		return recode(base, errors.Invalid, "WordPress rejected the request")
+		return recode(base, errors.Invalid, "WordPress rejected the request: "+answered)
 	default:
 		return base
 	}
+}
+
+const saidRunes = 200
+
+func answer(resp *http.Response, failure wpError, body []byte) string {
+	answered := "WordPress answered " + strconv.Itoa(resp.StatusCode) + " on " + resp.Request.Method + " " + route(resp.Request.URL)
+	said := plain(failure.Message)
+	if said == "" && failure.Code == "" {
+		said = plain(title(string(body)))
+	}
+	if said != "" {
+		answered += ": " + said
+	}
+	if failure.Code != "" {
+		answered += " (" + failure.Code + ")"
+	}
+	return answered
+}
+
+func route(target *url.URL) string {
+	if restRoute := target.Query().Get("rest_route"); restRoute != "" {
+		return restRoute
+	}
+	return target.Path
+}
+
+func title(page string) string {
+	lower := strings.ToLower(page)
+	opened := strings.Index(lower, "<title")
+	if opened < 0 {
+		return ""
+	}
+	start := strings.Index(lower[opened:], ">")
+	if start < 0 {
+		return ""
+	}
+	start += opened + 1
+	end := strings.Index(lower[start:], "</title")
+	if end < 0 {
+		return ""
+	}
+	return page[start : start+end]
+}
+
+func plain(markup string) string {
+	var text strings.Builder
+	inTag := false
+	for _, r := range markup {
+		switch {
+		case r == '<':
+			inTag = true
+			text.WriteRune(' ')
+		case r == '>':
+			inTag = false
+		case !inTag:
+			text.WriteRune(r)
+		}
+	}
+	collapsed := strings.Join(strings.Fields(html.UnescapeString(text.String())), " ")
+	runes := []rune(collapsed)
+	if len(runes) <= saidRunes {
+		return collapsed
+	}
+	return strings.TrimSpace(string(runes[:saidRunes])) + "…"
 }
 
 func recode(base *errors.Error, code errors.Code, message string) *errors.Error {
@@ -88,11 +157,11 @@ func recode(base *errors.Error, code errors.Code, message string) *errors.Error 
 	return next
 }
 
-func transportError(ctx context.Context, err error) error {
+func transportError(ctx context.Context, method, path string, err error) error {
 	if ctx.Err() != nil {
-		return errors.New(errors.Cancelled, "the WordPress request was cancelled").WithInternal(ctx.Err())
+		return errors.New(errors.Cancelled, "the WordPress request was cancelled on "+method+" "+path).WithInternal(ctx.Err())
 	}
-	return errors.New(errors.External, "the WordPress site could not be reached").WithInternal(err).WithRetry(0)
+	return errors.New(errors.External, "the WordPress site could not be reached on "+method+" "+path).WithInternal(err).WithRetry(0)
 }
 
 func retryAfter(header string) time.Duration {

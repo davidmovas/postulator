@@ -2,6 +2,7 @@ package observe_test
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/domain/block"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
 func TestABulkWalkTakesTermsFromItsListAndFetchesNoEmptyBody(t *testing.T) {
@@ -40,6 +42,49 @@ func TestABulkWalkTakesTermsFromItsListAndFetchesNoEmptyBody(t *testing.T) {
 	}
 	if got := s.stores.terms[s.pageAt(t, "/product/bpc-157-peptide/").ID]; len(got) != 2 || got[0].Taxonomy != "product_cat" || got[1].Taxonomy != "entity" {
 		t.Errorf("the product's terms = %+v, want the two its list item carries", got)
+	}
+}
+
+func TestAFailedReadNamesItsPageOrStageAndKeepsItsCode(t *testing.T) {
+	t.Parallel()
+
+	answered := "the WordPress site failed on its side: WordPress answered 500 on GET /wp-json/postulator/v1/content/4/raw"
+	cases := []struct {
+		name   string
+		broken func(s *scenario)
+		want   string
+	}{
+		{
+			name: "a page's body",
+			broken: func(s *scenario) {
+				s.plugin.failRaw = map[int64]error{tb500ID: errors.New(errors.External, answered).WithRetry(3 * time.Second)}
+			},
+			want: "reading the body of /tb-500/: " + answered,
+		},
+		{
+			name: "the list",
+			broken: func(s *scenario) {
+				s.plugin.failList = errors.New(errors.External, answered).WithRetry(3 * time.Second)
+			},
+			want: "reading the site's pages: " + answered,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			s := newScenario(t)
+			tc.broken(s)
+
+			_, err := s.service.Run(context.Background(), siteID, s.readers, observe.Options{}, 50)
+
+			if err == nil || err.Error() != tc.want {
+				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+			var kernel *errors.Error
+			if !stderrors.As(err, &kernel) || kernel.Code != errors.External || kernel.Retry == nil || kernel.Retry.After != 3*time.Second {
+				t.Errorf("err = %#v, want the site's code and its retry kept", kernel)
+			}
+		})
 	}
 }
 

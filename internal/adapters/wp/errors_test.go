@@ -3,6 +3,7 @@ package wp
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,6 +63,78 @@ func TestClassifyMapsWordPressStatusesToKernelCodes(t *testing.T) {
 				t.Errorf("path detail = %q", got)
 			}
 		})
+	}
+}
+
+func TestTheMessageSaysWhatWordPressAnswered(t *testing.T) {
+	t.Parallel()
+
+	long := strings.Repeat("word ", 80)
+	cases := []struct {
+		name   string
+		status int
+		url    string
+		body   string
+		want   string
+	}{
+		{
+			name: "a critical error", status: http.StatusInternalServerError, url: "https://example.com/wp-json/postulator/v1/content/12/raw",
+			body: `{"code":"internal_server_error","message":"<p>There has been a critical error on this website.</p><p><a href=\"https://wordpress.org/\">Learn more.</a></p>"}`,
+			want: "the WordPress site failed on its side: WordPress answered 500 on GET /wp-json/postulator/v1/content/12/raw: There has been a critical error on this website. Learn more. (internal_server_error)",
+		},
+		{
+			name: "a gateway page", status: http.StatusBadGateway, url: "https://example.com/wp-json/wp/v2/pages",
+			body: "<html><head><title> 502 Bad Gateway </title></head><body>nginx</body></html>",
+			want: "the WordPress site failed on its side: WordPress answered 502 on GET /wp-json/wp/v2/pages: 502 Bad Gateway",
+		},
+		{
+			name: "nothing said", status: http.StatusServiceUnavailable, url: "https://example.com/wp-json/wp/v2/pages",
+			want: "the WordPress site failed on its side: WordPress answered 503 on GET /wp-json/wp/v2/pages",
+		},
+		{
+			name: "a route in the query", status: http.StatusNotFound, url: "https://example.com/?rest_route=/postulator/v1/content&limit=50",
+			body: `{"code":"rest_no_route","message":"No route was found matching the URL and request method."}`,
+			want: "WordPress has no such resource: WordPress answered 404 on GET /postulator/v1/content: No route was found matching the URL and request method. (rest_no_route)",
+		},
+		{
+			name: "a refused password", status: http.StatusUnauthorized, url: "https://example.com/wp-json/wp/v2/pages",
+			body: `{"code":"rest_not_logged_in","message":"You are not currently logged in."}`,
+			want: "WordPress rejected the application password: WordPress answered 401 on GET /wp-json/wp/v2/pages: You are not currently logged in. (rest_not_logged_in)",
+		},
+		{
+			name: "a refused permission", status: http.StatusForbidden, url: "https://example.com/wp-json/wp/v2/pages",
+			body: `{"code":"rest_cannot_edit","message":"Sorry, you are not allowed to edit this post."}`,
+			want: "WordPress refused this request to the site's user: WordPress answered 403 on GET /wp-json/wp/v2/pages: Sorry, you are not allowed to edit this post. (rest_cannot_edit)",
+		},
+		{
+			name: "a long message", status: http.StatusBadRequest, url: "https://example.com/wp-json/wp/v2/pages",
+			body: `{"code":"rest_invalid_param","message":"` + long + `"}`,
+			want: "WordPress rejected the request: WordPress answered 400 on GET /wp-json/wp/v2/pages: " + strings.TrimSpace(long[:200]) + "… (rest_invalid_param)",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tc.url, http.NoBody)
+			if err != nil {
+				t.Fatalf("build the request: %v", err)
+			}
+			got := classify(&http.Response{StatusCode: tc.status, Header: http.Header{}, Request: request}, []byte(tc.body))
+			if got.Error() != tc.want {
+				t.Errorf("message =\n%q\nwant\n%q", got.Error(), tc.want)
+			}
+		})
+	}
+}
+
+func TestAnUnreachableSiteNamesTheRequest(t *testing.T) {
+	t.Parallel()
+
+	got := transportError(t.Context(), http.MethodGet, "/wp-json/wp/v2/pages", http.ErrHandlerTimeout)
+	if want := "the WordPress site could not be reached on GET /wp-json/wp/v2/pages: http: Handler timeout"; got.Error() != want {
+		t.Errorf("message = %q, want %q", got.Error(), want)
 	}
 }
 
@@ -238,7 +311,7 @@ func TestOnlyTransientCodesAreRetried(t *testing.T) {
 func TestATransportFailureRespectsTheCallersContext(t *testing.T) {
 	t.Parallel()
 
-	live := transportError(t.Context(), http.ErrHandlerTimeout)
+	live := transportError(t.Context(), http.MethodGet, "/wp-json/wp/v2/pages", http.ErrHandlerTimeout)
 	if !errors.IsCode(live, errors.External) {
 		t.Errorf("code = %q, want %q", errors.CodeOf(live), errors.External)
 	}
@@ -248,7 +321,7 @@ func TestATransportFailureRespectsTheCallersContext(t *testing.T) {
 
 	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
-	if got := transportError(cancelled, http.ErrHandlerTimeout); !errors.IsCode(got, errors.Cancelled) {
+	if got := transportError(cancelled, http.MethodGet, "/wp-json/wp/v2/pages", http.ErrHandlerTimeout); !errors.IsCode(got, errors.Cancelled) {
 		t.Errorf("code = %q, want %q", errors.CodeOf(got), errors.Cancelled)
 	}
 }

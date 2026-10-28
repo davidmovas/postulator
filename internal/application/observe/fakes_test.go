@@ -814,6 +814,7 @@ type pluginFake struct {
 	rawsRead []int64
 	termRead []int64
 	failRaw  map[int64]error
+	failList error
 	slow     time.Duration
 	active   int
 	peak     int
@@ -868,6 +869,9 @@ func (p *pluginFake) ListContent(_ context.Context, q observe.ContentQuery) (obs
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.queries = append(p.queries, q)
+	if p.failList != nil {
+		return observe.ContentPage{}, p.failList
+	}
 	matching := make([]observe.ContentItem, 0)
 	for i := range p.items {
 		if !contains(q.Types, p.items[i].Type) {

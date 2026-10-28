@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/application/events"
@@ -87,12 +88,17 @@ func (e *Engine) conclude(ctx context.Context, box *outbox, current run.Run, now
 	current.FinishedAt = &now
 
 	if current.Stats.Done == 0 && current.Stats.Failed > 0 {
+		reason, err := e.failedFor(ctx, current)
+		if err != nil {
+			return err
+		}
 		current.Status = run.StatusFailed
+		current.Error = reason
 		if err := e.deps.Runs.Update(ctx, current); err != nil {
 			return err
 		}
 		box.add(ctx, current.ID, events.RunFailed, events.RunFailedPayload{
-			RunID: current.ID, Code: run.CodeUnclassified, Message: "every item of the run failed",
+			RunID: current.ID, Code: run.CodeUnclassified, Message: reason,
 		})
 		return nil
 	}
@@ -105,6 +111,34 @@ func (e *Engine) conclude(ctx context.Context, box *outbox, current run.Run, now
 		RunID: current.ID, Succeeded: current.Stats.Done, Failed: current.Stats.Failed,
 	})
 	return nil
+}
+
+func (e *Engine) failedFor(ctx context.Context, current run.Run) (string, error) {
+	items, err := e.deps.Items.ByRun(ctx, current.ID)
+	if err != nil {
+		return "", err
+	}
+	var last *run.Item
+	for i := range items {
+		if items[i].Status != run.StatusFailed || items[i].Error == "" {
+			continue
+		}
+		if last == nil || later(items[i].FinishedAt, last.FinishedAt) {
+			last = &items[i]
+		}
+	}
+	switch {
+	case last == nil:
+		return "every item of the run failed", nil
+	case current.Stats.Failed == 1:
+		return last.Error, nil
+	default:
+		return strconv.Itoa(current.Stats.Failed) + " items failed; the last: " + last.Error, nil
+	}
+}
+
+func later(candidate, held *time.Time) bool {
+	return candidate != nil && (held == nil || candidate.After(*held))
 }
 
 func (e *Engine) expire(ctx context.Context, box *outbox, record run.Run, now time.Time) error {

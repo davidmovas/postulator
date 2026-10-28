@@ -280,14 +280,14 @@ func (a *absorber) read(ctx context.Context, p *prepared) (bool, error) {
 	terms, err := a.readTerms(ctx, p.it)
 	closed := closedToUser(err)
 	if err != nil && !closed {
-		return false, err
+		return false, during(err, "reading the terms of "+p.next.Path)
 	}
 	body, err := a.readBody(ctx, p.next, p.it)
 	if closedToUser(err) {
 		closed, err = true, nil
 	}
 	if err != nil {
-		return false, err
+		return false, during(err, "reading the body of "+p.next.Path)
 	}
 	p.terms, p.body = terms, body
 	return closed, nil
