@@ -811,6 +811,33 @@ type pluginFake struct {
 	queries  []observe.ContentQuery
 	custom   map[int64]map[string]string
 	asked    map[int64][]string
+	rawsRead []int64
+	termRead []int64
+	failRaw  map[int64]error
+	slow     time.Duration
+	active   int
+	peak     int
+}
+
+func (p *pluginFake) enter() {
+	p.mu.Lock()
+	p.active++
+	p.peak = max(p.peak, p.active)
+	slow := p.slow
+	p.mu.Unlock()
+	time.Sleep(slow)
+}
+
+func (p *pluginFake) leave() {
+	p.mu.Lock()
+	p.active--
+	p.mu.Unlock()
+}
+
+func (p *pluginFake) reads() (raws, terms []int64, peak int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.rawsRead), slices.Clone(p.termRead), p.peak
 }
 
 func (p *pluginFake) GetMeta(_ context.Context, _ string, id int64, keys []string) (map[string]string, error) {
@@ -873,6 +900,15 @@ func (p *pluginFake) ListContent(_ context.Context, q observe.ContentQuery) (obs
 
 func (p *pluginFake) GetRaw(_ context.Context, _ string, id int64) (observe.Raw, error) {
 	p.guard.read()
+	p.enter()
+	defer p.leave()
+	p.mu.Lock()
+	p.rawsRead = append(p.rawsRead, id)
+	failure := p.failRaw[id]
+	p.mu.Unlock()
+	if failure != nil {
+		return observe.Raw{}, failure
+	}
 	raw, ok := p.raws[id]
 	if !ok {
 		return observe.Raw{}, errors.New(errors.NotFound, "no raw")
@@ -896,6 +932,11 @@ func (p *pluginFake) GetSEOMeta(_ context.Context, _ string, id int64) (observe.
 
 func (p *pluginFake) GetTerms(_ context.Context, _ string, id int64) ([]pagemap.Term, error) {
 	p.guard.read()
+	p.enter()
+	defer p.leave()
+	p.mu.Lock()
+	p.termRead = append(p.termRead, id)
+	p.mu.Unlock()
 	return p.terms[id], nil
 }
 
@@ -946,11 +987,19 @@ func (c *coreFake) SiteSettings(_ context.Context) (observe.SiteSettings, error)
 }
 
 type storeFake struct {
+	mu         sync.Mutex
 	guard      *unitGuard
 	products   []observe.Product
 	variations map[int64][]observe.Variation
 	pages      site.TechnicalPages
 	queries    []observe.ProductQuery
+	asked      []int64
+}
+
+func (s *storeFake) askedVariations() []int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.asked)
 }
 
 func (s *storeFake) ListProducts(_ context.Context, q observe.ProductQuery) (observe.ProductPage, error) {
@@ -977,6 +1026,9 @@ func (s *storeFake) ListProducts(_ context.Context, q observe.ProductQuery) (obs
 
 func (s *storeFake) ListVariations(_ context.Context, productID int64, page int) (observe.VariationPage, error) {
 	s.guard.read()
+	s.mu.Lock()
+	s.asked = append(s.asked, productID)
+	s.mu.Unlock()
 	if page > 1 {
 		return observe.VariationPage{}, nil
 	}

@@ -32,6 +32,7 @@ type item struct {
 	WPID        int64
 	ParentWPID  int64
 	HasContent  bool
+	TermsListed bool
 }
 
 func (it item) mappedType() pagemap.WPType {
@@ -56,6 +57,7 @@ func pullBulk(ctx context.Context, state *State, readers Readers, install pagema
 		return nil, false, err
 	}
 	out := make([]item, 0, len(page.Items))
+	listed := readers.Manifest.listsTerms()
 	for i := range page.Items {
 		pulled := &page.Items[i]
 		path, normalizeErr := pagemap.NormalizePath(pulled.Path)
@@ -67,6 +69,7 @@ func pullBulk(ctx context.Context, state *State, readers Readers, install pagema
 			WPID: pulled.ID, ParentWPID: pulled.Parent, Type: pagemap.WPType(pulled.Type), Path: path, URL: install.URL(path),
 			Slug: pulled.Slug, Status: pulled.Status, Title: pulled.Title, H1: pulled.H1, Excerpt: pulled.Excerpt,
 			ContentHash: pulled.ContentHash, Meta: pulled.Meta, Links: pulled.Links, Terms: pulled.Terms, Modified: pulled.Modified,
+			TermsListed: listed,
 		})
 	}
 	state.Cursor = page.NextCursor
