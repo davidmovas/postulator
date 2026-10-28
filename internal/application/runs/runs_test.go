@@ -120,6 +120,7 @@ func (f *fakeEngine) Regenerate(_ context.Context, runID string, itemIDs []strin
 type fakeSpecs struct {
 	byTemplate map[string]template.TemplateSpec
 	handed     map[string]string
+	unassigned map[string]string
 	spec       template.TemplateSpec
 	siteID     string
 	version    int
@@ -130,6 +131,9 @@ type fakeSpecs struct {
 func (f *fakeSpecs) ResolveForPage(_ context.Context, req templates.ResolveForPageRequest) (templates.ResolveForPageResponse, error) {
 	if f.err != nil {
 		return templates.ResolveForPageResponse{}, f.err
+	}
+	if path, none := f.unassigned[req.PageID]; none && req.TemplateID == "" {
+		return templates.ResolveForPageResponse{}, templates.Unassigned(pagemap.Page{ID: req.PageID, Path: path})
 	}
 	f.seen = append(f.seen, req.PageID)
 	if f.handed == nil {
@@ -222,8 +226,9 @@ func newFixture(t *testing.T) *fixture {
 		}},
 	}}
 	specs := &fakeSpecs{
-		siteID:  "s",
-		version: 2,
+		siteID:     "s",
+		version:    2,
+		unassigned: map[string]string{},
 		spec: template.TemplateSpec{
 			Recipe: []template.StepSpec{{Name: "generate_body", Enabled: true}},
 		},
@@ -380,7 +385,7 @@ func TestEstimateAnswersTheCostWithoutEnqueuingAnything(t *testing.T) {
 		t.Fatalf("Marshal: %v", marshalErr)
 	}
 	want := `{"estimate":{"tokens":4200,"usd":0.12,` +
-		`"findings":[{"severity":"warn","code":"unpriced_step","message":"images are not priced"}]},"added":[],"fields":[]}`
+		`"findings":[{"severity":"warn","code":"unpriced_step","message":"images are not priced"}]},"added":[],"fields":[],"skipped":[]}`
 	if string(encoded) != want {
 		t.Fatalf("Estimate = %s", encoded)
 	}
@@ -464,9 +469,15 @@ func TestStartRejectsBadRequests(t *testing.T) {
 			want:    errors.Invalid,
 		},
 		{
-			name:    "the page has no template",
+			name:    "the only page has no template",
 			request: runs.StartRequest{SiteID: "s", PageIDs: []string{"p"}},
-			prepare: func(f *fixture) { f.specs.err = errors.New(errors.NotFound, "no template") },
+			prepare: func(f *fixture) { f.specs.unassigned["p"] = "/p/" },
+			want:    errors.Invalid,
+		},
+		{
+			name:    "the page's template cannot be read",
+			request: runs.StartRequest{SiteID: "s", PageIDs: []string{"p"}},
+			prepare: func(f *fixture) { f.specs.err = errors.New(errors.NotFound, "template not found") },
 			want:    errors.NotFound,
 		},
 		{
@@ -526,6 +537,9 @@ func TestGetAndListReadTheSnapshots(t *testing.T) {
 	if got.Run.DeadlineAt.String() == "" || len(got.Run.Targets) != 2 {
 		t.Fatalf("Get = %+v", got.Run)
 	}
+	if got.Run.Skipped == nil || len(got.Run.Skipped) != 0 {
+		t.Fatalf("a run that left nothing out reads %#v, want an empty list", got.Run.Skipped)
+	}
 	if _, err = fixture.service.Get(t.Context(), runs.GetRequest{RunID: id.New()}); !errors.IsCode(err, errors.NotFound) {
 		t.Fatalf("Get of an absent run = %v", err)
 	}
@@ -549,6 +563,17 @@ func TestGetAndListReadTheSnapshots(t *testing.T) {
 	}
 	if items.Items[0].CurrentStep != "generate_body" || items.Items[0].TargetID != fixture.pages[0] || items.Items[0].Seq != 4 {
 		t.Fatalf("ListItems = %+v, want the working order carried", items.Items[0])
+	}
+
+	leaving := record
+	leaving.ID = id.New()
+	leaving.Skipped = []run.Skipped{{PageID: "shop", Path: "/shop/", Reason: run.SkipNoTemplate, PageType: "Store category"}}
+	if insertErr := fixture.runs.Insert(t.Context(), leaving); insertErr != nil {
+		t.Fatalf("insert the run that left a page out: %v", insertErr)
+	}
+	if left, leftErr := fixture.service.Get(t.Context(), runs.GetRequest{RunID: leaving.ID}); leftErr != nil ||
+		!slices.Equal(left.Run.Skipped, leaving.Skipped) {
+		t.Fatalf("Get = %+v, %v; want the page the run left out", left.Run.Skipped, leftErr)
 	}
 }
 

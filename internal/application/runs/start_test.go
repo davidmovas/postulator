@@ -414,7 +414,7 @@ func TestTheRecipeABlankTemplateBuildsStartsAGenerateRun(t *testing.T) {
 	}
 }
 
-func TestARunOverAPageMappedToNothingIsRefusedBeforeItIsQueued(t *testing.T) {
+func TestARunLeavesOutAPageMappedToNothingAndIsRefusedOnlyWhenNothingRemains(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -435,29 +435,40 @@ func TestARunOverAPageMappedToNothingIsRefusedBeforeItIsQueued(t *testing.T) {
 			fixture.specs.siteID = fixture.siteID
 			fixture.mapping.unmapped[fixture.pages[1]] = "/hub/child/"
 
-			_, err := fixture.service.Start(t.Context(), runs.StartRequest{
+			started, err := fixture.service.Start(t.Context(), runs.StartRequest{
 				SiteID: fixture.siteID, PageIDs: fixture.pages, Kind: string(tc.kind),
 			})
-			if !errors.IsCode(err, errors.Invalid) {
-				t.Fatalf("Start = %v, want invalid", err)
+			if err != nil {
+				t.Fatalf("Start = %v, want the run over the mapped page", err)
+			}
+			want := []run.Skipped{{PageID: fixture.pages[1], Path: "/hub/child/", Reason: run.SkipNoEntity}}
+			if !slices.Equal(started.Skipped, want) || !slices.Equal(fixture.engine.queued.Skipped, want) {
+				t.Fatalf("left out %+v, the run records %+v; want %+v", started.Skipped, fixture.engine.queued.Skipped, want)
+			}
+			if got := fixture.engine.queued.Targets; !slices.Equal(got, fixture.pages[:1]) {
+				t.Fatalf("the run targets %v, want the mapped page alone", got)
 			}
 
-			var refusal *errors.Error
-			if !stderrors.As(err, &refusal) {
-				t.Fatalf("the refusal is not a kernel error: %v", err)
+			fixture.engine.queued = run.Run{}
+			_, err = fixture.service.Start(t.Context(), runs.StartRequest{
+				SiteID: fixture.siteID, PageIDs: fixture.pages[1:], Kind: string(tc.kind),
+			})
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Start over the unmapped page alone = %v, want invalid", err)
 			}
-			if got := refusal.Details["field"]; got != "pageIds" {
-				t.Fatalf("the refusal names the field %v, want pageIds", got)
+			var refusal *errors.Error
+			if !stderrors.As(err, &refusal) || refusal.Details["field"] != "pageIds" {
+				t.Fatalf("the refusal = %v, want it on pageIds", err)
 			}
 			paths, ok := refusal.Details["paths"].([]string)
 			if !ok || !slices.Equal(paths, []string{"/hub/child/"}) {
 				t.Fatalf("the refusal names the paths %v, want [/hub/child/]", refusal.Details["paths"])
 			}
-			if !strings.Contains(err.Error(), "/hub/child/") {
-				t.Fatalf("the message does not say which page is unmapped: %v", err)
+			if !strings.Contains(err.Error(), "/hub/child/") || !strings.Contains(err.Error(), "Graph") {
+				t.Fatalf("the message does not say which page is unmapped and where to map it: %v", err)
 			}
 			if fixture.engine.queued.SiteID != "" {
-				t.Fatalf("an unmapped target reached the engine: %+v", fixture.engine.queued)
+				t.Fatalf("a run with nothing to write reached the engine: %+v", fixture.engine.queued)
 			}
 		})
 	}

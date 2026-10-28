@@ -132,8 +132,7 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 		templateID, source = owner.Defaults.TemplateID, SourceSite
 	}
 	if templateID == nil {
-		return ResolveForPageResponse{}, errors.New(errors.NotFound, page.Path+" has no template: its type has none and the site has no default").
-			WithDetail("pageId", page.ID).WithDetail(detailReason, reasonUnassigned)
+		return ResolveForPageResponse{}, Unassigned(page)
 	}
 
 	base, err := s.templates.Get(ctx, *templateID)
@@ -164,6 +163,11 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	return ResolveForPageResponse{
 		TemplateID: base.ID, Name: base.Name, Source: source, SiteID: page.SiteID, Version: base.Version, Spec: spec.Expanded(vars),
 	}, nil
+}
+
+func Unassigned(page pagemap.Page) error {
+	return errors.New(errors.NotFound, page.Path+" has no template: its type has none and the site has no default").
+		WithDetail("pageId", page.ID).WithDetail(detailReason, reasonUnassigned)
 }
 
 func IsUnassigned(err error) bool {

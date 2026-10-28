@@ -24,6 +24,7 @@ type Run struct {
 	ParentRunID     *string             `json:"parentRunId"`
 	PauseReason     string              `json:"pauseReason"`
 	Error           string              `json:"error"`
+	Skipped         []run.Skipped       `json:"skipped"`
 	DeadlineAt      dto.Time            `json:"deadlineAt"`
 	CreatedAt       dto.Time            `json:"createdAt"`
 	StartedAt       dto.Time            `json:"startedAt"`
@@ -112,6 +113,7 @@ func runView(record run.Run) Run {
 		ParentRunID:     record.ParentRunID,
 		PauseReason:     string(record.PauseReason),
 		Error:           record.Error,
+		Skipped:         append(make([]run.Skipped, 0, len(record.Skipped)), record.Skipped...),
 		DeadlineAt:      dto.NewTime(record.DeadlineAt),
 		CreatedAt:       dto.NewTime(record.CreatedAt),
 		StartedAt:       dto.TimeOf(record.StartedAt),
