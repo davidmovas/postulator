@@ -272,6 +272,17 @@ describe("a sync's progress follows its run", () => {
         expect(refreshed(client)).toEqual(["active", "named"]);
     });
 
+    it("reads a sync again while its batches keep coming, not only once they stop", () => {
+        const client = synced();
+
+        for (let batch = 0; batch < 10; batch += 1) {
+            fire("step.done", { runId: "r1", itemId: "i1", step: "sync_site", durationMs: 60, message: "observed" }, "r1");
+            vi.advanceTimersByTime(100);
+        }
+
+        expect(refreshed(client)).toEqual(["active", "named"]);
+    });
+
     it("leaves every sync alone while a step of another run goes on", () => {
         const client = synced();
 

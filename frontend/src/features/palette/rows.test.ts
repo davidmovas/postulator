@@ -32,6 +32,12 @@ describe("runRowLabel", () => {
         expect(label).not.toContain("generate");
     });
 
+    it("names a sync by its kind and when, never as one page, since it reads the whole site", () => {
+        const sync = { ...run, kind: "sync", stats: { items: 1 } };
+        expect(runRowLabel(sync, now)).not.toContain("page");
+        expect(runRowLabel(sync, now)).toContain(copy.runs.kinds.sync);
+    });
+
     it("dates a run that never started by when it was asked for", () => {
         const queued = { ...run, startedAt: "" };
         expect(runRowLabel(queued, now)).toBe(runRowLabel({ ...run, startedAt: run.createdAt }, now));

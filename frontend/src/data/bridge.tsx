@@ -18,7 +18,7 @@ import {
     silentConversationIds,
 } from "./agent/turn.js";
 import { publishDrop } from "./drops.js";
-import { coalesce, invalidate, invalidateAll, invalidateBySite, invalidateWhere } from "./invalidate.js";
+import { coalesce, invalidate, invalidateAll, invalidateBySite, invalidateWhere, throttle } from "./invalidate.js";
 import { keys } from "./keys.js";
 import { markLocked, markUnlocked } from "./lock.js";
 import type { RawRunEvent } from "./runs/decode.js";
@@ -93,7 +93,7 @@ function syncOfRun(client: QueryClient, runId: string): void {
     if (runId === "") {
         return;
     }
-    coalesce(
+    throttle(
         `sync:${runId}`,
         () => {
             invalidateWhere(client, keys.sync.progresses(), (key, data) => key[4] === runId || heldRunOf(data) === runId);

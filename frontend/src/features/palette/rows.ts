@@ -16,9 +16,14 @@ export interface RunRow {
     createdAt: Timestamp;
 }
 
+const syncKind = "sync";
+
 export function runRowLabel(run: RunRow, now: Date = new Date()): string {
-    const when = run.startedAt === null || run.startedAt === "" ? run.createdAt : run.startedAt;
-    return copy.palette.run(runKindLabel(run.kind), run.stats.items, relativeTime(when, now));
+    const when = relativeTime(run.startedAt === null || run.startedAt === "" ? run.createdAt : run.startedAt, now);
+    if (run.kind === syncKind) {
+        return copy.palette.siteRun(runKindLabel(run.kind), when);
+    }
+    return copy.palette.run(runKindLabel(run.kind), run.stats.items, when);
 }
 
 export function pagePrefix(query: string): string {

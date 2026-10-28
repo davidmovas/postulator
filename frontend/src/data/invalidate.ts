@@ -20,6 +20,19 @@ export function coalesce(tag: string, run: () => void, delayMs: number = coalesc
     );
 }
 
+export function throttle(tag: string, run: () => void, delayMs: number = coalesceDelayMs): void {
+    if (timers.has(tag)) {
+        return;
+    }
+    timers.set(
+        tag,
+        setTimeout(() => {
+            timers.delete(tag);
+            run();
+        }, delayMs),
+    );
+}
+
 export function cancelCoalesced(): void {
     timers.forEach((held) => {
         clearTimeout(held);
