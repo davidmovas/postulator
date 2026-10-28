@@ -108,6 +108,20 @@ describe("the notice of a sync that stopped", () => {
     });
 });
 
+describe("the notices of a sync under way", () => {
+    it("never warns of a missing spending cap, since a sync calls no model", () => {
+        shown(aSyncRun({ status: "running" }), 0);
+
+        expect(screen.queryByText(copy.runs.detail.noCap)).toBeNull();
+    });
+
+    it("still warns a page run started without a cap", () => {
+        shown(aRun({ status: "running", budget: { maxUsd: 0, maxTokens: 0 } }), 0);
+
+        expect(screen.getByText(copy.runs.detail.noCap)).toBeDefined();
+    });
+});
+
 describe("the notice of a page run that failed", () => {
     it("still regenerates its failed pages and says why the run failed", () => {
         shown(aRun({ status: "failed", error: failure }), 1);

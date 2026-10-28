@@ -125,7 +125,7 @@ export function OverviewScreen(): ReactElement {
             title={copy.overview.title}
             actions={
                 <>
-                    <SyncButton siteId={siteId} label={copy.overview.sync} />
+                    <SyncButton siteId={siteId} label={copy.overview.sync} compact={true} />
                     <Button variant="primary" icon={PlayArrowIcon} onClick={startRun}>
                         {copy.overview.startRun}
                     </Button>

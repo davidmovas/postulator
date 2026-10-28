@@ -4,6 +4,7 @@ import { copy } from "../../copy/index.js";
 import { syncStages } from "../../generated/vocab.js";
 import { aProgress } from "../../testing/sync.js";
 import {
+    pageCount,
     stagePhrase,
     stageSteps,
     stageWords,
@@ -77,6 +78,11 @@ describe("the one line a panel shows of a live sync", () => {
         expect(syncLine(aProgress({ stage: "render", pulled: 150 }))).toBe("Visiting the pages · 150 pages read");
         expect(syncLine(aProgress({ stage: "content", pulled: 1 }))).toBe("Reading the pages · 1 page read");
         expect(syncLine(aProgress({ stage: "content", pulled: 1200 }))).toBe("Reading the pages · 1,200 pages read");
+    });
+
+    it("counts every page exactly, however many there are", () => {
+        expect(syncLine(aProgress({ stage: "content", pulled: 136_100 }))).toBe("Reading the pages · 136,100 pages read");
+        expect(pageCount(136_100)).toBe("136,100");
     });
 });
 

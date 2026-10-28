@@ -45,6 +45,7 @@ export function SiteSyncPanel({ site }: SiteSyncPanelProps): ReactElement {
                     runId={stopped.runId}
                     stage={stopped.stage}
                     error={stopped.error}
+                    compact={true}
                     onOpen={(runId) => {
                         void navigate(syncRunPath(site.id, runId));
                     }}

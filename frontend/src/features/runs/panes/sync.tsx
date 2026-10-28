@@ -3,10 +3,9 @@ import type { ReactElement } from "react";
 import { copy } from "../../../copy/index.js";
 import { useSyncProgress } from "../../../data/hooks/sync.js";
 import type { SyncProgress } from "../../../data/types.js";
-import { tokens } from "../../../domain/format.js";
 import { Banner, CheckSmallIcon, cx, SectionLabel, SkeletonRows, Spinner, useNow } from "../../../ui/index.js";
 import type { StageState, StageStep } from "../../sync/index.js";
-import { stageSteps, stageWords, stoppedTitle, SyncError, syncRetrying } from "../../sync/index.js";
+import { pageCount, stageSteps, stageWords, SyncError, syncRetrying } from "../../sync/index.js";
 import { countdown, remainingMs } from "../authority.js";
 import { statusCancelled, statusCompleted, statusFailed, statusPaused } from "../statuses.js";
 
@@ -87,17 +86,13 @@ function Counts({ progress }: { progress: SyncProgress }): ReactElement {
                     <div key={label} className="contents">
                         <dt className="truncate text-ink-dim">{label}</dt>
                         <dd className={cx("text-right font-mono tabular-nums", flagged ? "text-warn" : "text-ink")}>
-                            {tokens(value)}
+                            {pageCount(value)}
                         </dd>
                     </div>
                 ))}
             </dl>
         </section>
     );
-}
-
-function headlineOf(progress: SyncProgress): string {
-    return progress.status === statusFailed ? stoppedTitle(progress.stage) : stageWords(progress.stage);
 }
 
 function Body({ progress }: { progress: SyncProgress }): ReactElement {
@@ -116,7 +111,7 @@ function Body({ progress }: { progress: SyncProgress }): ReactElement {
                         progress.status === statusFailed ? "text-danger" : "text-ink",
                     )}
                 >
-                    {headlineOf(progress)}
+                    {stageWords(progress.stage)}
                 </h3>
                 <span
                     className="shrink-0 text-xs text-ink-dim"

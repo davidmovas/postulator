@@ -2,11 +2,12 @@ import { copy } from "../../copy/index.js";
 import { isCancellation } from "../../data/call.js";
 import { failure } from "../../data/errors.js";
 import type { SyncProgress } from "../../data/types.js";
-import { tokens } from "../../domain/format.js";
 import type { SyncStage } from "../../generated/vocab.js";
 import { syncStages } from "../../generated/vocab.js";
 
 const said = copy.sync;
+
+const exactCounts = new Intl.NumberFormat("en", { maximumFractionDigits: 0 });
 
 const statusPaused = "paused";
 const statusWaiting = "waiting";
@@ -55,8 +56,12 @@ export function stagePhrase(progress: PhraseView): string {
     return syncRetrying(progress) ? said.retrying(phrase) : phrase;
 }
 
+export function pageCount(count: number): string {
+    return exactCounts.format(count);
+}
+
 export function syncLine(progress: Pick<SyncProgress, "stage" | "pulled">): string {
-    return said.line(stageWords(progress.stage), tokens(progress.pulled), progress.pulled === 1);
+    return said.line(stageWords(progress.stage), pageCount(progress.pulled), progress.pulled === 1);
 }
 
 function stoppedState(status: string): StageState {

@@ -7,7 +7,7 @@ import { react } from "../../data/errors.js";
 import { useRegenerate, useRetryStep, useRunItems } from "../../data/hooks/runs.js";
 import { pushToast } from "../../data/toasts.js";
 import type { SyncProgress } from "../../data/types.js";
-import { Banner, Button, cx, PlayArrowIcon, RestartAltIcon } from "../../ui/index.js";
+import { Button, cx, ErrorIcon, PlayArrowIcon, RestartAltIcon } from "../../ui/index.js";
 import type { StageState, StageView } from "./model.js";
 import { stageSteps, stoppedTitle, syncLine } from "./model.js";
 
@@ -63,19 +63,27 @@ export function SyncLive({ progress }: SyncLiveProps): ReactElement {
 
 export interface SyncErrorProps {
     error: string;
+    compact?: boolean;
     className?: string;
 }
 
-export function SyncError({ error, className }: SyncErrorProps): ReactElement {
+export function SyncError({ error, compact = false, className }: SyncErrorProps): ReactElement {
     return (
         <pre
             data-sync-error={true}
             className={cx(
-                "max-h-48 overflow-y-auto rounded-sm border border-hairline bg-inset px-2 py-1.5 font-mono text-2xs leading-relaxed whitespace-pre-wrap text-ink select-text wrap-anywhere",
+                "min-w-0 rounded-sm border border-hairline bg-inset px-2 py-1.5 font-mono text-2xs leading-relaxed whitespace-pre-wrap text-ink select-text wrap-anywhere",
+                compact ? "overflow-hidden" : "max-h-48 overflow-y-auto",
                 className,
             )}
         >
-            {error}
+            {compact ? (
+                <span title={error} className="line-clamp-4">
+                    {error}
+                </span>
+            ) : (
+                error
+            )}
         </pre>
     );
 }
@@ -94,10 +102,21 @@ export interface SyncStoppedProps {
     error: string;
     title?: string;
     startOver?: boolean;
+    compact?: boolean;
     onOpen?: (runId: string) => void;
 }
 
-export function SyncStopped({ runId, stage, error, title, startOver = false, onOpen }: SyncStoppedProps): ReactElement {
+const fitted = "min-w-0 max-w-full";
+
+export function SyncStopped({
+    runId,
+    stage,
+    error,
+    title,
+    startOver = false,
+    compact = false,
+    onOpen,
+}: SyncStoppedProps): ReactElement {
     const listed = useRunItems(runId, failedStatus, failedPageSize);
     const retry = useRetryStep();
     const regenerate = useRegenerate();
@@ -107,66 +126,71 @@ export function SyncStopped({ runId, stage, error, title, startOver = false, onO
     const settling = listed.isPending || retry.isPending || regenerate.isPending;
 
     return (
-        <Banner
-            tone="danger"
-            title={title ?? stoppedTitle(stage)}
-            body={
-                <div className="flex min-w-0 flex-col gap-1.5">
-                    {error === "" ? null : <SyncError error={error} />}
-                    <p>{refusal ?? (startOver ? said.stopped.body : said.stopped.resumeBody)}</p>
-                </div>
-            }
-            actions={
-                <>
+        <div
+            role="note"
+            data-sync-stopped={runId}
+            className="flex min-w-0 flex-col gap-2 rounded-lg border border-danger-border bg-danger-soft p-3"
+        >
+            <p className="flex min-w-0 items-start gap-2 text-sm font-semibold text-danger">
+                <ErrorIcon size={17} className="mt-px shrink-0" />
+                <span className="min-w-0">{title ?? stoppedTitle(stage)}</span>
+            </p>
+            {error === "" ? null : <SyncError error={error} compact={compact} />}
+            <p className="text-xs text-ink-soft">
+                {refusal ?? (startOver ? said.stopped.body : said.stopped.resumeBody)}
+            </p>
+            <div className="flex min-w-0 flex-wrap gap-2">
+                <Button
+                    size="sm"
+                    variant="primary"
+                    icon={PlayArrowIcon}
+                    className={fitted}
+                    data-sync-resume={runId}
+                    disabled={first === undefined}
+                    busy={settling}
+                    onClick={() => {
+                        if (first === undefined) {
+                            return;
+                        }
+                        retry.mutate(
+                            { itemId: first },
+                            {
+                                onSuccess: () => {
+                                    pushToast("info", said.resumed);
+                                },
+                            },
+                        );
+                    }}
+                >
+                    <span className="min-w-0 truncate">{said.resume}</span>
+                </Button>
+                {startOver ? (
                     <Button
                         size="sm"
-                        variant="primary"
-                        icon={PlayArrowIcon}
-                        data-sync-resume={runId}
-                        disabled={first === undefined}
-                        busy={settling}
+                        icon={RestartAltIcon}
+                        className={fitted}
+                        data-sync-start-over={runId}
+                        disabled={itemIds.length === 0 || settling}
                         onClick={() => {
-                            if (first === undefined) {
-                                return;
-                            }
-                            retry.mutate(
-                                { itemId: first },
-                                {
-                                    onSuccess: () => {
-                                        pushToast("info", said.resumed);
-                                    },
-                                },
-                            );
+                            regenerate.mutate({ runId, itemIds });
                         }}
                     >
-                        {said.resume}
+                        <span className="min-w-0 truncate">{said.startOver}</span>
                     </Button>
-                    {startOver ? (
-                        <Button
-                            size="sm"
-                            icon={RestartAltIcon}
-                            data-sync-start-over={runId}
-                            disabled={itemIds.length === 0 || settling}
-                            onClick={() => {
-                                regenerate.mutate({ runId, itemIds });
-                            }}
-                        >
-                            {said.startOver}
-                        </Button>
-                    ) : null}
-                    {onOpen === undefined ? null : (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                                onOpen(runId);
-                            }}
-                        >
-                            {said.open}
-                        </Button>
-                    )}
-                </>
-            }
-        />
+                ) : null}
+                {onOpen === undefined ? null : (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className={fitted}
+                        onClick={() => {
+                            onOpen(runId);
+                        }}
+                    >
+                        <span className="min-w-0 truncate">{said.open}</span>
+                    </Button>
+                )}
+            </div>
+        </div>
     );
 }

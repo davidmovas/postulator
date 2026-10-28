@@ -116,6 +116,18 @@ describe("a sync button while a sync is under way", () => {
         expect(screen.queryByRole("button", { name: "Sync site" })).toBeNull();
     });
 
+    it("keeps a crowded header short by offering the sync under way as an icon", async () => {
+        const user = userEvent.setup();
+        held.active = aProgress({ runId: "r-sync", stage: "content" });
+        shown(<SyncButton siteId="s1" label="Sync site" compact={true} />);
+
+        const open = screen.getByRole("button", { name: said.open });
+        expect(open.textContent).toBe("");
+        await user.click(open);
+
+        expect(location()).toBe("/s/s1/runs/r-sync");
+    });
+
     it("opens the sync under way", async () => {
         const user = userEvent.setup();
         held.active = aProgress({ runId: "r-sync", stage: "content" });

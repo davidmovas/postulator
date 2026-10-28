@@ -3,6 +3,7 @@ export type { SyncButtonProps, SyncUnderWayProps } from "./button.js";
 export { SyncError, SyncLive, SyncMeter, SyncStopped } from "./live.js";
 export type { SyncErrorProps, SyncLiveProps, SyncMeterProps, SyncStoppedProps } from "./live.js";
 export {
+    pageCount,
     stagePhrase,
     stageSteps,
     stageWords,

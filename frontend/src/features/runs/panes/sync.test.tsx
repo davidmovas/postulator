@@ -102,6 +102,22 @@ describe("a sync run's own pane", () => {
         expect(count(said.counts.batches)).toBe("6");
     });
 
+    it("counts a large walk exactly rather than rounding it", () => {
+        held.progress = aProgress({ pulled: 136_100, batches: 2_723 });
+        render(<SiteSyncPane siteId="s1" runId="r-sync" />);
+
+        expect(count(said.counts.pulled)).toBe("136,100");
+        expect(count(said.counts.batches)).toBe("2,723");
+    });
+
+    it("heads the pane with the stage, which the notice above names as stopped", () => {
+        held.progress = aProgress({ status: "failed", stage: "content", error: failure });
+        render(<SiteSyncPane siteId="s1" runId="r-sync" />);
+
+        expect(screen.getByRole("heading", { name: "Reading the pages" })).toBeDefined();
+        expect(screen.queryByText("The sync stopped while reading the pages")).toBeNull();
+    });
+
     it("says the attempt that failed and counts down to the next while it waits to retry", () => {
         held.progress = aProgress({
             status: "waiting",

@@ -37,12 +37,14 @@ function RunHeading({ summary }: { summary: RunSummary }): ReactElement {
     const run = summary.run;
     return (
         <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-xs font-semibold text-ink">{runKindLabel(run.kind)}</span>
+            <span className="shrink-0 text-xs font-semibold text-ink">{runKindLabel(run.kind)}</span>
             <StatusBadge tone={summary.active ? "info" : "muted"}>
                 {summary.active ? copy.overview.run.active : runStatusLabel(run.status)}
             </StatusBadge>
-            <span className="truncate font-mono text-2xs text-ink-dim">
-                {copy.overview.run.startedBy(run.createdBy)} · {copy.overview.run.publish(run.publishMode)}
+            <span className="min-w-0 truncate font-mono text-2xs text-ink-dim">
+                {run.kind === syncRunKind
+                    ? copy.overview.run.startedBy(run.createdBy)
+                    : `${copy.overview.run.startedBy(run.createdBy)} · ${copy.overview.run.publish(run.publishMode)}`}
             </span>
         </div>
     );
@@ -67,6 +69,7 @@ function SyncRunPanel({ summary, siteId }: { summary: RunSummary; siteId: string
                     runId={run.id}
                     stage={stopped.stage}
                     error={stopped.error === "" ? run.error : stopped.error}
+                    compact={true}
                     onOpen={(runId) => {
                         void navigate(syncRunPath(siteId, runId));
                     }}

@@ -95,6 +95,14 @@ describe("a sync that stopped", () => {
         expect(calls.retried).toEqual([]);
     });
 
+    it("keeps a short error whole on a narrow panel and the whole of a long one a hover away", () => {
+        renderScreen(<SyncStopped runId="r-sync" stage="content" error={error} compact={true} />);
+
+        const shown = screen.getByText(error);
+        expect(shown.getAttribute("title")).toBe(error);
+        expect(shown.className).toMatch(/line-clamp-4/);
+    });
+
     it("offers no start over unless asked", () => {
         renderScreen(<SyncStopped runId="r-sync" stage="render" error={error} />);
 

@@ -38,7 +38,7 @@ export function RunNotices({
     const logFailed = events.phase === "error" && events.error !== null;
     const sync = run.kind === kindSync;
     const failed = !sync && view.status === statusFailed && run.error !== "";
-    const uncapped = !view.capped && !view.terminal;
+    const uncapped = !sync && !view.capped && !view.terminal;
     const shown =
         gap || logFailed || view.paused || failed || uncapped || failedItems > 0 || heldItems > 0 || notedItems > 0;
 
