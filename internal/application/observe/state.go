@@ -24,6 +24,13 @@ const (
 	SourceCore   = "core"
 )
 
+const CheckpointKey = "sync"
+
+type Progress struct {
+	State   State `json:"state"`
+	Batches int   `json:"batches"`
+}
+
 type Options struct {
 	Full         bool
 	RenderRescan bool

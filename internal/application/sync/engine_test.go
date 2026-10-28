@@ -112,7 +112,7 @@ func TestManySyncsOfOneSiteAtOnceQueueOne(t *testing.T) {
 		t.Fatalf("register the sync step: %v", err)
 	}
 	runRepo := sqlite.NewRunRepo(store)
-	service := sync.New(engineOver(t, store, registry), runRepo, siteRepo, prober{}, packer{}, clock.System{})
+	service := sync.New(engineOver(t, store, registry), runRepo, sqlite.NewRunItemRepo(store), siteRepo, prober{}, packer{}, clock.System{})
 
 	const callers = 8
 	answers := make(chan error, callers)
@@ -203,7 +203,7 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 	}
 	t.Cleanup(engine.Stop)
 
-	service := sync.New(engine, runRepo, siteRepo, prober{}, packer{}, clock.System{})
+	service := sync.New(engine, runRepo, sqlite.NewRunItemRepo(store), siteRepo, prober{}, packer{}, clock.System{})
 	queued, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: owner.ID})
 	if err != nil {
 		t.Fatalf("SyncSite: %v", err)

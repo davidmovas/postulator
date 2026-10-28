@@ -73,6 +73,7 @@ func catalog() []vocabulary {
 			},
 		},
 		{export: "pageTypeRoles", tsType: "PageTypeRole", pkg: "internal/domain/pagetype", typeName: "Role"},
+		{export: "syncStages", tsType: "SyncStage", pkg: "internal/application/observe", typeName: "Stage"},
 		{export: "ruleKinds", tsType: "RuleKind", pkg: "internal/domain/pagetype", typeName: "RuleKind"},
 		{export: "urlModes", tsType: "URLMode", pkg: "internal/domain/pagetype", typeName: "URLMode"},
 		{export: "schemaTypes", tsType: "SchemaType", pkg: "internal/domain/pagetype", typeName: "SchemaType"},

@@ -17,8 +17,13 @@ type engine interface {
 	Enqueue(ctx context.Context, record run.Run, directives ...run.Directive) (run.Run, error)
 }
 
-type activeSyncs interface {
+type syncRuns interface {
 	ActiveSync(ctx context.Context, siteID string) (run.Run, bool, error)
+	Get(ctx context.Context, id string) (run.Run, error)
+}
+
+type runItems interface {
+	ByRun(ctx context.Context, runID string) ([]run.Item, error)
 }
 
 type siteStore interface {
@@ -36,15 +41,16 @@ type packager interface {
 
 type Service struct {
 	engine engine
-	syncs  activeSyncs
+	syncs  syncRuns
+	items  runItems
 	sites  siteStore
 	probe  pluginProbe
 	packer packager
 	clock  clock.Clock
 }
 
-func New(engine engine, syncs activeSyncs, sites siteStore, probe pluginProbe, packed packager, clk clock.Clock) *Service {
-	return &Service{engine: engine, syncs: syncs, sites: sites, probe: probe, packer: packed, clock: clk}
+func New(engine engine, syncs syncRuns, items runItems, sites siteStore, probe pluginProbe, packed packager, clk clock.Clock) *Service {
+	return &Service{engine: engine, syncs: syncs, items: items, sites: sites, probe: probe, packer: packed, clock: clk}
 }
 
 func (s *Service) now() time.Time {

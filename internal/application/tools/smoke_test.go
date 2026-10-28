@@ -201,7 +201,7 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		}),
 		Templates: templateService,
 		Runs:      runs.New(stubEngine{}, runRepo, itemRepo, artifactRepo, sqlite.NewRunEventRepo(store), templateService, pageRepo, types, domainrun.NewRegistry(), pagesService, siteModel, graphService),
-		Sync:      sync.New(stubEngine{}, runRepo, siteRepo, stubProbe{}, stubPacker{}, now),
+		Sync:      sync.New(stubEngine{}, runRepo, itemRepo, siteRepo, stubProbe{}, stubPacker{}, now),
 		Reports:   reportsService,
 		Imports:   importsService,
 		Findings: findings.New(findings.Deps{

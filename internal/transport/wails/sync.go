@@ -18,6 +18,7 @@ const packageFileMode = 0o600
 type SyncUseCase interface {
 	SyncSite(ctx context.Context, req sync.SyncSiteRequest) (sync.SyncSiteResponse, error)
 	CheckPlugin(ctx context.Context, req sync.CheckPluginRequest) (sync.CheckPluginResponse, error)
+	Progress(ctx context.Context, req sync.ProgressRequest) (sync.ProgressResponse, error)
 	PluginPackage(ctx context.Context, req sync.PluginPackageRequest) (sync.PluginPackageResponse, error)
 }
 
@@ -34,6 +35,7 @@ type SavePluginPackageResponse struct {
 type SyncService struct {
 	syncSite          middleware.Handler[sync.SyncSiteRequest, sync.SyncSiteResponse]
 	checkPlugin       middleware.Handler[sync.CheckPluginRequest, sync.CheckPluginResponse]
+	progress          middleware.Handler[sync.ProgressRequest, sync.ProgressResponse]
 	savePluginPackage middleware.Handler[SavePluginPackageRequest, SavePluginPackageResponse]
 }
 
@@ -41,6 +43,7 @@ func NewSyncService(logger *zap.Logger, useCase Source[SyncUseCase]) *SyncServic
 	return &SyncService{
 		syncSite:          Wrap(logger, "sync.syncSite", call(useCase, SyncUseCase.SyncSite)),
 		checkPlugin:       Wrap(logger, "sync.checkPlugin", call(useCase, SyncUseCase.CheckPlugin)),
+		progress:          Wrap(logger, "sync.progress", call(useCase, SyncUseCase.Progress)),
 		savePluginPackage: Wrap(logger, "sync.savePluginPackage", savePluginPackage(useCase)),
 	}
 }
@@ -81,6 +84,10 @@ func (s *SyncService) SyncSite(c context.Context, req sync.SyncSiteRequest) (syn
 
 func (s *SyncService) CheckPlugin(c context.Context, req sync.CheckPluginRequest) (sync.CheckPluginResponse, error) {
 	return s.checkPlugin(c, req)
+}
+
+func (s *SyncService) Progress(c context.Context, req sync.ProgressRequest) (sync.ProgressResponse, error) {
+	return s.progress(c, req)
 }
 
 func (s *SyncService) SavePluginPackage(c context.Context, req SavePluginPackageRequest) (SavePluginPackageResponse, error) {

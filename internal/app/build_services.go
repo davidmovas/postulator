@@ -134,7 +134,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		models: models.New(llm.catalog, stores.overrides, llm.profiles, llm.ledger, stores.secrets, llm.client,
 			c.Events, stores.now),
 		runs:    runsService,
-		sync:    sync.New(running.engine, stores.runs, stores.sites, writing.wordpress, packer{}, stores.now),
+		sync:    sync.New(running.engine, stores.runs, stores.items, stores.sites, writing.wordpress, packer{}, stores.now),
 		reports: writing.reports,
 		schedules: schedules.New(schedules.Deps{
 			Schedules: stores.schedules, Pages: stores.pages, Sites: stores.sites, Runs: runsService,

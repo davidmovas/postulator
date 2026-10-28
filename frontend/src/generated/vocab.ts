@@ -214,6 +214,9 @@ export const creatablePageTypePresets: readonly PageTypePreset[] = [
 export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
 export type PageTypeRole = (typeof pageTypeRoles)[number];
 
+export const syncStages = ["inventory", "content", "store", "render", "derive", "fields", "done"] as const;
+export type SyncStage = (typeof syncStages)[number];
+
 export const ruleKinds = ["rule", "fallback"] as const;
 export type RuleKind = (typeof ruleKinds)[number];
 
