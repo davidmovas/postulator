@@ -267,6 +267,28 @@
     ]
   },
   {
+    "name": "propose-entities-range",
+    "route": "#/s/:siteId/findings?code=page_without_entity",
+    "wait": 1500,
+    "steps": [
+      { "click": "button:has-text(\"Propose entities for all\")" },
+      { "expect": "[data-workspace] [data-proposal-at]", "timeout": 20000 },
+      { "click": "[data-workspace] button:text-is(\"Keep all\")" },
+      { "click": "[data-workspace] button:text-is(\"Collapse all\")" },
+      { "click": ":nth-match([data-workspace] [data-proposal-at]:not([data-proposal-state=blocked]), 1) label" },
+      { "click": "[data-workspace] [data-proposal-at]:not([data-proposal-state=blocked]) >> nth=-1", "shift": true },
+      { "expect": "[data-workspace] [data-proposal-count=\"0\"]" },
+      { "click": ":nth-match([data-workspace] [data-proposal-at]:not([data-proposal-state=blocked]), 1)", "shift": true },
+      { "expect": "[data-workspace] [data-proposal-count]:not([data-proposal-count=\"0\"])" },
+      { "expect": "[data-workspace] [data-proposal-state=on]" },
+      { "expect": "[data-workspace] [data-proposal-state=off]", "count": 0 },
+      { "expect": "[data-workspace] [data-proposal-state=some]", "count": 0 },
+      { "click": "[data-workspace] button:text-is(\"Expand all\")" },
+      { "fits": "[data-workspace]" },
+      { "wait": 400 }
+    ]
+  },
+  {
     "name": "pages",
     "route": "#/s/:siteId/pages",
     "wait": 1200

@@ -47,9 +47,12 @@ panel rather than scrolling sideways.
 never appears; in routes.json an expect step may add "count", the exact number
 of matches to wait for, and "timeout" in milliseconds.
 
+A click step with "shift": true holds Shift down for that click, which is how a
+range is ticked.
+
 routes.json is an array of
   { "name", "route", "width", "height", "wait", "site", "siteName", "clip", "timed",
-    "steps": [ {"click": "<css>"}, {"type": "<css>=<text>"},
+    "steps": [ {"click": "<css>"}, {"click": "<css>", "shift": true}, {"type": "<css>=<text>"},
                {"key": "Control+K"}, {"wait": 500}, {"fits": "<css>"},
                {"expect": "<css>", "count": 2, "timeout": 15000},
                {"timed": "<label>", "click": "<css>", "until": "<css>"},
@@ -334,7 +337,7 @@ async function apply(page, steps) {
         }
         if (step.click !== undefined) {
             await page.bringToFront();
-            await page.click(step.click);
+            await page.click(step.click, step.shift === true ? { modifiers: ["Shift"] } : {});
             continue;
         }
         if (step.type !== undefined) {
