@@ -62,6 +62,12 @@ func TestNewRunRejects(t *testing.T) {
 		{name: "unknown pause reason", mutate: func(r *run.Run) { r.PauseReason = "tired" }},
 		{name: "empty parent", mutate: func(r *run.Run) { r.ParentRunID = &empty }},
 		{name: "no deadline", mutate: func(r *run.Run) { r.DeadlineAt = time.Time{} }},
+		{name: "a page left out for no known reason", mutate: func(r *run.Run) {
+			r.Skipped = []run.Skipped{{PageID: "page-2", Path: "/shop/", Reason: "tired"}}
+		}},
+		{name: "a page left out with no page", mutate: func(r *run.Run) {
+			r.Skipped = []run.Skipped{{Path: "/shop/", Reason: run.SkipNoTemplate}}
+		}},
 	}
 
 	for _, tc := range cases {
@@ -98,6 +104,9 @@ func TestKindsAndPublishModesAreClosedSets(t *testing.T) {
 		{name: "draft", valid: run.PublishDraft.Valid(), want: true},
 		{name: "publish", valid: run.PublishLive.Valid(), want: true},
 		{name: "an unknown publish mode", valid: run.PublishMode("broadcast").Valid()},
+		{name: "no entity", valid: run.SkipNoEntity.Valid(), want: true},
+		{name: "no template", valid: run.SkipNoTemplate.Valid(), want: true},
+		{name: "an unknown reason to leave a page out", valid: run.SkipReason("tired").Valid()},
 	}
 
 	for _, tc := range cases {
