@@ -84,6 +84,7 @@ type Server struct {
 	noStoreSettings bool
 	rawAnswerFaults []int
 	saveFilter      func(string) string
+	latency         time.Duration
 	seoSanitized    bool
 	mu              sync.Mutex
 }
@@ -169,6 +170,10 @@ func WithClock(now func() time.Time) Option {
 	return func(s *Server) { s.now = now }
 }
 
+func WithLatency(latency time.Duration) Option {
+	return func(s *Server) { s.latency = latency }
+}
+
 func New(t TB, opts ...Option) *Server {
 	t.Helper()
 
@@ -250,6 +255,7 @@ func (s *Server) record(next http.Handler) http.Handler {
 		})
 		s.mu.Unlock()
 
+		time.Sleep(s.latency)
 		next.ServeHTTP(w, r)
 	})
 }

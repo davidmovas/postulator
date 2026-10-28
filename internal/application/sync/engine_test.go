@@ -2,6 +2,8 @@ package sync_test
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	stdsync "sync"
 	"testing"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
@@ -154,6 +157,58 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 		wptest.Item{Type: wptest.TypePage, Title: "Boots", Slug: "boots", Status: "publish", Content: "<h1>Boots</h1>"},
 	)
 
+	if pages := syncedThroughTheEngine(t, server, 1); len(pages) != 2 {
+		t.Fatalf("the sync stored %d pages, want 2", len(pages))
+	}
+}
+
+func TestAFirstSyncOfEmptyPagesAsksTheSiteOnlyForWhatItLacks(t *testing.T) {
+	t.Parallel()
+
+	const count = 400
+	server := wptest.New(t, wptest.WithoutCommerce())
+	seeded := make([]wptest.Item, 0, count)
+	for i := range count {
+		slug := "empty-" + strconv.Itoa(i)
+		seeded = append(seeded, wptest.Item{Type: wptest.TypePage, Title: "Empty " + strconv.Itoa(i), Slug: slug, Status: "publish"})
+	}
+	server.Seed(seeded...)
+
+	if pages := syncedThroughTheEngine(t, server, steps.DefaultBatchSize); len(pages) != count {
+		t.Fatalf("the sync stored %d pages, want %d", len(pages), count)
+	}
+
+	asked := map[string]int{}
+	for _, request := range server.Requests() {
+		switch {
+		case strings.HasSuffix(request.Path, "/postulator/v1/content"):
+			asked["list"]++
+		case strings.HasSuffix(request.Path, "/raw"):
+			asked["raw"]++
+		case strings.Contains(request.Path, "/postulator/v1/terms/"):
+			asked["terms"]++
+		case strings.HasSuffix(request.Path, "/rendered"):
+			asked["rendered"]++
+		case !strings.HasPrefix(request.Path, "/wp-json"):
+			asked["visit"]++
+		default:
+			asked["other"]++
+		}
+	}
+	if asked["raw"] != 0 || asked["terms"] != 0 {
+		t.Errorf("the sync asked %d bodies and %d term lists of %d empty pages, want none: the list carries both", asked["raw"], asked["terms"], count)
+	}
+	if limit := count/steps.DefaultBatchSize + 2; asked["list"] > limit {
+		t.Errorf("the sync listed the content %d times, want at most %d batches of %d", asked["list"], limit, steps.DefaultBatchSize)
+	}
+	if asked["visit"] > count+5 || asked["rendered"] > count || asked["other"] > 20 {
+		t.Errorf("the sync asked %v, want one visit and one render per page and a few reads of the site's setup", asked)
+	}
+}
+
+func syncedThroughTheEngine(t *testing.T, server *wptest.Server, batch int) []pagemap.Page {
+	t.Helper()
+
 	store := sqlitetest.Open(t)
 	siteRepo := sqlite.NewSiteRepo(store)
 	pageRepo := sqlite.NewPageRepo(store)
@@ -191,7 +246,7 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 	if regErr := registry.Register(steps.SyncSite(steps.Deps{
 		Pages: pageRepo, Links: linkRepo, Sites: siteRepo, SiteWriter: siteRepo,
 		WordPress: oneClient{client: client}, Observe: observer, UnitOfWork: store, Publisher: silentBus{},
-		Clock: clock.System{}, BatchSize: 1,
+		Clock: clock.System{}, BatchSize: batch,
 	})); regErr != nil {
 		t.Fatalf("register the sync step: %v", regErr)
 	}
@@ -227,7 +282,5 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list the pages: %v", err)
 	}
-	if len(pages) != 2 {
-		t.Fatalf("the sync stored %d pages, want 2", len(pages))
-	}
+	return pages
 }

@@ -53,6 +53,17 @@ func decode(t *testing.T, payload []byte, out any) {
 	}
 }
 
+func TestASlowSiteAnswersEveryRequestAfterItsLatency(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t, wptest.WithLatency(40*time.Millisecond))
+	started := time.Now()
+	response, _ := call(t, server, http.MethodGet, "/wp-json", nil, true)
+	if took := time.Since(started); response.StatusCode != http.StatusOK || took < 40*time.Millisecond {
+		t.Fatalf("status %d after %s, want 200 after at least 40ms", response.StatusCode, took)
+	}
+}
+
 func TestTheRestRootListsItsNamespaces(t *testing.T) {
 	t.Parallel()
 
