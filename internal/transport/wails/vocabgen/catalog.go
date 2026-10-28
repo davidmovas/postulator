@@ -154,6 +154,7 @@ func catalog() []vocabulary {
 			export: "retryBlockedReasons", tsType: "RetryBlockedReason", pkg: "internal/domain/run",
 			typeName: "RetryBlockedReason",
 		},
+		{export: "skipReasons", tsType: "SkipReason", pkg: "internal/domain/run", typeName: "SkipReason"},
 		{export: "templateScopes", tsType: "TemplateScope", pkg: "internal/domain/template", typeName: "Scope"},
 		{export: "overrideScopes", tsType: "OverrideScope", pkg: "internal/domain/template", typeName: "OverrideScope"},
 		{

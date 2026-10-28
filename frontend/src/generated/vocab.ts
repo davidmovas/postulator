@@ -478,6 +478,9 @@ export type PerKindStepName = (typeof perKindStepNames)[number];
 export const retryBlockedReasons = ["inputs_expired"] as const;
 export type RetryBlockedReason = (typeof retryBlockedReasons)[number];
 
+export const skipReasons = ["no_entity", "no_template"] as const;
+export type SkipReason = (typeof skipReasons)[number];
+
 export const templateScopes = ["global", "site"] as const;
 export type TemplateScope = (typeof templateScopes)[number];
 
