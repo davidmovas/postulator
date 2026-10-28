@@ -66,6 +66,31 @@ func TestRunsStartTakesAFieldScopeAndShowsItsEstimateOnTheCard(t *testing.T) {
 	}
 }
 
+func TestARunStartCardCountsThePagesItWritesAndSaysWhichItLeavesOut(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, seeded := wired(t)
+	onTheSite(t, seeded)
+	binding.Mode = domainagent.ModeConfirm
+	unmapped := called[pages.CreateResponse](t, registry, tools.Binding{SiteID: binding.SiteID, Mode: domainagent.ModeAutonomous},
+		"pages_manage", `{"op":"create","path":"/coffee/mugs/"}`)
+
+	out, err := registry.Call(t.Context(), binding, "runs_control", json.RawMessage(`{"op":"start","pageIds":["`+
+		seeded.page+`","`+unmapped.Page.ID+`"]}`))
+	if err != nil {
+		t.Fatalf("runs_control start: %v", err)
+	}
+	asked, ok := out.(tools.Confirmation)
+	if !ok {
+		t.Fatalf("runs_control start in confirm mode answered %+v, want a card", out)
+	}
+	for _, said := range []string{"over 1 page (/coffee/)", "leaving out 1 page", "/coffee/mugs/ is mapped to nothing"} {
+		if !strings.Contains(asked.Summary, said) {
+			t.Errorf("the card says %q, want it to say %q", asked.Summary, said)
+		}
+	}
+}
+
 func TestAPlansRunStartTakesTheEdgeAStepItDependsOnAdds(t *testing.T) {
 	t.Parallel()
 

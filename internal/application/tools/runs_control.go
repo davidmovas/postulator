@@ -242,7 +242,8 @@ func (deps Deps) runChange(ctx context.Context, b Binding, in *runsControlArgs) 
 	}
 }
 
-func (deps Deps) startSummary(ctx context.Context, in *runsControlArgs, pageIDs []string, priced runs.EstimateResponse) (string, error) {
+func (deps Deps) startSummary(ctx context.Context, in *runsControlArgs, chosen []string, priced runs.EstimateResponse) (string, error) {
+	pageIDs := written(chosen, priced.Skipped)
 	named := make([]string, 0, min(len(pageIDs), maxPagesNamed))
 	for _, pageID := range pageIDs[:min(len(pageIDs), maxPagesNamed)] {
 		path, err := deps.pathOf(ctx, pageID)
@@ -271,12 +272,46 @@ func (deps Deps) startSummary(ctx context.Context, in *runsControlArgs, pageIDs 
 	if len(priced.Added) > 0 {
 		said += ", creating " + plural(len(priced.Added), "planned parent") + " first"
 	}
+	if len(priced.Skipped) > 0 {
+		said += ", leaving out " + plural(len(priced.Skipped), "page") + " it cannot write (" + leftOutSaid(priced.Skipped) + ")"
+	}
 	mode := "as drafts that wait for a review"
 	if in.PublishMode == string(run.PublishLive) {
 		mode = "straight to the site"
 	}
 	return said + ", " + mode + ": estimated $" + strconv.FormatFloat(priced.Estimate.USD, 'f', 2, 64) + " for " +
 		strconv.Itoa(priced.Estimate.Tokens) + " tokens", nil
+}
+
+func written(chosen []string, skipped []run.Skipped) []string {
+	left := make(map[string]struct{}, len(skipped))
+	for i := range skipped {
+		left[skipped[i].PageID] = struct{}{}
+	}
+	out := make([]string, 0, len(chosen))
+	for _, pageID := range chosen {
+		if _, gone := left[strings.TrimSpace(pageID)]; !gone {
+			out = append(out, pageID)
+		}
+	}
+	return out
+}
+
+func leftOutSaid(skipped []run.Skipped) string {
+	said := make([]string, 0, min(len(skipped), maxPagesNamed))
+	for _, page := range skipped[:min(len(skipped), maxPagesNamed)] {
+		switch page.Reason {
+		case run.SkipNoEntity:
+			said = append(said, page.Path+" is mapped to nothing in the graph")
+		default:
+			said = append(said, page.Path+" has no template")
+		}
+	}
+	joined := strings.Join(said, ", ")
+	if more := len(skipped) - len(said); more > 0 {
+		joined += " and " + strconv.Itoa(more) + " more"
+	}
+	return joined
 }
 
 func kindOf(in *runsControlArgs) string {
