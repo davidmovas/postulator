@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../copy/index.js";
-import type { SiteMapFilter, SiteMapNode, SiteMapView } from "../../data/types.js";
+import type { SiteMapFilter, SiteMapNode, SiteMapView, SyncProgress } from "../../data/types.js";
+import { aProgress } from "../../testing/sync.js";
 import { aNode, aRef } from "./model/fixture.js";
 
 interface Answer {
@@ -11,7 +13,12 @@ interface Answer {
     more: boolean;
 }
 
-const held: { answers: Map<string, Answer>; asked: SiteMapFilter[] } = { answers: new Map(), asked: [] };
+const held: { answers: Map<string, Answer>; asked: SiteMapFilter[]; active: SyncProgress | null; synced: unknown[] } = {
+    answers: new Map(),
+    asked: [],
+    active: null,
+    synced: [],
+};
 
 const stable = new Map<string, unknown>();
 
@@ -54,7 +61,13 @@ vi.mock("../../data/hooks/templates.js", () => ({
 }));
 
 vi.mock("../../data/hooks/sync.js", () => ({
-    useSyncSite: () => ({ mutate: () => undefined, isPending: false }),
+    useActiveSync: () => held.active,
+    useSyncSite: () => ({
+        mutate: (request: unknown) => {
+            held.synced.push(request);
+        },
+        isPending: false,
+    }),
 }));
 
 vi.mock("../graph/index.js", () => ({
@@ -100,6 +113,8 @@ const mugs = aNode("p-mugs", "/shop/mugs/", { page: aRef("p-mugs", "/shop/mugs/"
 beforeEach(() => {
     held.answers = new Map();
     held.asked = [];
+    held.active = null;
+    held.synced = [];
     stable.clear();
     answer({}, [shop, about]);
     answer({ parentId: "p-shop" }, [mugs], true);
@@ -218,5 +233,25 @@ describe("the site map", () => {
         expect(screen.getByText(said.empty.title)).toBeDefined();
         expect(screen.getByRole("button", { name: said.empty.sync })).toBeDefined();
         expect(screen.getByRole("button", { name: said.empty.import })).toBeDefined();
+    });
+
+    it("syncs the site from an empty map", async () => {
+        const user = userEvent.setup();
+        answer({}, []);
+        siteMap();
+
+        await user.click(screen.getByRole("button", { name: said.empty.sync }));
+
+        expect(held.synced).toStrictEqual([{ siteId: "s1" }]);
+    });
+
+    it("says the stage of the sync under way on an empty map and opens it instead of a second", () => {
+        held.active = aProgress({ runId: "r-live", stage: "content" });
+        answer({}, []);
+        siteMap();
+
+        expect(screen.getByRole("button", { name: copy.sync.syncing("reading the pages") })).toHaveProperty("disabled", true);
+        expect(screen.queryByRole("button", { name: said.empty.sync })).toBeNull();
+        expect(screen.getByRole("button", { name: copy.sync.open })).toBeDefined();
     });
 });

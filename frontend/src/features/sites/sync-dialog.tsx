@@ -2,9 +2,9 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { useSyncSite } from "../../data/hooks/sync.js";
 import type { SyncSiteRequest } from "../../data/types.js";
 import { Checkbox, Dialog, SyncIcon } from "../../ui/index.js";
+import { SyncLive, useStartSync } from "../sync/index.js";
 
 const said = copy.sites.sync;
 
@@ -15,7 +15,7 @@ export interface SyncDialogProps {
 }
 
 export function SyncDialog({ request, onOpenChange, onStarted }: SyncDialogProps): ReactElement {
-    const sync = useSyncSite();
+    const sync = useStartSync(request?.siteId ?? "");
     const [full, setFull] = useState(false);
     const [renderRescan, setRenderRescan] = useState(false);
 
@@ -23,6 +23,26 @@ export function SyncDialog({ request, onOpenChange, onStarted }: SyncDialogProps
         setFull(request?.full === true);
         setRenderRescan(request?.renderRescan === true);
     }, [request]);
+
+    if (sync.active !== null) {
+        const active = sync.active;
+        return (
+            <Dialog
+                open={request !== null}
+                onOpenChange={onOpenChange}
+                title={copy.sync.underWay.title}
+                description={copy.sync.underWay.body}
+                confirmLabel={copy.sync.open}
+                cancelLabel={said.cancel}
+                icon={SyncIcon}
+                onConfirm={() => {
+                    onStarted(active.runId);
+                }}
+            >
+                <SyncLive progress={active} />
+            </Dialog>
+        );
+    }
 
     return (
         <Dialog
@@ -33,19 +53,12 @@ export function SyncDialog({ request, onOpenChange, onStarted }: SyncDialogProps
             confirmLabel={said.start}
             cancelLabel={said.cancel}
             icon={SyncIcon}
-            busy={sync.isPending}
+            busy={sync.pending}
             onConfirm={() => {
                 if (request === null) {
                     return;
                 }
-                sync.mutate(
-                    { siteId: request.siteId, full, renderRescan },
-                    {
-                        onSuccess: (answered) => {
-                            onStarted(answered.runId);
-                        },
-                    },
-                );
+                sync.start({ full, renderRescan }, onStarted);
             }}
         >
             <span title={said.fullTooltip} className="w-fit">

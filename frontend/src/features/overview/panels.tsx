@@ -1,9 +1,11 @@
 import type { ReactElement } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { copy } from "../../copy/index.js";
+import { useSyncProgress } from "../../data/hooks/sync.js";
 import { formatScore } from "../graph/labels.js";
 import { runKindLabel, runStatusLabel } from "../runs/labels.js";
+import { SyncLive, SyncStopped, syncRunPath } from "../sync/index.js";
 import type { EntityScore } from "../../data/types.js";
 import { tokens, usd } from "../../domain/format.js";
 import {
@@ -28,6 +30,52 @@ export interface RunPanelProps {
     onStart: () => void;
 }
 
+const syncRunKind = "sync";
+const failedStatus = "failed";
+
+function RunHeading({ summary }: { summary: RunSummary }): ReactElement {
+    const run = summary.run;
+    return (
+        <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-xs font-semibold text-ink">{runKindLabel(run.kind)}</span>
+            <StatusBadge tone={summary.active ? "info" : "muted"}>
+                {summary.active ? copy.overview.run.active : runStatusLabel(run.status)}
+            </StatusBadge>
+            <span className="truncate font-mono text-2xs text-ink-dim">
+                {copy.overview.run.startedBy(run.createdBy)} · {copy.overview.run.publish(run.publishMode)}
+            </span>
+        </div>
+    );
+}
+
+function SyncRunPanel({ summary, siteId }: { summary: RunSummary; siteId: string }): ReactElement {
+    const run = summary.run;
+    const progress = useSyncProgress(siteId, run.id).data;
+    const navigate = useNavigate();
+    const stopped = run.status === failedStatus && progress !== undefined && progress.found ? progress : null;
+    return (
+        <div className="flex flex-col gap-2 rounded-lg border border-hairline bg-panel px-3 py-2.5" data-sync-run={run.id}>
+            <Link to={syncRunPath(siteId, run.id)} title={copy.overview.run.open} className="group flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <RunHeading summary={summary} />
+                    {progress === undefined || !progress.found ? null : <SyncLive progress={progress} />}
+                </div>
+                <ChevronRightIcon size={16} className="shrink-0 text-ink-faint group-hover:text-ink" />
+            </Link>
+            {stopped === null ? null : (
+                <SyncStopped
+                    runId={run.id}
+                    stage={stopped.stage}
+                    error={stopped.error === "" ? run.error : stopped.error}
+                    onOpen={(runId) => {
+                        void navigate(syncRunPath(siteId, runId));
+                    }}
+                />
+            )}
+        </div>
+    );
+}
+
 export function RunPanel({ summary, siteId, onStart }: RunPanelProps): ReactElement {
     if (summary === null) {
         return (
@@ -44,6 +92,9 @@ export function RunPanel({ summary, siteId, onStart }: RunPanelProps): ReactElem
             </Panel>
         );
     }
+    if (summary.run.kind === syncRunKind) {
+        return <SyncRunPanel summary={summary} siteId={siteId} />;
+    }
     const run = summary.run;
     return (
         <Link
@@ -52,15 +103,7 @@ export function RunPanel({ summary, siteId, onStart }: RunPanelProps): ReactElem
             className="flex items-center gap-3 rounded-lg border border-hairline bg-panel px-3 py-2.5 hover:border-edge"
         >
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex items-center gap-2">
-                    <span className="truncate text-xs font-semibold text-ink">{runKindLabel(run.kind)}</span>
-                    <StatusBadge tone={summary.active ? "info" : "muted"}>
-                        {summary.active ? copy.overview.run.active : runStatusLabel(run.status)}
-                    </StatusBadge>
-                    <span className="truncate font-mono text-2xs text-ink-dim">
-                        {copy.overview.run.startedBy(run.createdBy)} · {copy.overview.run.publish(run.publishMode)}
-                    </span>
-                </div>
+                <RunHeading summary={summary} />
                 <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                         <ProgressBar

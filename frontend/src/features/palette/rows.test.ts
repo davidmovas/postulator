@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { pagePrefix, runRowLabel } from "./rows.js";
+import { copy } from "../../copy/index.js";
+import { aProgress } from "../../testing/sync.js";
+import { pagePrefix, runRowLabel, syncActionLabel } from "./rows.js";
+
+describe("syncActionLabel", () => {
+    it("offers to sync the site when no sync is under way", () => {
+        expect(syncActionLabel(null)).toBe(copy.palette.syncSite);
+    });
+
+    it("says a sync is under way, in which stage, and offers to open it", () => {
+        expect(syncActionLabel(aProgress({ stage: "render" }))).toBe("Open the sync under way · visiting the pages");
+    });
+});
 
 const now = new Date("2026-09-21T10:00:00Z");
 

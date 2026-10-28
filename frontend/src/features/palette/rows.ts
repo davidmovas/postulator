@@ -1,7 +1,13 @@
 import { copy } from "../../copy/index.js";
+import type { SyncProgress } from "../../data/types.js";
 import type { Timestamp } from "../../data/wire.js";
 import { relativeTime } from "../../domain/format.js";
 import { runKindLabel } from "../runs/labels.js";
+import { stagePhrase } from "../sync/model.js";
+
+export function syncActionLabel(active: SyncProgress | null): string {
+    return active === null ? copy.palette.syncSite : copy.sync.palette.open(stagePhrase(active));
+}
 
 export interface RunRow {
     kind: string;

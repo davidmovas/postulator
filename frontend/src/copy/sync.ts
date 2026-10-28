@@ -1,0 +1,66 @@
+function pagesRead(count: string, one: boolean): string {
+    return one ? "1 page read" : `${count} pages read`;
+}
+
+export const sync = {
+    stages: {
+        inventory: "Reading the site's setup",
+        content: "Reading the pages",
+        store: "Reading the store",
+        render: "Visiting the pages",
+        derive: "Deriving the page tree",
+        fields: "Reading custom fields",
+        done: "Done",
+    } as Readonly<Record<string, string>>,
+    stagesLabel: "Stages of the sync",
+    waiting: "Waiting to start",
+    syncing: (phrase: string) => `Syncing · ${phrase}`,
+    starting: "starting",
+    paused: "paused",
+    retrying: (phrase: string) => `${phrase}, retrying`,
+    line: (stage: string, count: string, one: boolean) => `${stage} · ${pagesRead(count, one)}`,
+    open: "Open the sync",
+    started: "Sync started",
+    walk: {
+        full: "Full walk",
+        fullBody: "Every page is read again.",
+        incremental: "Incremental walk",
+        incrementalBody: "Only what changed since the last walk is read.",
+    },
+    counts: {
+        title: "Read so far",
+        pulled: "Pages read",
+        created: "New pages",
+        updated: "Pages changed",
+        products: "Products",
+        rendered: "Pages visited",
+        unreachable: "Unreachable",
+        archived: "Archived",
+        batches: "Batches saved",
+    },
+    attempt: (attempt: number) => (attempt === 1 ? "The first attempt failed" : `${attempt} attempts failed`),
+    retryIn: (left: string) => `the next starts in ${left}`,
+    error: "What stopped it",
+    lastError: "Last error",
+    stopped: {
+        title: (phrase: string) => `The sync stopped while ${phrase}`,
+        atStart: "The sync stopped before it read a page",
+        atEnd: "The sync stopped as it finished",
+        latest: "The last sync stopped",
+        body: "Resuming goes on from the last batch it saved; starting over walks the whole site again.",
+        resumeBody: "Resuming goes on from the last batch it saved.",
+    },
+    resume: "Resume the sync",
+    startOver: "Start over",
+    resumed: "The sync goes on from its last saved batch.",
+    underWay: {
+        title: "A sync is already under way",
+        body: "It reads every page, so a second one would only repeat it. Open it to follow where it is.",
+    },
+    palette: {
+        open: (phrase: string) => `Open the sync under way · ${phrase}`,
+    },
+    pane: "The sync's progress",
+    loading: "Reading the sync's progress",
+    gone: "This sync's progress could not be read.",
+};

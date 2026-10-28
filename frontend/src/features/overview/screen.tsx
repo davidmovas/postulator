@@ -9,7 +9,8 @@ import { usePageTree } from "../../data/hooks/pages.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
 import { useRuns } from "../../data/hooks/runs.js";
 import { useSite } from "../../data/hooks/sites.js";
-import { usePluginState, useSyncSite } from "../../data/hooks/sync.js";
+import { usePluginState } from "../../data/hooks/sync.js";
+import type { RunSort } from "../../data/sorts.js";
 import { maxLimit } from "../../lib/paging.js";
 import type { MenuEntry } from "../../ui/index.js";
 import {
@@ -25,9 +26,9 @@ import {
     Screen,
     Skeleton,
     SkeletonRows,
-    SyncIcon,
     TravelExploreIcon,
 } from "../../ui/index.js";
+import { SyncButton } from "../sync/index.js";
 import { ReadinessChecklist } from "./checklist.js";
 import { driftCount, edgeTile, entityTile, histogram, isEmptySite, pageTile, runSummary } from "./model/overview.js";
 import { ObservationPanel } from "./observation.js";
@@ -35,6 +36,8 @@ import { CoveragePanel, DepthPanel, DriftPanel, RunPanel, TopEntities } from "./
 import { Tiles } from "./tiles.js";
 import { useReadiness } from "./readiness.js";
 import { SetupBanner } from "./setup-banner.js";
+
+const newestFirst: RunSort = { field: "createdAt", desc: true };
 
 function Loading(): ReactElement {
     return (
@@ -62,11 +65,10 @@ export function OverviewScreen(): ReactElement {
     const site = useSite(siteId);
     const overview = useSiteOverview(siteId);
     const plugin = usePluginState(siteId);
-    const runs = useRuns({ siteId }, null, 20);
+    const runs = useRuns({ siteId }, newestFirst, 20);
     const proposed = useEdges({ siteId, status: "proposed" }, maxLimit);
     const tree = usePageTree(siteId);
     const readiness = useReadiness(siteId);
-    const sync = useSyncSite();
     const open = useOpenExternal();
     const [dismissed, setDismissed] = useState(false);
 
@@ -123,15 +125,7 @@ export function OverviewScreen(): ReactElement {
             title={copy.overview.title}
             actions={
                 <>
-                    <Button
-                        icon={SyncIcon}
-                        busy={sync.isPending}
-                        onClick={() => {
-                            sync.mutate({ siteId });
-                        }}
-                    >
-                        {copy.overview.sync}
-                    </Button>
+                    <SyncButton siteId={siteId} label={copy.overview.sync} />
                     <Button variant="primary" icon={PlayArrowIcon} onClick={startRun}>
                         {copy.overview.startRun}
                     </Button>
@@ -178,18 +172,7 @@ export function OverviewScreen(): ReactElement {
                             icon={TravelExploreIcon}
                             title={copy.overview.empty}
                             body={copy.overview.emptyBody}
-                            actions={
-                                <Button
-                                    variant="primary"
-                                    icon={SyncIcon}
-                                    busy={sync.isPending}
-                                    onClick={() => {
-                                        sync.mutate({ siteId });
-                                    }}
-                                >
-                                    {copy.overview.sync}
-                                </Button>
-                            }
+                            actions={<SyncButton siteId={siteId} label={copy.overview.sync} variant="primary" />}
                         />
                     ) : (
                         <>

@@ -13,13 +13,13 @@ import {
     Panel,
     PanelHeader,
     StatusBadge,
-    SyncIcon,
     TableCell,
     TableHead,
     TableRow,
     TaskAltIcon,
 } from "../../ui/index.js";
 import { liveUrl } from "../pages/summary.js";
+import { SyncButton } from "../sync/index.js";
 import { reasonLabel, reasonTone } from "./labels.js";
 import type { CoverageRow } from "./model/site.js";
 
@@ -82,26 +82,23 @@ export function CoverageTable({ siteId, rows }: CoverageTableProps): ReactElemen
 }
 
 export interface DriftTableProps {
+    siteId: string;
     baseUrl: string;
     rows: readonly Page[];
-    syncing: boolean;
-    onResync: () => void;
+    onStarted: (runId: string) => void;
 }
 
-export function DriftTable({ baseUrl, rows, syncing, onResync }: DriftTableProps): ReactElement {
+export function DriftTable({ siteId, baseUrl, rows, onStarted }: DriftTableProps): ReactElement {
     return (
         <Panel>
             <PanelHeader title={copy.reports.drift.title}>
-                <Button
+                <SyncButton
+                    siteId={siteId}
                     size="sm"
-                    variant="secondary"
-                    icon={SyncIcon}
-                    busy={syncing}
+                    label={copy.reports.drift.resync}
                     title={copy.reports.drift.resyncTitle}
-                    onClick={onResync}
-                >
-                    {copy.reports.drift.resync}
-                </Button>
+                    onStarted={onStarted}
+                />
             </PanelHeader>
             {rows.length === 0 ? (
                 <div className="p-3">

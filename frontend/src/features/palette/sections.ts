@@ -7,14 +7,14 @@ import { useEntities } from "../../data/hooks/graph.js";
 import { usePages } from "../../data/hooks/pages.js";
 import { useRuns } from "../../data/hooks/runs.js";
 import { useSettingsSchema } from "../../data/hooks/settings.js";
-import { useSyncSite } from "../../data/hooks/sync.js";
 import { pushToast } from "../../data/toasts.js";
 import { AddIcon, BoltIcon, DescriptionIcon, HubIcon, PlayCircleIcon, SmartToyIcon, SyncIcon, TuneIcon } from "../../ui/index.js";
 import type { IconComponent } from "../../ui/index.js";
 import { askAgent } from "../agent/index.js";
 import { humanLabel, tabOf } from "../settings/model/layout.js";
+import { syncRunPath, useStartSync } from "../sync/index.js";
 import { rankBy } from "./rank.js";
-import { pagePrefix, runRowLabel } from "./rows.js";
+import { pagePrefix, runRowLabel, syncActionLabel } from "./rows.js";
 import { closePalette } from "./state.js";
 
 const described = copy.settings.keys as Readonly<Record<string, { label: string; help: string }>>;
@@ -44,7 +44,7 @@ export interface Destination {
 
 export function usePaletteSections(siteId: string | null, destinations: readonly Destination[], settled: string): readonly Section[] {
     const navigate = useNavigate();
-    const sync = useSyncSite();
+    const sync = useStartSync(siteId ?? "");
 
     const entities = useEntities(
         { siteId: siteId ?? "", namePrefix: settled },
@@ -94,22 +94,21 @@ export function usePaletteSections(siteId: string | null, destinations: readonly
                 Icon: AddIcon,
                 run: go(`/s/${siteId}/graph?action=new`),
             });
+            const active = sync.active;
             actions.push({
                 key: "action:sync",
-                label: said.syncSite,
+                label: syncActionLabel(active),
                 kind: said.kinds.action,
                 Icon: SyncIcon,
-                run: () => {
-                    closePalette();
-                    sync.mutate(
-                        { siteId },
-                        {
-                            onSuccess: () => {
-                                pushToast("info", said.syncing);
-                            },
-                        },
-                    );
-                },
+                run:
+                    active === null
+                        ? () => {
+                              closePalette();
+                              sync.start({}, () => {
+                                  pushToast("info", said.syncing);
+                              });
+                          }
+                        : go(syncRunPath(siteId, active.runId)),
             });
         }
         actions.push({
