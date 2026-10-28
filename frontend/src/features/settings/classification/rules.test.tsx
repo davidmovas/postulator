@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
@@ -21,9 +22,13 @@ interface Calls {
 
 const calls: Calls = { saved: [], deleted: [], reordered: [], tested: [], applied: [], refetched: 0 };
 
-const answers: { saveError: Error | null; applyError: Error | null } = { saveError: null, applyError: null };
+const answers: { saveError: Error | null; applyError: Error | null; tested: RuleTest | null } = {
+    saveError: null,
+    applyError: null,
+    tested: null,
+};
 
-function aRule(id: string, number: number, name: string, typeId: string, conditions: Rule["conditions"], enabled = true): Rule {
+function aRule(id: string, number: number, name: string, typeId: string, conditions: Rule["conditions"], pages: number, enabled = true): Rule {
     return {
         id,
         siteId: "s1",
@@ -33,18 +38,19 @@ function aRule(id: string, number: number, name: string, typeId: string, conditi
         enabled,
         typeId,
         conditions,
+        pages,
         createdAt: "2026-10-26T09:00:00Z",
         updatedAt: "2026-10-26T09:00:00Z",
     };
 }
 
 const rules: Rule[] = [
-    aRule("r1", 1, "Front page", "t-landing", { frontPage: true }),
-    aRule("r2", 2, "Guides by address", "t-guide", { urls: [{ mode: "segment" as never, value: "guides" }] }),
-    aRule("r3", 3, "Under the lab", "t-guide", { ancestor: { pageId: "p-lab" } }, false),
+    aRule("r1", 1, "Front page", "t-landing", { frontPage: true }, 1),
+    aRule("r2", 2, "Guides by address", "t-guide", { urls: [{ mode: "segment" as never, value: "guides" }] }, 60),
+    aRule("r3", 3, "Under the lab", "t-guide", { ancestor: { pageId: "p-lab" } }, 0, false),
 ];
 
-const fallback: Rule = { ...aRule("rf", 4, "Anything no rule matched", "t-info", {}), kind: "fallback" };
+const fallback: Rule = { ...aRule("rf", 4, "Anything no rule matched", "t-info", {}, 12), kind: "fallback" };
 
 const types = [
     aPageType("t-landing", "landing", { name: "Landing" }),
@@ -53,7 +59,7 @@ const types = [
     aPageType("t-info", "info", { name: "Info" }),
 ];
 
-const tested: RuleTest = {
+const met: RuleTest = {
     verdict: "met",
     conditions: [{ condition: "url" as never, verdict: "met" as never }],
     facts: {
@@ -124,9 +130,15 @@ vi.mock("../../../data/hooks/sites.js", () => ({
 
 vi.mock("../../../data/hooks/templates.js", () => ({
     usePageTypes: () => ({ data: { types, fields: [] }, isPending: false, error: null, refetch: () => undefined }),
+    useTemplates: () => ({ data: { pages: [{ items: [], hasMore: false }] } }),
+    useCreatePageType: writer([]),
+    useSavePageType: writer([]),
+    useDeletePageType: writer([]),
+    useSetScope: writer([]),
 }));
 
 vi.mock("../../../data/hooks/pages.js", () => ({
+    useSetPageTemplates: writer([]),
     usePagePaths: (ids: readonly string[]) => new Map(ids.filter((id) => id === "p-lab").map((id) => [id, "/lab-guides/"])),
     useSiteMap: (filter: { search?: string }) => ({
         data:
@@ -139,7 +151,7 @@ vi.mock("../../../data/hooks/pages.js", () => ({
 }));
 
 vi.mock("../../../data/hooks/classification.js", () => ({
-    useRules: () => ({ data: { rules, fallback }, isPending: false, error: null, refetch: () => undefined }),
+    useRules: () => ({ data: { rules, fallback, beforeRules: 0 }, isPending: false, error: null, refetch: () => undefined }),
     useSaveRule: writer(calls.saved, () => answers.saveError),
     useDeleteRule: writer(calls.deleted),
     useReorderRules: writer(calls.reordered),
@@ -147,7 +159,7 @@ vi.mock("../../../data/hooks/classification.js", () => ({
         if (request !== null) {
             calls.tested.push(request);
         }
-        return { data: request === null ? undefined : tested, error: null, isPending: false };
+        return { data: request === null ? undefined : (answers.tested ?? met), error: null, isPending: false };
     },
     useClassificationPreview: (_siteId: string, enabled: boolean) => ({
         data: enabled ? preview : undefined,
@@ -165,7 +177,7 @@ vi.mock("../../../data/hooks/classification.js", () => ({
     useApplyClassification: writer(calls.applied, () => answers.applyError),
 }));
 
-const { ClassificationScreen } = await import("./screen.js");
+const { PageTypesScreen } = await import("../types/screen.js");
 
 beforeAll(() => {
     Element.prototype.hasPointerCapture = () => false;
@@ -181,10 +193,11 @@ beforeEach(() => {
     calls.refetched = 0;
     answers.saveError = null;
     answers.applyError = null;
+    answers.tested = null;
 });
 
 function open(): void {
-    renderScreen(<ClassificationScreen />, "/settings/classification?site=s1");
+    renderScreen(<PageTypesScreen />, "/settings/types?site=s1&view=rules");
 }
 
 function rowOf(id: string): HTMLElement {
@@ -204,35 +217,58 @@ function refused(message: string, field: string): Error {
     return new Error(message, { cause: { code: "INVALID", message, details: { field } } });
 }
 
-describe("Settings, Classification", () => {
-    it("lists the rules in order with their number, name, type and conditions in words, then the type for anything else", () => {
+async function testOn(): Promise<ReturnType<typeof within>> {
+    open();
+    fireEvent.click(screen.getByRole("button", { name: said.open("Guides by address") }));
+    const tester = within(screen.getByRole("region", { name: said.tester.title }));
+    fireEvent.change(tester.getByRole("searchbox"), { target: { value: "recon" } });
+    await waitFor(() => {
+        expect(tester.getByRole("option")).toBeDefined();
+    });
+    fireEvent.click(tester.getByRole("option"));
+    return tester;
+}
+
+describe("Settings, Page types, how pages get a type", () => {
+    it("says what a sync moves and what it leaves, then lists the rules in order with the pages each placed", () => {
         open();
 
+        expect(screen.getByText(said.body)).toBeDefined();
         expect([...document.querySelectorAll("[data-rule-row]")].map((row) => row.getAttribute("data-rule-row"))).toStrictEqual(["r1", "r2", "r3"]);
         expect(within(rowOf("r1")).getByText("Pages that are the front page.")).toBeDefined();
         expect(within(rowOf("r1")).getByText("Landing")).toBeDefined();
+        expect(within(rowOf("r1")).getByText(said.pages(1))).toBeDefined();
         expect(within(rowOf("r2")).getByText("Pages that have an address that has the word guides.")).toBeDefined();
+        expect(within(rowOf("r2")).getByText(said.pages(60))).toBeDefined();
         expect(within(rowOf("r3")).getByText("Pages that sit under /lab-guides/.")).toBeDefined();
         expect(within(rowOf("r3")).getByText(said.off)).toBeDefined();
-        expect(screen.getByText(said.fallback.name)).toBeDefined();
+        expect(within(rowOf("r3")).getByText(said.pages(0))).toBeDefined();
+        const last = document.querySelector<HTMLElement>("[data-rule-fallback]");
+        if (last === null) {
+            throw new Error("no fallback row");
+        }
+        expect(within(last).getByText(said.fallback.name)).toBeDefined();
+        expect(within(last).getByText(said.pages(12))).toBeDefined();
         expect(screen.getByRole("combobox", { name: said.fallback.type }).textContent).toContain("Info");
     });
 
-    it("turns a rule off with the rule as it stands", () => {
+    it("turns a rule off with the rule as it stands", async () => {
+        const user = userEvent.setup();
         open();
 
-        fireEvent.click(screen.getByRole("switch", { name: said.enable("Guides by address") }));
+        await user.click(screen.getByRole("switch", { name: said.enable("Guides by address") }));
 
         expect(calls.saved).toStrictEqual([
             { id: "r2", siteId: "s1", name: "Guides by address", enabled: false, typeId: "t-guide", conditions: rules[1]?.conditions },
         ]);
     });
 
-    it("moves a rule down, and never the first rule up", () => {
+    it("moves a rule down, and never the first rule up", async () => {
+        const user = userEvent.setup();
         open();
 
         expect(screen.getByRole("button", { name: said.moveUp("Front page") })).toHaveProperty("disabled", true);
-        fireEvent.click(screen.getByRole("button", { name: said.moveDown("Front page") }));
+        await user.click(screen.getByRole("button", { name: said.moveDown("Front page") }));
 
         expect(calls.reordered).toStrictEqual([{ siteId: "s1", ruleIds: ["r2", "r1", "r3"] }]);
     });
@@ -307,15 +343,7 @@ describe("Settings, Classification", () => {
     });
 
     it("tests the rule being edited on a page, condition by condition, with the page's facts and what the rules give it", async () => {
-        open();
-        fireEvent.click(screen.getByRole("button", { name: said.open("Guides by address") }));
-        const tester = within(screen.getByRole("region", { name: said.tester.title }));
-
-        fireEvent.change(tester.getByRole("searchbox"), { target: { value: "recon" } });
-        await waitFor(() => {
-            expect(tester.getByRole("option")).toBeDefined();
-        });
-        fireEvent.click(tester.getByRole("option"));
+        const tester = await testOn();
 
         expect(tester.getByText(said.tester.verdict.met("/lab-guides/reconstitution/"))).toBeDefined();
         expect(within(document.querySelector<HTMLElement>('[data-condition-verdict="url"]') ?? document.body).getByText(said.verdicts.met)).toBeDefined();
@@ -323,6 +351,19 @@ describe("Settings, Classification", () => {
         expect(tester.getByText("How-to")).toBeDefined();
         expect(tester.getByText(said.tester.outcomeRule("Guide", said.ruleName(2, "Guides by address")))).toBeDefined();
         expect(calls.tested.at(-1)).toMatchObject({ siteId: "s1", pageId: "p-recon", rule: { id: "r2", typeId: "t-guide" } });
+    });
+
+    it("says the rule cannot give its type to this kind of post, and shows the shop as the shop", async () => {
+        answers.tested = {
+            ...met,
+            verdict: "blocked",
+            facts: { ...met.facts, postType: "product", technical: "shop" },
+        };
+        const tester = await testOn();
+
+        expect(tester.getByText(said.tester.verdict.blocked("/lab-guides/reconstitution/", "Guide", said.postTypes.product))).toBeDefined();
+        const technical = tester.getByText(said.facts.technical).nextElementSibling;
+        expect(technical?.textContent).toBe(said.facts.shop);
     });
 });
 

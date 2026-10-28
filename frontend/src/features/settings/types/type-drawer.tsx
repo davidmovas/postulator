@@ -5,7 +5,7 @@ import { copy } from "../../../copy/index.js";
 import type { CatalogField, PageType } from "../../../data/types.js";
 import { Banner, Button, DeleteIcon, Drawer, EditNoteIcon, SectionLabel, StatusBadge, toneClasses } from "../../../ui/index.js";
 import { CustomFieldForm } from "./custom-field.js";
-import { presetHint, presetIcon, presetTone, roleLabel } from "./labels.js";
+import { presetHint, presetIcon, presetLabel, presetTone, roleLabel } from "./labels.js";
 import { aiWritableOf, lastOfRole, orderedScopes, usualFor } from "./model.js";
 import { ScopeCard } from "./scope-card.js";
 import type { TemplateChoice } from "./type-dialogs.js";
@@ -51,10 +51,10 @@ export function TypeDrawer({ siteId, type, types, catalog, templates, templateNa
                 <section className="flex flex-col gap-2" aria-label={said.identity}>
                     <SectionLabel>{said.identity}</SectionLabel>
                     <dl className="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-sm">
-                        <dt className="text-ink-dim">{said.role}</dt>
+                        <dt className="text-ink-dim">{said.startsFrom}</dt>
                         <dd className="flex items-center gap-1.5 text-ink">
                             <Icon size={14} className={toneClasses[presetTone(type.preset)].ink} />
-                            {role}
+                            {presetLabel(type.preset)}
                             {type.writable ? null : (
                                 <StatusBadge tone="muted" dot={false}>
                                     {copy.pageTypes.screen.readOnly}

@@ -18,12 +18,8 @@ function pages(count: number): string {
 
 export const classification = {
     pages,
-    title: "Classification",
-    body: "Every sync gives each page a type by these rules, read from the top: the first rule a page meets decides its type. A page no rule meets takes the type at the bottom. A type a person chose by hand is never changed.",
-    site: "Site",
+    body: "A page no rule meets takes the type at the bottom. A sync types new pages and those a rule placed; a type set by hand never moves, and one given before 2.6 moves only when the preview is applied.",
     loading: "Loading the rules",
-    noSites: "Add a site first: the rules belong to a site.",
-    openSites: "Open the sites",
     rulesTitle: "Rules",
     add: "New rule",
     preview: "Preview the changes",
@@ -185,7 +181,7 @@ export const classification = {
             met: (path: string) => `${path} meets this rule.`,
             unmet: (path: string) => `${path} does not meet this rule.`,
             waiting: (path: string) => `${path} has not been rendered yet, so this rule waits.`,
-            blocked: (path: string, type: string) => `${path} meets this rule, but cannot be a ${type} page.`,
+            blocked: (path: string, type: string, kind: string) => `${path} meets this rule, but the rule cannot give ${type} to ${kind}.`,
         },
         facts: "What the page shows",
         outcome: "What the saved rules give it",
@@ -214,7 +210,8 @@ export const classification = {
         none: "None",
         top: "The top of the site",
         listingOf: (products: number) => (products === 1 ? "Lists 1 product" : `Lists ${products} products`),
-        notTechnical: "No",
+        shop: "The shop",
+        otherKind: "this kind of post",
     },
     previewDialog: {
         title: "Preview the classification",

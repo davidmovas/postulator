@@ -7,6 +7,8 @@ export const settingsHome = "/settings/models";
 
 export const pageTypesPath = "/settings/types";
 
+export const rulesView = "rules";
+
 export function pageTypesOf(siteId: string): string {
     return `${pageTypesPath}?site=${encodeURIComponent(siteId)}`;
 }
@@ -15,16 +17,13 @@ export function pageTypeOf(siteId: string, typeId: string): string {
     return `${pageTypesOf(siteId)}&type=${encodeURIComponent(typeId)}`;
 }
 
-export const classificationPath = "/settings/classification";
-
-export function classificationOf(siteId: string): string {
-    return `${classificationPath}?site=${encodeURIComponent(siteId)}`;
+export function pageTypeRulesOf(siteId: string | null): string {
+    return siteId === null || siteId === "" ? `${pageTypesPath}?view=${rulesView}` : `${pageTypesOf(siteId)}&view=${rulesView}`;
 }
 
 export const settingsTabs: readonly TabItem<SettingsTabKey>[] = [
     { key: "models", label: copy.settings.tabs.models, to: settingsHome },
     { key: "types", label: copy.settings.tabs.types, to: pageTypesPath },
-    { key: "classification", label: copy.settings.tabs.classification, to: classificationPath },
     { key: "runs", label: copy.settings.tabs.runs, to: "/settings/runs" },
     { key: "agent", label: copy.settings.tabs.agent, to: "/settings/agent" },
     { key: "browser", label: copy.settings.tabs.browser, to: browserSettingsPath },

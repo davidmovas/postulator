@@ -6,9 +6,10 @@ import { errorMessageOf } from "../../../data/errors.js";
 import { useRuleTest } from "../../../data/hooks/classification.js";
 import { usePagePaths } from "../../../data/hooks/pages.js";
 import type { PageFacts, RuleTest, SaveRuleRequest, SiteMapRef } from "../../../data/types.js";
+import { isOneOf, pageWpTypes } from "../../../generated/vocab.js";
 import { Button, SkeletonRows, StatusBadge, useDebounced } from "../../../ui/index.js";
 import { PageSearch } from "../../findings/page-search.js";
-import { conditionLabel, postTypeOption, schemaOption, verdictLabel, verdictTone } from "./labels.js";
+import { conditionLabel, postTypeOption, postTypeWord, schemaOption, verdictLabel, verdictTone } from "./labels.js";
 import { asksAnything } from "./model.js";
 
 const said = copy.classification.tester;
@@ -23,8 +24,21 @@ export interface RuleTesterProps {
     ruleName: (ruleId: string) => string;
 }
 
+const shopReason = "shop";
+
 function yesNo(value: boolean): string {
     return value ? facts.yes : facts.no;
+}
+
+function technicalFact(technical: string): string {
+    if (technical === "") {
+        return facts.no;
+    }
+    return technical === shopReason ? facts.shop : facts.yes;
+}
+
+function kindOf(postType: string): string {
+    return isOneOf(pageWpTypes, postType) ? postTypeWord(postType) : facts.otherKind;
 }
 
 function FactList({ held, paths }: { held: PageFacts; paths: ReadonlyMap<string, string> }): ReactElement {
@@ -36,7 +50,7 @@ function FactList({ held, paths }: { held: PageFacts; paths: ReadonlyMap<string,
         [facts.level, String(held.level)],
         [facts.ancestors, ancestors.length === 0 ? facts.top : ancestors.join(" › ")],
         [facts.frontPage, yesNo(held.frontPage)],
-        [facts.technical, held.technical === "" ? facts.notTechnical : facts.yes],
+        [facts.technical, technicalFact(held.technical)],
         [facts.rendered, yesNo(held.rendered)],
         [facts.listing, held.listing ? facts.listingOf(held.products) : facts.no],
         [facts.schema, (held.schema ?? []).length === 0 ? facts.none : (held.schema ?? []).map(schemaOption).join(", ")],
@@ -82,7 +96,7 @@ function headline(answered: RuleTest, path: string, type: string): string {
         case "waiting":
             return said.verdict.waiting(path);
         case "blocked":
-            return said.verdict.blocked(path, type);
+            return said.verdict.blocked(path, type, kindOf(answered.facts.postType));
         default:
             return said.verdict.unmet(path);
     }

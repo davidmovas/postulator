@@ -6,7 +6,7 @@ import { fieldErrorOf, formErrorOf } from "../../../data/errors.js";
 import { useCreatePageType, useDeletePageType, useSavePageType } from "../../../data/hooks/templates.js";
 import { pushToast } from "../../../data/toasts.js";
 import type { PageType } from "../../../data/types.js";
-import { pageTypePresets } from "../../../generated/vocab.js";
+import { creatablePageTypePresets } from "../../../generated/vocab.js";
 import type { SelectOption } from "../../../ui/index.js";
 import { DeleteIcon, Dialog, Field, Input, Select } from "../../../ui/index.js";
 import { presetHint, presetLabel } from "./labels.js";
@@ -16,7 +16,9 @@ const said = copy.pageTypes.form;
 
 const noTemplate = "none";
 
-const presetOptions: readonly SelectOption<string>[] = pageTypePresets.map((value) => ({
+const firstPreset: string = creatablePageTypePresets[0] ?? "";
+
+const presetOptions: readonly SelectOption<string>[] = creatablePageTypePresets.map((value) => ({
     value,
     label: presetLabel(value),
 }));
@@ -39,7 +41,7 @@ export function TypeFormDialog({ open, siteId, type, templates, onOpenChange, on
     const create = useCreatePageType();
     const save = useSavePageType();
     const [name, setName] = useState("");
-    const [preset, setPreset] = useState<string>(pageTypePresets[0]);
+    const [preset, setPreset] = useState<string>(firstPreset);
     const [templateId, setTemplateId] = useState(noTemplate);
     const [missing, setMissing] = useState(false);
 
@@ -51,7 +53,7 @@ export function TypeFormDialog({ open, siteId, type, templates, onOpenChange, on
         save.reset();
         setMissing(false);
         setName(type?.name ?? "");
-        setPreset(type?.preset ?? pageTypePresets[0]);
+        setPreset(type?.preset ?? firstPreset);
         setTemplateId(type?.templateId ?? noTemplate);
     }, [open, type?.id]);
 
