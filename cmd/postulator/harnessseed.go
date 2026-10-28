@@ -27,6 +27,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/templates"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/template"
@@ -425,6 +426,9 @@ func seed(ctx context.Context, core *app.Core, site *wptest.Server, provider *pa
 	if adoptErr := adoptTheSite(ctx, core, site, siteID); adoptErr != nil {
 		return adoptErr
 	}
+	if beforeErr := seedTypedBeforeTheRules(ctx, core, siteID, pagesByPath); beforeErr != nil {
+		return beforeErr
+	}
 	if productErr := seedProduct(ctx, core, siteID, entities, pagesByPath); productErr != nil {
 		return productErr
 	}
@@ -766,6 +770,43 @@ func seedPageTypes(ctx context.Context, core *app.Core, siteID string, byPath ma
 		Links: field.NoLinks(), Label: subtitleLabel, Provider: string(field.ProviderPlugin),
 	})
 	return err
+}
+
+func seedTypedBeforeTheRules(ctx context.Context, core *app.Core, siteID string, byPath map[string]string) error {
+	listed, err := core.PageTypes.List(ctx, pagetypes.ListRequest{SiteID: siteID})
+	if err != nil {
+		return err
+	}
+	info := ""
+	for index := range listed.Types {
+		if pagetype.Preset(listed.Types[index].Preset) == pagetype.Info {
+			info = listed.Types[index].ID
+		}
+	}
+	if info == "" {
+		return errors.New(errors.NotFound, "the site was created without an Info type")
+	}
+
+	repo := sqlite.NewPageRepo(core.Store)
+	for _, path := range typedBeforeRules() {
+		page, getErr := repo.Get(ctx, byPath[path])
+		if getErr != nil {
+			return getErr
+		}
+		was := pagetype.Assignment{Source: page.TypeSource, Reason: page.TypeReason, RuleID: page.TypeRuleID}
+		if page.PageTypeID != nil {
+			was.TypeID = *page.PageTypeID
+		}
+		moved, classifyErr := repo.Classify(ctx, page.ID, was,
+			pagetype.Assignment{TypeID: info, Source: pagemap.TypeSourceAuto, Reason: pagemap.TypeByKind}, time.Now().UTC())
+		if classifyErr != nil {
+			return classifyErr
+		}
+		if !moved {
+			return errors.New(errors.Conflict, "the harness could not give "+path+" a type from before the rules")
+		}
+	}
+	return nil
 }
 
 func scopeOf(kind pagetypes.Type, key field.Key) (pagetypes.Scope, bool) {
