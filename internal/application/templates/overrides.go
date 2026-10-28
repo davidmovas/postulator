@@ -3,6 +3,7 @@ package templates
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/domain/graph"
@@ -12,6 +13,11 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/template"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
+)
+
+const (
+	detailReason     = "reason"
+	reasonUnassigned = "no_template"
 )
 
 func (s *Service) SetOverride(ctx context.Context, req SetOverrideRequest) (SetOverrideResponse, error) {
@@ -126,7 +132,8 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 		templateID, source = owner.Defaults.TemplateID, SourceSite
 	}
 	if templateID == nil {
-		return ResolveForPageResponse{}, errors.New(errors.NotFound, "page has no template and its site has no default template").WithDetail("pageId", page.ID)
+		return ResolveForPageResponse{}, errors.New(errors.NotFound, page.Path+" has no template: its type has none and the site has no default").
+			WithDetail("pageId", page.ID).WithDetail(detailReason, reasonUnassigned)
 	}
 
 	base, err := s.templates.Get(ctx, *templateID)
@@ -157,6 +164,14 @@ func (s *Service) ResolveForPage(ctx context.Context, req ResolveForPageRequest)
 	return ResolveForPageResponse{
 		TemplateID: base.ID, Name: base.Name, Source: source, SiteID: page.SiteID, Version: base.Version, Spec: spec.Expanded(vars),
 	}, nil
+}
+
+func IsUnassigned(err error) bool {
+	var refused *errors.Error
+	if !stderrors.As(err, &refused) || refused.Code != errors.NotFound {
+		return false
+	}
+	return refused.Details[detailReason] == reasonUnassigned
 }
 
 func (s *Service) varsFor(ctx context.Context, page pagemap.Page, owner site.Site) (template.Vars, error) {

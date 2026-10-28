@@ -286,11 +286,15 @@ func TestOverridesAndResolveForPage(t *testing.T) {
 	orphan := sqlitetest.Page(t, h.store, h.siteID, "/orphan/")
 	h.recorder.Reset()
 
-	if _, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID}); !errors.IsCode(err, errors.NotFound) {
-		t.Fatalf("a page without a template and a site without a default code = %q, want NOT_FOUND", errors.CodeOf(err))
+	unassigned, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: page.ID})
+	if !errors.IsCode(err, errors.NotFound) || !templates.IsUnassigned(err) {
+		t.Fatalf("a page without a template and a site without a default = %v (%+v), want NOT_FOUND that says no template answers", err, unassigned)
 	}
-	if _, err := h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: "missing"}); !errors.IsCode(err, errors.NotFound) {
-		t.Fatalf("unknown page code = %q, want NOT_FOUND", errors.CodeOf(err))
+	if !strings.Contains(err.Error(), "/shop/") {
+		t.Fatalf("the refusal %q does not name the page", err.Error())
+	}
+	if _, err = h.service.ResolveForPage(t.Context(), templates.ResolveForPageRequest{PageID: "missing"}); !errors.IsCode(err, errors.NotFound) || templates.IsUnassigned(err) {
+		t.Fatalf("unknown page = %v, want NOT_FOUND that is not taken for a page without a template", err)
 	}
 
 	owner, err := sqlite.NewSiteRepo(h.store).Get(t.Context(), h.siteID)
