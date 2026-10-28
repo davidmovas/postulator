@@ -1245,7 +1245,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-page-type-row=category]"
+        "click": "[data-type-card=category]"
       },
       {
         "wait": 900
@@ -1264,7 +1264,7 @@
     "wait": 1200,
     "steps": [
       {
-        "click": "[data-page-type-row=store_category]"
+        "click": "[data-type-card=store_category]"
       },
       {
         "wait": 900
@@ -1744,7 +1744,7 @@
   },
   {
     "name": "settings-classification-960",
-    "route": "#/settings/classification?site=:siteId",
+    "route": "#/settings/types?site=:siteId&view=rules",
     "width": 960,
     "height": 600,
     "wait": 1400,
@@ -1757,7 +1757,7 @@
   },
   {
     "name": "settings-classification-wide",
-    "route": "#/settings/classification?site=:siteId",
+    "route": "#/settings/types?site=:siteId&view=rules",
     "width": 1440,
     "height": 900,
     "wait": 1400,
@@ -1768,7 +1768,7 @@
   },
   {
     "name": "settings-rule-drawer-960",
-    "route": "#/settings/classification?site=:siteId",
+    "route": "#/settings/types?site=:siteId&view=rules",
     "width": 960,
     "height": 600,
     "wait": 1400,
@@ -1782,7 +1782,7 @@
   },
   {
     "name": "settings-rule-drawer-wide",
-    "route": "#/settings/classification?site=:siteId",
+    "route": "#/settings/types?site=:siteId&view=rules",
     "width": 1440,
     "height": 900,
     "wait": 1400,
@@ -1795,7 +1795,7 @@
   },
   {
     "name": "settings-classification-preview-960",
-    "route": "#/settings/classification?site=:siteId",
+    "route": "#/settings/types?site=:siteId&view=rules",
     "width": 960,
     "height": 600,
     "wait": 1400,
@@ -1813,7 +1813,7 @@
   },
   {
     "name": "settings-classification-preview-wide",
-    "route": "#/settings/classification?site=:siteId",
+    "route": "#/settings/types?site=:siteId&view=rules",
     "width": 1440,
     "height": 900,
     "wait": 1400,
@@ -1827,7 +1827,7 @@
   },
   {
     "name": "settings-classification-rule-on",
-    "route": "#/settings/classification?site=:siteId",
+    "route": "#/settings/types?site=:siteId&view=rules",
     "width": 1440,
     "height": 900,
     "wait": 1400,
@@ -1847,8 +1847,24 @@
     "wait": 1400,
     "steps": [
       { "expect": "[data-agent-dock]" },
-      { "expect": "[data-page-type-row]" },
+      { "expect": "[data-type-card]" },
       { "fits": "main" }
+    ]
+  },
+  {
+    "name": "settings-page-types-before-960",
+    "route": "#/settings/types?site=:siteId",
+    "width": 960,
+    "height": 600,
+    "wait": 1400,
+    "steps": [
+      { "expect": "[data-agent-dock]" },
+      { "expect": "[data-before-rules]" },
+      { "fits": "main" },
+      { "click": "[data-before-rules] button" },
+      { "expect": "[data-workspace]" },
+      { "wait": 700 },
+      { "fits": "[data-workspace]" }
     ]
   },
   {
@@ -1858,7 +1874,7 @@
     "height": 900,
     "wait": 1400,
     "steps": [
-      { "expect": "[data-page-type-row]" },
+      { "expect": "[data-type-card]" },
       { "fits": "main" }
     ]
   },
