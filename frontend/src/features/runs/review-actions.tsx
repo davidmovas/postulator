@@ -12,6 +12,7 @@ export interface ReviewActionsProps {
     runId: string;
     itemId: string;
     pageId: string;
+    sync?: boolean;
     blocked: string | null;
     state: RetryState | null;
     primary: ItemAction | null;
@@ -44,6 +45,7 @@ export function ReviewActions({
     runId,
     itemId,
     pageId,
+    sync = false,
     blocked,
     state,
     primary,
@@ -59,6 +61,7 @@ export function ReviewActions({
     onRegenerate,
 }: ReviewActionsProps): ReactElement {
     const retryReady = state !== null && state.kind === "ready";
+    const rerunOffered = !sync && (blocked !== null || regeneration?.kind === "published");
     return (
         <div className="flex w-full items-center justify-between gap-2">
             <span className="flex shrink-0 items-center gap-1.5 text-2xs text-ink-faint">
@@ -66,15 +69,17 @@ export function ReviewActions({
                 {copy.runs.review.moveItems}
             </span>
             <div className="flex shrink-0 gap-2">
-                <Button
-                    size="sm"
-                    icon={OpenInNewIcon}
-                    onClick={() => {
-                        onOpenPage(pageId);
-                    }}
-                >
-                    {copy.runs.review.openPage}
-                </Button>
+                {sync ? null : (
+                    <Button
+                        size="sm"
+                        icon={OpenInNewIcon}
+                        onClick={() => {
+                            onOpenPage(pageId);
+                        }}
+                    >
+                        {copy.runs.review.openPage}
+                    </Button>
+                )}
                 <Button
                     size="sm"
                     variant="ghost"
@@ -85,7 +90,7 @@ export function ReviewActions({
                 >
                     {copy.agent.askAbout}
                 </Button>
-                {blocked === null && regeneration?.kind !== "published" ? null : (
+                {!rerunOffered ? null : (
                     <Button
                         size="sm"
                         onClick={() => {
@@ -104,12 +109,14 @@ export function ReviewActions({
                     busy={regenerating}
                     title={
                         regeneration === null || regeneration.kind === "ready"
-                            ? copy.runs.regenerateHint
+                            ? sync
+                                ? copy.sync.startOverHint
+                                : copy.runs.regenerateHint
                             : regenerateRefusals[regeneration.kind]
                     }
                     onClick={onRegenerate}
                 >
-                    {copy.runs.regenerate}
+                    {sync ? copy.sync.startOver : copy.runs.regenerate}
                 </Button>
                 <Button
                     size="sm"
@@ -127,7 +134,7 @@ export function ReviewActions({
                     }
                     onClick={onRetry}
                 >
-                    {copy.runs.retryStep}
+                    {sync ? copy.sync.resume : copy.runs.retryStep}
                 </Button>
                 {primary === "accept" ? (
                     <Button

@@ -36,6 +36,7 @@ import {
     itemPaused,
     pauseAwaitingReview,
     retentionDaysKey,
+    stepSyncSite,
 } from "./statuses.js";
 import { stepText } from "./step-cell.js";
 
@@ -187,6 +188,7 @@ export function ReviewDrawer({
                         runId={item.runId}
                         itemId={item.id}
                         pageId={item.targetId}
+                        sync={item.currentStep === stepSyncSite}
                         blocked={blocked}
                         state={state}
                         primary={primary}

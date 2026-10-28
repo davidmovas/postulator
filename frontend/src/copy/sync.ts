@@ -53,6 +53,7 @@ export const sync = {
     },
     resume: "Resume the sync",
     startOver: "Start over",
+    startOverHint: "Starting over walks the whole site again; resuming goes on from the last batch it saved.",
     resumed: "The sync goes on from its last saved batch.",
     underWay: {
         title: "A sync is already under way",
