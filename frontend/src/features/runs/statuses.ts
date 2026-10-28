@@ -2,6 +2,7 @@ import type {
     ArtifactKind,
     ItemStatus,
     PauseReason,
+    PerKindStepName,
     RetryBlockedReason,
     RunKind,
     RunStatus,
@@ -33,7 +34,9 @@ export const retryInputsExpired: RetryBlockedReason = "inputs_expired";
 export const kindGenerate: RunKind = "generate";
 export const kindRevert: RunKind = "revert";
 export const kindRepair: RunKind = "repair";
+export const kindSync: RunKind = "sync";
 
+export const stepSyncSite: PerKindStepName = "sync_site";
 export const stepPublish: StepName = "publish";
 export const stepValidate: StepName = "validate";
 export const stepGenerateBody: StepName = "generate_body";

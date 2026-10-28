@@ -96,6 +96,7 @@ function drawer(): void {
     const item = aHeldItem();
     renderScreen(
         <ReviewDrawer
+            siteId="s1"
             view={{ item, step: "publish", stepStartedAt: null, stepAttempt: 1, stepFailure: null }}
             page={undefined}
             steps={["publish"]}

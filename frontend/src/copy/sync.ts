@@ -43,6 +43,7 @@ export const sync = {
     error: "What stopped it",
     lastError: "Last error",
     stopped: {
+        plain: "The sync stopped",
         title: (phrase: string) => `The sync stopped while ${phrase}`,
         atStart: "The sync stopped before it read a page",
         atEnd: "The sync stopped as it finished",

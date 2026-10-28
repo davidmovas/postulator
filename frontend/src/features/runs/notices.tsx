@@ -5,12 +5,14 @@ import { copy } from "../../copy/index.js";
 import { flatten } from "../../data/call.js";
 import { react } from "../../data/errors.js";
 import { useRegenerate, useRunItems } from "../../data/hooks/runs.js";
+import { useSyncProgress } from "../../data/hooks/sync.js";
 import type { RunEventsState } from "../../data/runs/log.js";
 import type { Run } from "../../data/types.js";
 import { Banner, Button, CloudSyncIcon, RefreshIcon } from "../../ui/index.js";
+import { SyncStopped } from "../sync/index.js";
 import type { RunView } from "./authority.js";
 import { pauseReasonText, pauseReasonTone } from "./labels.js";
-import { statusFailed } from "./statuses.js";
+import { kindSync, statusFailed } from "./statuses.js";
 
 const failedPageSize = 200;
 
@@ -34,7 +36,8 @@ export function RunNotices({
     notedItems,
 }: RunNoticesProps): ReactElement | null {
     const logFailed = events.phase === "error" && events.error !== null;
-    const failed = view.status === statusFailed && run.error !== "";
+    const sync = run.kind === kindSync;
+    const failed = !sync && view.status === statusFailed && run.error !== "";
     const uncapped = !view.capped && !view.terminal;
     const shown =
         gap || logFailed || view.paused || failed || uncapped || failedItems > 0 || heldItems > 0 || notedItems > 0;
@@ -59,7 +62,13 @@ export function RunNotices({
             ) : view.paused ? (
                 <Banner tone={pauseReasonTone(run.pauseReason)} title={pauseReasonText(run.pauseReason)} />
             ) : null}
-            {failed ? <Banner tone="danger" title={copy.runs.detail.failure} body={run.error} /> : null}
+            {failed ? (
+                <Banner
+                    tone="danger"
+                    title={copy.runs.detail.failure}
+                    body={<span className="select-text wrap-anywhere">{run.error}</span>}
+                />
+            ) : null}
             {heldItems > 0 ? (
                 <Banner
                     tone="warn"
@@ -67,12 +76,32 @@ export function RunNotices({
                     body={copy.runs.decisionBody}
                 />
             ) : null}
-            {failedItems > 0 ? <FailedItems runId={run.id} count={failedItems} /> : null}
+            {failedItems > 0 ? (
+                sync ? (
+                    <SyncFailed run={run} />
+                ) : (
+                    <FailedItems runId={run.id} count={failedItems} />
+                )
+            ) : null}
             {notedItems > 0 ? (
                 <Banner tone="warn" title={copy.runs.noted.title(notedItems)} body={copy.runs.noted.body} />
             ) : null}
             {uncapped ? <Banner tone="warn" title={copy.runs.detail.noCap} body={copy.runs.detail.noCapBody} /> : null}
         </div>
+    );
+}
+
+function SyncFailed({ run }: { run: Run }): ReactElement {
+    const progress = useSyncProgress(run.siteId, run.id).data;
+    const known = progress !== undefined && progress.found;
+    return (
+        <SyncStopped
+            runId={run.id}
+            stage={known ? progress.stage : ""}
+            title={known ? undefined : copy.sync.stopped.plain}
+            error=""
+            startOver={true}
+        />
     );
 }
 

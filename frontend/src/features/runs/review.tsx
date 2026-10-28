@@ -48,6 +48,7 @@ function retentionOf(held: unknown): number | null {
 }
 
 export interface ReviewDrawerProps {
+    siteId: string;
     view: ItemView | null;
     page: Page | undefined;
     steps: readonly string[];
@@ -66,6 +67,7 @@ export interface ReviewDrawerProps {
 }
 
 export function ReviewDrawer({
+    siteId,
     view,
     page,
     steps,
@@ -301,6 +303,7 @@ export function ReviewDrawer({
                             <TabPanel label={artifactLabel(active)} active={true}>
                                 <ArtifactPane
                                     key={`${item.id}:${active}`}
+                                    siteId={siteId}
                                     itemId={item.id}
                                     runId={item.runId}
                                     kind={active}

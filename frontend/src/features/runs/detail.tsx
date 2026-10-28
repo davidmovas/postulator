@@ -30,11 +30,13 @@ import {
 import { retryNotices, stepTimeline } from "./log-view.js";
 import { RunNotices } from "./notices.js";
 import { targetPathOf, usePageIndex } from "./page-index.js";
+import { SiteSyncPane } from "./panes/sync.js";
 import { itemSearchOf, readItemStatus } from "./params.js";
 import { RunProgress } from "./progress.js";
 import { recipeSteps } from "./recipe.js";
 import { ReviewDrawer } from "./review.js";
 import { StartRunDrawer } from "./start.js";
+import { kindSync } from "./statuses.js";
 
 const tickMs = 1000;
 
@@ -169,6 +171,11 @@ export function RunDetailScreen(): ReactElement {
                 heldItems={stats.needsHuman ?? 0}
                 notedItems={stats.noted ?? 0}
             />
+            {run.kind === kindSync ? (
+                <div className="max-h-[60%] min-h-0 shrink-0 overflow-y-auto border-b border-hairline">
+                    <SiteSyncPane siteId={siteId} runId={runId} />
+                </div>
+            ) : null}
 
             {listed.isPending ? (
                 <div className="min-h-0 flex-1 overflow-auto p-3">
@@ -197,6 +204,7 @@ export function RunDetailScreen(): ReactElement {
 
             {itemId === null ? null : (
                 <ReviewDrawer
+                    siteId={siteId}
                     view={
                         selected === undefined
                             ? null
