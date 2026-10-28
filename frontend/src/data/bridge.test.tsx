@@ -234,6 +234,78 @@ describe("the page model follows the observation", () => {
     });
 });
 
+describe("a sync's progress follows its run", () => {
+    const held = {
+        active: keys.sync.progress("s1", ""),
+        named: keys.sync.progress("s1", "r1"),
+        otherSite: keys.sync.progress("s2", ""),
+        otherRun: keys.sync.progress("s2", "r2"),
+    } as const;
+
+    type Held = keyof typeof held;
+
+    function synced(): QueryClient {
+        const client = bridged();
+        client.setQueryData(held.active, { found: true, runId: "r1", status: "running" });
+        client.setQueryData(held.named, { found: true, runId: "r1", status: "running" });
+        client.setQueryData(held.otherSite, { found: true, runId: "r2", status: "running" });
+        client.setQueryData(held.otherRun, { found: true, runId: "r2", status: "running" });
+        return client;
+    }
+
+    function refreshed(client: QueryClient): Held[] {
+        return (Object.keys(held) as Held[]).filter(
+            (name) => client.getQueryState(held[name])?.isInvalidated === true,
+        );
+    }
+
+    it.each([
+        ["step.done", { runId: "r1", itemId: "i1", step: "sync_site", durationMs: 900, message: "observed 150 items" }],
+        ["step.retrying", { runId: "r1", itemId: "i1", step: "sync_site", attempt: 1, afterMs: 5000, code: "EXTERNAL", message: "WordPress answered 500" }],
+        ["item.failed", { runId: "r1", itemId: "i1", code: "EXTERNAL", message: "WordPress answered 500" }],
+    ] as const)("reads that sync again, and no other, after %s", (type, payload) => {
+        const client = synced();
+
+        fire(type, payload, "r1");
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual(["active", "named"]);
+    });
+
+    it("leaves every sync alone while a step of another run goes on", () => {
+        const client = synced();
+
+        fire("step.done", { runId: "r9", itemId: "i9", step: "publish", durationMs: 900, message: "published" }, "r9");
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual([]);
+    });
+
+    it.each([
+        ["run.queued", { runId: "r3", kind: "sync", items: 1 }],
+        ["run.started", { runId: "r3" }],
+        ["run.resumed", { runId: "r3" }],
+        ["run.failed", { runId: "r3", code: "EXTERNAL", message: "WordPress answered 500" }],
+        ["item.restarted", { runId: "r3", itemId: "i3" }],
+    ] as const)("reads every site's sync again after %s, which may start or end one", (type, payload) => {
+        const client = synced();
+
+        fire(type, payload, "r3");
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual(["active", "named", "otherSite", "otherRun"]);
+    });
+
+    it("leaves every sync alone when a run of another kind is queued", () => {
+        const client = synced();
+
+        fire("run.queued", { runId: "r4", kind: "generate", items: 3 }, "r4");
+        vi.advanceTimersByTime(usageCoalesceMs);
+
+        expect(refreshed(client)).toEqual([]);
+    });
+});
+
 describe("a plan's card follows its plan", () => {
     function planned(): QueryClient {
         const client = bridged();

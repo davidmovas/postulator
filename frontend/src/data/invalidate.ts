@@ -49,6 +49,16 @@ export function invalidateAll(client: QueryClient, ...list: readonly (readonly u
     }
 }
 
+export function invalidateWhere(
+    client: QueryClient,
+    prefix: readonly unknown[],
+    matches: (key: QueryKey, data: unknown) => boolean,
+): void {
+    void client.invalidateQueries({
+        predicate: (query) => prefixed(query.queryKey, prefix) && matches(query.queryKey, query.state.data),
+    });
+}
+
 export function invalidateBySite(client: QueryClient, prefix: readonly unknown[], siteId: string): void {
     void client.invalidateQueries({
         predicate: (query) => prefixed(query.queryKey, prefix) && siteOf(query.queryKey) === siteId,

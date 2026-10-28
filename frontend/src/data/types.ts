@@ -220,6 +220,7 @@ export type JudgeReport = Wire<ContentModels.JudgeReport>;
 
 export type PluginState = Wire<SyncModels.Plugin>;
 export type SyncSiteRequest = SyncModels.SyncSiteRequest;
+export type SyncProgress = Wire<SyncModels.ProgressResponse>;
 
 export type SettingDescriptor = Wire<SettingsModels.Descriptor>;
 export type SettingValue = Wire<TransportModels.GetSettingResponse>;

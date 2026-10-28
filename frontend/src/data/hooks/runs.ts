@@ -186,6 +186,8 @@ export function useRetryStep() {
         onSettled: () => {
             void client.invalidateQueries({ queryKey: keys.runs.itemLists() });
             void client.invalidateQueries({ queryKey: keys.runs.details() });
+            void client.invalidateQueries({ queryKey: keys.runs.lists() });
+            void client.invalidateQueries({ queryKey: keys.sync.progresses() });
         },
     });
 }
@@ -199,6 +201,7 @@ export function useRegenerate() {
             void client.invalidateQueries({ queryKey: keys.runs.itemLists() });
             void client.invalidateQueries({ queryKey: keys.runs.details() });
             void client.invalidateQueries({ queryKey: keys.runs.lists() });
+            void client.invalidateQueries({ queryKey: keys.sync.progresses() });
         },
     });
 }

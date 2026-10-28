@@ -216,6 +216,8 @@ export const keys = {
         root: () => [scope, "sync"] as const,
         plugins: () => [scope, "sync", "plugin"] as const,
         plugin: (siteId: string) => [scope, "sync", "plugin", siteId] as const,
+        progresses: () => [scope, "sync", "progress"] as const,
+        progress: (siteId: string, runId: string) => [scope, "sync", "progress", siteId, runId] as const,
     },
 };
 

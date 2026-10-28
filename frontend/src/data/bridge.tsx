@@ -18,7 +18,7 @@ import {
     silentConversationIds,
 } from "./agent/turn.js";
 import { publishDrop } from "./drops.js";
-import { coalesce, invalidate, invalidateAll, invalidateBySite } from "./invalidate.js";
+import { coalesce, invalidate, invalidateAll, invalidateBySite, invalidateWhere } from "./invalidate.js";
 import { keys } from "./keys.js";
 import { markLocked, markUnlocked } from "./lock.js";
 import type { RawRunEvent } from "./runs/decode.js";
@@ -69,15 +69,50 @@ function fanOutSite(client: QueryClient, siteId: string | null): void {
     );
 }
 
+const syncRunKind = "sync";
+
+function heldRunOf(data: unknown): string | null {
+    if (typeof data !== "object" || data === null) {
+        return null;
+    }
+    const held = (data as { runId?: unknown }).runId;
+    return typeof held === "string" ? held : null;
+}
+
+function everySync(client: QueryClient): void {
+    coalesce(
+        "sync",
+        () => {
+            invalidate(client, keys.sync.progresses());
+        },
+        itemCoalesceMs,
+    );
+}
+
+function syncOfRun(client: QueryClient, runId: string): void {
+    if (runId === "") {
+        return;
+    }
+    coalesce(
+        `sync:${runId}`,
+        () => {
+            invalidateWhere(client, keys.sync.progresses(), (key, data) => key[4] === runId || heldRunOf(data) === runId);
+        },
+        itemCoalesceMs,
+    );
+}
+
 function runLifecycle(client: QueryClient, envelope: Envelope<EventType>, ...extra: readonly (readonly unknown[])[]): void {
     const runId = runIdOf(envelope);
     ingestLive(runId, record(envelope));
     invalidateAll(client, keys.runs.detail(runId), keys.runs.lists(), ...extra);
+    everySync(client);
 }
 
 function itemChanged(client: QueryClient, envelope: Envelope<EventType>, withDetail: boolean): void {
     const runId = runIdOf(envelope);
     ingestLive(runId, record(envelope));
+    syncOfRun(client, runId);
     coalesce(
         `item:${runId}`,
         () => {
@@ -91,8 +126,10 @@ function itemChanged(client: QueryClient, envelope: Envelope<EventType>, withDet
     );
 }
 
-function stepOnly(envelope: Envelope<EventType>): void {
-    ingestLive(runIdOf(envelope), record(envelope));
+function stepMoved(client: QueryClient, envelope: Envelope<EventType>): void {
+    const runId = runIdOf(envelope);
+    ingestLive(runId, record(envelope));
+    syncOfRun(client, runId);
 }
 
 function spendMoved(client: QueryClient, runId: string): void {
@@ -123,6 +160,9 @@ function handlersFor(client: QueryClient): Handlers {
             coalesce(`run.queued:${runId}`, () => {
                 invalidateAll(client, keys.runs.lists(), keys.runs.detail(runId), keys.schedules.lists());
             });
+            if (envelope.payload.kind === syncRunKind) {
+                everySync(client);
+            }
         },
         "run.started": (envelope) => {
             const runId = runIdOf(envelope);
@@ -130,6 +170,7 @@ function handlersFor(client: QueryClient): Handlers {
             coalesce(`run.started:${runId}`, () => {
                 invalidateAll(client, keys.runs.detail(runId), keys.runs.lists());
             });
+            everySync(client);
         },
         "run.paused": (envelope) => {
             runLifecycle(client, envelope);
@@ -174,13 +215,20 @@ function handlersFor(client: QueryClient): Handlers {
         },
         "item.restarted": (envelope) => {
             itemChanged(client, envelope, true);
+            everySync(client);
         },
         "step.started": (envelope) => {
             itemChanged(client, envelope, false);
         },
-        "step.done": stepOnly,
-        "step.failed": stepOnly,
-        "step.retrying": stepOnly,
+        "step.done": (envelope) => {
+            stepMoved(client, envelope);
+        },
+        "step.failed": (envelope) => {
+            stepMoved(client, envelope);
+        },
+        "step.retrying": (envelope) => {
+            stepMoved(client, envelope);
+        },
         "llm.usage": (envelope) => {
             const runId = runIdOf(envelope);
             coalesce(
