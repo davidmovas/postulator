@@ -101,13 +101,14 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 }
 
 type prepared struct {
-	it      item
-	current pagemap.Page
-	next    pagemap.Page
-	terms   []pagemap.Term
-	body    bodyRead
-	known   bool
-	planned bool
+	it        item
+	current   pagemap.Page
+	next      pagemap.Page
+	terms     []pagemap.Term
+	body      bodyRead
+	known     bool
+	planned   bool
+	rawWanted bool
 }
 
 func (a *absorber) lastSeen(ctx context.Context, items []item) (map[string]lastSeen, error) {
@@ -227,6 +228,11 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 		a.rows.remember(next)
 		batch = append(batch, prepared{it: items[i], current: current, next: next, known: known, planned: planned})
 	}
+	for i := range batch {
+		if err := a.storedBody(ctx, &batch[i]); err != nil {
+			return nil, err
+		}
+	}
 	if err := a.readAll(ctx, batch); err != nil {
 		return nil, err
 	}
@@ -282,14 +288,19 @@ func (a *absorber) read(ctx context.Context, p *prepared) (bool, error) {
 	if err != nil && !closed {
 		return false, during(err, "reading the terms of "+p.next.Path)
 	}
-	body, err := a.readBody(ctx, p.next, p.it)
-	if closedToUser(err) {
-		closed, err = true, nil
+	p.terms = terms
+	if !p.rawWanted {
+		return closed, nil
 	}
-	if err != nil {
+	raw, err := a.readers.Plugin.GetRaw(ctx, string(p.it.mappedType()), p.it.WPID)
+	switch {
+	case closedToUser(err):
+		p.body = bodyRead{}
+		return true, nil
+	case err != nil:
 		return false, during(err, "reading the body of "+p.next.Path)
 	}
-	p.terms, p.body = terms, body
+	p.body = bodyRead{raw: raw.Content, hash: raw.Hash, fetched: true, current: p.body.current}
 	return closed, nil
 }
 
@@ -438,31 +449,26 @@ func (a *absorber) observeFields(ctx context.Context, page pagemap.Page, values 
 	return nil
 }
 
-func (a *absorber) readBody(ctx context.Context, page pagemap.Page, it item) (bodyRead, error) {
+func (a *absorber) storedBody(ctx context.Context, p *prepared) error {
+	it := p.it
 	if it.mappedType().Term() {
-		return bodyRead{}, nil
+		return nil
 	}
-	current, base, found, err := a.service.deps.Bodies.Get(ctx, page.ID)
+	current, base, found, err := a.service.deps.Bodies.Get(ctx, p.next.ID)
 	if err != nil {
-		return bodyRead{}, err
-	}
-	if found && current.Hash == it.ContentHash {
-		return bodyRead{current: current, base: base, stored: true}, nil
+		return err
 	}
 	switch {
+	case found && current.Hash == it.ContentHash:
+		p.body = bodyRead{current: current, base: base, stored: true}
 	case it.HasContent:
-		return bodyRead{raw: it.Content, hash: it.ContentHash, fetched: true, current: current}, nil
+		p.body = bodyRead{raw: it.Content, hash: it.ContentHash, fetched: true, current: current}
 	case it.ContentHash == emptyBody:
-		return bodyRead{hash: it.ContentHash, fetched: true, current: current}, nil
+		p.body = bodyRead{hash: it.ContentHash, fetched: true, current: current}
 	case a.readers.plugin(capabilityRaw):
-		read, readErr := a.readers.Plugin.GetRaw(ctx, string(it.mappedType()), it.WPID)
-		if readErr != nil {
-			return bodyRead{}, readErr
-		}
-		return bodyRead{raw: read.Content, hash: read.Hash, fetched: true, current: current}, nil
-	default:
-		return bodyRead{}, nil
+		p.body, p.rawWanted = bodyRead{current: current}, true
 	}
+	return nil
 }
 
 func (a *absorber) body(ctx context.Context, page pagemap.Page, it item, read bodyRead) error {
