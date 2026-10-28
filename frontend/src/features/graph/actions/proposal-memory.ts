@@ -17,6 +17,7 @@ export interface ProposalMemory {
     edits: ProposalEdits;
     query: string;
     filter: ProposalFilter;
+    matched: ReadonlySet<number> | null;
     collapsed: ReadonlySet<number>;
     focus: number | null;
     anchor: number | null;
@@ -34,6 +35,7 @@ function blank(input: ProposalInput, stage: ProposalStage): ProposalMemory {
         edits: new Map<number, ProposalEdit>(),
         query: "",
         filter: "all" as const,
+        matched: null,
         collapsed: new Set<number>(),
         focus: null,
         anchor: null,

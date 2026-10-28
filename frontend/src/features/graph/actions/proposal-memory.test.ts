@@ -28,6 +28,7 @@ describe("the proposal memory", () => {
         expect(held.edits.size).toBe(0);
         expect(held.query).toBe("");
         expect(held.filter).toBe("all");
+        expect(held.matched).toBeNull();
         expect(held.collapsed.size).toBe(0);
         expect(held.focus).toBeNull();
         expect(held.anchor).toBeNull();

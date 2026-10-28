@@ -1,5 +1,5 @@
-import type { KeyboardEvent, ReactElement } from "react";
-import { useId, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, KeyboardEvent, ReactElement } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { copy } from "../../../copy/index.js";
 import type { ProposedEntity } from "../../../data/types.js";
@@ -14,7 +14,6 @@ import {
     SearchIcon,
     Segmented,
     Select,
-    shiftHeld,
     Stars2Icon,
     Textarea,
     VirtualRows,
@@ -33,13 +32,14 @@ import type {
 } from "../model/proposal-tree.js";
 import {
     branches,
-    cascaded,
     changed,
     clashNoName,
     clashesOf,
     everyTickable,
+    heldOn,
     keywordLinesOf,
     keywordsOf,
+    matchedRows,
     nameOf,
     orphaned,
     parentChoices,
@@ -49,9 +49,14 @@ import {
     pruned,
     rangeTicked,
     sharedLabel,
+    shownReach,
+    spanTicked,
     tickState,
+    tickedAll,
     tickedByType,
+    tickedTo,
     treeStep,
+    turnsOn,
     typeCounts,
     visibleRows,
 } from "../model/proposal-tree.js";
@@ -70,11 +75,41 @@ const treeKeys: Readonly<Record<string, TreeKey>> = {
     End: "end",
 };
 
+type TickHow = "deep" | "one" | "range";
+
+interface HeldKeys {
+    shiftKey: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+}
+
+const noKeys: HeldKeys = Object.freeze({ shiftKey: false, ctrlKey: false, metaKey: false });
+
+function howOf(keys: HeldKeys): TickHow {
+    if (keys.shiftKey) {
+        return "range";
+    }
+    return keys.ctrlKey || keys.metaKey ? "one" : "deep";
+}
+
+function keysOf(event: ChangeEvent<HTMLInputElement>): HeldKeys {
+    const native = event.nativeEvent;
+    return native instanceof MouseEvent ? native : noKeys;
+}
+
+interface Drag {
+    on: boolean;
+    deep: boolean;
+    kept: ReadonlySet<number>;
+    painted: Set<number>;
+}
+
 export interface ReviewState {
     kept: ReadonlySet<number>;
     edits: ProposalEdits;
     query: string;
     filter: ProposalFilter;
+    matched: ReadonlySet<number> | null;
     collapsed: ReadonlySet<number>;
     focus: number | null;
     anchor: number | null;
@@ -181,15 +216,16 @@ interface RowProps {
     row: TreeRow;
     id: string;
     focused: boolean;
-    onTick: (at: number, ranged: boolean) => void;
+    onTick: (at: number, how: TickHow) => void;
+    onPress: (at: number, how: TickHow) => void;
+    onPaint: (at: number, buttons: number) => void;
     onFold: (at: number) => void;
     onFocus: (at: number) => void;
     onGrab: () => void;
 }
 
-function ProposalRow({ context, row, id, focused, onTick, onFold, onFocus, onGrab }: RowProps): ReactElement {
+function ProposalRow({ context, row, id, focused, onTick, onPress, onPaint, onFold, onFocus, onGrab }: RowProps): ReactElement {
     const { at } = row;
-    const pressedShift = useRef(false);
     const proposal = context.proposals[at];
     const name = nameOf(context.proposals, context.edits, at);
     const path = pathOf(proposal);
@@ -216,10 +252,16 @@ function ProposalRow({ context, row, id, focused, onTick, onFold, onFocus, onGra
             aria-current={focused ? true : undefined}
             onMouseDown={(event) => {
                 event.preventDefault();
-                pressedShift.current = event.shiftKey;
                 onGrab();
             }}
-            onClick={() => {
+            onPointerOver={(event) => {
+                onPaint(at, event.buttons);
+            }}
+            onClick={(event) => {
+                if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                    onTick(at, howOf(event));
+                    return;
+                }
                 onFocus(at);
             }}
             className={cx(
@@ -248,8 +290,16 @@ function ProposalRow({ context, row, id, focused, onTick, onFold, onFocus, onGra
                 <span aria-hidden={true} className="w-5 shrink-0" />
             )}
             <span
+                onPointerDown={(event) => {
+                    if (event.button === 0 && !allBlocked) {
+                        onPress(at, howOf(event));
+                    }
+                }}
                 onClick={(event) => {
                     event.stopPropagation();
+                    if (event.detail > 0) {
+                        event.preventDefault();
+                    }
                 }}
                 className="flex shrink-0 items-center"
             >
@@ -260,9 +310,7 @@ function ProposalRow({ context, row, id, focused, onTick, onFold, onFocus, onGra
                     disabled={allBlocked}
                     aria-label={path === "" ? shown : said.keepRow(shown, path)}
                     onChange={(event) => {
-                        const ranged = pressedShift.current || shiftHeld(event);
-                        pressedShift.current = false;
-                        onTick(at, ranged);
+                        onTick(at, howOf(keysOf(event)));
                     }}
                 />
             </span>
@@ -270,7 +318,10 @@ function ProposalRow({ context, row, id, focused, onTick, onFold, onFocus, onGra
                 <span className="flex min-w-0 items-baseline gap-2">
                     <span
                         title={shown}
-                        className={cx("truncate text-sm", name.trim() === "" ? "text-ink-faint" : blocked ? "text-ink-dim" : "text-ink")}
+                        className={cx(
+                            "truncate text-sm",
+                            name.trim() === "" ? "text-ink-faint" : blocked || !row.matched ? "text-ink-dim" : "text-ink",
+                        )}
                     >
                         {shown}
                     </span>
@@ -443,7 +494,7 @@ function TypeBar({ proposals, state, kept, clashes, types, onChange }: TypeBarPr
     const chosen = state.typeChoice !== null && counts.has(state.typeChoice) ? state.typeChoice : null;
     const tickType = (on: boolean): void => {
         if (chosen !== null) {
-            onChange({ kept: tickedByType(proposals, state.pageTypes, kept, clashes, chosen, on) });
+            onChange({ kept: tickedByType(proposals, state.pageTypes, kept, clashes, chosen, on), anchor: null });
         }
     };
     return (
@@ -491,14 +542,22 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
         () => ({ proposals, edits: state.edits, tree, clashes, kept, entities }),
         [proposals, state.edits, tree, clashes, kept, entities],
     );
-    const rows = useMemo(
-        () => visibleRows(proposals, state.edits, tree, kept, { query: state.query, filter: state.filter, collapsed: state.collapsed }),
-        [proposals, state.edits, tree, kept, state.query, state.filter, state.collapsed],
-    );
+    const rows = useMemo(() => visibleRows(tree, state.matched, state.collapsed), [tree, state.matched, state.collapsed]);
+    const reach = useMemo(() => shownReach(tree, clashes, rows), [tree, clashes, rows]);
+    const drag = useRef<Drag | null>(null);
+    const unlisten = useRef<(() => void) | null>(null);
     const tickableCount = proposals.length - clashes.size;
     const focus = state.focus !== null && state.focus < proposals.length ? state.focus : null;
     const focusRow = focus === null ? -1 : rows.findIndex((row) => row.at === focus);
     const rowId = (at: number): string => `${treeId}-${String(at)}`;
+    const shownRow = (at: number | null): at is number => at !== null && rows.some((row) => row.at === at);
+
+    useEffect(
+        () => () => {
+            unlisten.current?.();
+        },
+        [],
+    );
 
     const edit = (at: number, next: ProposalEdit | null): void => {
         const edits = new Map(state.edits);
@@ -510,10 +569,65 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
         onChange({ edits });
     };
 
-    const tick = (at: number, ranged: boolean): void => {
-        const anchored = ranged && state.anchor !== null && rows.some((row) => row.at === state.anchor);
-        const next = ranged ? rangeTicked(tree, kept, clashes, rows, state.anchor, at) : cascaded(tree, kept, clashes, at);
-        onChange(anchored ? { kept: next } : { kept: next, anchor: at });
+    const tick = (at: number, how: TickHow): Drag => {
+        const deep = how !== "one";
+        const on = turnsOn(tree, kept, clashes, at, deep);
+        const next = how === "range" ? rangeTicked(tree, kept, clashes, rows, state.anchor, at) : tickedTo(tree, kept, clashes, at, on, deep);
+        onChange({ kept: next, anchor: at, focus: at });
+        return { on, deep, kept: next, painted: new Set([at]) };
+    };
+
+    const endDrag = (): void => {
+        drag.current = null;
+        unlisten.current?.();
+        unlisten.current = null;
+    };
+
+    const press = (at: number, how: TickHow): void => {
+        endDrag();
+        drag.current = tick(at, how);
+        const stop = (): void => {
+            endDrag();
+        };
+        document.addEventListener("pointerup", stop);
+        document.addEventListener("pointercancel", stop);
+        window.addEventListener("blur", stop);
+        unlisten.current = () => {
+            document.removeEventListener("pointerup", stop);
+            document.removeEventListener("pointercancel", stop);
+            window.removeEventListener("blur", stop);
+        };
+    };
+
+    const paint = (at: number, buttons: number): void => {
+        const held = drag.current;
+        if (held === null || held.painted.has(at)) {
+            return;
+        }
+        if ((buttons & 1) === 0) {
+            endDrag();
+            return;
+        }
+        held.painted.add(at);
+        held.kept = tickedTo(tree, held.kept, clashes, at, held.on, held.deep);
+        onChange({ kept: held.kept });
+    };
+
+    const extend = (to: number): void => {
+        const from = shownRow(state.anchor) ? state.anchor : shownRow(focus) ? focus : null;
+        if (from === null) {
+            onChange({ focus: to });
+            return;
+        }
+        onChange({ focus: to, anchor: from, kept: spanTicked(tree, kept, clashes, rows, from, to, heldOn(tree, kept, clashes, from)) });
+    };
+
+    const tickShown = (on: boolean): void => {
+        onChange({ kept: tickedAll(kept, reach, on), anchor: null });
+    };
+
+    const narrow = (query: string, filter: ProposalFilter): void => {
+        onChange({ query, filter, matched: matchedRows(proposals, state.edits, kept, query, filter) });
     };
 
     const fold = (at: number, shut: boolean): void => {
@@ -527,6 +641,11 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+            event.preventDefault();
+            tickShown(true);
+            return;
+        }
         const key = treeKeys[event.key];
         if (key !== undefined) {
             event.preventDefault();
@@ -534,16 +653,20 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
             if (step === null) {
                 return;
             }
-            if (step.kind === "focus") {
-                onChange({ focus: step.at });
-            } else {
+            if (step.kind !== "focus") {
                 fold(step.at, step.kind === "collapse");
+                return;
             }
+            if (event.shiftKey && (key === "up" || key === "down")) {
+                extend(step.at);
+                return;
+            }
+            onChange({ focus: step.at });
             return;
         }
         if (event.key === " " && focus !== null && focusRow >= 0) {
             event.preventDefault();
-            tick(focus, event.shiftKey);
+            tick(focus, howOf(event));
         }
     };
 
@@ -563,7 +686,7 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
                             value={state.query}
                             className="pl-7"
                             onChange={(event) => {
-                                onChange({ query: event.target.value });
+                                narrow(event.target.value, state.filter);
                             }}
                         />
                     </div>
@@ -573,12 +696,22 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
                         value={state.filter}
                         options={filterOptions}
                         onValueChange={(filter) => {
-                            onChange({ filter });
+                            narrow(state.query, filter);
                         }}
                     />
                     <span data-proposal-count={kept.size} className="font-mono text-2xs text-ink-faint">
                         {said.tickedOf(kept.size, tickableCount)}
                     </span>
+                    {state.matched === null ? null : (
+                        <span data-proposal-shown={reach.length} className="flex items-center gap-1">
+                            <Button size="sm" variant="ghost" disabled={reach.length === 0} onClick={() => tickShown(true)}>
+                                {said.tickShown(reach.length)}
+                            </Button>
+                            <Button size="sm" variant="ghost" disabled={reach.length === 0} onClick={() => tickShown(false)}>
+                                {said.untickShown(reach.length)}
+                            </Button>
+                        </span>
+                    )}
                     <span className="ml-auto flex flex-wrap items-center gap-1">
                         <Button size="sm" variant="ghost" onClick={() => onChange({ collapsed: new Set() })}>
                             {said.expandAll}
@@ -586,10 +719,14 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
                         <Button size="sm" variant="ghost" onClick={() => onChange({ collapsed: branches(tree) })}>
                             {said.collapseAll}
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => onChange({ kept: everyTickable(proposals.length, clashes) })}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onChange({ kept: everyTickable(proposals.length, clashes), anchor: null })}
+                        >
                             {said.keepAll}
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => onChange({ kept: new Set() })}>
+                        <Button size="sm" variant="ghost" onClick={() => onChange({ kept: new Set(), anchor: null })}>
                             {said.keepNone}
                         </Button>
                     </span>
@@ -619,7 +756,11 @@ export function ProposalReview({ proposals, state, source, existing, types, onCh
                                         row={row}
                                         id={rowId(row.at)}
                                         focused={row.at === focus}
-                                        onTick={tick}
+                                        onTick={(at, how) => {
+                                            tick(at, how);
+                                        }}
+                                        onPress={press}
+                                        onPaint={paint}
                                         onFold={(at) => {
                                             fold(at, !state.collapsed.has(at));
                                         }}

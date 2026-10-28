@@ -48,6 +48,7 @@ function freshReview(answered: readonly ProposedEntity[], pageTypes: SourceTypes
         edits: noEdits,
         query: "",
         filter: "all",
+        matched: null,
         collapsed: new Set(),
         focus: null,
         anchor: null,

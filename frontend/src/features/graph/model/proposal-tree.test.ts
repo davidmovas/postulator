@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { ProposedEntity } from "../../../data/types.js";
 import type { ParentChoice, ProposalEdit, ProposalEdits } from "./proposal-tree.js";
 import {
-    cascaded,
     changed,
     clashesOf,
     entityKey,
     everyTickable,
+    heldOn,
     keywordLinesOf,
+    matchedRows,
     nameOf,
     orphaned,
     originalParent,
@@ -18,11 +19,16 @@ import {
     rangeTicked,
     sentProposals,
     sharedLabel,
+    shownReach,
     sourceTypesOf,
+    spanTicked,
     subtree,
     tickState,
+    tickedAll,
     tickedByType,
+    tickedTo,
     treeStep,
+    turnsOn,
     typeCounts,
     visibleRows,
 } from "./proposal-tree.js";
@@ -140,11 +146,13 @@ describe("what blocks a proposal", () => {
 describe("ticking a subtree", () => {
     const tree = proposalTree(site, none);
     const clashes = clashesOf(site, none);
+    const clicked = (kept: ReadonlySet<number>, at: number): ReadonlySet<number> =>
+        tickedTo(tree, kept, clashes, at, turnsOn(tree, kept, clashes, at, true), true);
 
     it("ticks and unticks a node with its whole subtree, never a blocked row", () => {
-        const on = cascaded(tree, new Set(), clashes, 0);
+        const on = clicked(new Set(), 0);
         expect([...on].sort()).toStrictEqual([0, 1, 2, 3]);
-        expect([...cascaded(tree, on, clashes, 1)].sort()).toStrictEqual([0]);
+        expect([...clicked(on, 1)].sort()).toStrictEqual([0]);
     });
 
     it.each([
@@ -158,7 +166,7 @@ describe("ticking a subtree", () => {
     });
 
     it("ticks the whole subtree when the node is partial", () => {
-        expect([...cascaded(tree, new Set([2]), clashes, 1)].sort()).toStrictEqual([1, 2, 3]);
+        expect([...clicked(new Set([2]), 1)].sort()).toStrictEqual([1, 2, 3]);
     });
 
     it("says a ticked row whose parent is not ticked goes to the top level", () => {
@@ -234,37 +242,43 @@ describe("what is sent to be written", () => {
 
 describe("the rows the tree shows", () => {
     const tree = proposalTree(site, none);
-    const view = { query: "", filter: "all" as const, collapsed: new Set<number>() };
+    const nothing = new Set<number>();
 
     it("shows every row in tree order with its depth", () => {
-        expect(visibleRows(site, none, tree, new Set(), view).map((row) => [row.at, row.depth])).toStrictEqual([
-            [0, 0],
-            [1, 1],
-            [2, 2],
-            [3, 2],
-            [4, 1],
-            [6, 1],
-            [5, 0],
+        expect(visibleRows(tree, null, nothing).map((row) => [row.at, row.depth, row.matched])).toStrictEqual([
+            [0, 0, true],
+            [1, 1, true],
+            [2, 2, true],
+            [3, 2, true],
+            [4, 1, true],
+            [6, 1, true],
+            [5, 0, true],
         ]);
     });
 
     it("hides what a collapsed node holds", () => {
-        const rows = visibleRows(site, none, tree, new Set(), { ...view, collapsed: new Set([1]) });
+        const rows = visibleRows(tree, null, new Set([1]));
         expect(rows.map((row) => row.at)).toStrictEqual([0, 1, 4, 6, 5]);
         expect(rows.find((row) => row.at === 1)).toMatchObject({ branch: true, open: false });
     });
 
-    it("keeps the ancestors of a match visible and opens them", () => {
-        const rows = visibleRows(site, none, tree, new Set(), { ...view, query: "red", collapsed: new Set([0, 1]) });
-        expect(rows.map((row) => row.at)).toStrictEqual([0, 1, 3]);
+    it("keeps the ancestors of a match visible, opens them and marks them as context", () => {
+        const rows = visibleRows(tree, matchedRows(site, none, nothing, "red", "all"), new Set([0, 1]));
+        expect(rows.map((row) => [row.at, row.matched, row.open])).toStrictEqual([
+            [0, false, true],
+            [1, false, true],
+            [3, true, true],
+        ]);
     });
 
     it("matches a path as well as a name, and an edited name", () => {
-        expect(visibleRows(site, none, tree, new Set(), { ...view, query: "/journal" }).map((row) => row.at)).toStrictEqual([5]);
+        expect([...(matchedRows(site, none, nothing, "/journal", "all") ?? [])]).toStrictEqual([5]);
         const renamed = edits([[5, { name: "Field notes" }]]);
-        expect(
-            visibleRows(site, renamed, proposalTree(site, renamed), new Set(), { ...view, query: "field" }).map((row) => row.at),
-        ).toStrictEqual([5]);
+        expect([...(matchedRows(site, renamed, nothing, "field", "all") ?? [])]).toStrictEqual([5]);
+    });
+
+    it("narrows nothing without a search or a filter", () => {
+        expect(matchedRows(site, none, new Set([2]), "  ", "all")).toBeNull();
     });
 
     it.each([
@@ -272,26 +286,80 @@ describe("the rows the tree shows", () => {
         { filter: "unticked" as const, rows: [0, 1, 3, 5] },
         { filter: "clash" as const, rows: [0, 4, 6] },
     ])("filters to the $filter rows with their ancestors", ({ filter, rows }) => {
-        expect(visibleRows(site, none, tree, new Set([2]), { ...view, filter }).map((row) => row.at)).toStrictEqual(rows);
+        expect(visibleRows(tree, matchedRows(site, none, new Set([2]), "", filter), nothing).map((row) => row.at)).toStrictEqual(rows);
     });
 });
 
 describe("a shift-range over the shown rows", () => {
     const tree = proposalTree(site, none);
     const clashes = clashesOf(site, none);
-    const view = { query: "", filter: "all" as const, collapsed: new Set<number>() };
-    const open = visibleRows(site, none, tree, new Set(), view);
-    const folded = visibleRows(site, none, tree, new Set(), { ...view, collapsed: new Set([1]) });
+    const open = visibleRows(tree, null, new Set());
+    const folded = visibleRows(tree, null, new Set([1]));
 
     it.each([
-        { label: "forwards from a ticked anchor, past the blocked rows", rows: open, kept: [1, 2, 3], anchor: 1, target: 5, ticked: [1, 2, 3, 5] },
-        { label: "backwards from a ticked anchor", rows: open, kept: [5], anchor: 5, target: 2, ticked: [2, 3, 5] },
-        { label: "off, when the anchor is off", rows: open, kept: [0, 1, 2, 5], anchor: 3, target: 0, ticked: [5] },
-        { label: "over the shown rows only, leaving a folded branch's children", rows: folded, kept: [5], anchor: 5, target: 0, ticked: [0, 1, 5] },
+        { label: "on when the clicked row is off, though the anchor is off", rows: open, kept: [0, 1, 2, 5], anchor: 3, target: 0, ticked: [0, 1, 2, 3, 5] },
+        { label: "off when the clicked row is on, though the anchor is on", rows: open, kept: [0, 1, 2, 3, 5], anchor: 1, target: 5, ticked: [0] },
+        { label: "on from an off anchor to an off row, past the blocked rows", rows: open, kept: [], anchor: 1, target: 5, ticked: [1, 2, 3, 5] },
+        { label: "backwards, to the state the clicked row takes", rows: open, kept: [0, 1, 2, 3], anchor: 5, target: 2, ticked: [0, 1] },
+        { label: "into what a folded branch holds", rows: folded, kept: [], anchor: 5, target: 1, ticked: [1, 2, 3, 5] },
         { label: "as a plain click without an anchor", rows: open, kept: [], anchor: null, target: 1, ticked: [1, 2, 3] },
         { label: "as a plain click when the anchor is hidden", rows: folded, kept: [], anchor: 2, target: 1, ticked: [1, 2, 3] },
     ])("ticks $label", ({ rows, kept, anchor, target, ticked }) => {
         expect([...rangeTicked(tree, new Set(kept), clashes, rows, anchor, target)].sort()).toStrictEqual(ticked);
+    });
+});
+
+describe("ticking one row, a span and what is shown", () => {
+    const tree = proposalTree(site, none);
+    const clashes = clashesOf(site, none);
+    const open = visibleRows(tree, null, new Set());
+    const folded = visibleRows(tree, null, new Set([1]));
+
+    it.each([
+        { label: "ticks one row without its children", kept: [], at: 1, on: true, deep: false, ticked: [1] },
+        { label: "unticks one row and keeps its children", kept: [1, 2, 3], at: 1, on: false, deep: false, ticked: [2, 3] },
+        { label: "ticks a row with its whole subtree", kept: [], at: 1, on: true, deep: true, ticked: [1, 2, 3] },
+        { label: "leaves a blocked row alone", kept: [], at: 4, on: true, deep: false, ticked: [] },
+    ])("$label", ({ kept, at, on, deep, ticked }) => {
+        expect([...tickedTo(tree, new Set(kept), clashes, at, on, deep)].sort()).toStrictEqual(ticked);
+    });
+
+    it.each([
+        { label: "turns a partial node on with its subtree", kept: [2], at: 1, deep: true, on: true },
+        { label: "turns a full node off with its subtree", kept: [1, 2, 3], at: 1, deep: true, on: false },
+        { label: "turns a ticked row off alone though its children are not ticked", kept: [1], at: 1, deep: false, on: false },
+        { label: "turns an unticked row on alone though its children are ticked", kept: [2, 3], at: 1, deep: false, on: true },
+    ])("$label", ({ kept, at, deep, on }) => {
+        expect(turnsOn(tree, new Set(kept), clashes, at, deep)).toBe(on);
+    });
+
+    it.each([
+        { label: "paints a span on with each row's subtree", kept: [1], rows: open, from: 1, to: 5, on: true, ticked: [1, 2, 3, 5] },
+        { label: "paints a span off with each row's subtree", kept: [0, 1, 2, 3, 5], rows: open, from: 5, to: 1, on: false, ticked: [0] },
+        { label: "paints the last row alone when the first is not shown", kept: [], rows: folded, from: 2, to: 5, on: true, ticked: [5] },
+    ])("$label", ({ kept, rows, from, to, on, ticked }) => {
+        expect([...spanTicked(tree, new Set(kept), clashes, rows, from, to, on)].sort()).toStrictEqual(ticked);
+    });
+
+    it.each([
+        { label: "a row's own tick, though its children are not ticked", kept: [1], at: 1, on: true },
+        { label: "a row's own tick, though its children are ticked", kept: [2, 3], at: 1, on: false },
+        { label: "a blocked row as off", kept: [0, 1, 2, 3, 5], at: 4, on: false },
+    ])("holds $label", ({ kept, at, on }) => {
+        expect(heldOn(tree, new Set(kept), clashes, at)).toBe(on);
+    });
+
+    it.each([
+        { label: "every shown row and what a fold hides under it", rows: folded, reach: [0, 1, 2, 3, 5] },
+        { label: "only the rows a search matched, never their ancestors", rows: visibleRows(tree, matchedRows(site, none, new Set(), "red", "all"), new Set()), reach: [3] },
+        { label: "no blocked row", rows: visibleRows(tree, matchedRows(site, none, new Set(), "", "clash"), new Set()), reach: [] },
+    ])("reaches $label", ({ rows, reach }) => {
+        expect([...shownReach(tree, clashes, rows)].sort()).toStrictEqual(reach);
+    });
+
+    it("ticks and unticks the rows it is handed and keeps the rest", () => {
+        expect([...tickedAll(new Set([0]), [3, 5], true)].sort()).toStrictEqual([0, 3, 5]);
+        expect([...tickedAll(new Set([0, 3, 5]), [3, 5], false)]).toStrictEqual([0]);
     });
 });
 
@@ -351,10 +419,9 @@ describe("a name shared with another entity", () => {
 
 describe("moving through the tree by keyboard", () => {
     const tree = proposalTree(site, none);
-    const view = { query: "", filter: "all" as const, collapsed: new Set<number>() };
-    const open = visibleRows(site, none, tree, new Set(), view);
-    const folded = visibleRows(site, none, tree, new Set(), { ...view, collapsed: new Set([1]) });
-    const searched = visibleRows(site, none, tree, new Set(), { ...view, query: "red", collapsed: new Set([0, 1]) });
+    const open = visibleRows(tree, null, new Set());
+    const folded = visibleRows(tree, null, new Set([1]));
+    const searched = visibleRows(tree, matchedRows(site, none, new Set(), "red", "all"), new Set([0, 1]));
 
     it.each<{ label: string; rows: typeof open; collapsed: number[]; focus: number | null; key: TreeKey; step: TreeStep | null }>([
         { label: "down from nothing to the first row", rows: open, collapsed: [], focus: null, key: "down", step: { kind: "focus", at: 0 } },
