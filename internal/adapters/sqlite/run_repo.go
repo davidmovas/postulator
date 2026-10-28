@@ -16,9 +16,9 @@ import (
 const (
 	runColumns = `id, site_id, kind, status, targets, recipe, template_id, template_version, publish_mode,
 		budget_max_usd, budget_max_tokens, stats_items, stats_done, stats_failed, stats_tokens, stats_usd,
-		created_by, parent_run_id, pause_reason, error, deadline_at, created_at, started_at, finished_at, brief`
+		created_by, parent_run_id, pause_reason, error, deadline_at, created_at, started_at, finished_at, brief, skipped`
 	insertRun = `INSERT INTO runs (` + runColumns + `)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateRun = `UPDATE runs SET status = ?, stats_items = ?, stats_done = ?, stats_failed = ?, stats_tokens = ?,
 		stats_usd = ?, pause_reason = ?, error = ?, deadline_at = ?, started_at = ?, finished_at = ? WHERE id = ?`
 	selectRun      = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
@@ -56,6 +56,12 @@ func (r *RunRepo) Insert(ctx context.Context, record run.Run) error {
 			return err
 		}
 	}
+	skipped := ""
+	if len(record.Skipped) > 0 {
+		if skipped, err = encodeJSON(record.Skipped); err != nil {
+			return err
+		}
+	}
 
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertRun, []any{
 		record.ID, record.SiteID, string(record.Kind), string(record.Status), targets, recipe,
@@ -64,7 +70,7 @@ func (r *RunRepo) Insert(ctx context.Context, record run.Run) error {
 		record.Stats.Items, record.Stats.Done, record.Stats.Failed, record.Stats.Tokens, record.Stats.USD,
 		string(record.CreatedBy), nullString(record.ParentRunID), string(record.PauseReason), record.Error,
 		formatTime(record.DeadlineAt), formatTime(record.CreatedAt),
-		nullTime(record.StartedAt), nullTime(record.FinishedAt), brief,
+		nullTime(record.StartedAt), nullTime(record.FinishedAt), brief, skipped,
 	}, errors.New(errors.Conflict, "a run with this id already exists"), "insert the run")
 	return err
 }
@@ -135,7 +141,7 @@ func scanRun(rows *sql.Rows) (run.Run, error) {
 	var (
 		record                             run.Run
 		kind, status, publishMode, creator string
-		targets, recipe, brief             string
+		targets, recipe, brief, skipped    string
 		pauseReason                        string
 		parentRunID                        sql.NullString
 		deadlineAt, createdAt              string
@@ -145,12 +151,17 @@ func scanRun(rows *sql.Rows) (run.Run, error) {
 		&record.ID, &record.SiteID, &kind, &status, &targets, &recipe, &record.TemplateID, &record.TemplateVersion,
 		&publishMode, &record.Budget.MaxUSD, &record.Budget.MaxTokens, &record.Stats.Items, &record.Stats.Done,
 		&record.Stats.Failed, &record.Stats.Tokens, &record.Stats.USD, &creator, &parentRunID, &pauseReason,
-		&record.Error, &deadlineAt, &createdAt, &startedAt, &finishedAt, &brief,
+		&record.Error, &deadlineAt, &createdAt, &startedAt, &finishedAt, &brief, &skipped,
 	); err != nil {
 		return run.Run{}, err
 	}
 	if brief != "" {
 		if err := decodeJSON(brief, &record.Brief, "stored run brief is not readable"); err != nil {
+			return run.Run{}, err
+		}
+	}
+	if skipped != "" {
+		if err := decodeJSON(skipped, &record.Skipped, "stored pages a run left out are not readable"); err != nil {
 			return run.Run{}, err
 		}
 	}
