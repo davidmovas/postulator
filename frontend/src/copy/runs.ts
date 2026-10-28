@@ -305,7 +305,7 @@ export const runs = {
             generate: "Writes each page from its template and publishes it, then links the pages around it.",
             relink: "Reads each page from WordPress and places the links its rules ask for. The body is left as it is and no model is called.",
             audit: "Runs the page steps you choose without a recipe of its own.",
-            sync: "Reads the whole site back into the page map. The pages it names are ignored.",
+            sync: "A sync is started from the site's Sync button and reads every page back into the page map.",
             import: "Runs the page steps you choose without a recipe of its own.",
             repair: "No model is called. The hierarchy is read from the site and never written, so a repair can no longer be started; a relink fixes the links.",
             revert: "A revert is started from the run it undoes, on that run's page.",
