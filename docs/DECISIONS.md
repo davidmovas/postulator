@@ -5813,3 +5813,47 @@ Settings → Page types and Classification told him nothing. The plan is the ses
 - **`SyncService.Progress`** was added for the screens; the plan named the screens, not the read.
 - **The stands ran after the close**, at the owner's word: vanilla 13 green, the replica 24 green,
   the degraded loop green, none failed; the race groups stay owed.
+
+## 2026-10-28 — the client's "template" sync error, and a page a run cannot write
+
+The owner remembered the client's failed 2.7.0 sync as an error about synced pages that could not
+be given templates, and asked whether the classification of 2.6 was too strict, slow, and what broke
+the sync. The client's site was not available, so 2.7.0 and `dev` were exported side by side and
+synced over the fake WordPress: 433 items (400 empty pages, 30 products, a shop, a cart and a
+checkout), eight seeded types none of which had a template, no site default, 30 ms a request, and a
+`ResolveForPage` that counted its calls and refused every one.
+
+### What the experiments proved
+
+- **A sync never asks for a template.** The call count stayed 0 on both trees; a sync is not
+  `PageScoped`, and nothing in `observe` or `sync_site` reads one. Every page was typed (400 Info by
+  the fallback, 30 Product, 2 Technical, 1 Catalog) and the run completed.
+- **The classification is neither slow nor fragile.** The derive stage, which types every page,
+  took 0.58 s on 2.7.0 and 0.59 s on `dev`; it is in memory and fails only on a database error. The
+  time went to the content stage: 6.3 to 6.6 s per 100 items on 2.7.0 (1,803 requests, 37.9 s in all)
+  against 10.2 s and 911 requests on `dev`.
+- **The client's failure was the batch timeout.** With 2.7.0's step limit shrunk to 3 s, so a batch
+  overran as a 10-minute batch does at about 3 s a request, the sync failed exactly as reported: two
+  `step.retrying`, then `step sync_site failed 3 times and has no attempts left: the WordPress
+  request was cancelled: context deadline exceeded`, and no page stored, so no page was ever typed.
+- **The word "template" came from the run header**, which in 2.7.0 printed "writes drafts" and "no
+  template recorded" on every run, a sync included; 2.8.0 had already removed both (`2680ff8`).
+
+### The defect the owner's intuition pointed at
+
+A page run refused the whole selection on the first chosen page mapped to nothing, and on the first
+page no template answers for, which a Store category, Catalog or Technical page is on a site without
+a default template, those presets carrying none by design; the drawer showed that `NOT_FOUND` as
+"that record no longer exists here", and opening such a page raised the same toast.
+
+### The ruling (owner, 2026-10-28)
+
+- **A chosen page a run cannot write is left out and said, never a refusal**: `no_entity` and
+  `no_template`, in the start's and the estimate's `skipped` and in the run's own (0087), shown in
+  the drawer and on the run screen with each path, its reason and where it is fixed, and counted on
+  the agent's card. Only a selection with nothing left is refused, naming every page.
+- **A picked template still answers for every chosen page**; a directive or a rewrite of a page left
+  out goes with it; a planned parent the run must write first with no template is refused by name.
+- **The steps are unchanged**: they still refuse a page with no entity, and the claim still fails an
+  item whose template was deleted after the start.
+- **It ships in 2.8.0**, unreleased, with no version bump.

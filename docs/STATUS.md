@@ -122,6 +122,15 @@ The client's fourth request, in short:
   rule's page count. Pages still typed before 2.6 are counted and retyped by the preview.
 - **"Entity" is the graph's word again.** The 2.5 type Entity is now "Article"; the Pages column and
   the drawer say "Graph entity", and every page Postulator writes needs one, whatever its type.
+- **A page a run cannot write is left out, not a refusal.** A run over a selection that holds a page
+  with no template (a Store category, Catalog or Technical page on a site without a default
+  template) or a page mapped to nothing in the graph writes the others: the Start-run drawer, the
+  run screen and the assistant's card name each page left out, why, and where it is fixed. Only a
+  selection with nothing left is refused, and it says why for each page. Opening a page with no
+  template no longer raises "That record no longer exists here". The client's "template" error was
+  not this: his 2.7.0 sync was cut by the batch time limit fixed above, and the "no template
+  recorded" he read sat in the run's header, which no longer shows it on a sync (**2026-10-28** in
+  `DECISIONS.md` has the experiments).
 - **No new plugin.** 1.5.2 stays.
 
 ## Release 2.7.0

@@ -333,6 +333,19 @@ a type of their own, so none of them reaches `vocab.ts`, the blank template's re
 three tool step enums; `run.PerKindStep(name)` is the domain predicate and
 `run.StepNames()` is what a template recipe may draw from.
 
+A page run's `Start` and `Estimate` leave out every chosen page they cannot write, and say so
+(2026-10-28): a page mapped to nothing in the graph is `no_entity`, a page no template answers
+for (none of its own, none on its type, no site default: a Store category, Catalog or Technical
+page on such a site) is `no_template`, and each lands in `skipped []{pageId, path, reason,
+pageType}` of both answers and in the run's own `skipped` (`runs.skipped`, 0087), which the run
+screen shows; `skipReasons` is the vocabulary. A directive or a rewrite naming a page left out
+goes with it, a picked template answers for every chosen page, and only a selection with nothing
+left is refused, `INVALID` on `pageIds` with `details.paths` and `details.skipped` and one
+sentence per reason saying where it is fixed. `templates.Unassigned` and `templates.IsUnassigned`
+are the one way that error is made and told apart from a missing page or template, whose
+`NOT_FOUND` still refuses. A planned parent the run must write first and no template answers for
+is refused by name, never as a raw `NOT_FOUND`.
+
 `RunsService.Estimate` answers zero for `relink` and `sync`, because none of their
 steps declares a model role. It prices every target on the template that resolves for it and
 carries `findings []{severity, code, message, pageId?, path?}`: `unpriced_step` names an
