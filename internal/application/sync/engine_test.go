@@ -2,6 +2,7 @@ package sync_test
 
 import (
 	"context"
+	stdsync "sync"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 	"github.com/davidmovas/postulator/internal/runtime"
 	"github.com/davidmovas/postulator/internal/runtime/steps"
@@ -77,6 +79,72 @@ func (noSpecs) ResolveForPage(context.Context, templates.ResolveForPageRequest) 
 	return templates.ResolveForPageResponse{}, nil
 }
 
+func engineOver(t *testing.T, store *sqlite.Store, registry *run.Registry) *runtime.Engine {
+	t.Helper()
+
+	return runtime.New(runtime.Deps{
+		Runs: sqlite.NewRunRepo(store), Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
+		Execs: sqlite.NewStepExecRepo(store), Events: sqlite.NewRunEventRepo(store), Pages: sqlite.NewPageRepo(store),
+		Specs: noSpecs{}, Spend: noSpend{}, Catalog: noCatalog{}, Profiles: noProfiles{},
+		UnitOfWork: store, Publisher: silentBus{},
+	}, registry, runtime.Config{
+		Workers: 2, PerSite: 1, SweepInterval: 20 * time.Millisecond,
+		StepTimeout: 10 * time.Second, LeaseDuration: time.Minute, RunDeadline: time.Hour,
+	}, clock.System{}, zaptest.NewLogger(t))
+}
+
+func TestManySyncsOfOneSiteAtOnceQueueOne(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	siteRepo := sqlite.NewSiteRepo(store)
+	owner := site.Site{
+		ID: id.New(), Name: "Shop", BaseURL: "https://shop.example.com", Username: "editor",
+		Status: site.StatusActive, Plugin: site.PluginState{Capabilities: []string{}},
+		CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+	}
+	owner.SecretRef = site.SecretRef(owner.ID)
+	if err := siteRepo.Insert(t.Context(), owner); err != nil {
+		t.Fatalf("insert the site: %v", err)
+	}
+	registry := run.NewRegistry()
+	if err := registry.Register(steps.SyncSite(steps.Deps{Clock: clock.System{}})); err != nil {
+		t.Fatalf("register the sync step: %v", err)
+	}
+	runRepo := sqlite.NewRunRepo(store)
+	service := sync.New(engineOver(t, store, registry), runRepo, siteRepo, prober{}, packer{}, clock.System{})
+
+	const callers = 8
+	answers := make(chan error, callers)
+	var wait stdsync.WaitGroup
+	for range callers {
+		wait.Go(func() {
+			_, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: owner.ID})
+			answers <- err
+		})
+	}
+	wait.Wait()
+	close(answers)
+
+	queued, refused := 0, 0
+	for err := range answers {
+		switch {
+		case err == nil:
+			queued++
+		case errors.IsCode(err, errors.Conflict):
+			refused++
+		default:
+			t.Errorf("a sync answered %v, want it queued or refused as a conflict", err)
+		}
+	}
+	if queued != 1 || refused != callers-1 {
+		t.Fatalf("queued %d and refused %d of %d syncs started at once, want one queued", queued, refused, callers)
+	}
+	if active, found, err := runRepo.ActiveSync(t.Context(), owner.ID); err != nil || !found || active.Kind != run.KindSync {
+		t.Fatalf("the active sync = %+v %t %v", active, found, err)
+	}
+}
+
 func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 	t.Parallel()
 
@@ -129,22 +197,13 @@ func TestSyncSiteCompletesThroughTheEngine(t *testing.T) {
 	}
 
 	runRepo := sqlite.NewRunRepo(store)
-	engine := runtime.New(runtime.Deps{
-		Runs: runRepo, Items: sqlite.NewRunItemRepo(store), Artifacts: sqlite.NewArtifactRepo(store),
-		Execs: sqlite.NewStepExecRepo(store), Events: sqlite.NewRunEventRepo(store), Pages: pageRepo,
-		Specs: noSpecs{}, Spend: noSpend{}, Catalog: noCatalog{}, Profiles: noProfiles{},
-		UnitOfWork: store, Publisher: silentBus{},
-	}, registry, runtime.Config{
-		Workers: 2, PerSite: 1, SweepInterval: 20 * time.Millisecond,
-		StepTimeout: 10 * time.Second, LeaseDuration: time.Minute, RunDeadline: time.Hour,
-	}, clock.System{}, zaptest.NewLogger(t))
-
+	engine := engineOver(t, store, registry)
 	if startErr := engine.Start(t.Context()); startErr != nil {
 		t.Fatalf("start the engine: %v", startErr)
 	}
 	t.Cleanup(engine.Stop)
 
-	service := sync.New(engine, siteRepo, prober{}, packer{}, clock.System{})
+	service := sync.New(engine, runRepo, siteRepo, prober{}, packer{}, clock.System{})
 	queued, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: owner.ID})
 	if err != nil {
 		t.Fatalf("SyncSite: %v", err)

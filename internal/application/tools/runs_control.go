@@ -60,7 +60,7 @@ type runsControlArgs struct {
 	Fields         []string        `json:"fields,omitempty" description:"start, estimate: the field keys the run writes, its other steps skipped; revert: the fields to put back; default every field"`
 	Rewrite        []string        `json:"rewrite,omitempty" description:"start, estimate: page ids whose owner's text the run may rewrite"`
 	PublishMode    string          `json:"publishMode,omitempty" enum:"draft,publish" description:"start, estimate: default draft"`
-	Kind           string          `json:"kind,omitempty" enum:"generate,relink,audit,sync,import,custom" description:"start, estimate: the run's purpose; default from the steps"`
+	Kind           string          `json:"kind,omitempty" enum:"generate,relink,audit,import,custom" description:"start, estimate: the run's purpose; default from the steps"`
 	MaxUSD         float64         `json:"maxUsd,omitempty" minimum:"0" description:"start, estimate: dollar ceiling; default configured"`
 	MaxTokens      int             `json:"maxTokens,omitempty" minimum:"0" description:"start, estimate: token ceiling; default configured"`
 	Brief          *briefArgs      `json:"brief,omitempty" description:"start, estimate: what the whole run is for; the writer, the linker and the judge read it first"`

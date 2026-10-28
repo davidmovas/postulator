@@ -21,16 +21,16 @@ func names(recipe []template.StepSpec) []string {
 func TestAKindAPersonMayStartIsNeitherARepairNorARevert(t *testing.T) {
 	t.Parallel()
 
-	startable := []run.Kind{run.KindGenerate, run.KindRelink, run.KindAudit, run.KindSync, run.KindImport, run.KindCustom}
+	startable := []run.Kind{run.KindGenerate, run.KindRelink, run.KindAudit, run.KindImport, run.KindCustom}
 	for _, kind := range startable {
 		if !kind.Startable() {
 			t.Errorf("%s is not startable, yet a person may ask for it", kind)
 		}
 	}
-	for _, kind := range []run.Kind{run.KindRepair, run.KindRevert, run.KindEdit, run.Kind("teleport")} {
+	for _, kind := range []run.Kind{run.KindRepair, run.KindRevert, run.KindEdit, run.KindSync, run.Kind("teleport")} {
 		if kind.Startable() {
 			t.Errorf("%s is startable: a repair writes nothing any more, a revert starts from the run it undoes, "+
-				"an edit from the change a person confirmed", kind)
+				"an edit from the change a person confirmed, a sync from its site, one at a time", kind)
 		}
 	}
 	if run.KindEdit.PageScoped() {

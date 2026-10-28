@@ -385,14 +385,7 @@ export type RunKind = (typeof runKinds)[number];
 
 export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "revert", "edit"];
 
-export const startableRunKinds: readonly RunKind[] = [
-    "generate",
-    "relink",
-    "audit",
-    "sync",
-    "import",
-    "custom",
-];
+export const startableRunKinds: readonly RunKind[] = ["generate", "relink", "audit", "import", "custom"];
 
 export const runStatuses = [
     "pending",

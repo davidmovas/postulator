@@ -2,6 +2,7 @@ package sync_test
 
 import (
 	"context"
+	stderrors "errors"
 	"slices"
 	"testing"
 
@@ -75,8 +76,64 @@ func (p packer) Package() ([]byte, error) {
 	return p.archive, p.err
 }
 
+type underway struct {
+	active []run.Run
+	asked  int
+}
+
+func (u *underway) ActiveSync(context.Context, string) (run.Run, bool, error) {
+	u.asked++
+	if len(u.active) == 0 {
+		return run.Run{}, false, nil
+	}
+	next := u.active[0]
+	if len(u.active) > 1 {
+		u.active = u.active[1:]
+	}
+	if next.ID == "" {
+		return run.Run{}, false, nil
+	}
+	return next, true, nil
+}
+
 func newService(store *sites, q *queue, probe prober, pack packer) *sync.Service {
-	return sync.New(q, store, probe, pack, clock.NewFake(sqlitetest.Stamp))
+	return sync.New(q, &underway{}, store, probe, pack, clock.NewFake(sqlitetest.Stamp))
+}
+
+func TestASecondSyncOfASiteIsRefusedAndNamesTheOneUnderWay(t *testing.T) {
+	t.Parallel()
+
+	running := run.Run{ID: "run-under-way", SiteID: siteID, Kind: run.KindSync, Status: run.StatusRunning}
+	cases := []struct {
+		name   string
+		active []run.Run
+		queue  *queue
+	}{
+		{name: "one already under way", active: []run.Run{running}, queue: &queue{}},
+		{
+			name: "one that won the race to the index", active: []run.Run{{}, running},
+			queue: &queue{err: errors.New(errors.Conflict, "insert the run")},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			service := sync.New(tc.queue, &underway{active: tc.active}, newSites(), prober{}, packer{}, clock.NewFake(sqlitetest.Stamp))
+			_, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: siteID})
+
+			var kernel *errors.Error
+			if !stderrors.As(err, &kernel) || kernel.Code != errors.Conflict || kernel.Details["runId"] != running.ID {
+				t.Fatalf("err = %v, want a conflict naming %s", err, running.ID)
+			}
+			if kernel.Message != "a sync of Shop is already under way; it reads every page, so a second one would only repeat it" {
+				t.Errorf("message = %q", kernel.Message)
+			}
+			if tc.queue.queued.ID != "" {
+				t.Errorf("a second sync was queued: %+v", tc.queue.queued)
+			}
+		})
+	}
 }
 
 func newSites() *sites {
@@ -289,7 +346,7 @@ func TestCheckPluginReprobesASiteThatGainedThePlugin(t *testing.T) {
 	store.record.AllowInsecure = true
 
 	held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
-	service := sync.New(&queue{}, store, held, packer{}, clock.NewFake(sqlitetest.Stamp))
+	service := sync.New(&queue{}, &underway{}, store, held, packer{}, clock.NewFake(sqlitetest.Stamp))
 
 	absent, err := service.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
 	if err != nil {

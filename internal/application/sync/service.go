@@ -17,6 +17,10 @@ type engine interface {
 	Enqueue(ctx context.Context, record run.Run, directives ...run.Directive) (run.Run, error)
 }
 
+type activeSyncs interface {
+	ActiveSync(ctx context.Context, siteID string) (run.Run, bool, error)
+}
+
 type siteStore interface {
 	Get(ctx context.Context, id string) (site.Site, error)
 	Update(ctx context.Context, record site.Site) error
@@ -32,14 +36,15 @@ type packager interface {
 
 type Service struct {
 	engine engine
+	syncs  activeSyncs
 	sites  siteStore
 	probe  pluginProbe
 	packer packager
 	clock  clock.Clock
 }
 
-func New(engine engine, sites siteStore, probe pluginProbe, packed packager, clk clock.Clock) *Service {
-	return &Service{engine: engine, sites: sites, probe: probe, packer: packed, clock: clk}
+func New(engine engine, syncs activeSyncs, sites siteStore, probe pluginProbe, packed packager, clk clock.Clock) *Service {
+	return &Service{engine: engine, syncs: syncs, sites: sites, probe: probe, packer: packed, clock: clk}
 }
 
 func (s *Service) now() time.Time {
@@ -59,6 +64,9 @@ func (s *Service) SyncSite(ctx context.Context, req SyncSiteRequest) (SyncSiteRe
 	record, err := s.sites.Get(ctx, siteID)
 	if err != nil {
 		return SyncSiteResponse{}, err
+	}
+	if busy := s.underway(ctx, record); busy != nil {
+		return SyncSiteResponse{}, busy
 	}
 
 	actor, ok := kctx.ActorFrom(ctx)
@@ -88,10 +96,27 @@ func (s *Service) SyncSite(ctx context.Context, req SyncSiteRequest) (SyncSiteRe
 		CreatedBy:   actor,
 		CreatedAt:   s.now(),
 	})
+	if errors.IsCode(err, errors.Conflict) {
+		if busy := s.underway(ctx, record); busy != nil {
+			return SyncSiteResponse{}, busy
+		}
+	}
 	if err != nil {
 		return SyncSiteResponse{}, err
 	}
 	return SyncSiteResponse{RunID: queued.ID}, nil
+}
+
+func (s *Service) underway(ctx context.Context, record site.Site) error {
+	active, found, err := s.syncs.ActiveSync(ctx, record.ID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+	return errors.New(errors.Conflict, "a sync of "+record.Name+" is already under way; it reads every page, so a second one would only repeat it").
+		WithDetail("runId", active.ID)
 }
 
 func (s *Service) CheckPlugin(ctx context.Context, req CheckPluginRequest) (CheckPluginResponse, error) {

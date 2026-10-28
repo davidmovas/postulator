@@ -33,7 +33,7 @@ func (k Kind) Valid() bool {
 
 func (k Kind) Startable() bool {
 	switch k {
-	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindCustom:
+	case KindGenerate, KindRelink, KindAudit, KindImport, KindCustom:
 		return true
 	default:
 		return false

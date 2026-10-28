@@ -24,7 +24,9 @@ const (
 	selectRun      = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
 	selectStaleRun = `SELECT ` + runColumns + ` FROM runs
 		WHERE status IN ('pending', 'running', 'waiting') AND deadline_at <= ? ORDER BY created_at, id LIMIT ?`
-	selectChildRuns = `SELECT ` + runColumns + ` FROM runs WHERE parent_run_id = ? ORDER BY created_at, id`
+	selectChildRuns  = `SELECT ` + runColumns + ` FROM runs WHERE parent_run_id = ? ORDER BY created_at, id`
+	selectActiveSync = `SELECT ` + runColumns + ` FROM runs
+		WHERE site_id = ? AND kind = 'sync' AND status IN ('pending', 'running', 'waiting', 'paused') LIMIT 1`
 )
 
 type RunRepo struct {
@@ -78,6 +80,15 @@ func (r *RunRepo) Update(ctx context.Context, record run.Run) error {
 
 func (r *RunRepo) Get(ctx context.Context, id string) (run.Run, error) {
 	return selectOne(ctx, r.store.execFrom(ctx), selectRun, []any{id}, scanRun, runNotFound(id), "read the run")
+}
+
+func (r *RunRepo) ActiveSync(ctx context.Context, siteID string) (run.Run, bool, error) {
+	active, err := selectAll(ctx, r.store.execFrom(ctx), selectActiveSync, []any{siteID}, scanRun,
+		"read the sync under way on the site")
+	if err != nil || len(active) == 0 {
+		return run.Run{}, false, err
+	}
+	return active[0], true, nil
 }
 
 func (r *RunRepo) ByParent(ctx context.Context, parentRunID string) ([]run.Run, error) {

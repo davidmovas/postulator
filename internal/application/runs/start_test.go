@@ -226,7 +226,6 @@ func TestAKindWithARecipeOfItsOwnNeverTakesTheTemplates(t *testing.T) {
 			name: "relink", kind: run.KindRelink,
 			want: []string{"resolve_context", "relink_page", "sync_back", "report"},
 		},
-		{name: "sync", kind: run.KindSync, want: []string{"sync_site"}},
 	}
 
 	for _, tc := range cases {
@@ -306,6 +305,23 @@ func TestARevertIsNotStartedLikeAnyOtherRun(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "run it undoes") {
 		t.Fatalf("the refusal does not say where a revert comes from: %v", err)
+	}
+}
+
+func TestASyncIsNotStartedFromAListOfPages(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+
+	_, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: fixture.pages, Kind: string(run.KindSync),
+	})
+	if !errors.IsCode(err, errors.Invalid) || !strings.Contains(err.Error(), "one at a time") {
+		t.Fatalf("Start of a sync over pages = %v, want it refused and pointed at the site's own sync", err)
+	}
+	if fixture.engine.queued.SiteID != "" {
+		t.Fatalf("a sync reached the engine: %+v", fixture.engine.queued)
 	}
 }
 
@@ -458,17 +474,6 @@ func TestARunOverAPageMappedToNothingIsRefusedByTheEstimateToo(t *testing.T) {
 		SiteID: fixture.siteID, PageIDs: fixture.pages[:1],
 	}); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Estimate = %v, want invalid", err)
-	}
-}
-
-func TestASiteWideRunIsNotJudgedByTheMapping(t *testing.T) {
-	t.Parallel()
-
-	fixture := newFixture(t)
-	fixture.mapping.unmapped[fixture.pages[0]] = "/hub/"
-
-	if got := startedWith(t, fixture, runs.StartRequest{Kind: string(run.KindSync)}); !slices.Equal(got, []string{"sync_site"}) {
-		t.Fatalf("a sync run over an unmapped page runs %v, want [sync_site]", got)
 	}
 }
 
