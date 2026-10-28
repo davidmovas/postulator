@@ -5811,4 +5811,5 @@ Settings → Page types and Classification told him nothing. The plan is the ses
 - **Creating a Hub or Entity type is refused in Go**, not only hidden from the picker, so the
   assistant cannot make one either.
 - **`SyncService.Progress`** was added for the screens; the plan named the screens, not the read.
-- **`e2e:full` on the stands was not run** this session; it is item 1 of STATUS's next steps.
+- **The stands ran after the close**, at the owner's word: vanilla 13 green, the replica 24 green,
+  the degraded loop green, none failed; the race groups stay owed.

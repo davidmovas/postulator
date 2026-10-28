@@ -12,10 +12,9 @@ notes are under **Release 2.8.0**, its gate under **The gate at 2.8.0**.
 
 ## Next, in order
 
-1. **2.8.0's owed legs**: `task e2e:full` on vanilla and on the replica (not run this session; a
-   stand's whole suite takes the better part of an hour), then the race legs below, which 2.7.0 owed
-   too. The plain Go suite, both lints with every tag, the harness suite and the whole frontend
-   suite are green (under **The gate at 2.8.0**).
+1. **2.8.0's owed legs**: the race legs below, which 2.7.0 owed too. `e2e:full` on both stands, the
+   degraded loop, the plain Go suite, every lint, the harness suite and the whole frontend suite are
+   green (under **The gate at 2.8.0**).
 2. **The owner opens a pull request from `dev` to `master` for 2.8.0 and tags `v2.8.0`** when he
    asks; the tag's workflow builds the installer, the executable and the plugin zip.
 3. **The client installs 2.8.0 over 2.7.0.** The plugin does not change: 1.5.2 stays, no new zip.
@@ -224,8 +223,8 @@ The notes as the pull request carries them, in short:
 
 ## Known limits at 2.8.0
 
-- **`e2e:full` on both stands, the race groups and `covergate` are owed** for 2.8.0 (items 1 and 5 of
-  **Next, in order**); every package passed without `-race`.
+- **The race groups and `covergate` are owed** for 2.8.0 (item 5 of **Next, in order**); every
+  package passed without `-race`, and both stands' whole suites are green.
 - **A sync is paced by the site's request limit**, four a second by default (`wp.rateLimitPerSecond`
   in Settings → WordPress): 400 pages take at least about three and a half minutes, two requests a
   page for the visit and the plugin's render, more on a host slower than a second a request.
@@ -1026,7 +1025,11 @@ tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
   order, which dates from phase 18: an earlier route starts a new conversation that the scripted
   provider titles like the seeded one, so `/s/:siteId/agent` opens it and not the one holding the
   plans. Phase 19 changed nothing they show.
-- **Owed**: `e2e:full` on both stands and the race groups (items 1 and 5 of **Next, in order**).
+- **`task e2e:full STAND=vanilla -- -v`**: 13 passed, 13 skipped (the replica's own and the degraded
+  loop), 0 failed, 6 min 3 s. **`STAND=replica`**: 24 passed, 2 skipped (the capture, the degraded
+  loop), 0 failed, 15 min 22 s. **`task e2e:full:noplugin STAND=vanilla`**: the degraded loop green in
+  1 min 8 s.
+- **Owed**: the race groups and `covergate` (item 5 of **Next, in order**).
 
 **2026-10-27, on Windows, at the close of phase 18, for 2.7.0. On the final code (`7106ef2`), exit
 codes checked, one leg at a time; the race groups past `application/schedules` and `covergate` are
