@@ -41,7 +41,6 @@ export const pages = {
     },
     importSheet: "Import",
     sync: "Sync site",
-    syncing: "Syncing",
     preview: {
         title: (path: string) => `How ${path} looks on the site`,
         openAnyway: "Open in Tor Browser anyway",

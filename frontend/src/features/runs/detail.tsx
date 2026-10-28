@@ -148,7 +148,9 @@ export function RunDetailScreen(): ReactElement {
                         }}
                     />
                     <span className="ml-auto shrink-0 font-mono text-2xs text-ink-faint" title={run.id}>
-                        {copy.runs.detail.targets(run.targets?.length ?? 0)}
+                        {run.kind === kindSync
+                            ? copy.runs.wholeSite
+                            : copy.runs.detail.targets(run.targets?.length ?? 0)}
                     </span>
                 </Toolbar>
             }

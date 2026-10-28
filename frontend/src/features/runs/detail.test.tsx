@@ -7,6 +7,7 @@ import type { RunEventsState } from "../../data/runs/log.js";
 import type { Run } from "../../data/types.js";
 import { aRun, aSyncRun } from "../../testing/runs.js";
 import { aProgress } from "../../testing/sync.js";
+import { publishingLabel } from "./labels.js";
 
 const held: { run: Run; asked: unknown[] } = { run: aSyncRun(), asked: [] };
 
@@ -97,5 +98,23 @@ describe("a run's screen", () => {
 
         expect(screen.queryByRole("region", { name: copy.sync.pane })).toBeNull();
         expect(held.asked).toEqual([]);
+    });
+
+    it("leaves out of a sync's header what only a run over pages has", () => {
+        shown(aSyncRun({ status: "failed" }));
+
+        expect(screen.queryByText(publishingLabel(held.run.publishMode))).toBeNull();
+        expect(screen.queryByText(copy.runs.detail.noTemplate)).toBeNull();
+        expect(screen.queryByRole("button", { name: copy.runs.revert })).toBeNull();
+        expect(screen.getByText(copy.runs.wholeSite)).toBeDefined();
+    });
+
+    it("keeps a page run's publishing, template, revert and target count", () => {
+        shown(aRun({ status: "completed", templateId: "", targets: ["p1", "p2"] }));
+
+        expect(screen.getByText(publishingLabel(held.run.publishMode))).toBeDefined();
+        expect(screen.getByText(copy.runs.detail.noTemplate)).toBeDefined();
+        expect(screen.getByRole("button", { name: copy.runs.revert })).toBeDefined();
+        expect(screen.getByText(copy.runs.detail.targets(2))).toBeDefined();
     });
 });
