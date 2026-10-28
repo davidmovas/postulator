@@ -21,11 +21,17 @@ describe("what the drawer says a kind does", () => {
         expect(kindDoes("teleport")).toBe("");
     });
 
-    it("offers every kind but a revert, a repair and an agent's edit, which start elsewhere or no longer", () => {
+    it("offers every kind but a sync, a revert, a repair and an agent's edit, which start elsewhere or no longer", () => {
+        expect(startableKinds).not.toContain("sync");
         expect(startableKinds).not.toContain("revert");
         expect(startableKinds).not.toContain("repair");
         expect(startableKinds).not.toContain("edit");
-        expect(startableKinds).toHaveLength(runKinds.length - 3);
+        expect(startableKinds).toHaveLength(runKinds.length - 4);
+    });
+
+    it("says a sync starts from the site's own Sync button, not over the pages picked here", () => {
+        expect(kindDoes("sync")).toMatch(/Sync button/);
+        expect(kindDoes("sync")).not.toMatch(/pages it names/);
     });
 
     it("tells a relink apart from a generate", () => {

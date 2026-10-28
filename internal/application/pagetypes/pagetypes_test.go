@@ -282,14 +282,14 @@ func TestATypeCreatedFromAPresetInheritsItsTemplate(t *testing.T) {
 		requested    *string
 		want         string
 	}{
-		{name: "Pillar", preset: "hub", want: shipped["Hub"]},
-		{name: "Article", preset: "entity", want: shipped["Guide"]},
+		{name: "Pillar", preset: "category", want: shipped["Hub"]},
+		{name: "Article", preset: "guide", want: shipped["Guide"]},
 		{name: "Item", preset: "product", want: shipped["Product"]},
 		{name: "Archive", preset: "store_category", want: ""},
 		{name: "Top", preset: "landing", want: shipped["Hub"]},
 		{name: "Policies", preset: "info", want: shipped["Guide"]},
-		{name: "Plain", preset: "hub", requested: new(""), want: ""},
-		{name: "Chosen", preset: "hub", requested: new(shipped["Category"]), want: shipped["Category"]},
+		{name: "Plain", preset: "category", requested: new(""), want: ""},
+		{name: "Chosen", preset: "category", requested: new(shipped["Category"]), want: shipped["Category"]},
 	}
 	for _, tc := range cases {
 		created, err := h.service.Create(t.Context(), pagetypes.CreateRequest{
@@ -327,18 +327,24 @@ func TestATypeIsCreatedFromAPresetAndRenamed(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 
-	created, err := h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: " Pillar ", Preset: "hub"})
+	created, err := h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: " Pillar ", Preset: "landing"})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	if created.Name != "Pillar" || created.Preset != "hub" || !scopeOf(created, field.Body).Enabled || !scopeOf(created, field.Body).Stored {
+	if created.Name != "Pillar" || created.Preset != "landing" || !scopeOf(created, field.Body).Enabled || !scopeOf(created, field.Body).Stored {
 		t.Fatalf("created = %+v, want Pillar with the hub's scopes", created)
 	}
-	if _, err = h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "pillar", Preset: "entity"}); !errors.IsCode(err, errors.Conflict) {
+	if _, err = h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "pillar", Preset: "guide"}); !errors.IsCode(err, errors.Conflict) {
 		t.Errorf("a second Pillar = %q, want CONFLICT", errors.CodeOf(err))
 	}
 	if _, err = h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Cat", Preset: "pillar"}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("an unknown preset = %q, want INVALID", errors.CodeOf(err))
+	}
+	for _, legacy := range []string{"hub", "entity"} {
+		_, err = h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Old " + legacy, Preset: legacy})
+		if name, reason := reasonOf(t, err); name != "preset" || reason != "preset_before_rules" {
+			t.Errorf("a new %s type = %v (%s %s), want it refused: start from Landing, Category, Guide or Info", legacy, err, name, reason)
+		}
 	}
 
 	hub := h.typeNamed(t, h.siteID, "Landing")
@@ -368,7 +374,7 @@ func TestDeletingATypeReassignsItsPages(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 
-	pillar, err := h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Pillar", Preset: "hub"})
+	pillar, err := h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Pillar", Preset: "landing"})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

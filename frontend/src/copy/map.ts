@@ -103,7 +103,6 @@ export const map = {
         title: "No pages in the model yet",
         body: "A sync reads the site's pages into the model, and an import plans them from a workbook.",
         sync: "Sync now",
-        syncing: "Syncing",
         import: "Import",
     },
     noMatch: {

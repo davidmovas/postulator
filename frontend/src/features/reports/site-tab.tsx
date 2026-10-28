@@ -8,7 +8,6 @@ import { useGraph } from "../../data/hooks/graph.js";
 import { usePageTree } from "../../data/hooks/pages.js";
 import { useLinkAudit, useSiteOverview } from "../../data/hooks/reports.js";
 import { useSite } from "../../data/hooks/sites.js";
-import { useSyncSite } from "../../data/hooks/sync.js";
 import { usePageTypes } from "../../data/hooks/templates.js";
 import { Banner, Button, EmptyState, MonitoringIcon, SkeletonRows } from "../../ui/index.js";
 import { auditCard, bars, coverageRows, driftRows, flattenTree, tiles } from "./model/site.js";
@@ -29,7 +28,6 @@ export function SiteTab({ siteId }: SiteTabProps): ReactElement {
     const graph = useGraph(key);
     const types = usePageTypes(key);
     const site = useSite(key);
-    const sync = useSyncSite();
 
     const pages = useMemo(() => flattenTree(tree.data?.roots ?? null), [tree.data]);
     const drifted = useMemo(() => driftRows(pages), [pages]);
@@ -117,18 +115,11 @@ export function SiteTab({ siteId }: SiteTabProps): ReactElement {
             </div>
             <CoverageTable siteId={siteId} rows={coverage} />
             <DriftTable
+                siteId={siteId}
                 baseUrl={site.data?.site.baseUrl ?? ""}
                 rows={drifted}
-                syncing={sync.isPending}
-                onResync={() => {
-                    sync.mutate(
-                        { siteId },
-                        {
-                            onSuccess: (answered) => {
-                                void navigate(`/s/${siteId}/runs/${answered.runId}`);
-                            },
-                        },
-                    );
+                onStarted={(runId) => {
+                    void navigate(`/s/${siteId}/runs/${runId}`);
                 }}
             />
         </div>

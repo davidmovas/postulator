@@ -20,6 +20,19 @@ export function coalesce(tag: string, run: () => void, delayMs: number = coalesc
     );
 }
 
+export function throttle(tag: string, run: () => void, delayMs: number = coalesceDelayMs): void {
+    if (timers.has(tag)) {
+        return;
+    }
+    timers.set(
+        tag,
+        setTimeout(() => {
+            timers.delete(tag);
+            run();
+        }, delayMs),
+    );
+}
+
 export function cancelCoalesced(): void {
     timers.forEach((held) => {
         clearTimeout(held);
@@ -47,6 +60,16 @@ export function invalidateAll(client: QueryClient, ...list: readonly (readonly u
     for (const key of list) {
         invalidate(client, key);
     }
+}
+
+export function invalidateWhere(
+    client: QueryClient,
+    prefix: readonly unknown[],
+    matches: (key: QueryKey, data: unknown) => boolean,
+): void {
+    void client.invalidateQueries({
+        predicate: (query) => prefixed(query.queryKey, prefix) && matches(query.queryKey, query.state.data),
+    });
 }
 
 export function invalidateBySite(client: QueryClient, prefix: readonly unknown[], siteId: string): void {

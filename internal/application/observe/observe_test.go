@@ -59,6 +59,10 @@ func newScenario(t *testing.T) *scenario {
 		Settings: site.DefaultSettings(), CreatedAt: earlier, UpdatedAt: earlier,
 	}
 	s := &scenario{stores: newStores(owner), clock: clock.NewFake(start)}
+	productTerms := []pagemap.Term{
+		{Taxonomy: "product_cat", TermID: healingTermID, Name: "Healing Peptides", Slug: "healing-peptides", ParentTermID: pepcatTermID},
+		{Taxonomy: "entity", TermID: entityTermID, Name: "BPC-157", Slug: "bpc-157"},
+	}
 	s.plugin = &pluginFake{
 		items: []observe.ContentItem{
 			contentItem(homeID, "page", "/", "Home", homeRaw),
@@ -68,7 +72,7 @@ func newScenario(t *testing.T) *scenario {
 				observe.SEOMeta{Title: "TB-500 | Peptide Store", Description: "Buy TB-500."}),
 			contentItem(shopID, "page", "/shop/", "Shop", ""),
 			contentItem(accountID, "page", "/account/", "Account", accountRaw),
-			withExcerpt(contentItem(productID, "product", "/product/bpc-157-peptide/", "BPC-157 Peptide", "<p>BPC-157 is a pentadecapeptide.</p>"), "<p>Lyophilized BPC-157.</p>"),
+			withTerms(withExcerpt(contentItem(productID, "product", "/product/bpc-157-peptide/", "BPC-157 Peptide", "<p>BPC-157 is a pentadecapeptide.</p>"), "<p>Lyophilized BPC-157.</p>"), productTerms),
 			termItem(pepcatTermID, "/product-category/peptides/", "Peptides", 0),
 			termItem(healingTermID, "/product-category/peptides/healing-peptides/", "Healing Peptides", pepcatTermID),
 		},
@@ -78,12 +82,7 @@ func newScenario(t *testing.T) *scenario {
 		},
 		rendered: map[int64]observe.Rendered{},
 		meta:     map[int64]observe.SEOMeta{tb500ID: {Title: "TB-500 | Peptide Store", Description: "Buy TB-500."}},
-		terms: map[int64][]pagemap.Term{
-			productID: {
-				{Taxonomy: "product_cat", TermID: healingTermID, Name: "Healing Peptides", Slug: "healing-peptides", ParentTermID: pepcatTermID},
-				{Taxonomy: "entity", TermID: entityTermID, Name: "BPC-157", Slug: "bpc-157"},
-			},
-		},
+		terms:    map[int64][]pagemap.Term{productID: productTerms},
 		pages:    site.TechnicalPages{Front: homeID, Shop: shopID},
 		previews: map[int64]string{},
 	}
@@ -148,6 +147,11 @@ func withLinks(item observe.ContentItem, links ...observe.ContentLink) observe.C
 
 func withMeta(item observe.ContentItem, meta observe.SEOMeta) observe.ContentItem {
 	item.Meta = meta
+	return item
+}
+
+func withTerms(item observe.ContentItem, terms []pagemap.Term) observe.ContentItem {
+	item.Terms = terms
 	return item
 }
 

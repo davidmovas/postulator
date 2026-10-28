@@ -7,7 +7,7 @@ import type { Run } from "../../data/types.js";
 import { Button, CancelIcon, Dialog, HistoryIcon, PauseIcon, PlayArrowIcon } from "../../ui/index.js";
 import type { RevertBlock } from "./authority.js";
 import { revertState, runView } from "./authority.js";
-import { statusRunning } from "./statuses.js";
+import { kindSync, statusRunning } from "./statuses.js";
 
 export interface RunControlsProps {
     run: Run;
@@ -58,18 +58,20 @@ export function RunControls({ run, onReverted }: RunControlsProps): ReactElement
             >
                 {copy.runs.resume}
             </Button>
-            <Button
-                data-run-revert={true}
-                icon={HistoryIcon}
-                disabled={revertable.kind !== "ready"}
-                busy={revert.isPending}
-                title={revertable.kind === "ready" ? undefined : revertBlocks[revertable.reason]}
-                onClick={() => {
-                    setReverting(true);
-                }}
-            >
-                {copy.runs.revert}
-            </Button>
+            {run.kind === kindSync ? null : (
+                <Button
+                    data-run-revert={true}
+                    icon={HistoryIcon}
+                    disabled={revertable.kind !== "ready"}
+                    busy={revert.isPending}
+                    title={revertable.kind === "ready" ? undefined : revertBlocks[revertable.reason]}
+                    onClick={() => {
+                        setReverting(true);
+                    }}
+                >
+                    {copy.runs.revert}
+                </Button>
+            )}
             <Button
                 variant="danger"
                 icon={CancelIcon}

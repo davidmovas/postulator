@@ -1,6 +1,6 @@
 import type { SettingGroup } from "../../../generated/vocab.js";
 
-export const settingsTabKeys = ["models", "types", "classification", "runs", "agent", "browser", "security", "about"] as const;
+export const settingsTabKeys = ["models", "types", "runs", "agent", "browser", "security", "about"] as const;
 export type SettingsTabKey = (typeof settingsTabKeys)[number];
 
 export type SectionId =

@@ -27,6 +27,10 @@ func (f syncFake) CheckPlugin(context.Context, sync.CheckPluginRequest) (sync.Ch
 	return answer[sync.CheckPluginResponse](f.mode)
 }
 
+func (f syncFake) Progress(context.Context, sync.ProgressRequest) (sync.ProgressResponse, error) {
+	return answer[sync.ProgressResponse](f.mode)
+}
+
 func (f syncFake) PluginPackage(context.Context, sync.PluginPackageRequest) (sync.PluginPackageResponse, error) {
 	if f.body == nil {
 		return answer[sync.PluginPackageResponse](f.mode)
@@ -38,7 +42,7 @@ func TestSyncServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](syncFake{})), []string{
-		"CheckPlugin", "SavePluginPackage", "SyncSite",
+		"CheckPlugin", "Progress", "SavePluginPackage", "SyncSite",
 	})
 	assertEveryMethodConverts(t, wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](syncFake{mode: missing})), missingBody, "SavePluginPackage")
 	assertEveryMethodConverts(t, wails.NewSyncService(zap.NewNop(), ready[wails.SyncUseCase](syncFake{mode: panicking})), panicBody, "SavePluginPackage")

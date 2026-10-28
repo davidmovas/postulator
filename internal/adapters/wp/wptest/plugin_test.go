@@ -3,9 +3,11 @@ package wptest_test
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -185,6 +187,51 @@ func TestContentPagesWithAnOpaqueCursorAndAnExclusiveSince(t *testing.T) {
 	decode(t, payload, &first)
 	if len(first.Items) != 1 {
 		t.Errorf("since returned %d items, want 1; the bound is exclusive", len(first.Items))
+	}
+}
+
+func TestPostsRestoredWithinOneSecondArePagedOnceEach(t *testing.T) {
+	t.Parallel()
+
+	server := wptest.New(t)
+	within := time.Date(2026, time.October, 28, 16, 0, 0, 0, time.UTC)
+	for i := range 5 {
+		restored := server.Restore(wptest.Item{
+			Type: wptest.TypePage, Title: "Page " + strconv.Itoa(i), Modified: within.Add(time.Duration(i+1) * 100 * time.Millisecond),
+		})
+		if got := restored[0].Modified; !got.Equal(within) {
+			t.Fatalf("restored modified = %s, want the whole second WordPress keeps, %s", got, within)
+		}
+	}
+
+	seen := map[string]int{}
+	cursor := ""
+	for range 10 {
+		var page struct {
+			Items      []map[string]any `json:"items"`
+			NextCursor *string          `json:"nextCursor"`
+		}
+		path := "/wp-json/postulator/v1/content?limit=2"
+		if cursor != "" {
+			path += "&cursor=" + cursor
+		}
+		_, payload := call(t, server, http.MethodGet, path, nil, true)
+		decode(t, payload, &page)
+		for _, item := range page.Items {
+			seen[fmt.Sprint(item["id"])]++
+		}
+		if page.NextCursor == nil {
+			break
+		}
+		cursor = *page.NextCursor
+	}
+	if len(seen) != 5 {
+		t.Fatalf("the listing reached %d of the 5 posts: %v", len(seen), seen)
+	}
+	for id, times := range seen {
+		if times != 1 {
+			t.Errorf("post %s was listed %d times, want once", id, times)
+		}
 	}
 }
 

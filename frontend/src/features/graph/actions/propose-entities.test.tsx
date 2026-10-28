@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { copy } from "../../../copy/index.js";
@@ -216,6 +217,8 @@ describe("the entity proposal drawer", () => {
         await waitFor(() => {
             expect(screen.getByText(said.reviewTitle(4))).toBeTruthy();
         });
+        expect(screen.getByText(said.siteBody)).toBeTruthy();
+        expect(said.siteBody).toContain("needs one");
         expect(screen.queryByRole("button", { name: said.back })).toBeNull();
 
         const blue = within(rowOf("p2"));
@@ -294,7 +297,8 @@ describe("what the entity proposal drawer keeps", () => {
 
         drawer("s1", fromPages);
 
-        expect(screen.getByText(said.reviewTitle(2))).toBeTruthy();
+        expect(screen.getByRole("tree", { name: said.reviewTitle(2) })).toBeTruthy();
+        expect(document.querySelector('[data-proposal-inspector="1"]')).not.toBeNull();
         expect(keepBox("Travel Mugs", "/shop/mugs/travel/").checked).toBe(false);
         expect(screen.getByRole("button", { name: said.create(1) })).toBeTruthy();
         expect(calls.previewed).toHaveLength(1);
@@ -511,37 +515,226 @@ function restoreScrolls(): void {
     }
 }
 
+function boxOf(label: string, path: string): HTMLElement {
+    const box = keepBox(label, path).closest("label");
+    if (box === null) {
+        throw new Error(`no box for ${label}`);
+    }
+    return box;
+}
+
+function nameIn(pageId: string, name: string): HTMLElement {
+    return within(rowOf(pageId)).getByText(name);
+}
+
+function ticked(count: number): HTMLElement {
+    return screen.getByText(said.tickedOf(count, 3));
+}
+
 describe("ticking many proposals at once", () => {
-    it("ticks every shown row between the last box clicked and a shift-clicked one, past a blocked row, and unticks back", async () => {
+    it("ranges a shift-click from the rows all ticked to the state the clicked row takes, on its box or its name", async () => {
+        const user = userEvent.setup();
         await reviewSeed();
-        fireEvent.click(screen.getByRole("button", { name: said.keepNone }));
+        expect(ticked(3)).toBeTruthy();
 
-        fireEvent.click(keepBox("Mugs", "/shop/mugs/"));
-        fireEvent.click(keepBox("Plates", "/shop/plates/"), { shiftKey: true });
-        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
-        expect(keepBox("Mugs", "/shop/cups/").checked).toBe(false);
-        expect(screen.getByRole("button", { name: said.create(3) })).toBeTruthy();
+        await user.click(boxOf("Plates", "/shop/plates/"));
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(false);
+        expect(ticked(2)).toBeTruthy();
 
-        fireEvent.click(keepBox("Plates", "/shop/plates/"));
-        fireEvent.click(keepBox("Blue Mug", "/shop/mugs/blue/"), { shiftKey: true });
+        await user.keyboard("{Shift>}");
+        await user.click(nameIn("p2", "Blue Mug"));
+        await user.keyboard("{/Shift}");
         expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
         expect(keepBox("Plates", "/shop/plates/").checked).toBe(false);
         expect(rowOf("p1").getAttribute("aria-checked")).toBe("mixed");
-        expect(screen.getByRole("button", { name: said.create(1) })).toBeTruthy();
+        expect(ticked(1)).toBeTruthy();
+
+        await user.keyboard("{Shift>}");
+        await user.click(boxOf("Plates", "/shop/plates/"));
+        await user.keyboard("{/Shift}");
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(keepBox("Mugs", "/shop/cups/").checked).toBe(false);
+        expect(ticked(3)).toBeTruthy();
     });
 
-    it("leaves what a folded branch holds out of a range", async () => {
+    it("ranges a shift-click after Keep none, past a blocked row", async () => {
+        const user = userEvent.setup();
         await reviewSeed();
-        fireEvent.click(screen.getByRole("button", { name: said.keepNone }));
-        fireEvent.click(within(rowOf("p1")).getByRole("button", { name: said.collapseRow }));
+        await user.click(screen.getByRole("button", { name: said.keepNone }));
 
-        fireEvent.click(keepBox("Plates", "/shop/plates/"));
-        fireEvent.click(keepBox("Mugs", "/shop/mugs/"), { shiftKey: true });
-        fireEvent.click(within(rowOf("p1")).getByRole("button", { name: said.expandRow }));
+        await user.click(boxOf("Mugs", "/shop/mugs/"));
+        await user.keyboard("{Shift>}");
+        await user.click(nameIn("p4", "Plates"));
+        await user.keyboard("{/Shift}");
 
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(keepBox("Mugs", "/shop/cups/").checked).toBe(false);
+        expect(screen.getByRole("button", { name: said.create(3) })).toBeTruthy();
+    });
+
+    it("keeps a row the Not ticked filter matched in view once it is ticked, so a range still starts from it", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        await user.click(boxOf("Plates", "/shop/plates/"));
+        await user.click(boxOf("Blue Mug", "/shop/mugs/blue/"));
+        await user.click(screen.getByRole("radio", { name: said.filters.unticked }));
+        expect(document.querySelectorAll("[data-proposal-at]")).toHaveLength(3);
+
+        await user.click(boxOf("Blue Mug", "/shop/mugs/blue/"));
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        await user.keyboard("{Shift>}");
+        await user.click(nameIn("p4", "Plates"));
+        await user.keyboard("{/Shift}");
+
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(ticked(3)).toBeTruthy();
+
+        await user.click(screen.getByRole("radio", { name: said.filters.unticked }));
+        expect(screen.getByText(said.noMatchProposals)).toBeTruthy();
+    });
+
+    it("ticks what a collapsed parent holds when a range crosses it", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        await user.click(screen.getByRole("button", { name: said.keepNone }));
+        await user.click(within(rowOf("p1")).getByRole("button", { name: said.collapseRow }));
+
+        await user.click(boxOf("Plates", "/shop/plates/"));
+        await user.keyboard("{Shift>}");
+        await user.click(nameIn("p1", "Mugs"));
+        await user.keyboard("{/Shift}");
+        await user.click(within(rowOf("p1")).getByRole("button", { name: said.expandRow }));
+
+        expect(keepBox("Mugs", "/shop/mugs/").checked).toBe(true);
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(ticked(3)).toBeTruthy();
+    });
+
+    it("ticks one row without its children on a ctrl-click, on its box or its name", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        await user.click(screen.getByRole("button", { name: said.keepNone }));
+
+        await user.keyboard("{Control>}");
+        await user.click(boxOf("Mugs", "/shop/mugs/"));
+        await user.keyboard("{/Control}");
         expect(keepBox("Mugs", "/shop/mugs/").getAttribute("aria-checked")).toBe("mixed");
         expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
-        expect(screen.getByRole("button", { name: said.create(2) })).toBeTruthy();
+        expect(ticked(1)).toBeTruthy();
+
+        await user.keyboard("{Control>}");
+        await user.click(nameIn("p2", "Blue Mug"));
+        await user.keyboard("{/Control}");
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(ticked(2)).toBeTruthy();
+    });
+
+    it("paints the state the pressed box took onto each row the pointer crosses while the button is held", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        await user.click(screen.getByRole("button", { name: said.keepNone }));
+
+        await user.pointer([
+            { keys: "[MouseLeft>]", target: boxOf("Mugs", "/shop/mugs/") },
+            { target: boxOf("Mugs", "/shop/cups/") },
+            { target: boxOf("Plates", "/shop/plates/") },
+            { keys: "[/MouseLeft]" },
+        ]);
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(keepBox("Mugs", "/shop/cups/").checked).toBe(false);
+        expect(ticked(3)).toBeTruthy();
+
+        await user.pointer({ target: nameIn("p2", "Blue Mug") });
+        expect(ticked(3)).toBeTruthy();
+
+        await user.pointer([
+            { keys: "[MouseLeft>]", target: boxOf("Plates", "/shop/plates/") },
+            { target: nameIn("p2", "Blue Mug") },
+            { keys: "[/MouseLeft]" },
+        ]);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(false);
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
+        expect(ticked(1)).toBeTruthy();
+    });
+
+    it("ticks and unticks the rows a search shows, never a parent shown only for its match", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        await user.click(screen.getByRole("button", { name: said.keepNone }));
+        expect(screen.queryByRole("button", { name: said.tickShown(3) })).toBeNull();
+        const search = screen.getByLabelText(said.searchProposals);
+
+        await user.type(search, "blue");
+        await user.click(screen.getByRole("button", { name: said.tickShown(1) }));
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(keepBox("Mugs", "/shop/mugs/").getAttribute("aria-checked")).toBe("mixed");
+        expect(ticked(1)).toBeTruthy();
+
+        await user.clear(search);
+        await user.type(search, "mug");
+        await user.click(screen.getByRole("button", { name: said.tickShown(2) }));
+        expect(ticked(2)).toBeTruthy();
+        await user.click(screen.getByRole("button", { name: said.untickShown(2) }));
+        expect(ticked(0)).toBeTruthy();
+
+        await user.clear(search);
+        expect(screen.queryByRole("button", { name: said.untickShown(2) })).toBeNull();
+    });
+
+    it("ticks the shown rows on Ctrl+A in the tree", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        await user.click(screen.getByRole("button", { name: said.keepNone }));
+
+        await user.type(screen.getByLabelText(said.searchProposals), "mug");
+        await user.click(nameIn("p2", "Blue Mug"));
+        await user.keyboard("{Control>}a{/Control}");
+        expect(keepBox("Mugs", "/shop/mugs/").checked).toBe(true);
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(true);
+        expect(ticked(2)).toBeTruthy();
+
+        await user.clear(screen.getByLabelText(said.searchProposals));
+        await user.click(nameIn("p4", "Plates"));
+        await user.keyboard("{Control>}a{/Control}");
+        expect(ticked(3)).toBeTruthy();
+    });
+
+    it("extends the range from the anchor with Shift and the arrows, moving the focus", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        const tree = screen.getByRole("tree");
+        await user.click(screen.getByRole("button", { name: said.keepNone }));
+
+        await user.click(boxOf("Mugs", "/shop/mugs/"));
+        await user.keyboard("{Shift>}{ArrowDown}{ArrowDown}{ArrowDown}{/Shift}");
+        expect(tree.getAttribute("aria-activedescendant")).toBe(rowOf("p4").id);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(ticked(3)).toBeTruthy();
+
+        await user.click(boxOf("Plates", "/shop/plates/"));
+        await user.keyboard("{Shift>}{ArrowUp}{ArrowUp}{/Shift}");
+        expect(tree.getAttribute("aria-activedescendant")).toBe(rowOf("p2").id);
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
+        expect(keepBox("Mugs", "/shop/mugs/").getAttribute("aria-checked")).toBe("mixed");
+        expect(ticked(1)).toBeTruthy();
+    });
+
+    it("starts the next range afresh after Keep all", async () => {
+        const user = userEvent.setup();
+        await reviewSeed();
+        await user.click(boxOf("Plates", "/shop/plates/"));
+        await user.click(screen.getByRole("button", { name: said.keepAll }));
+
+        await user.keyboard("{Shift>}");
+        await user.click(nameIn("p2", "Blue Mug"));
+        await user.keyboard("{/Shift}");
+
+        expect(keepBox("Blue Mug", "/shop/mugs/blue/").checked).toBe(false);
+        expect(keepBox("Plates", "/shop/plates/").checked).toBe(true);
+        expect(ticked(2)).toBeTruthy();
     });
 
     it("ticks and unticks every proposal of one source page type, and keeps the type chosen", async () => {

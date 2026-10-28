@@ -98,8 +98,8 @@ func TestEveryUseCaseIsRegisteredExactlyOnce(t *testing.T) {
 }
 
 const (
-	schemaCeilingBytes  = 48543
-	schemaCeilingTokens = 11084
+	schemaCeilingBytes  = 48521
+	schemaCeilingTokens = 11078
 	widestLogged        = 8
 )
 

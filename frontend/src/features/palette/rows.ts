@@ -1,7 +1,13 @@
 import { copy } from "../../copy/index.js";
+import type { SyncProgress } from "../../data/types.js";
 import type { Timestamp } from "../../data/wire.js";
 import { relativeTime } from "../../domain/format.js";
 import { runKindLabel } from "../runs/labels.js";
+import { stagePhrase } from "../sync/model.js";
+
+export function syncActionLabel(active: SyncProgress | null): string {
+    return active === null ? copy.palette.syncSite : copy.sync.palette.open(stagePhrase(active));
+}
 
 export interface RunRow {
     kind: string;
@@ -10,9 +16,14 @@ export interface RunRow {
     createdAt: Timestamp;
 }
 
+const syncKind = "sync";
+
 export function runRowLabel(run: RunRow, now: Date = new Date()): string {
-    const when = run.startedAt === null || run.startedAt === "" ? run.createdAt : run.startedAt;
-    return copy.palette.run(runKindLabel(run.kind), run.stats.items, relativeTime(when, now));
+    const when = relativeTime(run.startedAt === null || run.startedAt === "" ? run.createdAt : run.startedAt, now);
+    if (run.kind === syncKind) {
+        return copy.palette.siteRun(runKindLabel(run.kind), when);
+    }
+    return copy.palette.run(runKindLabel(run.kind), run.stats.items, when);
 }
 
 export function pagePrefix(query: string): string {

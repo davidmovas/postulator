@@ -52,7 +52,7 @@ func (s *Service) Start(ctx context.Context, req StartRequest) (StartResponse, e
 	if err != nil {
 		return StartResponse{}, err
 	}
-	return StartResponse{RunID: queued.ID, Estimate: estimate, Added: plan.added, Fields: plan.fields}, nil
+	return StartResponse{RunID: queued.ID, Estimate: estimate, Added: plan.added, Fields: plan.fields, Skipped: plan.record.Skipped}, nil
 }
 
 func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateResponse, error) {
@@ -65,7 +65,7 @@ func (s *Service) Estimate(ctx context.Context, req StartRequest) (EstimateRespo
 	if err != nil {
 		return EstimateResponse{}, err
 	}
-	return EstimateResponse{Estimate: estimate, Added: plan.added, Fields: plan.fields}, nil
+	return EstimateResponse{Estimate: estimate, Added: plan.added, Fields: plan.fields, Skipped: plan.record.Skipped}, nil
 }
 
 func refusedByPreflight(blocking []run.EstimateFinding) error {
@@ -113,23 +113,26 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 		templateID = strings.TrimSpace(req.TemplateID)
 		version    int
 		picked     string
+		skipped    = make([]run.Skipped, 0)
 	)
 	if _, owns := kind.Recipe(); kind.PageScoped() && !owns {
 		picked = templateID
 	}
 	if kind.PageScoped() {
-		if mappedErr := s.mapped(ctx, targets); mappedErr != nil {
-			return planned{}, mappedErr
+		ready, readyErr := s.writable(ctx, siteID, targets, picked)
+		if readyErr != nil {
+			return planned{}, readyErr
 		}
-		first, resolveErr := s.resolve(ctx, siteID, targets[0], picked)
-		if resolveErr != nil {
-			return planned{}, resolveErr
-		}
+		targets, skipped = ready.targets, ready.skipped
+		first := ready.resolved[targets[0]]
 		spec = first.Spec
 		version = first.Version
 		if templateID == "" || picked != "" {
 			templateID = first.TemplateID
 		}
+		left := leftOut(skipped)
+		req.Rewrite = withoutPages(req.Rewrite, left)
+		req.Directives = withoutDirectives(req.Directives, left)
 	}
 
 	recipe, err := recipeFor(kind, req.Recipe, spec.Recipe)
@@ -165,16 +168,9 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 			targets = append(targets, page.PageID)
 		}
 	}
-	if kind.PageScoped() {
-		for _, pageID := range chosen[1:] {
-			if _, resolveErr := s.resolve(ctx, siteID, pageID, picked); resolveErr != nil {
-				return planned{}, resolveErr
-			}
-		}
-		for _, page := range added {
-			if _, resolveErr := s.resolve(ctx, siteID, page.PageID, ""); resolveErr != nil {
-				return planned{}, resolveErr
-			}
+	for _, page := range added {
+		if _, resolveErr := s.resolve(ctx, siteID, page.PageID, ""); resolveErr != nil {
+			return planned{}, unwritableParent(page, resolveErr)
 		}
 	}
 
@@ -200,6 +196,7 @@ func (s *Service) plan(ctx context.Context, req StartRequest) (planned, error) {
 			PublishMode:     mode,
 			Budget:          req.Budget,
 			Brief:           briefOf(req),
+			Skipped:         skipped,
 			CreatedBy:       actor,
 		},
 		added:      added,
@@ -363,30 +360,6 @@ func (s *Service) parentOf(ctx context.Context, child pagemap.Page) (pagemap.Pag
 	return parent, true, nil
 }
 
-func (s *Service) mapped(ctx context.Context, targets []string) error {
-	unmapped := make([]string, 0, len(targets))
-	for _, pageID := range targets {
-		page, err := s.pages.Get(ctx, pageID)
-		if err != nil {
-			return err
-		}
-		if page.EntityID != nil && strings.TrimSpace(*page.EntityID) != "" {
-			continue
-		}
-		where := page.Path
-		if where == "" {
-			where = pageID
-		}
-		unmapped = append(unmapped, where)
-	}
-	if len(unmapped) == 0 {
-		return nil
-	}
-	return invalid("a run plans a page's links from the entity it is mapped to, and nothing is mapped to "+
-		strings.Join(unmapped, ", ")+"; map each of them on the Graph screen first", "pageIds").
-		WithDetail("paths", unmapped)
-}
-
 func withRewrite(recipe []template.StepSpec, rewrite, chosen []string) ([]template.StepSpec, error) {
 	if len(rewrite) == 0 {
 		return recipe, nil
@@ -446,6 +419,10 @@ func recipeFor(kind run.Kind, requested, templated []template.StepSpec) ([]templ
 	}
 	if kind == run.KindEdit {
 		return nil, invalid("an edit is started from the one change a person confirmed, not from a list of pages", "kind")
+	}
+	if kind == run.KindSync {
+		return nil, invalid("a sync reads the whole site and is started from the site itself, one at a time, "+
+			"not from a list of pages", "kind")
 	}
 	if kind == run.KindRepair {
 		return nil, invalid("a repair run can no longer be started: the hierarchy is read from the site and never written, "+

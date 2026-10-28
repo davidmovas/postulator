@@ -18,15 +18,8 @@ const (
 	ParamRenderRescan = run.ParamRenderRescan
 	ParamFullWalk     = run.ParamFullWalk
 
-	checkpointSync = "sync"
-
 	syncStepTimeout = 10 * time.Minute
 )
-
-type syncCheckpoint struct {
-	State   observe.State `json:"state"`
-	Batches int           `json:"batches"`
-}
 
 type SiteSyncResult struct {
 	StartedAt   time.Time         `json:"startedAt"`
@@ -53,7 +46,7 @@ func SyncSite(deps Deps) run.StepDef {
 		Retry:   run.RetryPolicy{Max: 3},
 		Timeout: syncStepTimeout,
 		Run: func(ctx context.Context, sc *run.StepContext) (run.Result, error) {
-			held, found, err := run.Get[syncCheckpoint](sc.Check, checkpointSync)
+			held, found, err := run.Get[observe.Progress](sc.Check, observe.CheckpointKey)
 			if err != nil {
 				return run.Result{}, err
 			}
@@ -78,7 +71,7 @@ func SyncSite(deps Deps) run.StepDef {
 				if beginErr != nil {
 					return run.Result{}, beginErr
 				}
-				held = syncCheckpoint{State: state}
+				held = observe.Progress{State: state}
 			}
 			readers, err := observeReaders(ctx, client, owner)
 			if err != nil {
@@ -97,9 +90,9 @@ func optionsOf(sc *run.StepContext) observe.Options {
 	return observe.Options{RenderRescan: sc.BoolParam(ParamRenderRescan), Full: sc.BoolParam(ParamFullWalk)}
 }
 
-func syncResult(ctx context.Context, deps Deps, owner site.Site, held syncCheckpoint) (run.Result, error) {
+func syncResult(ctx context.Context, deps Deps, owner site.Site, held observe.Progress) (run.Result, error) {
 	checkpoint := run.NewCheckpoint()
-	if err := run.Set(checkpoint, checkpointSync, held); err != nil {
+	if err := run.Set(checkpoint, observe.CheckpointKey, held); err != nil {
 		return run.Result{}, err
 	}
 

@@ -19,6 +19,7 @@ import type { RunView, StatsView } from "./authority.js";
 import { publishingLabel, stepLabel } from "./labels.js";
 import { recipeSteps } from "./recipe.js";
 import { spanMs } from "./span.js";
+import { kindSync } from "./statuses.js";
 
 interface FactProps {
     icon: IconComponent;
@@ -51,19 +52,22 @@ function templateFact(run: Run, named: ReturnType<typeof useTemplate>): string {
 
 function Facts({ run }: { run: Run }): ReactElement {
     const steps = recipeSteps(run);
-    const named = useTemplate(run.templateId === "" ? null : run.templateId);
+    const writes = run.kind !== kindSync;
+    const named = useTemplate(run.templateId === "" || !writes ? null : run.templateId);
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 md:col-span-3">
             <Fact icon={ScheduleIcon} title={absoluteTime(run.startedAt)}>
                 {`${copy.runs.detail.startedBy(run.createdBy)} · ${relativeTime(run.startedAt)}`}
             </Fact>
-            <Fact icon={EditNoteIcon}>{publishingLabel(run.publishMode)}</Fact>
+            {writes ? <Fact icon={EditNoteIcon}>{publishingLabel(run.publishMode)}</Fact> : null}
             <Fact icon={AlarmIcon} title={absoluteTime(run.deadlineAt)}>
                 {`${copy.runs.detail.deadline} ${relativeTime(run.deadlineAt)}`}
             </Fact>
-            <Fact icon={DashboardCustomizeIcon} title={run.templateId}>
-                {templateFact(run, named)}
-            </Fact>
+            {writes ? (
+                <Fact icon={DashboardCustomizeIcon} title={run.templateId}>
+                    {templateFact(run, named)}
+                </Fact>
+            ) : null}
             {steps.length === 0 ? null : (
                 <Fact icon={DashboardCustomizeIcon}>
                     {copy.runs.step.recipe(

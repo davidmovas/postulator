@@ -50,7 +50,8 @@ type useCases struct {
 func (c *Core) buildAuthoring(stores repos, llm llmParts) authoring {
 	templateService := templates.New(stores.templates, stores.pages, stores.entities, stores.sites, stores.pageTypes,
 		stores.store, c.Events, stores.now)
-	wordpress := registry.New(stores.sites, stores.secrets, append(wp.FromSettings(stores.values), c.cfg.WordPress...)...)
+	wordpress := registry.New(stores.sites, stores.secrets,
+		append(append(wp.FromSettings(stores.values), wp.WithLogger(c.logger.Named("wordpress"))), c.cfg.WordPress...)...)
 	pageTypes := pagetypes.New(pagetypes.Deps{
 		Types: stores.pageTypes, Scopes: stores.scopes, Rules: stores.rules, Pages: stores.pages, Templates: stores.templates,
 		Sites: stores.sites, UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now,
@@ -133,7 +134,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		models: models.New(llm.catalog, stores.overrides, llm.profiles, llm.ledger, stores.secrets, llm.client,
 			c.Events, stores.now),
 		runs:    runsService,
-		sync:    sync.New(running.engine, stores.sites, writing.wordpress, packer{}, stores.now),
+		sync:    sync.New(running.engine, stores.runs, stores.items, stores.sites, writing.wordpress, packer{}, stores.now),
 		reports: writing.reports,
 		schedules: schedules.New(schedules.Deps{
 			Schedules: stores.schedules, Pages: stores.pages, Sites: stores.sites, Runs: runsService,

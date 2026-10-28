@@ -16,15 +16,17 @@ import (
 const (
 	runColumns = `id, site_id, kind, status, targets, recipe, template_id, template_version, publish_mode,
 		budget_max_usd, budget_max_tokens, stats_items, stats_done, stats_failed, stats_tokens, stats_usd,
-		created_by, parent_run_id, pause_reason, error, deadline_at, created_at, started_at, finished_at, brief`
+		created_by, parent_run_id, pause_reason, error, deadline_at, created_at, started_at, finished_at, brief, skipped`
 	insertRun = `INSERT INTO runs (` + runColumns + `)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	updateRun = `UPDATE runs SET status = ?, stats_items = ?, stats_done = ?, stats_failed = ?, stats_tokens = ?,
 		stats_usd = ?, pause_reason = ?, error = ?, deadline_at = ?, started_at = ?, finished_at = ? WHERE id = ?`
 	selectRun      = `SELECT ` + runColumns + ` FROM runs WHERE id = ?`
 	selectStaleRun = `SELECT ` + runColumns + ` FROM runs
 		WHERE status IN ('pending', 'running', 'waiting') AND deadline_at <= ? ORDER BY created_at, id LIMIT ?`
-	selectChildRuns = `SELECT ` + runColumns + ` FROM runs WHERE parent_run_id = ? ORDER BY created_at, id`
+	selectChildRuns  = `SELECT ` + runColumns + ` FROM runs WHERE parent_run_id = ? ORDER BY created_at, id`
+	selectActiveSync = `SELECT ` + runColumns + ` FROM runs
+		WHERE site_id = ? AND kind = 'sync' AND status IN ('pending', 'running', 'waiting', 'paused') LIMIT 1`
 )
 
 type RunRepo struct {
@@ -54,6 +56,12 @@ func (r *RunRepo) Insert(ctx context.Context, record run.Run) error {
 			return err
 		}
 	}
+	skipped := ""
+	if len(record.Skipped) > 0 {
+		if skipped, err = encodeJSON(record.Skipped); err != nil {
+			return err
+		}
+	}
 
 	_, err = execWrite(ctx, r.store.writeFrom(ctx), insertRun, []any{
 		record.ID, record.SiteID, string(record.Kind), string(record.Status), targets, recipe,
@@ -62,7 +70,7 @@ func (r *RunRepo) Insert(ctx context.Context, record run.Run) error {
 		record.Stats.Items, record.Stats.Done, record.Stats.Failed, record.Stats.Tokens, record.Stats.USD,
 		string(record.CreatedBy), nullString(record.ParentRunID), string(record.PauseReason), record.Error,
 		formatTime(record.DeadlineAt), formatTime(record.CreatedAt),
-		nullTime(record.StartedAt), nullTime(record.FinishedAt), brief,
+		nullTime(record.StartedAt), nullTime(record.FinishedAt), brief, skipped,
 	}, errors.New(errors.Conflict, "a run with this id already exists"), "insert the run")
 	return err
 }
@@ -78,6 +86,15 @@ func (r *RunRepo) Update(ctx context.Context, record run.Run) error {
 
 func (r *RunRepo) Get(ctx context.Context, id string) (run.Run, error) {
 	return selectOne(ctx, r.store.execFrom(ctx), selectRun, []any{id}, scanRun, runNotFound(id), "read the run")
+}
+
+func (r *RunRepo) ActiveSync(ctx context.Context, siteID string) (run.Run, bool, error) {
+	active, err := selectAll(ctx, r.store.execFrom(ctx), selectActiveSync, []any{siteID}, scanRun,
+		"read the sync under way on the site")
+	if err != nil || len(active) == 0 {
+		return run.Run{}, false, err
+	}
+	return active[0], true, nil
 }
 
 func (r *RunRepo) ByParent(ctx context.Context, parentRunID string) ([]run.Run, error) {
@@ -124,7 +141,7 @@ func scanRun(rows *sql.Rows) (run.Run, error) {
 	var (
 		record                             run.Run
 		kind, status, publishMode, creator string
-		targets, recipe, brief             string
+		targets, recipe, brief, skipped    string
 		pauseReason                        string
 		parentRunID                        sql.NullString
 		deadlineAt, createdAt              string
@@ -134,12 +151,17 @@ func scanRun(rows *sql.Rows) (run.Run, error) {
 		&record.ID, &record.SiteID, &kind, &status, &targets, &recipe, &record.TemplateID, &record.TemplateVersion,
 		&publishMode, &record.Budget.MaxUSD, &record.Budget.MaxTokens, &record.Stats.Items, &record.Stats.Done,
 		&record.Stats.Failed, &record.Stats.Tokens, &record.Stats.USD, &creator, &parentRunID, &pauseReason,
-		&record.Error, &deadlineAt, &createdAt, &startedAt, &finishedAt, &brief,
+		&record.Error, &deadlineAt, &createdAt, &startedAt, &finishedAt, &brief, &skipped,
 	); err != nil {
 		return run.Run{}, err
 	}
 	if brief != "" {
 		if err := decodeJSON(brief, &record.Brief, "stored run brief is not readable"); err != nil {
+			return run.Run{}, err
+		}
+	}
+	if skipped != "" {
+		if err := decodeJSON(skipped, &record.Skipped, "stored pages a run left out are not readable"); err != nil {
 			return run.Run{}, err
 		}
 	}

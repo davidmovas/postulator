@@ -11,8 +11,9 @@ type ListRulesRequest struct {
 }
 
 type RulesResponse struct {
-	Rules    []Rule `json:"rules"`
-	Fallback *Rule  `json:"fallback"`
+	Rules       []Rule `json:"rules"`
+	Fallback    *Rule  `json:"fallback"`
+	BeforeRules int    `json:"beforeRules"`
 }
 
 type SaveRuleRequest struct {

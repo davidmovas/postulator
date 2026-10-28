@@ -71,6 +71,10 @@ func Seeded() []Preset {
 	return []Preset{Landing, Category, Guide, Info, Product, StoreCategory, Catalog, Technical}
 }
 
+func (p Preset) Legacy() bool {
+	return p == Hub || p == Entity
+}
+
 func (p Preset) Valid() bool {
 	_, known := presetNames[p]
 	return known

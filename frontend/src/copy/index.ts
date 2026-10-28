@@ -18,6 +18,7 @@ import { runs } from "./runs.js";
 import { schedules } from "./schedules.js";
 import { settings } from "./settings.js";
 import { sites } from "./sites.js";
+import { sync } from "./sync.js";
 
 export { errorMessages } from "./errors.js";
 
@@ -31,6 +32,7 @@ export const copy = {
     readiness,
     overview,
     sites,
+    sync,
     settings,
     runs,
     reports,

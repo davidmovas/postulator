@@ -72,7 +72,7 @@ func (c *Client) peek(ctx context.Context, method string, target *url.URL) (stat
 	resp, err := c.probe.Do(req)
 	logged := request{method: method, path: target.EscapedPath()}
 	if err != nil {
-		failure := transportError(ctx, err)
+		failure := transportError(ctx, method, route(target), err)
 		c.logAttempt(logged, attempt{err: failure}, time.Since(started))
 		return 0, "", failure
 	}

@@ -52,6 +52,10 @@ func (s *Service) store(ctx context.Context, state *State, readers Readers, batc
 		if _, known := rows.byWPID[keyOf(pagemap.WPProduct, id)]; !known {
 			continue
 		}
+		if len(products[id].VariationIDs) == 0 {
+			variations[id] = nil
+			continue
+		}
 		listed, listErr := a.variations(ctx, id)
 		if listErr != nil {
 			return false, listErr

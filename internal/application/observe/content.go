@@ -5,6 +5,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/davidmovas/postulator/internal/domain/block"
@@ -14,8 +15,11 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/render"
 	"github.com/davidmovas/postulator/internal/domain/site"
+	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
+
+var emptyBody = block.BodyHash("")
 
 var modelCodes = []finding.Code{
 	finding.FieldChangedOnSite, finding.BodyChangedOnSite, finding.PageTitleDiffers, finding.PageH1Differs, finding.RowWithoutPage,
@@ -97,13 +101,14 @@ func (s *Service) absorb(ctx context.Context, state *State, readers Readers, own
 }
 
 type prepared struct {
-	it      item
-	current pagemap.Page
-	next    pagemap.Page
-	terms   []pagemap.Term
-	body    bodyRead
-	known   bool
-	planned bool
+	it        item
+	current   pagemap.Page
+	next      pagemap.Page
+	terms     []pagemap.Term
+	body      bodyRead
+	known     bool
+	planned   bool
+	rawWanted bool
 }
 
 func (a *absorber) lastSeen(ctx context.Context, items []item) (map[string]lastSeen, error) {
@@ -221,25 +226,82 @@ func (a *absorber) prepare(ctx context.Context, items []item) ([]prepared, error
 			a.pending[next.ID] = struct{}{}
 		}
 		a.rows.remember(next)
-
-		terms, err := a.readTerms(ctx, items[i])
-		closed := closedToUser(err)
-		if err != nil && !closed {
+		batch = append(batch, prepared{it: items[i], current: current, next: next, known: known, planned: planned})
+	}
+	for i := range batch {
+		if err := a.storedBody(ctx, &batch[i]); err != nil {
 			return nil, err
 		}
-		body, err := a.readBody(ctx, next, items[i])
-		if closedToUser(err) {
-			closed, err = true, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		if closed {
-			a.state.Counts.Closed++
-		}
-		batch = append(batch, prepared{it: items[i], current: current, next: next, terms: terms, body: body, known: known, planned: planned})
+	}
+	if err := a.readAll(ctx, batch); err != nil {
+		return nil, err
 	}
 	return batch, nil
+}
+
+func (a *absorber) readAll(ctx context.Context, batch []prepared) error {
+	reading, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var (
+		wait  sync.WaitGroup
+		once  sync.Once
+		first error
+	)
+	closed := make([]bool, len(batch))
+	slots := make(chan struct{}, max(a.owner.Settings.Observe.RenderConcurrency, 1))
+	for i := range batch {
+		wait.Go(func() {
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			if reading.Err() != nil {
+				return
+			}
+			shut, err := a.read(reading, &batch[i])
+			if err != nil {
+				once.Do(func() {
+					first = err
+					cancel()
+				})
+				return
+			}
+			closed[i] = shut
+		})
+	}
+	wait.Wait()
+	if first != nil {
+		return first
+	}
+	if ctx.Err() != nil {
+		return errors.Wrap(ctx.Err(), errors.Cancelled, "the observation stopped before it read every page of its batch")
+	}
+	for i := range closed {
+		if closed[i] {
+			a.state.Counts.Closed++
+		}
+	}
+	return nil
+}
+
+func (a *absorber) read(ctx context.Context, p *prepared) (bool, error) {
+	terms, err := a.readTerms(ctx, p.it)
+	closed := closedToUser(err)
+	if err != nil && !closed {
+		return false, during(err, "reading the terms of "+p.next.Path)
+	}
+	p.terms = terms
+	if !p.rawWanted {
+		return closed, nil
+	}
+	raw, err := a.readers.Plugin.GetRaw(ctx, string(p.it.mappedType()), p.it.WPID)
+	switch {
+	case closedToUser(err):
+		p.body = bodyRead{}
+		return true, nil
+	case err != nil:
+		return false, during(err, "reading the body of "+p.next.Path)
+	}
+	p.body = bodyRead{raw: raw.Content, hash: raw.Hash, fetched: true, current: p.body.current}
+	return closed, nil
 }
 
 func (a *absorber) keep(ctx context.Context, p prepared) error {
@@ -298,7 +360,7 @@ func (a *absorber) identity(ctx context.Context, page pagemap.Page, it item) err
 
 func (a *absorber) readTerms(ctx context.Context, it item) ([]pagemap.Term, error) {
 	terms := it.Terms
-	if !it.mappedType().Term() && a.readers.plugin(capabilityTerms) {
+	if !it.mappedType().Term() && !it.TermsListed && a.readers.plugin(capabilityTerms) {
 		listed, err := a.readers.Plugin.GetTerms(ctx, string(it.mappedType()), it.WPID)
 		if err != nil {
 			return nil, err
@@ -387,29 +449,26 @@ func (a *absorber) observeFields(ctx context.Context, page pagemap.Page, values 
 	return nil
 }
 
-func (a *absorber) readBody(ctx context.Context, page pagemap.Page, it item) (bodyRead, error) {
+func (a *absorber) storedBody(ctx context.Context, p *prepared) error {
+	it := p.it
 	if it.mappedType().Term() {
-		return bodyRead{}, nil
+		return nil
 	}
-	current, base, found, err := a.service.deps.Bodies.Get(ctx, page.ID)
+	current, base, found, err := a.service.deps.Bodies.Get(ctx, p.next.ID)
 	if err != nil {
-		return bodyRead{}, err
-	}
-	if found && current.Hash == it.ContentHash {
-		return bodyRead{current: current, base: base, stored: true}, nil
+		return err
 	}
 	switch {
+	case found && current.Hash == it.ContentHash:
+		p.body = bodyRead{current: current, base: base, stored: true}
 	case it.HasContent:
-		return bodyRead{raw: it.Content, hash: it.ContentHash, fetched: true, current: current}, nil
+		p.body = bodyRead{raw: it.Content, hash: it.ContentHash, fetched: true, current: current}
+	case it.ContentHash == emptyBody:
+		p.body = bodyRead{hash: it.ContentHash, fetched: true, current: current}
 	case a.readers.plugin(capabilityRaw):
-		read, readErr := a.readers.Plugin.GetRaw(ctx, string(it.mappedType()), it.WPID)
-		if readErr != nil {
-			return bodyRead{}, readErr
-		}
-		return bodyRead{raw: read.Content, hash: read.Hash, fetched: true, current: current}, nil
-	default:
-		return bodyRead{}, nil
+		p.body, p.rawWanted = bodyRead{current: current}, true
 	}
+	return nil
 }
 
 func (a *absorber) body(ctx context.Context, page pagemap.Page, it item, read bodyRead) error {

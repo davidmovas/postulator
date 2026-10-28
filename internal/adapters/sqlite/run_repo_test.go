@@ -302,6 +302,28 @@ func TestARunsBriefAndAnItemsDirectiveRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTheChosenPagesARunLeftOutRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRunFixture(t, 2)
+	leaving := fixture.run
+	leaving.ID = id.New()
+	leaving.Skipped = []run.Skipped{
+		{PageID: fixture.pages[0], Path: "/shop/", Reason: run.SkipNoTemplate, PageType: "Store category"},
+		{PageID: fixture.pages[1], Path: "/cart/", Reason: run.SkipNoEntity, PageType: "Technical"},
+	}
+	if err := fixture.runs.Insert(t.Context(), leaving); err != nil {
+		t.Fatalf("insert the run: %v", err)
+	}
+	stored, err := fixture.runs.Get(t.Context(), leaving.ID)
+	if err != nil || !slices.Equal(stored.Skipped, leaving.Skipped) {
+		t.Fatalf("the pages left out read back as %+v, %v", stored.Skipped, err)
+	}
+	if plain, plainErr := fixture.runs.Get(t.Context(), fixture.run.ID); plainErr != nil || len(plain.Skipped) != 0 {
+		t.Fatalf("a run that left nothing out read back %+v, %v", plain.Skipped, plainErr)
+	}
+}
+
 func TestAwaitingParentFindsAChildOnlyOnceItsParentIsOnTheSite(t *testing.T) {
 	t.Parallel()
 

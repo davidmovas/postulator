@@ -4,7 +4,10 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"strconv"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
@@ -87,7 +90,27 @@ func (e *Engine) execute(ctx context.Context, held *claim) (result run.Result, e
 		Run: held.record, Item: held.item, Page: held.page, Spec: held.spec, Type: held.kind, Links: held.links,
 		Params: held.params, Artifacts: held.artifacts, Check: held.item.Checkpoint.Clone(),
 	}
-	return held.step.Run(stepCtx, sc)
+	result, err = held.step.Run(stepCtx, sc)
+	if stopped := overran(err, ctx, stepCtx, held.timeout); stopped != err {
+		e.logger.Warn("a run step ran past its time limit", zap.String("step", held.step.Name), zap.Error(err))
+		err = stopped
+	}
+	return result, err
+}
+
+func overran(err error, parent, step context.Context, limit time.Duration) error {
+	if err == nil || parent.Err() != nil || !stderrors.Is(step.Err(), context.DeadlineExceeded) {
+		return err
+	}
+	return errors.New(errors.Cancelled, "the step ran past its time limit of "+limitText(limit)+
+		" and was stopped; a retry starts from the last point it saved")
+}
+
+func limitText(limit time.Duration) string {
+	if limit >= time.Minute && limit%time.Minute == 0 {
+		return strconv.Itoa(int(limit/time.Minute)) + " minutes"
+	}
+	return limit.String()
 }
 
 func (e *Engine) outcomeOf(held *claim, result run.Result, stepErr error) outcome {
@@ -164,8 +187,7 @@ func (e *Engine) faultOutcome(held *claim, out outcome, stepErr error) outcome {
 			exhausted := fault
 			exhausted.Code = run.CodeAttemptsExhausted
 			exhausted.Action = run.ActionFail
-			exhausted.Message = fmt.Sprintf("step %s failed %d times and has no attempts left: %s",
-				held.step.Name, attempts, fault.Message)
+			exhausted.Message = fmt.Sprintf("it failed %d times in a row, so it stopped: %s", attempts, fault.Message)
 			out.fault = &exhausted
 			out.message = exhausted.Message
 			out.status = run.StatusFailed

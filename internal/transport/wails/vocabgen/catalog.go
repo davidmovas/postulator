@@ -6,6 +6,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
 
@@ -65,8 +66,14 @@ func catalog() []vocabulary {
 			export: "cannibalizationReasons", tsType: "CannibalizationReason", pkg: "internal/domain/pagemap",
 			typeName: "Reason",
 		},
-		{export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset"},
+		{
+			export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset",
+			derived: []derivation{
+				{export: "creatablePageTypePresets", keep: func(value string) bool { return !pagetype.Preset(value).Legacy() }},
+			},
+		},
 		{export: "pageTypeRoles", tsType: "PageTypeRole", pkg: "internal/domain/pagetype", typeName: "Role"},
+		{export: "syncStages", tsType: "SyncStage", pkg: "internal/application/observe", typeName: "Stage"},
 		{export: "ruleKinds", tsType: "RuleKind", pkg: "internal/domain/pagetype", typeName: "RuleKind"},
 		{export: "urlModes", tsType: "URLMode", pkg: "internal/domain/pagetype", typeName: "URLMode"},
 		{export: "schemaTypes", tsType: "SchemaType", pkg: "internal/domain/pagetype", typeName: "SchemaType"},
@@ -147,6 +154,7 @@ func catalog() []vocabulary {
 			export: "retryBlockedReasons", tsType: "RetryBlockedReason", pkg: "internal/domain/run",
 			typeName: "RetryBlockedReason",
 		},
+		{export: "skipReasons", tsType: "SkipReason", pkg: "internal/domain/run", typeName: "SkipReason"},
 		{export: "templateScopes", tsType: "TemplateScope", pkg: "internal/domain/template", typeName: "Scope"},
 		{export: "overrideScopes", tsType: "OverrideScope", pkg: "internal/domain/template", typeName: "OverrideScope"},
 		{

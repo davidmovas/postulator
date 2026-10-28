@@ -1,10 +1,11 @@
 import type { ReactElement } from "react";
 
 import { copy } from "../../copy/index.js";
-import type { AddedPage, Estimate } from "../../data/types.js";
+import type { AddedPage, Estimate, SkippedPage } from "../../data/types.js";
 import { tokens as formatTokens, usd as formatUsd } from "../../domain/format.js";
 import type { Tone } from "../../ui/index.js";
 import { Banner, Field, Input, SectionLabel } from "../../ui/index.js";
+import { SkippedPages } from "./skipped.js";
 
 const findingTones: Readonly<Record<string, Tone>> = { error: "danger", warn: "warn", info: "info" };
 
@@ -73,11 +74,12 @@ export function StartCaps({ cap, tokenCap, capValue, tokenCapValue, onCap, onTok
 export interface StartPriceProps {
     estimate: Estimate | null;
     added: readonly AddedPage[];
+    skipped: readonly SkippedPage[];
     over: boolean;
     refusal: string | null;
 }
 
-export function StartPrice({ estimate, added, over, refusal }: StartPriceProps): ReactElement {
+export function StartPrice({ estimate, added, skipped, over, refusal }: StartPriceProps): ReactElement {
     return (
         <>
             {estimate === null ? null : (
@@ -102,6 +104,8 @@ export function StartPrice({ estimate, added, over, refusal }: StartPriceProps):
                     }
                 />
             )}
+
+            <SkippedPages skipped={skipped} title={copy.runs.skipped.starting(skipped.length)} />
 
             {(estimate?.findings ?? []).map((finding) => (
                 <Banner

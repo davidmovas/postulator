@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { pagePrefix, runRowLabel } from "./rows.js";
+import { copy } from "../../copy/index.js";
+import { aProgress } from "../../testing/sync.js";
+import { pagePrefix, runRowLabel, syncActionLabel } from "./rows.js";
+
+describe("syncActionLabel", () => {
+    it("offers to sync the site when no sync is under way", () => {
+        expect(syncActionLabel(null)).toBe(copy.palette.syncSite);
+    });
+
+    it("says a sync is under way, in which stage, and offers to open it", () => {
+        expect(syncActionLabel(aProgress({ stage: "render" }))).toBe("Open the sync under way · visiting the pages");
+    });
+});
 
 const now = new Date("2026-09-21T10:00:00Z");
 
@@ -18,6 +30,12 @@ describe("runRowLabel", () => {
         expect(label).toContain("5 pages");
         expect(label).not.toContain("b3e009fb");
         expect(label).not.toContain("generate");
+    });
+
+    it("names a sync by its kind and when, never as one page, since it reads the whole site", () => {
+        const sync = { ...run, kind: "sync", stats: { items: 1 } };
+        expect(runRowLabel(sync, now)).not.toContain("page");
+        expect(runRowLabel(sync, now)).toContain(copy.runs.kinds.sync);
     });
 
     it("dates a run that never started by when it was asked for", () => {

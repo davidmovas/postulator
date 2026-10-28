@@ -250,23 +250,70 @@ export function tickState(
     return on === open.length ? "on" : "some";
 }
 
-export function cascaded(
+function paint(
+    next: Set<number>,
     tree: ProposalTree,
-    kept: ReadonlySet<number>,
     clashes: ReadonlyMap<number, string>,
     at: number,
-): ReadonlySet<number> {
-    const turnOn = tickState(tree, kept, clashes, at) !== "on";
-    const next = new Set(kept);
-    for (const held of subtree(tree, at)) {
+    on: boolean,
+    deep: boolean,
+): void {
+    for (const held of deep ? subtree(tree, at) : [at]) {
         if (!tickable(clashes, held)) {
             continue;
         }
-        if (turnOn) {
+        if (on) {
             next.add(held);
         } else {
             next.delete(held);
         }
+    }
+}
+
+export function turnsOn(
+    tree: ProposalTree,
+    kept: ReadonlySet<number>,
+    clashes: ReadonlyMap<number, string>,
+    at: number,
+    deep: boolean,
+): boolean {
+    return deep ? tickState(tree, kept, clashes, at) !== "on" : !kept.has(at);
+}
+
+export function heldOn(tree: ProposalTree, kept: ReadonlySet<number>, clashes: ReadonlyMap<number, string>, at: number): boolean {
+    return tickable(clashes, at) ? kept.has(at) : tickState(tree, kept, clashes, at) === "on";
+}
+
+export function tickedTo(
+    tree: ProposalTree,
+    kept: ReadonlySet<number>,
+    clashes: ReadonlyMap<number, string>,
+    at: number,
+    on: boolean,
+    deep: boolean,
+): ReadonlySet<number> {
+    const next = new Set(kept);
+    paint(next, tree, clashes, at, on, deep);
+    return next;
+}
+
+export function spanTicked(
+    tree: ProposalTree,
+    kept: ReadonlySet<number>,
+    clashes: ReadonlyMap<number, string>,
+    rows: readonly TreeRow[],
+    from: number,
+    to: number,
+    on: boolean,
+): ReadonlySet<number> {
+    const span = between(
+        rows.map((row) => row.at),
+        from,
+        to,
+    );
+    const next = new Set(kept);
+    for (const held of span.length === 0 ? [to] : span) {
+        paint(next, tree, clashes, held, on, true);
     }
     return next;
 }
@@ -279,20 +326,31 @@ export function rangeTicked(
     anchor: number | null,
     target: number,
 ): ReadonlySet<number> {
-    const span = anchor === null ? [] : between(rows.map((row) => row.at), anchor, target);
-    if (anchor === null || span.length === 0) {
-        return cascaded(tree, kept, clashes, target);
-    }
-    const turnOn = tickState(tree, kept, clashes, anchor) !== "off";
-    const next = new Set(kept);
-    for (const held of span) {
-        if (!tickable(clashes, held)) {
+    return spanTicked(tree, kept, clashes, rows, anchor ?? target, target, turnsOn(tree, kept, clashes, target, true));
+}
+
+export function shownReach(tree: ProposalTree, clashes: ReadonlyMap<number, string>, rows: readonly TreeRow[]): readonly number[] {
+    const out = new Set<number>();
+    for (const row of rows) {
+        if (!row.matched) {
             continue;
         }
-        if (turnOn) {
-            next.add(held);
+        for (const held of row.branch && !row.open ? subtree(tree, row.at) : [row.at]) {
+            if (tickable(clashes, held)) {
+                out.add(held);
+            }
+        }
+    }
+    return [...out];
+}
+
+export function tickedAll(kept: ReadonlySet<number>, ats: readonly number[], on: boolean): ReadonlySet<number> {
+    const next = new Set(kept);
+    for (const at of ats) {
+        if (on) {
+            next.add(at);
         } else {
-            next.delete(held);
+            next.delete(at);
         }
     }
     return next;
@@ -537,12 +595,7 @@ export interface TreeRow {
     depth: number;
     branch: boolean;
     open: boolean;
-}
-
-export interface RowView {
-    query: string;
-    filter: ProposalFilter;
-    collapsed: ReadonlySet<number>;
+    matched: boolean;
 }
 
 export function matchesQuery(name: string, path: string, query: string): boolean {
@@ -563,30 +616,36 @@ function passes(filter: ProposalFilter, kept: ReadonlySet<number>, clashes: Read
     }
 }
 
-export function visibleRows(
+export function matchedRows(
     proposals: readonly ProposedEntity[],
     edits: ProposalEdits,
-    tree: ProposalTree,
     kept: ReadonlySet<number>,
-    view: RowView,
-): TreeRow[] {
+    query: string,
+    filter: ProposalFilter,
+): ReadonlySet<number> | null {
+    if (query.trim() === "" && filter === "all") {
+        return null;
+    }
     const clashes = clashesOf(proposals, edits);
-    const narrowed = view.query.trim() !== "" || view.filter !== "all";
+    const out = new Set<number>();
+    proposals.forEach((proposal, at) => {
+        if (passes(filter, kept, clashes, at) && matchesQuery(nameOf(proposals, edits, at), pathOf(proposal), query)) {
+            out.add(at);
+        }
+    });
+    return out;
+}
+
+export function visibleRows(tree: ProposalTree, matched: ReadonlySet<number> | null, collapsed: ReadonlySet<number>): TreeRow[] {
+    const narrowed = matched !== null;
     const wanted = new Set<number>();
-    if (narrowed) {
-        proposals.forEach((proposal, at) => {
-            if (
-                passes(view.filter, kept, clashes, at) &&
-                matchesQuery(nameOf(proposals, edits, at), pathOf(proposal), view.query)
-            ) {
-                for (let held: number | undefined = at; held !== undefined; held = tree.parentAt.get(held)) {
-                    if (wanted.has(held)) {
-                        break;
-                    }
-                    wanted.add(held);
-                }
+    for (const at of matched ?? []) {
+        for (let held: number | undefined = at; held !== undefined; held = tree.parentAt.get(held)) {
+            if (wanted.has(held)) {
+                break;
             }
-        });
+            wanted.add(held);
+        }
     }
     const out: TreeRow[] = [];
     const walk = (at: number, depth: number): void => {
@@ -594,8 +653,8 @@ export function visibleRows(
             return;
         }
         const below = (tree.children.get(at) ?? []).filter((child) => !narrowed || wanted.has(child));
-        const open = narrowed || !view.collapsed.has(at);
-        out.push({ at, depth, branch: below.length > 0, open });
+        const open = narrowed || !collapsed.has(at);
+        out.push({ at, depth, branch: below.length > 0, open, matched: matched === null || matched.has(at) });
         if (open) {
             for (const child of below) {
                 walk(child, depth + 1);

@@ -24,6 +24,7 @@ import {
     artifactRevertResult,
     artifactSyncResult,
     artifactValidationReport,
+    stepSyncSite,
 } from "../statuses.js";
 import { BodyPane, DraftPane, FieldsPane, ImagesPane, MetaPane } from "./content.js";
 import { JudgePane } from "./judge.js";
@@ -31,6 +32,7 @@ import { LinkContextPane, ValidationPane } from "./links.js";
 import { EditPlanPane } from "./plan.js";
 import { FinalPane, PublishPane, RelinkPane, RevertPane, SyncPane } from "./publish.js";
 import { Unreadable } from "./shared.js";
+import { SiteSyncPane } from "./sync.js";
 
 interface PayloadProps {
     itemId: string;
@@ -75,6 +77,7 @@ function Payload({ itemId, runId, kind, pageId, payload, choice }: PayloadProps)
 }
 
 export interface ArtifactPaneProps {
+    siteId: string;
     itemId: string;
     runId: string;
     kind: ArtifactKind;
@@ -83,7 +86,15 @@ export interface ArtifactPaneProps {
     choice?: ReviewChoice | null;
 }
 
-export function ArtifactPane({ itemId, runId, kind, pageId, retentionDays, choice = null }: ArtifactPaneProps): ReactElement {
+export function ArtifactPane({
+    siteId,
+    itemId,
+    runId,
+    kind,
+    pageId,
+    retentionDays,
+    choice = null,
+}: ArtifactPaneProps): ReactElement {
     const artifact = useArtifact(itemId, kind);
 
     if (artifact.isPending) {
@@ -108,6 +119,10 @@ export function ArtifactPane({ itemId, runId, kind, pageId, retentionDays, choic
     }
 
     const row = artifact.data.artifact;
+
+    if (kind === artifactSyncResult && row.step === stepSyncSite) {
+        return <SiteSyncPane siteId={siteId} runId={runId} />;
+    }
 
     if (row.purged) {
         return (

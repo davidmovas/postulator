@@ -2,6 +2,7 @@ package observe
 
 import (
 	"context"
+	stderrors "errors"
 	"strings"
 	"time"
 
@@ -83,13 +84,37 @@ func (s *Service) Step(ctx context.Context, state State, readers Readers, batch 
 		return state, invalid("the observation stage is not recognized", "stage")
 	}
 	if err != nil {
-		return state, err
+		return state, during(err, stagePhrases[state.Stage])
 	}
 	if done {
 		state.Stage = nextStage(state.Stage)
 	}
 	return state, nil
 }
+
+var stagePhrases = map[Stage]string{
+	StageInventory: "reading the site's post types and settings",
+	StageContent:   "reading the site's pages",
+	StageStore:     "reading the store's products",
+	StageRender:    "visiting the site's pages",
+	StageDerive:    "deriving the page tree",
+	StageFields:    "reading the pages' custom fields",
+}
+
+func during(err error, what string) error {
+	var kernel *errors.Error
+	if !stderrors.As(err, &kernel) || kernel == nil {
+		return errors.Wrap(err, errors.Internal, what)
+	}
+	if _, named := kernel.Details[detailDuring]; named {
+		return err
+	}
+	next := kernel.WithDetail(detailDuring, what)
+	next.Message = what + ": " + kernel.Message
+	return next
+}
+
+const detailDuring = "during"
 
 func nextStage(stage Stage) Stage {
 	switch stage {

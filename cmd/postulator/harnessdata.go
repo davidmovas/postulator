@@ -189,6 +189,10 @@ type seedTyped struct {
 	Preset pagetype.Preset
 }
 
+func typedBeforeRules() []string {
+	return []string{"/glossary/", "/faq/", "/newsletter/", "/about/"}
+}
+
 func seedTypes() []seedTyped {
 	return []seedTyped{
 		{Path: "/espresso-machines/", Preset: pagetype.Category},

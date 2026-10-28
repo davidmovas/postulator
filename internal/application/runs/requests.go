@@ -28,16 +28,18 @@ type AssumedEdge struct {
 }
 
 type StartResponse struct {
-	RunID    string       `json:"runId"`
-	Estimate run.Estimate `json:"estimate"`
-	Added    []AddedPage  `json:"added"`
-	Fields   []string     `json:"fields"`
+	RunID    string        `json:"runId"`
+	Estimate run.Estimate  `json:"estimate"`
+	Added    []AddedPage   `json:"added"`
+	Fields   []string      `json:"fields"`
+	Skipped  []run.Skipped `json:"skipped"`
 }
 
 type EstimateResponse struct {
-	Estimate run.Estimate `json:"estimate"`
-	Added    []AddedPage  `json:"added"`
-	Fields   []string     `json:"fields"`
+	Estimate run.Estimate  `json:"estimate"`
+	Added    []AddedPage   `json:"added"`
+	Fields   []string      `json:"fields"`
+	Skipped  []run.Skipped `json:"skipped"`
 }
 
 type ParentsRequest struct {

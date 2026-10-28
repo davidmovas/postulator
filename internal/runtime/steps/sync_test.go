@@ -958,8 +958,8 @@ func TestBatchSizeCarriesItsDefaultAndItsSetting(t *testing.T) {
 	t.Parallel()
 
 	values := settings.Default().NewValues()
-	if got := steps.BatchSize(values); got != steps.DefaultBatchSize {
-		t.Fatalf("BatchSize = %d, want %d", got, steps.DefaultBatchSize)
+	if got := steps.BatchSize(values); got != 50 || steps.DefaultBatchSize != 50 {
+		t.Fatalf("BatchSize = %d and its default %d, want 50: a list of 100 runs the_content a hundred times inside one request", got, steps.DefaultBatchSize)
 	}
 
 	if _, err := settings.Default().Apply(values, map[string]json.RawMessage{

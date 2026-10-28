@@ -5,12 +5,12 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { copy } from "../../copy/index.js";
 import { usePageCount } from "../../data/hooks/pages.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
-import { useSyncSite } from "../../data/hooks/sync.js";
 import { wantsNew } from "../../data/params.js";
 import { AccountTreeIcon, AddIcon, Button, CountBadge, EmptyState, FilterAltIcon, Screen, UploadFileIcon, useWidthOf } from "../../ui/index.js";
 import type { Selection } from "../../ui/selection.js";
 import { dropWhole, isEmpty, selectAll } from "../../ui/selection.js";
 import { StartRunDrawer } from "../runs/start.js";
+import { SyncButton } from "../sync/index.js";
 import { PlanPageDialog } from "./create.js";
 import { PageDrawer } from "./drawer.js";
 import { useEntityIndex } from "./entities.js";
@@ -43,7 +43,6 @@ export function PagesScreen(): ReactElement {
     const search = searchOf(query);
     const index = useEntityIndex(siteId);
     const overview = useSiteOverview(siteId);
-    const sync = useSyncSite();
     const naming = useTypeNaming(siteId);
     const memory = usePagesMemory(siteId);
     const view = memory.view;
@@ -154,14 +153,7 @@ export function PagesScreen(): ReactElement {
                     >
                         {copy.pages.importSheet}
                     </Button>
-                    <Button
-                        busy={sync.isPending}
-                        onClick={() => {
-                            sync.mutate({ siteId });
-                        }}
-                    >
-                        {sync.isPending ? copy.pages.syncing : copy.pages.sync}
-                    </Button>
+                    <SyncButton siteId={siteId} label={copy.pages.sync} icon={null} />
                     <Button
                         variant="ghost"
                         onClick={() => {

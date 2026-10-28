@@ -3,11 +3,11 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { copy } from "../../copy/index.js";
-import { useSyncSite } from "../../data/hooks/sync.js";
 import { AccountTreeIcon, Button, EmptyState, Screen, UploadFileIcon } from "../../ui/index.js";
 import { AdoptParentsDrawer } from "../graph/index.js";
 import type { PageTab } from "../pages/index.js";
 import { PageDrawer, readTab, useEntityIndex, withTab } from "../pages/index.js";
+import { SyncButton } from "../sync/index.js";
 import { SubtreeCrumbs } from "./crumbs.js";
 import { FlatList } from "./flat.js";
 import { useBranch } from "./loader.js";
@@ -28,7 +28,6 @@ export function SiteMapScreen(): ReactElement {
     const filter = useMemo(() => filterOf(siteId, query), [siteId, query]);
     const search = searchOf(query);
     const index = useEntityIndex(siteId);
-    const sync = useSyncSite();
     const [adopting, setAdopting] = useState(false);
     const subtree = useBranch({ siteId, parentId: query.under }, query.under !== "");
     const underPath = subtree.view?.parent?.page.path ?? query.under;
@@ -86,15 +85,7 @@ export function SiteMapScreen(): ReactElement {
                             className="w-96"
                             actions={
                                 <>
-                                    <Button
-                                        variant="primary"
-                                        busy={sync.isPending}
-                                        onClick={() => {
-                                            sync.mutate({ siteId });
-                                        }}
-                                    >
-                                        {sync.isPending ? said.empty.syncing : said.empty.sync}
-                                    </Button>
+                                    <SyncButton siteId={siteId} label={said.empty.sync} variant="primary" />
                                     <Button
                                         icon={UploadFileIcon}
                                         onClick={() => {

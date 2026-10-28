@@ -136,6 +136,22 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	}
 }
 
+func TestTheHarnessSeedsPagesTypedBeforeTheRules(t *testing.T) {
+	core := seeded(t)
+
+	listed, err := core.Sites.List(t.Context(), seededSites)
+	if err != nil {
+		t.Fatalf("List sites: %v", err)
+	}
+	rules, err := core.PageTypes.ListRules(t.Context(), pagetypes.ListRulesRequest{SiteID: listed.Items[0].ID})
+	if err != nil {
+		t.Fatalf("ListRules: %v", err)
+	}
+	if rules.BeforeRules != len(typedBeforeRules()) {
+		t.Fatalf("pages typed before the rules = %d, want the %d the 2.5 notice is shot over", rules.BeforeRules, len(typedBeforeRules()))
+	}
+}
+
 func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 	core := seeded(t)
 

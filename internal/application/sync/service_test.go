@@ -2,13 +2,17 @@ package sync_test
 
 import (
 	"context"
+	stderrors "errors"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/adapters/wp"
 	"github.com/davidmovas/postulator/internal/adapters/wp/registry"
 	"github.com/davidmovas/postulator/internal/adapters/wp/wptest"
+	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/run"
 	"github.com/davidmovas/postulator/internal/domain/site"
@@ -75,8 +79,131 @@ func (p packer) Package() ([]byte, error) {
 	return p.archive, p.err
 }
 
+type underway struct {
+	active []run.Run
+	asked  int
+	runs   map[string]run.Run
+	items  map[string][]run.Item
+}
+
+func (u *underway) Get(_ context.Context, runID string) (run.Run, error) {
+	record, held := u.runs[runID]
+	if !held {
+		return run.Run{}, errors.New(errors.NotFound, "no such run")
+	}
+	return record, nil
+}
+
+func (u *underway) ByRun(_ context.Context, runID string) ([]run.Item, error) {
+	return u.items[runID], nil
+}
+
+func (u *underway) ActiveSync(context.Context, string) (run.Run, bool, error) {
+	u.asked++
+	if len(u.active) == 0 {
+		return run.Run{}, false, nil
+	}
+	next := u.active[0]
+	if len(u.active) > 1 {
+		u.active = u.active[1:]
+	}
+	if next.ID == "" {
+		return run.Run{}, false, nil
+	}
+	return next, true, nil
+}
+
 func newService(store *sites, q *queue, probe prober, pack packer) *sync.Service {
-	return sync.New(q, store, probe, pack, clock.NewFake(sqlitetest.Stamp))
+	held := &underway{}
+	return sync.New(q, held, held, store, probe, pack, clock.NewFake(sqlitetest.Stamp))
+}
+
+func TestTheProgressOfASyncSaysItsStageCountsAndTrouble(t *testing.T) {
+	t.Parallel()
+
+	wake := sqlitetest.Stamp.Add(2 * time.Second)
+	checkpoint := run.NewCheckpoint()
+	if err := run.Set(checkpoint, observe.CheckpointKey, observe.Progress{
+		State: observe.State{
+			StartedAt: sqlitetest.Stamp, Source: observe.SourcePlugin, Stage: observe.StageRender, Full: true,
+			Counts: observe.Counts{Pulled: 412, Created: 400, Updated: 12, Rendered: 150, Unreachable: 2},
+		},
+		Batches: 11,
+	}); err != nil {
+		t.Fatalf("set the checkpoint: %v", err)
+	}
+	active := run.Run{ID: "run-active", SiteID: siteID, Kind: run.KindSync, Status: run.StatusWaiting, CreatedAt: sqlitetest.Stamp}
+	done := run.Run{ID: "run-done", SiteID: siteID, Kind: run.KindSync, Status: run.StatusFailed, Error: "the step ran past its time limit"}
+	other := run.Run{ID: "run-generate", SiteID: siteID, Kind: run.KindGenerate, Status: run.StatusRunning}
+	held := &underway{
+		active: []run.Run{active},
+		runs:   map[string]run.Run{active.ID: active, done.ID: done, other.ID: other},
+		items: map[string][]run.Item{active.ID: {{
+			RunID: active.ID, Status: run.StatusWaiting, Attempts: 1, WakeAt: &wake, Checkpoint: checkpoint,
+			Error: "reading the body of /about/: the WordPress site failed on its side: WordPress answered 500 on GET /x",
+		}}},
+	}
+	service := sync.New(&queue{}, held, held, newSites(), prober{}, packer{}, clock.NewFake(sqlitetest.Stamp))
+
+	got, err := service.Progress(t.Context(), sync.ProgressRequest{SiteID: siteID})
+	if err != nil {
+		t.Fatalf("Progress: %v", err)
+	}
+	if !got.Found || got.RunID != active.ID || got.Status != "waiting" || got.Stage != "render" || !got.Full || got.Source != "plugin" ||
+		got.Batches != 11 || got.Pulled != 412 || got.Created != 400 || got.Rendered != 150 || got.Unreachable != 2 ||
+		got.Attempts != 1 || got.WakeAt == nil || !strings.Contains(got.Error, "WordPress answered 500") {
+		t.Fatalf("the active sync's progress = %+v", got)
+	}
+
+	named, err := service.Progress(t.Context(), sync.ProgressRequest{SiteID: siteID, RunID: done.ID})
+	if err != nil || !named.Found || named.Status != "failed" || named.Stage != "" || named.Error != done.Error {
+		t.Fatalf("a finished sync's progress = %+v %v, want its status and the run's error", named, err)
+	}
+	if _, err = service.Progress(t.Context(), sync.ProgressRequest{SiteID: siteID, RunID: other.ID}); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("the progress of a generate run = %v, want it refused", err)
+	}
+
+	idle := sync.New(&queue{}, &underway{}, &underway{}, newSites(), prober{}, packer{}, clock.NewFake(sqlitetest.Stamp))
+	if none, idleErr := idle.Progress(t.Context(), sync.ProgressRequest{SiteID: siteID}); idleErr != nil || none.Found {
+		t.Fatalf("the progress of a site with no sync = %+v %v, want nothing found", none, idleErr)
+	}
+}
+
+func TestASecondSyncOfASiteIsRefusedAndNamesTheOneUnderWay(t *testing.T) {
+	t.Parallel()
+
+	running := run.Run{ID: "run-under-way", SiteID: siteID, Kind: run.KindSync, Status: run.StatusRunning}
+	cases := []struct {
+		name   string
+		active []run.Run
+		queue  *queue
+	}{
+		{name: "one already under way", active: []run.Run{running}, queue: &queue{}},
+		{
+			name: "one that won the race to the index", active: []run.Run{{}, running},
+			queue: &queue{err: errors.New(errors.Conflict, "insert the run")},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			held := &underway{active: tc.active}
+			service := sync.New(tc.queue, held, held, newSites(), prober{}, packer{}, clock.NewFake(sqlitetest.Stamp))
+			_, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: siteID})
+
+			var kernel *errors.Error
+			if !stderrors.As(err, &kernel) || kernel.Code != errors.Conflict || kernel.Details["runId"] != running.ID {
+				t.Fatalf("err = %v, want a conflict naming %s", err, running.ID)
+			}
+			if kernel.Message != "a sync of Shop is already under way; it reads every page, so a second one would only repeat it" {
+				t.Errorf("message = %q", kernel.Message)
+			}
+			if tc.queue.queued.ID != "" {
+				t.Errorf("a second sync was queued: %+v", tc.queue.queued)
+			}
+		})
+	}
 }
 
 func newSites() *sites {
@@ -289,7 +416,7 @@ func TestCheckPluginReprobesASiteThatGainedThePlugin(t *testing.T) {
 	store.record.AllowInsecure = true
 
 	held := registry.New(store, vault{password: wptest.DefaultPassword}, wp.WithRateLimit(0))
-	service := sync.New(&queue{}, store, held, packer{}, clock.NewFake(sqlitetest.Stamp))
+	service := sync.New(&queue{}, &underway{}, &underway{}, store, held, packer{}, clock.NewFake(sqlitetest.Stamp))
 
 	absent, err := service.CheckPlugin(t.Context(), sync.CheckPluginRequest{SiteID: siteID})
 	if err != nil {

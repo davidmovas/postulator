@@ -23,6 +23,7 @@ const (
 	reasonReadOnlyRole     = "role_read_only"
 	reasonExcerptOnProduct = "excerpt_is_short_description"
 	reasonPersonOnly       = "field_not_ai_written"
+	reasonBeforeRules      = "preset_before_rules"
 )
 
 type typeStore interface {
@@ -221,6 +222,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (Type, error) {
 	kind := pagetype.Type{
 		ID: id.New(), SiteID: req.SiteID, Name: strings.TrimSpace(req.Name), Preset: pagetype.Preset(req.Preset),
 		CreatedAt: now, UpdatedAt: now,
+	}
+	if kind.Preset.Legacy() {
+		return Type{}, errors.New(errors.Invalid, "Hub and Entity are the types of a site from before 2.6; a new type "+
+			"starts from Landing or Category for a page that gathers others, Guide or Info for an article").
+			WithDetail("field", "preset").WithDetail("reason", reasonBeforeRules)
 	}
 	err := s.deps.UnitOfWork.Do(ctx, func(c context.Context) error {
 		templateID, templateErr := s.templateFor(c, req.SiteID, req.TemplateID)

@@ -33,7 +33,7 @@ func (k Kind) Valid() bool {
 
 func (k Kind) Startable() bool {
 	switch k {
-	case KindGenerate, KindRelink, KindAudit, KindSync, KindImport, KindCustom:
+	case KindGenerate, KindRelink, KindAudit, KindImport, KindCustom:
 		return true
 	default:
 		return false
@@ -92,6 +92,7 @@ type Run struct {
 	Budget          Budget
 	Stats           Stats
 	Brief           Brief
+	Skipped         []Skipped
 	CreatedBy       kctx.Actor
 	ParentRunID     *string
 	PauseReason     PauseReason
@@ -140,6 +141,8 @@ func NewRun(r Run) (Run, error) {
 		return Run{}, invalid("parent run id must not be empty when set", "parentRunId")
 	case r.DeadlineAt.IsZero():
 		return Run{}, invalid("a run needs a deadline", "deadlineAt")
+	case !validSkipped(r.Skipped):
+		return Run{}, invalid("a page left out of a run needs its id and a known reason", "skipped")
 	}
 	return r, nil
 }

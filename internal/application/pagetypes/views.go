@@ -45,6 +45,7 @@ type Rule struct {
 	Enabled    bool                `json:"enabled"`
 	TypeID     string              `json:"typeId"`
 	Conditions pagetype.Conditions `json:"conditions"`
+	Pages      int                 `json:"pages"`
 	CreatedAt  dto.Time            `json:"createdAt"`
 	UpdatedAt  dto.Time            `json:"updatedAt"`
 }

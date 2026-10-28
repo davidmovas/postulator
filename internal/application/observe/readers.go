@@ -235,6 +235,10 @@ func (m Manifest) Has(capability string) bool {
 	return slices.Contains(m.Capabilities, capability)
 }
 
+func (m Manifest) listsTerms() bool {
+	return len(m.PostTypes) > 0
+}
+
 type Readers struct {
 	Core     CoreReader
 	Store    StoreReader

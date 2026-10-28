@@ -241,6 +241,7 @@ func (s *Server) add(item Item) Item {
 	if item.Modified.IsZero() {
 		item.Modified = s.tick()
 	}
+	item.Modified = item.Modified.UTC().Truncate(time.Second)
 
 	stored := item
 	if s.term(item.Type) {

@@ -18,11 +18,14 @@ import {
     StatusBadge,
     VerifiedIcon,
 } from "../../ui/index.js";
+import { findingsOfCode } from "../findings/index.js";
 import { ConflictNotice } from "./conflict-notice.js";
 import type { EntityIndex } from "./entities.js";
 import { formatScore } from "../graph/labels.js";
 
 const noEntity = "none";
+
+const withoutEntity = "page_without_entity";
 
 export interface PageMappingProps {
     page: Page;
@@ -65,6 +68,13 @@ export function PageMapping({ page, siteId, index, search }: PageMappingProps): 
                 ) : null}
             </PanelHeader>
             <div className="flex flex-col gap-2.5 p-3">
+                {page.entityId === null ? (
+                    <Link to={findingsOfCode(siteId, withoutEntity)} className="text-xs leading-snug text-accent hover:underline">
+                        {copy.pages.detail.entityWhy}
+                    </Link>
+                ) : (
+                    <p className="text-xs leading-snug text-ink-dim">{copy.pages.detail.entityWhy}</p>
+                )}
                 {page.entityId === null ? (
                     <div className="flex items-start gap-2">
                         <LinkOffIcon size={18} className="mt-px shrink-0 text-ink-faint" />

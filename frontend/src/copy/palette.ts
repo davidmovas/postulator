@@ -23,6 +23,7 @@ export const palette = {
     },
     run: (kind: string, items: number, when: string) =>
         `${kind} · ${items === 1 ? "1 page" : `${items} pages`} · ${when}`,
+    siteRun: (kind: string, when: string) => `${kind} of the whole site · ${when}`,
     settings: "Settings",
     newRun: "New run",
     newEntity: "New entity",

@@ -19,7 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 84
+const latestMigration = 87
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -106,6 +106,9 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0082_run_brief.sql",
 		"0083_agent_plans.sql",
 		"0084_pending_action_risk.sql",
+		"0085_one_sync_per_site.sql",
+		"0086_entity_type_named_article.sql",
+		"0087_runs_skipped.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1882,6 +1885,134 @@ func TestAPagesRuleAndItsReasonsComeAndGoWithTheirMigration(t *testing.T) {
 	}
 	if got := columnOf(t, store, "pages", "page_type_rule_id"); got != "" {
 		t.Fatalf("the down kept page_type_rule_id: %q", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestASiteKeepsItsOldestSyncAndHoldsOneAtATime(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 84)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	insertRun := func(runID, siteID, kind, status, createdAt string) error {
+		_, execErr := store.writer.ExecContext(t.Context(), `INSERT INTO runs (id, site_id, kind, status, targets, recipe, publish_mode, created_by, deadline_at, created_at)
+			VALUES (?, ?, ?, ?, '[]', '[]', 'draft', 'user', '2026-10-28T18:00:00Z', ?)`, runID, siteID, kind, status, createdAt)
+		if execErr != nil {
+			return execErr
+		}
+		_, execErr = store.writer.ExecContext(t.Context(), `INSERT INTO run_items (id, run_id, site_id, target_id, status, current_step, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, 'sync_site', ?, ?)`, "item-"+runID, runID, siteID, siteID, status, createdAt, createdAt)
+		return execErr
+	}
+	const at = "2026-10-28T08:00:00Z"
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s2', 'Blog', 'https://blog', 'site:s2:wp_password', 'active', ?, ?)`, at, at)
+	for _, seeded := range []struct{ id, site, kind, status, at string }{
+		{"sync-done", "s1", "sync", "completed", "2026-10-28T08:30:00Z"},
+		{"sync-first", "s1", "sync", "pending", "2026-10-28T09:00:00Z"},
+		{"generate", "s1", "generate", "running", "2026-10-28T09:01:00Z"},
+		{"sync-second", "s1", "sync", "running", "2026-10-28T09:05:00Z"},
+		{"sync-third", "s1", "sync", "waiting", "2026-10-28T09:10:00Z"},
+		{"sync-blog", "s2", "sync", "paused", "2026-10-28T09:00:00Z"},
+	} {
+		if insertErr := insertRun(seeded.id, seeded.site, seeded.kind, seeded.status, seeded.at); insertErr != nil {
+			t.Fatalf("seed %s: %v", seeded.id, insertErr)
+		}
+	}
+
+	if _, err = provider.UpTo(t.Context(), 85); err != nil {
+		t.Fatalf("up to 85: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, status FROM runs ORDER BY id`); !slices.Equal(got, []string{
+		"generate | running", "sync-blog | paused", "sync-done | completed", "sync-first | pending", "sync-second | cancelled", "sync-third | cancelled",
+	}) {
+		t.Fatalf("the runs after 85 = %v, want the oldest active sync of each site kept and the others cancelled", got)
+	}
+	if got := rowsOf(t, store, `SELECT run_id, status, finished_at IS NOT NULL FROM run_items WHERE run_id LIKE 'sync-%' ORDER BY run_id`); !slices.Equal(got, []string{
+		"sync-blog | paused | 0", "sync-done | completed | 0", "sync-first | pending | 0", "sync-second | cancelled | 1", "sync-third | cancelled | 1",
+	}) {
+		t.Fatalf("the items after 85 = %v", got)
+	}
+	if got := rowsOf(t, store, `SELECT error FROM runs WHERE id = 'sync-second'`); len(got) != 1 || !strings.Contains(got[0], "another sync of this site") {
+		t.Fatalf("a cancelled duplicate says %v", got)
+	}
+	if insertErr := insertRun("sync-fourth", "s1", "sync", "pending", "2026-10-28T09:20:00Z"); insertErr == nil {
+		t.Fatal("a second active sync of the site was accepted")
+	}
+	if insertErr := insertRun("generate-two", "s1", "generate", "pending", "2026-10-28T09:20:00Z"); insertErr != nil {
+		t.Fatalf("a generate run beside the sync was refused: %v", insertErr)
+	}
+	must(`UPDATE runs SET status = 'completed' WHERE id = 'sync-first'`)
+	if insertErr := insertRun("sync-next", "s1", "sync", "pending", "2026-10-28T09:30:00Z"); insertErr != nil {
+		t.Fatalf("a sync after the last one finished was refused: %v", insertErr)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 84); err != nil {
+		t.Fatalf("down to 84: %v", err)
+	}
+	if insertErr := insertRun("sync-twin", "s1", "sync", "pending", "2026-10-28T09:40:00Z"); insertErr != nil {
+		t.Fatalf("the down kept the one-sync index: %v", insertErr)
+	}
+}
+
+func TestTheTypeNamedEntityBecomesArticleSoItIsNotTakenForTheGraph(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 85)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const at = "2026-10-28T08:00:00Z"
+	for _, owner := range []string{"s1", "s2", "s3"} {
+		must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+			owner, owner, "https://"+owner, "site:"+owner+":wp_password", at, at)
+	}
+	for _, seeded := range []struct{ id, site, name, preset string }{
+		{"s1-entity", "s1", "Entity", "entity"},
+		{"s1-hub", "s1", "Hub", "hub"},
+		{"s2-entity", "s2", "Entity", "entity"},
+		{"s2-article", "s2", "Article", "guide"},
+		{"s3-entity", "s3", "Entity", "hub"},
+	} {
+		must(`INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+			seeded.id, seeded.site, seeded.name, seeded.preset, at, at)
+	}
+
+	if _, err = provider.UpTo(t.Context(), 86); err != nil {
+		t.Fatalf("up to 86: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, name, preset FROM page_types ORDER BY id`); !slices.Equal(got, []string{
+		"s1-entity | Article | entity", "s1-hub | Hub | hub", "s2-article | Article | guide",
+		"s2-entity | Article (2.5) | entity", "s3-entity | Entity | hub",
+	}) {
+		t.Fatalf("the types after 86 = %v, want the entity preset's Entity renamed and nothing else", got)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 85); err != nil {
+		t.Fatalf("down to 85: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, name FROM page_types ORDER BY id`); !slices.Equal(got, []string{
+		"s1-entity | Entity", "s1-hub | Hub", "s2-article | Article", "s2-entity | Entity", "s3-entity | Entity",
+	}) {
+		t.Fatalf("the down left the types as %v", got)
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)

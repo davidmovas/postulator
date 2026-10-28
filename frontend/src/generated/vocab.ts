@@ -200,8 +200,22 @@ export const pageTypePresets = [
 ] as const;
 export type PageTypePreset = (typeof pageTypePresets)[number];
 
+export const creatablePageTypePresets: readonly PageTypePreset[] = [
+    "landing",
+    "category",
+    "guide",
+    "info",
+    "product",
+    "store_category",
+    "catalog",
+    "technical",
+];
+
 export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
 export type PageTypeRole = (typeof pageTypeRoles)[number];
+
+export const syncStages = ["inventory", "content", "store", "render", "derive", "fields", "done"] as const;
+export type SyncStage = (typeof syncStages)[number];
 
 export const ruleKinds = ["rule", "fallback"] as const;
 export type RuleKind = (typeof ruleKinds)[number];
@@ -385,14 +399,7 @@ export type RunKind = (typeof runKinds)[number];
 
 export const runKindsWithTheirOwnRecipe: readonly RunKind[] = ["relink", "sync", "revert", "edit"];
 
-export const startableRunKinds: readonly RunKind[] = [
-    "generate",
-    "relink",
-    "audit",
-    "sync",
-    "import",
-    "custom",
-];
+export const startableRunKinds: readonly RunKind[] = ["generate", "relink", "audit", "import", "custom"];
 
 export const runStatuses = [
     "pending",
@@ -470,6 +477,9 @@ export type PerKindStepName = (typeof perKindStepNames)[number];
 
 export const retryBlockedReasons = ["inputs_expired"] as const;
 export type RetryBlockedReason = (typeof retryBlockedReasons)[number];
+
+export const skipReasons = ["no_entity", "no_template"] as const;
+export type SkipReason = (typeof skipReasons)[number];
 
 export const templateScopes = ["global", "site"] as const;
 export type TemplateScope = (typeof templateScopes)[number];

@@ -226,7 +226,6 @@ func TestAKindWithARecipeOfItsOwnNeverTakesTheTemplates(t *testing.T) {
 			name: "relink", kind: run.KindRelink,
 			want: []string{"resolve_context", "relink_page", "sync_back", "report"},
 		},
-		{name: "sync", kind: run.KindSync, want: []string{"sync_site"}},
 	}
 
 	for _, tc := range cases {
@@ -306,6 +305,23 @@ func TestARevertIsNotStartedLikeAnyOtherRun(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "run it undoes") {
 		t.Fatalf("the refusal does not say where a revert comes from: %v", err)
+	}
+}
+
+func TestASyncIsNotStartedFromAListOfPages(t *testing.T) {
+	t.Parallel()
+
+	fixture := newFixture(t)
+	fixture.specs.siteID = fixture.siteID
+
+	_, err := fixture.service.Start(t.Context(), runs.StartRequest{
+		SiteID: fixture.siteID, PageIDs: fixture.pages, Kind: string(run.KindSync),
+	})
+	if !errors.IsCode(err, errors.Invalid) || !strings.Contains(err.Error(), "one at a time") {
+		t.Fatalf("Start of a sync over pages = %v, want it refused and pointed at the site's own sync", err)
+	}
+	if fixture.engine.queued.SiteID != "" {
+		t.Fatalf("a sync reached the engine: %+v", fixture.engine.queued)
 	}
 }
 
@@ -398,7 +414,7 @@ func TestTheRecipeABlankTemplateBuildsStartsAGenerateRun(t *testing.T) {
 	}
 }
 
-func TestARunOverAPageMappedToNothingIsRefusedBeforeItIsQueued(t *testing.T) {
+func TestARunLeavesOutAPageMappedToNothingAndIsRefusedOnlyWhenNothingRemains(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -419,29 +435,40 @@ func TestARunOverAPageMappedToNothingIsRefusedBeforeItIsQueued(t *testing.T) {
 			fixture.specs.siteID = fixture.siteID
 			fixture.mapping.unmapped[fixture.pages[1]] = "/hub/child/"
 
-			_, err := fixture.service.Start(t.Context(), runs.StartRequest{
+			started, err := fixture.service.Start(t.Context(), runs.StartRequest{
 				SiteID: fixture.siteID, PageIDs: fixture.pages, Kind: string(tc.kind),
 			})
-			if !errors.IsCode(err, errors.Invalid) {
-				t.Fatalf("Start = %v, want invalid", err)
+			if err != nil {
+				t.Fatalf("Start = %v, want the run over the mapped page", err)
+			}
+			want := []run.Skipped{{PageID: fixture.pages[1], Path: "/hub/child/", Reason: run.SkipNoEntity}}
+			if !slices.Equal(started.Skipped, want) || !slices.Equal(fixture.engine.queued.Skipped, want) {
+				t.Fatalf("left out %+v, the run records %+v; want %+v", started.Skipped, fixture.engine.queued.Skipped, want)
+			}
+			if got := fixture.engine.queued.Targets; !slices.Equal(got, fixture.pages[:1]) {
+				t.Fatalf("the run targets %v, want the mapped page alone", got)
 			}
 
-			var refusal *errors.Error
-			if !stderrors.As(err, &refusal) {
-				t.Fatalf("the refusal is not a kernel error: %v", err)
+			fixture.engine.queued = run.Run{}
+			_, err = fixture.service.Start(t.Context(), runs.StartRequest{
+				SiteID: fixture.siteID, PageIDs: fixture.pages[1:], Kind: string(tc.kind),
+			})
+			if !errors.IsCode(err, errors.Invalid) {
+				t.Fatalf("Start over the unmapped page alone = %v, want invalid", err)
 			}
-			if got := refusal.Details["field"]; got != "pageIds" {
-				t.Fatalf("the refusal names the field %v, want pageIds", got)
+			var refusal *errors.Error
+			if !stderrors.As(err, &refusal) || refusal.Details["field"] != "pageIds" {
+				t.Fatalf("the refusal = %v, want it on pageIds", err)
 			}
 			paths, ok := refusal.Details["paths"].([]string)
 			if !ok || !slices.Equal(paths, []string{"/hub/child/"}) {
 				t.Fatalf("the refusal names the paths %v, want [/hub/child/]", refusal.Details["paths"])
 			}
-			if !strings.Contains(err.Error(), "/hub/child/") {
-				t.Fatalf("the message does not say which page is unmapped: %v", err)
+			if !strings.Contains(err.Error(), "/hub/child/") || !strings.Contains(err.Error(), "Graph") {
+				t.Fatalf("the message does not say which page is unmapped and where to map it: %v", err)
 			}
 			if fixture.engine.queued.SiteID != "" {
-				t.Fatalf("an unmapped target reached the engine: %+v", fixture.engine.queued)
+				t.Fatalf("a run with nothing to write reached the engine: %+v", fixture.engine.queued)
 			}
 		})
 	}
@@ -458,17 +485,6 @@ func TestARunOverAPageMappedToNothingIsRefusedByTheEstimateToo(t *testing.T) {
 		SiteID: fixture.siteID, PageIDs: fixture.pages[:1],
 	}); !errors.IsCode(err, errors.Invalid) {
 		t.Fatalf("Estimate = %v, want invalid", err)
-	}
-}
-
-func TestASiteWideRunIsNotJudgedByTheMapping(t *testing.T) {
-	t.Parallel()
-
-	fixture := newFixture(t)
-	fixture.mapping.unmapped[fixture.pages[0]] = "/hub/"
-
-	if got := startedWith(t, fixture, runs.StartRequest{Kind: string(run.KindSync)}); !slices.Equal(got, []string{"sync_site"}) {
-		t.Fatalf("a sync run over an unmapped page runs %v, want [sync_site]", got)
 	}
 }
 

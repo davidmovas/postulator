@@ -382,7 +382,8 @@ export const graph = {
         noMatchProposals: "No proposal matches.",
         underParent: (label: string) => `under ${label}`,
         inspectorLabel: "The picked proposal",
-        inspectorEmpty: "Pick a row to rename it, move it under another parent or change its keywords.",
+        inspectorEmpty:
+            "Pick a row to rename it, move it under another parent or change its keywords. Shift-click to tick a range, Ctrl-click to tick a row without what sits under it, or drag across the boxes.",
         nameField: "Name",
         nameNeeded: "Give it a name.",
         parentField: "Parent",
@@ -396,11 +397,13 @@ export const graph = {
         factsField: "Facts",
         keepAll: "Keep all",
         keepNone: "Keep none",
+        tickShown: (count: number) => `Tick the ${count} shown`,
+        untickShown: (count: number) => `Untick the ${count} shown`,
         applied: (entities: number, mapped: number, edges: number, skipped: number) =>
             `${entities} ${entities === 1 ? "entity" : "entities"} created, ${mapped} ${mapped === 1 ? "page" : "pages"} mapped, ${edges} ${edges === 1 ? "edge" : "edges"} proposed${skipped > 0 ? `, ${skipped} skipped` : ""}.`,
         reviewEdges: "Review the edges",
         siteBody:
-            "Each page proposes an entity named from what the site shows, under the entity of its parent page. Nothing is written until you confirm the ones you keep.",
+            "Each page you keep becomes an entity in the graph, named from what the site shows and placed under the entity of its parent page; a page Postulator writes needs one. Nothing is written until you confirm.",
         reading: "Reading the pages",
         siteReviewBody: "Untick what you do not want. A row the site cannot name, or whose name is taken under its parent, stays unticked.",
         columnPage: "Page",

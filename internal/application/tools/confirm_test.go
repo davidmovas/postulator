@@ -19,7 +19,7 @@ import (
 func rewritingType(t *testing.T, seeded fixture, name string) pagetypes.Type {
 	t.Helper()
 
-	created, err := seeded.types.Create(t.Context(), pagetypes.CreateRequest{SiteID: seeded.site, Name: name, Preset: "hub"})
+	created, err := seeded.types.Create(t.Context(), pagetypes.CreateRequest{SiteID: seeded.site, Name: name, Preset: "landing"})
 	if err != nil {
 		t.Fatalf("create the type %s: %v", name, err)
 	}
@@ -106,7 +106,7 @@ func TestTypingAPageIntoAnOrdinaryTypeRunsInAutonomousMode(t *testing.T) {
 
 	registry, binding, seeded := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
-	plain, err := seeded.types.Create(t.Context(), pagetypes.CreateRequest{SiteID: seeded.site, Name: "Plain", Preset: "hub"})
+	plain, err := seeded.types.Create(t.Context(), pagetypes.CreateRequest{SiteID: seeded.site, Name: "Plain", Preset: "landing"})
 	if err != nil {
 		t.Fatalf("create the type: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestReassigningPagesIntoARewritingTypeWaitsForAPerson(t *testing.T) {
 	registry, binding, seeded := wired(t)
 	binding.Mode = domainagent.ModeAutonomous
 	rewriting := rewritingType(t, seeded, "Rewritten")
-	leaving, err := seeded.types.Create(t.Context(), pagetypes.CreateRequest{SiteID: seeded.site, Name: "Leaving", Preset: "hub"})
+	leaving, err := seeded.types.Create(t.Context(), pagetypes.CreateRequest{SiteID: seeded.site, Name: "Leaving", Preset: "landing"})
 	if err != nil {
 		t.Fatalf("create the type: %v", err)
 	}

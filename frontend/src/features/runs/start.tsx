@@ -6,7 +6,7 @@ import { flatten } from "../../data/call.js";
 import { usePagePaths } from "../../data/hooks/pages.js";
 import { useEstimateRun, useStartRun } from "../../data/hooks/runs.js";
 import { useResolvedTemplate, useTemplates } from "../../data/hooks/templates.js";
-import type { AddedPage, Estimate, WriterDirections } from "../../data/types.js";
+import type { AddedPage, Estimate, SkippedPage, WriterDirections } from "../../data/types.js";
 import { publishModes } from "../../generated/vocab.js";
 import type { SelectOption } from "../../ui/index.js";
 import { Button, CalculateIcon, Drawer, Field, PlayArrowIcon, Select } from "../../ui/index.js";
@@ -81,6 +81,7 @@ export function StartRunDrawer({
     const [tokenCap, setTokenCap] = useState(defaultTokenCap);
     const [estimate, setEstimate] = useState<Estimate | null>(null);
     const [added, setAdded] = useState<readonly AddedPage[]>([]);
+    const [skipped, setSkipped] = useState<readonly SkippedPage[]>([]);
     const [scoped, setScoped] = useState<readonly string[]>([]);
     const [rewrite, setRewrite] = useState<ReadonlySet<string>>(new Set());
     const [named, setNamed] = useState<ReadonlyMap<string, string>>(new Map());
@@ -118,6 +119,7 @@ export function StartRunDrawer({
         setTokenCap(defaultTokenCap);
         setEstimate(null);
         setAdded([]);
+        setSkipped([]);
         setScoped([]);
         setRewrite(new Set(seed?.rewrite ?? []));
         setNamed(new Map(paths ?? []));
@@ -137,6 +139,7 @@ export function StartRunDrawer({
     const forget = (): void => {
         setEstimate(null);
         setAdded([]);
+        setSkipped([]);
         setScoped([]);
         priced.reset();
     };
@@ -175,6 +178,7 @@ export function StartRunDrawer({
             onSuccess: (answered) => {
                 setEstimate(answered.estimate);
                 setAdded(answered.added ?? []);
+                setSkipped(answered.skipped ?? []);
                 setScoped(answered.fields ?? []);
             },
         });
@@ -393,7 +397,7 @@ export function StartRunDrawer({
                     }}
                 />
 
-                <StartPrice estimate={estimate} added={added} over={over} refusal={refusal.banner} />
+                <StartPrice estimate={estimate} added={added} skipped={skipped} over={over} refusal={refusal.banner} />
             </div>
             {previewing === null ? null : (
                 <WriterDrawer

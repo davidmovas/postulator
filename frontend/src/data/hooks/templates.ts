@@ -49,6 +49,7 @@ export function useResolvedTemplate(pageId: string | null, templateId = "") {
         queryFn: ({ signal }) =>
             resolveForPage(templateId === "" ? { pageId: page } : { pageId: page, templateId }, signal),
         enabled: page !== "",
+        quiet: ["NOT_FOUND"],
     });
 }
 

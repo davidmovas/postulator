@@ -20,7 +20,7 @@ type pagetypesArgs struct {
 	Op          string            `json:"op" enum:"list,get,save,delete,scope" description:"list the types in brief; get one whole with its scopes and the field catalog; save creates one without pageTypeId or changes one; scope changes how one field of a type is written"`
 	PageTypeID  string            `json:"pageTypeId,omitempty" description:"get, save, delete, scope: the type"`
 	Name        *string           `json:"name,omitempty" description:"save: its name; required to create"`
-	Preset      string            `json:"preset,omitempty" enum:"landing,category,guide,info,product,store_category,catalog,technical,hub,entity" description:"save: the role it takes; required to create, fixed after"`
+	Preset      string            `json:"preset,omitempty" enum:"landing,category,guide,info,product,store_category,catalog,technical" description:"save: the role it takes; required to create, fixed after"`
 	TemplateID  *string           `json:"templateId,omitempty" description:"save: the template of its pages; empty clears"`
 	ReassignTo  string            `json:"reassignTo,omitempty" description:"delete: the type its pages move to"`
 	Field       string            `json:"field,omitempty" enum:"title,excerpt,body,seo_title,seo_description,product_description,product_short_description,variation_description,image_alt,image_title,upsells,cross_sells" description:"scope: the field; omit for a custom field"`

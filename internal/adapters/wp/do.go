@@ -119,13 +119,13 @@ func (c *Client) send(ctx context.Context, client *http.Client, req request, tar
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return attempt{err: transportError(ctx, err)}
+		return attempt{err: transportError(ctx, req.method, route(httpReq.URL), err)}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
-		return attempt{status: resp.StatusCode, err: transportError(ctx, err)}
+		return attempt{status: resp.StatusCode, err: transportError(ctx, req.method, route(httpReq.URL), err)}
 	}
 
 	if resp.StatusCode >= http.StatusMultipleChoices {
