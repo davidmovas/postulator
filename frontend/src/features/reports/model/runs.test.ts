@@ -20,6 +20,7 @@ function run(id: string, status: string): Run {
         parentRunId: null,
         pauseReason: "",
         error: "",
+        skipped: null,
         deadlineAt: null,
         createdAt: null,
         startedAt: null,

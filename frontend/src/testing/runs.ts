@@ -1,4 +1,9 @@
-import type { Run } from "../data/types.js";
+import type { Run, SkippedPage } from "../data/types.js";
+import type { SkipReason } from "../generated/vocab.js";
+
+export function aSkippedPage(path: string, reason: SkipReason, pageType = ""): SkippedPage {
+    return { pageId: `p-${path}`, path, reason: reason as SkippedPage["reason"], pageType };
+}
 
 export function aRun(overrides: Partial<Run> = {}): Run {
     return {
@@ -17,6 +22,7 @@ export function aRun(overrides: Partial<Run> = {}): Run {
         parentRunId: null,
         pauseReason: "",
         error: "",
+        skipped: null,
         deadlineAt: null,
         createdAt: "2026-10-28T09:00:00Z",
         startedAt: "2026-10-28T09:00:01Z",

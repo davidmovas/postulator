@@ -64,7 +64,7 @@ export function TemplatePanel({ page, siteId }: TemplatePanelProps): ReactElemen
                 {resolved.isPending ? (
                     <Skeleton height={18} width="60%" />
                 ) : missing ? (
-                    <p className="text-xs text-warn">{copy.pages.detail.templateNone}</p>
+                    <p className="text-xs text-ink-dim">{copy.pages.detail.templateNone}</p>
                 ) : resolved.data === undefined ? (
                     <p className="text-xs text-ink-dim">{failure(resolved.error).message}</p>
                 ) : (

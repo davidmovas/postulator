@@ -6,7 +6,7 @@ import { copy } from "../../copy/index.js";
 import type { RunEventsState } from "../../data/runs/log.js";
 import type { Run } from "../../data/types.js";
 import { renderScreen } from "../../testing/render.js";
-import { aRun, aSyncRun } from "../../testing/runs.js";
+import { aRun, aSkippedPage, aSyncRun } from "../../testing/runs.js";
 import { aProgress } from "../../testing/sync.js";
 import { runView } from "./authority.js";
 
@@ -119,6 +119,27 @@ describe("the notices of a sync under way", () => {
         shown(aRun({ status: "running", budget: { maxUsd: 0, maxTokens: 0 } }), 0);
 
         expect(screen.getByText(copy.runs.detail.noCap)).toBeDefined();
+    });
+});
+
+describe("the notice of a run that left chosen pages out", () => {
+    it("names each page the run left out once it has finished", () => {
+        shown(
+            aRun({
+                status: "completed",
+                skipped: [aSkippedPage("/shop/", "no_template", "Store category")],
+            }),
+            0,
+        );
+
+        expect(screen.getByText(copy.runs.skipped.started(1))).toBeDefined();
+        expect(screen.getByText("/shop/")).toBeDefined();
+    });
+
+    it("says nothing of a run that wrote every chosen page", () => {
+        shown(aRun({ status: "completed", skipped: [] }), 0);
+
+        expect(screen.queryByText(copy.runs.skipped.started(0))).toBeNull();
     });
 });
 

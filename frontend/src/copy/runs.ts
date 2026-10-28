@@ -137,6 +137,20 @@ export const runs = {
         body: "Each is marked Done, check. Its row says what it lacks: a link it owes, a link to a page that is not published yet, or the images its template asked for. The Linking screen shows the links as they stand now.",
         drawer: "The page went through every step. Links & compliance lists the links it owes as they stood at validation, Images says what the image step could not do, and the Linking screen shows the links as they stand now.",
     },
+    skipped: {
+        starting: (count: number) =>
+            count === 1 ? "1 chosen page is left out of this run" : `${count} chosen pages are left out of this run`,
+        started: (count: number) =>
+            count === 1 ? "1 chosen page was left out when this run started" : `${count} chosen pages were left out when this run started`,
+        noTemplate: (pageType: string) =>
+            pageType === ""
+                ? "has no template, and the site has no default"
+                : `has no template: ${pageType} has none, and the site has no default`,
+        noEntity: "is mapped to nothing in the graph",
+        more: (count: number) => `and ${count} more`,
+        fixTemplate: "A page type takes its template on the Page types screen; the site's default template is set on the site.",
+        fixEntity: "A page is mapped to its entity on the Graph screen.",
+    },
     after: (path: string) => `after ${path}`,
     retryBlocked: {
         inputs_expired: "Inputs expired — re-run the page",

@@ -133,7 +133,7 @@ export const pages = {
         templateOwn: "Chosen for this page",
         templateDefault: "From its type or the site",
         templateNone:
-            "No template. This page names none, its type has none and the site has no default, so a run cannot write it.",
+            "No template: this page names none, its type has none and the site has no default. A run leaves it out until one of them has one.",
         templateVersion: (name: string, version: number) => `${name} · v${version}`,
         templateDefaultOption: "Its type's, else the site default",
         templateSave: "Use it",

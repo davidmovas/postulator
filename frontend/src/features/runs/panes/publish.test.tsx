@@ -48,6 +48,7 @@ function aRun(overrides: Partial<Run> = {}): Run {
         parentRunId: null,
         pauseReason: "",
         error: "",
+        skipped: null,
         deadlineAt: "2026-10-22T18:00:00Z",
         createdAt: "2026-10-22T10:00:00Z",
         startedAt: "2026-10-22T10:00:01Z",

@@ -12,6 +12,7 @@ import { Banner, Button, CloudSyncIcon, RefreshIcon } from "../../ui/index.js";
 import { SyncStopped } from "../sync/index.js";
 import type { RunView } from "./authority.js";
 import { pauseReasonText, pauseReasonTone } from "./labels.js";
+import { SkippedPages } from "./skipped.js";
 import { kindSync, statusFailed } from "./statuses.js";
 
 const failedPageSize = 200;
@@ -39,8 +40,17 @@ export function RunNotices({
     const sync = run.kind === kindSync;
     const failed = !sync && view.status === statusFailed && run.error !== "";
     const uncapped = !sync && !view.capped && !view.terminal;
+    const skipped = run.skipped ?? [];
     const shown =
-        gap || logFailed || view.paused || failed || uncapped || failedItems > 0 || heldItems > 0 || notedItems > 0;
+        gap ||
+        logFailed ||
+        view.paused ||
+        failed ||
+        uncapped ||
+        failedItems > 0 ||
+        heldItems > 0 ||
+        notedItems > 0 ||
+        skipped.length > 0;
 
     if (!shown) {
         return null;
@@ -86,6 +96,7 @@ export function RunNotices({
             {notedItems > 0 ? (
                 <Banner tone="warn" title={copy.runs.noted.title(notedItems)} body={copy.runs.noted.body} />
             ) : null}
+            <SkippedPages skipped={skipped} title={copy.runs.skipped.started(skipped.length)} />
             {uncapped ? <Banner tone="warn" title={copy.runs.detail.noCap} body={copy.runs.detail.noCapBody} /> : null}
         </div>
     );
