@@ -187,8 +187,7 @@ func (e *Engine) faultOutcome(held *claim, out outcome, stepErr error) outcome {
 			exhausted := fault
 			exhausted.Code = run.CodeAttemptsExhausted
 			exhausted.Action = run.ActionFail
-			exhausted.Message = fmt.Sprintf("step %s failed %d times and has no attempts left: %s",
-				held.step.Name, attempts, fault.Message)
+			exhausted.Message = fmt.Sprintf("it failed %d times in a row, so it stopped: %s", attempts, fault.Message)
 			out.fault = &exhausted
 			out.message = exhausted.Message
 			out.status = run.StatusFailed

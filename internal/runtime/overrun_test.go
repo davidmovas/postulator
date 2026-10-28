@@ -9,6 +9,30 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
+func TestAStepOutOfAttemptsSaysWhatStoppedItWithoutItsInternalName(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 1)
+	unreachable := producing("generate_body", run.ArtifactBodyHTML, nil, func(context.Context, *run.StepContext) (run.Result, error) {
+		return run.Result{}, errors.New(errors.External, "the WordPress site could not be reached on GET /wp-json/postulator/v1/manifest")
+	})
+
+	engine := harness.engine(t, mustRegister(t, unreachable))
+	queued, err := engine.Enqueue(t.Context(), harness.newRun(recipeOf("generate_body")))
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	harness.waitForRun(t, queued.ID, run.StatusFailed)
+	items, err := harness.items.ByRun(t.Context(), queued.ID)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("items = %d, %v", len(items), err)
+	}
+	want := "it failed 3 times in a row, so it stopped: the WordPress site could not be reached on GET /wp-json/postulator/v1/manifest"
+	if items[0].Error != want {
+		t.Errorf("the item's error = %q, want %q", items[0].Error, want)
+	}
+}
+
 func TestARunWhoseEveryItemFailedCarriesTheirReason(t *testing.T) {
 	t.Parallel()
 
