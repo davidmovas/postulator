@@ -5683,3 +5683,132 @@ defects surfaced, each fixed test first in the package that owned it:
 - **The card text of the folded tools** landed in one frontend pass after the Go fold, not in each
   group's commit; no test ties the frontend's tool names to Go, and the cards fell back to the
   generic view in between.
+
+## 2026-10-28 — phase 19: 2.8.0, a sync that finishes and says why it did not; one at a time; selection that keeps up; types a person can read
+
+The client, on 2.7.0, reported five things. A sync of his 400 mostly empty pages ran for more than
+ten minutes, failed with a WordPress error nobody could read, retried and ran ten minutes more. He
+had started 15 syncs at once, because nothing stopped a second one. Shift-ranges in Proposed Entities
+did not work, so 400 proposals meant 400 clicks. Pages typed "Entity" were not in the entity graph.
+Settings → Page types and Classification told him nothing. The plan is the session's plan file.
+
+### What the exploration found
+
+- **The "WordPress error" was our own deadline.** `sync_site` runs one batch of one stage per call
+  under a 10-minute step timeout. The content stage read each page of a 100-page batch one at a time:
+  the bulk list, then `/terms` (redundant, the bulk item carries `post_terms` since plugin 1.4.0) and
+  `/raw` (asked even for an empty body). A slow host at 3 s a request passes 600 s on one batch; the
+  step's context expires, the WordPress client reports "the WordPress request was cancelled: context
+  deadline exceeded", the engine retries the same batch from its checkpoint, and the third failure
+  ends the run with "every item of the run failed" and an empty `runs.error`.
+- **The detail was dropped at every hop.** `wp.classify` kept the status, the route and WordPress's
+  message only as details, `run.Classify` stored `err.Error()`, the production client had a no-op
+  logger, and the run screen offered "Regenerate the failed page", which starts the walk over.
+- **Nothing held a site to one sync**, in Go, the database or the buttons; and a Start-run "Sync"
+  over K picked pages queued K whole-site walks, one item per page.
+- **A page type is not a graph entity.** 2.5.0's detection gave "Entity" to any rendered page with no
+  other signal; the graph is filled by a workbook import or by accepting proposals, and every page a
+  run writes needs an entity whatever its type. The word was on three things: a type, a role and the
+  Pages column.
+- **The proposals' shift-range** set the anchor's state, not the clicked row's, on rows that start
+  ticked; it broke under "Not ticked", kept a stale anchor after Keep all/none and did not reach
+  collapsed branches. The tests clicked the hidden input only.
+
+### The owner's answers at the plan
+
+1. **Rename and explain**: the `entity` role reads "Article", the 2.5 type named Entity becomes
+   Article (0086), the Pages column becomes "Graph entity", the 2.5 types get a notice to retype.
+2. **One sync at a time per site**; generate and edit runs still queue beside it as before.
+3. **No plugin change**: 1.5.2 stays.
+4. **One rebuilt Page types screen** in place of Page types and Classification.
+
+### The sync
+
+- **Fewer requests** (`2f14cba`): a bulk item's terms are used as they stand (`item.TermsListed`, the
+  manifest naming its post types); a list hash equal to `block.BodyHash("")` is the empty body, so no
+  `/raw`; a simple product is not asked for variations; `sync.batchSize` defaults to 50, since the
+  bulk list runs `the_content` once per post inside one request. The WordPress client now logs a
+  failed request through the app's logger.
+- **Parallel reads, sequential storage reads** (`2f14cba`, `d539e73`): the `/terms` and `/raw` calls of
+  a batch run at the site's render concurrency under the one limiter, each page keeping its own
+  answer; the stored bodies are read in turn before them, because reading SQLite inside the parallel
+  reads let the pool open connections by timing and the scale suite's walk counted 57.99 statements a
+  touched page at 2,000 pages and 58.01 at 5,000. Now 102 + 58.02 at both.
+- **Measured** (`9bc5680`, `wptest.WithLatency`): 400 empty pages at 30 ms a request, no rate limit —
+  before, 1,609 requests in 35.8 s (400 `/raw`, 400 `/terms`, the content stage serial); after, 813 in
+  10.7 s. At the default four requests a second the floor goes from about 400 s to about 200 s, and a
+  batch at 3 s a request takes under a minute against its ten.
+
+### Failures that say what happened
+
+- `wp.classify` writes "WordPress answered 500 on GET /wp-json/…: <the site's message> (<code>)", tags
+  stripped and capped at 200 runes, or an error page's title; a 403 says the site's user was refused
+  rather than the password; an unreachable site names its request (`c0bc067`).
+- The observation prefixes the page or the stage it was reading (`during`), keeping the code, the
+  details and the retry, so a 403 is still "closed to the user" and a 429 still waits as asked.
+- `runtime.overran`: a step whose own deadline expired answers "the step ran past its time limit of 10
+  minutes and was stopped; a retry starts from the last point it saved" and logs what it cut off.
+- A run whose every item failed carries the reason in `error` (one item: its error; several: "N items
+  failed; the last: …").
+- `SyncService.Progress` (`f756e4c`) reads the run, its item and the observation's checkpoint
+  (`observe.Progress`, moved out of `steps`) for the screens.
+
+### One sync per site
+
+- **0085** cancels every active sync of a site but its oldest, with its items, then adds
+  `runs_one_active_sync`, a partial unique index on `runs(site_id)` over the active statuses.
+- **The sync service** checks first and answers `CONFLICT` with `details.runId`; a start that loses the
+  race at the index answers the same. Eight syncs started at once over a real store queue one.
+- **`RunsService.Start` refuses the kind `sync`**; `startableRunKinds` and `runs_control` drop it, and
+  the schema ceilings fall with it.
+
+### Types a person can read
+
+- **0086** renames the type Entity over the entity preset to Article, or Article (2.5) where Article is
+  taken; Hub stays. `CreatePageType` refuses `hub` and `entity` (`preset_before_rules`), the picker and
+  `pagetypes` read `creatablePageTypePresets`, and the schema ceilings fall to 48,521 bytes and 11,078
+  tokens.
+- **`ListRules` counts** the pages each rule placed, the fallback's unmatched pages and `beforeRules`,
+  the auto pages a 2.5 type still holds (`TypeReason.BeforeRules`).
+
+### The screens (two agents, files split by feature)
+
+- **Proposed Entities** (`c96748f`, `122f7cb`): a shift-click paints the clicked row's new state over
+  the range and through each row's subtree, folded ones included; a drag from a box paints the boxes
+  it crosses; Ctrl-click takes one row without its children; a narrowed list offers "Tick/Untick the N
+  shown" and Ctrl+A; Shift+arrows extend; a filter keeps the rows it matched until it changes; the
+  bulk buttons drop the anchor. The tests click the visible box and the row with user-event, and the
+  harness shift-clicks a range both ways.
+- **The sync screens** (`069d1f0` to `df567bd`, `2680ff8`): `useSyncProgress`, refreshed by the run's
+  events at most every 400 ms and a 4 s poll while active; one `SyncButton` that turns into "Syncing ·
+  <stage>" with "Open the sync" on every screen that starts a sync, and opens the run a `CONFLICT`
+  names; the sync pane (seven stages, the counts, the walk, the retry, the error in full); "Resume the
+  sync" (`RetryStep`) and "Start over" (`Regenerate`) in place of "Regenerate the failed page"; a
+  sync's header without publishing, template, revert or page count.
+- **One Page types tab** (`a920c1a`, `4ca9044`, `06d64d2`): three numbered steps (a real sequence),
+  two notes (a hand-chosen type never moves; a type does not put a page in the graph), the 2.5 notice
+  opening the existing preview, a card per type (purpose, pages linking to Pages → By type, "Gets this
+  type when" from the rules giving it, "Postulator writes" from its scopes, its template), read-only
+  types under "Never written", and "How pages get a type" with each rule's pages; the Classification
+  tab and route redirect into it; the copy the exploration found wrong is right.
+
+### What the harness found
+
+- **The fake WordPress paged forever** (`6358469`): `placeOnSite` restores the harness's pages stamped
+  `time.Now()`, the fake kept the nanoseconds, and its content cursor names the second; with batches
+  of 50 the harness site paged for the first time, every post of the cursor's second came back after
+  it, and the seed's first sync listed one page until the seed gave up after three minutes. WordPress
+  keeps `modified_gmt` to the second, so the fake now does; the plugin's own cursor was never at
+  fault.
+
+### Deviations from the plan
+
+- **No soft time budget inside a batch**: smaller batches and parallel reads keep a batch near a
+  minute on a slow host, so the step's ten minutes stay a safety net, not a pace.
+- **`RunsService.Start` refuses a sync** rather than turning it into the site's one sync, and the
+  Start-run dialog no longer offers it; the sync buttons are the one way in, beside the assistant's
+  `sites_manage op sync`.
+- **Creating a Hub or Entity type is refused in Go**, not only hidden from the picker, so the
+  assistant cannot make one either.
+- **`SyncService.Progress`** was added for the screens; the plan named the screens, not the read.
+- **`e2e:full` on the stands was not run** this session; it is item 1 of STATUS's next steps.

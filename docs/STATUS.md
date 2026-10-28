@@ -4,16 +4,29 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.5.0` on 2026-10-24 (PR #31, notes under **Release 2.5.0**). 2.5.1 (phase 16) and
-2.6.0 (phase 17) were never merged or tagged: pull request #32 goes from `dev` to `master` and now
-carries **2.7.0** as well, **built and waiting there**, neither merged nor tagged: the assistant reads
-the whole site, proposes plans and carries them out once approved, and a run takes a brief (phase 18,
-2026-10-26/27). Its notes are under **Release 2.7.0** below and in the pull request's body, which
-keeps 2.6.0's and 2.5.1's. Its gate is under **The gate**.
+**Released:** `v2.7.0` on 2026-10-27 (PR #32 merged, tagged; it carried 2.5.1, 2.6.0 and 2.7.0, notes
+under **Release 2.7.0** and below). **2.8.0 is built on `dev`** (phase 19, 2026-10-28), not yet in a
+pull request: the client's fourth request, a sync that finishes and says why when it does not, one
+sync per site, selection that keeps up with 400 proposals, and page types a person can read. Its
+notes are under **Release 2.8.0**, its gate under **The gate at 2.8.0**.
 
 ## Next, in order
 
-1. **The owed gate legs**, one call each on a quiet machine (no stand up, nothing else holding
+1. **2.8.0's owed legs**: `task e2e:full` on vanilla and on the replica (not run this session; a
+   stand's whole suite takes the better part of an hour), then the race legs below, which 2.7.0 owed
+   too. The plain Go suite, both lints with every tag, the harness suite and the whole frontend
+   suite are green (under **The gate at 2.8.0**).
+2. **The owner opens a pull request from `dev` to `master` for 2.8.0 and tags `v2.8.0`** when he
+   asks; the tag's workflow builds the installer, the executable and the plugin zip.
+3. **The client installs 2.8.0 over 2.7.0.** The plugin does not change: 1.5.2 stays, no new zip.
+   Migration 0085 cancels every queued sync of a site but its oldest (his 15), 0086 names his 2.5
+   type Entity "Article". His next sync of 400 empty pages makes about 810 requests where 2.7.0 made
+   about 1,610, and a failure names the page, the stage and what WordPress answered.
+4. **What to look at first on his site**: one sync, timed, and its run screen (the stages, the
+   counts, and "Resume the sync" if it stops); Settings → Page types (the three steps, a card per
+   type, "How pages get a type" with each rule's pages, the notice over his pages typed before 2.6,
+   whose Preview retypes them); Proposed Entities with shift-click, drag and "Tick the N shown".
+5. **The race legs**, one call each on a quiet machine (no stand up, nothing else holding
    memory), from the repository root under bash:
    ```
    go test -race -count=1 -covermode=atomic -coverprofile=cov-kd.out ./internal/kernel/... ./internal/domain/...
@@ -27,19 +40,8 @@ keeps 2.6.0's and 2.5.1's. Its gate is under **The gate**.
    then delete the `cov-*.out` files, which no ignore rule covers. The kernel and domain group passed
    at the close; it runs again only for its coverage profile. A `0xc0000142` on a build is Windows
    failing to start a process for lack of memory, not the code; after a stop, look for a leftover
-   `*.test.exe`.
-2. **The owner merges pull request #32 and tags `v2.7.0` on `master`** (2.5.1 and 2.6.0 ship inside
-   it); the tag's workflow builds and publishes the installer, the executable and the plugin zip.
-3. **The client installs 2.7.0 over 2.5.0.** The plugin did not change: 1.5.2 stays on his sites, no
-   new zip. Migrations 0075 to 0084 run on first start: 2.6.0's types and rules arrive as its notes
-   say, a chat from before starts the assistant afresh with its transcript kept, and his next sync
-   raises "entity parent differs" wherever his graph and his page tree disagree.
-4. **What to look at first on his site**: ask the assistant again to design a section's links (the
-   request that stopped on `ParentId`), and approve or edit the plan it proposes; the inbox's "entity
-   parent differs" and the Graph screen's preview of the tree's parents for his flat graph; a run
-   started with a brief, and its "What the writer will see"; Settings → About's support bundle if
-   anything reads wrong, which he can send as it is.
-5. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+   `*.test.exe`. The scale package needs `-timeout 30m` on a loaded machine.
+6. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
    `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24, a replica
    round now 13,260 tokens); see what a real model calls for each of the matrix's jobs, which the
    scripted suite cannot; settle the output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and
@@ -91,6 +93,37 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.8.0
+
+The client's fourth request, in short:
+
+- **A sync that finishes.** A first sync of 400 empty pages asks the site about 810 times where 2.7.0
+  asked about 1,610: the terms come with the page list, an empty page's body is known without asking,
+  the bodies a batch needs are fetched four at a time, and a batch is 50 pages. On a slow host a
+  batch now takes about a minute, far under the ten minutes that cut 2.7.0's off, so the "WordPress
+  error" the client saw, which was our own time limit, no longer happens.
+- **A failure that says what happened.** The run screen shows where the sync is (its seven stages,
+  pages read, visited, created, changed, products, unreachable, archived), and when it stops, what
+  WordPress answered, on which request and which page ("reading the body of /about/: WordPress
+  answered 500 on GET …: There has been a critical error on this website."). "Resume the sync" goes on
+  from the last batch saved; "Start over" walks the site again. The Sites panel and the Overview follow
+  a sync live.
+- **One sync at a time.** While a site syncs, every Sync button says "Syncing · reading the pages"
+  and opens the sync; a second one is refused with a link to the first. On upgrade, the queued
+  duplicates of a site's oldest sync are cancelled. A sync is no longer started from the Start-run
+  dialog, where picking 400 pages queued 400 whole-site syncs.
+- **Proposed Entities keeps up.** A shift-click sets the range to what the clicked row becomes, through
+  folded branches; a drag across the boxes ticks or unticks them; Ctrl-click takes one row without its
+  children; a search or a filter offers "Tick the N shown" and "Untick the N shown", and a row ticked
+  under "Not ticked" stays in view.
+- **Page types a person can read.** Settings → Page types is one screen: three steps (the sync reads
+  each page, the rules give it a type, the type decides what Postulator writes), a card per type with
+  its pages, the rules that give it and what Postulator writes, and "How pages get a type" with each
+  rule's page count. Pages still typed before 2.6 are counted and retyped by the preview.
+- **"Entity" is the graph's word again.** The 2.5 type Entity is now "Article"; the Pages column and
+  the drawer say "Graph entity", and every page Postulator writes needs one, whatever its type.
+- **No new plugin.** 1.5.2 stays.
 
 ## Release 2.7.0
 
@@ -189,6 +222,17 @@ The notes as the pull request carries them, in short:
   code, and one page's Model tab and "What the writer will see".
 - **The known limits** are below; the first is that **no run has been made with a funded OpenAI key**.
 
+## Known limits at 2.8.0
+
+- **`e2e:full` on both stands, the race groups and `covergate` are owed** for 2.8.0 (items 1 and 5 of
+  **Next, in order**); every package passed without `-race`.
+- **A sync is paced by the site's request limit**, four a second by default (`wp.rateLimitPerSecond`
+  in Settings → WordPress): 400 pages take at least about three and a half minutes, two requests a
+  page for the visit and the plugin's render, more on a host slower than a second a request.
+- **Permanent harness routes for a stopped and a live sync** need a seeded sync in those states; the
+  run pane, the resume notice and the busy buttons were shot by steering a seeded site at an
+  unreachable address (`scratchpad/sync-ui`).
+
 ## Known limits at 2.7.0
 
 - **The race groups past `application/schedules` and `covergate` are owed** for 2.7.0 (item 1 of
@@ -229,6 +273,36 @@ The notes as the pull request carries them, in short:
 - **The rest** is under **Known gaps**, each with its reason.
 
 ## Where we are
+
+**2026-10-28, phase 19: 2.8.0, a sync that finishes and says why it did not; one sync per site;
+selection that keeps up; page types a person can read.** The reasoning is under "phase 19" in
+`DECISIONS.md`.
+
+- **The diagnosis**: the "WordPress error" after ten minutes was our own per-batch step timeout. The
+  content stage asked `/terms` (redundant) and `/raw` (even for an empty body) one page at a time,
+  about 200 requests in a row a batch; the detail was dropped at every hop; nothing held a site to
+  one sync; "Entity" named a type, a role and a column at once.
+- **The owner's answers at the plan**: rename and explain; one sync at a time per site; no plugin
+  change; one rebuilt Page types screen.
+- **The sync** (`2f14cba`, `d539e73`, `9bc5680`): no `/terms` a list carries, no `/raw` for an empty
+  body, no variations for a simple product, the site's reads four at a time and SQLite's in turn,
+  batches of 50, the client's logger. Measured at 30 ms a request: 1,609 requests in 35.8 s before,
+  813 in 10.7 s after.
+- **Failures** (`c0bc067`, `f756e4c`, the attempts message): WordPress's status, route, message and
+  code; the page or the stage; a step's own time limit as ours; the run's error; `SyncService.Progress`.
+- **One sync per site** (`4205eb0`): 0085 and `runs_one_active_sync`, `CONFLICT` with the run under
+  way, no sync from `RunsService.Start`.
+- **Types** (`032c884`): 0086 names Entity "Article", rule page counts and `beforeRules`, no new Hub
+  or Entity type.
+- **The screens** (two agents): Proposed Entities' ranges, drag, ctrl-click and "the N shown"
+  (`c96748f`, `122f7cb`); every Sync button, the sync pane, the resume notice, the Overview and the
+  Sites panel (`069d1f0` to `df567bd`, the header `2680ff8`); one Page types tab with steps, cards and
+  rule counts, Graph entity on the Pages screen (`a920c1a`, `4ca9044`, `06d64d2`).
+- **The harness** (`6358469`): the fake kept nanoseconds in a restored post's modified time while its
+  cursor names the second, so once batches dropped to 50 the seed's first sync listed one page
+  forever; a post's time is now cut to the second, as WordPress keeps it. The seed gives Crema Bench
+  four pages typed before the rules.
+- **2.8.0** in the seven version files. Migrations to 0086; plugin 1.5.2, unchanged.
 
 **2026-10-26/27, phase 18: 2.7.0, the assistant reads, proposes and works; the writer takes a
 brief.** The reasoning is under "phase 18" in `DECISIONS.md`; the task list and the capability
@@ -931,6 +1005,28 @@ by exhausting the writer, because an incomplete draft is tried again instead of 
 `go run ./cmd/tokenreport` (`-json` for JSON) belongs to every gate as a report, not a gate: it prints
 what every agent round, every step's prompt and the estimate cost in `o200k_base` tokens. The
 tripwires `schemaCeilingTokens` and `instructionsCeilingTokens` are the gate.
+
+**The gate at 2.8.0: 2026-10-28, on Windows, at the close of phase 19.** Exit codes checked.
+
+- `gofmt -l .`, silent; `golangci-lint run ./...`, `--build-tags e2e ./...` and `--build-tags
+  uiharness ./cmd/...`: 0 issues each.
+- `go test -count=1` over kernel, domain and application, then runtime and adapters, then app,
+  transport and cmd: green, but for `internal/app/scale`, which ran past the default ten minutes
+  on a machine shared with two agents and found the walk's statement count unequal across sizes
+  (57.99 and 58.01 a touched page). Fixed (`d539e73`), the count test alone green: 102 + 58.02 at
+  2,003 and 5,003 pages.
+- `-race` over `application/observe` and `application/sync`: green.
+- `go test -tags uiharness ./cmd/postulator/`: green in 223 s, after the fake's paging fix
+  (`6358469`); four runs of the seed in a row green in about 8 s each.
+- `task build`: green (bindings 17 services, 154 methods; typecheck; the installer's version 2.8.0).
+- `npx vitest run --maxWorkers=2`: 2,631 tests in 224 files, green (218 s).
+- **The UI walk** (`task ui:reset`, `task ui:run`, `task ui:walk`, 142 routes): every route green,
+  the new Page types, rules, 2.5 notice and proposals-range routes included, but for the three
+  plan-card routes (`plan-card`, `plan-card-chosen`, `plan-card-dock`). Those fail on the walk's
+  order, which dates from phase 18: an earlier route starts a new conversation that the scripted
+  provider titles like the seeded one, so `/s/:siteId/agent` opens it and not the one holding the
+  plans. Phase 19 changed nothing they show.
+- **Owed**: `e2e:full` on both stands and the race groups (items 1 and 5 of **Next, in order**).
 
 **2026-10-27, on Windows, at the close of phase 18, for 2.7.0. On the final code (`7106ef2`), exit
 codes checked, one leg at a time; the race groups past `application/schedules` and `covergate` are
