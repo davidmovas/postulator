@@ -5857,3 +5857,31 @@ a default template, those presets carrying none by design; the drawer showed tha
 - **The steps are unchanged**: they still refuse a page with no entity, and the claim still fails an
   item whose template was deleted after the start.
 - **It ships in 2.8.0**, unreleased, with no version bump.
+
+## 2026-10-29 — 2.8.1, a shift-range in the page picker
+
+On 2.8.0 the owner reported that Shift multi-select in Proposed Entities "does nothing": a
+shift-click on a box ticked that box alone. The screen he meant is the first stage of Graph →
+Propose from pages, the page picker (`features/pages/pick`), not the proposals tree that follows
+Preview, whose range 2.8.0 had rebuilt and which works.
+
+### What the exploration found
+
+- **The picker never read Shift.** `PageRow` handed its box `onToggle` with no event, and `PageTree`
+  toggled the one id; the same picker is the Start-run page list. The tests and the harness covered
+  the review tree only, so 2.8.0's selection work never reached the list before it.
+- **It was not the modal or the window.** The review tree ranged in headless Chromium, over CDP in
+  the WebView2 window and under real OS input with a physical Shift; the picker failed in all three.
+  Reproduced on the installed 2.8.0 over a fresh home and the sandbox provisioned as the replica.
+- **The first diagnosis tested the wrong list** and told the owner it did not reproduce; he had to
+  repeat himself. The screen is asked for, or opened from the button the person names, first.
+
+### The ruling
+
+- **A plain click anchors on its page; a shift-click sets every pickable page shown between the
+  anchor and the clicked one to the anchor's state** (`pick.nextPick`), as the Pages table's
+  `selection.range` does: refused rows are skipped, the anchor stays, an anchor no longer shown makes
+  the click a plain toggle, and a shift press does not select the rows' text. The range names every
+  page it touches, so the Start-run drawer has each path.
+- **The proposals tree keeps its own rule** (the clicked row's new state, through each subtree),
+  since a tree whose rows carry their children is not a flat list.

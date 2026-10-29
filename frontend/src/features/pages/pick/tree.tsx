@@ -10,7 +10,7 @@ import { BranchLoader, useBranch } from "../../map/loader.js";
 import { flattenTree, openBranches } from "../../map/model/tree.js";
 import type { Branches, TreeRow } from "../../map/model/tree.js";
 import type { Keep, NamedPage } from "./model.js";
-import { everyNode, kept, labelOf, tick, toggled } from "./model.js";
+import { everyNode, kept, labelOf, nextPick, tick, toggled } from "./model.js";
 import { PageRow } from "./row.js";
 
 const searchDelayMs = 250;
@@ -95,10 +95,17 @@ export function PageTree({
                 : flattenTree(rootParent, expanded, branches).filter((row) => row.kind !== "node" || kept(row.node, keep)),
         [searching, found.branch, keep, expanded, branches],
     );
+    const [anchor, setAnchor] = useState<string | null>(null);
     const top = searching ? found : loaded.get(rootParent);
     const pending = top === undefined || (top.branch.pending && top.branch.nodes.length === 0);
     const failed = top === undefined ? null : errorMessageOf(top.error);
     const narrowed = searching || keep !== everyNode;
+
+    const refusalFor = (node: SiteMapNode): string | null => refusalOf?.(node) ?? (pickable(node) ? null : copy.pages.pick.unavailable);
+    const shown = (): NamedPage[] =>
+        rows.flatMap((row) =>
+            row.kind === "node" && refusalFor(row.node) === null ? [{ id: row.node.page.pageId, path: row.node.page.path }] : [],
+        );
 
     const renderRow = (row: TreeRow): ReactNode => {
         if (row.kind === "more") {
@@ -125,7 +132,7 @@ export function PageTree({
         }
         const node = row.node;
         const id = node.page.pageId;
-        const refusal = refusalOf?.(node) ?? (pickable(node) ? null : copy.pages.pick.unavailable);
+        const refusal = refusalFor(node);
         return (
             <PageRow
                 node={node}
@@ -135,8 +142,10 @@ export function PageTree({
                 tick={tick(id, selected, required, branches)}
                 refusal={refusal}
                 note={noteOf?.(node) ?? null}
-                onToggle={() => {
-                    onChange(toggled(selected, [id], !selected.has(id)), [{ id, path: node.page.path }]);
+                onToggle={(ranged) => {
+                    const next = nextPick(selected, shown(), anchor, { id, path: node.page.path }, ranged);
+                    setAnchor(next.anchor);
+                    onChange(next.selected, next.named);
                 }}
                 onExpand={() => {
                     setView({ search: typed, expanded: toggled(expanded, [id], !expanded.has(id)) });

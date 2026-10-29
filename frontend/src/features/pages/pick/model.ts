@@ -1,4 +1,5 @@
 import type { SiteMapNode } from "../../../data/types.js";
+import { between } from "../../../ui/selection.js";
 import type { Branches } from "../../map/model/tree.js";
 
 export type Tick = "on" | "off" | "some";
@@ -46,6 +47,34 @@ export function toggled(held: ReadonlySet<string>, ids: readonly string[], on: b
         }
     }
     return next;
+}
+
+export interface NextPick {
+    selected: ReadonlySet<string>;
+    named: readonly NamedPage[];
+    anchor: string;
+}
+
+export function nextPick(
+    selected: ReadonlySet<string>,
+    shown: readonly NamedPage[],
+    anchor: string | null,
+    target: NamedPage,
+    ranged: boolean,
+): NextPick {
+    const span =
+        ranged && anchor !== null
+            ? between(
+                  shown.map((page) => page.id),
+                  anchor,
+                  target.id,
+              )
+            : [];
+    if (anchor === null || span.length === 0) {
+        return { selected: toggled(selected, [target.id], !selected.has(target.id)), named: [target], anchor: target.id };
+    }
+    const spanned = new Set(span);
+    return { selected: toggled(selected, span, selected.has(anchor)), named: shown.filter((page) => spanned.has(page.id)), anchor };
 }
 
 export function kept(node: SiteMapNode, keep: Keep): boolean {
