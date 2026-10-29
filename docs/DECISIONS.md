@@ -5955,3 +5955,9 @@ uncertain it is left, never a failure. Plan: `C:\Users\admin\.claude\plans\synth
   now, which leaves 4 a block as `no_breadcrumbs` and keeps the list measured.
 - **The e2e harness removes what the sync built** before it seeds a stand's graph, and the suites
   that need pages without an entity sync once more after the removal, which proves the removal sticks.
+- **The UI harness's own site is placed by its breadcrumbs too**: the journal and the reviews its
+  seed left unmapped became two hubs and six articles (8 entities, 6 edges, 56 pages mapped, 9
+  roots), and its tests say so.
+- **Found while looking at the screens**: with the dock open the Graph's toolbar ran past its pane
+  (Link proof and Isolate unreachable at 1280 and 1440), which the new lens made worse; a toolbar may
+  now wrap, the Graph's does, and the walk's `graph` shot checks it with `fits`.

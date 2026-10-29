@@ -109,6 +109,8 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   Graph entity column, the Graph tree and the export's `entity` and `parent_entity` fill from it.
 - **Migrations** 0088 (the `site` source on entities and edges, by a table rebuild whose down hands
   them to a person) and 0089 (`topic_builds`, what a sync settled).
+- **The Graph's toolbar wraps beside the dock**: with the dock open it ran past its pane, so Link
+  proof and Isolate could not be reached at 1280 or 1440; it now takes a second line.
 
 ## Release 2.8.1
 
