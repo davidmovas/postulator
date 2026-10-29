@@ -2,8 +2,8 @@ import { copy } from "../../copy/index.js";
 import { isCancellation } from "../../data/call.js";
 import { failure } from "../../data/errors.js";
 import type { SyncProgress } from "../../data/types.js";
-import type { SyncStage } from "../../generated/vocab.js";
-import { syncStages } from "../../generated/vocab.js";
+import type { SyncStage, TopicSkip } from "../../generated/vocab.js";
+import { isOneOf, syncStages, topicSkips } from "../../generated/vocab.js";
 
 const said = copy.sync;
 
@@ -58,6 +58,24 @@ export function stagePhrase(progress: PhraseView): string {
 
 export function pageCount(count: number): string {
     return exactCounts.format(count);
+}
+
+export interface LeftReason {
+    reason: string;
+    words: string;
+    count: number;
+}
+
+const reasonWords: Readonly<Record<TopicSkip, string>> = said.left.reasons;
+
+export function leftReasons(progress: Pick<SyncProgress, "unplacedBy">): readonly LeftReason[] {
+    const out: LeftReason[] = [];
+    for (const [reason, count] of Object.entries(progress.unplacedBy ?? {})) {
+        if (count !== undefined && count > 0) {
+            out.push({ reason, words: isOneOf(topicSkips, reason) ? reasonWords[reason] : reason, count });
+        }
+    }
+    return out.sort((a, b) => b.count - a.count || a.words.localeCompare(b.words, "en"));
 }
 
 export function syncLine(progress: Pick<SyncProgress, "stage" | "pulled">): string {

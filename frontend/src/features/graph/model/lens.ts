@@ -1,7 +1,7 @@
 import { nodeStateOf, presetOf } from "./index.js";
 import type { GraphIndex, NodeState } from "./index.js";
 
-export const lenses = ["all", "noPage", "proposed", "orphan", "ai"] as const;
+export const lenses = ["all", "noPage", "proposed", "orphan", "ai", "site"] as const;
 
 export type Lens = (typeof lenses)[number];
 
@@ -18,6 +18,8 @@ function matchesLens(index: GraphIndex, lens: Lens, id: string): boolean {
             return flags?.orphan === true;
         case "ai":
             return index.byId.get(id)?.source === "ai";
+        case "site":
+            return index.byId.get(id)?.source === "site";
     }
 }
 
@@ -45,7 +47,7 @@ export function matchedSet(
 }
 
 export function lensCounts(index: GraphIndex): Record<Lens, number> {
-    const counts: Record<Lens, number> = { all: 0, noPage: 0, proposed: 0, orphan: 0, ai: 0 };
+    const counts: Record<Lens, number> = { all: 0, noPage: 0, proposed: 0, orphan: 0, ai: 0, site: 0 };
     for (const id of index.byId.keys()) {
         for (const lens of lenses) {
             if (matchesLens(index, lens, id)) {

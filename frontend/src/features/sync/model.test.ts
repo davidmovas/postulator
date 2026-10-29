@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../copy/index.js";
-import { syncStages } from "../../generated/vocab.js";
+import { syncStages, topicSkips } from "../../generated/vocab.js";
 import { aProgress } from "../../testing/sync.js";
 import {
+    leftReasons,
     pageCount,
     stagePhrase,
     stageSteps,
@@ -39,10 +40,38 @@ describe("a sync's stage in words", () => {
         ["store", "Reading the store"],
         ["render", "Visiting the pages"],
         ["derive", "Deriving the page tree"],
+        ["topics", "Building the topical map"],
         ["fields", "Reading custom fields"],
         ["done", "Done"],
     ])("names %s as %s", (stage, words) => {
         expect(stageWords(stage)).toBe(words);
+    });
+});
+
+describe("why the topical map left pages without an entity", () => {
+    it("has words for every reason the map can give", () => {
+        for (const reason of topicSkips) {
+            const words = leftReasons(aProgress({ unplacedBy: { [reason]: 1 } }));
+            expect(
+                words.map((left) => left.words),
+                reason,
+            ).toEqual([said.left.reasons[reason]]);
+            expect(words[0]?.words, reason).not.toBe(reason);
+        }
+    });
+
+    it("lists the commonest reason first and the rest by their words", () => {
+        const left = leftReasons(aProgress({ unplacedBy: { removed: 2, disagrees: 2, unknown_link: 5 } }));
+        expect(left).toEqual([
+            { reason: "unknown_link", words: said.left.reasons.unknown_link, count: 5 },
+            { reason: "removed", words: said.left.reasons.removed, count: 2 },
+            { reason: "disagrees", words: said.left.reasons.disagrees, count: 2 },
+        ]);
+    });
+
+    it("lists nothing when no reasons came back", () => {
+        expect(leftReasons(aProgress({ unplacedBy: null }))).toEqual([]);
+        expect(leftReasons(aProgress({ unplacedBy: { disagrees: 0 } }))).toEqual([]);
     });
 });
 
@@ -93,17 +122,17 @@ describe("the stages of a sync, in order", () => {
 
     it("marks the stages behind the current one done and the ones ahead pending", () => {
         const states = stageSteps(aProgress({ stage: "render", status: "running" })).map((step) => step.state);
-        expect(states).toEqual(["done", "done", "done", "current", "pending", "pending", "pending"]);
+        expect(states).toEqual(["done", "done", "done", "current", "pending", "pending", "pending", "pending"]);
     });
 
     it("marks the stage a failed sync stopped in", () => {
         const states = stageSteps(aProgress({ stage: "content", status: "failed" })).map((step) => step.state);
-        expect(states).toEqual(["done", "failed", "pending", "pending", "pending", "pending", "pending"]);
+        expect(states).toEqual(["done", "failed", "pending", "pending", "pending", "pending", "pending", "pending"]);
     });
 
     it("marks the stage a cancelled sync was stopped in", () => {
         const states = stageSteps(aProgress({ stage: "derive", status: "cancelled" })).map((step) => step.state);
-        expect(states).toEqual(["done", "done", "done", "done", "stopped", "pending", "pending"]);
+        expect(states).toEqual(["done", "done", "done", "done", "stopped", "pending", "pending", "pending"]);
     });
 
     it("marks every stage done once the sync completed", () => {

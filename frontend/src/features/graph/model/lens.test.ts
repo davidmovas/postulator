@@ -16,6 +16,7 @@ describe("matchedSet", () => {
         expect(ids(matchedSet(index, "noPage", null))).toStrictEqual(["kiln", "travel"]);
         expect(ids(matchedSet(index, "orphan", null))).toStrictEqual(["care", "kiln"]);
         expect(ids(matchedSet(index, "ai", null))).toStrictEqual(["kiln", "travel"]);
+        expect(ids(matchedSet(index, "site", null))).toStrictEqual(["stone"]);
         expect(ids(matchedSet(index, "proposed", null))).toStrictEqual(["glazing", "kiln", "mugs", "stone", "teapots"]);
     });
 
@@ -29,11 +30,11 @@ describe("matchedSet", () => {
 
 describe("lensCounts", () => {
     it("counts every lens once", () => {
-        expect(lensCounts(index)).toStrictEqual({ all: 10, noPage: 2, proposed: 5, orphan: 2, ai: 2 });
+        expect(lensCounts(index)).toStrictEqual({ all: 10, noPage: 2, proposed: 5, orphan: 2, ai: 2, site: 1 });
     });
 
     it("names every lens", () => {
-        expect(lenses).toStrictEqual(["all", "noPage", "proposed", "orphan", "ai"]);
+        expect(lenses).toStrictEqual(["all", "noPage", "proposed", "orphan", "ai", "site"]);
     });
 });
 

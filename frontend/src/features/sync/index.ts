@@ -3,6 +3,7 @@ export type { SyncButtonProps, SyncUnderWayProps } from "./button.js";
 export { SyncError, SyncLive, SyncMeter, SyncStopped } from "./live.js";
 export type { SyncErrorProps, SyncLiveProps, SyncMeterProps, SyncStoppedProps } from "./live.js";
 export {
+    leftReasons,
     pageCount,
     stagePhrase,
     stageSteps,
@@ -13,6 +14,6 @@ export {
     syncRetrying,
     syncRunPath,
 } from "./model.js";
-export type { StageState, StageStep, SyncConflict } from "./model.js";
+export type { LeftReason, StageState, StageStep, SyncConflict } from "./model.js";
 export { useStartSync } from "./start.js";
 export type { StartSync, SyncOptions } from "./start.js";

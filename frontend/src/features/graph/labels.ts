@@ -1,6 +1,6 @@
 import { copy } from "../../copy/index.js";
-import type { AdoptionSkip, ProposalClash } from "../../generated/vocab.js";
-import { adoptionSkips, isOneOf, proposalClashes } from "../../generated/vocab.js";
+import type { AdoptionSkip, ProposalClash, Source } from "../../generated/vocab.js";
+import { adoptionSkips, isOneOf, proposalClashes, sources } from "../../generated/vocab.js";
 import type { Tone } from "../../ui/index.js";
 import type { EntityType, NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
@@ -17,6 +17,12 @@ export function clashLabel(clash: string): string {
 
 const skipWords: Readonly<Record<AdoptionSkip, string>> = copy.graph.adopt.skips;
 
+const sourceWords: Readonly<Record<Source, string>> = copy.graph.inspector.sources;
+
+export function sourceLabel(source: string): string {
+    return isOneOf(sources, source) ? sourceWords[source] : source;
+}
+
 export function adoptionSkipLabel(skip: string): string {
     return isOneOf(adoptionSkips, skip) ? skipWords[skip] : skip;
 }
@@ -31,6 +37,7 @@ const lensTones: Readonly<Record<Lens, Tone>> = {
     proposed: "info",
     orphan: "warn",
     ai: "accent",
+    site: "ok",
 };
 
 export function lensTone(lens: Lens): Tone {
