@@ -4,11 +4,10 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.8.0` on 2026-10-28 (PR #34 merged, tagged; phase 19, notes under **Release
-2.8.0**, its gate under **The gate at 2.8.0**). **2.8.1 and 2.9.0 are built on `dev`** (2026-10-29):
-2.8.1 ticks a range on a shift-click in the page picker; 2.9.0 (phase 20) has the sync build the
-topical map from the site's breadcrumbs, with no model. Their notes are under **Release 2.9.0** and
-**Release 2.8.1**.
+**Released:** `v2.8.1` on 2026-10-29 (PR #35 merged, tagged; a shift-click ticks a range in the
+page picker, notes under **Release 2.8.1**). **2.9.0 is built on `dev`** (2026-10-29, phase 20): the
+sync builds the topical map from the site's breadcrumbs, with no model; its notes are under
+**Release 2.9.0**.
 
 ## Next, in order
 
@@ -16,9 +15,9 @@ topical map from the site's breadcrumbs, with no model. Their notes are under **
    the replica 24 after two fixes its run found (the workbook's parent over a built one, and the page
    types suite's entities), each failed test then passed alone on the stand with every test that
    imports a workbook. The stands are down.
-2. **The owner opens a pull request from `dev` to `master` for 2.8.1 and 2.9.0 and tags `v2.9.0`**
-   when he asks; the tag's workflow builds the installer, the executable and the plugin zip. 2.9.0
-   adds migrations 0088 and 0089; the plugin stays 1.5.2.
+2. **The pull request from `dev` to `master` for 2.9.0 is open**; the owner merges it and tags
+   `v2.9.0`, whose workflow builds the installer, the executable and the plugin zip. 2.9.0 adds
+   migrations 0088 and 0089; the plugin stays 1.5.2.
 3. **The client installs 2.9.0 and syncs once**: the run screen says how many entities the
    breadcrumbs built, how many pages they placed and why the rest were left; the Graph's "From the
    site" lens shows what was built, and a page left without an entity keeps its finding and its
