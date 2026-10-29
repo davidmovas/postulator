@@ -179,6 +179,8 @@ func (b *blueprint) block(at int, home crumb) {
 				}
 				if k < 2 {
 					article.entity, article.scope = articleName, topicName
+				} else {
+					article.crumbs = nil
 				}
 				if k == 1 {
 					article.related = fmt.Sprintf("Article %03d %d %d 0", at, i, j)
