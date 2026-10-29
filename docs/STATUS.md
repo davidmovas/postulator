@@ -5,22 +5,25 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
 **Released:** `v2.8.0` on 2026-10-28 (PR #34 merged, tagged; phase 19, notes under **Release
-2.8.0**, its gate under **The gate at 2.8.0**). **2.8.1 is built on `dev`** (2026-10-29): a
-shift-click ticks a range in the page picker of Graph → Propose from pages and of Start run, which
-2.8.0 left at one page per click. Its notes are under **Release 2.8.1**.
+2.8.0**, its gate under **The gate at 2.8.0**). **2.8.1 and 2.9.0 are built on `dev`** (2026-10-29):
+2.8.1 ticks a range on a shift-click in the page picker; 2.9.0 (phase 20) has the sync build the
+topical map from the site's breadcrumbs, with no model. Their notes are under **Release 2.9.0** and
+**Release 2.8.1**.
 
 ## Next, in order
 
-1. **The owner opens a pull request from `dev` to `master` for 2.8.1 and tags `v2.8.1`** when he
-   asks; the tag's workflow builds the installer, the executable and the plugin zip. 2.8.1 changes
-   the frontend only: no migration, no Go change, the plugin stays 1.5.2.
-2. **The client installs 2.8.1 over 2.8.0** and picks his pages without an entity with a click and
-   a shift-click in Graph → Propose from pages.
-3. **What to look at first on his site**: one sync, timed, and its run screen (the stages, the
-   counts, and "Resume the sync" if it stops); Settings → Page types (the three steps, a card per
-   type, "How pages get a type" with each rule's pages, the notice over his pages typed before 2.6,
-   whose Preview retypes them); Propose from pages with shift-click, then the proposals with
-   shift-click, drag and "Tick the N shown".
+1. **`task e2e:full` on both stands for 2.9.0** (vanilla about 6 minutes, replica about 15), owed at
+   the close: the harness now removes what the sync built before it seeds a stand's graph, and the
+   suites that sync without seeding (the client loop over the samples, the reconciliation, the
+   products) meet site-built entities for the first time, so a workbook import over them is what to
+   read first if one fails.
+2. **The owner opens a pull request from `dev` to `master` for 2.8.1 and 2.9.0 and tags `v2.9.0`**
+   when he asks; the tag's workflow builds the installer, the executable and the plugin zip. 2.9.0
+   adds migrations 0088 and 0089; the plugin stays 1.5.2.
+3. **The client installs 2.9.0 and syncs once**: the run screen says how many entities the
+   breadcrumbs built, how many pages they placed and why the rest were left; the Graph's "From the
+   site" lens shows what was built, and a page left without an entity keeps its finding and its
+   "Propose entity".
 4. **The race legs**, owed since 2.7.0, one call each on a quiet machine (no stand up, nothing else holding
    memory), from the repository root under bash:
    ```
@@ -67,8 +70,9 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   on the site, a page no entity carries), which he or the agent settles one at a time or a whole code
   at once. The Site map shows the site by its derived hierarchy.
 - **The entity graph** says what links where: up to parents, down to children, sideways only to the
-  related pages the graph names. A page without an entity gets one through proposals named from the
-  site itself, with no model call.
+  related pages the graph names. A sync builds it from the site's breadcrumbs with no model call,
+  each crumb a topic and each page an entity under the crumb above it, and leaves with a reason
+  whatever it cannot be sure of; a page it left gets an entity through proposals named from the site.
 - **The writer's full picture.** Before it writes a field, the model sees the page's type, its entity
   card, its breadcrumb path, its children and siblings, the products it lists, the keywords with
   their volumes, the anchors, the notes and the field's own instruction and policy, fitted to a
@@ -88,6 +92,23 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.9.0
+
+- **The sync builds the topical map from the breadcrumbs.** After the page tree, a new stage reads
+  every crumb of every page, from the root down: a crumb that links a page is that page's entity, a
+  crumb no page carries (or a store category with no page of its own) is a topic entity with no page,
+  and each entity sits under the crumb above it. Entities are named by the crumb's text, then the
+  H1, then the title. Products fall under the hub their store category folds into.
+- **Nothing it is unsure of is written.** A crumb that links a page the sync does not hold, a name
+  two pages carry, a name already taken at that place, breadcrumbs that disagree with the page tree
+  or loop: the page is left without an entity, with its reason, and so is everything under it. A
+  page a person mapped is kept as it is, and an entity a person removes is never built again.
+- **What it shows**: the run screen counts the entities built, the pages placed and the pages left,
+  and lists why; the Graph has a "From the site" lens; the inspector says who made an entity. The
+  Graph entity column, the Graph tree and the export's `entity` and `parent_entity` fill from it.
+- **Migrations** 0088 (the `site` source on entities and edges, by a table rebuild whose down hands
+  them to a person) and 0089 (`topic_builds`, what a sync settled).
 
 ## Release 2.8.1
 
