@@ -28,6 +28,7 @@ const (
 	releaseRowKey     = `UPDATE pages SET row_key = '', updated_at = ? WHERE site_id = ? AND row_key = ? AND id <> ?`
 	updateDerived     = `UPDATE pages SET parent_page_id = ?, parent_reason = ?, parent_method = ?, technical_reason = ?, read_only_reason = ?, status = ?, updated_at = ? WHERE id = ?`
 	followObservedH1  = `UPDATE pages SET h1 = ?, updated_at = ? WHERE id = ? AND h1 = ? AND h1 <> ?`
+	mapEntity         = `UPDATE pages SET entity_id = ?, updated_at = ? WHERE id = ? AND entity_id IS NULL`
 	updatePublished   = `UPDATE pages SET wp_id = ?, status = ?, wp_modified_at = ?, last_synced_at = ?, updated_at = ? WHERE id = ?`
 	setPageType       = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, page_type_rule_id = '', updated_at = ? WHERE id = ?`
 	reassignPageType  = `UPDATE pages SET page_type_id = ?, page_type_source = 'manual', page_type_reason = ?, page_type_rule_id = '', updated_at = ? WHERE page_type_id = ?`
@@ -163,6 +164,12 @@ func (r *PageRepo) FollowObservedH1(ctx context.Context, pageID, was, now string
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), followObservedH1, []any{now, formatTime(at), pageID, was, now}, nil,
 		"let the page's h1 follow the observed one")
 	return err
+}
+
+func (r *PageRepo) MapEntity(ctx context.Context, pageID, entityID string, at time.Time) (bool, error) {
+	affected, err := execWrite(ctx, r.store.writeFrom(ctx), mapEntity, []any{entityID, formatTime(at), pageID}, nil,
+		"map the entity onto a page that carries none")
+	return affected == 1, err
 }
 
 func (r *PageRepo) UpdatePublished(ctx context.Context, p pagemap.Page) error {

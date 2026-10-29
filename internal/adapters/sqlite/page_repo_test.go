@@ -384,6 +384,56 @@ func TestPageRepoFollowsTheObservedH1OnlyWhereNoPlanHoldsIt(t *testing.T) {
 	}
 }
 
+func TestPageRepoMapsAnEntityOnlyOntoAPageThatCarriesNone(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	repo := sqlite.NewPageRepo(store)
+	built := sqlitetest.Entity(t, store, owner.ID, "Healing Peptides")
+	chosen := sqlitetest.Entity(t, store, owner.ID, "Chosen by a person")
+
+	open := fullPage(owner.ID, "/healing-peptides/", sqlitetest.Stamp)
+	held := fullPage(owner.ID, "/tb-500/", sqlitetest.Stamp)
+	held.EntityID = &chosen.ID
+	for _, page := range []pagemap.Page{open, held} {
+		if err := repo.Insert(t.Context(), page); err != nil {
+			t.Fatalf("Insert: %v", err)
+		}
+	}
+
+	later := sqlitetest.Stamp.Add(time.Hour)
+	cases := []struct {
+		name   string
+		pageID string
+		mapped bool
+		want   pagemap.Page
+	}{
+		{name: "a page with no entity takes it", pageID: open.ID, mapped: true, want: func() pagemap.Page {
+			want := open
+			want.EntityID, want.UpdatedAt = &built.ID, later
+			return want
+		}()},
+		{name: "a page a person mapped keeps its entity", pageID: held.ID, want: held},
+		{name: "an unknown page maps nothing", pageID: id.New()},
+	}
+	for _, tc := range cases {
+		mapped, err := repo.MapEntity(t.Context(), tc.pageID, built.ID, later)
+		if err != nil || mapped != tc.mapped {
+			t.Errorf("%s: MapEntity = %v, %v; want %v", tc.name, mapped, err, tc.mapped)
+		}
+		if tc.want.ID == "" {
+			continue
+		}
+		if got, getErr := repo.Get(t.Context(), tc.pageID); getErr != nil || !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: the page = %+v, %v\nwant %+v", tc.name, got, getErr, tc.want)
+		}
+	}
+	if mapped, err := repo.MapEntity(t.Context(), open.ID, chosen.ID, later); err != nil || mapped {
+		t.Errorf("a second mapping = %v, %v; want the first entity kept", mapped, err)
+	}
+}
+
 func TestPageRepoUpdateDerivedTouchesOnlyTheDerivedColumns(t *testing.T) {
 	t.Parallel()
 

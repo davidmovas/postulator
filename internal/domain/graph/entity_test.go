@@ -211,7 +211,7 @@ func TestNewEntityKeepsTheAnchorOrderAndTrims(t *testing.T) {
 func TestEnums(t *testing.T) {
 	t.Parallel()
 
-	for _, source := range []graph.Source{graph.SourceImport, graph.SourceUser, graph.SourceAI} {
+	for _, source := range []graph.Source{graph.SourceImport, graph.SourceUser, graph.SourceAI, graph.SourceSite} {
 		if !source.Valid() {
 			t.Errorf("%q must be valid", source)
 		}

@@ -19,7 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 87
+const latestMigration = 89
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -109,6 +109,8 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0085_one_sync_per_site.sql",
 		"0086_entity_type_named_article.sql",
 		"0087_runs_skipped.sql",
+		"0088_entity_source_site.sql",
+		"0089_topic_builds.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -153,7 +155,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("down: %v", err)
 	}
 
-	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders", "findings", "page_types", "field_scopes", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules", "page_map", "page_map_sites"} {
+	for _, table := range []string{"app_meta", "settings", "secrets", "sites", "link_policies", "templates", "entities", "entity_anchors", "entity_terms", "categories", "category_terms", "edges", "pages", "page_links", "page_identity", "page_terms", "page_fields", "page_bodies", "page_blocks_written", "page_renders", "findings", "page_types", "field_scopes", "template_overrides", "model_catalog", "model_profiles", "llm_calls", "runs", "run_items", "artifacts", "step_execs", "run_events", "conversations", "messages", "conversation_histories", "pending_actions", "tool_calls", "schedules", "page_map", "page_map_sites", "topic_builds"} {
 		var name string
 		scanErr := store.writer.QueryRowContext(t.Context(),
 			`SELECT name FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&name)
@@ -2019,6 +2021,97 @@ func TestTheTypeNamedEntityBecomesArticleSoItIsNotTakenForTheGraph(t *testing.T)
 	}
 }
 
+func TestTheSiteBuildsEntitiesAndADownHandsThemToAPerson(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 87)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	refused := func(query string, args ...any) bool {
+		t.Helper()
+		_, execErr := store.writer.ExecContext(t.Context(), query, args...)
+		return execErr != nil
+	}
+	const (
+		at          = "2026-10-29T08:00:00Z"
+		insertSited = `INSERT INTO entities (id, site_id, name, scope_entity_id, canonical_page_id, source, created_at, updated_at) VALUES (?, 's1', ?, ?, ?, 'site', ?, ?)`
+	)
+	must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES ('s1', 'Shop', 'https://shop', 'site:s1:wp_password', 'active', ?, ?)`, at, at)
+	must(`INSERT INTO pages (id, site_id, path, slug, wp_type, status, created_at, updated_at) VALUES ('p1', 's1', '/healing-peptides/', 'healing-peptides', 'page', 'published', ?, ?)`, at, at)
+	must(`INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e-user', 's1', 'Lab Guides', 'user', ?, ?)`, at, at)
+	if !refused(insertSited, "e-early", "Early", nil, nil, at, at) {
+		t.Fatal("87 accepted an entity the site built")
+	}
+
+	if _, err = provider.UpTo(t.Context(), 89); err != nil {
+		t.Fatalf("up to 89: %v", err)
+	}
+	must(insertSited, "e-topic", "Peptides", nil, nil, at, at)
+	must(insertSited, "e-hub", "Healing Peptides", "e-topic", "p1", at, at)
+	must(`UPDATE pages SET entity_id = 'e-hub' WHERE id = 'p1'`)
+	must(`INSERT INTO entity_anchors (entity_id, position, text, source, weight) VALUES ('e-hub', 0, 'healing peptides', 'user', 1)`)
+	must(`INSERT INTO edges (id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, created_at) VALUES ('g1', 's1', 'e-hub', 'e-topic', 'parent', 1, 'site', 'approved', ?)`, at)
+	must(`INSERT INTO topic_builds (site_id, subject, built_at) VALUES ('s1', 'page:p1', ?)`, at)
+	if !refused(`INSERT INTO topic_builds (site_id, subject, built_at) VALUES ('s1', 'page:p1', ?)`, at) {
+		t.Fatal("a subject was recorded twice for one site")
+	}
+	if !refused(insertSited, "e-twin", "healing peptides", "e-topic", nil, at, at) {
+		t.Fatal("the rebuild lost the name's uniqueness under its parent")
+	}
+	if got := rowsOf(t, store, `PRAGMA foreign_key_check`); len(got) != 0 {
+		t.Fatalf("the rebuild broke references: %v", got)
+	}
+
+	must(`DELETE FROM entities WHERE id = 'e-topic'`)
+	if got := rowsOf(t, store, `SELECT id, coalesce(scope_entity_id, '-') FROM entities ORDER BY id`); !slices.Equal(got, []string{"e-hub | -", "e-user | -"}) {
+		t.Fatalf("after the topic's delete the entities are %v, want the child's scope cleared", got)
+	}
+	if got := rowsOf(t, store, `SELECT count(*) FROM edges`); !slices.Equal(got, []string{"0"}) {
+		t.Fatalf("the topic's edges outlived it: %v", got)
+	}
+	must(insertSited, "e-topic", "Peptides", nil, nil, at, at)
+	must(`UPDATE entities SET scope_entity_id = 'e-topic' WHERE id = 'e-hub'`)
+	must(`INSERT INTO edges (id, site_id, from_entity_id, to_entity_id, kind, weight, source, status, created_at) VALUES ('g1', 's1', 'e-hub', 'e-topic', 'parent', 1, 'site', 'approved', ?)`, at)
+
+	if _, err = provider.DownTo(t.Context(), 87); err != nil {
+		t.Fatalf("down to 87: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, source, coalesce(scope_entity_id, '-') FROM entities ORDER BY id`); !slices.Equal(got, []string{
+		"e-hub | user | e-topic", "e-topic | user | -", "e-user | user | -",
+	}) {
+		t.Fatalf("the entities after the down = %v, want the site's handed to a person and their scopes kept", got)
+	}
+	if got := rowsOf(t, store, `SELECT id, source FROM edges`); !slices.Equal(got, []string{"g1 | user"}) {
+		t.Fatalf("the edges after the down = %v", got)
+	}
+	if got := rowsOf(t, store, `SELECT entity_id FROM pages WHERE id = 'p1'`); !slices.Equal(got, []string{"e-hub"}) {
+		t.Fatalf("the page lost its entity in the down: %v", got)
+	}
+	if got := rowsOf(t, store, `SELECT text FROM entity_anchors WHERE entity_id = 'e-hub'`); !slices.Equal(got, []string{"healing peptides"}) {
+		t.Fatalf("the anchors after the down = %v", got)
+	}
+	if got := rowsOf(t, store, `SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'topic_builds'`); len(got) != 0 {
+		t.Fatal("topic_builds survived the down")
+	}
+	if got := rowsOf(t, store, `PRAGMA foreign_key_check`); len(got) != 0 {
+		t.Fatalf("the down broke references: %v", got)
+	}
+	if !refused(insertSited, "e-late", "Late", nil, nil, at, at) {
+		t.Fatal("the down kept the site source")
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
 func TestTheLinkRulesMoveIntoTheScopesAndThePoliciesGo(t *testing.T) {
 	t.Parallel()
 
@@ -3134,6 +3227,7 @@ func TestSchemaCascades(t *testing.T) {
 	exec(`INSERT INTO page_links (id, site_id, from_page_id, to_page_id, to_url, anchor_text, type, source, ours, observed_at) VALUES ('l2', 's1', 'pg1', 'pg2', '/shoes/boots/', 'boots', 'contextual', 'raw', 1, ?)`, at)
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o1', 't1', 'site', 's1', NULL, '{}', ?, ?)`, at, at)
 	exec(`INSERT INTO template_overrides (id, template_id, scope, site_id, page_id, patch, created_at, updated_at) VALUES ('o2', 't1', 'page', NULL, 'pg1', '{}', ?, ?)`, at, at)
+	exec(`INSERT INTO topic_builds (site_id, subject, built_at) VALUES ('s1', 'page:pg1', ?)`, at)
 
 	if _, err := store.writer.ExecContext(t.Context(), `INSERT INTO entities (id, site_id, name, source, created_at, updated_at) VALUES ('e3', 's1', 'shoes', 'user', ?, ?)`, at, at); err == nil {
 		t.Fatal("entity names must be unique per site regardless of case")
@@ -3178,7 +3272,7 @@ func TestSchemaCascades(t *testing.T) {
 	}
 
 	exec(`DELETE FROM sites WHERE id = 's1'`)
-	for _, table := range []string{"entities", "pages", "page_links", "page_types", "field_scopes", "template_overrides"} {
+	for _, table := range []string{"entities", "pages", "page_links", "page_types", "field_scopes", "template_overrides", "topic_builds"} {
 		if got := count(table); got != 0 {
 			t.Errorf("%s after site delete = %d", table, got)
 		}
