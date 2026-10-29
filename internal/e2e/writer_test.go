@@ -219,9 +219,54 @@ func startRun(t *testing.T, core *app.Core, siteID string, mode run.PublishMode,
 	return started.RunID
 }
 
+func siteBuiltEntities(t *testing.T, core *app.Core, siteID string) []graph.Entity {
+	t.Helper()
+
+	built := make([]graph.Entity, 0)
+	request := graph.ListEntitiesRequest{SiteID: siteID, ListRequest: dto.ListRequest{Limit: 500}}
+	for {
+		listed, err := core.Graph.ListEntities(t.Context(), request)
+		if err != nil {
+			t.Fatalf("list the site's entities: %v", err)
+		}
+		for i := range listed.Items {
+			if listed.Items[i].Source == "site" {
+				built = append(built, listed.Items[i])
+			}
+		}
+		if !listed.HasMore {
+			return built
+		}
+		request.Cursor = string(listed.Next)
+	}
+}
+
+func removeTheSitesMap(t *testing.T, core *app.Core, siteID string) int {
+	t.Helper()
+
+	built := siteBuiltEntities(t, core, siteID)
+	for i := range built {
+		if _, err := core.Graph.DeleteEntity(t.Context(), graph.DeleteEntityRequest{ID: built[i].ID}); err != nil {
+			t.Fatalf("remove %s, which the sync built: %v", built[i].Name, err)
+		}
+	}
+	return len(built)
+}
+
+func clearTheSitesMap(t *testing.T, core *app.Core, siteID string) {
+	t.Helper()
+
+	removed := removeTheSitesMap(t, core, siteID)
+	runSync(t, core, siteID)
+	if rebuilt := siteBuiltEntities(t, core, siteID); len(rebuilt) != 0 {
+		t.Fatalf("a sync after a person removed the %d entities the site's breadcrumbs built brought back %d", removed, len(rebuilt))
+	}
+}
+
 func seedStandGraph(t *testing.T, core *app.Core, siteID string, seeds []seededEntity) map[string]string {
 	t.Helper()
 
+	removeTheSitesMap(t, core, siteID)
 	stored := pagesByPath(t, core.Pages, siteID)
 	ids := make(map[string]string, len(seeds))
 	for i := range seeds {
