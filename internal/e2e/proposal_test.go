@@ -118,6 +118,7 @@ func TestAProductWithoutAnEntityIsWrittenThroughAProposal(t *testing.T) {
 		t.Fatalf("the check reports %+v (%v), want a store that can be edited", checked, checkErr)
 	}
 	runSync(t, core, siteID)
+	clearTheSitesMap(t, core, siteID)
 	seeded := seedStandGraph(t, core, siteID, stand.graph)
 
 	page := pagesByPath(t, core.Pages, siteID)[productPath]

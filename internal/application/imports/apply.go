@@ -72,6 +72,11 @@ func (s *Service) write(ctx context.Context, computed *plan) error {
 			return err
 		}
 	}
+	for _, retired := range computed.retired {
+		if err := s.deps.Edges.Delete(ctx, retired); err != nil {
+			return err
+		}
+	}
 	for i := range computed.edges {
 		if err := s.deps.Edges.Insert(ctx, computed.edges[i]); err != nil {
 			return err

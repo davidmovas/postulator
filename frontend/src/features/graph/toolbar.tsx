@@ -50,7 +50,7 @@ export function GraphToolbar({ index, query, proofBusy, focusSearch, onChange, o
     };
 
     return (
-        <Toolbar label={copy.graph.label}>
+        <Toolbar label={copy.graph.label} wrap>
             <SearchBox index={index} onPick={onPick} focusKey={focusSearch} />
             <Segmented
                 label={copy.graph.lens.all}

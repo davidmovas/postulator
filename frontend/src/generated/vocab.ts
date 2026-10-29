@@ -152,6 +152,18 @@ export type ParentWhyReason = (typeof parentWhyReasons)[number];
 export const adoptionSkips = ["loop", "name_taken"] as const;
 export type AdoptionSkip = (typeof adoptionSkips)[number];
 
+export const topicSkips = [
+    "no_breadcrumbs",
+    "unknown_link",
+    "ambiguous_name",
+    "no_name",
+    "name_taken",
+    "disagrees",
+    "parent_skipped",
+    "removed",
+] as const;
+export type TopicSkip = (typeof topicSkips)[number];
+
 export const proposalSources = ["model", "site"] as const;
 export type ProposalSource = (typeof proposalSources)[number];
 
@@ -214,7 +226,16 @@ export const creatablePageTypePresets: readonly PageTypePreset[] = [
 export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
 export type PageTypeRole = (typeof pageTypeRoles)[number];
 
-export const syncStages = ["inventory", "content", "store", "render", "derive", "fields", "done"] as const;
+export const syncStages = [
+    "inventory",
+    "content",
+    "store",
+    "render",
+    "derive",
+    "topics",
+    "fields",
+    "done",
+] as const;
 export type SyncStage = (typeof syncStages)[number];
 
 export const ruleKinds = ["rule", "fallback"] as const;
@@ -354,7 +375,7 @@ export type EdgeKind = (typeof edgeKinds)[number];
 export const edgeStatuses = ["approved", "proposed", "rejected"] as const;
 export type EdgeStatus = (typeof edgeStatuses)[number];
 
-export const sources = ["import", "user", "ai"] as const;
+export const sources = ["import", "user", "ai", "site"] as const;
 export type Source = (typeof sources)[number];
 
 export const anchorSources = ["user", "ai"] as const;
@@ -604,7 +625,7 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
     "scope_clash",
 ];
 
-export const importActions = ["create", "update", "skip", "ambiguous"] as const;
+export const importActions = ["create", "update", "skip", "ambiguous", "replace"] as const;
 export type ImportAction = (typeof importActions)[number];
 
 export const exportFormats = ["xlsx", "csv"] as const;

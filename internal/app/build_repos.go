@@ -20,6 +20,7 @@ type repos struct {
 	sites         *sqlite.SiteRepo
 	entities      *sqlite.EntityRepo
 	edges         *sqlite.EdgeRepo
+	topics        *sqlite.TopicBuildRepo
 	pages         *sqlite.PageRepo
 	links         *sqlite.PageLinkRepo
 	identities    *sqlite.PageIdentityRepo
@@ -78,6 +79,7 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		sites:         sqlite.NewSiteRepo(store),
 		entities:      sqlite.NewEntityRepo(store),
 		edges:         sqlite.NewEdgeRepo(store),
+		topics:        sqlite.NewTopicBuildRepo(store),
 		pages:         sqlite.NewPageRepo(store),
 		links:         sqlite.NewPageLinkRepo(store),
 		identities:    sqlite.NewPageIdentityRepo(store),

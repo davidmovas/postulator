@@ -9,9 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/note"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 func (h harness) sheet(t *testing.T, path, name string) imports.Mapping {
@@ -258,6 +262,174 @@ func TestTheClientWorkbookFindsTheReplicasPagesWithoutAURL(t *testing.T) {
 	for i := range report.Pages {
 		if report.Pages[i].Path == "/tissue-repair/" || report.Pages[i].Path == "/product-category/peptides/healing-peptides/" {
 			t.Errorf("the workbook plans or writes %+v", report.Pages[i])
+		}
+	}
+}
+
+func (h harness) builtEntity(t *testing.T, name string, scope *graph.Entity) graph.Entity {
+	t.Helper()
+
+	entity := graph.Entity{ID: id.New(), SiteID: h.siteID, Name: name, Source: graph.SourceSite, CreatedAt: observedAt, UpdatedAt: observedAt}
+	if scope != nil {
+		entity.ScopeID = &scope.ID
+	}
+	built, err := graph.NewEntity(entity)
+	if err != nil {
+		t.Fatalf("NewEntity: %v", err)
+	}
+	if err = sqlite.NewEntityRepo(h.store).Insert(t.Context(), built); err != nil {
+		t.Fatalf("insert the entity: %v", err)
+	}
+	if scope == nil {
+		return built
+	}
+	edge, err := graph.NewEdge(graph.Edge{
+		ID: id.New(), SiteID: h.siteID, FromEntityID: built.ID, ToEntityID: scope.ID, Kind: graph.EdgeParent, Weight: 1,
+		Source: graph.SourceSite, Status: graph.StatusApproved, CreatedAt: observedAt,
+	})
+	if err != nil {
+		t.Fatalf("NewEdge: %v", err)
+	}
+	if err = sqlite.NewEdgeRepo(h.store).Insert(t.Context(), edge); err != nil {
+		t.Fatalf("insert the breadcrumbs' edge: %v", err)
+	}
+	return built
+}
+
+func TestTheClientWorkbookTakesTheEntitiesTheSitesBreadcrumbsBuilt(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	peptides := h.builtEntity(t, "Peptides", nil)
+	healing := h.builtEntity(t, "Healing Peptides", &peptides)
+	guides := h.builtEntity(t, "Lab Guides", nil)
+	for at, held := range []struct {
+		path, title string
+		entity      *graph.Entity
+	}{
+		{"/", "Home", nil}, {"/peptides/", "Peptides", &peptides}, {"/healing-peptides/", "Healing Peptides", &healing},
+		{"/bpc-157/", "BPC-157", new(h.builtEntity(t, "BPC-157", &healing))}, {"/tb-500/", "TB-500", new(h.builtEntity(t, "TB-500", &healing))},
+		{"/lab-guides/", "Lab Guides", &guides}, {"/reconstitution/", "Reconstitution", new(h.builtEntity(t, "Reconstitution", &guides))},
+	} {
+		var entityID *string
+		if held.entity != nil {
+			entityID = &held.entity.ID
+		}
+		placed := h.sitePage(t, held.path, held.title, int64(10+at), entityID)
+		if held.entity != nil {
+			if err := sqlite.NewEntityRepo(h.store).SetCanonicalPage(t.Context(), held.entity.ID, &placed.ID, observedAt); err != nil {
+				t.Fatalf("make %s the page of %s: %v", held.path, held.entity.Name, err)
+			}
+		}
+	}
+	term := int64(90)
+	h.termPage(t, "/product-category/peptides/", "Peptides", term, nil)
+	h.termPage(t, "/product-category/peptides/healing-peptides/", "Healing Peptides", 100, &term)
+	for at, name := range []string{"BPC-157 Peptide", "TB-500 Peptide"} {
+		product := h.storeProduct(t, strings.ToLower(strings.ReplaceAll(name, " ", "-")), name, int64(501+at))
+		built := h.builtEntity(t, name, &healing)
+		product.EntityID = &built.ID
+		if err := sqlite.NewPageRepo(h.store).Update(t.Context(), product); err != nil {
+			t.Fatalf("map the product: %v", err)
+		}
+		if err := sqlite.NewEntityRepo(h.store).SetCanonicalPage(t.Context(), built.ID, &product.ID, observedAt); err != nil {
+			t.Fatalf("make the product the page of %s: %v", name, err)
+		}
+	}
+	for child, parent := range map[string]string{
+		"/peptides/": "/", "/healing-peptides/": "/peptides/", "/bpc-157/": "/healing-peptides/", "/tb-500/": "/healing-peptides/",
+		"/lab-guides/": "/", "/reconstitution/": "/lab-guides/",
+	} {
+		page, _ := h.pageAt(t, child)
+		above, _ := h.pageAt(t, parent)
+		page.ParentPageID, page.ParentReason, page.ParentMethod = &above.ID, pagemap.ParentJSONLD, pagemap.MethodHref
+		if err := sqlite.NewPageRepo(h.store).UpdateDerived(t.Context(), page); err != nil {
+			t.Fatalf("place %s under %s: %v", child, parent, err)
+		}
+	}
+
+	report := h.workbookPreview(t, clientWorkbook, clientSheets...)
+	if len(report.Errors) != 0 {
+		t.Fatalf("errors = %+v, want the rows naming a built entity to take it rather than plan its twin", report.Errors)
+	}
+	for _, name := range []string{"BPC-157", "TB-500", "Peptides", "Healing Peptides"} {
+		for _, planned := range report.Entities {
+			if planned.Name == name && planned.Action == string(imports.ActionCreate) {
+				t.Errorf("the %s sheet creates a second %s beside the one its page carries: %+v", planned.Sheet, name, planned)
+			}
+		}
+	}
+	for _, name := range []string{"BPC-157", "TB-500"} {
+		if !slices.ContainsFunc(report.Edges, func(edge imports.PreviewEdge) bool {
+			return edge.From == name && edge.To == "Healing Peptides" && edge.Kind == string(graph.EdgeParent) && edge.Action == string(imports.ActionReplace)
+		}) {
+			t.Errorf("edges = %+v, want the breadcrumbs' parent of %s replaced by the workbook's", report.Edges, name)
+		}
+	}
+
+	sheets := make([]imports.SheetMapping, 0, len(clientSheets))
+	for _, sheet := range clientSheets {
+		sheets = append(sheets, imports.SheetMapping{Sheet: sheet})
+	}
+	applied, err := h.service.Apply(t.Context(), imports.ApplyRequest{SiteID: h.siteID, Path: clientWorkbook, Sheets: sheets})
+	if err != nil {
+		t.Fatalf("Apply the workbook: %v", err)
+	}
+	clean(t, "whole", applied)
+	byID := make(map[string]graph.Entity)
+	for _, entity := range h.entities(t) {
+		byID[entity.ID] = entity
+	}
+	for _, name := range []string{"BPC-157", "TB-500"} {
+		named := make([]graph.Entity, 0, 1)
+		for _, entity := range byID {
+			if entity.Name == name {
+				named = append(named, entity)
+			}
+		}
+		if len(named) != 1 || named[0].Source != graph.SourceSite || trail(byID, named[0].ID) != "Peptides › "+name {
+			t.Fatalf("the workbook left %+v named %s, want the one the breadcrumbs built, moved under Peptides", named, name)
+		}
+		parents := 0
+		for _, edge := range h.edges(t) {
+			if edge.FromEntityID == named[0].ID && edge.Kind == graph.EdgeParent && edge.Status == graph.StatusApproved {
+				parents++
+			}
+		}
+		if parents != 1 {
+			t.Errorf("%s carries %d approved parents, want the workbook's alone", name, parents)
+		}
+	}
+}
+
+func TestAParentAPersonGaveIsKeptBesideTheWorkbooks(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	peptides := h.builtEntity(t, "Peptides", nil)
+	healing := h.builtEntity(t, "Healing Peptides", &peptides)
+	bpc := h.builtEntity(t, "BPC-157", &healing)
+	guides := h.builtEntity(t, "Lab Guides", nil)
+	h.sitePage(t, "/peptides/", "Peptides", 10, &peptides.ID)
+	h.sitePage(t, "/bpc-157/", "BPC-157", 11, &bpc.ID)
+	edge, err := graph.NewEdge(graph.Edge{
+		ID: id.New(), SiteID: h.siteID, FromEntityID: bpc.ID, ToEntityID: guides.ID, Kind: graph.EdgeParent, Weight: 1,
+		Source: graph.SourceUser, Status: graph.StatusApproved, CreatedAt: observedAt,
+	})
+	if err != nil {
+		t.Fatalf("NewEdge: %v", err)
+	}
+	if err = sqlite.NewEdgeRepo(h.store).Insert(t.Context(), edge); err != nil {
+		t.Fatalf("insert the person's edge: %v", err)
+	}
+
+	path := h.file(t, "rows.csv", "path,entity,parent\n/bpc-157/,BPC-157,Peptides\n")
+	report := h.preview(t, path, h.mapping(map[string]string{
+		string(importmap.FieldPath): "path", string(importmap.FieldEntity): "entity", string(importmap.FieldParentEntity): "parent",
+	}))
+	for _, held := range report.Edges {
+		if held.Action == string(imports.ActionReplace) {
+			t.Errorf("the workbook replaces %+v, which a person approved", held)
 		}
 	}
 }

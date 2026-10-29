@@ -14,7 +14,7 @@
     !define INFO_PRODUCTNAME "Postulator"
 !endif
 !ifndef INFO_PRODUCTVERSION
-    !define INFO_PRODUCTVERSION "2.8.1"
+    !define INFO_PRODUCTVERSION "2.9.0"
 !endif
 !ifndef INFO_COPYRIGHT
     !define INFO_COPYRIGHT "(c) 2026, Postulator"

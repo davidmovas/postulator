@@ -79,6 +79,7 @@ func openCapability(t *testing.T, script *fake.Scripted, shape graphShape) *capa
 	started := time.Now()
 	runSync(t, core, c.siteID)
 	t.Logf("the replica synced in %s", time.Since(started).Round(time.Millisecond))
+	clearTheSitesMap(t, core, c.siteID)
 	c.entities = map[string]string{}
 	if len(seeds) > 0 {
 		c.entities = seedStandGraph(t, core, c.siteID, seeds)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,6 +78,7 @@ type stores struct {
 	findings      map[string]finding.Finding
 	entities      []graph.Entity
 	edges         []graph.Edge
+	built         []string
 	published     []events.Type
 	bodyLists     int
 	bodyGets      int
@@ -212,6 +214,18 @@ func (p pageStore) Update(_ context.Context, page pagemap.Page) error {
 	page.PageTypeID, page.TypeSource, page.TypeReason = stored.PageTypeID, stored.TypeSource, stored.TypeReason
 	p.s.pages[page.ID] = page
 	return nil
+}
+
+func (p pageStore) MapEntity(_ context.Context, pageID, entityID string, at time.Time) (bool, error) {
+	p.s.mu.Lock()
+	defer p.s.mu.Unlock()
+	stored, ok := p.s.pages[pageID]
+	if !ok || stored.EntityID != nil {
+		return false, nil
+	}
+	stored.EntityID, stored.UpdatedAt = &entityID, at
+	p.s.pages[pageID] = stored
+	return true, nil
 }
 
 func (p pageStore) Classify(_ context.Context, pageID string, was, now pagetype.Assignment, at time.Time) (bool, error) {
@@ -753,7 +767,7 @@ func (s *stores) deps(clk clock.Clock) observe.Deps {
 	return observe.Deps{
 		Sites: s, Pages: pageStore{s}, Identity: identityStore{s}, Fields: fieldStore{s}, Bodies: bodyStore{s},
 		Renders: renderStore{s}, Links: linkStore{s}, Findings: findingStore{s}, Types: s.types, UnitOfWork: unit{s.guard}, Publisher: bus{s}, Clock: clk,
-		Maps: &s.maps, Entities: graphStore{s}, Edges: edgeList{s},
+		Maps: &s.maps, Entities: graphStore{s}, Edges: edgeList{s}, Topics: topicMemory{s},
 	}
 }
 
@@ -765,12 +779,93 @@ func (g graphStore) ListBySite(context.Context, string) ([]graph.Entity, error) 
 	return slices.Clone(g.s.entities), nil
 }
 
+func (g graphStore) Insert(_ context.Context, entity graph.Entity) error {
+	g.s.mu.Lock()
+	defer g.s.mu.Unlock()
+	for i := range g.s.entities {
+		if sameScope(g.s.entities[i].ScopeID, entity.ScopeID) && graph.Key(g.s.entities[i].Name) == graph.Key(entity.Name) {
+			return errors.New(errors.Conflict, "an entity of that name already sits under that parent")
+		}
+	}
+	g.s.entities = append(g.s.entities, entity)
+	return nil
+}
+
+func (g graphStore) Delete(_ context.Context, id string) error {
+	g.s.mu.Lock()
+	defer g.s.mu.Unlock()
+	g.s.entities = slices.DeleteFunc(g.s.entities, func(entity graph.Entity) bool { return entity.ID == id })
+	g.s.edges = slices.DeleteFunc(g.s.edges, func(edge graph.Edge) bool { return edge.FromEntityID == id || edge.ToEntityID == id })
+	for pageID := range g.s.pages {
+		if page := g.s.pages[pageID]; page.EntityID != nil && *page.EntityID == id {
+			page.EntityID = nil
+			g.s.pages[pageID] = page
+		}
+	}
+	return nil
+}
+
+func (g graphStore) SetCanonicalPage(_ context.Context, id string, pageID *string, at time.Time) error {
+	g.s.mu.Lock()
+	defer g.s.mu.Unlock()
+	for i := range g.s.entities {
+		if g.s.entities[i].ID == id {
+			g.s.entities[i].CanonicalPageID, g.s.entities[i].UpdatedAt = pageID, at
+			return nil
+		}
+	}
+	return errors.New(errors.NotFound, "no such entity")
+}
+
+func sameScope(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
 type edgeList struct{ s *stores }
 
 func (e edgeList) ListBySite(context.Context, string) ([]graph.Edge, error) {
 	e.s.mu.Lock()
 	defer e.s.mu.Unlock()
 	return slices.Clone(e.s.edges), nil
+}
+
+func (e edgeList) Insert(_ context.Context, edge graph.Edge) error {
+	e.s.mu.Lock()
+	defer e.s.mu.Unlock()
+	for i := range e.s.edges {
+		if e.s.edges[i].FromEntityID == edge.FromEntityID && e.s.edges[i].ToEntityID == edge.ToEntityID && e.s.edges[i].Kind == edge.Kind {
+			return errors.New(errors.Conflict, "the edge already stands")
+		}
+	}
+	e.s.edges = append(e.s.edges, edge)
+	return nil
+}
+
+type topicMemory struct{ s *stores }
+
+func (m topicMemory) Record(_ context.Context, siteID, subject string, _ time.Time) error {
+	m.s.mu.Lock()
+	defer m.s.mu.Unlock()
+	if !slices.Contains(m.s.built, siteID+"|"+subject) {
+		m.s.built = append(m.s.built, siteID+"|"+subject)
+	}
+	return nil
+}
+
+func (m topicMemory) ListBySite(_ context.Context, siteID string) ([]string, error) {
+	m.s.mu.Lock()
+	defer m.s.mu.Unlock()
+	out := make([]string, 0, len(m.s.built))
+	for _, held := range m.s.built {
+		if subject, found := strings.CutPrefix(held, siteID+"|"); found {
+			out = append(out, subject)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
 }
 
 type mapRefresher struct {

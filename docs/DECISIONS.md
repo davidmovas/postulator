@@ -5885,3 +5885,92 @@ Preview, whose range 2.8.0 had rebuilt and which works.
   page it touches, so the Start-run drawer has each path.
 - **The proposals tree keeps its own rule** (the clicked row's new state, through each subtree),
   since a tree whose rows carry their children is not a flat list.
+
+## 2026-10-29 — phase 20, 2.9.0: the sync builds the topical map from the breadcrumbs
+
+The client asked that a sync build the topical map itself, with no model: the entities and their
+parents as the site already shows them, mostly in the breadcrumbs his snippet prints, filling the
+Graph entity column, the Graph tree and the export's `entity` and `parent_entity`. Where a piece is
+uncertain it is left, never a failure. Plan: `C:\Users\admin\.claude\plans\synthetic-beaming-pony.md`.
+
+### What the exploration found
+
+- **The trails were read whole and used by one crumb.** `DeriveParent` took the nearest crumb for
+  the page's parent; every crumb above it, and any crumb no page carries ("Peptides" in the
+  replica's `Home › Peptides › Healing Peptides › TB-500`), was kept in `page_renders.trail` and
+  never became anything.
+- **A no-model proposal already existed and ran by hand only**: `contextpack.Map.EntityProposals`,
+  named by H1 or title, written as `user`, reached from a finding's `propose_entity` or the agent.
+
+### The owner's answers (2026-10-29)
+
+- The columns are Graph entity in Pages, the Graph tree and the xlsx export; all three fill once a
+  page carries an entity.
+- **The sync writes the map itself**, marked as the site's (a new source `site`, 0088).
+- **A crumb no page carries becomes a page-less topic entity.**
+- **An entity is named by its crumb's text**, then its H1, then its title.
+
+### The ruling
+
+- **One reading of a crumb.** `pagemap.TopicChain` resolves every crumb between the root and the
+  page through `matchCrumb`, the function `DeriveParent` now resolves its nearest crumb with, so the
+  chain ends where the tree's parent is. A crumb no page or term carries is a bare name; a live link
+  the model lacks (`unknown_link`) and a name two pages carry (`ambiguous_name`) break the chain at
+  that crumb. A trail whose nearest crumb is a page wins, then one whose nearest is a bare name, then
+  a broken one; Home alone places a page at the root only when no trail says more.
+- **The plan** (`contextpack.Map.TopicMap`): a page that can carry an entity is a node; a bare name
+  or a store term with no hub twin is a topic keyed by its parent and `graph.Key(name)`, so a term
+  linked in one trail and named in another is one entity, and a term with a hub twin folds into the
+  hub. A page takes its parent from its own chain, else from every chain through it when they agree.
+  A page that carries an entity is kept as it is; a same-name entity at the place is reused, or
+  adopted by a page when no page carries it; the rest is created parent first.
+- **Left, with a reason, never an error**: `no_breadcrumbs`, `unknown_link`, `ambiguous_name`,
+  `no_name`, `name_taken` (one name twice at one place, or an entity another page carries),
+  `disagrees` (the chain's nearest page is not the tree's, so the build never raises
+  `entity_parent_differs` for what it creates; breadcrumbs that loop are `disagrees` too),
+  `parent_skipped` (the subtree waits rather than landing at the root) and `removed`.
+- **A person's removal sticks.** `topic_builds` (0089) remembers every subject a sync settled; a
+  page unmapped or a topic deleted after that is `removed` and never built again.
+- **Only what is needed is written**: a page that needs an entity, and the ancestors its new parent
+  edge reaches; an ancestor that is kept stops the climb, so no topic is left without children.
+- **The stage** (`observe.StageTopics`, between derive and fields) plans once, writes a batch of
+  nodes per unit behind a cursor on the plan's order, so a stopped sync resumes, maps a page only
+  where it carries none (`PageRepo.MapEntity`), approves each parent edge as `site`, and raises
+  `page_without_entity` and `entity_parent_differs` at its end, over the built graph; derive no
+  longer raises them. The counts say how many entities were built, how many pages were placed and
+  why the rest were left; the sync pane lists the reasons, the Graph has a "From the site" lens, and
+  the inspector says who made an entity in words.
+- **This amends phase 15**: a person's acceptance writes each proposal they open, and the sync's
+  breadcrumb build is the one writer of entities that needs none. The steps still refuse a page with
+  no entity.
+
+### What the captures and the suites showed
+
+- **The replica capture** builds Bacteriostatic Water under Peptides and the three products under
+  Healing Peptides (their store categories fold into the hubs), keeps the mapped hubs, and leaves
+  `/hello-world/`, whose crumb links an unsynced post category (`unknown_link`); **vanilla's** turns
+  the store category Koffein, which has no page, into a topic over its two products.
+- **The scale suite placed every page at 2,000 and 5,000**, so its paged list of
+  `page_without_entity` had nothing to page: the third article of each topic prints no breadcrumbs
+  now, which leaves 4 a block as `no_breadcrumbs` and keeps the list measured.
+- **The e2e harness removes what the sync built** before it seeds a stand's graph, and the suites
+  that need pages without an entity sync once more after the removal, which proves the removal sticks.
+- **The UI harness's own site is placed by its breadcrumbs too**: the journal and the reviews its
+  seed left unmapped became two hubs and six articles (8 entities, 6 edges, 56 pages mapped, 9
+  roots), and its tests say so.
+- **The replica's reconciliation found the import's half of it.** After the build placed BPC-157 and
+  TB-500 under Healing Peptides, the client's workbook put them under Peptides: the Groups sheet's
+  row took the built entity and added a second approved parent, its scope then fell to a tie-break
+  on random ids, and the Entities sheet planned a twin, so the Variations' "Parent Product Entity"
+  was ambiguous. **Ruling: a parent the sheet names replaces an entity's parents when every one was
+  drawn by the breadcrumbs** (`source site`), shown in the preview as `replace`; a parent a person or
+  an earlier import gave stays beside the sheet's, as before. The workbook is the client's plan, the
+  build a reading of his site; their difference stays an `entity_parent_differs` with its options.
+  The page types suite created an entity for each of its pages and met the built ones; it now gives
+  one only to a page the breadcrumbs left without.
+- **The stands**: vanilla 13 passed (13 skipped, replica-only or degraded) before and after the fix;
+  the replica's first full run passed 22 of 24, its two failures (the reconciliation and the page
+  types) then passed on the stand beside the five other suites that import a workbook.
+- **Found while looking at the screens**: with the dock open the Graph's toolbar ran past its pane
+  (Link proof and Isolate unreachable at 1280 and 1440), which the new lens made worse; a toolbar may
+  now wrap, the Graph's does, and the walk's `graph` shot checks it with `fits`.

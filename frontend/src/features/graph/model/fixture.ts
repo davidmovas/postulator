@@ -86,7 +86,7 @@ export const potteryEntities: Entity[] = [
     entity({ id: "m350", name: "Mug 350ml", score: 0.5 }),
     entity({ id: "m500", name: "Mug 500ml", score: 0.4 }),
     entity({ id: "travel", name: "Travel Mug", score: 0.2, page: false, source: "ai" }),
-    entity({ id: "stone", name: "Stoneware", score: 0.82, secondaryKeywords: ["stoneware mugs"] }),
+    entity({ id: "stone", name: "Stoneware", score: 0.82, secondaryKeywords: ["stoneware mugs"], source: "site" }),
     entity({ id: "kiln", name: "Kiln Care", score: 0.35, page: false, source: "ai" }),
 ];
 

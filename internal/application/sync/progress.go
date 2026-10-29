@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"maps"
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application/observe"
@@ -26,6 +27,7 @@ func (s *Service) Progress(ctx context.Context, req ProgressRequest) (ProgressRe
 
 	out := ProgressResponse{
 		Found: true, RunID: record.ID, Status: string(record.Status), Error: record.Error, CreatedAt: dto.NewTime(record.CreatedAt),
+		UnplacedBy: map[string]int{},
 	}
 	if len(items) == 0 {
 		return out, nil
@@ -48,6 +50,8 @@ func (s *Service) Progress(ctx context.Context, req ProgressRequest) (ProgressRe
 	out.Pulled, out.Created, out.Updated = state.Counts.Pulled, state.Counts.Created, state.Counts.Updated
 	out.Products, out.Rendered, out.Unreachable = state.Counts.Products, state.Counts.Rendered, state.Counts.Unreachable
 	out.Archived = state.Counts.Archived
+	out.Entities, out.Placed, out.Unplaced = state.Counts.Entities, state.Counts.Placed, state.Counts.Unplaced
+	maps.Copy(out.UnplacedBy, state.Counts.UnplacedBy)
 	if !state.StartedAt.IsZero() {
 		started := dto.NewTime(state.StartedAt)
 		out.StartedAt = &started

@@ -1,7 +1,7 @@
 package app
 
 var (
-	Version   = "2.8.1-dev"
+	Version   = "2.9.0-dev"
 	Commit    = "unknown"
 	BuildDate = "unknown"
 )

@@ -5,7 +5,7 @@ import { useSyncProgress } from "../../../data/hooks/sync.js";
 import type { SyncProgress } from "../../../data/types.js";
 import { Banner, CheckSmallIcon, cx, SectionLabel, SkeletonRows, Spinner, useNow } from "../../../ui/index.js";
 import type { StageState, StageStep } from "../../sync/index.js";
-import { pageCount, stageSteps, stageWords, SyncError, syncRetrying } from "../../sync/index.js";
+import { leftReasons, pageCount, stageSteps, stageWords, SyncError, syncRetrying } from "../../sync/index.js";
 import { countdown, remainingMs } from "../authority.js";
 import { statusCancelled, statusCompleted, statusFailed, statusPaused } from "../statuses.js";
 
@@ -76,6 +76,9 @@ function Counts({ progress }: { progress: SyncProgress }): ReactElement {
         [said.counts.rendered, progress.rendered, false],
         [said.counts.unreachable, progress.unreachable, progress.unreachable > 0],
         [said.counts.archived, progress.archived, false],
+        [said.counts.entities, progress.entities, false],
+        [said.counts.placed, progress.placed, false],
+        [said.counts.unplaced, progress.unplaced, progress.unplaced > 0],
         [said.counts.batches, progress.batches, false],
     ];
     return (
@@ -91,6 +94,26 @@ function Counts({ progress }: { progress: SyncProgress }): ReactElement {
                     </div>
                 ))}
             </dl>
+        </section>
+    );
+}
+
+function Left({ progress }: { progress: SyncProgress }): ReactElement | null {
+    const reasons = leftReasons(progress);
+    if (reasons.length === 0) {
+        return null;
+    }
+    return (
+        <section className="flex min-w-0 flex-col gap-1.5">
+            <SectionLabel>{said.left.title}</SectionLabel>
+            <ul aria-label={said.left.title} className="flex min-w-0 flex-col gap-1 text-xs">
+                {reasons.map((left) => (
+                    <li key={left.reason} className="flex min-w-0 items-baseline justify-between gap-4">
+                        <span className="min-w-0 text-ink-dim">{left.words}</span>
+                        <span className="shrink-0 text-right font-mono tabular-nums text-ink">{pageCount(left.count)}</span>
+                    </li>
+                ))}
+            </ul>
         </section>
     );
 }
@@ -124,6 +147,7 @@ function Body({ progress }: { progress: SyncProgress }): ReactElement {
                 <StageRail steps={stageSteps(progress)} moving={moving} />
                 <div className="flex min-w-0 flex-col gap-3">
                     <Counts progress={progress} />
+                    <Left progress={progress} />
                     {left === null ? null : (
                         <p className="text-xs text-warn">{`${said.attempt(progress.attempts)}; ${said.retryIn(countdown(left))}`}</p>
                     )}

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { copy } from "../../copy/index.js";
-import { proposalClashes } from "../../generated/vocab.js";
-import { clashLabel, entityTypeLabel, formatScore, scored } from "./labels.js";
+import { proposalClashes, sources } from "../../generated/vocab.js";
+import { clashLabel, entityTypeLabel, formatScore, scored, sourceLabel } from "./labels.js";
 
 describe("clashLabel", () => {
     it("words every clash a site proposal can carry", () => {
@@ -14,6 +14,16 @@ describe("clashLabel", () => {
 
     it("says nothing for a proposal that does not clash", () => {
         expect(clashLabel("")).toBe("");
+    });
+});
+
+describe("sourceLabel", () => {
+    it("says in words who made every entity", () => {
+        for (const source of sources) {
+            expect(sourceLabel(source)).not.toBe(source);
+            expect(sourceLabel(source).length).toBeGreaterThan(0);
+        }
+        expect(sourceLabel("site")).toBe(copy.graph.inspector.sources.site);
     });
 });
 

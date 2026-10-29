@@ -203,24 +203,48 @@ func (d *Derivation) decide(page Page, t Trail, evidence ParentSignals, index In
 }
 
 func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, index Index) (Page, ParentMethod, bool) {
+	match := matchCrumb(page, crumb, evidence.Landings, index)
+	switch {
+	case match.found:
+		if len(match.twinTerms) > 0 {
+			d.twin(crumb, match.page, match.twinTerms)
+		}
+		return match.page, match.method, true
+	case len(match.candidates) > 0:
+		d.ambiguous(crumb, match.candidates)
+	default:
+		d.unresolved(crumb)
+	}
+	return Page{}, MethodNone, false
+}
+
+type crumbMatch struct {
+	page       Page
+	method     ParentMethod
+	found      bool
+	liveLink   bool
+	candidates []Page
+	twinTerms  []Page
+}
+
+func matchCrumb(page Page, crumb Crumb, landings map[string]string, index Index) crumbMatch {
 	if crumb.Path != "" {
 		if target, found := index.ByPath(crumb.Path); found && target.ID != page.ID {
-			if landed, moved := evidence.Landings[target.Path]; moved {
+			if landed, moved := landings[target.Path]; moved {
 				if final, ok := landing(page, crumb, landed, index); ok {
-					return final, MethodRedirect, true
+					return crumbMatch{page: final, method: MethodRedirect, found: true}
 				}
 			}
-			return target, MethodHref, true
+			return crumbMatch{page: target, method: MethodHref, found: true}
 		}
 		if crumb.Final != "" && crumb.Final != crumb.Path {
 			if final, ok := landing(page, crumb, crumb.Final, index); ok {
-				return final, MethodRedirect, true
+				return crumbMatch{page: final, method: MethodRedirect, found: true}
 			}
 		}
 	}
 	if crumb.Linked() && (crumb.Path == "" || !crumb.Dead()) {
-		d.unresolved(crumb)
-		return Page{}, MethodNone, false
+		return crumbMatch{liveLink: true}
 	}
 
 	pages, terms := index.parentsNamed(page, crumb.Name)
@@ -229,17 +253,17 @@ func (d *Derivation) resolve(page Page, crumb Crumb, evidence ParentSignals, ind
 		candidates = terms
 	}
 	switch len(candidates) {
-	case 1:
-		if len(pages) == 1 && len(terms) > 0 {
-			d.twin(crumb, pages[0], terms)
-		}
-		return candidates[0], MethodName, true
 	case 0:
-		d.unresolved(crumb)
+		return crumbMatch{}
+	case 1:
+		match := crumbMatch{page: candidates[0], method: MethodName, found: true}
+		if len(pages) == 1 && len(terms) > 0 {
+			match.twinTerms = terms
+		}
+		return match
 	default:
-		d.ambiguous(crumb, candidates)
+		return crumbMatch{candidates: candidates}
 	}
-	return Page{}, MethodNone, false
 }
 
 func (i Index) ParentNamed(page Page, name string) []Page {

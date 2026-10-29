@@ -18,6 +18,7 @@ type staged struct {
 	model    siteModel
 	observed map[string]time.Time
 	stored   map[string][]field.Value
+	topics   *topicRun
 }
 
 type stages struct {

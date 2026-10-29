@@ -4,23 +4,24 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.8.0` on 2026-10-28 (PR #34 merged, tagged; phase 19, notes under **Release
-2.8.0**, its gate under **The gate at 2.8.0**). **2.8.1 is built on `dev`** (2026-10-29): a
-shift-click ticks a range in the page picker of Graph → Propose from pages and of Start run, which
-2.8.0 left at one page per click. Its notes are under **Release 2.8.1**.
+**Released:** `v2.8.1` on 2026-10-29 (PR #35 merged, tagged; a shift-click ticks a range in the
+page picker, notes under **Release 2.8.1**). **2.9.0 is built on `dev`** (2026-10-29, phase 20): the
+sync builds the topical map from the site's breadcrumbs, with no model; its notes are under
+**Release 2.9.0**.
 
 ## Next, in order
 
-1. **The owner opens a pull request from `dev` to `master` for 2.8.1 and tags `v2.8.1`** when he
-   asks; the tag's workflow builds the installer, the executable and the plugin zip. 2.8.1 changes
-   the frontend only: no migration, no Go change, the plugin stays 1.5.2.
-2. **The client installs 2.8.1 over 2.8.0** and picks his pages without an entity with a click and
-   a shift-click in Graph → Propose from pages.
-3. **What to look at first on his site**: one sync, timed, and its run screen (the stages, the
-   counts, and "Resume the sync" if it stops); Settings → Page types (the three steps, a card per
-   type, "How pages get a type" with each rule's pages, the notice over his pages typed before 2.6,
-   whose Preview retypes them); Propose from pages with shift-click, then the proposals with
-   shift-click, drag and "Tick the N shown".
+1. **The stands are green for 2.9.0** (2026-10-29): vanilla 13 passed and 13 skipped, twice;
+   the replica 24 after two fixes its run found (the workbook's parent over a built one, and the page
+   types suite's entities), each failed test then passed alone on the stand with every test that
+   imports a workbook. The stands are down.
+2. **The pull request from `dev` to `master` for 2.9.0 is open**; the owner merges it and tags
+   `v2.9.0`, whose workflow builds the installer, the executable and the plugin zip. 2.9.0 adds
+   migrations 0088 and 0089; the plugin stays 1.5.2.
+3. **The client installs 2.9.0 and syncs once**: the run screen says how many entities the
+   breadcrumbs built, how many pages they placed and why the rest were left; the Graph's "From the
+   site" lens shows what was built, and a page left without an entity keeps its finding and its
+   "Propose entity".
 4. **The race legs**, owed since 2.7.0, one call each on a quiet machine (no stand up, nothing else holding
    memory), from the repository root under bash:
    ```
@@ -67,8 +68,9 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   on the site, a page no entity carries), which he or the agent settles one at a time or a whole code
   at once. The Site map shows the site by its derived hierarchy.
 - **The entity graph** says what links where: up to parents, down to children, sideways only to the
-  related pages the graph names. A page without an entity gets one through proposals named from the
-  site itself, with no model call.
+  related pages the graph names. A sync builds it from the site's breadcrumbs with no model call,
+  each crumb a topic and each page an entity under the crumb above it, and leaves with a reason
+  whatever it cannot be sure of; a page it left gets an entity through proposals named from the site.
 - **The writer's full picture.** Before it writes a field, the model sees the page's type, its entity
   card, its breadcrumb path, its children and siblings, the products it lists, the keywords with
   their volumes, the anchors, the notes and the field's own instruction and policy, fitted to a
@@ -88,6 +90,29 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.9.0
+
+- **The sync builds the topical map from the breadcrumbs.** After the page tree, a new stage reads
+  every crumb of every page, from the root down: a crumb that links a page is that page's entity, a
+  crumb no page carries (or a store category with no page of its own) is a topic entity with no page,
+  and each entity sits under the crumb above it. Entities are named by the crumb's text, then the
+  H1, then the title. Products fall under the hub their store category folds into.
+- **Nothing it is unsure of is written.** A crumb that links a page the sync does not hold, a name
+  two pages carry, a name already taken at that place, breadcrumbs that disagree with the page tree
+  or loop: the page is left without an entity, with its reason, and so is everything under it. A
+  page a person mapped is kept as it is, and an entity a person removes is never built again.
+- **What it shows**: the run screen counts the entities built, the pages placed and the pages left,
+  and lists why; the Graph has a "From the site" lens; the inspector says who made an entity. The
+  Graph entity column, the Graph tree and the export's `entity` and `parent_entity` fill from it.
+- **Migrations** 0088 (the `site` source on entities and edges, by a table rebuild whose down hands
+  them to a person) and 0089 (`topic_builds`, what a sync settled).
+- **A workbook places the entities the breadcrumbs built.** When the client's sheet names another
+  parent for an entity the sync built, the sheet's parent replaces the breadcrumbs' (the preview
+  says "replaced by the sheet"), so a sync and then an import never leave two entities of one name;
+  the difference with the site's breadcrumbs stays a finding. A parent a person gave is kept.
+- **The Graph's toolbar wraps beside the dock**: with the dock open it ran past its pane, so Link
+  proof and Isolate could not be reached at 1280 or 1440; it now takes a second line.
 
 ## Release 2.8.1
 

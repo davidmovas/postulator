@@ -15,6 +15,7 @@ const (
 	StageStore     Stage = "store"
 	StageRender    Stage = "render"
 	StageDerive    Stage = "derive"
+	StageTopics    Stage = "topics"
 	StageFields    Stage = "fields"
 	StageDone      Stage = "done"
 )
@@ -37,16 +38,20 @@ type Options struct {
 }
 
 type Counts struct {
-	Pulled      int `json:"pulled"`
-	Created     int `json:"created"`
-	Updated     int `json:"updated"`
-	Products    int `json:"products"`
-	Rendered    int `json:"rendered"`
-	Unreachable int `json:"unreachable"`
-	Archived    int `json:"archived"`
-	Typed       int `json:"typed"`
-	Custom      int `json:"custom"`
-	Closed      int `json:"closed"`
+	Pulled      int            `json:"pulled"`
+	Created     int            `json:"created"`
+	Updated     int            `json:"updated"`
+	Products    int            `json:"products"`
+	Rendered    int            `json:"rendered"`
+	Unreachable int            `json:"unreachable"`
+	Archived    int            `json:"archived"`
+	Typed       int            `json:"typed"`
+	Custom      int            `json:"custom"`
+	Closed      int            `json:"closed"`
+	Entities    int            `json:"entities"`
+	Placed      int            `json:"placed"`
+	Unplaced    int            `json:"unplaced"`
+	UnplacedBy  map[string]int `json:"unplacedBy,omitempty"`
 }
 
 type State struct {
@@ -62,6 +67,7 @@ type State struct {
 	CorePage     int                 `json:"corePage"`
 	StorePage    int                 `json:"storePage"`
 	RenderAfter  string              `json:"renderAfter"`
+	TopicsAfter  string              `json:"topicsAfter"`
 	FieldsAfter  string              `json:"fieldsAfter"`
 	Technical    site.TechnicalPages `json:"technical"`
 	Findings     []content.Finding   `json:"findings,omitempty"`

@@ -19,7 +19,7 @@ type timeStamp = time.Time
 var deriveCodes = []finding.Code{
 	finding.TechnicalDetected, finding.BuilderDetected, finding.ParentUnresolved, finding.ParentAmbiguous, finding.ParentCycle,
 	finding.ParentNameTwin, finding.ParentDiffers, finding.URLFormMixed, finding.RenderUnreachable, finding.RenderRedirected,
-	finding.PageWithoutEntity, finding.TypeByDefault, finding.EntityParentDiffers,
+	finding.TypeByDefault,
 }
 
 func (s *Service) derive(ctx context.Context, state *State, readers Readers) error {
@@ -118,12 +118,6 @@ func (s *Service) derive(ctx context.Context, state *State, readers Readers) err
 	}
 	typed := retyped(m, set, rules, products)
 	if err := s.byDefault(ctx, tracked, m, typed, set); err != nil {
-		return err
-	}
-	if err := s.entityless(ctx, tracked, m, changed, typed, set); err != nil {
-		return err
-	}
-	if err := s.parentsDiffer(ctx, tracked, state.SiteID, m, set); err != nil {
 		return err
 	}
 
@@ -287,35 +281,6 @@ func (s *Service) byDefault(ctx context.Context, tracked *findings, m siteModel,
 		if err := tracked.raise(ctx, finding.TypeByDefault, &outcome.PageID, subject, map[string]string{
 			"path": m.pathOf(outcome.PageID), "type": kind.Name,
 		}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *Service) entityless(ctx context.Context, tracked *findings, m siteModel, changed map[string]pagemap.Page, typed []pagetype.Outcome, set pagetype.Set) error {
-	assigned := make(map[string]string, len(typed))
-	for i := range typed {
-		if typed[i].Changed() {
-			assigned[typed[i].PageID] = typed[i].TypeID
-		}
-	}
-	for i := range m.pages {
-		page := m.pages[i]
-		if moved, held := changed[page.ID]; held {
-			page = moved
-		}
-		if typeID, held := assigned[page.ID]; held {
-			page.PageTypeID = &typeID
-		}
-		subject := finding.SubjectPage(page.ID)
-		if !set.NeedsEntity(page) {
-			if err := tracked.clear(ctx, finding.PageWithoutEntity, subject); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := tracked.raise(ctx, finding.PageWithoutEntity, &page.ID, subject, map[string]string{"path": page.Path}); err != nil {
 			return err
 		}
 	}

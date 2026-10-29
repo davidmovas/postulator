@@ -60,6 +60,7 @@ describe("a sync run's own pane", () => {
             "Reading the store",
             "Visiting the pages",
             "Deriving the page tree",
+            "Building the topical map",
             "Reading custom fields",
             "Done",
         ]);
@@ -100,6 +101,34 @@ describe("a sync run's own pane", () => {
         expect(count(said.counts.unreachable)).toBe("2");
         expect(count(said.counts.archived)).toBe("1");
         expect(count(said.counts.batches)).toBe("6");
+    });
+
+    it("counts what the topical map built and says why each page it left has no entity, the commonest first", () => {
+        held.progress = aProgress({
+            stage: "fields",
+            entities: 30,
+            placed: 27,
+            unplaced: 4,
+            unplacedBy: { disagrees: 1, unknown_link: 3 },
+        });
+        render(<SiteSyncPane siteId="s1" runId="r-sync" />);
+
+        expect(count(said.counts.entities)).toBe("30");
+        expect(count(said.counts.placed)).toBe("27");
+        expect(count(said.counts.unplaced)).toBe("4");
+        const reasons = within(screen.getByRole("list", { name: said.left.title })).getAllByRole("listitem");
+        expect(reasons.map((reason) => reason.textContent)).toEqual([
+            `${said.left.reasons.unknown_link}3`,
+            `${said.left.reasons.disagrees}1`,
+        ]);
+    });
+
+    it("says no reasons while every page that needs an entity has one", () => {
+        held.progress = aProgress({ stage: "done", entities: 4, placed: 3 });
+        render(<SiteSyncPane siteId="s1" runId="r-sync" />);
+
+        expect(count(said.counts.unplaced)).toBe("0");
+        expect(screen.queryByRole("list", { name: said.left.title })).toBeNull();
     });
 
     it("counts a large walk exactly rather than rounding it", () => {

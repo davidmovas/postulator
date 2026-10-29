@@ -488,9 +488,9 @@ func TestAWalkReadsTheModelOncePerStage(t *testing.T) {
 
 	walk()
 	renders, identities, _ := s.stores.modelReads()
-	if renders != 3 || identities != 3 {
+	if renders != 4 || identities != 4 {
 		t.Errorf("a walk of one-page batches listed the renders %d times and the identities %d times, "+
-			"want once for the render stage, once for derive and once for the fields stage", renders, identities)
+			"want once each for the render stage, derive, the topical map and the fields stage", renders, identities)
 	}
 	s.clock.Set(start.Add(time.Hour))
 	for i := range s.plugin.items {

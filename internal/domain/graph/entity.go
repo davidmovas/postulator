@@ -16,11 +16,12 @@ const (
 	SourceImport Source = "import"
 	SourceUser   Source = "user"
 	SourceAI     Source = "ai"
+	SourceSite   Source = "site"
 )
 
 func (s Source) Valid() bool {
 	switch s {
-	case SourceImport, SourceUser, SourceAI:
+	case SourceImport, SourceUser, SourceAI, SourceSite:
 		return true
 	default:
 		return false

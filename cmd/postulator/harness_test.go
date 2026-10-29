@@ -118,11 +118,21 @@ func TestTheHarnessSeedsASiteWorthLookingAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 45 {
-		t.Errorf("entities = %d, want 45, the workbook's planned guide included", len(loaded.Entities))
+	if len(loaded.Entities) != 53 {
+		t.Errorf("entities = %d, want 53: the 44 seeded, the workbook's planned guide and the 8 the journal's and the reviews' breadcrumbs built",
+			len(loaded.Entities))
 	}
-	if len(loaded.Edges) != 49 {
-		t.Errorf("edges = %d, want 49, the planned guide's parent included", len(loaded.Edges))
+	if len(loaded.Edges) != 55 {
+		t.Errorf("edges = %d, want 55, the planned guide's parent and the 6 the breadcrumbs drew included", len(loaded.Edges))
+	}
+	built := 0
+	for _, entity := range loaded.Entities {
+		if entity.Source == "site" {
+			built++
+		}
+	}
+	if built != 8 {
+		t.Errorf("entities the site's breadcrumbs built = %d, want the journal and the reviews, two hubs and six articles", built)
 	}
 
 	proposed := 0
@@ -185,8 +195,8 @@ func TestTheHarnessSeedsMappedAndUnmappedPages(t *testing.T) {
 	if total != 68 {
 		t.Errorf("pages = %d, want 68, the duplicated review and the workbook's planned guide included", total)
 	}
-	if mapped != 48 {
-		t.Errorf("mapped pages = %d, want 48", mapped)
+	if mapped != 56 {
+		t.Errorf("mapped pages = %d, want 56, the 48 seeded and the 8 the breadcrumbs placed", mapped)
 	}
 }
 
@@ -557,8 +567,8 @@ func TestASeededHomeIsNotSeededTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGraph: %v", err)
 	}
-	if len(loaded.Entities) != 45 {
-		t.Fatalf("entities after the restart = %d, want the forty-five that were seeded", len(loaded.Entities))
+	if len(loaded.Entities) != 53 {
+		t.Fatalf("entities after the restart = %d, want the fifty-three of the first start, none built twice", len(loaded.Entities))
 	}
 }
 
@@ -619,8 +629,8 @@ func TestTheSeededGraphIsATreeAndNotAFlatList(t *testing.T) {
 			t.Errorf("%s carries %d parents, want one", entity.Name, parents[entity.ID])
 		}
 	}
-	if rooted != 7 {
-		t.Errorf("entities without a parent = %d, want the seven hubs", rooted)
+	if rooted != 9 {
+		t.Errorf("entities without a parent = %d, want the seven hubs and the journal and the reviews the breadcrumbs built", rooted)
 	}
 }
 

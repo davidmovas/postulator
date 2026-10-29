@@ -21,7 +21,7 @@ import { askAgent } from "../../agent/index.js";
 import { severityOf } from "../../links/model/audit.js";
 import { pageTypesOf } from "../../settings/tabs.js";
 import { presetIcon, presetLabel, presetTone } from "../../settings/types/labels.js";
-import { entityTypeLabel, formatScore } from "../labels.js";
+import { entityTypeLabel, formatScore, sourceLabel } from "../labels.js";
 import type { EntityType, GraphIndex } from "../model/index.js";
 import { presetOf, typeOf } from "../model/index.js";
 import type { Lens } from "../model/lens.js";
@@ -264,7 +264,7 @@ export function Inspector({
 
                 <footer className="flex items-center justify-between gap-2 border-t border-hairline pt-3">
                     <p className="text-2xs text-ink-faint">
-                        {copy.graph.inspector.source} {entity.source} · {copy.graph.inspector.created}{" "}
+                        {sourceLabel(entity.source)} · {copy.graph.inspector.created}{" "}
                         {entity.createdAt === null ? "" : relativeTime(entity.createdAt)}
                     </p>
                     <Button

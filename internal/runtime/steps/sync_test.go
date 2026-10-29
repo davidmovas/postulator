@@ -92,7 +92,8 @@ func newSyncHarness(t *testing.T, batch int, opts ...wptest.Option) *syncHarness
 	observer := observe.New(observe.Deps{
 		Sites: siteRepo, Pages: pageRepo, Identity: identityRepo, Fields: fieldRepo, Bodies: bodyRepo,
 		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: findingRepo,
-		Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store), UnitOfWork: store, Publisher: bus, Clock: fake,
+		Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store), Topics: sqlite.NewTopicBuildRepo(store),
+		UnitOfWork: store, Publisher: bus, Clock: fake,
 		Types: pagetypes.New(pagetypes.Deps{
 			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: pageRepo,
 			Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: fake,
@@ -1016,7 +1017,7 @@ func TestSyncSiteArchivesNothingUntilThePullIsComplete(t *testing.T) {
 
 	for range 80 {
 		state, _ := h.once(t)
-		if !state.Done && state.Stage != string(observe.StageFields) {
+		if !state.Done && state.Stage != string(observe.StageTopics) && state.Stage != string(observe.StageFields) {
 			if state.Archived != 0 {
 				t.Fatalf("a partial pull archived %d pages: %+v", state.Archived, state)
 			}

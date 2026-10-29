@@ -39,17 +39,25 @@ func TestAWritablePageNoEntityCarriesIsAFindingUntilOneDoes(t *testing.T) {
 	s.serveTheSite(false)
 
 	s.run(t, observe.Options{})
-	want := []string{"/bpc-157/", "/peptides/", "/product/bpc-157-peptide/", "/tb-500/"}
-	if got := s.withoutEntity(); !slices.Equal(got, want) {
-		t.Fatalf("the pages without an entity = %v, want %v", got, want)
+	if got := s.withoutEntity(); !slices.Equal(got, []string{"/product/bpc-157-peptide/"}) {
+		t.Fatalf("the pages without an entity = %v, want the one the breadcrumbs could not place", got)
 	}
-	peptides := s.pageAt(t, "/peptides/")
-	raised, _ := s.finding(finding.PageWithoutEntity, finding.SubjectPage(peptides.ID))
-	if string(raised.Subject) != `{"path":"/peptides/"}` || !slices.Equal(raised.Options, []finding.Option{finding.ProposeEntity, finding.Ignore}) {
+	product := s.pageAt(t, "/product/bpc-157-peptide/")
+	raised, _ := s.finding(finding.PageWithoutEntity, finding.SubjectPage(product.ID))
+	if string(raised.Subject) != `{"path":"/product/bpc-157-peptide/"}` || !slices.Equal(raised.Options, []finding.Option{finding.ProposeEntity, finding.Ignore}) {
 		t.Errorf("the finding = %s %v, want the path alone and its two options", raised.Subject, raised.Options)
 	}
 
-	s.carry(t, "/peptides/", new("entity-peptides"))
+	s.carry(t, "/product/bpc-157-peptide/", new("entity-product"))
+	s.carry(t, "/tb-500/", nil)
+	s.walkAgain(t, time.Hour)
+	if got := s.withoutEntity(); !slices.Equal(got, []string{"/tb-500/"}) {
+		t.Fatalf("after mapping the product and unmapping /tb-500/ = %v, want the unmapped page open and not placed again", got)
+	}
+	if cleared, _ := s.finding(finding.PageWithoutEntity, finding.SubjectPage(product.ID)); cleared.Status != finding.Resolved || cleared.ResolvedBy != finding.ResolvedByObservation {
+		t.Errorf("the mapped page's finding = %s by %s, want resolved by the observation", cleared.Status, cleared.ResolvedBy)
+	}
+
 	tb500 := s.pageAt(t, "/tb-500/")
 	s.dismiss(finding.PageWithoutEntity, finding.SubjectPage(tb500.ID))
 	for i := range s.plugin.items {
@@ -57,22 +65,16 @@ func TestAWritablePageNoEntityCarriesIsAFindingUntilOneDoes(t *testing.T) {
 			s.plugin.items[i].Title = "TB-500 Fragment"
 		}
 	}
-	s.touch(tb500WPID(s), start.Add(time.Hour))
+	s.touch(tb500WPID(s), start.Add(90*time.Minute))
 	s.walkAgain(t, 2*time.Hour)
-	if got := s.withoutEntity(); !slices.Equal(got, []string{"/bpc-157/", "/product/bpc-157-peptide/"}) {
-		t.Fatalf("after mapping /peptides/ and dismissing /tb-500/ = %v", got)
-	}
-	if cleared, _ := s.finding(finding.PageWithoutEntity, finding.SubjectPage(peptides.ID)); cleared.Status != finding.Resolved || cleared.ResolvedBy != finding.ResolvedByObservation {
-		t.Errorf("the mapped page's finding = %s by %s, want resolved by the observation", cleared.Status, cleared.ResolvedBy)
-	}
 	if kept, _ := s.finding(finding.PageWithoutEntity, finding.SubjectPage(tb500.ID)); kept.Status != finding.Dismissed {
 		t.Errorf("a dismissed finding whose page was retitled = %s, want it still dismissed", kept.Status)
 	}
 
-	s.carry(t, "/peptides/", nil)
+	s.carry(t, "/product/bpc-157-peptide/", nil)
 	s.walkAgain(t, 3*time.Hour)
-	if got := s.withoutEntity(); !slices.Equal(got, []string{"/bpc-157/", "/peptides/", "/product/bpc-157-peptide/"}) {
-		t.Errorf("after unmapping /peptides/ = %v, want its finding open again", got)
+	if got := s.withoutEntity(); !slices.Equal(got, []string{"/product/bpc-157-peptide/"}) {
+		t.Errorf("after unmapping the product = %v, want its finding open again", got)
 	}
 }
 
@@ -85,11 +87,13 @@ func TestAnEntityWhoseParentDisagreesWithItsPagesIsAFindingUntilTheGraphAgrees(t
 	peptides, tb500 := s.pageAt(t, "/peptides/"), s.pageAt(t, "/tb-500/")
 	s.carry(t, "/peptides/", new("e-peptides"))
 	s.carry(t, "/tb-500/", new("e-tb"))
+	s.carry(t, "/bpc-157/", nil)
 	s.stores.mu.Lock()
 	s.stores.entities = []graph.Entity{
 		{ID: "e-peptides", SiteID: siteID, Name: "Peptides", CanonicalPageID: new(peptides.ID), Source: graph.SourceUser},
 		{ID: "e-tb", SiteID: siteID, Name: "TB-500", CanonicalPageID: new(tb500.ID), Source: graph.SourceUser},
 	}
+	s.stores.edges = nil
 	s.stores.mu.Unlock()
 	s.walkAgain(t, time.Hour)
 

@@ -126,7 +126,10 @@ func TestTheProgressOfASyncSaysItsStageCountsAndTrouble(t *testing.T) {
 	if err := run.Set(checkpoint, observe.CheckpointKey, observe.Progress{
 		State: observe.State{
 			StartedAt: sqlitetest.Stamp, Source: observe.SourcePlugin, Stage: observe.StageRender, Full: true,
-			Counts: observe.Counts{Pulled: 412, Created: 400, Updated: 12, Rendered: 150, Unreachable: 2},
+			Counts: observe.Counts{
+				Pulled: 412, Created: 400, Updated: 12, Rendered: 150, Unreachable: 2,
+				Entities: 30, Placed: 27, Unplaced: 4, UnplacedBy: map[string]int{"unknown_link": 3, "disagrees": 1},
+			},
 		},
 		Batches: 11,
 	}); err != nil {
@@ -153,6 +156,12 @@ func TestTheProgressOfASyncSaysItsStageCountsAndTrouble(t *testing.T) {
 		got.Batches != 11 || got.Pulled != 412 || got.Created != 400 || got.Rendered != 150 || got.Unreachable != 2 ||
 		got.Attempts != 1 || got.WakeAt == nil || !strings.Contains(got.Error, "WordPress answered 500") {
 		t.Fatalf("the active sync's progress = %+v", got)
+	}
+	if got.Entities != 30 || got.Placed != 27 || got.Unplaced != 4 || got.UnplacedBy["unknown_link"] != 3 || got.UnplacedBy["disagrees"] != 1 {
+		t.Errorf("the topical map's counts = %d %d %d %v", got.Entities, got.Placed, got.Unplaced, got.UnplacedBy)
+	}
+	if named, namedErr := service.Progress(t.Context(), sync.ProgressRequest{SiteID: siteID, RunID: done.ID}); namedErr != nil || named.UnplacedBy == nil {
+		t.Errorf("a sync without a checkpoint says its reasons as %v (%v), want an empty map", named.UnplacedBy, namedErr)
 	}
 
 	named, err := service.Progress(t.Context(), sync.ProgressRequest{SiteID: siteID, RunID: done.ID})

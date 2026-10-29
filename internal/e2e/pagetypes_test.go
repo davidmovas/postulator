@@ -211,14 +211,17 @@ func assertTemplatesFollowTheTypes(t *testing.T, core *app.Core, siteID string, 
 	targets := make([]string, 0, len(want))
 	for _, path := range slices.Sorted(maps.Keys(want)) {
 		page := models[path].Page
+		targets = append(targets, page.ID)
+		if page.EntityID != nil {
+			continue
+		}
 		created, createErr := core.Graph.CreateEntity(t.Context(), graph.CreateEntityRequest{SiteID: siteID, Name: page.Title})
 		if createErr != nil {
-			t.Fatalf("create the entity of %s: %v", path, createErr)
+			t.Fatalf("create the entity of %s, which the site's breadcrumbs left without one: %v", path, createErr)
 		}
 		if _, mapErr := core.Pages.MapToEntity(t.Context(), pages.MapToEntityRequest{PageID: page.ID, EntityID: created.Entity.ID}); mapErr != nil {
 			t.Fatalf("map %s to its entity: %v", path, mapErr)
 		}
-		targets = append(targets, page.ID)
 	}
 	for i := range listed.Types {
 		kind := &listed.Types[i]
