@@ -5958,6 +5958,19 @@ uncertain it is left, never a failure. Plan: `C:\Users\admin\.claude\plans\synth
 - **The UI harness's own site is placed by its breadcrumbs too**: the journal and the reviews its
   seed left unmapped became two hubs and six articles (8 entities, 6 edges, 56 pages mapped, 9
   roots), and its tests say so.
+- **The replica's reconciliation found the import's half of it.** After the build placed BPC-157 and
+  TB-500 under Healing Peptides, the client's workbook put them under Peptides: the Groups sheet's
+  row took the built entity and added a second approved parent, its scope then fell to a tie-break
+  on random ids, and the Entities sheet planned a twin, so the Variations' "Parent Product Entity"
+  was ambiguous. **Ruling: a parent the sheet names replaces an entity's parents when every one was
+  drawn by the breadcrumbs** (`source site`), shown in the preview as `replace`; a parent a person or
+  an earlier import gave stays beside the sheet's, as before. The workbook is the client's plan, the
+  build a reading of his site; their difference stays an `entity_parent_differs` with its options.
+  The page types suite created an entity for each of its pages and met the built ones; it now gives
+  one only to a page the breadcrumbs left without.
+- **The stands**: vanilla 13 passed (13 skipped, replica-only or degraded) before and after the fix;
+  the replica's first full run passed 22 of 24, its two failures (the reconciliation and the page
+  types) then passed on the stand beside the five other suites that import a workbook.
 - **Found while looking at the screens**: with the dock open the Graph's toolbar ran past its pane
   (Link proof and Isolate unreachable at 1280 and 1440), which the new lens made worse; a toolbar may
   now wrap, the Graph's does, and the walk's `graph` shot checks it with `fits`.

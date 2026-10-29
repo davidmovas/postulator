@@ -12,11 +12,10 @@ topical map from the site's breadcrumbs, with no model. Their notes are under **
 
 ## Next, in order
 
-1. **`task e2e:full` on both stands for 2.9.0** (vanilla about 6 minutes, replica about 15), owed at
-   the close: the harness now removes what the sync built before it seeds a stand's graph, and the
-   suites that sync without seeding (the client loop over the samples, the reconciliation, the
-   products) meet site-built entities for the first time, so a workbook import over them is what to
-   read first if one fails.
+1. **The stands are green for 2.9.0** (2026-10-29): vanilla 13 passed and 13 skipped, twice;
+   the replica 24 after two fixes its run found (the workbook's parent over a built one, and the page
+   types suite's entities), each failed test then passed alone on the stand with every test that
+   imports a workbook. The stands are down.
 2. **The owner opens a pull request from `dev` to `master` for 2.8.1 and 2.9.0 and tags `v2.9.0`**
    when he asks; the tag's workflow builds the installer, the executable and the plugin zip. 2.9.0
    adds migrations 0088 and 0089; the plugin stays 1.5.2.
@@ -109,6 +108,10 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   Graph entity column, the Graph tree and the export's `entity` and `parent_entity` fill from it.
 - **Migrations** 0088 (the `site` source on entities and edges, by a table rebuild whose down hands
   them to a person) and 0089 (`topic_builds`, what a sync settled).
+- **A workbook places the entities the breadcrumbs built.** When the client's sheet names another
+  parent for an entity the sync built, the sheet's parent replaces the breadcrumbs' (the preview
+  says "replaced by the sheet"), so a sync and then an import never leave two entities of one name;
+  the difference with the site's breadcrumbs stays a finding. A parent a person gave is kept.
 - **The Graph's toolbar wraps beside the dock**: with the dock open it ran past its pane, so Link
   proof and Isolate could not be reached at 1280 or 1440; it now takes a second line.
 
