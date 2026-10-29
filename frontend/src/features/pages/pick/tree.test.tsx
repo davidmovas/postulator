@@ -112,6 +112,27 @@ describe("the page picker over the site map", () => {
         expect(selectedNow()).toBe("mugs,travel");
     });
 
+    it("ticks the shown pages from the last pick to a shift-click, past a refused page, both ways", () => {
+        render(<Harness />);
+        fireEvent.click(within(rowOf("shop")).getByRole("button", { name: said.expand }));
+
+        fireEvent.click(screen.getByRole("checkbox", { name: "shop/" }));
+        fireEvent.click(screen.getByRole("checkbox", { name: "about/" }), { shiftKey: true });
+
+        expect(selectedNow()).toBe("about,mugs,shop");
+        expect(named.at(-1)).toStrictEqual([
+            { id: "shop", path: "/shop/" },
+            { id: "mugs", path: "/shop/mugs/" },
+            { id: "about", path: "/about/" },
+        ]);
+
+        fireEvent.click(screen.getByRole("checkbox", { name: "mugs/" }));
+        expect(selectedNow()).toBe("about,shop");
+        fireEvent.click(screen.getByRole("checkbox", { name: "shop/" }), { shiftKey: true });
+
+        expect(selectedNow()).toBe("about");
+    });
+
     it("refuses a page nothing is mapped to, in words", () => {
         render(<Harness />);
         fireEvent.click(within(rowOf("shop")).getByRole("button", { name: said.expand }));
