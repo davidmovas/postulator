@@ -4,28 +4,24 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.7.0` on 2026-10-27 (PR #32 merged, tagged; it carried 2.5.1, 2.6.0 and 2.7.0, notes
-under **Release 2.7.0** and below). **2.8.0 is built on `dev`** (phase 19, 2026-10-28), not yet in a
-pull request: the client's fourth request, a sync that finishes and says why when it does not, one
-sync per site, selection that keeps up with 400 proposals, and page types a person can read. Its
-notes are under **Release 2.8.0**, its gate under **The gate at 2.8.0**.
+**Released:** `v2.8.0` on 2026-10-28 (PR #34 merged, tagged; phase 19, notes under **Release
+2.8.0**, its gate under **The gate at 2.8.0**). **2.8.1 is built on `dev`** (2026-10-29): a
+shift-click ticks a range in the page picker of Graph → Propose from pages and of Start run, which
+2.8.0 left at one page per click. Its notes are under **Release 2.8.1**.
 
 ## Next, in order
 
-1. **2.8.0's owed legs**: the race legs below, which 2.7.0 owed too. `e2e:full` on both stands, the
-   degraded loop, the plain Go suite, every lint, the harness suite and the whole frontend suite are
-   green (under **The gate at 2.8.0**).
-2. **The owner opens a pull request from `dev` to `master` for 2.8.0 and tags `v2.8.0`** when he
-   asks; the tag's workflow builds the installer, the executable and the plugin zip.
-3. **The client installs 2.8.0 over 2.7.0.** The plugin does not change: 1.5.2 stays, no new zip.
-   Migration 0085 cancels every queued sync of a site but its oldest (his 15), 0086 names his 2.5
-   type Entity "Article". His next sync of 400 empty pages makes about 810 requests where 2.7.0 made
-   about 1,610, and a failure names the page, the stage and what WordPress answered.
-4. **What to look at first on his site**: one sync, timed, and its run screen (the stages, the
+1. **The owner opens a pull request from `dev` to `master` for 2.8.1 and tags `v2.8.1`** when he
+   asks; the tag's workflow builds the installer, the executable and the plugin zip. 2.8.1 changes
+   the frontend only: no migration, no Go change, the plugin stays 1.5.2.
+2. **The client installs 2.8.1 over 2.8.0** and picks his pages without an entity with a click and
+   a shift-click in Graph → Propose from pages.
+3. **What to look at first on his site**: one sync, timed, and its run screen (the stages, the
    counts, and "Resume the sync" if it stops); Settings → Page types (the three steps, a card per
    type, "How pages get a type" with each rule's pages, the notice over his pages typed before 2.6,
-   whose Preview retypes them); Proposed Entities with shift-click, drag and "Tick the N shown".
-5. **The race legs**, one call each on a quiet machine (no stand up, nothing else holding
+   whose Preview retypes them); Propose from pages with shift-click, then the proposals with
+   shift-click, drag and "Tick the N shown".
+4. **The race legs**, owed since 2.7.0, one call each on a quiet machine (no stand up, nothing else holding
    memory), from the repository root under bash:
    ```
    go test -race -count=1 -covermode=atomic -coverprofile=cov-kd.out ./internal/kernel/... ./internal/domain/...
@@ -40,7 +36,7 @@ notes are under **Release 2.8.0**, its gate under **The gate at 2.8.0**.
    at the close; it runs again only for its coverage profile. A `0xc0000142` on a build is Windows
    failing to start a process for lack of memory, not the code; after a stop, look for a leftover
    `*.test.exe`. The scale package needs `-timeout 30m` on a loaded machine.
-6. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+5. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
    `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24, a replica
    round now 13,260 tokens); see what a real model calls for each of the matrix's jobs, which the
    scripted suite cannot; settle the output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and
@@ -92,6 +88,14 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.8.1
+
+- **A shift-click ticks a range of pages.** In Graph → Propose from pages and in the Start-run page
+  list, a click ticks or unticks one page and a shift-click gives every page shown between it and
+  the clicked one the state of the first, as the Pages list does; pages that cannot be picked are
+  skipped. 2.8.0 toggled one page per click there, so 400 pages without an entity meant 400 clicks;
+  the proposals list after Preview already took a range.
 
 ## Release 2.8.0
 
