@@ -625,7 +625,7 @@ export const blockingImportFindingCodes: readonly ImportFindingCode[] = [
     "scope_clash",
 ];
 
-export const importActions = ["create", "update", "skip", "ambiguous"] as const;
+export const importActions = ["create", "update", "skip", "ambiguous", "replace"] as const;
 export type ImportAction = (typeof importActions)[number];
 
 export const exportFormats = ["xlsx", "csv"] as const;

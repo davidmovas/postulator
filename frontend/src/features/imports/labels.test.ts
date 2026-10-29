@@ -141,6 +141,7 @@ describe("action tones", () => {
         ["create", "ok"],
         ["update", "info"],
         ["skip", "muted"],
+        ["replace", "warn"],
     ] as const)("tints %s as %s", (action, want) => {
         expect(actionTone(action)).toBe(want);
     });

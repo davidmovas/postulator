@@ -285,6 +285,7 @@ export const imports = {
         update: "updated",
         skip: "skipped",
         ambiguous: "pick a page",
+        replace: "replaced by the sheet",
     },
     edgeKinds: {
         parent: "Parent",

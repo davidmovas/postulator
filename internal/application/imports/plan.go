@@ -35,6 +35,7 @@ type plan struct {
 	report    PreviewReport
 	entities  []plannedEntity
 	edges     []graph.Edge
+	retired   []string
 	pages     []plannedPage
 	canonical []canonical
 	rows      int

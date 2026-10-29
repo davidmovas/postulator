@@ -34,6 +34,7 @@ type entityStore interface {
 
 type edgeStore interface {
 	Insert(ctx context.Context, e graph.Edge) error
+	Delete(ctx context.Context, id string) error
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
 }
 

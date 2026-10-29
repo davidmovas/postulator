@@ -123,9 +123,44 @@ func (b *builder) planParentEdge(u *unit, seen map[string]struct{}) error {
 		b.p.noteAt(u.parent.at, string(importmap.FieldParentEntity), CodeSelfEdge, "the entity names itself as its parent: "+u.name)
 	case u.parent.weak && u.matched != "" && b.parents[u.matched] > 0:
 	default:
+		b.retireBuiltParents(u, parentID)
 		return b.addEdge(u, parentID, graph.EdgeParent, seen)
 	}
 	return nil
+}
+
+func (b *builder) retireBuiltParents(u *unit, parentID string) {
+	if u.matched == "" || u.parent.weak {
+		return
+	}
+	built := make([]*graph.Edge, 0, 1)
+	for i := range b.state.edges {
+		edge := &b.state.edges[i]
+		if edge.FromEntityID != u.matched || edge.Kind != graph.EdgeParent || edge.Status != graph.StatusApproved {
+			continue
+		}
+		if edge.Source != graph.SourceSite || edge.ToEntityID == parentID {
+			return
+		}
+		built = append(built, edge)
+	}
+	for _, edge := range built {
+		if slices.Contains(b.p.retired, edge.ID) {
+			continue
+		}
+		b.p.retired = append(b.p.retired, edge.ID)
+		b.p.report.Edges = append(b.p.report.Edges, PreviewEdge{
+			Sheet: b.p.sheetAt(u.at), From: b.nameOf(edge.FromEntityID), To: b.nameOf(edge.ToEntityID), Kind: string(graph.EdgeParent),
+			Action: string(ActionReplace),
+		})
+	}
+}
+
+func standing(edges []graph.Edge, retired []string) []graph.Edge {
+	if len(retired) == 0 {
+		return edges
+	}
+	return slices.DeleteFunc(slices.Clone(edges), func(edge graph.Edge) bool { return slices.Contains(retired, edge.ID) })
 }
 
 func (b *builder) planRelatedEdges(u *unit, seen map[string]struct{}) error {
@@ -194,7 +229,7 @@ func (b *builder) checkAcyclic() error {
 		}
 	}
 
-	g, err := graph.New(entities, slices.Concat(b.state.edges, b.p.edges))
+	g, err := graph.New(entities, slices.Concat(standing(b.state.edges, b.p.retired), b.p.edges))
 	if err != nil {
 		return err
 	}

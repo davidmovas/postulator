@@ -230,7 +230,7 @@ func (s siteState) after(p *plan, now time.Time) (siteState, error) {
 	}
 	pages, _ := fold(s.pages, written, func(page *pagemap.Page) string { return page.ID })
 
-	edges := slices.Concat(s.edges, p.edges)
+	edges := slices.Concat(standing(s.edges, p.retired), p.edges)
 	moved, err := graph.Settle(entities, edges)
 	for i := range moved {
 		at := entityAt[moved[i].ID]

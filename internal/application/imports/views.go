@@ -19,6 +19,7 @@ const (
 	ActionUpdate    Action = "update"
 	ActionSkip      Action = "skip"
 	ActionAmbiguous Action = "ambiguous"
+	ActionReplace   Action = "replace"
 )
 
 type FindingCode string

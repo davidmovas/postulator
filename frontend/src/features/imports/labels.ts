@@ -108,6 +108,8 @@ export function actionTone(action: string): Tone {
             return "ok";
         case "update":
             return "info";
+        case "replace":
+            return "warn";
         default:
             return "muted";
     }
