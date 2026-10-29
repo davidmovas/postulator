@@ -13,14 +13,14 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 )
 
-func capturedStores(t *testing.T, stand string) (*stores, string) {
+func capturedStores(t *testing.T, stand string) (s *stores, siteID string) {
 	t.Helper()
 
 	held, err := sitemodeltest.Read(stand)
 	if err != nil {
 		t.Fatalf("read the %s capture: %v", stand, err)
 	}
-	s := newStores(held.Site)
+	s = newStores(held.Site)
 	for i := range held.Pages {
 		s.pages[held.Pages[i].ID] = held.Pages[i]
 	}
