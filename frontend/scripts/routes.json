@@ -23,7 +23,12 @@
   {
     "name": "graph",
     "route": "#/s/:siteId/graph",
-    "wait": 1400
+    "wait": 1400,
+    "steps": [
+      {
+        "fits": "[role=toolbar][aria-label=\"Entity graph\"]"
+      }
+    ]
   },
   {
     "name": "graph-entity-card",
