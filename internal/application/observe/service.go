@@ -76,6 +76,8 @@ func (s *Service) Step(ctx context.Context, state State, readers Readers, batch 
 	case StageDerive:
 		err = s.derive(ctx, &state, readers)
 		done = true
+	case StageTopics:
+		done, err = s.topics(ctx, &state, batch)
 	case StageFields:
 		done, err = s.fields(ctx, &state, readers, batch)
 	case StageDone:
@@ -98,6 +100,7 @@ var stagePhrases = map[Stage]string{
 	StageStore:     "reading the store's products",
 	StageRender:    "visiting the site's pages",
 	StageDerive:    "deriving the page tree",
+	StageTopics:    "building the topical map from the breadcrumbs",
 	StageFields:    "reading the pages' custom fields",
 }
 
@@ -127,6 +130,8 @@ func nextStage(stage Stage) Stage {
 	case StageRender:
 		return StageDerive
 	case StageDerive:
+		return StageTopics
+	case StageTopics:
 		return StageFields
 	default:
 		return StageDone

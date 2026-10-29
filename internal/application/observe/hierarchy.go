@@ -9,16 +9,20 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
-func (s *Service) parentsDiffer(ctx context.Context, tracked *findings, siteID string, m siteModel, set pagetype.Set) error {
+func (s *Service) graph(ctx context.Context, siteID string) (graph.Graph, error) {
 	entities, err := s.deps.Entities.ListBySite(ctx, siteID)
 	if err != nil {
-		return err
+		return graph.Graph{}, err
 	}
 	edges, err := s.deps.Edges.ListBySite(ctx, siteID)
 	if err != nil {
-		return err
+		return graph.Graph{}, err
 	}
-	g, err := graph.New(entities, edges)
+	return graph.New(entities, edges)
+}
+
+func (s *Service) parentsDiffer(ctx context.Context, tracked *findings, siteID string, m siteModel, set pagetype.Set) error {
+	g, err := s.graph(ctx, siteID)
 	if err != nil {
 		return err
 	}

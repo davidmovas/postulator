@@ -155,6 +155,9 @@ func TestTheSitesBreadcrumbsBuildItsTopicalMap(t *testing.T) {
 	if words := byPage["tb"].Keywords; len(words) != 1 || words[0].Text != "tb-500" {
 		t.Errorf("the page's keywords = %v, want the page's own", words)
 	}
+	if parent := byPage["hub"].ParentName; parent != "Peptides" {
+		t.Errorf("the hub's parent is named %q, want the topic's name", parent)
+	}
 	for i := 1; i < len(plan.Writes); i++ {
 		if plan.Writes[i-1].Order >= plan.Writes[i].Order {
 			t.Errorf("the order keys do not rise: %q then %q", plan.Writes[i-1].Order, plan.Writes[i].Order)

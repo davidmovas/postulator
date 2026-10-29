@@ -28,6 +28,7 @@ type pageStore interface {
 	Insert(ctx context.Context, page pagemap.Page) error
 	Update(ctx context.Context, page pagemap.Page) error
 	UpdateDerived(ctx context.Context, page pagemap.Page) error
+	MapEntity(ctx context.Context, pageID, entityID string, at time.Time) (bool, error)
 	FollowObservedH1(ctx context.Context, pageID, was, now string, at time.Time) error
 	Classify(ctx context.Context, pageID string, was, now pagetype.Assignment, at time.Time) (bool, error)
 }
@@ -96,12 +97,21 @@ type mapRefresher interface {
 	Refresh(ctx context.Context, siteID string) error
 }
 
-type entityReader interface {
+type entityStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Entity, error)
+	Insert(ctx context.Context, entity graph.Entity) error
+	Delete(ctx context.Context, id string) error
+	SetCanonicalPage(ctx context.Context, id string, pageID *string, updatedAt time.Time) error
 }
 
-type edgeReader interface {
+type edgeStore interface {
 	ListBySite(ctx context.Context, siteID string) ([]graph.Edge, error)
+	Insert(ctx context.Context, edge graph.Edge) error
+}
+
+type topicStore interface {
+	Record(ctx context.Context, siteID, subject string, at time.Time) error
+	ListBySite(ctx context.Context, siteID string) ([]string, error)
 }
 
 type Deps struct {
@@ -115,8 +125,9 @@ type Deps struct {
 	Findings   findingStore
 	Types      typeSet
 	Maps       mapRefresher
-	Entities   entityReader
-	Edges      edgeReader
+	Entities   entityStore
+	Edges      edgeStore
+	Topics     topicStore
 	UnitOfWork unitOfWork
 	Publisher  application.Publisher
 	Clock      clock.Clock

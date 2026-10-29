@@ -38,6 +38,7 @@ type TopicNode struct {
 	PageID         string
 	Name           string
 	Parent         string
+	ParentName     string
 	ParentEntityID string
 	EntityID       string
 	EdgeMissing    bool
@@ -513,7 +514,7 @@ func (b *topicBuild) plan() TopicPlan {
 			Order: fmt.Sprintf("%06d\x00%s\x00%s", d.depth, d.sortKey(), d.subject),
 		}
 		if parent := b.drafts[d.parent]; parent != nil {
-			node.ParentEntityID = parent.entityID
+			node.ParentEntityID, node.ParentName = parent.entityID, parent.name
 		}
 		if d.page != nil {
 			node.PageID = d.page.ID

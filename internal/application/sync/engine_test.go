@@ -236,7 +236,7 @@ func syncedThroughTheEngine(t *testing.T, server *wptest.Server, batch int) []pa
 		Sites: siteRepo, Pages: pageRepo, Identity: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store),
 		Bodies: sqlite.NewPageBodyRepo(store), Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo,
 		Findings: sqlite.NewFindingRepo(store), UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},
-		Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store),
+		Entities: sqlite.NewEntityRepo(store), Edges: sqlite.NewEdgeRepo(store), Topics: sqlite.NewTopicBuildRepo(store),
 		Types: pagetypes.New(pagetypes.Deps{
 			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store), Pages: pageRepo,
 			Templates: sqlite.NewTemplateRepo(store), Sites: siteRepo, UnitOfWork: store, Publisher: silentBus{}, Clock: clock.System{},

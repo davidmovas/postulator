@@ -56,6 +56,7 @@ func catalog() []vocabulary {
 		{export: "proposalClashes", tsType: "ProposalClash", pkg: "internal/domain/contextpack", typeName: "ProposalClash"},
 		{export: "parentWhyReasons", tsType: "ParentWhyReason", pkg: "internal/domain/contextpack", typeName: "WhyReason"},
 		{export: "adoptionSkips", tsType: "AdoptionSkip", pkg: "internal/domain/contextpack", typeName: "AdoptionSkip"},
+		{export: "topicSkips", tsType: "TopicSkip", pkg: "internal/domain/contextpack", typeName: "TopicSkip"},
 		{export: "proposalSources", tsType: "ProposalSource", pkg: "internal/application/graph", typeName: "ProposalSource"},
 		{export: "blockKinds", tsType: "BlockKind", pkg: "internal/domain/block", typeName: "BlockKind"},
 		{export: "bodyKinds", tsType: "BodyKind", pkg: "internal/domain/block", typeName: "Kind"},
