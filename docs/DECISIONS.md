@@ -6041,3 +6041,32 @@ Home entity; and `/cart/` is typed as a hub, in scope for generation. Plan:
 - **Links and the export needed no code**: a mapped term's entity has its canonical page, so a
   product's owed link up is its category; the export writes `entity` and `parent_entity` for every
   page that carries one, a twin's row included. Tests pin both.
+
+## 2026-10-30 — 2.10.1: products come in through the plugin
+
+The owner installed 2.10.0 at the client's, synced, then deleted the site and added it again: not one
+product page, and no word of why, while `/cart/` was typed rightly. He held the code to blame.
+
+### What the stands showed
+
+- **No product page is possible when both of the walk's ways in are shut.** With the plugin, the walk's
+  post types came from WordPress's `/wp/v2/types` (`observe.observedTypes`), which lists only the
+  types shown in REST, filtered by the plugin's own list; products otherwise came through `wc/v3`,
+  read only when the site's store is `ready`. On the replica, with a mu-plugin hiding `product` from
+  REST and WooCommerce answering 403 `woocommerce_rest_cannot_view`, a fresh site got 0 product pages
+  on v2.9.0 and on v2.10.0 alike (a worktree at the tag, the same diagnostic): the gap predates 2.10.
+- **Each way alone suffices**: with `product` hidden but the store ready, the five products came
+  through the store; with REST showing it, through the plugin.
+- **The client's workbook plans no product**, so the product pages 2.9.0 showed came from an earlier
+  record of the site, whose store state a later probe's error had left `ready`
+  (`wp.Client.CommerceOr` keeps the known state on an error); a site added again has none to keep.
+  Not confirmed on the client's site: its `/wp/v2/types` and the Sites panel's store line were asked
+  for and not given.
+
+### The ruling
+
+- **With the plugin, the walk reads every post type the plugin serves** (its public types but
+  attachments and variations), adding to WordPress's list those REST does not show; products then
+  come in through `/content` whatever WooCommerce answers, and their store fields still need `wc/v3`.
+- **Proposed, not built**: a message on the run screen when the store cannot be read, with the site's
+  answer, so a site with neither way open says why.
