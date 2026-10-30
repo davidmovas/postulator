@@ -4,11 +4,10 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.8.1` on 2026-10-29 (PR #35 merged, tagged; a shift-click ticks a range in the
-page picker, notes under **Release 2.8.1**). **2.9.0** (phase 20, the topical map from the
-breadcrumbs) is in the open pull request #36. **2.10.0 is built on `dev`** (2026-10-30, phase 21):
+**Released:** `v2.9.0` on 2026-10-29 (PR #36 merged, tagged; the topical map from the
+breadcrumbs, notes under **Release 2.9.0**). **2.10.0 is built on `dev`** (2026-10-30, phase 21):
 store categories, products and the front page in the topical map, `/cart/` typed technical; its notes
-are under **Release 2.10.0**.
+are under **Release 2.10.0**, and its pull request is open.
 
 ## Next, in order
 
@@ -17,8 +16,9 @@ are under **Release 2.10.0**.
    observation now proving every store page and the front page carry an entity, the twins their
    hub's, `/cart/` Technical and the export's product rows; its noindex Uncategorized is no longer
    technical. `e2e:full` on both stands is owed before the pull request. The stands are down.
-2. **The pull request from `dev` to `master`** carries 2.9.0 and 2.10.0 when the owner asks; he
-   merges it and tags. 2.10.0 adds migration 0090; the plugin stays 1.5.2.
+2. **The pull request from `dev` to `master` for 2.10.0 is open**; the owner merges it and tags
+   `v2.10.0`, whose workflow builds the installer, the executable and the plugin zip. 2.10.0 adds
+   migration 0090; the plugin stays 1.5.2.
 3. **The client installs it and syncs once**: his store categories carry their entities, his products
    hang under them, the front page is Home, and `/cart/` is Technical. If his products still carry no
    entity, the checklist under **Release 2.10.0** says what to look at on his site.
