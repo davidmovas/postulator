@@ -60,12 +60,12 @@ func TestTheFirstObservationTypesEveryPageByTheSitesRules(t *testing.T) {
 		rule   int
 	}{
 		"/account/":                   {pagetype.Technical, 1},
-		"/product/bpc-157-peptide/":   {pagetype.Product, 2},
-		"/product-category/peptides/": {pagetype.StoreCategory, 3},
-		"/shop/":                      {pagetype.Catalog, 4},
-		"/":                           {pagetype.Landing, 5},
-		"/peptides/":                  {pagetype.Landing, 6},
-		"/tb-500/":                    {pagetype.Category, 7},
+		"/product/bpc-157-peptide/":   {pagetype.Product, 3},
+		"/product-category/peptides/": {pagetype.StoreCategory, 4},
+		"/shop/":                      {pagetype.Catalog, 5},
+		"/":                           {pagetype.Landing, 6},
+		"/peptides/":                  {pagetype.Landing, 7},
+		"/tb-500/":                    {pagetype.Category, 8},
 	}
 	for path, expected := range want {
 		preset, source, reason := s.typeOf(t, path)
@@ -92,7 +92,7 @@ func TestARegularPageWaitsForItsRenderBeforeItIsTyped(t *testing.T) {
 	delete(s.visitor.failed, baseURL+"/peptides/")
 	s.clock.Set(start.Add(time.Hour))
 	s.run(t, observe.Options{Full: true, RenderRescan: true})
-	if preset, _, reason := s.typeOf(t, "/peptides/"); preset != pagetype.Landing || reason != pagemap.TypeByRule || s.ruleOf(t, "/peptides/") != 6 {
+	if preset, _, reason := s.typeOf(t, "/peptides/"); preset != pagetype.Landing || reason != pagemap.TypeByRule || s.ruleOf(t, "/peptides/") != 7 {
 		t.Errorf("the hub once rendered = %s %s, want Landing by its listing at the top level", preset, reason)
 	}
 }
@@ -124,12 +124,12 @@ func TestAPageTheRulesPlacedFollowsThemAndAPersonsOrAnOlderTypeStays(t *testing.
 		t.Errorf("type_by_default on a page no rule matched = %+v, want it open for the client to review", held)
 	}
 
-	s.stores.types.changeRule(siteID, 10, func(rule *pagetype.Rule) {
+	s.stores.types.changeRule(siteID, 11, func(rule *pagetype.Rule) {
 		rule.Conditions.URLs = append(rule.Conditions.URLs, pagetype.URLMatch{Mode: pagetype.URLSegment, Value: "tb"})
 	})
 	s.clock.Set(start.Add(2 * time.Hour))
 	s.run(t, observe.Options{Full: true})
-	if preset, _, reason := s.typeOf(t, "/tb-500/"); preset != pagetype.Guide || reason != pagemap.TypeByRule || s.ruleOf(t, "/tb-500/") != 10 {
+	if preset, _, reason := s.typeOf(t, "/tb-500/"); preset != pagetype.Guide || reason != pagemap.TypeByRule || s.ruleOf(t, "/tb-500/") != 11 {
 		t.Errorf("tb-500 after its rule changed = %s %s by rule %d, want the next sync to follow the rule", preset, reason, s.ruleOf(t, "/tb-500/"))
 	}
 	if held, _ := s.finding(finding.TypeByDefault, finding.SubjectPage(tb500.ID)); held.Status == finding.Open {

@@ -117,8 +117,8 @@ func TestEveryDefaultRuleIsValidAndPointsAtTheSitesOwnType(t *testing.T) {
 	for name, types := range map[string][]pagetype.Type{"a 2.6 site": fresh("s1"), "an upgraded site": append(legacy("s1"), fresh("s1")[:4]...)} {
 		set := pagetype.NewSet(types, nil)
 		rules := pagetype.DefaultRules(set, "s1", stamp, ids())
-		if len(rules) != 15 {
-			t.Fatalf("%s: %d default rules, want fourteen and the fallback", name, len(rules))
+		if len(rules) != 16 {
+			t.Fatalf("%s: %d default rules, want fifteen and the fallback", name, len(rules))
 		}
 		for i := range rules {
 			if err := rules[i].Validate(set); err != nil {
@@ -131,7 +131,7 @@ func TestEveryDefaultRuleIsValidAndPointsAtTheSitesOwnType(t *testing.T) {
 		if last := rules[len(rules)-1]; last.Kind != pagetype.KindFallback || last.TypeID != "s1-info" {
 			t.Errorf("%s: the last rule = %+v, want the fallback to Info", name, last)
 		}
-		if under := rules[10].Conditions.Ancestor; under == nil || under.TypeID != "s1-guide" {
+		if under := rules[11].Conditions.Ancestor; under == nil || under.TypeID != "s1-guide" {
 			t.Errorf("%s: under a guide names %+v, want the site's Guide type", name, under)
 		}
 	}
@@ -140,8 +140,8 @@ func TestEveryDefaultRuleIsValidAndPointsAtTheSitesOwnType(t *testing.T) {
 	renamed[0].Name = "Category"
 	upgraded := slices.Concat(renamed, []pagetype.Type{fresh("s1")[0], fresh("s1")[2], fresh("s1")[3]})
 	rules := pagetype.DefaultRules(pagetype.NewSet(upgraded, nil), "s1", stamp, ids())
-	if rules[6].TypeID != "s1-hub" {
-		t.Errorf("the category rule on a site whose Hub the client renamed Category = %s, want that hub", rules[6].TypeID)
+	if rules[7].TypeID != "s1-hub" {
+		t.Errorf("the category rule on a site whose Hub the client renamed Category = %s, want that hub", rules[7].TypeID)
 	}
 }
 
