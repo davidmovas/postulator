@@ -491,7 +491,7 @@ func TestAWritablePageOnTheSiteNoEntityCarriesNeedsOne(t *testing.T) {
 		"a product":           {onSite("/product/bpc/", pagemap.WPProduct, nil), true},
 		"a client's own type": {onSite("/pillar/", pagemap.WPPage, typed("s1-pillar")), true},
 		"a mapped page":       {onSite("/bpc/", pagemap.WPPage, func(p *pagemap.Page) { p.EntityID = new("e1") }), false},
-		"the root":            {onSite(pagemap.RootPath, pagemap.WPPage, nil), false},
+		"the front page":      {onSite(pagemap.RootPath, pagemap.WPPage, typed("s1-landing")), true},
 		"a store category":    {onSite("/product-category/peptides/", pagemap.WPProductCategory, nil), false},
 		"a catalog":           {onSite("/shop/", pagemap.WPPage, typed("s1-catalog")), false},
 		"a technical page":    {onSite("/cart/", pagemap.WPPage, func(p *pagemap.Page) { p.TechnicalReason = pagemap.TechnicalCart }), false},

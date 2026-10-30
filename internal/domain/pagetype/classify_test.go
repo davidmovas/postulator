@@ -82,9 +82,12 @@ func TestTheDefaultRulesTypeEveryKindOfPage(t *testing.T) {
 	ruleAt := func(position int) string { return rules[position-1].ID }
 	pages := []pagetype.Facts{
 		aPage("/", 0, front(), lists(4)),
-		aPage("/cart/", 1, technical(pagemap.TechnicalCart)),
+		aPage("/checkout/", 1, technical(pagemap.TechnicalCheckout)),
+		aPage("/cart/", 1, lists(6)),
+		aPage("/my-account/", 1),
 		aPage("/hidden-product/", 2, wp(pagemap.WPProduct), technical(pagemap.TechnicalNoindex)),
 		aPage("/product/bpc/", 2, wp(pagemap.WPProduct)),
+		aPage("/product/cart/", 2, wp(pagemap.WPProduct)),
 		aPage("/product-category/peptides/", 1, wp(pagemap.WPProductCategory)),
 		aPage("/shop/", 1, technical(pagemap.TechnicalShop)),
 		aPage("/peptides/", 1, lists(6)),
@@ -105,23 +108,26 @@ func TestTheDefaultRulesTypeEveryKindOfPage(t *testing.T) {
 		typeID string
 		rule   int
 	}{
-		"/":                           {"s1-landing", 5},
-		"/cart/":                      {"s1-technical", 1},
-		"/hidden-product/":            {"s1-product", 2},
-		"/product/bpc/":               {"s1-product", 2},
-		"/product-category/peptides/": {"s1-store_category", 3},
-		"/shop/":                      {"s1-catalog", 4},
-		"/peptides/":                  {"s1-landing", 6},
-		"/healing-peptides/":          {"s1-category", 7},
-		"/hello-world/":               {"s1-guide", 8},
-		"/storage/":                   {"s1-guide", 9},
-		"/lab-guides/":                {"s1-guide", 10},
-		"/how-to-reconstitute-bpc/":   {"s1-guide", 10},
-		"/reconstitution/":            {"s1-guide", 11},
-		"/our-company/":               {"s1-info", 12},
-		"/about-us/":                  {"s1-info", 13},
-		"/peptide-storage-explained/": {"s1-guide", 14},
-		"/listing-notes/":             {"s1-category", 7},
+		"/":                           {"s1-landing", 6},
+		"/checkout/":                  {"s1-technical", 1},
+		"/cart/":                      {"s1-technical", 2},
+		"/my-account/":                {"s1-technical", 2},
+		"/hidden-product/":            {"s1-product", 3},
+		"/product/bpc/":               {"s1-product", 3},
+		"/product/cart/":              {"s1-product", 3},
+		"/product-category/peptides/": {"s1-store_category", 4},
+		"/shop/":                      {"s1-catalog", 5},
+		"/peptides/":                  {"s1-landing", 7},
+		"/healing-peptides/":          {"s1-category", 8},
+		"/hello-world/":               {"s1-guide", 9},
+		"/storage/":                   {"s1-guide", 10},
+		"/lab-guides/":                {"s1-guide", 11},
+		"/how-to-reconstitute-bpc/":   {"s1-guide", 11},
+		"/reconstitution/":            {"s1-guide", 12},
+		"/our-company/":               {"s1-info", 13},
+		"/about-us/":                  {"s1-info", 14},
+		"/peptide-storage-explained/": {"s1-guide", 15},
+		"/listing-notes/":             {"s1-category", 8},
 		"/sample-page/":               {"s1-info", 0},
 		"/short-with-sections/":       {"s1-info", 0},
 	}
@@ -163,7 +169,7 @@ func TestAPageWithoutARenderWaitsAtTheFirstRuleThatNeedsOne(t *testing.T) {
 		t.Errorf("a page under a page that waits = %+v, want it waiting when a rule asks for the page above's type", child)
 	}
 
-	explained := c.Explain(rules[5], "/new/", pages, pagetype.ModeWalk)
+	explained := c.Explain(rules[6], "/new/", pages, pagetype.ModeWalk)
 	if explained.Verdict != pagetype.VerdictWaiting || !slices.Equal(explained.Conditions, []pagetype.ConditionResult{
 		{Condition: pagetype.ConditionLevel, Verdict: pagetype.VerdictMet},
 		{Condition: pagetype.ConditionListing, Verdict: pagetype.VerdictWaiting},
@@ -180,19 +186,19 @@ func TestTheFirstRuleThatMatchesWinsAndADisabledOneIsSkipped(t *testing.T) {
 	post := aPage("/hello-world/", 1, wp(pagemap.WPPost), schema("Article"))
 
 	got := byPage(pagetype.NewClassifier(rules, set).Classify([]pagetype.Facts{post}, pagetype.ModeWalk))
-	if got["/hello-world/"].RuleID != rules[7].ID {
+	if got["/hello-world/"].RuleID != rules[8].ID {
 		t.Fatalf("a post with an Article schema = %+v, want the blog-post rule that comes first", got["/hello-world/"])
 	}
-	rules[7].Enabled = false
+	rules[8].Enabled = false
 	got = byPage(pagetype.NewClassifier(rules, set).Classify([]pagetype.Facts{post}, pagetype.ModeWalk))
-	if got["/hello-world/"].RuleID != rules[8].ID {
+	if got["/hello-world/"].RuleID != rules[9].ID {
 		t.Fatalf("with the blog-post rule off = %+v, want the schema rule after it", got["/hello-world/"])
 	}
 
-	rules[7].Enabled = true
-	rules[7].Position, rules[8].Position = rules[8].Position, rules[7].Position
+	rules[8].Enabled = true
+	rules[8].Position, rules[9].Position = rules[9].Position, rules[8].Position
 	got = byPage(pagetype.NewClassifier(rules, set).Classify([]pagetype.Facts{post}, pagetype.ModeWalk))
-	if got["/hello-world/"].RuleID != rules[8].ID {
+	if got["/hello-world/"].RuleID != rules[9].ID {
 		t.Fatalf("with the two rules swapped = %+v, want the one now first", got["/hello-world/"])
 	}
 }
@@ -222,7 +228,7 @@ func TestARuleNeverGivesAProductOrATermARoleItCannotHold(t *testing.T) {
 	if product := got["/items/cup/"]; product.TypeID != "s1-product" || product.RuleID != "items" {
 		t.Errorf("a product = %+v, want the product rule", product)
 	}
-	if term := got["/product-category/cups/"]; term.TypeID != "s1-store_category" || term.RuleID != rules[2].ID {
+	if term := got["/product-category/cups/"]; term.TypeID != "s1-store_category" || term.RuleID != rules[3].ID {
 		t.Errorf("a term = %+v, want the store category rule, never the catch-all guide", term)
 	}
 }
@@ -235,7 +241,7 @@ func TestAPersonsTypeIsKeptAndATypeFromBefore26MovesOnlyInThePreview(t *testing.
 		aPage("/about-us/", 1, typed("s1-catalog", pagemap.TypeSourceManual, pagemap.TypeByUser, "")),
 		aPage("/imported/", 1, typed("s1-hub", pagemap.TypeSourceManual, pagemap.TypeByImport, "")),
 		aPage("/lab-guides/", 1, typed("s1-entity", pagemap.TypeSourceAuto, pagemap.TypeByDefault, "")),
-		aPage("/reconstitution/", 2, under("/lab-guides/"), typed("s1-guide", pagemap.TypeSourceAuto, pagemap.TypeByRule, rules[10].ID)),
+		aPage("/reconstitution/", 2, under("/lab-guides/"), typed("s1-guide", pagemap.TypeSourceAuto, pagemap.TypeByRule, rules[11].ID)),
 		aPage("/new-page/", 2, under("/lab-guides/")),
 		aPage("/learn/", 1, typed("s1-info", pagemap.TypeSourceAuto, pagemap.TypeByUnmatched, "")),
 	}
@@ -246,7 +252,7 @@ func TestAPersonsTypeIsKeptAndATypeFromBefore26MovesOnlyInThePreview(t *testing.
 			t.Errorf("the walk moved %s: %+v", path, outcome)
 		}
 	}
-	if learn := walk["/learn/"]; !learn.Changed() || learn.TypeID != "s1-guide" || learn.RuleID != rules[9].ID {
+	if learn := walk["/learn/"]; !learn.Changed() || learn.TypeID != "s1-guide" || learn.RuleID != rules[10].ID {
 		t.Errorf("a page the rules placed = %+v, want the walk to keep it in line with the rules", learn)
 	}
 	if moved := walk["/reconstitution/"]; moved.TypeID != "s1-info" || moved.Reason != pagemap.TypeByUnmatched {
@@ -314,10 +320,10 @@ func TestARuleSaysWhichPagesItMatches(t *testing.T) {
 
 	c, rules := classifier(t, fresh("s1"))
 	pages := []pagetype.Facts{aPage("/about-us/", 1), aPage("/contact/", 1), aPage("/peptides/", 1, lists(4))}
-	if got := c.Matches(rules[12], pages, pagetype.ModeWalk); !slices.Equal(got, []string{"/about-us/", "/contact/"}) {
+	if got := c.Matches(rules[13], pages, pagetype.ModeWalk); !slices.Equal(got, []string{"/about-us/", "/contact/"}) {
 		t.Errorf("the slug rule matches %v", got)
 	}
-	explained := c.Explain(rules[12], "/peptides/", pages, pagetype.ModeWalk)
+	explained := c.Explain(rules[13], "/peptides/", pages, pagetype.ModeWalk)
 	if explained.Verdict != pagetype.VerdictUnmet || explained.Outcome.TypeID != "s1-landing" {
 		t.Errorf("Explain on another page = %+v, want the slug unmet and the page's own outcome", explained)
 	}

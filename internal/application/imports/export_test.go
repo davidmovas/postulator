@@ -8,12 +8,17 @@ import (
 	"testing"
 
 	"github.com/davidmovas/postulator/internal/adapters/importer"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite"
+	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
 	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/importmap"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
+	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
 const richSheet = "path,title,h1,primary keyword,keywords,anchors,entity,page type,parent,related,meta title,meta description,post type\n" +
@@ -315,6 +320,87 @@ func TestTheExportWritesThePageTypeByName(t *testing.T) {
 	want := map[string]string{"/hub/#Hub": "Collection", "/plain/#Plain": "", "#Loose": ""}
 	if !maps.Equal(cells, want) {
 		t.Fatalf("the exported page types = %v, want %v", cells, want)
+	}
+}
+
+func TestTheExportWritesAStorePagesEntityAndItsParent(t *testing.T) {
+	t.Parallel()
+
+	h := newHarness(t)
+	pages, entities, edges := sqlite.NewPageRepo(h.store), sqlite.NewEntityRepo(h.store), sqlite.NewEdgeRepo(h.store)
+	at := sqlitetest.Stamp
+	page := func(path string, wpType pagemap.WPType, wpID int64) pagemap.Page {
+		t.Helper()
+		record := pagemap.Page{
+			ID: id.New(), SiteID: h.siteID, Path: path, Slug: pagemap.Slug(path), WPType: wpType, WPID: &wpID, ParentReason: pagemap.ParentNone,
+			Title: path, Keywords: keyword.Of(), Notes: []note.Note{}, Status: pagemap.StatusPublished, CreatedAt: at, UpdatedAt: at,
+		}
+		if err := pages.Insert(t.Context(), record); err != nil {
+			t.Fatalf("insert %s: %v", path, err)
+		}
+		return record
+	}
+	entity := func(name string, scope, canonical *pagemap.Page) graph.Entity {
+		t.Helper()
+		record := graph.Entity{ID: id.New(), SiteID: h.siteID, Name: name, Keywords: keyword.Of(name), Source: graph.SourceSite, CreatedAt: at, UpdatedAt: at}
+		if canonical != nil {
+			record.CanonicalPageID = &canonical.ID
+		}
+		if scope != nil {
+			record.ScopeID = scope.EntityID
+		}
+		if err := entities.Insert(t.Context(), record); err != nil {
+			t.Fatalf("insert %s: %v", name, err)
+		}
+		if scope != nil {
+			if err := edges.Insert(t.Context(), graph.Edge{
+				ID: id.New(), SiteID: h.siteID, FromEntityID: record.ID, ToEntityID: *scope.EntityID, Kind: graph.EdgeParent, Weight: 1,
+				Source: graph.SourceSite, Status: graph.StatusApproved, CreatedAt: at,
+			}); err != nil {
+				t.Fatalf("insert the edge of %s: %v", name, err)
+			}
+		}
+		return record
+	}
+	carry := func(held *pagemap.Page, e graph.Entity) {
+		t.Helper()
+		if mapped, err := pages.MapEntity(t.Context(), held.ID, e.ID, at); err != nil || !mapped {
+			t.Fatalf("map %s: %v %v", held.Path, mapped, err)
+		}
+		held.EntityID = &e.ID
+	}
+
+	hub, twin := page("/peptides/", pagemap.WPPage, 2), page("/product-category/peptides/", pagemap.WPProductCategory, 20)
+	category, product := page("/product-category/peptides/healing/", pagemap.WPProductCategory, 21), page("/product/bpc-157/", pagemap.WPProduct, 10)
+	peptides := entity("Peptides", nil, &hub)
+	carry(&hub, peptides)
+	carry(&twin, peptides)
+	healing := entity("Healing Peptides", &hub, &category)
+	carry(&category, healing)
+	carry(&product, entity("BPC-157 Peptide", &category, &product))
+
+	exported := filepath.Join(h.dir, "export.xlsx")
+	if _, err := h.service.Export(t.Context(), imports.ExportRequest{SiteID: h.siteID, Path: exported}); err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	table, err := importer.Read(t.Context(), exported, importer.ReadOptions{})
+	if err != nil {
+		t.Fatalf("Read the export: %v", err)
+	}
+	binding, err := importmap.AutoDetect(table.Headers).Bind(table.Headers)
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	got := make(map[string]string, len(table.Rows))
+	for _, row := range table.Rows {
+		got[binding.Text(row, importmap.FieldPath)] = binding.Text(row, importmap.FieldEntity) + " < " + binding.Text(row, importmap.FieldParentEntity)
+	}
+	want := map[string]string{
+		"/peptides/": "Peptides < ", "/product-category/peptides/": "Peptides < ",
+		"/product-category/peptides/healing/": "Healing Peptides < Peptides", "/product/bpc-157/": "BPC-157 Peptide < Healing Peptides",
+	}
+	if !maps.Equal(got, want) {
+		t.Fatalf("the exported entities = %v, want the product under its store category and the twin with its hub's", got)
 	}
 }
 

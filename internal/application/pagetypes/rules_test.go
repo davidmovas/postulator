@@ -34,8 +34,8 @@ func TestANewSiteGetsTheDefaultRulesAndTheFallback(t *testing.T) {
 	h := newHarness(t)
 
 	listed := h.rules(t, h.siteID)
-	if len(listed.Rules) != 14 || !slices.Equal(numbers(listed.Rules), []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}) {
-		t.Fatalf("the rules = %v, want fourteen numbered in order", numbers(listed.Rules))
+	if len(listed.Rules) != 15 || !slices.Equal(numbers(listed.Rules), []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}) {
+		t.Fatalf("the rules = %v, want fifteen numbered in order", numbers(listed.Rules))
 	}
 	info := h.typeOf(t, h.siteID, pagetype.Info)
 	if listed.Fallback == nil || listed.Fallback.TypeID != info.ID || listed.Fallback.Kind != string(pagetype.KindFallback) {
@@ -45,8 +45,12 @@ func TestANewSiteGetsTheDefaultRulesAndTheFallback(t *testing.T) {
 		t.Errorf("the first rule = %+v, want technical pages to Technical", first)
 	}
 	guide := h.typeOf(t, h.siteID, pagetype.Guide)
-	if under := listed.Rules[10].Conditions.Ancestor; under == nil || under.TypeID != guide.ID {
-		t.Errorf("rule 11 = %+v, want it under the site's own Guide", listed.Rules[10])
+	if under := listed.Rules[11].Conditions.Ancestor; under == nil || under.TypeID != guide.ID {
+		t.Errorf("rule 12 = %+v, want it under the site's own Guide", listed.Rules[11])
+	}
+	technical := h.typeOf(t, h.siteID, pagetype.Technical)
+	if slugs := listed.Rules[1]; slugs.TypeID != technical.ID || !slices.Equal(slugs.Conditions.Slugs, pagetype.TechnicalSlugs()) {
+		t.Errorf("rule 2 = %+v, want the cart, the checkout and the account by their address to Technical", slugs)
 	}
 }
 
@@ -62,7 +66,7 @@ func TestARuleIsAddedEditedMovedAndRemoved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SaveRule: %v", err)
 	}
-	if added.Number != 15 || added.Name != "Research notes" || added.Conditions.URLs[0].Value != "/research/" {
+	if added.Number != 16 || added.Name != "Research notes" || added.Conditions.URLs[0].Value != "/research/" {
 		t.Fatalf("the added rule = %+v, want it last, trimmed and its address normalized", added)
 	}
 	listed := h.rules(t, h.siteID)
@@ -87,7 +91,7 @@ func TestARuleIsAddedEditedMovedAndRemoved(t *testing.T) {
 	edited, err := h.service.SaveRule(t.Context(), pagetypes.SaveRuleRequest{
 		ID: added.ID, SiteID: h.siteID, Name: added.Name, Enabled: added.Enabled, TypeID: added.TypeID, Conditions: added.Conditions,
 	})
-	if err != nil || edited.Name != "Research" || edited.Enabled || edited.Number != 15 {
+	if err != nil || edited.Name != "Research" || edited.Enabled || edited.Number != 16 {
 		t.Fatalf("the edited rule = %+v %v", edited, err)
 	}
 
@@ -96,7 +100,7 @@ func TestARuleIsAddedEditedMovedAndRemoved(t *testing.T) {
 		order = append(order, rule.ID)
 	}
 	moved, err := h.service.ReorderRules(t.Context(), pagetypes.ReorderRulesRequest{SiteID: h.siteID, RuleIDs: order})
-	if err != nil || moved.Rules[0].ID != added.ID || moved.Rules[14].ID != listed.Rules[0].ID {
+	if err != nil || moved.Rules[0].ID != added.ID || moved.Rules[15].ID != listed.Rules[0].ID {
 		t.Fatalf("the reversed rules = %+v %v", numbers(moved.Rules), err)
 	}
 	if _, err = h.service.ReorderRules(t.Context(), pagetypes.ReorderRulesRequest{SiteID: h.siteID, RuleIDs: order[1:]}); !errors.IsCode(err, errors.Invalid) {
@@ -107,7 +111,7 @@ func TestARuleIsAddedEditedMovedAndRemoved(t *testing.T) {
 		t.Fatalf("DeleteRule: %v", err)
 	}
 	after := h.rules(t, h.siteID)
-	if len(after.Rules) != 14 || !slices.Equal(numbers(after.Rules), []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}) {
+	if len(after.Rules) != 15 || !slices.Equal(numbers(after.Rules), []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}) {
 		t.Fatalf("after the delete = %v, want the others renumbered", numbers(after.Rules))
 	}
 	if _, err = h.service.DeleteRule(t.Context(), pagetypes.DeleteRuleRequest{ID: after.Fallback.ID}); !errors.IsCode(err, errors.Invalid) {
@@ -145,7 +149,7 @@ func TestEachRuleCountsThePagesItPlacedAndTheListCountsThoseTypedBeforeTheRules(
 	t.Parallel()
 	h := newHarness(t)
 	listed := h.rules(t, h.siteID)
-	posts := listed.Rules[7]
+	posts := listed.Rules[8]
 	guide, info, landing := h.typeOf(t, h.siteID, pagetype.Guide), h.typeOf(t, h.siteID, pagetype.Info), h.typeOf(t, h.siteID, pagetype.Landing)
 	repo := sqlite.NewPageRepo(h.store)
 	typed := func(path, typeID string, source pagemap.TypeSource, reason pagemap.TypeReason, ruleID string, status pagemap.Status) {
@@ -206,8 +210,8 @@ func TestDeletingATypeMovesItsRulesToTheTypeItsPagesMoveTo(t *testing.T) {
 			t.Errorf("rule %d still gives the deleted Guide", listed.Rules[i].Number)
 		}
 	}
-	if under := listed.Rules[10].Conditions.Ancestor; under == nil || under.TypeID != info.ID {
-		t.Errorf("the rule under a guide = %+v, want it under the type the guides moved to", listed.Rules[10])
+	if under := listed.Rules[11].Conditions.Ancestor; under == nil || under.TypeID != info.ID {
+		t.Errorf("the rule under a guide = %+v, want it under the type the guides moved to", listed.Rules[11])
 	}
 
 	notes, err := h.service.Create(t.Context(), pagetypes.CreateRequest{SiteID: h.siteID, Name: "Notes", Preset: string(pagetype.Guide)})

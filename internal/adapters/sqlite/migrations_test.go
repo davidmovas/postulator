@@ -19,7 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 89
+const latestMigration = 90
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -111,6 +111,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0087_runs_skipped.sql",
 		"0088_entity_source_site.sql",
 		"0089_topic_builds.sql",
+		"0090_technical_slugs_rule.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1787,8 +1788,8 @@ func TestTheMigrationSeedsTheRulesTheApplicationSeeds(t *testing.T) {
 		pagetype.Landing, pagetype.Guide, pagetype.Info,
 	}, map[pagetype.Preset]string{pagetype.Hub: "Category"})
 
-	if _, err = provider.UpTo(t.Context(), 77); err != nil {
-		t.Fatalf("up to 77: %v", err)
+	if _, err = provider.UpTo(t.Context(), 90); err != nil {
+		t.Fatalf("up to 90: %v", err)
 	}
 
 	typesRepo, rulesRepo := NewPageTypeRepo(store), NewPageTypeRuleRepo(store)
@@ -1816,7 +1817,7 @@ func TestTheMigrationSeedsTheRulesTheApplicationSeeds(t *testing.T) {
 		}
 	}
 	renamedHub := rowsOf(t, store, `SELECT id FROM page_types WHERE site_id = 'renamed' AND name = 'Category'`)
-	if got := rowsOf(t, store, `SELECT page_type_id FROM page_type_rules WHERE site_id = 'renamed' AND position = 7`); !slices.Equal(got, renamedHub) {
+	if got := rowsOf(t, store, `SELECT page_type_id FROM page_type_rules WHERE site_id = 'renamed' AND position = 8`); !slices.Equal(got, renamedHub) {
 		t.Errorf("the category rule on the renamed site gives %v, want the client's Category %v", got, renamedHub)
 	}
 	if got := rowsOf(t, store, `SELECT count(*) FROM page_type_rules WHERE site_id = 'bare'`); !slices.Equal(got, []string{"0"}) {
@@ -2015,6 +2016,69 @@ func TestTheTypeNamedEntityBecomesArticleSoItIsNotTakenForTheGraph(t *testing.T)
 		"s1-entity | Entity", "s1-hub | Hub", "s2-article | Article", "s2-entity | Entity", "s3-entity | Entity",
 	}) {
 		t.Fatalf("the down left the types as %v", got)
+	}
+	if _, err = provider.Up(t.Context()); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+}
+
+func TestTheTechnicalSlugsRuleComesSecondOnEverySiteWithATechnicalType(t *testing.T) {
+	t.Parallel()
+
+	store := storeAt(t, 89)
+	provider, err := store.provider()
+	if err != nil {
+		t.Fatalf("provider: %v", err)
+	}
+	must := func(query string, args ...any) {
+		t.Helper()
+		if _, execErr := store.writer.ExecContext(t.Context(), query, args...); execErr != nil {
+			t.Fatalf("%s: %v", query, execErr)
+		}
+	}
+	const (
+		at         = "2026-10-30T08:00:00Z"
+		insertType = `INSERT INTO page_types (id, site_id, name, preset, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+		insertRule = `INSERT INTO page_type_rules (id, site_id, kind, position, name, enabled, page_type_id, conditions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)`
+	)
+	for _, site := range []string{"s1", "s2"} {
+		must(`INSERT INTO sites (id, name, base_url, secret_ref, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+			site, site, "https://"+site, "site:"+site+":wp_password", at, at)
+	}
+	must(insertType, "s1-technical", "s1", "Utility", "technical", at, at)
+	must(insertType, "s1-product", "s1", "Product", "product", at, at)
+	must(insertType, "s1-info", "s1", "Info", "info", at, at)
+	must(insertType, "s2-info", "s2", "Info", "info", at, at)
+	must(insertRule, "r1", "s1", "rule", 1, "Technical pages", 1, "s1-technical", at, at)
+	must(insertRule, "r2", "s1", "rule", 2, "Products", 1, "s1-product", at, at)
+	must(insertRule, "r3", "s1", "rule", 3, "The client's own, turned off", 0, "s1-info", at, at)
+	must(insertRule, "r4", "s1", "fallback", 4, "Anything no rule matched", 1, "s1-info", at, at)
+	must(insertRule, "r5", "s2", "fallback", 1, "Anything no rule matched", 1, "s2-info", at, at)
+	before := rowsOf(t, store, `SELECT id, site_id, position, enabled FROM page_type_rules ORDER BY site_id, position`)
+
+	if _, err = provider.UpTo(t.Context(), 90); err != nil {
+		t.Fatalf("up to 90: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT site_id, position, CASE WHEN id LIKE 'r%' THEN id ELSE 'new' END, page_type_id FROM page_type_rules ORDER BY site_id, position`); !slices.Equal(got, []string{
+		"s1 | 1 | r1 | s1-technical", "s1 | 2 | new | s1-technical", "s1 | 3 | r2 | s1-product", "s1 | 4 | r3 | s1-info", "s1 | 5 | r4 | s1-info",
+		"s2 | 1 | r5 | s2-info",
+	}) {
+		t.Fatalf("the rules after 90 = %v, want the slug rule second on the site with a technical type and nothing on the other", got)
+	}
+	added, err := NewPageTypeRuleRepo(store).ListBySite(t.Context(), "s1")
+	if err != nil {
+		t.Fatalf("ListBySite: %v", err)
+	}
+	if rule := added[1]; !id.Valid(rule.ID) || !rule.Enabled || !slices.Equal(rule.Conditions.PostTypes, []string{"page"}) ||
+		!slices.Equal(rule.Conditions.Slugs, pagetype.TechnicalSlugs()) {
+		t.Errorf("the seeded rule = %+v, want an enabled rule over pages with the application's technical slugs", rule)
+	}
+
+	if _, err = provider.DownTo(t.Context(), 89); err != nil {
+		t.Fatalf("down to 89: %v", err)
+	}
+	if got := rowsOf(t, store, `SELECT id, site_id, position, enabled FROM page_type_rules ORDER BY site_id, position`); !slices.Equal(got, before) {
+		t.Fatalf("the rules after the down = %v, want them as they were %v", got, before)
 	}
 	if _, err = provider.Up(t.Context()); err != nil {
 		t.Fatalf("up again: %v", err)

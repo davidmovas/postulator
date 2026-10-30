@@ -23,6 +23,13 @@ func InfoSlugs() []string {
 	}
 }
 
+func TechnicalSlugs() []string {
+	return []string{
+		"cart", "basket", "checkout", "my-account", "account", "wishlist", "compare", "order-tracking", "track-order",
+		"login", "register", "lost-password",
+	}
+}
+
 type ruleSeed struct {
 	name       string
 	preset     Preset
@@ -38,6 +45,7 @@ func defaultSeeds() []ruleSeed {
 	}
 	return []ruleSeed{
 		{"Technical pages, such as the cart, the checkout and the account", Technical, Conditions{Technical: &yes}},
+		{"The cart, the checkout and the account by their address", Technical, Conditions{PostTypes: []string{string(pagemap.WPPage)}, Slugs: TechnicalSlugs()}},
 		{"Products", Product, Conditions{PostTypes: []string{string(pagemap.WPProduct)}}},
 		{"Store categories", StoreCategory, Conditions{PostTypes: []string{string(pagemap.WPProductCategory)}}},
 		{"The shop", Catalog, Conditions{Shop: &yes}},

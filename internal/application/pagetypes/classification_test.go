@@ -261,12 +261,12 @@ func TestARuleIsTestedAgainstOnePageAndSaysWhy(t *testing.T) {
 	c := newClassifying(t)
 	rules := c.rules(t, c.siteID)
 
-	got, err := c.classification.TestRule(t.Context(), pagetypes.TestRuleRequest{SiteID: c.siteID, PageID: c.ids["/lab-guides/"], RuleID: rules.Rules[5].ID})
+	got, err := c.classification.TestRule(t.Context(), pagetypes.TestRuleRequest{SiteID: c.siteID, PageID: c.ids["/lab-guides/"], RuleID: rules.Rules[6].ID})
 	if err != nil {
 		t.Fatalf("TestRule: %v", err)
 	}
 	if got.Verdict != string(pagetype.VerdictUnmet) || got.Facts.Level != 1 || got.Facts.Listing || got.Outcome.TypeID != c.typeOf(t, c.siteID, pagetype.Guide).ID {
-		t.Fatalf("rule 6 on /lab-guides/ = %+v, want unmet with the page's facts and its own outcome", got)
+		t.Fatalf("rule 7 on /lab-guides/ = %+v, want unmet with the page's facts and its own outcome", got)
 	}
 	if !slices.Contains(got.Conditions, pagetype.ConditionResult{Condition: pagetype.ConditionListing, Verdict: pagetype.VerdictUnmet}) {
 		t.Errorf("the conditions = %+v, want the listing named as what failed", got.Conditions)
@@ -283,7 +283,7 @@ func TestARuleIsTestedAgainstOnePageAndSaysWhy(t *testing.T) {
 		t.Errorf("a draft with a bad pattern = %v, want INVALID", err)
 	}
 
-	matching, err := c.classification.Matching(t.Context(), c.siteID, rules.Rules[12].ID)
+	matching, err := c.classification.Matching(t.Context(), c.siteID, rules.Rules[13].ID)
 	if err != nil || !slices.Equal(matching, []string{c.ids["/about-us/"]}) {
 		t.Errorf("the pages the slug rule matches = %v %v", matching, err)
 	}

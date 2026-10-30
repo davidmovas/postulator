@@ -219,7 +219,10 @@ func (s *Service) classify(ctx context.Context, tracked *findings, page *pagemap
 }
 
 func technicalReason(page pagemap.Page, body block.Snapshot, record render.Record, rendered bool, settings site.Settings, technical site.TechnicalPages) pagemap.TechnicalReason {
-	if !page.WPType.Term() && page.WPID != nil {
+	if !pagetype.Fits(pagetype.RoleTechnical, page.WPType) {
+		return pagemap.TechnicalNone
+	}
+	if page.WPID != nil {
 		ids := map[int64]pagemap.TechnicalReason{}
 		for id, reason := range map[int64]pagemap.TechnicalReason{
 			technical.Posts: pagemap.TechnicalPosts, technical.Privacy: pagemap.TechnicalPrivacy,

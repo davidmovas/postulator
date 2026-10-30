@@ -30,6 +30,7 @@ const (
 	TopicCreate TopicAction = "create"
 	TopicAdopt  TopicAction = "adopt"
 	TopicRecord TopicAction = "record"
+	TopicShare  TopicAction = "share"
 )
 
 type TopicNode struct {
@@ -41,6 +42,7 @@ type TopicNode struct {
 	ParentName     string
 	ParentEntityID string
 	EntityID       string
+	Hub            string
 	EdgeMissing    bool
 	Facts          []graph.Fact
 	Keywords       keyword.List
@@ -106,6 +108,8 @@ type topicBuild struct {
 	built    map[string]struct{}
 	entities []graph.Entity
 	carried  map[string]struct{}
+	front    *topicDraft
+	twinned  []pagemap.Page
 }
 
 func (m Map) TopicMap(chains map[string]pagemap.Chain, built []string) TopicPlan {
@@ -122,11 +126,16 @@ func (m Map) TopicMap(chains map[string]pagemap.Chain, built []string) TopicPlan
 			b.carried[*pages[i].EntityID] = struct{}{}
 		}
 	}
+	if front, found := m.snapshot.Index.ByPath(pagemap.RootPath); found && m.carriable(front) {
+		b.front = b.pageDraft(front)
+		b.front.own = true
+	}
 	for i := range pages {
-		if chain, held := chains[pages[i].ID]; held && carriable(pages[i]) {
+		if chain, held := chains[pages[i].ID]; held && m.carriable(pages[i]) {
 			b.walk(pages[i], chain)
 		}
 	}
+	b.twinned = b.twins()
 	b.settle()
 	for {
 		b.resolve()
@@ -138,8 +147,27 @@ func (m Map) TopicMap(chains map[string]pagemap.Chain, built []string) TopicPlan
 	return b.plan()
 }
 
-func carriable(page pagemap.Page) bool {
-	return page.WPID != nil && live(page) && !page.WPType.Term() && page.Path != pagemap.RootPath && page.TechnicalReason == pagemap.TechnicalNone
+func (m Map) carriable(page pagemap.Page) bool {
+	_, folded := m.folded[page.ID]
+	return !folded && page.WPID != nil && live(page) && page.TechnicalReason == pagemap.TechnicalNone
+}
+
+func (b *topicBuild) needs(page pagemap.Page) bool {
+	if page.WPType.Term() {
+		return page.EntityID == nil && page.WPID != nil && live(page) && page.TechnicalReason == pagemap.TechnicalNone
+	}
+	return b.m.snapshot.Types.NeedsEntity(page)
+}
+
+func (b *topicBuild) twins() []pagemap.Page {
+	out := make([]pagemap.Page, 0, len(b.m.folded))
+	for termID := range b.m.folded {
+		if term, found := b.m.snapshot.Index.ByID(termID); found && b.needs(term) {
+			out = append(out, term)
+		}
+	}
+	slices.SortFunc(out, func(x, y pagemap.Page) int { return strings.Compare(x.ID, y.ID) })
+	return out
 }
 
 func (b *topicBuild) pageDraft(page pagemap.Page) *topicDraft {
@@ -174,7 +202,7 @@ func (b *topicBuild) linkDraft(link pagemap.ChainLink, parent string, known bool
 			id = hub
 		}
 		page, found := b.m.snapshot.Index.ByID(id)
-		if found && carriable(page) {
+		if found && b.m.carriable(page) {
 			return b.pageDraft(page), name
 		}
 		if found && name == "" {
@@ -188,6 +216,9 @@ func (b *topicBuild) linkDraft(link pagemap.ChainLink, parent string, known bool
 }
 
 func (b *topicBuild) walk(page pagemap.Page, chain pagemap.Chain) {
+	if b.front != nil {
+		b.front.label(chain.Home)
+	}
 	self := b.pageDraft(page)
 	self.ownLabel = strings.TrimSpace(chain.Label)
 	if chain.Break == pagemap.ChainNoTrail {
@@ -424,8 +455,13 @@ func (b *topicBuild) want() {
 		d.wanted = false
 	}
 	for _, d := range b.order {
-		if d.page != nil && d.placing() && b.m.snapshot.Types.NeedsEntity(*d.page) {
+		if d.page != nil && d.placing() && b.needs(*d.page) {
 			b.mark(d)
+		}
+	}
+	for i := range b.twinned {
+		if hub := b.drafts[pageSubject+b.m.folded[b.twinned[i].ID]]; hub != nil {
+			b.mark(hub)
 		}
 	}
 }
@@ -511,7 +547,7 @@ func (b *topicBuild) plan() TopicPlan {
 		}
 		node := TopicNode{
 			Subject: d.subject, Action: d.action, Name: d.name, Parent: d.parent, EntityID: d.entityID,
-			Order: fmt.Sprintf("%06d\x00%s\x00%s", d.depth, d.sortKey(), d.subject),
+			Order: orderKey(d.depth, d.sortKey(), d.subject),
 		}
 		if parent := b.drafts[d.parent]; parent != nil {
 			node.ParentEntityID, node.ParentName = parent.entityID, parent.name
@@ -525,10 +561,26 @@ func (b *topicBuild) plan() TopicPlan {
 		node.EdgeMissing = d.action == TopicAdopt && node.ParentEntityID != "" && !b.hasParent(d.entityID, node.ParentEntityID)
 		out.Writes = append(out.Writes, node)
 	}
+	twinsLeft := make(map[string]TopicSkip)
+	for i := range b.twinned {
+		node, skip := b.share(b.twinned[i])
+		if skip != "" {
+			twinsLeft[b.twinned[i].ID] = skip
+			continue
+		}
+		out.Writes = append(out.Writes, node)
+	}
+	slices.SortFunc(out.Writes, func(x, y TopicNode) int { return strings.Compare(x.Order, y.Order) })
 	pages := b.m.snapshot.Index.Pages()
 	for i := range pages {
 		page := &pages[i]
-		if !live(*page) || !b.m.snapshot.Types.NeedsEntity(*page) {
+		if !b.needs(*page) {
+			continue
+		}
+		if _, folded := b.m.folded[page.ID]; folded {
+			if skip, left := twinsLeft[page.ID]; left {
+				out.Unplaced = append(out.Unplaced, TopicMiss{PageID: page.ID, Path: page.Path, Skip: skip})
+			}
 			continue
 		}
 		d := b.drafts[pageSubject+page.ID]
@@ -540,6 +592,37 @@ func (b *topicBuild) plan() TopicPlan {
 		}
 	}
 	return out
+}
+
+func (b *topicBuild) share(term pagemap.Page) (TopicNode, TopicSkip) {
+	subject := pageSubject + term.ID
+	if _, recorded := b.built[subject]; recorded {
+		return TopicNode{}, TopicRemoved
+	}
+	hub, _ := b.m.snapshot.Index.ByID(b.m.folded[term.ID])
+	node := TopicNode{Subject: subject, Action: TopicShare, PageID: term.ID, Hub: pageSubject + hub.ID}
+	d := b.drafts[node.Hub]
+	switch {
+	case hub.EntityID != nil:
+		node.EntityID = *hub.EntityID
+	case d == nil:
+		return TopicNode{}, TopicNoBreadcrumbs
+	case d.skip != "":
+		return TopicNode{}, d.skip
+	default:
+		node.EntityID = d.entityID
+	}
+	if d != nil {
+		node.Name, node.Order = d.name, orderKey(d.depth, d.sortKey(), d.subject)
+	} else {
+		node.Name, node.Order = b.m.snapshot.siteName(hub), orderKey(0, hub.Path, node.Hub)
+	}
+	node.Order += "\x00" + subject
+	return node, ""
+}
+
+func orderKey(depth int, sortKey, subject string) string {
+	return fmt.Sprintf("%06d\x00%s\x00%s", depth, sortKey, subject)
 }
 
 func (b *topicBuild) hasParent(entityID, parentID string) bool {

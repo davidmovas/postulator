@@ -26,6 +26,7 @@ type publicPage struct {
 	crumbs   []crumb
 	content  string
 	listing  []string
+	robots   string
 	absolute bool
 }
 
@@ -47,6 +48,9 @@ func (p publicPage) href(path string) string {
 func (p publicPage) html() string {
 	var b strings.Builder
 	b.WriteString("<!doctype html><html><head><title>" + p.title + "</title>")
+	if p.robots != "" {
+		b.WriteString(`<meta name="robots" content="` + p.robots + `">`)
+	}
 	if len(p.crumbs) > 0 {
 		items := make([]map[string]any, 0, len(p.crumbs))
 		for i, c := range p.crumbs {

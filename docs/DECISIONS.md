@@ -5974,3 +5974,70 @@ uncertain it is left, never a failure. Plan: `C:\Users\admin\.claude\plans\synth
 - **Found while looking at the screens**: with the dock open the Graph's toolbar ran past its pane
   (Link proof and Isolate unreachable at 1280 and 1440), which the new lens made worse; a toolbar may
   now wrap, the Graph's does, and the walk's `graph` shot checks it with `fits`.
+
+## 2026-10-30 — phase 21, 2.10.0: store categories, products and the front page in the topical map
+
+The owner, after 2.9.0 ran on the client's site: the products the sync knows (typed Product, rightly)
+get no entity and the run screen says nothing; the store categories get their entities and edges
+but their pages are never mapped, though mapping them by hand works; the hubs are fine; there is no
+Home entity; and `/cart/` is typed as a hub, in scope for generation. Plan:
+`C:\Users\admin\.claude\plans\iterative-dazzling-pike.md`.
+
+### What the exploration found
+
+- **The store category was a topic by design.** `contextpack.carriable` and `Set.NeedsEntity` refused
+  `WPType.Term()`, so 2.9.0's build made a store term with no hub twin a page-less `topic:` node: the
+  entity and its edge were written, the term page never carried it. A term twinned with a hub folded
+  into the hub, which alone carried the entity.
+- **Products were never refused, and a technical reason hid them.** A product's type can only be
+  Product (`pagetype.Fits`), so the first rule (technical) never types one Technical; but
+  `observe.technicalReason` still marked a product or a store category `noindex` (an SEO plugin's
+  setting for products) or `shortcode`, and `NeedsEntity` and the build's `carriable` drop any page
+  with a technical reason. Such a product was typed Product, never placed and never counted, so the run
+  screen and the inbox said nothing. The replica's capture shows it live on `/product-category/uncategorized/`
+  (`noindex`). The client's own site was not inspected; the checklist went to the owner.
+- **A hand-mapped store category made its products disagree.** With the term still a topic, a
+  product's nearest page in the graph was nobody while the tree's was the mapped term: `disagrees`.
+- **A Home-only trail placed a store category at the root** while `DeriveParent` took its WordPress
+  parent (the weak-trail rule), so a subcategory showing `Home › Healing Peptides` disagreed with its
+  tree once it became a node.
+- **`/cart/` is technical only by WooCommerce's cart id, a top-level cart block or shortcode, or a
+  noindex**; when all three miss, its product grid is a listing and rule 6 makes it a Landing.
+
+### The owner's answers (2026-10-30)
+
+- A store category twinned with a hub: **one entity on both pages**, the hub canonical.
+- A product's up link goes **to its store category's page**.
+- `/cart/`: **a seeded rule with a built-in list of addresses**, editable in Settings → Classification,
+  no detection hardcoded.
+- The front page: **an entity with no children**; the hierarchy does not change.
+- **Products and store categories are never technical**: noindex and body shortcodes make a page or a
+  post technical, never a store page.
+
+### The ruling
+
+- **A store category is a page node** (`Map.carriable` admits a live, unfolded term), wanted on its
+  own beside every page that needs an entity, so an empty category is built too and one left is
+  counted with its reason; `Set.NeedsEntity` still refuses terms, so a store category raises no
+  `page_without_entity` and proposals still skip it.
+- **A twin shares its hub's entity** (`TopicShare`, ordered right after its hub, subject
+  `page:<term>` recorded in `topic_builds` so an unmapping sticks); the hub stays canonical, so links
+  go to the hub, and `MatchRow` already prefers a regular page over a term.
+- **2.9.0's page-less store topics are adopted** by their term pages on the next sync (same name,
+  same scope, no canonical, not carried), through the existing adopt path; no migration.
+- **A Home-only trail gives way to the WordPress parent** in `pagemap.TopicChain`, as in
+  `DeriveParent`; a page that shows no breadcrumbs is still `no_breadcrumbs`.
+- **The front page carries an entity at the root**, named by the Home crumb, then its H1 and title;
+  `chainOf` and the tree walks stop at the root, so nothing hangs under it and no
+  `entity_parent_differs` comes of it; `NeedsEntity` no longer refuses `/`, so it is proposable and a
+  run may write it.
+- **`technicalReason` returns none for any type the Technical role cannot hold** (`pagetype.Fits`); a
+  noindex product's `technical_detected` closes on the next sync.
+- **Rule 2, "The cart, the checkout and the account by their address"**: post type `page` and
+  `pagetype.TechnicalSlugs()` (cart, basket, checkout, my-account, account, wishlist, compare,
+  order-tracking, track-order, login, register, lost-password) to Technical; 0090 inserts it second on
+  every site with a Technical type and shifts the rest, its down puts them back. A page rule 6 placed
+  is re-typed on the next sync.
+- **Links and the export needed no code**: a mapped term's entity has its canonical page, so a
+  product's owed link up is its category; the export writes `entity` and `parent_entity` for every
+  page that carries one, a twin's row included. Tests pin both.

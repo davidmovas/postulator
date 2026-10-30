@@ -619,6 +619,41 @@ func TestTechnicalPagesAreNamedWithTheirReason(t *testing.T) {
 	}
 }
 
+func TestANoindexMakesAPageTechnicalButNeverAProductOrAStoreCategory(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.serveTheSite(false)
+	s.serve(
+		publicPage{title: "BPC-157 Peptide", path: "/product/bpc-157-peptide/", robots: "noindex, follow",
+			crumbs:  []crumb{{name: "Home", path: "/"}, {name: "Healing Peptides", path: "/product-category/peptides/healing-peptides/"}, {name: "BPC-157 Peptide", path: "/product/bpc-157-peptide/"}},
+			content: "<p>BPC-157 is a pentadecapeptide.</p>"},
+		publicPage{title: "Healing Peptides", path: "/product-category/peptides/healing-peptides/", robots: "noindex, follow",
+			crumbs: []crumb{{name: "Home", path: "/"}, {name: "Healing Peptides", path: "/product-category/peptides/healing-peptides/"}}},
+	)
+	tb500 := tb500Page(false, crumb{name: "Home", path: "/"}, crumb{name: "Peptides", path: "/peptides/"}, crumb{name: "TB-500", path: "/tb-500/"})
+	tb500.robots = "noindex"
+	s.serve(tb500)
+
+	s.run(t, observe.Options{})
+	for path, want := range map[string]pagemap.TechnicalReason{
+		"/product/bpc-157-peptide/": pagemap.TechnicalNone, "/product-category/peptides/healing-peptides/": pagemap.TechnicalNone,
+		"/tb-500/": pagemap.TechnicalNoindex,
+	} {
+		page := s.pageAt(t, path)
+		if page.TechnicalReason != want {
+			t.Errorf("%s technical reason = %q, want %q", path, page.TechnicalReason, want)
+		}
+		if _, raised := s.finding(finding.TechnicalDetected, finding.SubjectPage(page.ID)); raised != (want != pagemap.TechnicalNone) {
+			t.Errorf("%s technical_detected raised %v, want %v", path, raised, want != pagemap.TechnicalNone)
+		}
+	}
+	for path, name := range map[string]string{"/product/bpc-157-peptide/": "BPC-157 Peptide", "/product-category/peptides/healing-peptides/": "Healing Peptides"} {
+		if got := s.mappedTo(t, path); got != name {
+			t.Errorf("the noindex %s carries %q, want %q", path, got, name)
+		}
+	}
+}
+
 func TestAPlannedPageKeepsItsWorkbookParent(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

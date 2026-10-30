@@ -59,7 +59,7 @@ func (s Set) TypeOf(page pagemap.Page) Type {
 }
 
 func (s Set) NeedsEntity(page pagemap.Page) bool {
-	return page.EntityID == nil && page.WPID != nil && page.Status != pagemap.StatusArchived && page.Path != pagemap.RootPath &&
+	return page.EntityID == nil && page.WPID != nil && page.Status != pagemap.StatusArchived &&
 		!page.WPType.Term() && page.TechnicalReason == pagemap.TechnicalNone && s.TypeOf(page).Preset.Writable()
 }
 

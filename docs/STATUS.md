@@ -4,24 +4,24 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.8.1` on 2026-10-29 (PR #35 merged, tagged; a shift-click ticks a range in the
-page picker, notes under **Release 2.8.1**). **2.9.0 is built on `dev`** (2026-10-29, phase 20): the
-sync builds the topical map from the site's breadcrumbs, with no model; its notes are under
-**Release 2.9.0**.
+**Released:** `v2.9.0` on 2026-10-29 (PR #36 merged, tagged; the topical map from the
+breadcrumbs, notes under **Release 2.9.0**). **2.10.0 is built on `dev`** (2026-10-30, phase 21):
+store categories, products and the front page in the topical map, `/cart/` typed technical; its notes
+are under **Release 2.10.0**, and its pull request is open.
 
 ## Next, in order
 
-1. **The stands are green for 2.9.0** (2026-10-29): vanilla 13 passed and 13 skipped, twice;
-   the replica 24 after two fixes its run found (the workbook's parent over a built one, and the page
-   types suite's entities), each failed test then passed alone on the stand with every test that
-   imports a workbook. The stands are down.
-2. **The pull request from `dev` to `master` for 2.9.0 is open**; the owner merges it and tags
-   `v2.9.0`, whose workflow builds the installer, the executable and the plugin zip. 2.9.0 adds
-   migrations 0088 and 0089; the plugin stays 1.5.2.
-3. **The client installs 2.9.0 and syncs once**: the run screen says how many entities the
-   breadcrumbs built, how many pages they placed and why the rest were left; the Graph's "From the
-   site" lens shows what was built, and a page left without an entity keeps its finding and its
-   "Propose entity".
+1. **The stands for 2.10.0**: the replica passed the five suites 2.10.0 touches (2026-10-30: the
+   observation, page types, the product loop, the proposal and the reconciliation, 149 s), the
+   observation now proving every store page and the front page carry an entity, the twins their
+   hub's, `/cart/` Technical and the export's product rows; its noindex Uncategorized is no longer
+   technical. `e2e:full` on both stands is owed before the pull request. The stands are down.
+2. **The pull request from `dev` to `master` for 2.10.0 is open**; the owner merges it and tags
+   `v2.10.0`, whose workflow builds the installer, the executable and the plugin zip. 2.10.0 adds
+   migration 0090; the plugin stays 1.5.2.
+3. **The client installs it and syncs once**: his store categories carry their entities, his products
+   hang under them, the front page is Home, and `/cart/` is Technical. If his products still carry no
+   entity, the checklist under **Release 2.10.0** says what to look at on his site.
 4. **The race legs**, owed since 2.7.0, one call each on a quiet machine (no stand up, nothing else holding
    memory), from the repository root under bash:
    ```
@@ -90,6 +90,33 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.10.0
+
+- **Store categories are entities with their pages.** 2.9.0 made a store category a topic with no page,
+  so its entity and edges were built but its page never carried them. A sync now maps every store
+  category's page to its entity, under the category its breadcrumbs (or, when they show only Home, its
+  WordPress parent) put it above, and builds an empty category too; one it leaves is counted on the
+  run screen with its reason. The topics 2.9.0 built are taken by their pages on the first sync, with
+  nothing rebuilt.
+- **A store category and a hub of the same name share one entity**, the hub's; links go to the hub.
+- **Products hang under their store category**, and a product's link up is its category's page. A
+  product whose page an SEO plugin marks noindex (or whose description holds a technical shortcode)
+  was typed Product but treated as technical, so it got no entity and no reason; products and store
+  categories are never technical now, and their "technical page" finding closes on the next sync.
+- **The front page is the entity Home** (named by the Home crumb), with nothing under it: the
+  hierarchy is as before, and the front page can be written by a run like any Landing.
+- **`/cart/` is Technical.** A new rule, second in Settings → Classification, types the cart, the
+  checkout, the account and their kin (`cart`, `basket`, `checkout`, `my-account`, `account`,
+  `wishlist`, `compare`, `order-tracking`, `track-order`, `login`, `register`, `lost-password`) by
+  their address; the client edits the list or turns the rule off there. A page the listing rule had
+  typed moves on the next sync.
+- **The export** writes a product's `entity` and `parent_entity`, and the store category's.
+- **Migration 0090** (the rule); the plugin stays 1.5.2.
+- **If a product still carries no entity on the client's site**: open the product in a private
+  window and look in its source for `noindex` (fixed by this release), for breadcrumbs above the
+  product and a `BreadcrumbList` (without them the run screen says "The page shows no breadcrumbs"),
+  and that the product is published and public.
 
 ## Release 2.9.0
 
@@ -310,6 +337,24 @@ The notes as the pull request carries them, in short:
 - **The rest** is under **Known gaps**, each with its reason.
 
 ## Where we are
+
+**2026-10-30, phase 21: 2.10.0, store categories, products and the front page in the topical map;
+`/cart/` technical.** The reasoning is under "phase 21" in `DECISIONS.md`.
+
+- **The diagnosis**: a store term was a page-less topic by 2.9.0's design; a product or a term marked
+  noindex stayed typed Product or Store category while `NeedsEntity` dropped it with no reason; a
+  hand-mapped term made its products disagree; `/cart/` fell to the listing rule.
+- **The owner's answers at the plan**: one entity for a store category and its hub twin, the hub
+  canonical; a product links up to its category; `/cart/` by a seeded editable rule; Home an entity
+  with no children; store pages never technical.
+- **The chain** (`06080864`): a Home-only trail gives way to the WordPress parent; each chain names
+  its Home crumb.
+- **The map** (`4e9e33f8`): store categories as page nodes built on their own, `TopicShare` for a twin,
+  Home at the root, `technicalReason` none for store types.
+- **The rule** (`78b6141e`): rule 2 and `pagetype.TechnicalSlugs`, migration 0090.
+- **Pinned** (`e8ce49b0`): a product's link up to its category's page, the export's store rows.
+- **2.10.0** (`6efe1dbe`) in the seven version files. Migrations to 0090; plugin 1.5.2, unchanged.
+- **Owed**: `e2e:full` on both stands; the race legs, as before.
 
 **2026-10-28, phase 19: 2.8.0, a sync that finishes and says why it did not; one sync per site;
 selection that keeps up; page types a person can read.** The reasoning is under "phase 19" in

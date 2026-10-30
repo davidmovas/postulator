@@ -270,6 +270,35 @@ func passThroughFixture(t *testing.T, groupPages []pagemap.Page) dag {
 	return dag{g: g, index: pagemap.NewIndex(pages)}
 }
 
+func TestAProductLinksUpToItsStoreCategoryPageAndATwinToItsHub(t *testing.T) {
+	t.Parallel()
+
+	entities := []graph.Entity{
+		entity("hub", "Peptides", 1, []string{"peptides"}, "page-hub"),
+		entity("category", "Healing Peptides", 0.8, []string{"healing peptides"}, "page-category"),
+		entity("product", "BPC-157 Peptide", 0.5, []string{"bpc 157"}, "page-product"),
+	}
+	g, err := graph.New(entities, []graph.Edge{parentEdge("e1", "category", "hub"), parentEdge("e2", "product", "category")})
+	if err != nil {
+		t.Fatalf("graph.New: %v", err)
+	}
+	category := page("page-category", "/product-category/peptides/healing-peptides/", "category")
+	category.WPType = pagemap.WPProductCategory
+	twin := page("page-twin", "/product-category/peptides/", "hub")
+	twin.WPType = pagemap.WPProductCategory
+	product := page("page-product", "/product/bpc-157-peptide/", "product")
+	product.WPType = pagemap.WPProduct
+	index := pagemap.NewIndex([]pagemap.Page{page("page-hub", "/peptides/", "hub"), twin, category, product})
+
+	plan := content.PlanLinks(g, index, content.Subject{EntityID: "product", PageID: "page-product"}, policy(field.LinkRules{UpDepth: 2}))
+	if got := urls(plan.Context.Targets); !slices.Equal(got, []string{"/product-category/peptides/healing-peptides/", "/peptides/"}) {
+		t.Fatalf("the product's links up = %v, want its store category's page, then the hub the category's twin shares", got)
+	}
+	if !plan.Context.Targets[0].Required || len(plan.Blocked) != 0 {
+		t.Errorf("the link to the store category = %+v, blocked %+v, want it owed and nothing blocked", plan.Context.Targets[0], plan.Blocked)
+	}
+}
+
 func TestAParentWithNoPageIsPassedThrough(t *testing.T) {
 	t.Parallel()
 
