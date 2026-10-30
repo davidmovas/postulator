@@ -4,15 +4,20 @@ package e2e_test
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/davidmovas/postulator/internal/adapters/importer"
+	"github.com/davidmovas/postulator/internal/app"
+	"github.com/davidmovas/postulator/internal/application/imports"
 	"github.com/davidmovas/postulator/internal/application/observe"
 	"github.com/davidmovas/postulator/internal/application/sites"
 	appsync "github.com/davidmovas/postulator/internal/application/sync"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/importmap"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/domain/render"
@@ -40,6 +45,7 @@ type standModel struct {
 	redirected      map[string]string
 	types           map[string]expectedType
 	templates       map[string]string
+	twins           map[string]string
 	custom          string
 	trailsResolved  int
 }
@@ -155,7 +161,10 @@ func modelOf(t *testing.T, env environment) standModel {
 				"/checkout/":   typedTechnical,
 				"/my-account/": typedTechnical,
 			},
-			templates:      map[string]string{"/peptides/": "Hub", "/healing-peptides/": "Hub", "/lab-guides/": "Guide"},
+			templates: map[string]string{"/peptides/": "Hub", "/healing-peptides/": "Hub", "/lab-guides/": "Guide"},
+			twins: map[string]string{
+				"/product-category/peptides/": "/peptides/", "/product-category/peptides/healing-peptides/": "/healing-peptides/",
+			},
 			custom:         "/tb-500/",
 			trailsResolved: 7,
 		}
@@ -241,6 +250,8 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 		}
 	}
 	logModels(t, models, byID)
+	storePagesCarryTheirEntities(t, models, expected.twins)
+	theExportWritesTheProductsEntities(t, core, siteID)
 
 	for path, want := range expected.parents {
 		model, ok := models[path]
@@ -339,6 +350,61 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 		if model.Page.ParentReason != before.Page.ParentReason {
 			t.Errorf("the second observation changed the parent of %s from %s to %s", path, before.Page.ParentReason, model.Page.ParentReason)
 		}
+	}
+}
+
+func storePagesCarryTheirEntities(t *testing.T, models map[string]observe.PageModel, twins map[string]string) {
+	t.Helper()
+
+	for path, model := range models {
+		page := model.Page
+		store := page.WPType == pagemap.WPProduct || page.WPType.Term()
+		if page.WPID == nil || page.Status == pagemap.StatusArchived || (!store && page.Path != pagemap.RootPath) {
+			continue
+		}
+		if page.EntityID == nil {
+			t.Errorf("the sync left %s (%s, technical %q) without an entity", path, page.WPType, page.TechnicalReason)
+		}
+		if store && page.TechnicalReason != pagemap.TechnicalNone {
+			t.Errorf("%s is technical for %q, and a store page never is", path, page.TechnicalReason)
+		}
+	}
+	for term, hub := range twins {
+		held, carrier := models[term].Page.EntityID, models[hub].Page.EntityID
+		if held == nil || carrier == nil || *held != *carrier {
+			t.Errorf("the store category %s carries %v, want the entity of its hub %s, %v", term, held, hub, carrier)
+		}
+	}
+}
+
+func theExportWritesTheProductsEntities(t *testing.T, core *app.Core, siteID string) {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "export.xlsx")
+	if _, err := core.Imports.Export(t.Context(), imports.ExportRequest{SiteID: siteID, Path: path}); err != nil {
+		t.Fatalf("export the site: %v", err)
+	}
+	table, err := importer.Read(t.Context(), path, importer.ReadOptions{})
+	if err != nil {
+		t.Fatalf("read the export: %v", err)
+	}
+	binding, err := importmap.AutoDetect(table.Headers).Bind(table.Headers)
+	if err != nil {
+		t.Fatalf("bind the export: %v", err)
+	}
+	products := 0
+	for _, row := range table.Rows {
+		if binding.Text(row, importmap.FieldWPType) != string(pagemap.WPProduct) {
+			continue
+		}
+		products++
+		if binding.Text(row, importmap.FieldEntity) == "" || binding.Text(row, importmap.FieldParentEntity) == "" {
+			t.Errorf("the export's row for %s has entity %q and parent %q, want both", binding.Text(row, importmap.FieldPath),
+				binding.Text(row, importmap.FieldEntity), binding.Text(row, importmap.FieldParentEntity))
+		}
+	}
+	if products == 0 {
+		t.Error("the export holds no product row")
 	}
 }
 
