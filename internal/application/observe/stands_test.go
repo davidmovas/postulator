@@ -10,6 +10,8 @@ import (
 	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
 	"github.com/davidmovas/postulator/internal/domain/field"
 	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 	"github.com/davidmovas/postulator/internal/kernel/clock"
 )
 
@@ -22,7 +24,11 @@ func capturedStores(t *testing.T, stand string) (s *stores, siteID string) {
 	}
 	s = newStores(held.Site)
 	for i := range held.Pages {
-		s.pages[held.Pages[i].ID] = held.Pages[i]
+		page := held.Pages[i]
+		if !pagetype.Fits(pagetype.RoleTechnical, page.WPType) {
+			page.TechnicalReason = pagemap.TechnicalNone
+		}
+		s.pages[page.ID] = page
 	}
 	for i := range held.Renders {
 		s.renders[held.Renders[i].PageID] = held.Renders[i]
@@ -48,12 +54,13 @@ func TestTheCapturedStandsBuildTheTopicalMapTheirBreadcrumbsDraw(t *testing.T) {
 		"replica": {
 			built: []string{
 				"BPC-157 Capsules under Healing Peptides", "BPC-157 Nasal Spray under Healing Peptides",
-				"Bacteriostatic Water under Peptides", "Sample Page under the root", "TB-500 Peptide under Healing Peptides",
+				"Bacteriostatic Water under Peptides", "Home under the root", "Sample Page under the root", "TB-500 Peptide under Healing Peptides",
+				"Uncategorized under the root",
 			},
 			left: map[string]int{"unknown_link": 1},
 		},
 		"vanilla": {
-			built: []string{"Coffee Beans under Koffein", "Koffein under the root", "Powder under Koffein"},
+			built: []string{"Coffee Beans under Koffein", "Koffein under the root", "Powder under Koffein", "Uncategorized under the root"},
 			left:  map[string]int{"no_breadcrumbs": 2},
 		},
 	}
@@ -91,6 +98,12 @@ func TestTheCapturedStandsBuildTheTopicalMapTheirBreadcrumbsDraw(t *testing.T) {
 			}
 			if !maps.Equal(state.Counts.UnplacedBy, tc.left) {
 				t.Errorf("the %s left pages for %v, want %v", stand, state.Counts.UnplacedBy, tc.left)
+			}
+			for _, page := range s.pages {
+				store := page.WPType == pagemap.WPProductCategory || page.WPType == pagemap.WPProduct
+				if store && page.WPID != nil && page.Status != pagemap.StatusArchived && page.EntityID == nil {
+					t.Errorf("the %s %s %s carries no entity", stand, page.WPType, page.Path)
+				}
 			}
 		})
 	}

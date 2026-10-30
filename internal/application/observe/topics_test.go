@@ -63,13 +63,16 @@ func (s *scenario) mappedTo(t *testing.T, path string) string {
 
 var builtFromTheTrails = []builtEntity{
 	{name: "BPC-157", parent: "Healing Peptides", page: "/bpc-157/", source: graph.SourceSite},
-	{name: "Healing Peptides", parent: "Peptides", source: graph.SourceSite},
+	{name: "BPC-157 Peptide", parent: "Healing Peptides", page: "/product/bpc-157-peptide/", source: graph.SourceSite},
+	{name: "Healing Peptides", parent: "Peptides", page: "/product-category/peptides/healing-peptides/", source: graph.SourceSite},
+	{name: "Home", page: "/", source: graph.SourceSite},
 	{name: "Peptides", page: "/peptides/", source: graph.SourceSite},
 	{name: "TB-500", parent: "Peptides", page: "/tb-500/", source: graph.SourceSite},
 }
 
 var edgesFromTheTrails = []string{
 	"BPC-157 > Healing Peptides parent approved site",
+	"BPC-157 Peptide > Healing Peptides parent approved site",
 	"Healing Peptides > Peptides parent approved site",
 	"TB-500 > Peptides parent approved site",
 }
@@ -82,22 +85,26 @@ func TestTheSyncBuildsTheTopicalMapFromTheBreadcrumbs(t *testing.T) {
 	state := s.run(t, observe.Options{})
 	entities, edges := s.theGraph()
 	if !slices.Equal(entities, builtFromTheTrails) {
-		t.Fatalf("the built entities =\n%+v\nwant, the dead Healing Peptides crumb a topic under Peptides\n%+v", entities, builtFromTheTrails)
+		t.Fatalf("the built entities =\n%+v\nwant the front page, the store category its WordPress parent places under Peptides and the product under it\n%+v",
+			entities, builtFromTheTrails)
 	}
 	if !slices.Equal(edges, edgesFromTheTrails) {
 		t.Errorf("the built edges = %v, want %v", edges, edgesFromTheTrails)
 	}
-	for path, name := range map[string]string{"/peptides/": "Peptides", "/tb-500/": "TB-500", "/bpc-157/": "BPC-157", "/product/bpc-157-peptide/": ""} {
+	for path, name := range map[string]string{
+		"/": "Home", "/peptides/": "Peptides", "/tb-500/": "TB-500", "/bpc-157/": "BPC-157", "/product/bpc-157-peptide/": "BPC-157 Peptide",
+		"/product-category/peptides/healing-peptides/": "Healing Peptides", "/product-category/peptides/": "Peptides",
+	} {
 		if got := s.mappedTo(t, path); got != name {
 			t.Errorf("%s carries %q, want %q", path, got, name)
 		}
 	}
-	if got := s.withoutEntity(); !slices.Equal(got, []string{"/product/bpc-157-peptide/"}) {
-		t.Errorf("the pages without an entity = %v, want only the product whose short trail skips Peptides", got)
+	if got := s.withoutEntity(); len(got) != 0 {
+		t.Errorf("the pages without an entity = %v, want none", got)
 	}
 	counts := state.Counts
-	if counts.Entities != 4 || counts.Placed != 3 || counts.Unplaced != 1 || counts.UnplacedBy["disagrees"] != 1 {
-		t.Errorf("the counts = %+v, want 4 entities, 3 pages placed and the product left as disagreeing", counts)
+	if counts.Entities != 6 || counts.Placed != 7 || counts.Unplaced != 0 {
+		t.Errorf("the counts = %+v, want 6 entities and 7 pages placed, the hub's twin among them", counts)
 	}
 	s.stores.mu.Lock()
 	published := slices.Clone(s.stores.published)
@@ -131,7 +138,7 @@ func TestASecondSyncWritesNothingAndADeletionSticks(t *testing.T) {
 	if got := s.mappedTo(t, "/tb-500/"); got != "" {
 		t.Errorf("the sync brought back the entity a person deleted: %q", got)
 	}
-	if got := s.withoutEntity(); !slices.Equal(got, []string{"/product/bpc-157-peptide/", "/tb-500/"}) {
+	if got := s.withoutEntity(); !slices.Equal(got, []string{"/tb-500/"}) {
 		t.Errorf("the pages without an entity = %v, want the deleted one's page open again", got)
 	}
 	if after.Counts.UnplacedBy["removed"] != 1 {

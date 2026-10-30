@@ -101,7 +101,7 @@ func (s *topicSite) page(id string, change func(*pagemap.Page)) {
 }
 
 type write struct {
-	subject, action, page, name, parent, parentEntity, entity string
+	subject, action, page, name, parent, parentEntity, entity, hub string
 }
 
 func writesOf(plan contextpack.TopicPlan) []write {
@@ -110,7 +110,7 @@ func writesOf(plan contextpack.TopicPlan) []write {
 		node := plan.Writes[i]
 		out = append(out, write{
 			subject: node.Subject, action: string(node.Action), page: node.PageID, name: node.Name,
-			parent: node.Parent, parentEntity: node.ParentEntityID, entity: node.EntityID,
+			parent: node.Parent, parentEntity: node.ParentEntityID, entity: node.EntityID, hub: node.Hub,
 		})
 	}
 	return out
@@ -124,20 +124,41 @@ func missesOf(plan contextpack.TopicPlan) map[string]contextpack.TopicSkip {
 	return out
 }
 
+func nodeOf(plan contextpack.TopicPlan, subject string) (contextpack.TopicNode, bool) {
+	for i := range plan.Writes {
+		if plan.Writes[i].Subject == subject {
+			return plan.Writes[i], true
+		}
+	}
+	return contextpack.TopicNode{}, false
+}
+
+var (
+	homeCreated = write{subject: "page:home", action: "create", page: "home", name: "Home"}
+	healShared  = write{subject: "page:healcat", action: "share", page: "healcat", name: "Healing Peptides", hub: "page:hub"}
+)
+
+const (
+	pepcatPath  = "/product-category/peptides/"
+	healcatPath = "/product-category/peptides/healing-peptides/"
+)
+
 func TestTheSitesBreadcrumbsBuildItsTopicalMap(t *testing.T) {
 	t.Parallel()
 
 	plan := replicaTopics().plan(t)
 	want := []write{
+		homeCreated,
 		{subject: "page:guides", action: "create", page: "guides", name: "Lab Guides"},
-		{subject: "topic:/peptides", action: "create", name: "Peptides"},
-		{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "topic:/peptides"},
+		{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+		{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "page:pepcat"},
+		healShared,
 		{subject: "page:reconstitution", action: "create", page: "reconstitution", name: "Reconstitution", parent: "page:guides"},
 		{subject: "page:bpc", action: "create", page: "bpc", name: "BPC-157 Peptide", parent: "page:hub"},
 		{subject: "page:tb", action: "create", page: "tb", name: "TB-500", parent: "page:hub"},
 	}
 	if got := writesOf(plan); !reflect.DeepEqual(got, want) {
-		t.Fatalf("the writes =\n%+v\nwant, parent first, the store term a page-less topic, the hub's term folded into it and About left alone\n%+v", got, want)
+		t.Fatalf("the writes =\n%+v\nwant, parent first, the store category a node of its own page, the hub's twin sharing the hub's entity and About left alone\n%+v", got, want)
 	}
 	if got, want := missesOf(plan), map[string]contextpack.TopicSkip{
 		"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs,
@@ -156,7 +177,7 @@ func TestTheSitesBreadcrumbsBuildItsTopicalMap(t *testing.T) {
 		t.Errorf("the page's keywords = %v, want the page's own", words)
 	}
 	if parent := byPage["hub"].ParentName; parent != "Peptides" {
-		t.Errorf("the hub's parent is named %q, want the topic's name", parent)
+		t.Errorf("the hub's parent is named %q, want the store category's name", parent)
 	}
 	for i := 1; i < len(plan.Writes); i++ {
 		if plan.Writes[i-1].Order >= plan.Writes[i].Order {
@@ -174,7 +195,7 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 		want   []write
 		misses map[string]contextpack.TopicSkip
 	}{
-		"a page a person mapped is kept as it is and its children hang under its entity": {
+		"a page a person mapped is kept as it is, its twin and its children hang under its entity": {
 			site: base.with(func(s *topicSite) {
 				s.entities = append(s.entities, graph.Entity{ID: "e-heal", SiteID: siteID, Name: "Healing", CanonicalPageID: new("hub"), Source: graph.SourceUser})
 				s.page("hub", func(p *pagemap.Page) { p.EntityID = new("e-heal") })
@@ -182,7 +203,10 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				delete(s.chains, "reconstitution")
 			}),
 			want: []write{
-				{subject: "page:hub", action: "record", page: "hub", name: "Healing Peptides", parent: "topic:/peptides", entity: "e-heal"},
+				homeCreated,
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+				{subject: "page:hub", action: "record", page: "hub", name: "Healing Peptides", parent: "page:pepcat", entity: "e-heal"},
+				{subject: "page:healcat", action: "share", page: "healcat", name: "Healing Peptides", hub: "page:hub", entity: "e-heal"},
 				{subject: "page:bpc", action: "create", page: "bpc", name: "BPC-157 Peptide", parent: "page:hub", parentEntity: "e-heal"},
 				{subject: "page:tb", action: "create", page: "tb", name: "TB-500", parent: "page:hub", parentEntity: "e-heal"},
 			},
@@ -190,7 +214,7 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
 			},
 		},
-		"an entity of the topic's name at its place is reused and one a page may take is adopted": {
+		"an entity of the store category's name at its place is adopted, and the hub's under it": {
 			site: base.with(func(s *topicSite) {
 				s.entities = append(s.entities,
 					graph.Entity{ID: "e-pep", SiteID: siteID, Name: "peptides", Source: graph.SourceImport},
@@ -199,8 +223,10 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				delete(s.chains, "reconstitution")
 			}),
 			want: []write{
-				{subject: "topic:/peptides", action: "record", name: "Peptides", entity: "e-pep"},
-				{subject: "page:hub", action: "adopt", page: "hub", name: "Healing Peptides", parent: "topic:/peptides", parentEntity: "e-pep", entity: "e-heal"},
+				homeCreated,
+				{subject: "page:pepcat", action: "adopt", page: "pepcat", name: "Peptides", entity: "e-pep"},
+				{subject: "page:hub", action: "adopt", page: "hub", name: "Healing Peptides", parent: "page:pepcat", parentEntity: "e-pep", entity: "e-heal"},
+				{subject: "page:healcat", action: "share", page: "healcat", name: "Healing Peptides", hub: "page:hub", entity: "e-heal"},
 				{subject: "page:bpc", action: "create", page: "bpc", name: "BPC-157 Peptide", parent: "page:hub", parentEntity: "e-heal"},
 				{subject: "page:tb", action: "create", page: "tb", name: "TB-500", parent: "page:hub", parentEntity: "e-heal"},
 			},
@@ -208,7 +234,7 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
 			},
 		},
-		"a name another page carries is taken, so its subtree waits": {
+		"a name another page carries is taken, so its subtree and its twin wait": {
 			site: base.with(func(s *topicSite) {
 				s.entities = append(s.entities,
 					graph.Entity{ID: "e-pep", SiteID: siteID, Name: "Peptides", Source: graph.SourceImport},
@@ -217,10 +243,14 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				delete(s.chains, "guides")
 				delete(s.chains, "reconstitution")
 			}),
-			want: []write{},
+			want: []write{
+				homeCreated,
+				{subject: "page:pepcat", action: "adopt", page: "pepcat", name: "Peptides", entity: "e-pep"},
+			},
 			misses: map[string]contextpack.TopicSkip{
 				"/hello-world/": contextpack.TopicUnknownLink, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
 				"/healing-peptides/": contextpack.TopicNameTaken, "/tb-500/": contextpack.TopicParentSkipped, "/product/bpc-157-peptide/": contextpack.TopicParentSkipped,
+				healcatPath: contextpack.TopicNameTaken,
 			},
 		},
 		"what a person removed after an earlier build is not brought back": {
@@ -228,11 +258,15 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				s.built = []string{"page:hub", "topic:/peptides", "page:guides"}
 				s.entities = append(s.entities, graph.Entity{ID: "e-pep", SiteID: siteID, Name: "Peptides", Source: graph.SourceSite})
 			}),
-			want: []write{},
+			want: []write{
+				homeCreated,
+				{subject: "page:pepcat", action: "adopt", page: "pepcat", name: "Peptides", entity: "e-pep"},
+			},
 			misses: map[string]contextpack.TopicSkip{
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs,
 				"/healing-peptides/": contextpack.TopicRemoved, "/tb-500/": contextpack.TopicParentSkipped,
 				"/product/bpc-157-peptide/": contextpack.TopicParentSkipped, "/reconstitution/": contextpack.TopicParentSkipped,
+				healcatPath: contextpack.TopicRemoved,
 			},
 		},
 		"two pages that would take one name under one parent are both left": {
@@ -242,8 +276,10 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				delete(s.chains, "reconstitution")
 			}),
 			want: []write{
-				{subject: "topic:/peptides", action: "create", name: "Peptides"},
-				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "topic:/peptides"},
+				homeCreated,
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "page:pepcat"},
+				healShared,
 			},
 			misses: map[string]contextpack.TopicSkip{
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
@@ -255,9 +291,11 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				s.page("tb", func(p *pagemap.Page) { p.ParentPageID, p.ParentReason = new("reconstitution"), pagemap.ParentWorkbook })
 			}),
 			want: []write{
+				homeCreated,
 				{subject: "page:guides", action: "create", page: "guides", name: "Lab Guides"},
-				{subject: "topic:/peptides", action: "create", name: "Peptides"},
-				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "topic:/peptides"},
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "page:pepcat"},
+				healShared,
 				{subject: "page:reconstitution", action: "create", page: "reconstitution", name: "Reconstitution", parent: "page:guides"},
 				{subject: "page:bpc", action: "create", page: "bpc", name: "BPC-157 Peptide", parent: "page:hub"},
 			},
@@ -272,8 +310,10 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				delete(s.chains, "reconstitution")
 			}),
 			want: []write{
-				{subject: "topic:/peptides", action: "create", name: "Peptides"},
-				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "topic:/peptides"},
+				homeCreated,
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "page:pepcat"},
+				healShared,
 				{subject: "page:bpc", action: "create", page: "bpc", name: "BPC-157 Peptide", parent: "page:hub"},
 				{subject: "page:tb", action: "create", page: "tb", name: "TB-500", parent: "page:hub"},
 			},
@@ -281,17 +321,21 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
 			},
 		},
-		"trails that disagree on a page without its own leave it and everything under it": {
+		"trails that disagree on a page without its own leave it, everything under it and its twin": {
 			site: base.with(func(s *topicSite) {
 				delete(s.chains, "hub")
 				delete(s.chains, "guides")
 				delete(s.chains, "reconstitution")
 				s.chains["bpc"] = chainOf("BPC-157 Peptide", toName("Compounds"), toPage("Healing Peptides", "healcat"))
 			}),
-			want: []write{},
+			want: []write{
+				homeCreated,
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+			},
 			misses: map[string]contextpack.TopicSkip{
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
 				"/healing-peptides/": contextpack.TopicDisagrees, "/tb-500/": contextpack.TopicParentSkipped, "/product/bpc-157-peptide/": contextpack.TopicParentSkipped,
+				healcatPath: contextpack.TopicDisagrees,
 			},
 		},
 		"pages whose breadcrumbs loop are left": {
@@ -301,10 +345,14 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				delete(s.chains, "reconstitution")
 				delete(s.chains, "bpc")
 			}),
-			want: []write{},
+			want: []write{
+				homeCreated,
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+			},
 			misses: map[string]contextpack.TopicSkip{
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
 				"/product/bpc-157-peptide/": contextpack.TopicNoBreadcrumbs, "/healing-peptides/": contextpack.TopicDisagrees, "/tb-500/": contextpack.TopicDisagrees,
+				healcatPath: contextpack.TopicDisagrees,
 			},
 		},
 		"a topic under a crumb the model cannot place is left with its page": {
@@ -314,8 +362,10 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				delete(s.chains, "reconstitution")
 			}),
 			want: []write{
-				{subject: "topic:/peptides", action: "create", name: "Peptides"},
-				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "topic:/peptides"},
+				homeCreated,
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+				{subject: "page:hub", action: "create", page: "hub", name: "Healing Peptides", parent: "page:pepcat"},
+				healShared,
 				{subject: "page:bpc", action: "create", page: "bpc", name: "BPC-157 Peptide", parent: "page:hub"},
 				{subject: "page:tb", action: "create", page: "tb", name: "TB-500", parent: "page:hub"},
 			},
@@ -329,10 +379,11 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				s.chains["lonely"] = chainOf(" ")
 				s.chains = map[string]pagemap.Chain{"lonely": s.chains["lonely"]}
 			}),
-			want: []write{},
+			want: []write{homeCreated},
 			misses: map[string]contextpack.TopicSkip{
 				"/hello-world/": contextpack.TopicNoBreadcrumbs, "/healing-peptides/": contextpack.TopicNoBreadcrumbs, "/tb-500/": contextpack.TopicNoBreadcrumbs,
 				"/product/bpc-157-peptide/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs, "/lonely/": contextpack.TopicNoName,
+				pepcatPath: contextpack.TopicNoBreadcrumbs, healcatPath: contextpack.TopicNoBreadcrumbs,
 			},
 		},
 		"a page the trails name differently from its title takes the name they use most": {
@@ -344,8 +395,10 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				s.chains["bpc"] = chainOf("BPC-157 Peptide", toPage("Peptides", "pepcat"), toPage("Healing", "healcat"))
 			}),
 			want: []write{
-				{subject: "topic:/peptides", action: "create", name: "Peptides"},
-				{subject: "page:hub", action: "create", page: "hub", name: "Healing", parent: "topic:/peptides"},
+				homeCreated,
+				{subject: "page:pepcat", action: "create", page: "pepcat", name: "Peptides"},
+				{subject: "page:hub", action: "create", page: "hub", name: "Healing", parent: "page:pepcat"},
+				{subject: "page:healcat", action: "share", page: "healcat", name: "Healing", hub: "page:hub"},
 				{subject: "page:bpc", action: "create", page: "bpc", name: "BPC-157 Peptide", parent: "page:hub"},
 				{subject: "page:tb", action: "create", page: "tb", name: "TB-500", parent: "page:hub"},
 			},
@@ -353,17 +406,31 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs, "/reconstitution/": contextpack.TopicNoBreadcrumbs,
 			},
 		},
-		"a second build over the first writes nothing": {
+		"a 2.9.0 build: the store category adopts its page-less topic and the hub's twin shares the hub's entity": {
 			site: base.with(func(s *topicSite) {
 				s.built = []string{"page:guides", "topic:/peptides", "page:reconstitution", "page:hub", "page:bpc", "page:tb"}
-				s.entities = append(s.entities,
-					graph.Entity{ID: "e-guides", SiteID: siteID, Name: "Lab Guides", CanonicalPageID: new("guides"), Source: graph.SourceSite},
-					graph.Entity{ID: "e-pep", SiteID: siteID, Name: "Peptides", Source: graph.SourceSite},
-					graph.Entity{ID: "e-rec", SiteID: siteID, Name: "Reconstitution", ScopeID: new("e-guides"), CanonicalPageID: new("reconstitution"), Source: graph.SourceSite},
-					graph.Entity{ID: "e-heal", SiteID: siteID, Name: "Healing Peptides", ScopeID: new("e-pep"), CanonicalPageID: new("hub"), Source: graph.SourceSite},
-					graph.Entity{ID: "e-bpc", SiteID: siteID, Name: "BPC-157 Peptide", ScopeID: new("e-heal"), CanonicalPageID: new("bpc"), Source: graph.SourceSite},
-					graph.Entity{ID: "e-tb", SiteID: siteID, Name: "TB-500", ScopeID: new("e-heal"), CanonicalPageID: new("tb"), Source: graph.SourceSite})
+				s.entities = append(s.entities, builtBy290()...)
 				for pageID, entityID := range map[string]string{"guides": "e-guides", "reconstitution": "e-rec", "hub": "e-heal", "bpc": "e-bpc", "tb": "e-tb"} {
+					s.page(pageID, func(p *pagemap.Page) { p.EntityID = new(entityID) })
+				}
+			}),
+			want: []write{
+				homeCreated,
+				{subject: "page:pepcat", action: "adopt", page: "pepcat", name: "Peptides", entity: "e-pep"},
+				{subject: "page:healcat", action: "share", page: "healcat", name: "Healing Peptides", hub: "page:hub", entity: "e-heal"},
+			},
+			misses: map[string]contextpack.TopicSkip{
+				"/hello-world/": contextpack.TopicUnknownLink, "/lonely/": contextpack.TopicNoBreadcrumbs,
+			},
+		},
+		"a second build over the first writes nothing": {
+			site: base.with(func(s *topicSite) {
+				s.built = []string{"page:home", "page:guides", "page:pepcat", "page:healcat", "page:reconstitution", "page:hub", "page:bpc", "page:tb"}
+				s.entities = append(s.entities, builtBy290()...)
+				s.entities = append(s.entities, graph.Entity{ID: "e-home", SiteID: siteID, Name: "Home", CanonicalPageID: new("home"), Source: graph.SourceSite})
+				for pageID, entityID := range map[string]string{
+					"home": "e-home", "guides": "e-guides", "pepcat": "e-pep", "healcat": "e-heal", "reconstitution": "e-rec", "hub": "e-heal", "bpc": "e-bpc", "tb": "e-tb",
+				} {
 					s.page(pageID, func(p *pagemap.Page) { p.EntityID = new(entityID) })
 				}
 			}),
@@ -386,4 +453,105 @@ func TestTheMapKeepsWhatStandsAndSkipsWhatItCannotBeSureOf(t *testing.T) {
 			}
 		})
 	}
+}
+
+func builtBy290() []graph.Entity {
+	return []graph.Entity{
+		{ID: "e-guides", SiteID: siteID, Name: "Lab Guides", CanonicalPageID: new("guides"), Source: graph.SourceSite},
+		{ID: "e-pep", SiteID: siteID, Name: "Peptides", Source: graph.SourceSite},
+		{ID: "e-rec", SiteID: siteID, Name: "Reconstitution", ScopeID: new("e-guides"), CanonicalPageID: new("reconstitution"), Source: graph.SourceSite},
+		{ID: "e-heal", SiteID: siteID, Name: "Healing Peptides", ScopeID: new("e-pep"), CanonicalPageID: new("hub"), Source: graph.SourceSite},
+		{ID: "e-bpc", SiteID: siteID, Name: "BPC-157 Peptide", ScopeID: new("e-heal"), CanonicalPageID: new("bpc"), Source: graph.SourceSite},
+		{ID: "e-tb", SiteID: siteID, Name: "TB-500", ScopeID: new("e-heal"), CanonicalPageID: new("tb"), Source: graph.SourceSite},
+	}
+}
+
+func TestStoreCategoriesAndTheFrontPageAreNodesOfTheMap(t *testing.T) {
+	t.Parallel()
+
+	base := replicaTopics()
+	blends := typed(under(onSitePage("blends", "/product-category/peptides/blends/", "Blends", 22, pagemap.WPProductCategory), "pepcat", pagemap.ParentWP), pagetype.StoreCategory)
+	wolverine := typed(under(onSitePage("wolverine", "/product/wolverine/", "Wolverine", 11, pagemap.WPProduct), "blends", pagemap.ParentJSONLD), pagetype.Product)
+
+	t.Run("a store category a person mapped holds the products under it, which agree with the tree", func(t *testing.T) {
+		t.Parallel()
+		plan := base.with(func(s *topicSite) {
+			s.pages = append(s.pages, mapped(blends, "e-blend"), wolverine)
+			s.entities = append(s.entities, graph.Entity{ID: "e-blend", SiteID: siteID, Name: "Blends", CanonicalPageID: new("blends"), Source: graph.SourceUser})
+			s.chains["wolverine"] = chainOf("Wolverine", toPage("Peptides", "pepcat"), toPage("Blends", "blends"))
+		}).plan(t)
+		node, found := nodeOf(plan, "page:wolverine")
+		if !found || node.Action != contextpack.TopicCreate || node.Parent != "page:blends" || node.ParentEntityID != "e-blend" {
+			t.Errorf("the product = %+v (found %v), want it created under the store category's entity", node, found)
+		}
+		if skip, left := missesOf(plan)["/product/wolverine/"]; left {
+			t.Errorf("the product was left as %s", skip)
+		}
+	})
+
+	t.Run("a store category is built on its own, products under it or not", func(t *testing.T) {
+		t.Parallel()
+		empty := typed(onSitePage("empty", "/product-category/empty/", "Empty", 23, pagemap.WPProductCategory), pagetype.StoreCategory)
+		plan := base.with(func(s *topicSite) {
+			s.pages = append(s.pages, empty)
+			s.chains["empty"] = chainOf("Empty")
+		}).plan(t)
+		if node, found := nodeOf(plan, "page:empty"); !found || node.Action != contextpack.TopicCreate || node.Parent != "" || node.Name != "Empty" {
+			t.Errorf("the empty store category = %+v (found %v), want it created at the root", node, found)
+		}
+	})
+
+	t.Run("a store category no trail reaches is left with its reason", func(t *testing.T) {
+		t.Parallel()
+		lost := typed(onSitePage("lost", "/product-category/lost/", "Lost", 24, pagemap.WPProductCategory), pagetype.StoreCategory)
+		plan := base.with(func(s *topicSite) { s.pages = append(s.pages, lost) }).plan(t)
+		if skip := missesOf(plan)["/product-category/lost/"]; skip != contextpack.TopicNoBreadcrumbs {
+			t.Errorf("the store category no trail reaches was left as %q, want no_breadcrumbs", skip)
+		}
+	})
+
+	t.Run("a twin a person unmapped is not mapped again", func(t *testing.T) {
+		t.Parallel()
+		plan := base.with(func(s *topicSite) {
+			s.built = []string{"page:hub", "page:healcat"}
+			s.entities = append(s.entities, graph.Entity{ID: "e-heal", SiteID: siteID, Name: "Healing Peptides", CanonicalPageID: new("hub"), Source: graph.SourceSite})
+			s.page("hub", func(p *pagemap.Page) { p.EntityID = new("e-heal") })
+		}).plan(t)
+		if _, found := nodeOf(plan, "page:healcat"); found {
+			t.Error("the twin a person unmapped was mapped again")
+		}
+		if skip := missesOf(plan)[healcatPath]; skip != contextpack.TopicRemoved {
+			t.Errorf("the unmapped twin was left as %q, want removed", skip)
+		}
+	})
+
+	t.Run("a twin shares its hub's entity even when no trail reaches the hub", func(t *testing.T) {
+		t.Parallel()
+		plan := base.with(func(s *topicSite) {
+			s.chains = map[string]pagemap.Chain{}
+			s.entities = append(s.entities, graph.Entity{ID: "e-heal", SiteID: siteID, Name: "Healing Peptides", CanonicalPageID: new("hub"), Source: graph.SourceUser})
+			s.page("hub", func(p *pagemap.Page) { p.EntityID = new("e-heal") })
+		}).plan(t)
+		if node, found := nodeOf(plan, "page:healcat"); !found || node.Action != contextpack.TopicShare || node.EntityID != "e-heal" {
+			t.Errorf("the twin = %+v (found %v), want it sharing e-heal", node, found)
+		}
+	})
+
+	t.Run("the front page is named by its Home crumb and nothing hangs under it", func(t *testing.T) {
+		t.Parallel()
+		plan := base.with(func(s *topicSite) {
+			for pageID, chain := range s.chains {
+				chain.Home = "Start"
+				s.chains[pageID] = chain
+			}
+		}).plan(t)
+		if node, found := nodeOf(plan, "page:home"); !found || node.Name != "Start" || node.Parent != "" {
+			t.Errorf("the front page = %+v (found %v), want an entity named Start at the root", node, found)
+		}
+		for i := range plan.Writes {
+			if plan.Writes[i].Parent == "page:home" {
+				t.Errorf("%s hangs under the front page", plan.Writes[i].Subject)
+			}
+		}
+	})
 }

@@ -67,14 +67,15 @@ func TestTheSiteProposesAnEntityForEveryPageThatNeedsOne(t *testing.T) {
 		byPath[proposals[i].Path] = proposals[i]
 	}
 	want := []string{
-		"/product/lonely/", "/product/untitled/", "/blends/",
+		"/", "/product/lonely/", "/product/untitled/", "/blends/",
 		"/product/blend-a/", "/product/bpc-157-5mg/", "/product/bpc-157/", "/product/bpc-kit/", "/product/peptides-sampler/",
 	}
 	if !slices.Equal(paths, want) {
-		t.Fatalf("proposals = %v, want %v: by depth, then path; no root, store category, technical, mapped or planned page", paths, want)
+		t.Fatalf("proposals = %v, want %v: by depth, then path, the front page first; no store category, technical, mapped or planned page", paths, want)
 	}
 
 	cases := map[string]contextpack.EntityProposal{
+		"/":                  {Name: "Home", Label: "Home"},
 		"/product/lonely/":   {Name: "Lonely Peptide", Label: "Lonely Peptide", ExistingEntityID: "e-lonely"},
 		"/product/untitled/": {Clash: contextpack.ClashNoName},
 		"/blends/":           {Name: "Blends", Label: "Blends"},
@@ -103,15 +104,15 @@ func TestTheSiteProposesAnEntityForEveryPageThatNeedsOne(t *testing.T) {
 func TestTheSiteProposesOnlyForTheChosenPages(t *testing.T) {
 	t.Parallel()
 
-	proposals := storeWithoutEntities(t).Map(nil).EntityProposals([]string{"blend", "term", "five"})
+	proposals := storeWithoutEntities(t).Map(nil).EntityProposals([]string{"blend", "term", "five", "home"})
 	paths := make([]string, 0, len(proposals))
 	for i := range proposals {
 		paths = append(paths, proposals[i].Path)
 	}
-	if want := []string{"/product/blend-a/", "/product/bpc-157-5mg/"}; !slices.Equal(paths, want) {
-		t.Fatalf("proposals = %v, want %v: a store category is never proposed for", paths, want)
+	if want := []string{"/", "/product/blend-a/", "/product/bpc-157-5mg/"}; !slices.Equal(paths, want) {
+		t.Fatalf("proposals = %v, want %v: a store category is never proposed for, the front page is", paths, want)
 	}
-	if proposals[0].Parent != "" || proposals[0].ParentEntityID != "" {
-		t.Errorf("a product whose parent page is not in the batch and carries no entity = %+v, want no parent", proposals[0])
+	if proposals[1].Parent != "" || proposals[1].ParentEntityID != "" {
+		t.Errorf("a product whose parent page is not in the batch and carries no entity = %+v, want no parent", proposals[1])
 	}
 }

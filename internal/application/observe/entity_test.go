@@ -37,10 +37,11 @@ func TestAWritablePageNoEntityCarriesIsAFindingUntilOneDoes(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)
 	s.serveTheSite(false)
+	s.serve(publicPage{title: "BPC-157 Peptide", path: "/product/bpc-157-peptide/", content: "<p>BPC-157 is a pentadecapeptide.</p>"})
 
 	s.run(t, observe.Options{})
 	if got := s.withoutEntity(); !slices.Equal(got, []string{"/product/bpc-157-peptide/"}) {
-		t.Fatalf("the pages without an entity = %v, want the one the breadcrumbs could not place", got)
+		t.Fatalf("the pages without an entity = %v, want the product that shows no breadcrumbs", got)
 	}
 	product := s.pageAt(t, "/product/bpc-157-peptide/")
 	raised, _ := s.finding(finding.PageWithoutEntity, finding.SubjectPage(product.ID))

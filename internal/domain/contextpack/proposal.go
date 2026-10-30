@@ -76,7 +76,7 @@ func (m Map) proposable(pageIDs []string) []pagemap.Page {
 	out := make([]pagemap.Page, 0, len(pageIDs))
 	for _, pageID := range pageIDs {
 		page, found := m.snapshot.Index.ByID(pageID)
-		if !found || page.WPType.Term() || page.EntityID != nil || page.Path == pagemap.RootPath || page.Status == pagemap.StatusArchived {
+		if !found || page.WPType.Term() || page.EntityID != nil || page.Status == pagemap.StatusArchived {
 			continue
 		}
 		out = append(out, page)

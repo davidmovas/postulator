@@ -1,6 +1,7 @@
 package observe
 
 import (
+	"cmp"
 	"context"
 	"time"
 	"unicode/utf8"
@@ -107,9 +108,12 @@ func (s *Service) writeTopics(ctx context.Context, state *State, run *topicRun, 
 }
 
 func (s *Service) writeTopic(ctx context.Context, state *State, run *topicRun, node *contextpack.TopicNode, now time.Time) error {
-	if node.Action == contextpack.TopicRecord {
+	switch node.Action {
+	case contextpack.TopicRecord:
 		run.written[node.Subject] = node.EntityID
 		return s.deps.Topics.Record(ctx, state.SiteID, node.Subject, now)
+	case contextpack.TopicShare:
+		return s.shareTopic(ctx, state, run, node, now)
 	}
 	parentID := node.ParentEntityID
 	if parentID == "" && node.Parent != "" {
@@ -145,6 +149,23 @@ func (s *Service) writeTopic(ctx context.Context, state *State, run *topicRun, n
 	if node.PageID != "" {
 		state.Counts.Placed++
 	}
+	return nil
+}
+
+func (s *Service) shareTopic(ctx context.Context, state *State, run *topicRun, node *contextpack.TopicNode, now time.Time) error {
+	entityID := cmp.Or(node.EntityID, run.written[node.Hub])
+	if entityID == "" {
+		return nil
+	}
+	mapped, err := s.deps.Pages.MapEntity(ctx, node.PageID, entityID, now)
+	if err != nil || !mapped {
+		return err
+	}
+	if recordErr := s.deps.Topics.Record(ctx, state.SiteID, node.Subject, now); recordErr != nil {
+		return recordErr
+	}
+	run.written[node.Subject] = entityID
+	state.Counts.Placed++
 	return nil
 }
 
