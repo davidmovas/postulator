@@ -12,9 +12,11 @@ are under **Release 2.10.0**.
 
 ## Next, in order
 
-1. **The stands for 2.10.0**: `e2e:full` on vanilla and the replica, which proves every product
-   under its store category's page, the hub's twin sharing the hub's entity, `/cart/` Technical and
-   the export's product rows.
+1. **The stands for 2.10.0**: the replica passed the five suites 2.10.0 touches (2026-10-30: the
+   observation, page types, the product loop, the proposal and the reconciliation, 149 s), the
+   observation now proving every store page and the front page carry an entity, the twins their
+   hub's, `/cart/` Technical and the export's product rows; its noindex Uncategorized is no longer
+   technical. `e2e:full` on both stands is owed before the pull request. The stands are down.
 2. **The pull request from `dev` to `master`** carries 2.9.0 and 2.10.0 when the owner asks; he
    merges it and tags. 2.10.0 adds migration 0090; the plugin stays 1.5.2.
 3. **The client installs it and syncs once**: his store categories carry their entities, his products
