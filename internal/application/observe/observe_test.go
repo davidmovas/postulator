@@ -619,6 +619,23 @@ func TestTechnicalPagesAreNamedWithTheirReason(t *testing.T) {
 	}
 }
 
+func TestThePluginListsTheProductsWhenWordPressHidesThemAndTheStoreRefuses(t *testing.T) {
+	t.Parallel()
+	s := newScenario(t)
+	s.core.types = slices.DeleteFunc(slices.Clone(s.core.types), func(postType observe.PostType) bool { return postType.Slug == "product" })
+	s.readers.Store = nil
+	s.serveTheSite(false)
+
+	s.run(t, observe.Options{})
+	product := s.pageAt(t, "/product/bpc-157-peptide/")
+	if product.WPID == nil || product.WPType != pagemap.WPProduct || product.Status != pagemap.StatusPublished {
+		t.Fatalf("the product = %+v, want it read through the plugin, which lists every public post type", product)
+	}
+	if got := s.mappedTo(t, "/product/bpc-157-peptide/"); got != "BPC-157 Peptide" {
+		t.Errorf("the product carries %q, want its entity", got)
+	}
+}
+
 func TestANoindexMakesAPageTechnicalButNeverAProductOrAStoreCategory(t *testing.T) {
 	t.Parallel()
 	s := newScenario(t)

@@ -4,24 +4,22 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.9.0` on 2026-10-29 (PR #36 merged, tagged; the topical map from the
-breadcrumbs, notes under **Release 2.9.0**). **2.10.0 is built on `dev`** (2026-10-30, phase 21):
-store categories, products and the front page in the topical map, `/cart/` typed technical; its notes
-are under **Release 2.10.0**, and its pull request is open.
+**Released:** `v2.10.0` on 2026-10-30 (PR #37 merged, tagged; store categories, products and the
+front page in the topical map, `/cart/` technical, notes under **Release 2.10.0**). **2.10.1 is built
+on `dev`** (2026-10-30): products read through the plugin when WordPress hides them and the store
+refuses; its notes are under **Release 2.10.1**, and its pull request is open.
 
 ## Next, in order
 
-1. **The stands for 2.10.0**: the replica passed the five suites 2.10.0 touches (2026-10-30: the
-   observation, page types, the product loop, the proposal and the reconciliation, 149 s), the
-   observation now proving every store page and the front page carry an entity, the twins their
-   hub's, `/cart/` Technical and the export's product rows; its noindex Uncategorized is no longer
-   technical. `e2e:full` on both stands is owed before the pull request. The stands are down.
-2. **The pull request from `dev` to `master` for 2.10.0 is open**; the owner merges it and tags
-   `v2.10.0`, whose workflow builds the installer, the executable and the plugin zip. 2.10.0 adds
-   migration 0090; the plugin stays 1.5.2.
-3. **The client installs it and syncs once**: his store categories carry their entities, his products
-   hang under them, the front page is Home, and `/cart/` is Technical. If his products still carry no
-   entity, the checklist under **Release 2.10.0** says what to look at on his site.
+1. **The pull request from `dev` to `master` for 2.10.1 is open**; the owner merges it and tags
+   `v2.10.1`. No migration; the plugin stays 1.5.2.
+2. **The client installs 2.10.1 and syncs once**: his products come in as pages with their
+   entities. If there are still none, the cause is not this one: look at the Sites panel (is the
+   plugin found, and what does it say about WooCommerce) and at `https://<site>/wp-json/wp/v2/types`.
+   A message on the run screen when the store cannot be read is proposed and not built.
+3. **`e2e:full` on both stands**, owed since 2.10.0: the replica passed the five suites 2.10.0 touches
+   (the observation, page types, the product loop, the proposal and the reconciliation, 149 s). The
+   stands are down.
 4. **The race legs**, owed since 2.7.0, one call each on a quiet machine (no stand up, nothing else holding
    memory), from the repository root under bash:
    ```
@@ -90,6 +88,17 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.10.1
+
+- **Products come in through the plugin.** On the client's site 2.10.0 read no product at all, with
+  no error: with the companion plugin the sync asked WordPress which post types to read, and
+  WordPress lists only those it shows in its REST API; products were read otherwise only through
+  WooCommerce's REST API, which may refuse the user. Where WordPress hid products and WooCommerce
+  refused, nothing was read, on 2.9.0 as on 2.10.0 (reproduced on the replica both ways). The sync now
+  reads every post type the plugin serves, products included, so they come in as pages with their
+  entities whatever WooCommerce answers; their prices and stock still need WooCommerce's access.
+- **No migration**; the plugin stays 1.5.2.
 
 ## Release 2.10.0
 
