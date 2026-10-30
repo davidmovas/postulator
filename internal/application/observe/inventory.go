@@ -54,23 +54,34 @@ func observedTypes(ctx context.Context, source string, readers Readers) ([]strin
 	if err != nil {
 		return nil, err
 	}
-	types := make([]string, 0, len(postTypes)+1)
+	types := make([]string, 0, len(postTypes)+len(readers.Manifest.PostTypes)+1)
 	for _, postType := range postTypes {
-		wpType := pagemap.WPType(postType.Slug)
 		switch {
-		case !postType.Viewable, postType.Slug == typeAttachment, postType.Slug == typeVariation, !wpType.Valid():
+		case !postType.Viewable, !listable(postType.Slug):
 			continue
-		case source == SourceCore && wpType.StoreAddressed():
+		case source == SourceCore && pagemap.WPType(postType.Slug).StoreAddressed():
 			continue
 		case source == SourcePlugin && len(readers.Manifest.PostTypes) > 0 && !contains(readers.Manifest.PostTypes, postType.Slug):
 			continue
 		}
 		types = append(types, postType.Slug)
 	}
-	if source == SourcePlugin && (len(readers.Manifest.Taxonomies) == 0 || contains(readers.Manifest.Taxonomies, typeTerm)) {
+	if source != SourcePlugin {
+		return types, nil
+	}
+	for _, slug := range readers.Manifest.PostTypes {
+		if listable(slug) && !contains(types, slug) {
+			types = append(types, slug)
+		}
+	}
+	if len(readers.Manifest.Taxonomies) == 0 || contains(readers.Manifest.Taxonomies, typeTerm) {
 		types = append(types, typeTerm)
 	}
 	return types, nil
+}
+
+func listable(slug string) bool {
+	return slug != typeAttachment && slug != typeVariation && pagemap.WPType(slug).Valid()
 }
 
 func technicalPages(ctx context.Context, readers Readers) (site.TechnicalPages, error) {
