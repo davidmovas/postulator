@@ -16,10 +16,13 @@ export interface PagesQuery {
     typeId: string;
     body: BodyChoice | "";
     findings: boolean;
+    noHub: boolean;
     branch: string;
     search: string;
     sort: PageSort | null;
 }
+
+export const noHubGap = "no_hub" as PageFilter["gap"];
 
 const codec = queryCodec<PagesQuery>({
     status: choiceParam("status", pageStatuses, ""),
@@ -30,6 +33,7 @@ const codec = queryCodec<PagesQuery>({
     typeId: textParam("type"),
     body: choiceParam("text", bodyChoices, ""),
     findings: flagParam("findings"),
+    noHub: flagParam("nohub"),
     branch: textParam("branch"),
     search: textParam("q"),
     sort: sortParam("sort", pageSortFields),
@@ -69,6 +73,9 @@ export function filterOf(siteId: string, query: PagesQuery): PageFilter {
     if (query.findings) {
         filter.findings = true;
     }
+    if (query.noHub) {
+        filter.gap = noHubGap;
+    }
     if (query.branch !== "") {
         filter.under = query.branch;
     }
@@ -82,7 +89,18 @@ export function facetsOf(filter: PageFilter): PageFacets {
     return Object.fromEntries(Object.entries(filter).filter(([key]) => key !== "siteId")) as PageFacets;
 }
 
-const filterKeys: readonly (keyof PagesQuery)[] = ["status", "entityId", "unmapped", "pathPrefix", "typeId", "body", "findings", "branch", "search"];
+const filterKeys: readonly (keyof PagesQuery)[] = [
+    "status",
+    "entityId",
+    "unmapped",
+    "pathPrefix",
+    "typeId",
+    "body",
+    "findings",
+    "noHub",
+    "branch",
+    "search",
+];
 
 export function narrowed(query: PagesQuery): boolean {
     return codec.carries(query, filterKeys);

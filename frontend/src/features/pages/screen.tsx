@@ -11,6 +11,7 @@ import type { Selection } from "../../ui/selection.js";
 import { dropWhole, isEmpty, selectAll } from "../../ui/selection.js";
 import { StartRunDrawer } from "../runs/start.js";
 import { SyncButton } from "../sync/index.js";
+import { rootFolder } from "./address/model.js";
 import { PlanPageDialog } from "./create.js";
 import { PageDrawer } from "./drawer.js";
 import { useEntityIndex } from "./entities.js";
@@ -50,7 +51,7 @@ export function PagesScreen(): ReactElement {
     const [selectedId, setSelectedId] = useState<string | null>(pageId);
     const [creating, setCreating] = useState(false);
     const [running, setRunning] = useState<{ pageIds: readonly string[]; paths: ReadonlyMap<string, string> } | null>(null);
-    const [treeExpanded, setTreeExpanded] = useState<ReadonlySet<string>>(new Set());
+    const [treeExpanded, setTreeExpanded] = useState<ReadonlySet<string>>(new Set([rootFolder]));
     const known = useRef(new Map<string, KnownRow>());
     const filter = useMemo(() => filterOf(siteId, query), [siteId, query]);
     const facets = useMemo(() => facetsOf(filter), [filter]);
@@ -78,7 +79,7 @@ export function PagesScreen(): ReactElement {
 
     useEffect(() => {
         known.current = new Map();
-        setTreeExpanded(new Set());
+        setTreeExpanded(new Set([rootFolder]));
     }, [siteId]);
 
     useEffect(() => {
@@ -110,10 +111,12 @@ export function PagesScreen(): ReactElement {
         void navigate(`/s/${siteId}/pages/${id}${search}`);
     };
 
-    const under = (id: string): void => {
+    const under = (path: string): void => {
         rememberPages(siteId, { view: "list" });
-        change({ ...query, branch: id });
+        change({ ...query, branch: "", pathPrefix: path });
     };
+
+    const knownRows = useCallback(() => known.current, []);
 
     const showView = (next: PagesView): void => {
         rememberPages(siteId, { view: next });
@@ -279,7 +282,7 @@ export function PagesScreen(): ReactElement {
                     selection={selection}
                     onSelection={setSelection}
                     naming={naming}
-                    known={() => known.current}
+                    known={knownRows}
                     entityName={(entityId) => index.labels.get(entityId) ?? entityId}
                     selectAll={
                         view === "list" && matching !== null && matching > 0 && !wholeOf(selection, facets)

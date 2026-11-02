@@ -14,10 +14,15 @@ describe("readQuery", () => {
             typeId: "",
             body: "",
             findings: false,
+            noHub: false,
             branch: "",
             search: "",
             sort: { field: "path", desc: true },
         });
+    });
+
+    it("reads the pages with no hub above them", () => {
+        expect(readQuery(new URLSearchParams("nohub=1")).noHub).toBe(true);
     });
 
     it("reads the type, the text, the findings, the branch and the search", () => {
@@ -55,6 +60,7 @@ describe("writeQuery", () => {
             typeId: "t1",
             body: "with" as const,
             findings: true,
+            noHub: true,
             branch: "p1",
             search: "mugs",
             sort: { field: "createdAt" as const, desc: false },
@@ -106,6 +112,11 @@ describe("filterOf", () => {
             filterOf("site", { ...defaultQuery, typeId: "t1", body: "without", findings: true, branch: "p1", search: "  mugs " }),
         ).toStrictEqual({ siteId: "site", pageTypeId: "t1", body: "without", findings: true, under: "p1", search: "mugs" });
         expect(filterOf("site", { ...defaultQuery, search: "   " })).toStrictEqual({ siteId: "site" });
+    });
+
+    it("asks for the gap of the pages with no hub above them", () => {
+        expect(filterOf("site", { ...defaultQuery, noHub: true })).toStrictEqual({ siteId: "site", gap: "no_hub" });
+        expect(activeFilters({ ...defaultQuery, noHub: true })).toBe(1);
     });
 
     it("hands the facets of a filter to a selection without its site", () => {

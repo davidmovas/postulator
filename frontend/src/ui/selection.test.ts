@@ -39,6 +39,14 @@ const sizes: Readonly<Record<string, number>> = { a: 5, a1: 3, a1x: 1, a1y: 1, a
 
 const tree: Readonly<Record<string, readonly string[]>> = { a: ["a1", "a2"], a1: ["a1x", "a1y"], a1x: [], a1y: [], a2: [], b: ["b1"], b1: [] };
 
+const addresses: Readonly<Record<string, string>> = {
+    a: "/a/", a1: "/a/1/", a1x: "/a/1/x/", a1y: "/a/1/y/", a2: "/a/2/", b: "/b/", b1: "/b/1/",
+};
+
+function pathOf(key: string): string | undefined {
+    return addresses[key];
+}
+
 const rowOf = (id: string): SelectionRow | undefined => site[id];
 
 function row(id: string): SelectionRow {
@@ -151,7 +159,7 @@ describe("a branch taken out of a ticked branch", () => {
         expect(state.outs.map((out) => out.pageId)).toStrictEqual(["a1"]);
         expect(count(state)).toBe(2);
         expect(exact(state)).toBe(true);
-        expect(toRequest("s1", state)).toStrictEqual({ siteId: "s1", subtrees: [{ pageId: "a" }], exceptSubtrees: [{ pageId: "a1" }] });
+        expect(toRequest("s1", state, pathOf)).toStrictEqual({ siteId: "s1", folders: [{ path: "/a/" }], exceptFolders: [{ path: "/a/1/" }] });
     });
 
     it("drops the picks, rows and exceptions beneath a branch it takes out", () => {
@@ -178,11 +186,11 @@ describe("a branch taken out of a ticked branch", () => {
     it("splits the branch along the path when a page inside it is ticked", () => {
         const state = branch(unbranch(branch(noSelection, "a"), "a1"), "a1x");
         expect(chosen(state)).toStrictEqual(["a", "a1x", "a2"]);
-        expect(toRequest("s1", state)).toStrictEqual({
+        expect(toRequest("s1", state, pathOf)).toStrictEqual({
             siteId: "s1",
-            subtrees: [{ pageId: "a" }],
+            folders: [{ path: "/a/" }],
             except: ["a1"],
-            exceptSubtrees: [{ pageId: "a1y" }],
+            exceptFolders: [{ path: "/a/1/y/" }],
         });
         expect(count(state)).toBe(3);
         expect(exact(state)).toBe(true);
@@ -210,10 +218,10 @@ describe("a branch taken out of a ticked branch", () => {
     it("takes one type's branch out of a type's pick", () => {
         const state = unbranch(branch(noSelection, "a", "guide"), "a1", "guide");
         expect(chosen(state)).toStrictEqual([]);
-        expect(toRequest("s1", state)).toStrictEqual({
+        expect(toRequest("s1", state, pathOf)).toStrictEqual({
             siteId: "s1",
-            subtrees: [{ pageId: "a", typeId: "guide" }],
-            exceptSubtrees: [{ pageId: "a1", typeId: "guide" }],
+            folders: [{ path: "/a/", typeId: "guide" }],
+            exceptFolders: [{ path: "/a/1/", typeId: "guide" }],
         });
         expect(exact(state)).toBe(false);
     });
@@ -387,9 +395,9 @@ describe("the request Go resolves", () => {
         { label: "nothing", state: () => noSelection, request: { siteId: "s1" } },
         { label: "picked rows", state: () => tick(noSelection, "b", "a1"), request: { siteId: "s1", pageIds: ["b", "a1"] } },
         {
-            label: "subtrees with and without a type",
+            label: "folders with and without a type",
             state: () => branch(branch(noSelection, "a", "guide"), "b"),
-            request: { siteId: "s1", subtrees: [{ pageId: "a", typeId: "guide" }, { pageId: "b" }] },
+            request: { siteId: "s1", folders: [{ path: "/a/", typeId: "guide" }, { path: "/b/" }] },
         },
         {
             label: "a filter without its empty fields",
@@ -400,11 +408,50 @@ describe("the request Go resolves", () => {
         { label: "a group", state: () => selectGroup(noSelection, "guide", 4), request: { siteId: "s1", filter: { pageTypeId: "guide" }, seen: 4 } },
         { label: "a rule's matches", state: () => selectRule(noSelection, "r-guide", 4), request: { siteId: "s1", ruleId: "r-guide", seen: 4 } },
         {
-            label: "a subtree with an exception and a branch out beside a picked row",
+            label: "a folder with an exception and a folder out beside a picked row",
             state: () => unbranch(tick(branch(tick(noSelection, "b1"), "a"), "a2"), "a1"),
-            request: { siteId: "s1", pageIds: ["b1"], subtrees: [{ pageId: "a" }], except: ["a2"], exceptSubtrees: [{ pageId: "a1" }] },
+            request: { siteId: "s1", pageIds: ["b1"], folders: [{ path: "/a/" }], except: ["a2"], exceptFolders: [{ path: "/a/1/" }] },
         },
     ])("asks for $label", ({ state, request }) => {
-        expect(toRequest("s1", state())).toStrictEqual(request);
+        expect(toRequest("s1", state(), pathOf)).toStrictEqual(request);
+    });
+});
+
+describe("the request of a tree keyed by address", () => {
+    const addressed: Readonly<Record<string, SelectionRow>> = {
+        "/products/": { ancestors: ["home"] },
+        "page-p1": { ancestors: ["/products/", "home"], typeId: "product" },
+        "page-p2": { ancestors: ["/products/", "home"], typeId: "product" },
+        "/guides/": { ancestors: ["home"] },
+    };
+    const paths: Readonly<Record<string, string>> = { home: "/", "page-p1": "/products/p1/", "page-p2": "/products/p2/" };
+    const pathOfAddress = (key: string): string | undefined => paths[key];
+    const at = (state: Selection, key: string, typeId?: string): Selection =>
+        must(selectSubtree(state, typeId === undefined ? { pageId: key, size: 1 } : { pageId: key, typeId, size: null }, addressed[key]));
+
+    it.each<{ label: string; state: () => Selection; request: PageSelection }>([
+        { label: "nothing", state: () => noSelection, request: { siteId: "s1" } },
+        {
+            label: "folders, with and without a type, by their path",
+            state: () => at(at(noSelection, "/products/", "product"), "page-p2"),
+            request: { siteId: "s1", folders: [{ path: "/products/", typeId: "product" }, { path: "/products/p2/" }] },
+        },
+        {
+            label: "a folder less the folder of one of its pages",
+            state: () => clearSubtree(at(noSelection, "/products/"), { pageId: "page-p2", size: 1 }, addressed["page-p2"]),
+            request: { siteId: "s1", folders: [{ path: "/products/" }], exceptFolders: [{ path: "/products/p2/" }] },
+        },
+        {
+            label: "single rows as their pages, a folder with no page as nothing",
+            state: () => must(toggle(must(toggle(noSelection, "page-p1", addressed["page-p1"])), "/guides/", addressed["/guides/"])),
+            request: { siteId: "s1", pageIds: ["page-p1"] },
+        },
+        {
+            label: "a type's whole group beside a row it leaves out",
+            state: () => must(toggle(selectGroup(noSelection, "product", 2), "page-p1", addressed["page-p1"])),
+            request: { siteId: "s1", filter: { pageTypeId: "product" }, seen: 2, except: ["page-p1"] },
+        },
+    ])("asks for $label", ({ state, request }) => {
+        expect(toRequest("s1", state(), pathOfAddress)).toStrictEqual(request);
     });
 });

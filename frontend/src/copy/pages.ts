@@ -85,6 +85,8 @@ export const pages = {
         anyEntity: "Any entity",
         descendants: "And every entity under it",
         unmapped: "No entity attached",
+        noHub: "No hub above",
+        noHubHint: "Articles and products whose entity has no hub page anywhere above it in the graph",
         noEntities: "This site has no entities yet.",
     },
     loading: "Loading the page map",
@@ -279,6 +281,11 @@ export const pages = {
     },
     tree: {
         empty: "No page of this site is on the map yet.",
+        label: "Pages by address",
+        loading: "Loading the pages by address",
+        folder: "No page at this address; it only holds the pages under it",
+        pages: (count: number) => (count === 1 ? "1 page under this address" : `${count.toLocaleString("en-US")} pages under this address`),
+        under: (path: string) => `List the pages whose address starts with ${path}`,
     },
     byType: {
         title: "Page types",
@@ -308,6 +315,7 @@ export const pages = {
         search: (words: string) => `mentions “${words}”`,
         entity: (name: string, below: boolean) => (below ? `belongs to ${name} or an entity under it` : `belongs to ${name}`),
         unmapped: "has no entity",
+        noHub: "has no hub above its entity",
         group: (name: string) => `every ${name} page`,
         rule: (rule: string) => `every page ${rule} types`,
         subtree: (path: string) => `${path} and everything under it`,

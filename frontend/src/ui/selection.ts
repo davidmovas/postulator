@@ -1,4 +1,4 @@
-import type { PageFacets, PageSelection, PageSubtree } from "../data/types.js";
+import type { PageFacets, PageFolder, PageSelection } from "../data/types.js";
 
 export interface SelectionRow {
     ancestors?: readonly string[];
@@ -420,17 +420,33 @@ function cleanFilter(filter: PageFacets): PageFacets {
     return out;
 }
 
-function asked(pick: HeldSubtree): PageSubtree {
-    return pick.typeId === undefined ? { pageId: pick.pageId } : { pageId: pick.pageId, typeId: pick.typeId };
+export function isFolderKey(key: string): boolean {
+    return key.startsWith("/");
 }
 
-export function toRequest(siteId: string, state: Selection): PageSelection {
+function foldersOf(picks: readonly HeldSubtree[], pathOf: (key: string) => string | undefined): PageFolder[] {
+    return picks.flatMap((pick) => {
+        const path = isFolderKey(pick.pageId) ? pick.pageId : pathOf(pick.pageId);
+        if (path === undefined) {
+            return [];
+        }
+        return [pick.typeId === undefined ? { path } : { path, typeId: pick.typeId }];
+    });
+}
+
+function pageKeys(keys: Iterable<string>): string[] {
+    return [...keys].filter((key) => !isFolderKey(key));
+}
+
+export function toRequest(siteId: string, state: Selection, pathOf: (key: string) => string | undefined): PageSelection {
     const out: PageSelection = { siteId };
-    if (state.ids.size > 0) {
-        out.pageIds = [...state.ids.keys()];
+    const picked = pageKeys(state.ids.keys());
+    if (picked.length > 0) {
+        out.pageIds = picked;
     }
-    if (state.subtrees.length > 0) {
-        out.subtrees = state.subtrees.map(asked);
+    const folders = foldersOf(state.subtrees, pathOf);
+    if (folders.length > 0) {
+        out.folders = folders;
     }
     if (state.whole !== null) {
         if (state.whole.kind === "filter") {
@@ -440,11 +456,13 @@ export function toRequest(siteId: string, state: Selection): PageSelection {
         }
         out.seen = state.whole.seen;
     }
-    if (state.except.size > 0) {
-        out.except = [...state.except.keys()];
+    const except = pageKeys(state.except.keys());
+    if (except.length > 0) {
+        out.except = except;
     }
-    if (state.outs.length > 0) {
-        out.exceptSubtrees = state.outs.map(asked);
+    const outs = foldersOf(state.outs, pathOf);
+    if (outs.length > 0) {
+        out.exceptFolders = outs;
     }
     return out;
 }
