@@ -7,13 +7,18 @@ every ruling is in [`DECISIONS.md`](DECISIONS.md).
 **Released:** `v2.10.0` on 2026-10-30 (PR #37 merged, tagged; store categories, products and the
 front page in the topical map, `/cart/` technical, notes under **Release 2.10.0**). **2.10.1 is built
 on `dev`** (2026-10-30): products read through the plugin when WordPress hides them and the store
-refuses; its notes are under **Release 2.10.1**, and its pull request is open.
+refuses; its notes are under **Release 2.10.1**, and its pull request is open. **2.11.0 is built on
+`dev`** (2026-11-02, not pushed): the Pages tree by address, a run's parents only for a creation, the
+No hub above filter and lens, types shown under their role; notes under **Release 2.11.0**.
 
 ## Next, in order
 
-1. **The pull request from `dev` to `master` for 2.10.1 is open**; the owner merges it and tags
-   `v2.10.1`. No migration; the plugin stays 1.5.2.
-2. **The client installs 2.10.1 and syncs once**: his products come in as pages with their
+1. **2.11.0 goes to `master` when the owner asks** (with 2.10.1 if its pull request is still open).
+   Its gate: `go test ./...` green but `internal/app/scale`, which outran the default ten minutes and
+   needs `-timeout 30m`; vitest, typecheck, both lints and `task build` green; on both stands the
+   whole loop, the client's loop, page types and the product loop passed (replica 190 s, vanilla
+   329 s). Not run: race, the scale package, `e2e:full`, the UI harness walk.
+2. **The client installs it and syncs once**: his products come in as pages with their
    entities. If there are still none, the cause is not this one: look at the Sites panel (is the
    plugin found, and what does it say about WooCommerce) and at `https://<site>/wp-json/wp/v2/types`.
    A message on the run screen when the store cannot be read is proposed and not built.
