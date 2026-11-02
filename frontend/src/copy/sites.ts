@@ -1,3 +1,7 @@
+function many(count: number, one: string, more: string): string {
+    return count === 1 ? `1 ${one}` : `${count.toLocaleString("en-US")} ${more}`;
+}
+
 export const sites = {
     statuses: {
         active: "Active",
@@ -57,6 +61,29 @@ export const sites = {
     deleteBody: (name: string) =>
         `${name} goes, and with it everything recorded for it: its pages and their links, its entities, their anchors and their edges, its runs with their items, artifacts, step records and event log, its own templates and template overrides, its page types and their field scopes, its schedules, its saved import mappings and its agent conversations with their messages. None of it can be brought back, and the stored application password goes with it. Nothing on WordPress is touched: the pages stay on the site.`,
     deleteConfirm: "Delete the site",
+    busy: "A run of this site is under way. Stop it in Runs, then try again.",
+    openRuns: "Open Runs",
+    clear: {
+        button: "Clear data",
+        title: "Clear this site's data",
+        body: (name: string) =>
+            `Choose what Postulator forgets about ${name}. The connection and its password, the site's settings, page types, rules, templates and saved import mappings stay, and nothing on WordPress is touched.`,
+        model: "The site model",
+        modelHint: (pages: number, findings: number) =>
+            `${many(pages, "page", "pages")} and ${many(findings, "finding", "findings")}, with every field, body, render, link and parent a sync read. The next sync reads the whole site again, and text Postulator wrote before counts as the site's own.`,
+        graph: "The entity graph",
+        graphHint: (entities: number, edges: number) =>
+            `${many(entities, "entity", "entities")} and ${many(edges, "edge", "edges")}. Pages lose their entity, and the next sync builds the graph again from the breadcrumbs.`,
+        history: "Runs and chats",
+        historyHint: (runs: number, chats: number) =>
+            `${many(runs, "run", "runs")} and ${many(chats, "chat", "chats")}. Past runs can no longer be reverted; what they wrote stays on the site.`,
+        unfinished: (count: number) =>
+            count === 1 ? "1 run waiting for you goes with them." : `${count.toLocaleString("en-US")} runs waiting for you go with them.`,
+        historyTaken: "Clearing the site model clears these too: they point at its pages.",
+        counting: "Counting what the site holds",
+        nothing: "Choose what to clear.",
+        confirm: "Clear the data",
+    },
     plugin: {
         title: "Companion plugin",
         installed: (version: string) => (version === "" ? "Installed" : `Installed, version ${version}`),

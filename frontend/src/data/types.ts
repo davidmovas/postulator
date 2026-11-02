@@ -40,6 +40,8 @@ export type SitePlugin = Wire<SitesModels.Plugin>;
 export type SiteFilter = ListFilter<SitesModels.ListRequest>;
 export type Reachability = Wire<SitesModels.Reachability>;
 export type SiteSettings = Site["settings"];
+export type SiteDataHeld = Wire<SitesModels.DataHeld>;
+export type ClearSiteDataRequest = SitesModels.ClearDataRequest;
 
 export type Page = Wire<PagesModels.Page>;
 export type PageLink = Wire<PagesModels.PageLink>;

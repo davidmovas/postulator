@@ -21,6 +21,7 @@ import {
     TravelExploreIcon,
 } from "../../ui/index.js";
 import type { SegmentedOption } from "../../ui/index.js";
+import { ClearDataDialog } from "./clear-dialog.js";
 import { SiteDeleteDialog } from "./delete-dialog.js";
 import { SiteDetail } from "./detail.js";
 import { siteStatusLabel } from "./status.js";
@@ -55,6 +56,7 @@ export function SitesScreen(): ReactElement {
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(null);
     const [deleting, setDeleting] = useState<Site | null>(null);
+    const [clearing, setClearing] = useState<Site | null>(null);
 
     const filter = useMemo<SiteFilter>(() => (status === anyStatus ? {} : { status }), [status]);
     const sites = useSites(filter, sort);
@@ -123,6 +125,14 @@ export function SitesScreen(): ReactElement {
                     }}
                 />
             )}
+            {clearing === null ? null : (
+                <ClearDataDialog
+                    site={clearing}
+                    onClose={() => {
+                        setClearing(null);
+                    }}
+                />
+            )}
         </>
     );
 
@@ -158,6 +168,9 @@ export function SitesScreen(): ReactElement {
                         }}
                         onDelete={() => {
                             setDeleting(selected);
+                        }}
+                        onClear={() => {
+                            setClearing(selected);
                         }}
                     />
                 )

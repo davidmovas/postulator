@@ -61,6 +61,7 @@ export const keys = {
         detail: (id: string) => [scope, "sites", "detail", id] as const,
         typesAll: () => [scope, "sites", "types"] as const,
         types: (siteId: string) => [scope, "sites", "types", siteId] as const,
+        held: (siteId: string) => [scope, "sites", "held", siteId] as const,
     },
     pages: {
         root: () => [scope, "pages"] as const,
