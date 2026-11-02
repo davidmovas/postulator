@@ -145,7 +145,7 @@ func (deps Deps) controlRun(ctx context.Context, b Binding, in *runsControlArgs)
 
 func (deps Deps) startRequest(ctx context.Context, b Binding, in *runsControlArgs) (runs.StartRequest, error) {
 	pageIDs := in.PageIDs
-	if len(pageIDs) == 0 && !in.Select.empty() {
+	if len(pageIDs) == 0 && in.Select != nil {
 		picked, err := deps.selectPages(ctx, b, in.Select)
 		if err != nil {
 			return runs.StartRequest{}, err

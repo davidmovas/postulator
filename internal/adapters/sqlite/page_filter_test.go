@@ -67,6 +67,9 @@ func TestThePagesAreFilteredByTypeTextFindingsAndSubtreeAndTypedInBulk(t *testin
 		"an open finding":     {pagemap.Query{SiteID: owner.ID, Findings: true}, []string{hub.Path}},
 		"a type and its text": {pagemap.Query{SiteID: owner.ID, PageTypeID: "guide-type", Body: pagemap.BodyWithout}, nil},
 		"by title":            {pagemap.Query{SiteID: owner.ID, Sort: pagemap.SortTitle}, []string{home.Path, guide.Path, hub.Path, child.Path}},
+		"these pages":         {pagemap.Query{SiteID: owner.ID, PageIDs: []string{guide.ID, child.ID, elsewhere.ID}}, []string{guide.Path, child.Path}},
+		"no page at all":      {pagemap.Query{SiteID: owner.ID, PageIDs: []string{}}, nil},
+		"these pages by type": {pagemap.Query{SiteID: owner.ID, PageIDs: []string{guide.ID, child.ID}, PageTypeID: "guide-type"}, []string{guide.Path}},
 	}
 	for name, tc := range cases {
 		listed, listErr := repo.List(t.Context(), tc.q, paging.Request{Limit: 50})

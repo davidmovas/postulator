@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/kernel/dto"
 )
@@ -67,16 +68,17 @@ type GetResponse struct {
 }
 
 type PageFilter struct {
-	Status             string `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Only this state"`
-	EntityID           string `json:"entityId,omitempty" description:"Only pages of this entity"`
-	IncludeDescendants bool   `json:"includeDescendants,omitempty" description:"With entityId, also the entities below it"`
-	Unmapped           bool   `json:"unmapped,omitempty" description:"Only pages with no entity"`
-	PathPrefix         string `json:"pathPrefix,omitempty" description:"Only paths starting with this"`
-	PageTypeID         string `json:"pageTypeId,omitempty" description:"Only pages of this type"`
-	Body               string `json:"body,omitempty" description:"with or without text of its own"`
-	Findings           bool   `json:"findings,omitempty" description:"Only pages with an open finding"`
-	Search             string `json:"search,omitempty" description:"Words in the title or path"`
-	Under              string `json:"under,omitempty" description:"Only this page and those under it on the site map"`
+	Status             string          `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Only this state"`
+	EntityID           string          `json:"entityId,omitempty" description:"Only pages of this entity"`
+	IncludeDescendants bool            `json:"includeDescendants,omitempty" description:"With entityId, also the entities below it"`
+	Unmapped           bool            `json:"unmapped,omitempty" description:"Only pages with no entity"`
+	PathPrefix         string          `json:"pathPrefix,omitempty" description:"Only paths starting with this"`
+	PageTypeID         string          `json:"pageTypeId,omitempty" description:"Only pages of this type"`
+	Body               string          `json:"body,omitempty" description:"with or without text of its own"`
+	Findings           bool            `json:"findings,omitempty" description:"Only pages with an open finding"`
+	Search             string          `json:"search,omitempty" description:"Words in the title or path"`
+	Under              string          `json:"under,omitempty" description:"Only this page and those under it on the site map"`
+	Gap                contextpack.Gap `json:"gap,omitempty" description:"Only pages with this gap"`
 }
 
 type ListRequest struct {

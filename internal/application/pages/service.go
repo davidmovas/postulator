@@ -96,6 +96,10 @@ type findingClearer interface {
 	Clear(ctx context.Context, siteID string, code finding.Code, subjectKey, resolvedBy, resolution string, at time.Time) error
 }
 
+type gapReader interface {
+	Gapped(ctx context.Context, siteID string, gap contextpack.Gap) ([]string, error)
+}
+
 type Deps struct {
 	Pages      pageStore
 	Types      typeReader
@@ -115,6 +119,7 @@ type Deps struct {
 	Publisher  application.Publisher
 	Clock      clock.Clock
 	Preview    previewIssuer
+	Gaps       gapReader
 }
 
 type Service struct {
@@ -136,6 +141,7 @@ type Service struct {
 	publisher  application.Publisher
 	clock      clock.Clock
 	preview    previewIssuer
+	gaps       gapReader
 }
 
 func New(deps Deps) *Service {
@@ -143,7 +149,7 @@ func New(deps Deps) *Service {
 		pages: deps.Pages, types: deps.Types, links: deps.Links, entities: deps.Entities, edges: deps.Edges, sites: deps.Sites,
 		bodies: deps.Bodies, fields: deps.Fields, renders: deps.Renders, findings: deps.Findings, maps: deps.Maps, rows: deps.Rows,
 		classifier: deps.Classifier, templates: deps.Templates, uow: deps.UnitOfWork, publisher: deps.Publisher, clock: deps.Clock,
-		preview: deps.Preview,
+		preview: deps.Preview, gaps: deps.Gaps,
 	}
 }
 

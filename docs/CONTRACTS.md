@@ -671,9 +671,11 @@ scopes every call. Twenty-three tools since phase 18, one per job: `sites`, `sit
 `pages_fields`, `pages_manage`, `pages_judge`, `links`, `pagetypes`, `pagetypes_classify`, `templates`,
 `runs`, `runs_control`, `imports`, `findings`, `models`, `schedules` and `plans`. A read selects by a
 `view` enum and a write by an `op` enum; `RiskOf` reads the op, so one tool reads, writes and deletes
-at the risk of what it is asked. They measure 48,530 bytes and 11,082 `o200k_base` tokens of schema
+at the risk of what it is asked. They measure 48,858 bytes and 11,164 `o200k_base` tokens of schema
 resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds against
-`schemaCeilingBytes` (48,530) and `schemaCeilingTokens` (11,082) and logs with the eight widest.
+`schemaCeilingBytes` (48,858) and `schemaCeilingTokens` (11,164) and logs with the eight widest.
+A selection (`select` of `pages_manage` and `runs_control`) takes `gap` alone or with `ofType`, never
+with `under`, so the agent re-templates or runs every page `pages_find` names by a gap in one call.
 Since phase 19 `runs_control` starts no sync, a sync being the site's own (`sites_manage op sync`),
 one at a time, and `pagetypes` creates no Hub or Entity type (`creatablePageTypePresets`).
 `Describe` says in one sentence what a write's op will do, the sentence a confirmation card, a

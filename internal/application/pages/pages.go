@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/davidmovas/postulator/internal/application"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -395,12 +396,31 @@ func (s *Service) query(ctx context.Context, siteID string, filter PageFilter) (
 			return pagemap.Query{}, err
 		}
 	}
+	if filter.Gap != "" {
+		if q.PageIDs, err = s.gapped(ctx, siteID, filter.Gap); err != nil {
+			return pagemap.Query{}, err
+		}
+	}
 	if q.ReadsMap() && s.maps != nil {
 		if refreshErr := s.maps.Refresh(ctx, siteID); refreshErr != nil {
 			return pagemap.Query{}, refreshErr
 		}
 	}
 	return q, nil
+}
+
+func (s *Service) gapped(ctx context.Context, siteID string, gap contextpack.Gap) ([]string, error) {
+	if !slices.Contains(contextpack.Gaps(), gap) {
+		return nil, errors.New(errors.Invalid, "the gap is not recognized").WithDetail("field", "gap").WithDetail("value", string(gap))
+	}
+	held, err := s.gaps.Gapped(ctx, siteID, gap)
+	if err != nil {
+		return nil, err
+	}
+	if held == nil {
+		held = []string{}
+	}
+	return held, nil
 }
 
 func (s *Service) trailOf(ctx context.Context, siteID, pageID string) (string, error) {

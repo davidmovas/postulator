@@ -163,12 +163,6 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Sites: siteRepo, Specs: templateService, Types: types,
 	})
 
-	pagesService := pages.New(pages.Deps{
-		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Types: sqlite.NewPageTypeRepo(store),
-		Bodies: sqlite.NewPageBodyRepo(store), Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),
-		Rows: sqlite.NewPageMapRepo(store), Templates: templateRepo, UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
-	})
-	seeded.store, seeded.types, seeded.pages = store, types, pagesService
 	siteModel := sitemodel.New(sitemodel.Deps{
 		Budgets: wholeWindow{}, Audits: reportsService, Reader: store, UnitOfWork: store, Maps: sqlite.NewPageMapRepo(store),
 		Sites: siteRepo, Pages: pageRepo,
@@ -177,6 +171,13 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Renders: sqlite.NewPageRenderRepo(store), Links: linkRepo, Findings: sqlite.NewFindingRepo(store),
 		Runs: runRepo, Items: itemRepo,
 	})
+	pagesService := pages.New(pages.Deps{
+		Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Types: sqlite.NewPageTypeRepo(store),
+		Bodies: sqlite.NewPageBodyRepo(store), Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),
+		Rows: sqlite.NewPageMapRepo(store), Templates: templateRepo, UnitOfWork: store, Publisher: bus, Clock: now, Preview: stubPreview{},
+		Gaps: siteModel,
+	})
+	seeded.store, seeded.types, seeded.pages = store, types, pagesService
 	graphService := graph.New(graph.Deps{
 		Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo, Pages: pageRepo, Findings: sqlite.NewFindingRepo(store),
 		Identities: sqlite.NewPageIdentityRepo(store), Fields: sqlite.NewPageFieldRepo(store), Maps: siteModel,

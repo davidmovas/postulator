@@ -85,6 +85,31 @@ func TestManyPagesAreFoundInOneCallWithTheirKeyFacts(t *testing.T) {
 	}
 }
 
+func TestTheGappedPagesAreTheOnesFindAnswersForTheGap(t *testing.T) {
+	t.Parallel()
+
+	m := wide()
+	found := findAll(t, m, sitemodel.FindRequest{Gap: contextpack.GapEmpty})
+	want := make([]string, 0, len(found))
+	for _, node := range found {
+		want = append(want, node.Page.PageID)
+	}
+	slices.Sort(want)
+
+	got, err := m.Service().Gapped(t.Context(), m.Site.ID, contextpack.GapEmpty)
+	if err != nil {
+		t.Fatalf("Gapped: %v", err)
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Gapped = %v, want the %d pages Find answers, by id", got, len(want))
+	}
+	for _, refused := range []struct{ site, gap string }{{site: m.Site.ID, gap: "everything"}, {gap: string(contextpack.GapEmpty)}} {
+		if _, err = m.Service().Gapped(t.Context(), refused.site, contextpack.Gap(refused.gap)); !errors.IsCode(err, errors.Invalid) {
+			t.Errorf("Gapped(%q, %q) = %v, want invalid", refused.site, refused.gap, err)
+		}
+	}
+}
+
 func TestAPageIsFoundByTheKeywordsItTakesFromItsEntity(t *testing.T) {
 	t.Parallel()
 
