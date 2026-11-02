@@ -38,6 +38,7 @@ type ModelUseCase interface {
 type SiteModelUseCase interface {
 	Pack(ctx context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error)
 	SiteMap(ctx context.Context, req sitemodel.MapRequest) (sitemodel.MapView, error)
+	AddressTree(ctx context.Context, req sitemodel.AddressRequest) (sitemodel.AddressView, error)
 }
 
 type PagesService struct {
@@ -60,6 +61,7 @@ type PagesService struct {
 	modelSummary middleware.Handler[observe.SummaryRequest, observe.Summary]
 	writerPack   middleware.Handler[sitemodel.PackRequest, sitemodel.PackView]
 	siteMap      middleware.Handler[sitemodel.MapRequest, sitemodel.MapView]
+	addressTree  middleware.Handler[sitemodel.AddressRequest, sitemodel.AddressView]
 }
 
 func NewPagesService(
@@ -85,11 +87,16 @@ func NewPagesService(
 		modelSummary: Wrap(logger, "pages.modelSummary", call(models, ModelUseCase.SummaryOf)),
 		writerPack:   Wrap(logger, "pages.writerPack", call(siteModel, SiteModelUseCase.Pack)),
 		siteMap:      Wrap(logger, "pages.siteMap", call(siteModel, SiteModelUseCase.SiteMap)),
+		addressTree:  Wrap(logger, "pages.addressTree", call(siteModel, SiteModelUseCase.AddressTree)),
 	}
 }
 
 func (s *PagesService) SiteMap(c context.Context, req sitemodel.MapRequest) (sitemodel.MapView, error) {
 	return s.siteMap(c, req)
+}
+
+func (s *PagesService) AddressTree(c context.Context, req sitemodel.AddressRequest) (sitemodel.AddressView, error) {
+	return s.addressTree(c, req)
 }
 
 func (s *PagesService) WriterPack(c context.Context, req sitemodel.PackRequest) (sitemodel.PackView, error) {

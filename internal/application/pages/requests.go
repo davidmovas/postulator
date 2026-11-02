@@ -101,15 +101,22 @@ type Subtree struct {
 	TypeID string `json:"typeId,omitempty"`
 }
 
+type Folder struct {
+	Path   string `json:"path"`
+	TypeID string `json:"typeId,omitempty"`
+}
+
 type Selection struct {
 	SiteID         string      `json:"siteId"`
 	PageIDs        []string    `json:"pageIds,omitempty"`
 	Subtrees       []Subtree   `json:"subtrees,omitempty"`
+	Folders        []Folder    `json:"folders,omitempty"`
 	Filter         *PageFilter `json:"filter,omitempty"`
 	Seen           int         `json:"seen,omitempty"`
 	RuleID         string      `json:"ruleId,omitempty"`
 	Except         []string    `json:"except,omitempty"`
 	ExceptSubtrees []Subtree   `json:"exceptSubtrees,omitempty"`
+	ExceptFolders  []Folder    `json:"exceptFolders,omitempty"`
 }
 
 type ResolveResponse struct {

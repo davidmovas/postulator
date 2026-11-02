@@ -128,6 +128,21 @@ func TestThePagesAreFilteredByTypeTextFindingsAndSubtreeAndTypedInBulk(t *testin
 	if err != nil || !slices.Equal(under, []string{hub.ID, child.ID}) {
 		t.Fatalf("IDsUnder = %v %v, want the hub and its child", under, err)
 	}
+	for name, tc := range map[string]struct {
+		folder, typeID string
+		want           []string
+	}{
+		"a folder":                 {"/peptides/", "", []string{hub.ID, child.ID}},
+		"a folder's guides":        {"/", "guide-type", []string{guide.ID}},
+		"the whole site":           {"/", "", []string{home.ID, guide.ID, hub.ID, child.ID}},
+		"a folder that holds none": {"/peptides/healing/", "guide-type", []string{}},
+		"a wildcard is a letter":   {"/pep%/", "", []string{}},
+	} {
+		at, atErr := sqlite.NewPageMapRepo(store).IDsAt(t.Context(), owner.ID, tc.folder, tc.typeID)
+		if atErr != nil || !slices.Equal(at, tc.want) {
+			t.Errorf("IDsAt %s = %v %v, want %v", name, at, atErr, tc.want)
+		}
+	}
 
 	types := sqlite.NewPageTypeRepo(store)
 	kind := pagetype.Type{ID: id.New(), SiteID: owner.ID, Name: "Guide", Preset: pagetype.Guide, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp}

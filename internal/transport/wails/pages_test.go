@@ -95,6 +95,10 @@ func (f siteModelFake) SiteMap(context.Context, sitemodel.MapRequest) (sitemodel
 	return answer[sitemodel.MapView](f.mode)
 }
 
+func (f siteModelFake) AddressTree(context.Context, sitemodel.AddressRequest) (sitemodel.AddressView, error) {
+	return answer[sitemodel.AddressView](f.mode)
+}
+
 func pagesService(mode failure) *wails.PagesService {
 	return wails.NewPagesService(zap.NewNop(), ready[wails.PagesUseCase](pagesFake{mode: mode}),
 		ready[wails.ModelUseCase](pageModelsFake{mode: mode}), ready[wails.SiteModelUseCase](siteModelFake{mode: mode}))
@@ -104,7 +108,7 @@ func TestPagesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, pagesService(missing), []string{
-		"Count", "Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "ResolveSelection",
+		"AddressTree", "Count", "Create", "Delete", "Get", "List", "MapToEntity", "Model", "ModelSummary", "PreviewLink", "ResolveSelection",
 		"SetCanonical", "SetTemplates", "SetType", "SetTypes", "SiteMap", "Tree", "Unmap", "Update", "WriterPack",
 	})
 	assertEveryMethodConverts(t, pagesService(missing), missingBody)

@@ -43,6 +43,7 @@ type mapRefresher interface {
 type mapRows interface {
 	ListByIDs(ctx context.Context, pageIDs []string) ([]contextpack.MapRow, error)
 	IDsUnder(ctx context.Context, siteID, trail, typeID string) ([]string, error)
+	IDsAt(ctx context.Context, siteID, folder, typeID string) ([]string, error)
 }
 
 type classifier interface {

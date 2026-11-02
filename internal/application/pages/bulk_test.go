@@ -103,6 +103,13 @@ func TestASelectionIsResolvedFromItsIDsSubtreesFilterAndRuleLessItsExceptions(t 
 		"a type, seen as two": {pages.Selection{Filter: &pages.PageFilter{PageTypeID: b.category.ID}, Seen: 2},
 			[]string{"/peptides/", "/peptides/healing/"}},
 		"a rule's matches": {pages.Selection{RuleID: "rule-13"}, []string{"/lab-guides/"}},
+		"a folder, by its address": {pages.Selection{Folders: []pages.Folder{{Path: "/peptides/"}}},
+			[]string{"/peptides/", "/peptides/healing/", "/peptides/healing/bpc/"}},
+		"a folder's guides": {pages.Selection{Folders: []pages.Folder{{Path: "/peptides/", TypeID: b.guide.ID}}},
+			[]string{"/peptides/healing/bpc/"}},
+		"the site less a folder": {pages.Selection{
+			Folders: []pages.Folder{{Path: "/"}}, ExceptFolders: []pages.Folder{{Path: "/peptides/healing/"}},
+		}, []string{"/", "/lab-guides/", "/peptides/", "/product/bpc/"}},
 		"a gap": {pages.Selection{Filter: &pages.PageFilter{Gap: contextpack.GapNoHub}, Seen: 2},
 			[]string{"/peptides/healing/bpc/", "/product/bpc/"}},
 		"a gap of one type": {pages.Selection{Filter: &pages.PageFilter{Gap: contextpack.GapNoHub, PageTypeID: b.product.ID}},
@@ -135,6 +142,16 @@ func TestASelectionIsResolvedFromItsIDsSubtreesFilterAndRuleLessItsExceptions(t 
 	}
 	if _, err := b.service.Resolve(t.Context(), pages.Selection{SiteID: b.siteID, Filter: &pages.PageFilter{Gap: "everything"}}); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("an unknown gap = %v, want INVALID", err)
+	}
+	for _, path := range []string{"", "/peptides", "peptides/"} {
+		for _, sel := range []pages.Selection{
+			{SiteID: b.siteID, Folders: []pages.Folder{{Path: path}}},
+			{SiteID: b.siteID, PageIDs: []string{b.ids["/"]}, ExceptFolders: []pages.Folder{{Path: path}}},
+		} {
+			if _, err := b.service.Resolve(t.Context(), sel); !errors.IsCode(err, errors.Invalid) {
+				t.Errorf("the folder %q = %v, want INVALID", path, err)
+			}
+		}
 	}
 	counted, err := b.service.Count(t.Context(), pages.CountRequest{SiteID: b.siteID, PageFilter: pages.PageFilter{Gap: contextpack.GapNoHub}})
 	if err != nil || counted.Pages != 2 {

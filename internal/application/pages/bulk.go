@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -67,6 +68,9 @@ func (s *Service) resolve(ctx context.Context, sel Selection) ([]string, error) 
 			picked[pageID] = true
 		}
 	}
+	if err := s.atFolders(ctx, sel.SiteID, sel.Folders, picked, true); err != nil {
+		return nil, err
+	}
 	if sel.Filter != nil {
 		q, err := s.query(ctx, sel.SiteID, *sel.Filter)
 		if err != nil {
@@ -111,6 +115,9 @@ func (s *Service) resolve(ctx context.Context, sel Selection) ([]string, error) 
 			delete(picked, pageID)
 		}
 	}
+	if err := s.atFolders(ctx, sel.SiteID, sel.ExceptFolders, picked, false); err != nil {
+		return nil, err
+	}
 	if len(picked) > SelectionLimit {
 		return nil, errors.New(errors.Invalid, "a selection holds at most "+strconv.Itoa(SelectionLimit)+" pages; narrow it").
 			WithDetail("field", "selection").WithDetail("reason", reasonSelectionLimit)
@@ -121,6 +128,27 @@ func (s *Service) resolve(ctx context.Context, sel Selection) ([]string, error) 
 	}
 	slices.Sort(out)
 	return out, nil
+}
+
+func (s *Service) atFolders(ctx context.Context, siteID string, folders []Folder, picked map[string]bool, keep bool) error {
+	for _, folder := range folders {
+		if !contextpack.IsFolder(folder.Path) {
+			return errors.New(errors.Invalid, "a folder is a path with both slashes, such as /products/").
+				WithDetail("field", "folders").WithDetail("path", folder.Path)
+		}
+		at, err := s.rows.IDsAt(ctx, siteID, folder.Path, strings.TrimSpace(folder.TypeID))
+		if err != nil {
+			return err
+		}
+		for _, pageID := range at {
+			if keep {
+				picked[pageID] = true
+			} else {
+				delete(picked, pageID)
+			}
+		}
+	}
+	return nil
 }
 
 func seenAgain(seen, now int) error {
