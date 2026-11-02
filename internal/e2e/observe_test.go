@@ -356,8 +356,8 @@ func TestTheSiteIsObservedIntoTheModel(t *testing.T) {
 func storePagesCarryTheirEntities(t *testing.T, models map[string]observe.PageModel, twins map[string]string) {
 	t.Helper()
 
-	for path, model := range models {
-		page := model.Page
+	for path := range models {
+		page := models[path].Page
 		store := page.WPType == pagemap.WPProduct || page.WPType.Term()
 		if page.WPID == nil || page.Status == pagemap.StatusArchived || (!store && page.Path != pagemap.RootPath) {
 			continue
