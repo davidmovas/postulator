@@ -30,7 +30,11 @@ func (f *fixture) chain(links ...chain) {
 	}}
 	f.mapping.known = make(map[string]pagemap.Page, len(links))
 	for _, link := range links {
-		page := pagemap.Page{ID: link.id, SiteID: f.siteID, Path: link.path, WPType: link.wpType, WPID: link.wpID}
+		wpType := link.wpType
+		if wpType == "" {
+			wpType = pagemap.WPPage
+		}
+		page := pagemap.Page{ID: link.id, SiteID: f.siteID, Path: link.path, WPType: wpType, WPID: link.wpID}
 		if link.parent != "" {
 			parent := link.parent
 			page.ParentPageID = &parent
@@ -130,6 +134,48 @@ func TestStartAddsNoAncestorToAProductTheStoreAddresses(t *testing.T) {
 	}
 	if got := fixture.engine.queued.Targets; !slices.Equal(got, []string{"liquid", "capsules"}) {
 		t.Errorf("the run targets %v, want the products alone", got)
+	}
+}
+
+func TestStartAddsNoAncestorToAPageNothingCreates(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		wpType pagemap.WPType
+		wpID   *int64
+	}{
+		{name: "a page already on the site under a planned breadcrumb parent", wpType: pagemap.WPPage, wpID: onSite()},
+		{name: "a planned post, which WordPress files under no parent", wpType: pagemap.WPPost},
+		{name: "a planned post of a custom type", wpType: pagemap.WPType("researcher")},
+		{name: "a custom type already on the site", wpType: pagemap.WPType("researcher"), wpID: onSite()},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newFixture(t)
+			fixture.chain(
+				chain{id: "researchers", path: "/researchers/", mapped: true},
+				chain{id: "products", path: "/researchers/products/", parent: "researchers", mapped: true},
+				chain{id: "p1", path: "/products/p1/", parent: "products", wpType: tc.wpType, wpID: tc.wpID, mapped: true},
+			)
+
+			resp, err := fixture.service.Start(t.Context(), runs.StartRequest{SiteID: fixture.siteID, PageIDs: []string{"p1"}})
+			if err != nil {
+				t.Fatalf("Start: %v", err)
+			}
+			if len(resp.Added) != 0 || !slices.Equal(fixture.engine.queued.Targets, []string{"p1"}) {
+				t.Fatalf("Added = %+v, targets %v; only a page the run creates needs its parent first",
+					resp.Added, fixture.engine.queued.Targets)
+			}
+
+			parents, err := fixture.service.Parents(t.Context(), runs.ParentsRequest{SiteID: fixture.siteID, PageIDs: []string{"p1"}})
+			if err != nil || len(parents.Added) != 0 {
+				t.Fatalf("Parents = %+v, %v; want none for the drawer to tick", parents.Added, err)
+			}
+		})
 	}
 }
 

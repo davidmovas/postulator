@@ -15,7 +15,7 @@ type placement struct {
 }
 
 func parentFor(ctx context.Context, deps Deps, page pagemap.Page) (placement, error) {
-	if !hierarchical(page) || page.WPID != nil {
+	if !page.CreatedUnderParent() {
 		return placement{}, nil
 	}
 	return parentOf(ctx, deps, page)

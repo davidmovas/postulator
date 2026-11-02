@@ -191,6 +191,29 @@ func TestAPageIsLiveOnlyWhenTheSitePublishesIt(t *testing.T) {
 	}
 }
 
+func TestOnlyAPageWordPressHasNotCreatedSitsUnderAParentToBeCreated(t *testing.T) {
+	t.Parallel()
+
+	wpID := int64(7)
+	cases := []struct {
+		name  string
+		page  pagemap.Page
+		under bool
+	}{
+		{name: "a planned page", page: pagemap.Page{WPType: pagemap.WPPage}, under: true},
+		{name: "a page on the site", page: pagemap.Page{WPType: pagemap.WPPage, WPID: &wpID}},
+		{name: "a planned post", page: pagemap.Page{WPType: pagemap.WPPost}},
+		{name: "a planned custom type", page: pagemap.Page{WPType: pagemap.WPType("researcher")}},
+		{name: "a planned product", page: pagemap.Page{WPType: pagemap.WPProduct}},
+		{name: "a store category", page: pagemap.Page{WPType: pagemap.WPProductCategory, WPID: &wpID}},
+	}
+	for _, tc := range cases {
+		if got := tc.page.CreatedUnderParent(); got != tc.under {
+			t.Errorf("%s: CreatedUnderParent = %v, want %v", tc.name, got, tc.under)
+		}
+	}
+}
+
 func TestEnums(t *testing.T) {
 	t.Parallel()
 
