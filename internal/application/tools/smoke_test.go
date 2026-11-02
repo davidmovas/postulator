@@ -192,7 +192,10 @@ func wired(t *testing.T) (registry *tools.Registry, binding tools.Binding, seede
 		Publisher: bus, Clock: now,
 	})
 	return tools.New(tools.Deps{
-		Sites:     sites.New(siteRepo, secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), store, types, stubProbe{}, bus, now),
+		Sites: sites.New(sites.Deps{
+			Store: siteRepo, Secrets: secrets.NewStore(sqlite.NewSecretsRepo(store, now), sqlitetest.Key()), UoW: store, Types: types,
+			Data: sqlite.NewSiteDataRepo(store), Probe: stubProbe{}, Publisher: bus, Clock: now,
+		}),
 		Graph:     graphService,
 		Pages:     pagesService,
 		PageTypes: types,

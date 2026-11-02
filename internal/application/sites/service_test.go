@@ -58,7 +58,10 @@ func newHarness(t *testing.T) harness {
 		Templates: sqlite.NewTemplateRepo(store), Sites: sqlite.NewSiteRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk,
 	})
 	return harness{
-		service: sites.New(sqlite.NewSiteRepo(store), vault, store, types, reach, recorder, clk),
+		service: sites.New(sites.Deps{
+			Store: sqlite.NewSiteRepo(store), Secrets: vault, UoW: store, Types: types, Data: sqlite.NewSiteDataRepo(store),
+			Probe: reach, Publisher: recorder, Clock: clk,
+		}),
 		store:   store,
 		secrets: vault,
 		clock:   clk,

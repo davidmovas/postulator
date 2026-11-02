@@ -39,6 +39,26 @@ type DeleteRequest struct {
 
 type DeleteResponse struct{}
 
+type ClearDataRequest struct {
+	ID      string `json:"id" description:"Site id"`
+	Model   bool   `json:"model" description:"Remove the pages and everything a sync read, the findings, the runs and the chats"`
+	Graph   bool   `json:"graph" description:"Remove the entities and their edges; the next sync builds them again"`
+	History bool   `json:"history" description:"Remove the runs and the chats"`
+}
+
+type ClearDataResponse struct {
+	Held DataHeld `json:"held"`
+}
+
+type DataCountsRequest struct {
+	ID string `json:"id" description:"Site id"`
+}
+
+type DataCountsResponse struct {
+	Held DataHeld `json:"held"`
+	Busy []string `json:"busy"`
+}
+
 type GetRequest struct {
 	ID string `json:"id" description:"Site id"`
 }

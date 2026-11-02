@@ -123,7 +123,10 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	})
 
 	return useCases{
-		sites:   sites.New(stores.sites, stores.secrets, stores.store, writing.pageTypes, writing.wordpress, c.Events, stores.now),
+		sites: sites.New(sites.Deps{
+			Store: stores.sites, Secrets: stores.secrets, UoW: stores.store, Types: writing.pageTypes, Data: stores.siteData,
+			Probe: writing.wordpress, Publisher: c.Events, Clock: stores.now,
+		}),
 		graph:   graphService,
 		pages:   pagesService,
 		imports: importsService,

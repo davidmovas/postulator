@@ -17,6 +17,8 @@ type SitesUseCase interface {
 	Get(ctx context.Context, req sites.GetRequest) (sites.GetResponse, error)
 	List(ctx context.Context, req sites.ListRequest) (paging.List[sites.Site], error)
 	TestConnection(ctx context.Context, req sites.TestConnectionRequest) (sites.TestConnectionResponse, error)
+	ClearData(ctx context.Context, req sites.ClearDataRequest) (sites.ClearDataResponse, error)
+	DataCounts(ctx context.Context, req sites.DataCountsRequest) (sites.DataCountsResponse, error)
 }
 
 type SitesService struct {
@@ -26,6 +28,8 @@ type SitesService struct {
 	get    middleware.Handler[sites.GetRequest, sites.GetResponse]
 	list   middleware.Handler[sites.ListRequest, paging.List[sites.Site]]
 	test   middleware.Handler[sites.TestConnectionRequest, sites.TestConnectionResponse]
+	clear  middleware.Handler[sites.ClearDataRequest, sites.ClearDataResponse]
+	counts middleware.Handler[sites.DataCountsRequest, sites.DataCountsResponse]
 }
 
 func NewSitesService(logger *zap.Logger, useCase Source[SitesUseCase]) *SitesService {
@@ -36,7 +40,17 @@ func NewSitesService(logger *zap.Logger, useCase Source[SitesUseCase]) *SitesSer
 		get:    Wrap(logger, "sites.get", call(useCase, SitesUseCase.Get)),
 		list:   Wrap(logger, "sites.list", call(useCase, SitesUseCase.List)),
 		test:   Wrap(logger, "sites.testConnection", call(useCase, SitesUseCase.TestConnection)),
+		clear:  Wrap(logger, "sites.clearData", call(useCase, SitesUseCase.ClearData)),
+		counts: Wrap(logger, "sites.dataCounts", call(useCase, SitesUseCase.DataCounts)),
 	}
+}
+
+func (s *SitesService) ClearData(c context.Context, req sites.ClearDataRequest) (sites.ClearDataResponse, error) {
+	return s.clear(c, req)
+}
+
+func (s *SitesService) DataCounts(c context.Context, req sites.DataCountsRequest) (sites.DataCountsResponse, error) {
+	return s.counts(c, req)
 }
 
 func (s *SitesService) Create(c context.Context, req sites.CreateRequest) (sites.CreateResponse, error) {

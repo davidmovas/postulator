@@ -21,6 +21,7 @@ type siteStore interface {
 	Delete(ctx context.Context, id string) error
 	Get(ctx context.Context, id string) (site.Site, error)
 	List(ctx context.Context, q site.Query, page paging.Request) (paging.List[site.Site], error)
+	UpdateObservation(ctx context.Context, id string, technical site.TechnicalPages, observation site.ObservationState, at time.Time) error
 }
 
 type secretStore interface {
@@ -45,13 +46,28 @@ type Service struct {
 	secrets   secretStore
 	uow       unitOfWork
 	types     typeSeeder
+	data      siteData
 	probe     connectionProbe
 	publisher application.Publisher
 	clock     clock.Clock
 }
 
-func New(store siteStore, secrets secretStore, uow unitOfWork, types typeSeeder, probe connectionProbe, publisher application.Publisher, clk clock.Clock) *Service {
-	return &Service{store: store, secrets: secrets, uow: uow, types: types, probe: probe, publisher: publisher, clock: clk}
+type Deps struct {
+	Store     siteStore
+	Secrets   secretStore
+	UoW       unitOfWork
+	Types     typeSeeder
+	Data      siteData
+	Probe     connectionProbe
+	Publisher application.Publisher
+	Clock     clock.Clock
+}
+
+func New(deps Deps) *Service {
+	return &Service{
+		store: deps.Store, secrets: deps.Secrets, uow: deps.UoW, types: deps.Types, data: deps.Data,
+		probe: deps.Probe, publisher: deps.Publisher, clock: deps.Clock,
+	}
 }
 
 func (s *Service) now() time.Time {
@@ -207,6 +223,9 @@ func (s *Service) Delete(ctx context.Context, req DeleteRequest) (DeleteResponse
 		current, getErr := s.store.Get(c, req.ID)
 		if getErr != nil {
 			return getErr
+		}
+		if busyErr := s.refuseBusy(c, req.ID, "delete it"); busyErr != nil {
+			return busyErr
 		}
 		if deleteErr := s.store.Delete(c, req.ID); deleteErr != nil {
 			return deleteErr

@@ -33,6 +33,23 @@ type Site struct {
 	UpdatedAt     dto.Time      `json:"updatedAt"`
 }
 
+type DataHeld struct {
+	Pages      int `json:"pages"`
+	Findings   int `json:"findings"`
+	Entities   int `json:"entities"`
+	Edges      int `json:"edges"`
+	Runs       int `json:"runs"`
+	Unfinished int `json:"unfinished"`
+	Chats      int `json:"chats"`
+}
+
+func heldView(held site.Held) DataHeld {
+	return DataHeld{
+		Pages: held.Pages, Findings: held.Findings, Entities: held.Entities, Edges: held.Edges,
+		Runs: held.Runs, Unfinished: held.Unfinished, Chats: held.Chats,
+	}
+}
+
 type Reachability struct {
 	Reach            string `json:"reach"`
 	Message          string `json:"message"`
