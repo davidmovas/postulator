@@ -97,15 +97,16 @@ func (s Snapshot) NoHubAbove(page pagemap.Page) bool {
 	if role := s.typeOf(page).Preset.Role(); role != pagetype.RoleEntity && role != pagetype.RoleProduct {
 		return false
 	}
-	for _, above := range s.Graph.Parents(*page.EntityID, math.MaxInt) {
-		if s.hubEntity(above) {
+	above := s.Graph.Parents(*page.EntityID, math.MaxInt)
+	for i := range above {
+		if s.hubEntity(&above[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-func (s Snapshot) hubEntity(entity graph.Entity) bool {
+func (s Snapshot) hubEntity(entity *graph.Entity) bool {
 	if entity.CanonicalPageID == nil {
 		return false
 	}
