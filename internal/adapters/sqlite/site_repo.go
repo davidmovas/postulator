@@ -129,8 +129,13 @@ func (r *SiteRepo) UpdatePlugin(ctx context.Context, id string, plugin site.Plug
 }
 
 func (r *SiteRepo) Delete(ctx context.Context, id string) error {
-	affected, err := execWrite(ctx, r.store.writeFrom(ctx), deleteSite, []any{id}, nil, "delete the site")
-	return requireAffected(affected, err, siteNotFound(id))
+	return r.store.Do(ctx, func(c context.Context) error {
+		if err := r.store.deleteEntitiesLeavesFirst(c, id); err != nil {
+			return err
+		}
+		affected, err := execWrite(c, r.store.writeFrom(c), deleteSite, []any{id}, nil, "delete the site")
+		return requireAffected(affected, err, siteNotFound(id))
+	})
 }
 
 func (r *SiteRepo) Get(ctx context.Context, id string) (site.Site, error) {
