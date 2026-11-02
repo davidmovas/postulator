@@ -37,7 +37,7 @@ func (s *Service) Find(ctx context.Context, req FindRequest) (paging.List[contex
 		return paging.List[contextpack.MapNode]{}, errors.New(errors.Invalid, "name the site whose pages to find").WithDetail("field", "siteId")
 	case req.Gap != "" && !slices.Contains(contextpack.Gaps(), req.Gap):
 		return paging.List[contextpack.MapNode]{}, errors.New(errors.Invalid,
-			"the gap must be one of planned, empty, unmapped, orphan, missing_links or findings").
+			"the gap must be one of planned, empty, unmapped, orphan, missing_links, findings or no_hub").
 			WithDetail("field", "gap").WithDetail("value", string(req.Gap))
 	case req.Status != "" && !req.Status.Valid():
 		return paging.List[contextpack.MapNode]{}, errors.New(errors.Invalid,

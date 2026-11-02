@@ -363,7 +363,15 @@ export type TreeShape = (typeof treeShapes)[number];
 export const linksShapes = ["page", "section", "map", "owed", "orphans", "suggest"] as const;
 export type LinksShape = (typeof linksShapes)[number];
 
-export const siteGaps = ["planned", "empty", "unmapped", "orphan", "missing_links", "findings"] as const;
+export const siteGaps = [
+    "planned",
+    "empty",
+    "unmapped",
+    "orphan",
+    "missing_links",
+    "findings",
+    "no_hub",
+] as const;
 export type SiteGap = (typeof siteGaps)[number];
 
 export const fieldProviders = ["", "plugin", "store"] as const;
