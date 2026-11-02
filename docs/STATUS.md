@@ -89,6 +89,23 @@ through it; [`VISION.md`](VISION.md) is the longer version.
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
 
+## Release 2.11.0
+
+- **Pages → Tree shows the site by address.** Each folder of the URL is a row, a folder with no page
+  of its own included, so a product sits under its own address and not under the branch its
+  breadcrumbs name; ticking a folder selects every page under it. The Site map keeps the breadcrumb
+  hierarchy and the graph keeps the entities.
+- **A run writes first only the parents a new page needs.** Ticking a page already on the site, a
+  post or a product no longer pulls its planned breadcrumb parents into the run.
+- **No hub above.** A filter on the Pages screen, with its count, lists the articles and products
+  whose entity has no hub page anywhere above it; select them all, pick a template, start the run.
+  The graph's lens of the same name replaces Orphans, and the agent finds and re-templates them in
+  one call.
+- **Types under their role.** The graph's type filter and legend group the types by the role they
+  play (Hub: Landing, Category; Article: Guide, Info; Product; Store category; Catalog; Technical),
+  the Pages type filter says each type's role, and a type's card shows it.
+- **No migration**; the plugin stays 1.5.2.
+
 ## Release 2.10.1
 
 - **Products come in through the plugin.** On the client's site 2.10.0 read no product at all, with

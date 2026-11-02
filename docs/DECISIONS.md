@@ -6070,3 +6070,43 @@ product page, and no word of why, while `/cart/` was typed rightly. He held the 
   come in through `/content` whatever WooCommerce answers, and their store fields still need `wc/v3`.
 - **Proposed, not built**: a message on the run screen when the store cannot be read, with the site's
   answer, so a site with neither way open says why.
+
+## 2026-11-02 — 2.11.0: pages by address, no hub above, types by role
+
+The client has product entities with no hub above them and wanted to find them all and give them his
+own template at once. Pages → Tree did not help: it showed the breadcrumb hierarchy, so
+`/products/p1/` sat under `/researchers/products/`, and ticking a page for a run pulled in its whole
+chain of planned parents up to the root. He also no longer knew where Hub had gone among Category,
+Store category and the rest.
+
+### What the code showed
+
+- **The planner walked parents nobody needed.** `runs.ancestors` started from every target, a page
+  already on the site and a post or custom type included, and followed the derived parent; the
+  publish step (`steps.parentFor`) already asked for a parent only from a WordPress page it creates.
+  The two now share `pagemap.Page.CreatedUnderParent`, so a run adds only the planned pages a
+  creation needs.
+- **Hub never went away**: it is a role, and Landing, Category and the Hub from before the rules all
+  play it. The screens listed ten presets loose, with nothing saying which role each plays.
+
+### The rulings
+
+- **Two hierarchies, each where it belongs (amends "one tree").** The Pages tree, the by-type tree
+  and their selections are the site by address (`contextpack.Folders`, `sitemodel.AddressTree`,
+  `Selection.Folders` resolved by `PageMapRepo.IDsAt`); the Site map, the writer's pack and the graph
+  keep the derived, breadcrumb hierarchy. A selection's subtree by page (`Selection.Subtrees`) stays
+  for the agent's `under`, which names the model's hierarchy.
+- **No hub above is a gap** (`contextpack.GapNoHub`): a live article or product whose entity has no
+  approved ancestor, at any depth, with a hub page. A page-less topic is no hub, a proposed edge is no
+  parent, a hub, store category, catalog or technical page is never hubless, an unmapped page is
+  `unmapped`. It is a Pages filter (`PageFilter.Gap`, through a reader `pages` declares and
+  `sitemodel.Gapped` answers), so "select all matching" → Template → Run works on it; the graph's
+  orphan lens became the same rule; `pages_find` takes it, and the agent's `select` takes `gap`
+  alone or with `ofType`, never with `under`.
+- **Collections were not built.** The owner proposed folders the client fills by hand from the graph;
+  the filter answers this request with no new record, and folders wait for a case a filter cannot
+  name.
+- **A type is shown under the role it plays.** The vocabulary exports each role's presets from
+  `pagetype` (`hubPageTypePresets` and the rest), the graph's filter and legend group by them and
+  offer a preset no new type starts from only where the site has one, a type's card and drawer say
+  what it works as, and no label or hint names an application version.
