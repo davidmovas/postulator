@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { potteryEdges, potteryEntities, potteryPages, potteryTypes, typedPage } from "./fixture.js";
 import { buildGraphIndex } from "./index.js";
-import { isolate, lensCounts, lenses, matchedSet } from "./lens.js";
+import { roleGroups } from "../../settings/types/labels.js";
+import { isolate, lensCounts, lenses, matchedSet, presetsInUse, shownPresets } from "./lens.js";
 
 const index = buildGraphIndex(potteryEntities, potteryEdges, potteryPages, potteryTypes);
 
@@ -25,6 +26,16 @@ describe("matchedSet", () => {
         expect(ids(matchedSet(index, "all", new Set(["untyped"])))).toStrictEqual(["kiln", "travel"]);
         expect(ids(matchedSet(index, "noPage", new Set(["product"])))).toStrictEqual([]);
         expect(ids(matchedSet(index, "all", new Set()))).toHaveLength(10);
+    });
+});
+
+describe("the page types the filter offers, by role", () => {
+    it("offers a preset from before the rules only where the site still has one", () => {
+        const hub = roleGroups[0];
+        expect(shownPresets(hub, presetsInUse(index), [])).toStrictEqual(["landing", "category", "hub"]);
+        expect(shownPresets(roleGroups[1], presetsInUse(index), [])).toStrictEqual(["guide", "info", "entity"]);
+        expect(shownPresets(roleGroups[1], new Set(), [])).toStrictEqual(["guide", "info"]);
+        expect(shownPresets(roleGroups[1], new Set(), ["entity"])).toStrictEqual(["guide", "info", "entity"]);
     });
 });
 

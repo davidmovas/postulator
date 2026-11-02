@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { EntityContextMenu } from "./actions/context-menu.js";
 import type { MenuTarget } from "./actions/context-menu.js";
@@ -9,6 +9,7 @@ import { GraphMap } from "./canvas/map.js";
 import type { GraphMapProps, MapHandle } from "./canvas/map.js";
 import { collapseToDepth, expandAll, liftMore } from "./model/fold.js";
 import type { FoldState } from "./model/fold.js";
+import { presetsInUse } from "./model/lens.js";
 import { NodeCard } from "./node-card.js";
 import type { Hovered } from "./node-card.js";
 import type { GraphSession } from "./state.js";
@@ -51,6 +52,7 @@ export function GraphMapView(props: GraphMapViewProps): ReactElement {
     const [menu, setMenu] = useState<MenuTarget | null>(null);
     const [card, setCard] = useState<Card | null>(null);
     const map = useRef<MapHandle | null>(null);
+    const inUse = useMemo(() => presetsInUse(index), [index]);
 
     return (
         <>
@@ -116,6 +118,7 @@ export function GraphMapView(props: GraphMapViewProps): ReactElement {
             <Legend
                 open={session.legend}
                 proof={proof}
+                inUse={inUse}
                 onToggle={() => {
                     onPatchSession({ legend: !session.legend });
                 }}

@@ -1,15 +1,16 @@
 import type { ReactElement } from "react";
+import { useMemo } from "react";
 
 import { copy } from "../../copy/index.js";
 import { Button, cx, LinkIcon, Segmented, Switch, Toolbar, toneClasses } from "../../ui/index.js";
 import type { SegmentedOption } from "../../ui/index.js";
 import type { PresetRole } from "../settings/types/labels.js";
-import { presetIcon, presetLabel, presetRoles, presetTone } from "../settings/types/labels.js";
+import { presetIcon, presetLabel, presetRoles, presetTone, roleGroups, roleLabel, untyped } from "../settings/types/labels.js";
 import { lensHint, lensLabel, stateHint, stateLabel, stateTone } from "./labels.js";
 import { nodeStates } from "./model/index.js";
 import type { GraphIndex, NodeState } from "./model/index.js";
 import type { Lens } from "./model/lens.js";
-import { lenses } from "./model/lens.js";
+import { lenses, presetsInUse, shownPresets } from "./model/lens.js";
 import type { GraphQuery } from "./model/params.js";
 import { SearchBox } from "./search-box.js";
 
@@ -28,15 +29,50 @@ export interface GraphToolbarProps {
     onPick: (id: string) => void;
 }
 
+function PresetButton({ preset, active, onToggle }: { preset: PresetRole; active: boolean; onToggle: (preset: PresetRole) => void }): ReactElement {
+    const Icon = presetIcon(preset);
+    return (
+        <button
+            type="button"
+            aria-pressed={active}
+            title={presetLabel(preset)}
+            aria-label={presetLabel(preset)}
+            data-graph-preset={preset}
+            className={cx(
+                "flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-100",
+                active ? `bg-raised ${toneClasses[presetTone(preset)].ink}` : "text-ink-faint hover:bg-panel hover:text-ink-dim",
+            )}
+            onClick={() => {
+                onToggle(preset);
+            }}
+        >
+            <Icon size={14} />
+        </button>
+    );
+}
+
 export function GraphToolbar({ index, query, proofBusy, focusSearch, onChange, onPick }: GraphToolbarProps): ReactElement {
+    const inUse = useMemo(() => presetsInUse(index), [index]);
+    const choose = (held: ReadonlySet<PresetRole>): void => {
+        onChange({ ...query, presets: presetRoles.filter((known) => held.has(known)) });
+    };
     const togglePreset = (preset: PresetRole): void => {
         const held = new Set<PresetRole>(query.presets);
-        if (held.has(preset)) {
-            held.delete(preset);
-        } else {
+        if (!held.delete(preset)) {
             held.add(preset);
         }
-        onChange({ ...query, presets: presetRoles.filter((known) => held.has(known)) });
+        choose(held);
+    };
+    const toggleRole = (presets: readonly PresetRole[], whole: boolean): void => {
+        const held = new Set<PresetRole>(query.presets);
+        for (const preset of presets) {
+            if (whole) {
+                held.delete(preset);
+            } else {
+                held.add(preset);
+            }
+        }
+        choose(held);
     };
 
     const toggleState = (state: NodeState): void => {
@@ -60,30 +96,33 @@ export function GraphToolbar({ index, query, proofBusy, focusSearch, onChange, o
                     onChange({ ...query, lens });
                 }}
             />
-            <div className="flex items-center gap-0.5" role="group" aria-label={copy.graph.lens.types}>
-                {presetRoles.map((preset) => {
-                    const Icon = presetIcon(preset);
-                    const active = query.presets.includes(preset);
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={copy.graph.lens.types}>
+                {roleGroups.map((group) => {
+                    const shown = shownPresets(group, inUse, query.presets);
+                    const whole = shown.every((preset) => query.presets.includes(preset));
                     return (
-                        <button
-                            key={preset}
-                            type="button"
-                            aria-pressed={active}
-                            title={presetLabel(preset)}
-                            aria-label={presetLabel(preset)}
-                            data-graph-preset={preset}
-                            className={cx(
-                                "flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-100",
-                                active ? `bg-raised ${toneClasses[presetTone(preset)].ink}` : "text-ink-faint hover:bg-inset hover:text-ink-dim",
-                            )}
-                            onClick={() => {
-                                togglePreset(preset);
-                            }}
-                        >
-                            <Icon size={14} />
-                        </button>
+                        <div key={group.role} role="group" aria-label={roleLabel(group.role)} data-graph-role={group.role} className="flex items-center gap-0.5 rounded-md bg-inset/60 pr-0.5 pl-1.5">
+                            <button
+                                type="button"
+                                aria-pressed={whole}
+                                title={copy.graph.lens.role(roleLabel(group.role))}
+                                className={cx(
+                                    "h-6 rounded-sm px-1 text-2xs transition-colors duration-100",
+                                    whole ? "text-ink" : "text-ink-faint hover:text-ink-dim",
+                                )}
+                                onClick={() => {
+                                    toggleRole(shown, whole);
+                                }}
+                            >
+                                {roleLabel(group.role)}
+                            </button>
+                            {shown.map((preset) => (
+                                <PresetButton key={preset} preset={preset} active={query.presets.includes(preset)} onToggle={togglePreset} />
+                            ))}
+                        </div>
                     );
                 })}
+                <PresetButton preset={untyped} active={query.presets.includes(untyped)} onToggle={togglePreset} />
             </div>
             <div className="flex items-center gap-0.5" role="group" aria-label={copy.graph.legend.states}>
                 {nodeStates.map((state) => {

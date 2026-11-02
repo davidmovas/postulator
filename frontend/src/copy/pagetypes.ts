@@ -19,6 +19,7 @@ export const pageTypes = {
         catalog: "Catalog",
         technical: "Technical",
     },
+    roleHint: (role: string) => `Pages of this type play the ${role.toLowerCase()} role`,
     roles: {
         hub: "Hub",
         entity: "Article",
@@ -92,8 +93,8 @@ export const pageTypes = {
         category: "Your own category pages, the ones that gather other pages or list products.",
         guide: "An article: a guide, a how-to, research or a blog post.",
         info: "A page that informs: about, contact, shipping, an FAQ or a policy.",
-        hub: "A page that gathers the pages under it and links down to them, from before 2.6.",
-        entity: "A page about one subject. Before 2.6 this type was called Entity.",
+        hub: "A page that gathers the pages under it and links down to them.",
+        entity: "A page about one subject.",
         product: "A WooCommerce product. Its price, stock, SKU and attributes stay the store's.",
         store_category: "A WooCommerce category archive, which the store builds.",
         catalog: "The store's shop page.",
@@ -139,7 +140,7 @@ export const pageTypes = {
         withoutEntity: "Pages without an entity",
         views: { types: "Types", rules: "How pages get a type" },
         viewsLabel: "Show",
-        before: (count: number) => `${pageCount(count)} still ${count === 1 ? "carries" : "carry"} a type given before 2.6.`,
+        before: (count: number) => `${pageCount(count)} still ${count === 1 ? "carries" : "carry"} a type given before the site had rules.`,
         beforeBody: (count: number) =>
             count === 1
                 ? "The rules did not give it, so a sync leaves it as it is until the preview is applied."
@@ -210,6 +211,7 @@ export const pageTypes = {
         close: "Close",
         identity: "This type",
         startsFrom: "Starts from",
+        worksAs: "Works as",
         pages: "Pages",
         template: "Template",
         edit: "Rename or set the template",

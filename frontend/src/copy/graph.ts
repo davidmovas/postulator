@@ -15,6 +15,7 @@ export const graph = {
         noPage: "No page",
         proposed: "Proposed",
         noHub: "No hub above",
+        role: (role: string) => `Show every type that plays the ${role.toLowerCase()} role`,
         ai: "From AI",
         site: "From the site",
         types: "Page types",

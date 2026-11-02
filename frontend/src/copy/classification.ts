@@ -18,7 +18,7 @@ function pages(count: number): string {
 
 export const classification = {
     pages,
-    body: "A page no rule meets takes the type at the bottom. A sync types new pages and those a rule placed; a type set by hand never moves, and one given before 2.6 moves only when the preview is applied.",
+    body: "A page no rule meets takes the type at the bottom. A sync types new pages and those a rule placed; a type set by hand never moves, and one given before the site had rules moves only when the preview is applied.",
     loading: "Loading the rules",
     rulesTitle: "Rules",
     add: "New rule",

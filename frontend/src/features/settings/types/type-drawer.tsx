@@ -61,6 +61,10 @@ export function TypeDrawer({ siteId, type, types, catalog, templates, templateNa
                                 </StatusBadge>
                             )}
                         </dd>
+                        <dt className="text-ink-dim">{said.worksAs}</dt>
+                        <dd className="text-ink-soft" title={copy.pageTypes.roleHint(role)}>
+                            {role}
+                        </dd>
                         <dt className="text-ink-dim">{said.pages}</dt>
                         <dd className="font-mono text-xs text-ink-soft">{copy.pageTypes.screen.pages(type.pages)}</dd>
                         <dt className="text-ink-dim">{said.template}</dt>

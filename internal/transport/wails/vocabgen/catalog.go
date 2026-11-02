@@ -25,6 +25,10 @@ type vocabulary struct {
 	derived     []derivation
 }
 
+func ofRole(role pagetype.Role) func(value string) bool {
+	return func(value string) bool { return pagetype.Preset(value).Role() == role }
+}
+
 func catalog() []vocabulary {
 	return []vocabulary{
 		{export: "siteStatuses", tsType: "SiteStatus", pkg: "internal/domain/site", typeName: "Status"},
@@ -71,6 +75,12 @@ func catalog() []vocabulary {
 			export: "pageTypePresets", tsType: "PageTypePreset", pkg: "internal/domain/pagetype", typeName: "Preset",
 			derived: []derivation{
 				{export: "creatablePageTypePresets", keep: func(value string) bool { return !pagetype.Preset(value).Legacy() }},
+				{export: "hubPageTypePresets", keep: ofRole(pagetype.RoleHub)},
+				{export: "entityPageTypePresets", keep: ofRole(pagetype.RoleEntity)},
+				{export: "productPageTypePresets", keep: ofRole(pagetype.RoleProduct)},
+				{export: "archivePageTypePresets", keep: ofRole(pagetype.RoleArchive)},
+				{export: "catalogPageTypePresets", keep: ofRole(pagetype.RoleCatalog)},
+				{export: "technicalPageTypePresets", keep: ofRole(pagetype.RoleTechnical)},
 			},
 		},
 		{export: "pageTypeRoles", tsType: "PageTypeRole", pkg: "internal/domain/pagetype", typeName: "Role"},

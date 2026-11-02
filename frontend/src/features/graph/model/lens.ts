@@ -1,5 +1,16 @@
+import type { PageTypePreset } from "../../../generated/vocab.js";
+import type { PresetRole, RoleGroup } from "../../settings/types/labels.js";
+import { isLegacyPreset } from "../../settings/types/labels.js";
 import { nodeStateOf, presetOf } from "./index.js";
 import type { GraphIndex, NodeState } from "./index.js";
+
+export function presetsInUse(index: GraphIndex): ReadonlySet<string> {
+    return new Set([...index.types.values()].map((type) => type.preset));
+}
+
+export function shownPresets(group: RoleGroup, inUse: ReadonlySet<string>, active: readonly PresetRole[]): readonly PageTypePreset[] {
+    return group.presets.filter((preset) => !isLegacyPreset(preset) || inUse.has(preset) || active.includes(preset));
+}
 
 export const lenses = ["all", "noPage", "proposed", "noHub", "ai", "site"] as const;
 

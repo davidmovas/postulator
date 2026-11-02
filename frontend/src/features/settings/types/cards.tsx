@@ -25,7 +25,7 @@ import { rememberPages } from "../../pages/views/memory.js";
 import type { Names } from "../classification/model.js";
 import { sentence } from "../classification/model.js";
 import type { RuleNaming } from "../classification/naming.js";
-import { presetHint, presetIcon, presetTone } from "./labels.js";
+import { presetHint, presetIcon, presetTone, roleLabel } from "./labels.js";
 import type { RulesGiving } from "./summary.js";
 import { rulesGiving, typeGroups, writtenSummary } from "./summary.js";
 import type { TemplateChoice } from "./type-dialogs.js";
@@ -137,6 +137,11 @@ function TypeCard({ siteId, type, giving, names, selected, template, suggestion,
                         >
                             {type.name}
                         </button>
+                        <span title={copy.pageTypes.roleHint(roleLabel(type.role))} data-type-role={type.role}>
+                            <StatusBadge tone={presetTone(type.preset)} dot={false}>
+                                {roleLabel(type.role)}
+                            </StatusBadge>
+                        </span>
                         {type.writable ? null : (
                             <StatusBadge tone="muted" dot={false}>
                                 {said.readOnly}

@@ -1,8 +1,15 @@
 import { copy } from "../../../copy/index.js";
-import type { PageTypePreset } from "../../../generated/vocab.js";
+import type { PageTypePreset, PageTypeRole } from "../../../generated/vocab.js";
 import {
     anchorStrategies,
+    archivePageTypePresets,
+    catalogPageTypePresets,
+    creatablePageTypePresets,
+    entityPageTypePresets,
     fieldKeys,
+    hubPageTypePresets,
+    productPageTypePresets,
+    technicalPageTypePresets,
     fieldProviders,
     isOneOf,
     pageTypePresets,
@@ -28,6 +35,37 @@ import {
 export const untyped = "untyped";
 
 export const presetRoles = [...pageTypePresets, untyped] as const;
+
+export interface RoleGroup {
+    role: PageTypeRole;
+    presets: readonly PageTypePreset[];
+}
+
+export const roleGroups: readonly RoleGroup[] = [
+    { role: "hub", presets: hubPageTypePresets },
+    { role: "entity", presets: entityPageTypePresets },
+    { role: "product", presets: productPageTypePresets },
+    { role: "archive", presets: archivePageTypePresets },
+    { role: "catalog", presets: catalogPageTypePresets },
+    { role: "technical", presets: technicalPageTypePresets },
+];
+
+export function isLegacyPreset(preset: PageTypePreset): boolean {
+    return !creatablePageTypePresets.includes(preset);
+}
+
+export function typeWithRole(type: { name: string; role: string }): string {
+    const role = roleLabel(type.role);
+    return role === type.name ? type.name : `${type.name} (${role})`;
+}
+
+export function byRole<T extends { role: string }>(types: readonly T[]): T[] {
+    const rank = (role: string): number => {
+        const at = roleGroups.findIndex((group) => group.role === role);
+        return at < 0 ? roleGroups.length : at;
+    };
+    return types.toSorted((left, right) => rank(left.role) - rank(right.role));
+}
 
 export type PresetRole = (typeof presetRoles)[number];
 

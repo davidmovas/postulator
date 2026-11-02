@@ -223,6 +223,18 @@ export const creatablePageTypePresets: readonly PageTypePreset[] = [
     "technical",
 ];
 
+export const hubPageTypePresets: readonly PageTypePreset[] = ["landing", "category", "hub"];
+
+export const entityPageTypePresets: readonly PageTypePreset[] = ["guide", "info", "entity"];
+
+export const productPageTypePresets: readonly PageTypePreset[] = ["product"];
+
+export const archivePageTypePresets: readonly PageTypePreset[] = ["store_category"];
+
+export const catalogPageTypePresets: readonly PageTypePreset[] = ["catalog"];
+
+export const technicalPageTypePresets: readonly PageTypePreset[] = ["technical"];
+
 export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
 export type PageTypeRole = (typeof pageTypeRoles)[number];
 

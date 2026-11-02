@@ -12,6 +12,7 @@ import type { EntityIndex } from "./entities.js";
 import { pageStatusLabel } from "./labels.js";
 import { defaultQuery, narrowed, noHubGap } from "./params.js";
 import type { BodyChoice, PagesQuery } from "./params.js";
+import { byRole, typeWithRole } from "../settings/types/labels.js";
 import type { TypeNaming } from "./views/naming.js";
 
 const anyEntity = "any";
@@ -147,7 +148,7 @@ export function PageRail({ siteId, query, index, naming, onChange }: PageRailPro
 
     const typeOptions: SelectOption<string>[] = [
         { value: anyType, label: said.anyType },
-        ...naming.types.map((type) => ({ value: type.id, label: type.name })),
+        ...byRole(naming.types).map((type) => ({ value: type.id, label: typeWithRole(type) })),
     ];
 
     const entityOptions: SelectOption<string>[] = [
