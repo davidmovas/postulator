@@ -62,8 +62,8 @@ func (s *scriptedStream) Stream(_ context.Context, req llm.Request) (<-chan llm.
 	s.rounds = s.rounds[1:]
 
 	out := make(chan llm.Delta, len(round))
-	for _, delta := range round {
-		out <- delta
+	for i := range round {
+		out <- round[i]
 	}
 	close(out)
 	return out, nil

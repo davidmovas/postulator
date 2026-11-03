@@ -209,6 +209,45 @@ func TestLedgerRecordsTheServedTierAndTheUsageDetail(t *testing.T) {
 	}
 }
 
+func TestLedgerBooksTheSearchesACallPaidFor(t *testing.T) {
+	t.Parallel()
+
+	usage := llm.Usage{Input: 8000, Output: 500, Total: 8500, WebSearches: 3}
+	answer := port.Response{Text: "facts", Usage: usage, Tier: llm.TierDefault}
+	for _, streamed := range []bool{false, true} {
+		book, repo, published := newLedgerOver(t, served{response: answer, deltas: func(context.Context) <-chan port.Delta {
+			out := make(chan port.Delta, 2)
+			out <- port.Delta{Text: answer.Text}
+			out <- port.Delta{Done: true, Usage: &usage, Tier: llm.TierDefault}
+			close(out)
+			return out
+		}})
+		req := request(flexTerra.Ref.Model, "research")
+		if streamed {
+			deltas, err := book.Stream(t.Context(), req)
+			if err != nil {
+				t.Fatalf("Stream: %v", err)
+			}
+			for range deltas {
+			}
+		} else if _, err := book.Complete(t.Context(), req); err != nil {
+			t.Fatalf("Complete: %v", err)
+		}
+
+		row := onlyRow(t, repo)
+		if row.Usage.WebSearches != 3 {
+			t.Errorf("streamed %t: the row booked %d searches, want 3", streamed, row.Usage.WebSearches)
+		}
+		tokens := llm.Cost(llm.Usage{Input: 8000, Output: 500, Total: 8500}, flexTerra, llm.TierDefault)
+		if want := tokens + llm.SearchFee(3); row.USD != want {
+			t.Errorf("streamed %t: usd = %v, want the tokens %v and the three searches' fee", streamed, row.USD, tokens)
+		}
+		if heard := published.last(); heard.WebSearches != 3 || heard.USD != row.USD {
+			t.Errorf("streamed %t: llm.usage = %+v, want the searches and the cost with their fee", streamed, heard)
+		}
+	}
+}
+
 func TestLedgerRecordsAFailure(t *testing.T) {
 	t.Parallel()
 

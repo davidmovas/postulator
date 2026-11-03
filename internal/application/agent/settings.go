@@ -31,7 +31,12 @@ var (
 	turnTimeoutSetting = settings.Duration("agent.turnTimeout", DefaultTurnTimeout, settings.DurationRange(time.Minute, 2*time.Hour))
 	toolLoadingSetting = settings.Enum("agent.toolLoading", string(ToolsEveryRound),
 		[]string{string(ToolsEveryRound), string(ToolsOnDemand)})
+	webSearchSetting = settings.Bool("agent.webSearch", false)
 )
+
+func WebSearchOf(values *settings.Values) bool {
+	return webSearchSetting.Get(values)
+}
 
 func ToolLoadingOf(values *settings.Values) ToolLoading {
 	return ToolLoading(toolLoadingSetting.Get(values))

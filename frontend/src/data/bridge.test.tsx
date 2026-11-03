@@ -75,6 +75,7 @@ const usage = {
     completionTokens: 300,
     reasoningTokens: 120,
     cacheWriteTokens: 0,
+    webSearches: 0,
     usd: 0.004,
 };
 

@@ -17,11 +17,11 @@ func spentSlices() []llm.SpendSlice {
 	return []llm.SpendSlice{
 		{
 			Purpose: llm.PurposeRun, Provider: "openai", Model: "gpt-5.6-terra", Tier: llm.TierFlex, Calls: 3, Failed: 1,
-			Input: 6000, CachedInput: 1000, CacheWrite: 500, Output: 3000, Reasoning: 1500, USD: 0.75,
+			Input: 6000, CachedInput: 1000, CacheWrite: 500, Output: 3000, Reasoning: 1500, WebSearches: 5, USD: 0.75,
 		},
 		{
 			Purpose: llm.PurposeChat, Provider: "openai", Model: "gpt-5.6-terra", Tier: llm.TierDefault, Calls: 1,
-			Input: 4000, CachedInput: 3000, Output: 1000, USD: 0.25,
+			Input: 4000, CachedInput: 3000, Output: 1000, WebSearches: 2, USD: 0.25,
 		},
 	}
 }
@@ -107,7 +107,7 @@ func TestSpendReportTotalsTheSlices(t *testing.T) {
 			want: models.SpendTotals{
 				Spent: models.Spent{
 					Calls: 4, Failed: 1, Input: 10000, CachedInput: 4000, CacheWrite: 500, Output: 4000, Reasoning: 1500,
-					USD: 1,
+					WebSearches: 7, USD: 1,
 				},
 				CachedShare: 0.4, ReasoningShare: 0.375, FlexShare: 0.75,
 			},
@@ -178,7 +178,7 @@ func TestSpendReportSpeaksCamelCase(t *testing.T) {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	for _, key := range []string{
-		"calls", "failed", "input", "cachedInput", "cacheWrite", "output", "reasoning", "usd",
+		"calls", "failed", "input", "cachedInput", "cacheWrite", "output", "reasoning", "webSearches", "usd",
 		"cachedShare", "reasoningShare", "flexShare",
 	} {
 		if _, ok := shape.Totals[key]; !ok {
@@ -191,7 +191,7 @@ func TestSpendReportSpeaksCamelCase(t *testing.T) {
 	want := map[string]any{
 		"purpose": "run", "provider": "openai", "model": "gpt-5.6-terra", "tier": "flex", "step": "",
 		"calls": 3.0, "failed": 1.0, "input": 6000.0, "cachedInput": 1000.0, "cacheWrite": 500.0, "output": 3000.0,
-		"reasoning": 1500.0, "usd": 0.75,
+		"reasoning": 1500.0, "webSearches": 5.0, "usd": 0.75,
 	}
 	for key, value := range want {
 		if shape.Slices[0][key] != value {

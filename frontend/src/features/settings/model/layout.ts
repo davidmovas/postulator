@@ -5,6 +5,7 @@ export type SettingsTabKey = (typeof settingsTabKeys)[number];
 
 export type SectionId =
     | "reasoning"
+    | "webSearch"
     | "modelCalls"
     | "endpoints"
     | "images"
@@ -21,7 +22,17 @@ export type SectionId =
     | "tor"
     | "browserOther";
 
-export type UnitId = "pages" | "days" | "times" | "perSecond" | "steps" | "rows" | "characters" | "bytes" | "tokens";
+export type UnitId =
+    | "pages"
+    | "days"
+    | "times"
+    | "perSecond"
+    | "steps"
+    | "rows"
+    | "characters"
+    | "bytes"
+    | "tokens"
+    | "searches";
 
 export interface SectionSpec {
     id: SectionId;
@@ -48,6 +59,7 @@ export interface TabView {
 
 const specs: readonly SectionSpec[] = [
     { id: "reasoning", tab: "models", advanced: false },
+    { id: "webSearch", tab: "models", advanced: false },
     { id: "modelCalls", tab: "models", advanced: true },
     { id: "endpoints", tab: "models", advanced: true },
     { id: "images", tab: "models", advanced: true },
@@ -82,6 +94,11 @@ export const placements: readonly Placement[] = [
     { key: "llm.tier.titler", section: "reasoning" },
     { key: "llm.effort.chat", section: "reasoning" },
     { key: "llm.flexPatience", section: "reasoning" },
+    { key: "agent.webSearch", section: "webSearch" },
+    { key: "llm.webSearch.depth", section: "webSearch" },
+    { key: "llm.webSearch.maxCalls", section: "webSearch", unit: "searches" },
+    { key: "llm.webSearch.allowedDomains", section: "webSearch" },
+    { key: "llm.webSearch.blockedDomains", section: "webSearch" },
     { key: "llm.timeout", section: "modelCalls" },
     { key: "llm.retries", section: "modelCalls", unit: "times" },
     { key: "llm.recordReplayMode", section: "modelCalls" },

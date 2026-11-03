@@ -3,6 +3,9 @@ package tuning_test
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -204,6 +207,16 @@ func TestTheSettingsRefuseWhatTheProviderRefuses(t *testing.T) {
 		{name: "standard", key: "llm.tier.writer", value: `"standard"`, ok: true},
 		{name: "the wire name of the standard tier", key: "llm.tier.writer", value: `"default"`},
 		{name: "a chat tier is not a setting", key: "llm.tier.chat", value: `"flex"`},
+		{name: "a search depth", key: "llm.webSearch.depth", value: `"high"`, ok: true},
+		{name: "an unknown search depth", key: "llm.webSearch.depth", value: `"deep"`},
+		{name: "one search a call", key: "llm.webSearch.maxCalls", value: `1`, ok: true},
+		{name: "no search a call", key: "llm.webSearch.maxCalls", value: `0`},
+		{name: "more searches a call than a page needs", key: "llm.webSearch.maxCalls", value: `21`},
+		{name: "domains in any of the ways a person writes them", key: "llm.webSearch.allowedDomains",
+			value: `"https://WHO.int/, cdc.gov\nnih.gov/health"`, ok: true},
+		{name: "no domains at all", key: "llm.webSearch.blockedDomains", value: `""`, ok: true},
+		{name: "something that is not a domain", key: "llm.webSearch.blockedDomains", value: `"rival shop"`},
+		{name: "a domain without its suffix", key: "llm.webSearch.allowedDomains", value: `"localhost"`},
 		{name: "the shortest patience", key: "llm.flexPatience", value: `"30s"`, ok: true},
 		{name: "the longest patience stays under the writer's step", key: "llm.flexPatience", value: `"14m"`, ok: true},
 		{name: "a patience too short to answer", key: "llm.flexPatience", value: `"10s"`},
@@ -275,6 +288,66 @@ func TestTheSettingsDescribeTheirChoices(t *testing.T) {
 				if descriptor.Enum[i] != tc.enum[i] {
 					t.Fatalf("%s offers %v, want %v", tc.key, descriptor.Enum, tc.enum)
 				}
+			}
+		})
+	}
+}
+
+func TestThePolicyReadsTheWebSearchAsTheSettingsHoldIt(t *testing.T) {
+	t.Parallel()
+
+	many := make([]string, 0, 101)
+	for i := range 101 {
+		many = append(many, "site"+strconv.Itoa(i)+".example")
+	}
+	cases := []struct {
+		name   string
+		stored map[string]string
+		want   port.WebSearch
+		refuse bool
+	}{
+		{name: "the defaults", want: port.WebSearch{Depth: llm.DepthMedium, MaxCalls: 5}},
+		{
+			name: "a person's depth, limit and lists, cleaned",
+			stored: map[string]string{
+				"llm.webSearch.depth": "low", "llm.webSearch.maxCalls": "3",
+				"llm.webSearch.allowedDomains": "https://WHO.int/, cdc.gov\ncdc.gov  nih.gov/health",
+				"llm.webSearch.blockedDomains": "rival.example",
+			},
+			want: port.WebSearch{
+				Depth: llm.DepthLow, MaxCalls: 3, Allowed: []string{"who.int", "cdc.gov", "nih.gov"}, Blocked: []string{"rival.example"},
+			},
+		},
+		{name: "more than a hundred domains", stored: map[string]string{"llm.webSearch.blockedDomains": strings.Join(many, ",")}, refuse: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			raw := map[string]json.RawMessage{}
+			for key, value := range tc.stored {
+				encoded, err := json.Marshal(value)
+				if key == "llm.webSearch.maxCalls" {
+					encoded, err = []byte(value), nil
+				}
+				if err != nil {
+					t.Fatalf("encode %s: %v", key, err)
+				}
+				raw[key] = encoded
+			}
+			values := settings.Default().NewValues()
+			_, err := settings.Default().Apply(values, raw)
+			if tc.refuse {
+				if err == nil {
+					t.Fatal("Apply accepted more domains than a search takes")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Apply: %v", err)
+			}
+			if got := tuning.NewPolicy(values).WebSearch(); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("WebSearch() = %+v, want %+v", got, tc.want)
 			}
 		})
 	}

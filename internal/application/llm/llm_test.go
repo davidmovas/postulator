@@ -97,6 +97,18 @@ func TestRequestValidate(t *testing.T) {
 			wantErr: "the last message",
 		},
 		{name: "the ceiling is not negative", mutate: func(r *llm.Request) { r.MaxTokens = -1 }, wantErr: "the token ceiling"},
+		{name: "a web search the provider runs is valid", mutate: func(r *llm.Request) {
+			r.WebSearch = &llm.WebSearch{Depth: domain.DepthMedium, MaxCalls: 5, Allowed: []string{"who.int"}, Blocked: []string{"rival.example"}}
+		}},
+		{name: "a web search names its depth", mutate: func(r *llm.Request) {
+			r.WebSearch = &llm.WebSearch{Depth: "deep", MaxCalls: 5}
+		}, wantErr: "search depth"},
+		{name: "a web search allows at least one search", mutate: func(r *llm.Request) {
+			r.WebSearch = &llm.WebSearch{Depth: domain.DepthLow}
+		}, wantErr: "at least one search"},
+		{name: "a web search lists at most a hundred domains", mutate: func(r *llm.Request) {
+			r.WebSearch = &llm.WebSearch{Depth: domain.DepthLow, MaxCalls: 1, Blocked: make([]string, 101)}
+		}, wantErr: "a hundred domains"},
 		{name: "the temperature is bounded", mutate: func(r *llm.Request) { r.Temperature = &hot }, wantErr: "the temperature"},
 		{name: "developer context may precede the user", mutate: conversation(developer, user)},
 		{name: "developer context may close the request", mutate: conversation(user, developer)},

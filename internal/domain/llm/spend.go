@@ -72,5 +72,6 @@ type SpendSlice struct {
 	CacheWrite  int
 	Output      int
 	Reasoning   int
+	WebSearches int
 	USD         float64
 }

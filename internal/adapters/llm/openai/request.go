@@ -16,6 +16,8 @@ const (
 	toolFunction    = "function"
 	toolNamespace   = "namespace"
 	toolSearch      = "tool_search"
+	toolWebSearch   = "web_search"
+	includeSources  = "web_search_call.action.sources"
 	minOutputTokens = 16
 	maxCacheKey     = 64
 
@@ -31,6 +33,8 @@ type wireRequest struct {
 	Reasoning     *wireReasoning     `json:"reasoning,omitempty"`
 	Text          *wireText          `json:"text,omitempty"`
 	Tools         []wireTool         `json:"tools,omitempty"`
+	MaxToolCalls  int                `json:"max_tool_calls,omitempty"`
+	Include       []string           `json:"include,omitempty"`
 	ServiceTier   string             `json:"service_tier"`
 	CacheKey      string             `json:"prompt_cache_key,omitempty"`
 	CacheOptions  *wireCacheOptions  `json:"prompt_cache_options,omitempty"`
@@ -54,13 +58,20 @@ type wireFormat struct {
 }
 
 type wireTool struct {
-	Type         string         `json:"type"`
-	Name         string         `json:"name,omitempty"`
-	Description  string         `json:"description,omitempty"`
-	Parameters   map[string]any `json:"parameters,omitempty"`
-	Strict       *bool          `json:"strict,omitempty"`
-	DeferLoading bool           `json:"defer_loading,omitempty"`
-	Tools        []wireTool     `json:"tools,omitempty"`
+	Type          string         `json:"type"`
+	Name          string         `json:"name,omitempty"`
+	Description   string         `json:"description,omitempty"`
+	Parameters    map[string]any `json:"parameters,omitempty"`
+	Strict        *bool          `json:"strict,omitempty"`
+	DeferLoading  bool           `json:"defer_loading,omitempty"`
+	Tools         []wireTool     `json:"tools,omitempty"`
+	ContextSize   string         `json:"search_context_size,omitempty"`
+	SearchFilters *wireFilters   `json:"filters,omitempty"`
+}
+
+type wireFilters struct {
+	AllowedDomains []string `json:"allowed_domains,omitempty"`
+	BlockedDomains []string `json:"blocked_domains,omitempty"`
 }
 
 type wireCacheOptions struct {
@@ -105,6 +116,11 @@ func requestOf(req port.Request, model catalogRow, stream bool) (wireRequest, er
 	}
 	if len(req.Tools) == 0 && req.CacheKey == "" {
 		body.CacheOptions = &wireCacheOptions{Mode: cacheExplicit}
+	}
+	if req.WebSearch != nil {
+		body.Tools = append(body.Tools, webSearchOf(*req.WebSearch))
+		body.MaxToolCalls = req.WebSearch.MaxCalls
+		body.Include = []string{includeSources}
 	}
 	if stream {
 		body.Stream = true
@@ -183,6 +199,14 @@ func toolsOf(tools []port.Tool) []wireTool {
 		wired = append(wired, wireTool{Type: toolSearch})
 	}
 	return wired
+}
+
+func webSearchOf(search port.WebSearch) wireTool {
+	tool := wireTool{Type: toolWebSearch, ContextSize: string(search.Depth)}
+	if len(search.Allowed) > 0 || len(search.Blocked) > 0 {
+		tool.SearchFilters = &wireFilters{AllowedDomains: search.Allowed, BlockedDomains: search.Blocked}
+	}
+	return tool
 }
 
 func functionOf(tool port.Tool) wireTool {

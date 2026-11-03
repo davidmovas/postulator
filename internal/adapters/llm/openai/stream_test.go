@@ -22,6 +22,7 @@ type heard struct {
 	texts    []string
 	calls    []port.ToolCall
 	searches []port.ToolSearch
+	browsing []port.Browsing
 	order    []string
 	after    int
 	closed   bool
@@ -58,6 +59,9 @@ func listen(t *testing.T, deltas <-chan port.Delta) heard {
 			case delta.Search != nil:
 				got.searches = append(got.searches, *delta.Search)
 				got.order = append(got.order, "search "+string(delta.Search.Kind))
+			case delta.Browsing != nil:
+				got.browsing = append(got.browsing, *delta.Browsing)
+				got.order = append(got.order, "browse "+delta.Browsing.Query)
 			default:
 				got.texts = append(got.texts, delta.Text)
 			}
@@ -107,6 +111,47 @@ func TestAStreamDeliversTextThenOneFinalDelta(t *testing.T) {
 	request := only(t, server)
 	if request.Header.Get("Accept") != "text/event-stream" {
 		t.Errorf("accept = %q, want an event stream", request.Header.Get("Accept"))
+	}
+}
+
+func TestAStreamSaysWhatItSearchesAndEndsWithTheSourcesAndTheBill(t *testing.T) {
+	t.Parallel()
+
+	server := openaitest.New(t)
+	server.Enqueue(openaitest.Answer{
+		Text:      "It peaks in an hour. Then it falls.",
+		Chunks:    []string{"It peaks in an hour.", "citetu", "rn0search0", " Then it falls."},
+		Browsed:   []openaitest.WebSearch{{Query: "caffeine peak", Sources: []string{"https://a.example/1"}}},
+		Citations: []openaitest.Citation{{URL: "https://a.example/1", Title: "A"}},
+		Billed:    1,
+		Usage:     openaitest.Usage{Input: 800, Output: 60},
+	}.Stream())
+
+	req := chat("how fast does caffeine work")
+	req.WebSearch = &port.WebSearch{Depth: llm.DepthLow, MaxCalls: 2}
+	deltas, err := newClient(server).Stream(t.Context(), req)
+	if err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	got := listen(t, deltas)
+
+	if got.err != nil || got.done == nil {
+		t.Fatalf("stream = %+v, want it finished", got)
+	}
+	if want := []port.Browsing{{}, {Query: "caffeine peak", Done: true}}; !reflect.DeepEqual(got.browsing, want) {
+		t.Errorf("browsing = %+v, want the search opened and then named once", got.browsing)
+	}
+	if got.text() != "It peaks in an hour. Then it falls." {
+		t.Errorf("text = %q, want the private citation marks gone even when a chunk splits them", got.text())
+	}
+	if got.done.Usage == nil || got.done.Usage.WebSearches != 1 {
+		t.Errorf("usage = %+v, want the one search the provider billed", got.done.Usage)
+	}
+	if want := []port.Source{{URL: "https://a.example/1", Title: "A"}}; !reflect.DeepEqual(got.done.Sources, want) {
+		t.Errorf("sources = %+v, want %+v", got.done.Sources, want)
+	}
+	if sent := string(only(t, server).Raw); !strings.Contains(sent, `"type":"web_search"`) {
+		t.Errorf("the round went out without its search: %s", sent)
 	}
 }
 

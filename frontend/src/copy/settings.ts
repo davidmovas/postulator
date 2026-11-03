@@ -44,9 +44,11 @@ export const settings = {
         characters: "characters",
         bytes: "bytes",
         tokens: "tokens",
+        searches: "searches",
     },
     sections: {
         reasoning: "Reasoning, speed and input",
+        webSearch: "Web search",
         modelCalls: "Model calls",
         endpoints: "Endpoints",
         images: "Images",
@@ -96,6 +98,11 @@ export const settings = {
         "llm.effort.judge": effortLabels,
         "llm.effort.titler": effortLabels,
         "llm.effort.chat": effortLabels,
+        "llm.webSearch.depth": {
+            low: "Short",
+            medium: "Medium",
+            high: "Thorough",
+        },
         "llm.tier.writer": tierLabels,
         "llm.tier.editor": tierLabels,
         "llm.tier.linker": tierLabels,
@@ -126,6 +133,26 @@ export const settings = {
         "agent.toolLoading": {
             label: "Tool loading",
             help: "All tools every round is the default. Loading tools on demand sends fewer tokens per round; it stays experimental until it has been tested with your key.",
+        },
+        "agent.webSearch": {
+            label: "The assistant searches the web",
+            help: "Off by default. When on, the assistant may search the web while it answers, and its answer ends with the sources it used. OpenAI charges $10 for every thousand searches, plus what each search reads at the model's input price; the spend panel counts both.",
+        },
+        "llm.webSearch.depth": {
+            label: "How much a search reads",
+            help: "How much of what a search finds the model reads. Thorough finds more and costs more, since what it reads is paid for like input.",
+        },
+        "llm.webSearch.maxCalls": {
+            label: "Searches in one call",
+            help: "The most searches one research step or one step of the assistant may make. Each search is paid for, so this is also the most one call can spend on searching.",
+        },
+        "llm.webSearch.allowedDomains": {
+            label: "Search only these sites",
+            help: "Domains such as who.int or cdc.gov, separated by commas or new lines, at most 100. Empty means the whole web.",
+        },
+        "llm.webSearch.blockedDomains": {
+            label: "Never search these sites",
+            help: "Domains a search leaves out, such as a competitor's, separated by commas or new lines, at most 100.",
         },
         "agent.turnTimeout": {
             label: "Time limit for one answer",

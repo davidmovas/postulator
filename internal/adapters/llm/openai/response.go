@@ -26,6 +26,7 @@ type wireResponse struct {
 	Error             *wireFault      `json:"error"`
 	IncompleteDetails *wireIncomplete `json:"incomplete_details"`
 	Usage             *wireUsage      `json:"usage"`
+	ToolUsage         *wireToolUsage  `json:"tool_usage"`
 	Status            string          `json:"status"`
 	ServiceTier       string          `json:"service_tier"`
 	Output            []wireOutput    `json:"output"`
@@ -44,13 +45,15 @@ type wireOutput struct {
 	Arguments json.RawMessage `json:"arguments"`
 	Execution string          `json:"execution"`
 	Tools     json.RawMessage `json:"tools"`
+	Action    *wireAction     `json:"action"`
 	Content   []wireContent   `json:"content"`
 }
 
 type wireContent struct {
-	Type    string `json:"type"`
-	Text    string `json:"text"`
-	Refusal string `json:"refusal"`
+	Type        string           `json:"type"`
+	Text        string           `json:"text"`
+	Refusal     string           `json:"refusal"`
+	Annotations []wireAnnotation `json:"annotations"`
 }
 
 func responseOf(payload []byte, sentTier string) (port.Response, error) {
@@ -76,13 +79,16 @@ func answerOf(decoded wireResponse, sentTier string) (port.Response, error) {
 	if err != nil {
 		return port.Response{}, err
 	}
+	usage := usageOf(decoded.Usage)
+	usage.WebSearches = webSearchesOf(decoded)
 	return port.Response{
 		Text:         textOf(decoded.Output),
-		Usage:        usageOf(decoded.Usage),
+		Usage:        usage,
 		FinishReason: finishOf(decoded),
 		Calls:        calls,
 		Tier:         tierOf(decoded.ServiceTier, sentTier),
 		Searches:     searchesOf(decoded.Output),
+		Sources:      sourcesOf(decoded.Output),
 	}, nil
 }
 
@@ -106,7 +112,7 @@ func textOf(output []wireOutput) string {
 			}
 		}
 	}
-	return builder.String()
+	return unmarked(builder.String())
 }
 
 func refused(output []wireOutput) bool {

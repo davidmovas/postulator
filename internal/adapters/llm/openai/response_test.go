@@ -89,6 +89,44 @@ func TestAnAnswerIsReadBackWhole(t *testing.T) {
 			want:  port.Response{Text: "auto", FinishReason: port.FinishStop, Tier: llm.TierDefault},
 		},
 		{
+			name: "searches the provider billed and the sources its answer cites",
+			reply: openaitest.Answer{
+				Text:      "Caffeine peaks within an hour.",
+				Browsed:   []openaitest.WebSearch{{Query: "caffeine half life", Sources: []string{"https://a.example/1", "https://b.example/2"}}},
+				Citations: []openaitest.Citation{{URL: "https://b.example/2", Title: "B"}, {URL: "https://b.example/2", Title: "B"}},
+				Billed:    2,
+				Usage:     openaitest.Usage{Input: 900, Output: 100},
+			}.Reply(),
+			want: port.Response{
+				Text:         "Caffeine peaks within an hour.",
+				Usage:        llm.Usage{Input: 900, Output: 100, Total: 1000, WebSearches: 2},
+				FinishReason: port.FinishStop,
+				Tier:         llm.TierDefault,
+				Sources:      []port.Source{{URL: "https://b.example/2", Title: "B"}},
+			},
+		},
+		{
+			name: "searches counted from their items when the bill is not given, and the sources they read when none is cited",
+			reply: openaitest.Answer{
+				Text: "Two facts.",
+				Browsed: []openaitest.WebSearch{
+					{Query: "one", Sources: []string{"https://a.example/1"}}, {Query: "two", Sources: []string{"https://a.example/1", "https://c.example/3"}},
+				},
+			}.Reply(),
+			want: port.Response{
+				Text:         "Two facts.",
+				Usage:        llm.Usage{WebSearches: 2},
+				FinishReason: port.FinishStop,
+				Tier:         llm.TierDefault,
+				Sources:      []port.Source{{URL: "https://a.example/1"}, {URL: "https://c.example/3"}},
+			},
+		},
+		{
+			name:  "the provider's private citation marks never reach the text",
+			reply: openaitest.Answer{Text: "Peaks in an hour.citeturn0search2 Then falls."}.Reply(),
+			want:  port.Response{Text: "Peaks in an hour. Then falls.", FinishReason: port.FinishStop, Tier: llm.TierDefault},
+		},
+		{
 			name: "a body that names no tier keeps the one sent",
 			reply: openaitest.Reply{Status: http.StatusOK, Body: `{"status":"completed","output":[{"type":"message","content":[` +
 				`{"type":"output_text","text":"a"},{"type":"output_text","text":"b"}]},{"type":"message","content":[{"type":"output_text","text":"c"}]}]}`},

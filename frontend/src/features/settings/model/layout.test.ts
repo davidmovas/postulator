@@ -22,7 +22,7 @@ describe("the placement of every declared setting", () => {
     it("keeps the promised settings out of the advanced cards", () => {
         const open = (tab: (typeof settingsTabKeys)[number]): number =>
             tabLayout(tab, declared).plain.flatMap((section) => section.keys).length;
-        expect(open("models")).toBe(16);
+        expect(open("models")).toBe(21);
         expect(open("types")).toBe(0);
         expect(open("runs")).toBe(7);
         expect(open("agent")).toBe(2);
@@ -31,9 +31,22 @@ describe("the placement of every declared setting", () => {
         expect(open("about")).toBe(0);
     });
 
+    it("sets the web search right after the reasoning, the assistant's switch first", () => {
+        const shaped = tabLayout("models", declared);
+        const web = shaped.plain.find((section) => section.id === "webSearch");
+        expect(web?.keys).toEqual([
+            "agent.webSearch",
+            "llm.webSearch.depth",
+            "llm.webSearch.maxCalls",
+            "llm.webSearch.allowedDomains",
+            "llm.webSearch.blockedDomains",
+        ]);
+        expect(unitOf("llm.webSearch.maxCalls")).toBe("searches");
+    });
+
     it("opens the models tab on reasoning and speed, one role after another", () => {
         const shaped = tabLayout("models", declared);
-        expect(shaped.plain.map((section) => section.id)).toEqual(["reasoning"]);
+        expect(shaped.plain.map((section) => section.id)).toEqual(["reasoning", "webSearch"]);
         const keys = shaped.plain[0]?.keys ?? [];
         expect(keys.slice(0, 2)).toEqual(["llm.effort.writer", "llm.tier.writer"]);
         expect(keys.slice(-2)).toEqual(["llm.effort.chat", "llm.flexPatience"]);

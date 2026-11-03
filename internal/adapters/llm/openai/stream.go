@@ -118,6 +118,7 @@ func (s *sseReader) line() ([]byte, error) {
 
 type streamState struct {
 	delivered map[string]bool
+	marks     *unmarker
 	sentTier  string
 	spoke     bool
 }
@@ -129,7 +130,7 @@ type outcome struct {
 }
 
 func newStreamState(sentTier string) *streamState {
-	return &streamState{delivered: map[string]bool{}, sentTier: sentTier}
+	return &streamState{delivered: map[string]bool{}, marks: &unmarker{}, sentTier: sentTier}
 }
 
 func admission(event sseEvent) bool {
@@ -162,6 +163,8 @@ func (s *streamState) read(event sseEvent) outcome {
 		return s.text(event.data)
 	case eventItemDone:
 		return s.item(event.data)
+	case eventSearchStarted, eventSearching:
+		return s.browsingStarted(event.data)
 	case eventCompleted, eventIncomplete:
 		return s.finish(event.data, kind)
 	case eventFailed:
@@ -184,7 +187,11 @@ func (s *streamState) text(data []byte) outcome {
 		return outcome{}
 	}
 	s.spoke = true
-	return outcome{deltas: []port.Delta{{Text: delta.Delta}}}
+	clean := s.marks.clean(delta.Delta)
+	if clean == "" {
+		return outcome{}
+	}
+	return outcome{deltas: []port.Delta{{Text: clean}}}
 }
 
 func (s *streamState) item(data []byte) outcome {
@@ -207,6 +214,15 @@ func (s *streamState) item(data []byte) outcome {
 }
 
 func (s *streamState) carried(index int, item wireOutput) (*port.Delta, error) {
+	if item.Type == itemWebSearchCall {
+		key := browsingKey(index, item)
+		if s.delivered[key] {
+			return nil, nil
+		}
+		s.delivered[key] = true
+		browsed := browsedOf(item)
+		return &port.Delta{Browsing: &browsed}, nil
+	}
 	if search, found := searchOf(item); found {
 		key := searchKey(index, item)
 		if s.delivered[key] {
@@ -260,11 +276,13 @@ func (s *streamState) finish(data []byte, kind string) outcome {
 		}
 	}
 	usage := usageOf(answer.Usage)
+	usage.WebSearches = webSearchesOf(answer)
 	deltas = append(deltas, port.Delta{
-		Done:   true,
-		Usage:  &usage,
-		Finish: finishOf(answer),
-		Tier:   tierOf(answer.ServiceTier, s.sentTier),
+		Done:    true,
+		Usage:   &usage,
+		Finish:  finishOf(answer),
+		Tier:    tierOf(answer.ServiceTier, s.sentTier),
+		Sources: sourcesOf(answer.Output),
 	})
 	return outcome{deltas: deltas, ended: true}
 }
@@ -398,8 +416,8 @@ func (c *Client) openOnce(ctx context.Context, release context.CancelFunc, ex ex
 }
 
 func (c *Client) pump(caller context.Context, ex exchange, live *liveStream, out chan<- port.Delta) {
-	for _, delta := range live.pending {
-		if !send(caller, out, delta) {
+	for i := range live.pending {
+		if !send(caller, out, live.pending[i]) {
 			return
 		}
 	}
@@ -411,8 +429,8 @@ func (c *Client) pump(caller context.Context, ex exchange, live *liveStream, out
 		}
 
 		got := live.state.read(event)
-		for _, delta := range got.deltas {
-			if !send(caller, out, delta) {
+		for i := range got.deltas {
+			if !send(caller, out, got.deltas[i]) {
 				return
 			}
 		}

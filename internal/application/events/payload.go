@@ -240,5 +240,6 @@ type LLMUsagePayload struct {
 	CompletionTokens int     `json:"completionTokens"`
 	ReasoningTokens  int     `json:"reasoningTokens"`
 	CacheWriteTokens int     `json:"cacheWriteTokens"`
+	WebSearches      int     `json:"webSearches"`
 	USD              float64 `json:"usd"`
 }
