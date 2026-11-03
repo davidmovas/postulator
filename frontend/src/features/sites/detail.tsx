@@ -17,6 +17,7 @@ import {
     EditNoteIcon,
     IconButton,
     OpenInNewIcon,
+    RestartAltIcon,
     SectionLabel,
     SpaceDashboardIcon,
     StatusBadge,
@@ -69,9 +70,10 @@ export interface SiteDetailProps {
     site: Site;
     onEdit: () => void;
     onDelete: () => void;
+    onClear: () => void;
 }
 
-export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactElement {
+export function SiteDetail({ site, onEdit, onDelete, onClear }: SiteDetailProps): ReactElement {
     const probe = useTestConnection();
     const [reachability, setReachability] = useState<Reachability | null>(null);
     const [problem, setProblem] = useState<string | null>(null);
@@ -105,6 +107,14 @@ export function SiteDetail({ site, onEdit, onDelete }: SiteDetailProps): ReactEl
                         variant="ghost"
                         size="sm"
                         onClick={onEdit}
+                    />
+                    <IconButton
+                        data-site-clear={true}
+                        icon={RestartAltIcon}
+                        label={copy.sites.clear.button}
+                        variant="ghost"
+                        size="sm"
+                        onClick={onClear}
                     />
                     <IconButton
                         icon={DeleteIcon}

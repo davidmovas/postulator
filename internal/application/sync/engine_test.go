@@ -206,7 +206,20 @@ func TestAFirstSyncOfEmptyPagesAsksTheSiteOnlyForWhatItLacks(t *testing.T) {
 	}
 }
 
+type syncRig struct {
+	store   *sqlite.Store
+	owner   site.Site
+	service *sync.Service
+	runs    *sqlite.RunRepo
+	pages   *sqlite.PageRepo
+}
+
 func syncedThroughTheEngine(t *testing.T, server *wptest.Server, batch int) []pagemap.Page {
+	t.Helper()
+	return newSyncRig(t, server, batch).sync(t)
+}
+
+func newSyncRig(t *testing.T, server *wptest.Server, batch int) syncRig {
 	t.Helper()
 
 	store := sqlitetest.Open(t)
@@ -259,7 +272,13 @@ func syncedThroughTheEngine(t *testing.T, server *wptest.Server, batch int) []pa
 	t.Cleanup(engine.Stop)
 
 	service := sync.New(engine, runRepo, sqlite.NewRunItemRepo(store), siteRepo, prober{}, packer{}, clock.System{})
-	queued, err := service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: owner.ID})
+	return syncRig{store: store, owner: owner, service: service, runs: runRepo, pages: pageRepo}
+}
+
+func (r syncRig) sync(t *testing.T) []pagemap.Page {
+	t.Helper()
+
+	queued, err := r.service.SyncSite(t.Context(), sync.SyncSiteRequest{SiteID: r.owner.ID})
 	if err != nil {
 		t.Fatalf("SyncSite: %v", err)
 	}
@@ -267,7 +286,7 @@ func syncedThroughTheEngine(t *testing.T, server *wptest.Server, batch int) []pa
 	deadline := waitDeadline(t)
 	var final run.Run
 	for time.Now().Before(deadline) {
-		record, getErr := runRepo.Get(t.Context(), queued.RunID)
+		record, getErr := r.runs.Get(t.Context(), queued.RunID)
 		if getErr == nil && record.Status.Terminal() {
 			final = record
 			break
@@ -278,7 +297,7 @@ func syncedThroughTheEngine(t *testing.T, server *wptest.Server, batch int) []pa
 		t.Fatalf("the sync run ended as %q, want completed: %s", final.Status, final.Error)
 	}
 
-	pages, err := pageRepo.ListBySite(t.Context(), owner.ID)
+	pages, err := r.pages.ListBySite(t.Context(), r.owner.ID)
 	if err != nil {
 		t.Fatalf("list the pages: %v", err)
 	}

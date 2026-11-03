@@ -3,7 +3,8 @@ import type { ReactElement } from "react";
 import { copy } from "../../copy/index.js";
 import { useDeleteSite } from "../../data/hooks/sites.js";
 import type { Site } from "../../data/types.js";
-import { DeleteForeverIcon, Dialog } from "../../ui/index.js";
+import { Banner, DeleteForeverIcon, Dialog } from "../../ui/index.js";
+import { BusyBanner, isSiteBusy, quietProblem } from "./clear-dialog.js";
 
 export interface SiteDeleteDialogProps {
     site: Site;
@@ -13,6 +14,8 @@ export interface SiteDeleteDialogProps {
 
 export function SiteDeleteDialog({ site, onClose, onDeleted }: SiteDeleteDialogProps): ReactElement {
     const remove = useDeleteSite();
+    const busy = isSiteBusy(remove.error);
+    const problem = quietProblem(remove.error, ["CONFLICT"]);
 
     return (
         <Dialog
@@ -40,6 +43,9 @@ export function SiteDeleteDialog({ site, onClose, onDeleted }: SiteDeleteDialogP
                     },
                 );
             }}
-        />
+        >
+            {busy ? <BusyBanner siteId={site.id} /> : null}
+            {problem === null ? null : <Banner tone="danger" title={problem} />}
+        </Dialog>
     );
 }

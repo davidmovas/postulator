@@ -59,6 +59,45 @@ func TestToolLoadingIsDeclaredAndSendsEveryToolUnlessAskedOtherwise(t *testing.T
 	}
 }
 
+func TestTheAssistantSearchesTheWebOnlyWhenAPersonTurnsItOn(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		stored string
+		want   bool
+		refuse bool
+	}{
+		{name: "nothing stored searches nothing", want: false},
+		{name: "turned on", stored: `true`, want: true},
+		{name: "turned off", stored: `false`, want: false},
+		{name: "not a switch", stored: `"yes"`, refuse: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			declarations := settings.Default()
+			values := declarations.NewValues()
+			if tc.stored != "" {
+				raw := json.RawMessage(tc.stored)
+				if err := declarations.Validate("agent.webSearch", raw); tc.refuse != (err != nil) {
+					t.Fatalf("Validate(%s) = %v, want refused = %t", tc.stored, err, tc.refuse)
+				}
+				if tc.refuse {
+					return
+				}
+				if _, err := declarations.Apply(values, map[string]json.RawMessage{"agent.webSearch": raw}); err != nil {
+					t.Fatalf("Apply: %v", err)
+				}
+			}
+			if got := agent.WebSearchOf(values); got != tc.want {
+				t.Fatalf("WebSearchOf = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestTheHistoryToolResultCeilingIsDeclaredAndBounded(t *testing.T) {
 	t.Parallel()
 

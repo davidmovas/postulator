@@ -35,23 +35,31 @@ describe("buildGraphIndex", () => {
     });
 
     it("flags the problems a node carries", () => {
-        expect(typed.problems.get("travel")).toStrictEqual({ noPage: true, orphan: false, proposed: 0, multiParent: false });
-        expect(typed.problems.get("kiln")).toStrictEqual({ noPage: true, orphan: true, proposed: 2, multiParent: false });
-        expect(typed.problems.get("care")).toStrictEqual({ noPage: false, orphan: true, proposed: 0, multiParent: false });
-        expect(typed.problems.get("stone")).toStrictEqual({ noPage: false, orphan: false, proposed: 1, multiParent: true });
-        expect(typed.problems.get("mugs")).toStrictEqual({ noPage: false, orphan: false, proposed: 1, multiParent: false });
-        expect(typed.problems.get("pottery")).toStrictEqual({ noPage: false, orphan: false, proposed: 0, multiParent: false });
+        expect(typed.problems.get("travel")).toStrictEqual({ noPage: true, noHub: false, proposed: 0, multiParent: false });
+        expect(typed.problems.get("kiln")).toStrictEqual({ noPage: true, noHub: false, proposed: 2, multiParent: false });
+        expect(typed.problems.get("care")).toStrictEqual({ noPage: false, noHub: true, proposed: 0, multiParent: false });
+        expect(typed.problems.get("stone")).toStrictEqual({ noPage: false, noHub: false, proposed: 1, multiParent: true });
+        expect(typed.problems.get("mugs")).toStrictEqual({ noPage: false, noHub: false, proposed: 1, multiParent: false });
+        expect(typed.problems.get("pottery")).toStrictEqual({ noPage: false, noHub: false, proposed: 0, multiParent: false });
     });
 
-    it("calls a root an orphan unless its canonical page is a hub", () => {
-        expect(index.problems.get("pottery")?.orphan).toBe(true);
-        expect(typed.problems.get("pottery")?.orphan).toBe(false);
-        expect(typed.problems.get("teapots")?.orphan).toBe(false);
+    it("says an article or a product has no hub above only when no hub page sits anywhere over it", () => {
+        const deeper = buildGraphIndex(
+            [...potteryEntities, entity({ id: "firing", name: "Firing", score: 0.1 }), entity({ id: "loose", name: "Loose Lid", score: 0.1 })],
+            [...potteryEdges, edge("e13", "firing", "glazing", "parent"), edge("e14", "loose", "care", "parent")],
+            [...potteryPages, typedPage("firing", "entity"), typedPage("loose", "product")],
+            potteryTypes,
+        );
+        expect(deeper.problems.get("firing")?.noHub).toBe(false);
+        expect(deeper.problems.get("loose")?.noHub).toBe(true);
+        expect(deeper.problems.get("care")?.noHub).toBe(true);
+        expect(deeper.problems.get("teapots")?.noHub).toBe(false);
+        expect(index.problems.get("care")?.noHub).toBe(false);
     });
 
     it("totals the problems for the site", () => {
         expect(typed.counts).toStrictEqual({
-            total: 10, noPage: 2, orphan: 2, proposedEdges: 3, ai: 2, multiParent: 1,
+            total: 10, noPage: 2, noHub: 1, proposedEdges: 3, ai: 2, multiParent: 1,
             states: { mismatch: 0, working: 0, published: 0, exists: 0, planned: 8, archived: 0, noPage: 2 },
         });
     });

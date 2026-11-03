@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/application/graph"
 	"github.com/davidmovas/postulator/internal/application/pages"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 )
 
@@ -14,6 +15,7 @@ type selectArgs struct {
 	PageIDs []string `json:"pageIds,omitempty" description:"These pages"`
 	Under   []string `json:"under,omitempty" description:"Each of these pages and every page below it"`
 	OfType  string   `json:"ofType,omitempty" description:"With under, only pages of this type id below; alone, every page of it"`
+	Gap     string   `json:"gap,omitempty" enum:"planned,empty,unmapped,orphan,missing_links,findings,no_hub" description:"Every page with this gap; not with under"`
 	Except  []string `json:"except,omitempty" description:"Leave these pages out"`
 }
 
@@ -22,14 +24,21 @@ func (in *selectArgs) selection(siteID string) pages.Selection {
 	for _, pageID := range in.Under {
 		sel.Subtrees = append(sel.Subtrees, pages.Subtree{PageID: pageID, TypeID: in.OfType})
 	}
-	if in.OfType != "" && len(in.Under) == 0 {
-		sel.Filter = &pages.PageFilter{PageTypeID: in.OfType}
+	if len(in.Under) == 0 && (in.OfType != "" || in.Gap != "") {
+		sel.Filter = &pages.PageFilter{PageTypeID: in.OfType, Gap: contextpack.Gap(in.Gap)}
 	}
 	return sel
 }
 
-func (in *selectArgs) empty() bool {
-	return in == nil || (len(in.PageIDs) == 0 && len(in.Under) == 0 && in.OfType == "")
+func (in *selectArgs) checked() error {
+	switch {
+	case in == nil || (len(in.PageIDs) == 0 && len(in.Under) == 0 && in.OfType == "" && in.Gap == ""):
+		return errors.New(errors.Invalid, "name the pages: pageIds, under, ofType or gap").WithDetail("field", "select")
+	case in.Gap != "" && len(in.Under) > 0:
+		return errors.New(errors.Invalid, "a gap selects across the whole site; name it without under").WithDetail("field", "select.gap")
+	default:
+		return nil
+	}
 }
 
 type selected struct {
@@ -38,8 +47,8 @@ type selected struct {
 }
 
 func (deps Deps) selectPages(ctx context.Context, b Binding, in *selectArgs) (selected, error) {
-	if in.empty() {
-		return selected{}, errors.New(errors.Invalid, "name the pages: pageIds, under or ofType").WithDetail("field", "select")
+	if err := in.checked(); err != nil {
+		return selected{}, err
 	}
 	resolved, err := deps.Pages.Resolve(ctx, in.selection(b.SiteID))
 	if err != nil {

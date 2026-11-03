@@ -35,7 +35,7 @@ const lensTones: Readonly<Record<Lens, Tone>> = {
     all: "muted",
     noPage: "danger",
     proposed: "info",
-    orphan: "warn",
+    noHub: "warn",
     ai: "accent",
     site: "ok",
 };

@@ -8,7 +8,8 @@ import type { Page } from "../../data/types.js";
 import { aPage } from "../../testing/pages.js";
 import { aPageType } from "../../testing/pagetypes.js";
 import { renderScreen } from "../../testing/render.js";
-import { answerSiteMap, resetSiteMap, siteMapFake } from "../../testing/site-map.js";
+import { addressTreeFake, aFolder, answerAddressTree, resetAddressTree } from "../../testing/address-tree.js";
+import { resetSiteMap } from "../../testing/site-map.js";
 import { aNode, aRef } from "../map/model/fixture.js";
 import { forgetPages } from "./views/memory.js";
 
@@ -60,8 +61,10 @@ function writer(record: unknown[], answered: unknown, errorOf: () => Error | nul
 
 vi.mock("../../data/hooks/pages.js", async () => {
     const fake = await import("../../testing/site-map.js");
+    const address = await import("../../testing/address-tree.js");
     return {
         useSiteMap: fake.fakeSiteMap,
+        useAddressTree: address.fakeAddressTree,
         usePages: (filter: unknown) => {
             calls.listed.push(filter);
             return { data: { pages: [{ items: rows, hasMore: false }] }, isPending: false, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: () => undefined };
@@ -139,6 +142,7 @@ beforeEach(() => {
     forgetPages("s1");
     clearToasts();
     resetSiteMap();
+    resetAddressTree();
 });
 
 function show(at = "/s/s1/pages") {
@@ -276,41 +280,50 @@ describe("the pages as a list", () => {
 
 describe("the pages as a tree", () => {
     const tree = (): void => {
-        answerSiteMap({}, [
-            aNode("hub", "/peptides/", { page: aRef("hub", "/peptides/", { type: "Landing" }), children: 2, descendants: 3 }),
-            aNode("about", "/about/", { page: aRef("about", "/about/", { type: "Guide" }) }),
+        answerAddressTree({}, [aFolder("/", 2, 5, aNode("home", "/", { page: aRef("home", "/", { type: "Landing" }) }))]);
+        answerAddressTree({ folder: "/" }, [
+            aFolder("/products/", 2, 2),
+            aFolder("/researchers/", 1, 2, aNode("res", "/researchers/", { page: aRef("res", "/researchers/", { type: "Category" }) })),
         ]);
-        answerSiteMap({ parentId: "hub" }, [
-            aNode("bpc", "/bpc-157/", { page: aRef("bpc", "/bpc-157/", { type: "Category" }), children: 1, descendants: 1 }),
-            aNode("tb", "/tb-500/", { page: aRef("tb", "/tb-500/", { type: "Category" }) }),
+        answerAddressTree({ folder: "/products/" }, [
+            aFolder("/products/p1/", 0, 1, aNode("p1", "/products/p1/", { page: aRef("p1", "/products/p1/", { type: "Guide" }), parentId: "res" })),
+            aFolder("/products/p2/", 0, 1, aNode("p2", "/products/p2/", { page: aRef("p2", "/products/p2/", { type: "Guide" }) })),
         ]);
     };
 
-    it("is remembered as the site's view, and ticks a page with everything under it", () => {
+    it("is remembered as the site's view, sets every page under its address and ticks a folder with no page of its own", () => {
         tree();
         const first = show();
         fireEvent.click(screen.getByRole("radio", { name: said.views.tree }));
         first.unmount();
         show();
 
-        fireEvent.click(screen.getByRole("checkbox", { name: said.select.branch("/peptides/") }));
-        expect(bar().getByText(said.bulk.selected(4))).toBeDefined();
-        fireEvent.click(screen.getByRole("button", { name: copy.map.expand("/peptides/") }));
-        fireEvent.click(screen.getByRole("checkbox", { name: said.select.branch("/bpc-157/") }));
+        expect(addressTreeFake.asked.some((filter) => filter.folder === "/")).toBe(true);
+        fireEvent.click(screen.getByRole("checkbox", { name: said.select.branch("/products/") }));
         expect(bar().getByText(said.bulk.selected(2))).toBeDefined();
-        expect(document.querySelector('[data-map-node="hub"]')?.getAttribute("data-map-tick")).toBe("some");
+        fireEvent.click(screen.getByRole("button", { name: copy.map.expand("/products/") }));
+        expect(document.querySelector('[data-map-node="p1"]')).not.toBeNull();
+        fireEvent.click(screen.getByRole("checkbox", { name: said.select.branch("/products/p2/") }));
+        expect(bar().getByText(said.bulk.selected(1))).toBeDefined();
+        expect(document.querySelector('[data-address-folder="/products/"]')?.getAttribute("data-map-tick")).toBe("some");
 
         choose(said.bulk.setType, "Guide");
         fireEvent.click(screen.getByRole("button", { name: said.bulk.confirm }));
         expect(calls.typed).toStrictEqual([
-            { selection: { siteId: "s1", subtrees: [{ pageId: "hub" }], exceptSubtrees: [{ pageId: "bpc" }] }, pageTypeId: "t-guide" },
+            {
+                selection: { siteId: "s1", folders: [{ path: "/products/" }], exceptFolders: [{ path: "/products/p2/" }] },
+                pageTypeId: "t-guide",
+            },
         ]);
     });
 });
 
 describe("the pages by type", () => {
     it("lists one group per type with its pages and template, selects a whole group and shows its pages as a list or a tree", () => {
-        answerSiteMap({ within: "t-guide" }, [aNode("lab", "/lab-guides/", { page: aRef("lab", "/lab-guides/", { type: "Guide" }) })]);
+        answerAddressTree({ within: "t-guide" }, [aFolder("/", 1, 1)]);
+        answerAddressTree({ folder: "/", within: "t-guide" }, [
+            aFolder("/lab-guides/", 0, 1, aNode("lab", "/lab-guides/", { page: aRef("lab", "/lab-guides/", { type: "Guide" }) })),
+        ]);
         show();
         fireEvent.click(screen.getByRole("radio", { name: said.views.types }));
 
@@ -325,7 +338,7 @@ describe("the pages by type", () => {
         fireEvent.click(screen.getByRole("button", { name: said.byType.open("Guide") }));
         expect(calls.listed.at(-1)).toStrictEqual({ siteId: "s1", pageTypeId: "t-guide" });
         fireEvent.click(within(screen.getByRole("radiogroup", { name: said.byType.mode })).getByRole("radio", { name: said.views.tree }));
-        expect(siteMapFake.asked.some((filter) => filter.within === "t-guide")).toBe(true);
+        expect(addressTreeFake.asked.some((filter) => filter.within === "t-guide")).toBe(true);
         expect(document.querySelector('[data-map-node="lab"]')?.getAttribute("data-map-tick")).toBe("on");
 
         choose(said.bulk.setType, "Category");

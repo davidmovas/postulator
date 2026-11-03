@@ -8,3 +8,5 @@ export const deleteSite = one(Sites.Delete);
 export const getSite = one(Sites.Get);
 export const listSites = listed<Parameters<typeof Sites.List>[0], Site>(Sites.List);
 export const testConnection = one(Sites.TestConnection);
+export const clearSiteData = one(Sites.ClearData);
+export const siteDataCounts = one(Sites.DataCounts);

@@ -94,6 +94,7 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 		Sites: stores.sites, Bodies: stores.bodies, Fields: stores.fields, Renders: stores.renders, Findings: stores.findings,
 		Maps: writing.siteModel, Rows: stores.pageMaps, Classifier: writing.classification, Templates: stores.templates,
 		UnitOfWork: stores.store, Publisher: c.Events, Clock: stores.now, Preview: previewIssuer{clients: writing.wordpress},
+		Gaps: writing.siteModel,
 	})
 	graphService := graph.New(graph.Deps{
 		Entities: stores.entities, Edges: stores.edges, Sites: stores.sites, Pages: stores.pages, Findings: stores.findings,
@@ -122,7 +123,10 @@ func (c *Core) buildServices(stores repos, llm llmParts, writing authoring, runn
 	})
 
 	return useCases{
-		sites:   sites.New(stores.sites, stores.secrets, stores.store, writing.pageTypes, writing.wordpress, c.Events, stores.now),
+		sites: sites.New(sites.Deps{
+			Store: stores.sites, Secrets: stores.secrets, UoW: stores.store, Types: writing.pageTypes, Data: stores.siteData,
+			Probe: writing.wordpress, Publisher: c.Events, Clock: stores.now,
+		}),
 		graph:   graphService,
 		pages:   pagesService,
 		imports: importsService,

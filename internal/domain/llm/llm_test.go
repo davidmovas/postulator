@@ -11,7 +11,9 @@ import (
 func TestRoles(t *testing.T) {
 	t.Parallel()
 
-	want := []llm.Role{llm.RoleWriter, llm.RoleEditor, llm.RoleLinker, llm.RoleJudge, llm.RoleChat, llm.RoleImage, llm.RoleTitler}
+	want := []llm.Role{
+		llm.RoleWriter, llm.RoleEditor, llm.RoleLinker, llm.RoleJudge, llm.RoleChat, llm.RoleImage, llm.RoleTitler, llm.RoleResearcher,
+	}
 	got := llm.Roles()
 	if len(got) != len(want) {
 		t.Fatalf("Roles() = %v, want %v", got, want)
@@ -190,6 +192,14 @@ func TestCost(t *testing.T) {
 			usage: llm.Usage{Input: 1_000_000, CacheWrite: 400_000, Output: 100_000, Total: 1_100_000},
 			want:  1.8 + 1.5 + 1.5,
 		},
+		{
+			name: "each web search is charged the provider's fee", info: priced, tier: llm.TierDefault,
+			usage: llm.Usage{WebSearches: 3}, want: 3 * llm.WebSearchUSDPerThousand / 1000,
+		},
+		{
+			name: "a search's fee stands beside the tokens it read, on flex as well", info: flexible, tier: llm.TierFlex,
+			usage: llm.Usage{Input: 1_000_000, WebSearches: 2, Total: 1_000_000}, want: 1.5 + 2*llm.WebSearchUSDPerThousand/1000,
+		},
 	}
 
 	for _, tc := range cases {
@@ -290,10 +300,41 @@ func TestAllowance(t *testing.T) {
 func TestUsageAdd(t *testing.T) {
 	t.Parallel()
 
-	sum := llm.Usage{Input: 10, Output: 5, CachedInput: 4, CacheWrite: 2, Reasoning: 3, Total: 15}.
-		Add(llm.Usage{Input: 1, Output: 2, CachedInput: 1, CacheWrite: 1, Reasoning: 2, Total: 3})
-	if sum != (llm.Usage{Input: 11, Output: 7, CachedInput: 5, CacheWrite: 3, Reasoning: 5, Total: 18}) {
+	sum := llm.Usage{Input: 10, Output: 5, CachedInput: 4, CacheWrite: 2, Reasoning: 3, Total: 15, WebSearches: 2}.
+		Add(llm.Usage{Input: 1, Output: 2, CachedInput: 1, CacheWrite: 1, Reasoning: 2, Total: 3, WebSearches: 1})
+	if sum != (llm.Usage{Input: 11, Output: 7, CachedInput: 5, CacheWrite: 3, Reasoning: 5, Total: 18, WebSearches: 3}) {
 		t.Fatalf("Add = %+v", sum)
+	}
+}
+
+func TestTheWebSearchFeeIsNeverZero(t *testing.T) {
+	t.Parallel()
+
+	if llm.WebSearchUSDPerThousand <= 0 {
+		t.Fatalf("WebSearchUSDPerThousand = %v, want OpenAI's fee", llm.WebSearchUSDPerThousand)
+	}
+}
+
+func TestSearchDepthValid(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		depth llm.SearchDepth
+		want  bool
+	}{
+		{depth: llm.DepthLow, want: true},
+		{depth: llm.DepthMedium, want: true},
+		{depth: llm.DepthHigh, want: true},
+		{depth: "", want: false},
+		{depth: "deep", want: false},
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.depth), func(t *testing.T) {
+			t.Parallel()
+			if got := tc.depth.Valid(); got != tc.want {
+				t.Errorf("SearchDepth(%q).Valid() = %v, want %v", tc.depth, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -309,6 +350,11 @@ func TestUsageAndPricesAreCamelCase(t *testing.T) {
 			name:  "usage",
 			value: llm.Usage{Input: 10, CachedInput: 4, CacheWrite: 3, Output: 6, Reasoning: 2, Total: 16},
 			want:  `{"input":10,"cachedInput":4,"cacheWrite":3,"output":6,"reasoning":2,"total":16}`,
+		},
+		{
+			name:  "usage with web searches",
+			value: llm.Usage{Input: 10, Output: 6, Total: 16, WebSearches: 2},
+			want:  `{"input":10,"cachedInput":0,"cacheWrite":0,"output":6,"reasoning":0,"total":16,"webSearches":2}`,
 		},
 		{
 			name: "cache write and flex prices",

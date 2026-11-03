@@ -46,8 +46,8 @@ export function Summary({ index, recomputing, onLens, onSelect, onRecompute }: S
     if (index.counts.noPage > 0) {
         attention.push({ lens: "noPage", label: copy.graph.summary.noPage(index.counts.noPage) });
     }
-    if (index.counts.orphan > 0) {
-        attention.push({ lens: "orphan", label: copy.graph.summary.orphan(index.counts.orphan) });
+    if (index.counts.noHub > 0) {
+        attention.push({ lens: "noHub", label: copy.graph.summary.noHub(index.counts.noHub) });
     }
     if (index.counts.proposedEdges > 0) {
         attention.push({ lens: "proposed", label: copy.graph.summary.proposed(index.counts.proposedEdges) });

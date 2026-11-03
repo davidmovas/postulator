@@ -31,7 +31,7 @@ export interface RelatedLink {
 
 export interface EntityProblems {
     noPage: boolean;
-    orphan: boolean;
+    noHub: boolean;
     proposed: number;
     multiParent: boolean;
 }
@@ -39,7 +39,7 @@ export interface EntityProblems {
 export interface GraphCounts {
     total: number;
     noPage: number;
-    orphan: number;
+    noHub: number;
     proposedEdges: number;
     ai: number;
     multiParent: number;
@@ -74,6 +74,28 @@ export function typeOf(index: GraphIndex, id: string): EntityType | null {
 
 export function presetOf(index: GraphIndex, id: string): PresetRole {
     return roleOf(index.types.get(id)?.preset);
+}
+
+const hubless: ReadonlySet<string> = new Set(["entity", "product"]);
+
+function noHubAbove(id: string, parents: ReadonlyMap<string, readonly string[]>, types: ReadonlyMap<string, EntityType>): boolean {
+    if (!hubless.has(types.get(id)?.role ?? "")) {
+        return false;
+    }
+    const seen = new Set([id]);
+    const stack = [...(parents.get(id) ?? [])];
+    while (stack.length > 0) {
+        const above = stack.pop();
+        if (above === undefined || seen.has(above)) {
+            continue;
+        }
+        if (types.get(above)?.role === "hub") {
+            return false;
+        }
+        seen.add(above);
+        stack.push(...(parents.get(above) ?? []));
+    }
+    return true;
 }
 
 function canonicalTypes(
@@ -316,20 +338,20 @@ export function buildGraphIndex(
         mismatch: 0, working: 0, published: 0, exists: 0, planned: 0, archived: 0, noPage: 0,
     };
     const counts: GraphCounts = {
-        total: byId.size, noPage: 0, orphan: 0, proposedEdges: proposedEdges.length, ai: 0, multiParent: 0,
+        total: byId.size, noPage: 0, noHub: 0, proposedEdges: proposedEdges.length, ai: 0, multiParent: 0,
         states,
     };
     for (const held of byId.values()) {
         const approved = approvedParents.get(held.id) ?? [];
         const flags: EntityProblems = {
             noPage: held.canonicalPageId === null,
-            orphan: approved.length === 0 && types.get(held.id)?.role !== "hub",
+            noHub: noHubAbove(held.id, approvedParents, types),
             proposed: proposedTouches.get(held.id) ?? 0,
             multiParent: approved.length > 1,
         };
         problems.set(held.id, flags);
         counts.noPage += flags.noPage ? 1 : 0;
-        counts.orphan += flags.orphan ? 1 : 0;
+        counts.noHub += flags.noHub ? 1 : 0;
         counts.multiParent += flags.multiParent ? 1 : 0;
         counts.ai += held.source === "ai" ? 1 : 0;
     }

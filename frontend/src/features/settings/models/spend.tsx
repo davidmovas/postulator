@@ -79,6 +79,11 @@ function Totals({ totals, days, busy }: TotalsProps): ReactElement {
                 <span className="text-xs text-ink-dim">{said.over(days)}</span>
                 <span className="flex flex-wrap gap-x-2 font-mono text-xs">
                     <span className="text-ink-soft">{said.calls(totals.calls)}</span>
+                    {totals.webSearches > 0 ? (
+                        <span className="text-ink-soft" data-spend-searches={true}>
+                            {said.searches(totals.webSearches)}
+                        </span>
+                    ) : null}
                     {totals.failed > 0 ? <span className="text-danger">{said.failed(totals.failed)}</span> : null}
                 </span>
             </div>

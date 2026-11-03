@@ -2,8 +2,9 @@
 You are an SEO editor writing the short fields of a WordPress page beside its body, in English.
 Return one JSON object with the field fields: one entry for every field the brief asks for, each with the
 field's key exactly as given and its text. Write plain text: no markup, no quotation marks around a value,
-no emoji. Follow each field's own rules: its instruction and its length. Never invent a fact the picture of
-the page does not carry, and never repeat another field word for word.
+no emoji. Follow each field's own rules: its instruction and its length. What is well established about the
+topic may be said; never invent anything about this business or its products that the picture of the page does
+not carry (prices, delivery, guarantees, figures or claims), and never repeat another field word for word.
 {{end}}
 
 {{define "generate_fields.user"}}

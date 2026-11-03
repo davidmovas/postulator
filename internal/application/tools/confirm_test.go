@@ -310,15 +310,16 @@ func TestEveryPageChangeIsSaidInOneSentenceTheCardAndThePlanShow(t *testing.T) {
 		args string
 		want []string
 	}{
-		"create":        {`{"op":"create","path":"/coffee/grinders/"}`, []string{"Plan the page /coffee/grinders/"}},
-		"update":        {`{"op":"update","pageId":"` + seeded.page + `","title":"Coffee","h1":"Coffee"}`, []string{"title, H1 of /coffee/"}},
-		"delete":        {`{"op":"delete","pageId":"` + seeded.page + `"}`, []string{"Delete /coffee/ from the page map"}},
-		"map":           {`{"op":"map","pageId":"` + seeded.page + `","entityId":"` + seeded.entity + `"}`, []string{"Map /coffee/ to the entity Coffee"}},
-		"unmap":         {`{"op":"unmap","pageId":"` + seeded.page + `"}`, []string{"Detach /coffee/"}},
-		"canonical":     {`{"op":"canonical","pageId":"` + seeded.page + `","entityId":"` + seeded.entity + `"}`, []string{"canonical page of Coffee"}},
-		"preview_link":  {`{"op":"preview_link","pageId":"` + seeded.page + `"}`, []string{"one-hour link", "/coffee/"}},
-		"set_templates": {`{"op":"set_templates","templateId":"` + seeded.template + `","select":{"pageIds":["` + seeded.page + `"]}}`, []string{"1 page (/coffee/)", "Guide"}},
-		"back to rules": {`{"op":"set_types","reset":true,"select":{"pageIds":["` + seeded.page + `"]}}`, []string{"back to the classification rules"}},
+		"create":               {`{"op":"create","path":"/coffee/grinders/"}`, []string{"Plan the page /coffee/grinders/"}},
+		"update":               {`{"op":"update","pageId":"` + seeded.page + `","title":"Coffee","h1":"Coffee"}`, []string{"title, H1 of /coffee/"}},
+		"delete":               {`{"op":"delete","pageId":"` + seeded.page + `"}`, []string{"Delete /coffee/ from the page map"}},
+		"map":                  {`{"op":"map","pageId":"` + seeded.page + `","entityId":"` + seeded.entity + `"}`, []string{"Map /coffee/ to the entity Coffee"}},
+		"unmap":                {`{"op":"unmap","pageId":"` + seeded.page + `"}`, []string{"Detach /coffee/"}},
+		"canonical":            {`{"op":"canonical","pageId":"` + seeded.page + `","entityId":"` + seeded.entity + `"}`, []string{"canonical page of Coffee"}},
+		"preview_link":         {`{"op":"preview_link","pageId":"` + seeded.page + `"}`, []string{"one-hour link", "/coffee/"}},
+		"set_templates":        {`{"op":"set_templates","templateId":"` + seeded.template + `","select":{"pageIds":["` + seeded.page + `"]}}`, []string{"1 page (/coffee/)", "Guide"}},
+		"back to rules":        {`{"op":"set_types","reset":true,"select":{"pageIds":["` + seeded.page + `"]}}`, []string{"back to the classification rules"}},
+		"set_templates by gap": {`{"op":"set_templates","templateId":"` + seeded.template + `","select":{"gap":"planned"}}`, []string{"/coffee/", "Guide"}},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -341,6 +342,10 @@ func TestEveryPageChangeIsSaidInOneSentenceTheCardAndThePlanShow(t *testing.T) {
 	foreign := sqlitetest.Page(t, seeded.store, other.ID, "/elsewhere/")
 	if _, err := registry.Call(t.Context(), binding, "pages_manage", json.RawMessage(`{"op":"unmap","pageId":"`+foreign.ID+`"}`)); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("a page of another site = %v, want NotFound", err)
+	}
+	if _, err := registry.Call(t.Context(), binding, "pages_manage", json.RawMessage(
+		`{"op":"set_types","reset":true,"select":{"gap":"no_hub","under":["`+seeded.page+`"]}}`)); !errors.IsCode(err, errors.Invalid) {
+		t.Errorf("a gap under a subtree = %v, want Invalid, since a gap selects the whole site", err)
 	}
 	if _, err := registry.Call(t.Context(), binding, "pages_manage", json.RawMessage(`{"op":"set_types","reset":true}`)); !errors.IsCode(err, errors.Invalid) {
 		t.Errorf("a bulk change naming no page = %v, want Invalid", err)

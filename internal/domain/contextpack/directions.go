@@ -10,9 +10,22 @@ import (
 
 const (
 	SectionBrief     SectionName = "brief"
+	SectionResearch  SectionName = "research"
 	SectionReference SectionName = "reference"
 	SectionStyle     SectionName = "style"
 )
+
+func researchSection(f Facts) Section {
+	section := Section{
+		Name: SectionResearch, Priority: 2,
+		Heading: "What a web search found for this page; use what serves the page and never link its sources",
+	}
+	if f.Research == nil {
+		return section
+	}
+	section.Items = f.Research.Facts()
+	return section
+}
 
 type MustLinkRef struct {
 	Path   string `json:"path"`

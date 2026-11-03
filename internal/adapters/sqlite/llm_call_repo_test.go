@@ -136,6 +136,11 @@ func TestLLMCallRepoKeepsTheUsageDetailAndTheServedTier(t *testing.T) {
 			usage:    llm.Usage{Input: 12, Output: 3, Total: 15},
 			wantTier: llm.TierDefault,
 		},
+		{
+			name:  "a call that searched the web keeps how many searches it paid for",
+			usage: llm.Usage{Input: 9000, Output: 400, Total: 9400, WebSearches: 3},
+			tier:  llm.TierDefault, wantTier: llm.TierDefault,
+		},
 	}
 
 	for _, tc := range cases {
@@ -218,7 +223,7 @@ func TestLLMCallRepoAggregate(t *testing.T) {
 			usage: llm.Usage{Input: 1000, Output: 1000, Reasoning: 200}, usd: 0.25},
 		{runID: "run-1", step: "generate_body", model: terra, tier: llm.TierFlex, status: llm.CallError, minutesAgo: 8},
 		{runID: "run-1", step: "judge", model: luna, tier: llm.TierDefault, status: llm.CallOK, minutesAgo: 7,
-			usage: llm.Usage{Input: 500, Output: 100}, usd: 0.125},
+			usage: llm.Usage{Input: 500, Output: 100, WebSearches: 4}, usd: 0.125},
 		{runID: "run-2", step: "generate_body", model: terra, status: llm.CallOK, minutesAgo: 6,
 			usage: llm.Usage{Input: 10, Output: 10}, usd: 0.0625},
 		{step: "chat", conversation: "c1", model: terra, status: llm.CallOK, minutesAgo: 5,
@@ -255,7 +260,7 @@ func TestLLMCallRepoAggregate(t *testing.T) {
 				{Purpose: llm.PurposeChat, Provider: "openai", Model: terra, Tier: llm.TierDefault, Calls: 1, Failed: 1,
 					Input: 20000, CachedInput: 16000, Output: 300, USD: 0.5},
 				{Purpose: llm.PurposeRun, Provider: "openai", Model: luna, Tier: llm.TierDefault, Calls: 1,
-					Input: 500, Output: 100, USD: 0.125},
+					Input: 500, Output: 100, WebSearches: 4, USD: 0.125},
 				{Purpose: llm.PurposeRun, Provider: "openai", Model: terra, Tier: llm.TierDefault, Calls: 1,
 					Input: 10, Output: 10, USD: 0.0625},
 				{Purpose: llm.PurposeGraph, Provider: "openai", Model: luna, Tier: llm.TierDefault, Calls: 2,
@@ -278,7 +283,7 @@ func TestLLMCallRepoAggregate(t *testing.T) {
 					Calls: 2, Failed: 1, Input: 2000, CachedInput: 200, CacheWrite: 300, Output: 3000, Reasoning: 1000,
 					USD: 0.75},
 				{Purpose: llm.PurposeRun, Provider: "openai", Model: luna, Tier: llm.TierDefault, Step: "judge",
-					Calls: 1, Input: 500, Output: 100, USD: 0.125},
+					Calls: 1, Input: 500, Output: 100, WebSearches: 4, USD: 0.125},
 			},
 		},
 		{

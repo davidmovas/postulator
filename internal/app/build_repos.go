@@ -18,6 +18,7 @@ type repos struct {
 	unknown       []string
 	secrets       *secrets.Store
 	sites         *sqlite.SiteRepo
+	siteData      *sqlite.SiteDataRepo
 	entities      *sqlite.EntityRepo
 	edges         *sqlite.EdgeRepo
 	topics        *sqlite.TopicBuildRepo
@@ -77,6 +78,7 @@ func openRepos(ctx context.Context, store *sqlite.Store, key []byte) (repos, err
 		unknown:       unknown,
 		secrets:       secrets.NewStore(sqlite.NewSecretsRepo(store, now), key),
 		sites:         sqlite.NewSiteRepo(store),
+		siteData:      sqlite.NewSiteDataRepo(store),
 		entities:      sqlite.NewEntityRepo(store),
 		edges:         sqlite.NewEdgeRepo(store),
 		topics:        sqlite.NewTopicBuildRepo(store),

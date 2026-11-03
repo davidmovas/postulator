@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/davidmovas/postulator/internal/application/agent"
+	llmport "github.com/davidmovas/postulator/internal/application/llm"
 	"github.com/davidmovas/postulator/internal/application/tools"
 	agentrunner "github.com/davidmovas/postulator/internal/transport/agent"
 )
@@ -50,6 +51,7 @@ func (c *Core) buildAgent(stores repos, llm llmParts, writing authoring, service
 			HistoryBudget:     func() int { return agent.HistoryBudgetChars(values) },
 			MaxToolResult:     func() int { return agent.MaxToolResultBytes(values) },
 			HistoryToolResult: func() int { return agent.HistoryToolResultBytes(values) },
+			WebSearch:         func() bool { return agent.WebSearchOf(values) },
 			Dropped: func(err error) {
 				c.logger.Warn("the agent dropped a failure no caller was waiting for", zap.Error(err))
 			},
@@ -67,5 +69,12 @@ func (c *Core) agentRunner(stores repos, llm llmParts, toolRegistry *tools.Regis
 		Clock:       stores.now,
 		Logger:      c.logger,
 		ToolLoading: func() agent.ToolLoading { return agent.ToolLoadingOf(values) },
+		WebSearch: func() *llmport.WebSearch {
+			if !agent.WebSearchOf(values) {
+				return nil
+			}
+			search := llm.tuning.WebSearch()
+			return &search
+		},
 	})
 }

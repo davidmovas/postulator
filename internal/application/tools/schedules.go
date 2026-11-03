@@ -26,7 +26,7 @@ type schedulesArgs struct {
 	Status          *string  `json:"status,omitempty" enum:"planned,exists,published,archived" description:"create, update: only pages in this state"`
 	MaxPages        *int     `json:"maxPages,omitempty" minimum:"1" description:"create, update: the most pages a firing takes"`
 	TemplateID      *string  `json:"templateId,omitempty" description:"create, update: the template to move pages to; default their own"`
-	Steps           []string `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"create, update: the steps in order; default the template's recipe"`
+	Steps           []string `json:"steps,omitempty" enum:"resolve_context,research,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"create, update: the steps in order; default the template's recipe"`
 	PublishMode     *string  `json:"publishMode,omitempty" enum:"draft,publish" description:"create, update: default draft"`
 	MaxUSD          *float64 `json:"maxUsd,omitempty" minimum:"0" description:"create, update: dollar ceiling per run"`
 	MaxTokens       *int     `json:"maxTokens,omitempty" minimum:"0" description:"create, update: token ceiling per run"`

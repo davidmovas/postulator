@@ -64,7 +64,7 @@ function pathsOf(held: Readonly<Record<string, string | undefined>> | null): Rea
 
 export function BulkBar({ siteId, selection, onSelection, naming, known, entityName, selectAll, onStartRun }: BulkBarProps): ReactElement {
     const [asked, setAsked] = useState<Asked | null>(null);
-    const request = useMemo(() => toRequest(siteId, selection), [siteId, selection]);
+    const request = useMemo(() => toRequest(siteId, selection, (key) => known().get(key)?.path), [siteId, selection, known]);
     const certain = exact(selection);
     const settled = useDebounced(JSON.stringify(request), countDelayMs);
     const counted = useSelectionCount(certain ? null : (JSON.parse(settled) as typeof request));

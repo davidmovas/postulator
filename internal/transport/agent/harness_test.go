@@ -201,11 +201,14 @@ func buildWired(t *testing.T, store *sqlite.Store, model *fake.Client, wired wir
 	templateService := templates.New(sqlite.NewTemplateRepo(store), pageRepo, sqlite.NewEntityRepo(store), siteRepo,
 		sqlite.NewPageTypeRepo(store), store, bus, now)
 	registered := tools.New(tools.Deps{
-		Sites: sites.New(siteRepo, nil, store, pagetypes.New(pagetypes.Deps{
-			Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
-			Pages: pageRepo, Templates: sqlite.NewTemplateRepo(store),
-			Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now,
-		}), nil, bus, now),
+		Sites: sites.New(sites.Deps{
+			Store: siteRepo, UoW: store, Data: sqlite.NewSiteDataRepo(store), Publisher: bus, Clock: now,
+			Types: pagetypes.New(pagetypes.Deps{
+				Types: sqlite.NewPageTypeRepo(store), Scopes: sqlite.NewFieldScopeRepo(store), Rules: sqlite.NewPageTypeRuleRepo(store),
+				Pages: pageRepo, Templates: sqlite.NewTemplateRepo(store),
+				Sites: siteRepo, UnitOfWork: store, Publisher: bus, Clock: now,
+			}),
+		}),
 		Pages: pages.New(pages.Deps{
 			Pages: pageRepo, Links: linkRepo, Entities: entityRepo, Edges: edgeRepo, Sites: siteRepo,
 			Bodies: sqlite.NewPageBodyRepo(store), Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),

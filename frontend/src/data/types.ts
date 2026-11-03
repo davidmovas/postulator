@@ -40,6 +40,8 @@ export type SitePlugin = Wire<SitesModels.Plugin>;
 export type SiteFilter = ListFilter<SitesModels.ListRequest>;
 export type Reachability = Wire<SitesModels.Reachability>;
 export type SiteSettings = Site["settings"];
+export type SiteDataHeld = Wire<SitesModels.DataHeld>;
+export type ClearSiteDataRequest = SitesModels.ClearDataRequest;
 
 export type Page = Wire<PagesModels.Page>;
 export type PageLink = Wire<PagesModels.PageLink>;
@@ -49,7 +51,7 @@ export type PageFilter = ListFilter<PagesModels.ListRequest>;
 export type PageCountRequest = PagesModels.CountRequest;
 export type PageSelection = PagesModels.Selection;
 export type PageFacets = PagesModels.PageFilter;
-export type PageSubtree = PagesModels.Subtree;
+export type PageFolder = PagesModels.Folder;
 export type SetTypesRequest = PagesModels.SetTypesRequest;
 export type SetTypesResponse = Wire<PagesModels.SetTypesResponse>;
 export type SetTemplatesRequest = PagesModels.SetTemplatesRequest;
@@ -87,6 +89,9 @@ export type SiteMapNode = Wire<ContextPackModels.MapNode>;
 export type SiteMapRef = Wire<ContextPackModels.Ref>;
 export type ParentWhy = Wire<ContextPackModels.ParentWhy>;
 export type SiteMapFilter = Omit<SiteModelModels.MapRequest, "cursor" | "limit">;
+export type AddressView = Wire<SiteModelModels.AddressView>;
+export type AddressNode = Wire<SiteModelModels.AddressNode>;
+export type AddressFilter = Omit<SiteModelModels.AddressRequest, "cursor" | "limit">;
 
 export type WriterPack = Wire<SiteModelModels.PackView>;
 export type WriterPackSection = Wire<SiteModelModels.Section>;

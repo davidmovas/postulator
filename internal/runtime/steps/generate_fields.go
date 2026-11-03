@@ -96,6 +96,7 @@ func GenerateFields(deps Deps) run.StepDef {
 	return run.StepDef{
 		Name:      NameGenerateFields,
 		Role:      domainllm.RoleEditor,
+		Reads:     []run.ArtifactKind{run.ArtifactResearch},
 		Produces:  []run.ArtifactKind{run.ArtifactFields},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   editorTimeout,

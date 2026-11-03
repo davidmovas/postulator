@@ -223,6 +223,18 @@ export const creatablePageTypePresets: readonly PageTypePreset[] = [
     "technical",
 ];
 
+export const hubPageTypePresets: readonly PageTypePreset[] = ["landing", "category", "hub"];
+
+export const entityPageTypePresets: readonly PageTypePreset[] = ["guide", "info", "entity"];
+
+export const productPageTypePresets: readonly PageTypePreset[] = ["product"];
+
+export const archivePageTypePresets: readonly PageTypePreset[] = ["store_category"];
+
+export const catalogPageTypePresets: readonly PageTypePreset[] = ["catalog"];
+
+export const technicalPageTypePresets: readonly PageTypePreset[] = ["technical"];
+
 export const pageTypeRoles = ["hub", "entity", "product", "archive", "catalog", "technical"] as const;
 export type PageTypeRole = (typeof pageTypeRoles)[number];
 
@@ -363,7 +375,15 @@ export type TreeShape = (typeof treeShapes)[number];
 export const linksShapes = ["page", "section", "map", "owed", "orphans", "suggest"] as const;
 export type LinksShape = (typeof linksShapes)[number];
 
-export const siteGaps = ["planned", "empty", "unmapped", "orphan", "missing_links", "findings"] as const;
+export const siteGaps = [
+    "planned",
+    "empty",
+    "unmapped",
+    "orphan",
+    "missing_links",
+    "findings",
+    "no_hub",
+] as const;
 export type SiteGap = (typeof siteGaps)[number];
 
 export const fieldProviders = ["", "plugin", "store"] as const;
@@ -458,6 +478,7 @@ export type Actor = (typeof actors)[number];
 
 export const artifactKinds = [
     "link_context",
+    "research",
     "draft",
     "body_html",
     "meta",
@@ -478,6 +499,7 @@ export const purgeableArtifactKinds: readonly ArtifactKind[] = ["draft", "body_h
 
 export const stepNames = [
     "resolve_context",
+    "research",
     "generate_body",
     "generate_meta",
     "generate_fields",
@@ -514,7 +536,16 @@ export type AnchorStrategy = (typeof anchorStrategies)[number];
 export const imageSources = ["ai", "wpmedia", "local"] as const;
 export type ImageSource = (typeof imageSources)[number];
 
-export const modelRoles = ["writer", "editor", "linker", "judge", "chat", "image", "titler"] as const;
+export const modelRoles = [
+    "writer",
+    "editor",
+    "linker",
+    "judge",
+    "chat",
+    "image",
+    "titler",
+    "researcher",
+] as const;
 export type ModelRole = (typeof modelRoles)[number];
 
 export const reasoningEfforts = ["none", "low", "medium", "high", "xhigh"] as const;

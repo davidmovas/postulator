@@ -52,6 +52,7 @@ export interface SpecDraft {
 }
 
 export const imageStep = "generate_images";
+export const researchStep = "research";
 const drawnSource = "ai";
 
 export function isJsonObject(value: JsonValue | undefined): value is JsonObject {

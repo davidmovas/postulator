@@ -4,23 +4,36 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.10.0` on 2026-10-30 (PR #37 merged, tagged; store categories, products and the
-front page in the topical map, `/cart/` technical, notes under **Release 2.10.0**). **2.10.1 is built
-on `dev`** (2026-10-30): products read through the plugin when WordPress hides them and the store
-refuses; its notes are under **Release 2.10.1**, and its pull request is open.
+**Released:** `v2.10.1` on 2026-10-30 (PR #38 merged, tagged; products read through the plugin
+when WordPress hides them and the store refuses, notes under **Release 2.10.1**). **2.11.0 is in a pull
+request from `dev`** (2026-11-03): the Pages tree by address, a run's parents only for a creation, the
+No hub above filter and lens, types shown under their role, then a site that deletes again, Clear
+data, the assistant's reasoning as a setting and the web search; notes under **Release 2.11.0**.
 
 ## Next, in order
 
-1. **The pull request from `dev` to `master` for 2.10.1 is open**; the owner merges it and tags
-   `v2.10.1`. No migration; the plugin stays 1.5.2.
-2. **The client installs 2.10.1 and syncs once**: his products come in as pages with their
+1. **The owner merges 2.11.0 into `master` and tags it.** Its gate, 2026-11-03 after the second part:
+   `go test` over all 98 packages but `internal/app/scale` (in five groups, `-p 2`, for the machine's
+   memory) green; vitest over all 228 files (2,684 tests), typecheck and `golangci-lint` green; on the
+   replica eleven suites green (the whole loop, the client's loop, the observation, page types, the
+   product loop, the writer's picture, the run brief, the agent seeing the site and editing a block,
+   the assistant reading the site and planning content; 167 s and 294 s). Before the second part,
+   2026-11-02, `task build` and both stands' four suites passed. Not run: race, the scale package,
+   `e2e:full`, vanilla since the second part, `task build` since it, the UI harness walk.
+2. **Prove the web search's request shapes for free** with a key that has no credit (it validates a
+   request before it refuses it): a research call (the hosted `web_search` with `search_context_size`,
+   `filters.allowed_domains` and `blocked_domains`, `max_tool_calls`, `include`, no `text.format`) and a
+   streamed chat round with the function tools and the search. Then, with a funded key, read a page's
+   research and the ledger's `web_searches` and `input_tokens`, and settle the search allowance by depth
+   (`steps.searchTokensByDepth`) and the research step's overhead (the 800 default).
+3. **The client installs it and syncs once**: his products come in as pages with their
    entities. If there are still none, the cause is not this one: look at the Sites panel (is the
    plugin found, and what does it say about WooCommerce) and at `https://<site>/wp-json/wp/v2/types`.
    A message on the run screen when the store cannot be read is proposed and not built.
-3. **`e2e:full` on both stands**, owed since 2.10.0: the replica passed the five suites 2.10.0 touches
+4. **`e2e:full` on both stands**, owed since 2.10.0: the replica passed the five suites 2.10.0 touches
    (the observation, page types, the product loop, the proposal and the reconciliation, 149 s). The
    stands are down.
-4. **The race legs**, owed since 2.7.0, one call each on a quiet machine (no stand up, nothing else holding
+5. **The race legs**, owed since 2.7.0, one call each on a quiet machine (no stand up, nothing else holding
    memory), from the repository root under bash:
    ```
    go test -race -count=1 -covermode=atomic -coverprofile=cov-kd.out ./internal/kernel/... ./internal/domain/...
@@ -35,7 +48,7 @@ refuses; its notes are under **Release 2.10.1**, and its pull request is open.
    at the close; it runs again only for its coverage profile. A `0xc0000142` on a build is Windows
    failing to start a process for lack of memory, not the code; after a stop, look for a leftover
    `*.test.exe`. The scale package needs `-timeout 30m` on a loaded machine.
-5. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
+6. **With a funded OpenAI key, whenever there is one**: compare the ledger's real `input_tokens` with
    `go run ./cmd/tokenreport` (the input side was adopted from its counts on 2026-10-24, a replica
    round now 13,260 tokens); see what a real model calls for each of the matrix's jobs, which the
    scripted suite cannot; settle the output side (`llm.WordTokens` 2.2, `steps.tokensPerWord` 3) and
@@ -88,6 +101,41 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.11.0
+
+- **Pages → Tree shows the site by address.** Each folder of the URL is a row, a folder with no page
+  of its own included, so a product sits under its own address and not under the branch its
+  breadcrumbs name; ticking a folder selects every page under it. The Site map keeps the breadcrumb
+  hierarchy and the graph keeps the entities.
+- **A run writes first only the parents a new page needs.** Ticking a page already on the site, a
+  post or a product no longer pulls its planned breadcrumb parents into the run.
+- **No hub above.** A filter on the Pages screen, with its count, lists the articles and products
+  whose entity has no hub page anywhere above it; select them all, pick a template, start the run.
+  The graph's lens of the same name replaces Orphans, and the agent finds and re-templates them in
+  one call.
+- **Types under their role.** The graph's type filter and legend group the types by the role they
+  play (Hub: Landing, Category; Article: Guide, Info; Product; Store category; Catalog; Technical),
+  the Pages type filter says each type's role, and a type's card shows it.
+- **A site deletes again.** A site whose graph held one name under two parents (which the breadcrumbs
+  build since 2.9.0) could not be deleted: the dialog said "Something else changed this first". Its
+  entities now go leaves first.
+- **Clear data.** Beside Delete in the Sites panel: clear the site model (pages, fields, bodies,
+  renders, links and findings; the next sync reads the whole site again), the entity graph (the next
+  sync builds it again from the breadcrumbs) or the runs and chats, each with what it holds. The
+  connection, the settings, the page types, the rules, the templates and the spend stay. A site with a
+  run under way says so instead of the generic conflict, for a clear and a delete.
+- **The assistant thinks.** Its reasoning was fixed at none; it is now a setting (Settings → Models,
+  Reasoning of the assistant), medium by default.
+- **Web search.** A template's recipe can turn on Research the web, before the body: one call per page
+  searches the web for checkable facts with their sources, which the writers and the judge read and
+  the run screen lists with its sources. The writers may now use what is well established about a
+  topic, never a specific of the business the site does not hold. The assistant searches too when
+  Settings → Models → Web search turns it on, shows each search and ends with its sources. The client
+  sets how much a search reads, how many searches a call may make, and the sites to keep to or leave
+  out. OpenAI charges $10 a thousand searches plus what they read; the spend panel and every estimate
+  count both.
+- **Migration 0091** (`llm_calls.web_searches`); the plugin stays 1.5.2.
 
 ## Release 2.10.1
 

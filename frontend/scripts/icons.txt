@@ -47,6 +47,7 @@ extension_off
 filter_alt
 filter_list
 fit_screen
+folder
 forum
 gavel
 help

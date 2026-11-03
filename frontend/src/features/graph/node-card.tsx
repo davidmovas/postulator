@@ -38,8 +38,8 @@ export function flagsOf(index: GraphIndex, id: string): readonly Flag[] {
     if (problems?.multiParent === true) {
         out.push({ key: "parents", label: copy.graph.card.extraParent, tone: "muted" });
     }
-    if (problems?.orphan === true) {
-        out.push({ key: "orphan", label: copy.graph.card.orphan, tone: "warn" });
+    if (problems?.noHub === true) {
+        out.push({ key: "noHub", label: copy.graph.card.noHub, tone: "warn" });
     }
     return out;
 }

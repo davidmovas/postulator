@@ -14,6 +14,7 @@ import {
     anchorLabel,
     decimal,
     fieldLabel,
+    isLegacyPreset,
     metaKeyOf,
     presetIcon,
     presetLabel,
@@ -21,9 +22,12 @@ import {
     presetTone,
     providerLabel,
     reasonLabel,
+    byRole,
+    roleGroups,
     roleLabel,
     roleOf,
     sourceLabel,
+    typeWithRole,
 } from "./labels.js";
 
 const tables: readonly { name: string; values: readonly string[]; label: (value: string) => string }[] = [
@@ -35,6 +39,25 @@ const tables: readonly { name: string; values: readonly string[]; label: (value:
     { name: "fieldProviders", values: fieldProviders, label: providerLabel },
     { name: "anchorStrategies", values: anchorStrategies, label: anchorLabel },
 ];
+
+describe("the presets grouped under the role they work as", () => {
+    it("puts every preset in exactly one role, in the order the roles are declared", () => {
+        expect(roleGroups.map((group) => group.role)).toStrictEqual([...pageTypeRoles]);
+        expect(roleGroups.flatMap((group) => group.presets).toSorted()).toStrictEqual([...pageTypePresets].toSorted());
+        expect(roleGroups[0]).toStrictEqual({ role: "hub", presets: ["landing", "category", "hub"] });
+    });
+
+    it("names a type with the role it plays unless its name already says it, and orders types by role", () => {
+        expect(typeWithRole({ name: "Category", role: "hub" })).toBe("Category (Hub)");
+        expect(typeWithRole({ name: "Hub", role: "hub" })).toBe("Hub");
+        const ordered = byRole([{ name: "Guide", role: "entity" }, { name: "Shop", role: "catalog" }, { name: "Category", role: "hub" }]);
+        expect(ordered.map((type) => type.name)).toStrictEqual(["Category", "Guide", "Shop"]);
+    });
+
+    it("knows the presets a new type can no longer start from", () => {
+        expect(pageTypePresets.filter(isLegacyPreset)).toStrictEqual(["hub", "entity"]);
+    });
+});
 
 describe("the page type vocabulary in words", () => {
     for (const table of tables) {

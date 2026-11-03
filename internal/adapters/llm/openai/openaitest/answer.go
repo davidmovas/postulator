@@ -40,6 +40,16 @@ type Search struct {
 	Tools     string
 }
 
+type WebSearch struct {
+	Query   string
+	Sources []string
+}
+
+type Citation struct {
+	URL   string
+	Title string
+}
+
 type Answer struct {
 	Model      string
 	Text       string
@@ -47,9 +57,12 @@ type Answer struct {
 	Incomplete string
 	Tier       string
 	Searches   []Search
+	Browsed    []WebSearch
+	Citations  []Citation
 	Calls      []Call
 	Chunks     []string
 	Usage      Usage
+	Billed     int
 }
 
 func Text(text string) Answer {
@@ -132,6 +145,14 @@ func (a Answer) streamItem(builder *events, index int, item map[string]any) {
 			"output_index": index, "item_id": item["id"], "arguments": item["arguments"],
 		})
 		builder.add("response.output_item.done", map[string]any{"output_index": index, "item": item})
+	case "web_search_call":
+		started := map[string]any{"id": item["id"], "type": "web_search_call", "status": statusInProgress, "action": map[string]any{"type": "search"}}
+		builder.add("response.output_item.added", map[string]any{"output_index": index, "item": started})
+		at := map[string]any{"output_index": index, "item_id": item["id"]}
+		builder.add("response.web_search_call.in_progress", at)
+		builder.add("response.web_search_call.searching", at)
+		builder.add("response.web_search_call.completed", at)
+		builder.add("response.output_item.done", map[string]any{"output_index": index, "item": item})
 	default:
 		builder.add("response.output_item.added", map[string]any{"output_index": index, "item": item})
 		builder.add("response.output_item.done", map[string]any{"output_index": index, "item": item})
@@ -155,8 +176,12 @@ func (a Answer) streamMessage(builder *events, index int, item map[string]any) {
 		for _, chunk := range a.chunks() {
 			builder.add("response.output_text.delta", with(at, "delta", chunk))
 		}
+		for i, annotation := range a.annotations() {
+			added := with(at, "annotation_index", i)
+			builder.add("response.output_text.annotation.added", with(added, "annotation", annotation))
+		}
 		builder.add("response.output_text.done", with(at, "text", a.Text))
-		builder.add("response.content_part.done", with(at, "part", textPart(a.Text)))
+		builder.add("response.content_part.done", with(at, "part", a.textPart()))
 	}
 	builder.add("response.output_item.done", map[string]any{"output_index": index, "item": item})
 }
@@ -181,6 +206,9 @@ func (a Answer) response() map[string]any {
 		"output_tokens_details": map[string]any{"reasoning_tokens": a.Usage.Reasoning},
 		"total_tokens":          a.Usage.Input + a.Usage.Output,
 	}
+	if a.Billed > 0 {
+		body["tool_usage"] = map[string]any{"web_search": map[string]any{"num_requests": a.Billed}}
+	}
 	return body
 }
 
@@ -191,6 +219,9 @@ func (a Answer) items() []map[string]any {
 	}
 	for i, search := range a.Searches {
 		items = append(items, search.items(i)...)
+	}
+	for i, browsed := range a.Browsed {
+		items = append(items, browsed.item(i))
 	}
 	if a.Text != "" || a.Refusal != "" {
 		items = append(items, a.message())
@@ -226,6 +257,33 @@ func (s Search) items(index int) []map[string]any {
 	}
 }
 
+func (w WebSearch) item(index int) map[string]any {
+	sources := make([]any, 0, len(w.Sources))
+	for _, url := range w.Sources {
+		sources = append(sources, map[string]any{"type": "url", "url": url})
+	}
+	return map[string]any{
+		"id": "ws_test_" + strconv.Itoa(index), "type": "web_search_call", "status": statusCompleted,
+		"action": map[string]any{"type": "search", "query": w.Query, "queries": []any{w.Query}, "sources": sources},
+	}
+}
+
+func (a Answer) annotations() []any {
+	out := make([]any, 0, len(a.Citations))
+	for _, cited := range a.Citations {
+		out = append(out, map[string]any{
+			"type": "url_citation", "start_index": 0, "end_index": len(a.Text), "url": cited.URL, "title": cited.Title,
+		})
+	}
+	return out
+}
+
+func (a Answer) textPart() map[string]any {
+	part := textPart(a.Text)
+	part["annotations"] = a.annotations()
+	return part
+}
+
 func raw(value, fallback string) json.RawMessage {
 	if value == "" {
 		return json.RawMessage(fallback)
@@ -234,7 +292,7 @@ func raw(value, fallback string) json.RawMessage {
 }
 
 func (a Answer) message() map[string]any {
-	part := textPart(a.Text)
+	part := a.textPart()
 	if a.Refusal != "" {
 		part = map[string]any{"type": "refusal", "refusal": a.Refusal}
 	}

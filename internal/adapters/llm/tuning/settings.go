@@ -23,28 +23,32 @@ var (
 	tiers = []string{tierStandard, tierFlex}
 
 	effortSettings = map[llm.Role]*settings.Setting[string]{
-		llm.RoleWriter: settings.Enum("llm.effort.writer", string(llm.EffortMedium), efforts),
-		llm.RoleEditor: settings.Enum("llm.effort.editor", string(llm.EffortLow), efforts),
-		llm.RoleLinker: settings.Enum("llm.effort.linker", string(llm.EffortLow), efforts),
-		llm.RoleJudge:  settings.Enum("llm.effort.judge", string(llm.EffortLow), efforts),
-		llm.RoleTitler: settings.Enum("llm.effort.titler", string(llm.EffortNone), efforts),
+		llm.RoleWriter:     settings.Enum("llm.effort.writer", string(llm.EffortMedium), efforts),
+		llm.RoleEditor:     settings.Enum("llm.effort.editor", string(llm.EffortLow), efforts),
+		llm.RoleLinker:     settings.Enum("llm.effort.linker", string(llm.EffortLow), efforts),
+		llm.RoleJudge:      settings.Enum("llm.effort.judge", string(llm.EffortLow), efforts),
+		llm.RoleTitler:     settings.Enum("llm.effort.titler", string(llm.EffortNone), efforts),
+		llm.RoleChat:       settings.Enum("llm.effort.chat", string(llm.EffortMedium), efforts),
+		llm.RoleResearcher: settings.Enum("llm.effort.researcher", string(llm.EffortLow), efforts),
 	}
 
 	tierSettings = map[llm.Role]*settings.Setting[string]{
-		llm.RoleWriter: settings.Enum("llm.tier.writer", tierFlex, tiers),
-		llm.RoleEditor: settings.Enum("llm.tier.editor", tierStandard, tiers),
-		llm.RoleLinker: settings.Enum("llm.tier.linker", tierStandard, tiers),
-		llm.RoleJudge:  settings.Enum("llm.tier.judge", tierStandard, tiers),
-		llm.RoleTitler: settings.Enum("llm.tier.titler", tierStandard, tiers),
+		llm.RoleWriter:     settings.Enum("llm.tier.writer", tierFlex, tiers),
+		llm.RoleEditor:     settings.Enum("llm.tier.editor", tierStandard, tiers),
+		llm.RoleLinker:     settings.Enum("llm.tier.linker", tierStandard, tiers),
+		llm.RoleJudge:      settings.Enum("llm.tier.judge", tierStandard, tiers),
+		llm.RoleTitler:     settings.Enum("llm.tier.titler", tierStandard, tiers),
+		llm.RoleResearcher: settings.Enum("llm.tier.researcher", tierStandard, tiers),
 	}
 
 	flexPatienceSetting = settings.Duration("llm.flexPatience", defaultFlexPatience,
 		settings.DurationRange(leastFlexPatience, mostFlexPatience))
 
 	inputBudgetSettings = map[llm.Role]*settings.Setting[int]{
-		llm.RoleWriter: settings.Int("llm.inputBudget.writer", 0, settings.IntMin(0)),
-		llm.RoleEditor: settings.Int("llm.inputBudget.editor", 0, settings.IntMin(0)),
-		llm.RoleLinker: settings.Int("llm.inputBudget.linker", 0, settings.IntMin(0)),
-		llm.RoleJudge:  settings.Int("llm.inputBudget.judge", 0, settings.IntMin(0)),
+		llm.RoleWriter:     settings.Int("llm.inputBudget.writer", 0, settings.IntMin(0)),
+		llm.RoleEditor:     settings.Int("llm.inputBudget.editor", 0, settings.IntMin(0)),
+		llm.RoleLinker:     settings.Int("llm.inputBudget.linker", 0, settings.IntMin(0)),
+		llm.RoleJudge:      settings.Int("llm.inputBudget.judge", 0, settings.IntMin(0)),
+		llm.RoleResearcher: settings.Int("llm.inputBudget.researcher", 0, settings.IntMin(0)),
 	}
 )

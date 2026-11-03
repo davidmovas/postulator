@@ -164,6 +164,7 @@ func (l *Ledger) record(ctx context.Context, req port.Request, done outcome) err
 		CompletionTokens: call.Usage.Output,
 		ReasoningTokens:  call.Usage.Reasoning,
 		CacheWriteTokens: call.Usage.CacheWrite,
+		WebSearches:      call.Usage.WebSearches,
 		USD:              call.USD,
 	})
 }

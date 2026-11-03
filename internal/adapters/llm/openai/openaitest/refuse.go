@@ -17,6 +17,7 @@ const (
 )
 
 var (
+	searchDepths     = []string{"low", "medium", "high"}
 	supportedEfforts = []string{"none", "low", "medium", "high", "xhigh", "max"}
 	supportedTiers   = []string{"auto", "default", "flex", "fast", "priority"}
 	samplingKeys     = []string{"temperature", "top_p"}
@@ -27,7 +28,7 @@ type check func(body map[string]any) (Reply, bool)
 func refuse(body map[string]any) (Reply, bool) {
 	for _, run := range []check{
 		refuseModel, refuseEffort, refuseSampling, refuseTier, refuseCeiling, refuseCacheKey, refuseFormat,
-		refuseDeferred, refuseTools, refuseInput,
+		refuseDeferred, refuseTools, refuseWebSearch, refuseInput,
 	} {
 		if reply, refused := run(body); refused {
 			return reply, true
@@ -191,6 +192,21 @@ func refuseTools(body map[string]any) (Reply, bool) {
 		if problem := strictProblem(tool["parameters"]); problem != "" {
 			return badRequest("tools["+strconv.Itoa(i)+"].parameters", "invalid_function_parameters",
 				"Invalid schema for function '"+named(tool, "name")+"': "+problem), true
+		}
+	}
+	return Reply{}, false
+}
+
+func refuseWebSearch(body map[string]any) (Reply, bool) {
+	for i, each := range listAt(body, "tools") {
+		tool, isObject := each.(map[string]any)
+		if !isObject || tool["type"] != "web_search" {
+			continue
+		}
+		depth, given := textAt(tool, "search_context_size")
+		if given && !slices.Contains(searchDepths, depth) {
+			return badRequest("tools["+strconv.Itoa(i)+"].search_context_size", "invalid_value",
+				"Invalid value: '"+depth+"'. Supported values are: 'low', 'medium', and 'high'."), true
 		}
 	}
 	return Reply{}, false

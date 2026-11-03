@@ -18,7 +18,7 @@ type pagesFindArgs struct {
 	Under      string   `json:"under,omitempty" description:"Only pages below this page id"`
 	EntityID   string   `json:"entityId,omitempty" description:"Only this entity's pages"`
 	Status     string   `json:"status,omitempty" enum:"planned,exists,published,archived" description:"Only this state"`
-	Gap        string   `json:"gap,omitempty" enum:"planned,empty,unmapped,orphan,missing_links,findings" description:"Only pages with this gap"`
+	Gap        string   `json:"gap,omitempty" enum:"planned,empty,unmapped,orphan,missing_links,findings,no_hub" description:"Only pages with this gap"`
 	Cursor     string   `json:"cursor,omitempty" description:"nextCursor of the last call"`
 	Limit      int      `json:"limit,omitempty" description:"Default 50, at most 200"`
 }

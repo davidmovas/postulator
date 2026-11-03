@@ -63,6 +63,10 @@ func TestEveryCallIsTunedForTheRoleItIsMadeFor(t *testing.T) {
 		{name: "the writer thinks and waits for flex", role: domainllm.RoleWriter, wantEffort: domainllm.EffortMedium, wantTier: domainllm.TierFlex},
 		{name: "the judge thinks a little at the standard price", role: domainllm.RoleJudge, wantEffort: domainllm.EffortLow, wantTier: domainllm.TierDefault},
 		{
+			name: "the assistant thinks at its setting on the standard tier", role: domainllm.RoleChat,
+			tier: domainllm.TierDefault, wantEffort: domainllm.EffortMedium, wantTier: domainllm.TierDefault,
+		},
+		{
 			name: "what the caller chose is kept", role: domainllm.RoleChat,
 			effort: domainllm.EffortNone, tier: domainllm.TierDefault,
 			wantEffort: domainllm.EffortNone, wantTier: domainllm.TierDefault,

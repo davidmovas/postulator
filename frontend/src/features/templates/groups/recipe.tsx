@@ -3,9 +3,10 @@ import type { ReactElement } from "react";
 import { copy } from "../../../copy/index.js";
 import { fieldErrorOf } from "../../../data/errors.js";
 import type { JsonValue } from "../../../domain/merge-patch.js";
-import { Banner, cx, IconButton, RestartAltIcon, Switch, WarningIcon } from "../../../ui/index.js";
+import { Banner, cx, IconButton, Input, RestartAltIcon, Switch, WarningIcon } from "../../../ui/index.js";
 import { NumberInput } from "../controls.js";
 import { isKnownStep, stepLabel } from "../labels.js";
+import { researchStep } from "../spec.js";
 import type { SpecDraft, StepDraft } from "../spec.js";
 
 const minIterations = 1;
@@ -19,6 +20,25 @@ interface SettingProps {
 
 function Setting({ step, onParam }: SettingProps): ReactElement | null {
     const said = copy.templates.recipe.params;
+    if (step.name === researchStep) {
+        const held = step.params?.["focus"];
+        return (
+            <span className="flex w-72 shrink-0 items-center gap-2" title={said.focusHint}>
+                <span className="shrink-0 text-2xs text-ink-faint">{said.focus}</span>
+                <Input
+                    size="sm"
+                    value={typeof held === "string" ? held : ""}
+                    disabled={!step.enabled}
+                    placeholder={said.focusPlaceholder}
+                    aria-label={said.focus}
+                    data-recipe-focus={true}
+                    onChange={(event) => {
+                        onParam("focus", event.target.value);
+                    }}
+                />
+            </span>
+        );
+    }
     if (step.name === "validate") {
         return (
             <span className="flex shrink-0 items-center gap-2" title={said.allowErrorsHint}>

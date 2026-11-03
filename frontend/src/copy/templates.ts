@@ -346,10 +346,15 @@ export const templates = {
             allowErrorsHint: "Off, a page with errors stops here and waits for a person.",
             iterations: "Repair attempts",
             iterationsHint: "How many times the links are repaired before the page moves on.",
+            focus: "What to look for",
+            focusHint:
+                "What the search should find for every page of this template, such as current safety guidance or the standards that apply. Empty, it searches for what the sections need. Each search is paid for; Settings → Models sets how many a page may make.",
+            focusPlaceholder: "Optional: what the search should find",
         },
     },
     steps: {
         resolve_context: "Work out what this page may link to",
+        research: "Search the web for the page's facts first",
         generate_body: "Write the body",
         generate_meta: "Write the title and description",
         generate_fields: "Write the excerpt and the other short fields the page type enables",

@@ -8,6 +8,39 @@ export interface JudgeView {
     suggestions: readonly string[];
 }
 
+export interface ResearchSourceView {
+    url: string;
+    title: string;
+}
+
+export interface ResearchView {
+    facts: readonly string[];
+    sources: readonly ResearchSourceView[];
+    searches: number;
+}
+
+function factOf(line: string): string {
+    return line
+        .trim()
+        .replace(/^#+\s*/, "")
+        .replace(/^([-*•]|\d+[.)])\s+/, "")
+        .trim();
+}
+
+export function researchView(held: unknown): ResearchView | null {
+    if (record(held) === null || typeof record(held)?.["text"] !== "string") {
+        return null;
+    }
+    const facts = stringAt(held, "text")
+        .split("\n")
+        .map(factOf)
+        .filter((fact) => fact !== "");
+    const sources = listAt(held, "sources")
+        .map((source) => ({ url: stringAt(source, "url"), title: stringAt(source, "title") }))
+        .filter((source) => source.url !== "");
+    return { facts, sources, searches: numberAt(held, "searches") ?? 0 };
+}
+
 export function judgeView(held: unknown): JudgeView | null {
     if (record(held) === null) {
         return null;

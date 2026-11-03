@@ -13,7 +13,7 @@ import (
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 )
 
-const instructionsCeilingTokens = 2136
+const instructionsCeilingTokens = 2194
 
 func TestTheInstructionsAndTheReplicasBriefFitTheirCeiling(t *testing.T) {
 	t.Parallel()
@@ -34,7 +34,7 @@ func TestTheInstructionsAndTheReplicasBriefFitTheirCeiling(t *testing.T) {
 	widest, at := 0, ""
 	for _, mode := range []domainagent.Mode{domainagent.ModeConfirm, domainagent.ModeAutonomous} {
 		instructions, err := agent.Instructions(agent.SiteContext{
-			SiteID: replica.Site.ID, SiteName: replica.Site.Name, Mode: string(mode), Brief: brief.Text(),
+			SiteID: replica.Site.ID, SiteName: replica.Site.Name, Mode: string(mode), Brief: brief.Text(), WebSearch: true,
 		})
 		if err != nil {
 			t.Fatalf("render the %s instructions: %v", mode, err)
@@ -52,6 +52,20 @@ func TestTheInstructionsAndTheReplicasBriefFitTheirCeiling(t *testing.T) {
 	if widest > instructionsCeilingTokens {
 		t.Errorf("the %s instructions with the replica's brief grew to %d o200k_base tokens, over the %d this build allows; "+
 			"every round of every turn resends them", at, widest, instructionsCeilingTokens)
+	}
+}
+
+func TestTheInstructionsSpeakOfTheWebOnlyWhenTheAssistantMaySearchIt(t *testing.T) {
+	t.Parallel()
+
+	for _, searches := range []bool{false, true} {
+		instructions, err := agent.Instructions(agent.SiteContext{Mode: "autonomous", WebSearch: searches})
+		if err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		if said := strings.Contains(instructions, "Search the web"); said != searches {
+			t.Errorf("with the search %t the instructions speak of it: %t", searches, said)
+		}
 	}
 }
 

@@ -78,6 +78,7 @@ func Build(f Facts, scope field.Scope) Pack {
 		rulesSection(f, scope),
 		briefSection(f),
 		cardSection(f),
+		researchSection(f),
 		currentSection(f, scope.Key),
 		referenceSection(f),
 		styleSection(f),

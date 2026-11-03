@@ -142,6 +142,14 @@ title, H1, type or technical reason moves, a read that finds the map stale refre
 stage refreshes it at the end of every walk. So a map page, the picker and the findings list run the
 same statements at 2,000 and at 5,000 pages, which `internal/app/scale` proves on a real store.
 
+The **Pages tree is the site by address** (2.11): `contextpack.Folders` folds the same `page_map`
+rows by their path segments, a folder with no page of its own included and an archived page left
+out, and `sitemodel.AddressTree` reads one folder at a time; a selection there sends `folders`,
+which `PageMapRepo.IDsAt` resolves over the rows the tree shows. The breadcrumb hierarchy stays the
+model's (the Site map, the writer's pack, the graph's comparison), and a run asks for a parent first
+only for a WordPress page it is about to create (`pagemap.Page.CreatedUnderParent`, shared by
+`runs.ancestors` and `steps.parentFor`).
+
 The whole-site reads that stay are named, not hidden: the writer's pack (a snapshot once per pack and
 once per estimate), the graph preflight, a map search or type filter, the observation's content and
 store stages, the brief, the link audit and `Pages.Tree`, which the Overview and the Reports still

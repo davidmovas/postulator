@@ -1,6 +1,7 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
+    addressTree,
     countPages,
     createPage,
     deletePage,
@@ -27,6 +28,8 @@ import { useLockGate } from "../lock.js";
 import { useUnlockedInfinite, useUnlockedQueries, useUnlockedQuery } from "../query.js";
 import type { PageSort } from "../sorts.js";
 import type {
+    AddressFilter,
+    AddressView,
     Page,
     PageCountRequest,
     PageFilter,
@@ -48,6 +51,23 @@ export function useSiteMap(filter: SiteMapFilter, enabled = true) {
         queryFn: ({ pageParam, signal }) =>
             siteMap({ ...filter, limit: siteMapLimit, ...(pageParam === undefined ? {} : { cursor: pageParam }) }, signal),
         getNextPageParam: (last: SiteMapView) =>
+            last.nodes.hasMore && last.nodes.nextCursor !== undefined ? last.nodes.nextCursor : undefined,
+        getPreviousPageParam: () => undefined,
+        refetchOnWindowFocus: false,
+        gcTime: infiniteGcTimeMs,
+        placeholderData: keepPreviousData,
+    });
+}
+
+export function useAddressTree(filter: AddressFilter, enabled = true) {
+    const gate = useLockGate();
+    return useInfiniteQuery({
+        queryKey: keys.pages.address(filter, siteMapLimit),
+        enabled: enabled && filter.siteId !== "" && gate.ready && !gate.locked,
+        initialPageParam: undefined as Cursor | undefined,
+        queryFn: ({ pageParam, signal }) =>
+            addressTree({ ...filter, limit: siteMapLimit, ...(pageParam === undefined ? {} : { cursor: pageParam }) }, signal),
+        getNextPageParam: (last: AddressView) =>
             last.nodes.hasMore && last.nodes.nextCursor !== undefined ? last.nodes.nextCursor : undefined,
         getPreviousPageParam: () => undefined,
         refetchOnWindowFocus: false,

@@ -102,6 +102,7 @@ type Price struct {
 	Calls        func(target Target, params map[string]any) int
 	Input        func(ctx context.Context, target Target) (int, error)
 	Applies      func(ctx context.Context, target Target, params map[string]any) (bool, error)
+	Searches     func() (searches, tokensEach int)
 	Ref          *llm.ModelRef
 	OutputTokens int
 	Overhead     int
@@ -126,6 +127,7 @@ type StepDef struct {
 	Name      string
 	Role      llm.Role
 	Requires  []ArtifactKind
+	Reads     []ArtifactKind
 	Produces  []ArtifactKind
 	Retry     RetryPolicy
 	Price     Price

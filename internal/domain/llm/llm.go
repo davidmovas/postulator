@@ -3,22 +3,23 @@ package llm
 type Role string
 
 const (
-	RoleWriter Role = "writer"
-	RoleEditor Role = "editor"
-	RoleLinker Role = "linker"
-	RoleJudge  Role = "judge"
-	RoleChat   Role = "chat"
-	RoleImage  Role = "image"
-	RoleTitler Role = "titler"
+	RoleWriter     Role = "writer"
+	RoleEditor     Role = "editor"
+	RoleLinker     Role = "linker"
+	RoleJudge      Role = "judge"
+	RoleChat       Role = "chat"
+	RoleImage      Role = "image"
+	RoleTitler     Role = "titler"
+	RoleResearcher Role = "researcher"
 )
 
 func Roles() []Role {
-	return []Role{RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler}
+	return []Role{RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler, RoleResearcher}
 }
 
 func (r Role) Valid() bool {
 	switch r {
-	case RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler:
+	case RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler, RoleResearcher:
 		return true
 	default:
 		return false
@@ -130,6 +131,25 @@ func (i ModelInfo) OffersFlex() bool {
 	return i.FlexInputUSDPerM > 0
 }
 
+type SearchDepth string
+
+const (
+	DepthLow    SearchDepth = "low"
+	DepthMedium SearchDepth = "medium"
+	DepthHigh   SearchDepth = "high"
+)
+
+func (d SearchDepth) Valid() bool {
+	switch d {
+	case DepthLow, DepthMedium, DepthHigh:
+		return true
+	default:
+		return false
+	}
+}
+
+const WebSearchUSDPerThousand = 10.0
+
 type Usage struct {
 	Input       int `json:"input"`
 	CachedInput int `json:"cachedInput"`
@@ -137,6 +157,7 @@ type Usage struct {
 	Output      int `json:"output"`
 	Reasoning   int `json:"reasoning"`
 	Total       int `json:"total"`
+	WebSearches int `json:"webSearches,omitempty"`
 }
 
 func (u Usage) Add(other Usage) Usage {
@@ -147,10 +168,14 @@ func (u Usage) Add(other Usage) Usage {
 		Output:      u.Output + other.Output,
 		Reasoning:   u.Reasoning + other.Reasoning,
 		Total:       u.Total + other.Total,
+		WebSearches: u.WebSearches + other.WebSearches,
 	}
 }
 
-const tokensPerMillion = 1_000_000
+const (
+	tokensPerMillion = 1_000_000
+	searchesPerFee   = 1_000
+)
 
 type prices struct {
 	input  float64
@@ -186,7 +211,11 @@ func Cost(usage Usage, info ModelInfo, tier ServiceTier) float64 {
 	fresh := usage.Input - read - written
 
 	return perMillion(fresh, rate.input) + perMillion(read, rate.cached) + perMillion(written, rate.write) +
-		perMillion(usage.Output, rate.output)
+		perMillion(usage.Output, rate.output) + SearchFee(usage.WebSearches)
+}
+
+func SearchFee(searches int) float64 {
+	return float64(max(searches, 0)) / searchesPerFee * WebSearchUSDPerThousand
 }
 
 func perMillion(tokens int, usdPerMillion float64) float64 {

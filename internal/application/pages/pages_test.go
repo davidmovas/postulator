@@ -16,6 +16,7 @@ import (
 	"github.com/davidmovas/postulator/internal/application/events"
 	"github.com/davidmovas/postulator/internal/application/pages"
 	"github.com/davidmovas/postulator/internal/domain/block"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/finding"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/keyword"
@@ -34,7 +35,16 @@ type harness struct {
 	recorder   *applicationtest.Recorder
 	clock      *clock.Fake
 	classifier *fakeClassifier
+	gaps       *fakeGaps
 	siteID     string
+}
+
+type fakeGaps struct {
+	pages map[contextpack.Gap][]string
+}
+
+func (f *fakeGaps) Gapped(_ context.Context, _ string, gap contextpack.Gap) ([]string, error) {
+	return f.pages[gap], nil
 }
 
 type fakeClassifier struct {
@@ -65,13 +75,16 @@ func newPreviewHarness(t *testing.T, issuer *recordingIssuer) harness {
 	recorder := &applicationtest.Recorder{}
 	clk := clock.NewFake(time.Date(2026, time.September, 18, 9, 0, 0, 0, time.UTC))
 	classifier := &fakeClassifier{matches: map[string][]string{}}
+	gaps := &fakeGaps{pages: map[contextpack.Gap][]string{}}
 	return harness{
+		gaps: gaps,
 		service: pages.New(pages.Deps{
 			Pages: sqlite.NewPageRepo(store), Types: sqlite.NewPageTypeRepo(store), Links: sqlite.NewPageLinkRepo(store), Entities: sqlite.NewEntityRepo(store),
 			Edges: sqlite.NewEdgeRepo(store), Sites: sqlite.NewSiteRepo(store), Bodies: sqlite.NewPageBodyRepo(store),
 			Fields: sqlite.NewPageFieldRepo(store), Renders: sqlite.NewPageRenderRepo(store),
 			Findings: sqlite.NewFindingRepo(store), Rows: sqlite.NewPageMapRepo(store), Classifier: classifier,
 			Templates: sqlite.NewTemplateRepo(store), UnitOfWork: store, Publisher: recorder, Clock: clk, Preview: issuer,
+			Gaps: gaps,
 		}),
 		store:      store,
 		recorder:   recorder,

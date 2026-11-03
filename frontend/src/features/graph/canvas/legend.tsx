@@ -2,7 +2,8 @@ import type { ReactElement, ReactNode } from "react";
 
 import { copy } from "../../../copy/index.js";
 import { CallSplitIcon, cx, IconButton, LinkOffIcon, toneClasses, UnfoldLessIcon, UnfoldMoreIcon } from "../../../ui/index.js";
-import { presetIcon, presetLabel, presetRoles, presetTone } from "../../settings/types/labels.js";
+import { presetIcon, presetLabel, presetTone, roleGroups, roleLabel, untyped } from "../../settings/types/labels.js";
+import { shownPresets } from "../model/lens.js";
 
 interface RowProps {
     swatch: ReactNode;
@@ -27,6 +28,11 @@ function Group({ title, children }: { title: string; children: ReactNode }): Rea
     );
 }
 
+function PresetRow({ preset }: { preset: string }): ReactElement {
+    const Icon = presetIcon(preset);
+    return <Row swatch={<Icon size={14} className={toneClasses[presetTone(preset)].ink} />} label={presetLabel(preset)} />;
+}
+
 function Pill({ className }: { className: string }): ReactElement {
     return <span className={cx("block h-3 w-8 rounded-sm border bg-inset", className)} aria-hidden={true} />;
 }
@@ -48,10 +54,11 @@ function Line({ className, dashed }: { className: string; dashed?: boolean }): R
 export interface LegendProps {
     open: boolean;
     proof: boolean;
+    inUse: ReadonlySet<string>;
     onToggle: () => void;
 }
 
-export function Legend({ open, proof, onToggle }: LegendProps): ReactElement {
+export function Legend({ open, proof, inUse, onToggle }: LegendProps): ReactElement {
     const said = copy.graph.legend;
 
     return (
@@ -80,16 +87,17 @@ export function Legend({ open, proof, onToggle }: LegendProps): ReactElement {
                         </Group>
                     ) : null}
                     <Group title={said.types}>
-                        {presetRoles.map((preset) => {
-                            const Icon = presetIcon(preset);
-                            return (
-                                <Row
-                                    key={preset}
-                                    swatch={<Icon size={14} className={toneClasses[presetTone(preset)].ink} />}
-                                    label={presetLabel(preset)}
-                                />
-                            );
-                        })}
+                        {roleGroups.map((group) => (
+                            <li key={group.role} className="flex flex-col gap-1" data-legend-role={group.role}>
+                                <span className="text-2xs text-ink-dim">{roleLabel(group.role)}</span>
+                                <ul className="flex flex-col gap-1">
+                                    {shownPresets(group, inUse, []).map((preset) => (
+                                        <PresetRow key={preset} preset={preset} />
+                                    ))}
+                                </ul>
+                            </li>
+                        ))}
+                        <PresetRow preset={untyped} />
                     </Group>
                     <Group title={said.states}>
                         <Row swatch={<Pill className="border-danger bg-danger-soft" />} label={said.state.mismatch} />

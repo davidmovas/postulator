@@ -45,6 +45,6 @@ describe("readQuery and writeQuery", () => {
     it("writes nothing for the default", () => {
         expect(writeQuery(defaultQuery).toString()).toBe("");
         expect(searchOf(defaultQuery)).toBe("");
-        expect(searchOf({ ...defaultQuery, lens: "orphan" })).toBe("?lens=orphan");
+        expect(searchOf({ ...defaultQuery, lens: "noHub" })).toBe("?lens=noHub");
     });
 });

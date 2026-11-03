@@ -455,6 +455,84 @@ func TestADeferredToolSearchIsRecordedAndReplayedBeforeTheCallItLoaded(t *testin
 	}
 }
 
+type browsing struct{}
+
+func (browsing) answer() port.Response {
+	return port.Response{
+		Text:         "It peaks in an hour.",
+		Usage:        llm.Usage{Input: 700, Output: 30, Total: 730, WebSearches: 2},
+		FinishReason: port.FinishStop,
+		Sources:      []port.Source{{URL: "https://a.example/1", Title: "A"}},
+	}
+}
+
+func (b browsing) Complete(context.Context, port.Request) (port.Response, error) {
+	return b.answer(), nil
+}
+
+func (b browsing) Stream(context.Context, port.Request) (<-chan port.Delta, error) {
+	resp := b.answer()
+	out := make(chan port.Delta, 4)
+	out <- port.Delta{Browsing: &port.Browsing{}}
+	out <- port.Delta{Browsing: &port.Browsing{Query: "caffeine peak", Done: true}}
+	out <- port.Delta{Text: resp.Text}
+	out <- port.Delta{Done: true, Usage: &resp.Usage, Finish: resp.FinishReason, Sources: resp.Sources}
+	close(out)
+	return out, nil
+}
+
+func TestAWebSearchIsRecordedAndReplayedWithItsSourcesAndItsCount(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []string{"complete", "stream"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			req := request("how fast does caffeine work")
+			req.WebSearch = &port.WebSearch{Depth: llm.DepthMedium, MaxCalls: 3}
+			recorder := open(browsing{}, recordreplay.ModeRecord, dir)
+			if mode == "complete" {
+				if _, err := recorder.Complete(t.Context(), req); err != nil {
+					t.Fatalf("Complete: %v", err)
+				}
+			} else {
+				deltas, err := recorder.Stream(t.Context(), req)
+				if err != nil {
+					t.Fatalf("Stream: %v", err)
+				}
+				for range deltas {
+				}
+			}
+
+			answered, err := open(fake.New(), recordreplay.ModeReplay, dir).Complete(t.Context(), req)
+			if err != nil {
+				t.Fatalf("replay Complete: %v", err)
+			}
+			want := browsing{}.answer()
+			if !reflect.DeepEqual(answered.Sources, want.Sources) || answered.Usage.WebSearches != 2 || answered.Text != want.Text {
+				t.Fatalf("replayed %+v, want the sources and the two searches", answered)
+			}
+
+			replayed, err := open(fake.New(), recordreplay.ModeReplay, dir).Stream(t.Context(), req)
+			if err != nil {
+				t.Fatalf("replay Stream: %v", err)
+			}
+			var last port.Delta
+			for delta := range replayed {
+				last = delta
+			}
+			if !last.Done || !reflect.DeepEqual(last.Sources, want.Sources) || last.Usage == nil || last.Usage.WebSearches != 2 {
+				t.Fatalf("the replayed stream ended on %+v", last)
+			}
+
+			if _, err = open(fake.New(), recordreplay.ModeReplay, dir).Complete(t.Context(), request("how fast does caffeine work")); err == nil {
+				t.Fatal("a request without the search replayed the one with it")
+			}
+		})
+	}
+}
+
 func TestAStreamThatNeverEndsIsNotRecorded(t *testing.T) {
 	t.Parallel()
 

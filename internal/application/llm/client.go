@@ -84,6 +84,28 @@ type CallMeta struct {
 	Role           domain.Role `json:"role,omitempty"`
 }
 
+type WebSearch struct {
+	Depth    domain.SearchDepth `json:"depth"`
+	MaxCalls int                `json:"maxCalls"`
+	Allowed  []string           `json:"allowed,omitempty"`
+	Blocked  []string           `json:"blocked,omitempty"`
+}
+
+const MaxSearchDomains = 100
+
+func (w WebSearch) check() *errors.Error {
+	switch {
+	case !w.Depth.Valid():
+		return errors.New(errors.Invalid, "the search depth must be low, medium or high")
+	case w.MaxCalls < 1:
+		return errors.New(errors.Invalid, "a web search must allow at least one search")
+	case len(w.Allowed) > MaxSearchDomains || len(w.Blocked) > MaxSearchDomains:
+		return errors.New(errors.Invalid, "a web search lists at most a hundred domains to allow and a hundred to block")
+	default:
+		return nil
+	}
+}
+
 type Request struct {
 	Temperature *float64               `json:"temperature,omitempty"`
 	Schema      *Schema                `json:"schema,omitempty"`
@@ -96,6 +118,7 @@ type Request struct {
 	Effort      domain.ReasoningEffort `json:"effort,omitempty"`
 	Tier        domain.ServiceTier     `json:"tier,omitempty"`
 	CacheKey    string                 `json:"cacheKey,omitempty"`
+	WebSearch   *WebSearch             `json:"webSearch,omitempty"`
 }
 
 const (
@@ -133,6 +156,11 @@ func (r Request) Validate() error {
 	}
 	if r.Tier != "" && !r.Tier.Valid() {
 		return errors.New(errors.Invalid, "the service tier must be default or flex")
+	}
+	if r.WebSearch != nil {
+		if problem := r.WebSearch.check(); problem != nil {
+			return problem
+		}
 	}
 	return checkTools(r.Tools)
 }
@@ -267,6 +295,16 @@ const (
 	FinishContentFilter FinishReason = "content_filter"
 )
 
+type Source struct {
+	URL   string `json:"url"`
+	Title string `json:"title,omitempty"`
+}
+
+type Browsing struct {
+	Query string `json:"query,omitempty"`
+	Done  bool   `json:"done"`
+}
+
 type Response struct {
 	Text         string             `json:"text"`
 	Usage        domain.Usage       `json:"usage"`
@@ -274,17 +312,20 @@ type Response struct {
 	Calls        []ToolCall         `json:"calls,omitempty"`
 	Tier         domain.ServiceTier `json:"tier,omitempty"`
 	Searches     []ToolSearch       `json:"searches,omitempty"`
+	Sources      []Source           `json:"sources,omitempty"`
 }
 
 type Delta struct {
-	Usage  *domain.Usage      `json:"usage,omitempty"`
-	Err    error              `json:"-"`
-	Text   string             `json:"text"`
-	Done   bool               `json:"done"`
-	Call   *ToolCall          `json:"call,omitempty"`
-	Finish FinishReason       `json:"finish,omitempty"`
-	Tier   domain.ServiceTier `json:"tier,omitempty"`
-	Search *ToolSearch        `json:"search,omitempty"`
+	Usage    *domain.Usage      `json:"usage,omitempty"`
+	Err      error              `json:"-"`
+	Text     string             `json:"text"`
+	Done     bool               `json:"done"`
+	Call     *ToolCall          `json:"call,omitempty"`
+	Finish   FinishReason       `json:"finish,omitempty"`
+	Tier     domain.ServiceTier `json:"tier,omitempty"`
+	Search   *ToolSearch        `json:"search,omitempty"`
+	Browsing *Browsing          `json:"browsing,omitempty"`
+	Sources  []Source           `json:"sources,omitempty"`
 }
 
 type Client interface {

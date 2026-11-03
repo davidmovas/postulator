@@ -8,7 +8,10 @@ import (
 
 	"github.com/davidmovas/postulator/internal/adapters/sqlite"
 	"github.com/davidmovas/postulator/internal/adapters/sqlite/sqlitetest"
+	"github.com/davidmovas/postulator/internal/domain/graph"
+	"github.com/davidmovas/postulator/internal/domain/keyword"
 	"github.com/davidmovas/postulator/internal/domain/llm"
+	"github.com/davidmovas/postulator/internal/domain/note"
 	"github.com/davidmovas/postulator/internal/domain/site"
 	"github.com/davidmovas/postulator/internal/kernel/errors"
 	"github.com/davidmovas/postulator/internal/kernel/id"
@@ -294,6 +297,144 @@ func TestSiteRepoUpdatePluginTouchesOnlyThePluginAndCommerce(t *testing.T) {
 	}
 	if err = repo.UpdatePlugin(t.Context(), id.New(), plugin, site.CommerceReady, at); !errors.IsCode(err, errors.NotFound) {
 		t.Errorf("UpdatePlugin of an unknown site = %v, want NOT_FOUND", err)
+	}
+}
+
+type scopedName struct {
+	name   string
+	parent string
+}
+
+func plantGraph(t *testing.T, store *sqlite.Store, siteID string, planted []scopedName) {
+	t.Helper()
+	entities := sqlite.NewEntityRepo(store)
+	held := make(map[string]string, len(planted))
+	for _, node := range planted {
+		record := graph.Entity{
+			ID: id.New(), SiteID: siteID, Name: node.name, Keywords: keyword.Of(node.name),
+			Facts: []graph.Fact{}, Notes: []note.Note{}, Anchors: []graph.Anchor{},
+			Source: graph.SourceSite, CreatedAt: sqlitetest.Stamp, UpdatedAt: sqlitetest.Stamp,
+		}
+		if node.parent != "" {
+			parentID, found := held[node.parent]
+			if !found {
+				t.Fatalf("plant %s before its parent %s", node.name, node.parent)
+			}
+			record.ScopeID = &parentID
+		}
+		if err := entities.Insert(t.Context(), record); err != nil {
+			t.Fatalf("plant %s under %q: %v", node.name, node.parent, err)
+		}
+		if _, taken := held[node.name]; !taken {
+			held[node.name] = record.ID
+		}
+	}
+}
+
+func countEntities(t *testing.T, store *sqlite.Store, siteID string) int {
+	t.Helper()
+	listed, err := sqlite.NewEntityRepo(store).ListBySite(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("list the entities: %v", err)
+	}
+	return len(listed)
+}
+
+func TestSiteRepoDeletesASiteWhoseGraphRepeatsANameUnderTwoParents(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		graph []scopedName
+	}{
+		{name: "a child name under two parents", graph: []scopedName{
+			{name: "Shoes"}, {name: "Bags"}, {name: "Accessories", parent: "Shoes"}, {name: "Accessories", parent: "Bags"},
+		}},
+		{name: "a child named like a root", graph: []scopedName{
+			{name: "Shoes"}, {name: "Accessories"}, {name: "Accessories", parent: "Shoes"},
+		}},
+		{name: "a repeated name three levels down", graph: []scopedName{
+			{name: "Store"}, {name: "Shoes", parent: "Store"}, {name: "Bags", parent: "Store"},
+			{name: "Care", parent: "Shoes"}, {name: "Care", parent: "Bags"}, {name: "Care"},
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := sqlitetest.Open(t)
+			doomed := sqlitetest.Site(t, store, "doomed")
+			kept := sqlitetest.Site(t, store, "kept")
+			plantGraph(t, store, doomed.ID, tc.graph)
+			plantGraph(t, store, kept.ID, tc.graph)
+
+			if err := sqlite.NewSiteRepo(store).Delete(t.Context(), doomed.ID); err != nil {
+				t.Fatalf("Delete = %v, want the site and its graph gone", err)
+			}
+			if got := countEntities(t, store, doomed.ID); got != 0 {
+				t.Errorf("entities left of the deleted site = %d, want 0", got)
+			}
+			if got := countEntities(t, store, kept.ID); got != len(tc.graph) {
+				t.Errorf("entities of the other site = %d, want %d", got, len(tc.graph))
+			}
+		})
+	}
+}
+
+func closeLoops(t *testing.T, store *sqlite.Store, siteID string, roots []string) {
+	t.Helper()
+	entities := sqlite.NewEntityRepo(store)
+	listed, err := entities.ListBySite(t.Context(), siteID)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	for _, root := range roots {
+		var rootID, childID string
+		for i := range listed {
+			if listed[i].Name == root && listed[i].ScopeID == nil {
+				rootID = listed[i].ID
+			}
+		}
+		for i := range listed {
+			if listed[i].ScopeID != nil && *listed[i].ScopeID == rootID {
+				childID = listed[i].ID
+			}
+		}
+		if err = entities.SetScope(t.Context(), rootID, &childID, sqlitetest.Stamp); err != nil {
+			t.Fatalf("close the loop through %s: %v", root, err)
+		}
+	}
+}
+
+func TestSiteRepoDeletesASiteWhoseGraphHoldsAScopeLoop(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		graph []scopedName
+		loops []string
+	}{
+		{name: "one loop", graph: []scopedName{{name: "Shoes"}, {name: "Care", parent: "Shoes"}}, loops: []string{"Shoes"}},
+		{name: "two loops repeating a name", graph: []scopedName{
+			{name: "Shoes"}, {name: "Bags"}, {name: "Care", parent: "Shoes"}, {name: "Care", parent: "Bags"},
+		}, loops: []string{"Shoes", "Bags"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			store := sqlitetest.Open(t)
+			doomed := sqlitetest.Site(t, store, "doomed")
+			plantGraph(t, store, doomed.ID, tc.graph)
+			closeLoops(t, store, doomed.ID, tc.loops)
+
+			if err := sqlite.NewSiteRepo(store).Delete(t.Context(), doomed.ID); err != nil {
+				t.Fatalf("Delete = %v, want a looped graph deleted with its site", err)
+			}
+			if got := countEntities(t, store, doomed.ID); got != 0 {
+				t.Errorf("entities left = %d, want 0", got)
+			}
+		})
 	}
 }
 

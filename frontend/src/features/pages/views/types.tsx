@@ -12,6 +12,7 @@ import { Checkbox, cx, EmptyState, CategoryIcon, Segmented, SkeletonRows, TuneIc
 import type { Selection } from "../../../ui/selection.js";
 import { selectGroup } from "../../../ui/selection.js";
 import { pageTypeOf } from "../../settings/tabs.js";
+import { rootFolder } from "../address/model.js";
 import { presetIcon, presetTone } from "../../settings/types/labels.js";
 import type { EntityIndex } from "../entities.js";
 import { PageTable } from "../table.js";
@@ -104,7 +105,7 @@ export interface PagesByTypeProps {
     onMode: (mode: GroupMode) => void;
     onRows: (rows: ReadonlyMap<string, KnownRow>) => void;
     onOpen: (pageId: string) => void;
-    onUnder: (pageId: string) => void;
+    onUnder: (path: string) => void;
 }
 
 export function PagesByType({
@@ -124,7 +125,7 @@ export function PagesByType({
     const globals = useTemplates({ scope: "global" }, null, templatePage);
     const locals = useTemplates({ siteId }, null, templatePage);
     const [sort, setSort] = useState<PageSort | null>(null);
-    const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+    const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set([rootFolder]));
     const names = useMemo(
         () => new Map([...flatten(globals.data?.pages), ...flatten(locals.data?.pages)].map((held) => [held.id, held.name] as const)),
         [globals.data, locals.data],

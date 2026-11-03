@@ -238,6 +238,70 @@ func TestARequestCarriesWhatTheCallerAskedAndNothingTheProviderRefuses(t *testin
 	}
 }
 
+func TestAWebSearchGoesOutAsTheProvidersOwnTool(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		req      port.Request
+		wanted   []string
+		unwanted []string
+	}{
+		{
+			name: "a research call with its depth, its limit and both lists",
+			req: asked(func(r *port.Request) {
+				r.WebSearch = &port.WebSearch{Depth: llm.DepthHigh, MaxCalls: 4, Allowed: []string{"who.int"}, Blocked: []string{"rival.example"}}
+			}),
+			wanted: []string{
+				`"tools":[{"type":"web_search","search_context_size":"high","filters":{"allowed_domains":["who.int"],"blocked_domains":["rival.example"]}}]`,
+				`"max_tool_calls":4`, `"include":["web_search_call.action.sources"]`, `"prompt_cache_options":{"mode":"explicit"}`,
+			},
+		},
+		{
+			name: "a chat round searches beside its own tools and filters nothing it was not given",
+			req: asked(func(r *port.Request) {
+				r.Tools = []port.Tool{{Name: "pages_find", Description: "Finds pages."}}
+				r.WebSearch = &port.WebSearch{Depth: llm.DepthMedium, MaxCalls: 2}
+			}),
+			wanted:   []string{`"name":"pages_find"`, `{"type":"web_search","search_context_size":"medium"}`, `"max_tool_calls":2`},
+			unwanted: []string{`"filters"`},
+		},
+		{
+			name:     "a call that asked for no search sends none",
+			req:      asked(nil),
+			unwanted: []string{"web_search", "max_tool_calls", `"include"`},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			body, err := requestOf(tc.req, listed(terra()), false)
+			if err != nil {
+				t.Fatalf("requestOf: %v", err)
+			}
+			encoded, err := json.Marshal(body)
+			if err != nil {
+				t.Fatalf("encode: %v", err)
+			}
+			sent := string(encoded)
+			for _, want := range tc.wanted {
+				if !strings.Contains(sent, want) {
+					t.Errorf("the request lacks %s: %s", want, sent)
+				}
+			}
+			for _, unwanted := range tc.unwanted {
+				if strings.Contains(sent, unwanted) {
+					t.Errorf("the request carries %s: %s", unwanted, sent)
+				}
+			}
+			if strings.Contains(sent, "web_search") && strings.Index(sent, `"web_search"`) < strings.Index(sent, `"pages_find"`) {
+				t.Errorf("the search went ahead of the caller's tools: %s", sent)
+			}
+		})
+	}
+}
+
 func TestARequestWithoutStreamingSaysNothingOfIt(t *testing.T) {
 	t.Parallel()
 

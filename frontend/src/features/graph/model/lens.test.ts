@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { potteryEdges, potteryEntities, potteryPages, potteryTypes, typedPage } from "./fixture.js";
 import { buildGraphIndex } from "./index.js";
-import { isolate, lensCounts, lenses, matchedSet } from "./lens.js";
+import { roleGroups } from "../../settings/types/labels.js";
+import { isolate, lensCounts, lenses, matchedSet, presetsInUse, shownPresets } from "./lens.js";
 
 const index = buildGraphIndex(potteryEntities, potteryEdges, potteryPages, potteryTypes);
 
@@ -14,7 +15,7 @@ describe("matchedSet", () => {
     it("matches by lens", () => {
         expect(ids(matchedSet(index, "all", null))).toHaveLength(10);
         expect(ids(matchedSet(index, "noPage", null))).toStrictEqual(["kiln", "travel"]);
-        expect(ids(matchedSet(index, "orphan", null))).toStrictEqual(["care", "kiln"]);
+        expect(ids(matchedSet(index, "noHub", null))).toStrictEqual(["care"]);
         expect(ids(matchedSet(index, "ai", null))).toStrictEqual(["kiln", "travel"]);
         expect(ids(matchedSet(index, "site", null))).toStrictEqual(["stone"]);
         expect(ids(matchedSet(index, "proposed", null))).toStrictEqual(["glazing", "kiln", "mugs", "stone", "teapots"]);
@@ -28,13 +29,23 @@ describe("matchedSet", () => {
     });
 });
 
+describe("the page types the filter offers, by role", () => {
+    it("offers a preset from before the rules only where the site still has one", () => {
+        const hub = roleGroups[0];
+        expect(shownPresets(hub, presetsInUse(index), [])).toStrictEqual(["landing", "category", "hub"]);
+        expect(shownPresets(roleGroups[1], presetsInUse(index), [])).toStrictEqual(["guide", "info", "entity"]);
+        expect(shownPresets(roleGroups[1], new Set(), [])).toStrictEqual(["guide", "info"]);
+        expect(shownPresets(roleGroups[1], new Set(), ["entity"])).toStrictEqual(["guide", "info", "entity"]);
+    });
+});
+
 describe("lensCounts", () => {
     it("counts every lens once", () => {
-        expect(lensCounts(index)).toStrictEqual({ all: 10, noPage: 2, proposed: 5, orphan: 2, ai: 2, site: 1 });
+        expect(lensCounts(index)).toStrictEqual({ all: 10, noPage: 2, proposed: 5, noHub: 1, ai: 2, site: 1 });
     });
 
     it("names every lens", () => {
-        expect(lenses).toStrictEqual(["all", "noPage", "proposed", "orphan", "ai", "site"]);
+        expect(lenses).toStrictEqual(["all", "noPage", "proposed", "noHub", "ai", "site"]);
     });
 });
 

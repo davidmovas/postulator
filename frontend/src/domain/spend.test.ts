@@ -17,6 +17,7 @@ function slice(overrides: Partial<SpendSlice>): SpendSlice {
         cacheWrite: 0,
         output: 200,
         reasoning: 0,
+        webSearches: 0,
         usd: 0.01,
         ...overrides,
     };

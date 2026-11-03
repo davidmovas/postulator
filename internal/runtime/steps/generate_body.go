@@ -44,6 +44,7 @@ func GenerateBody(deps Deps) run.StepDef {
 		Name:      NameGenerateBody,
 		Role:      domainllm.RoleWriter,
 		Requires:  []run.ArtifactKind{run.ArtifactLinkContext},
+		Reads:     []run.ArtifactKind{run.ArtifactResearch},
 		Produces:  []run.ArtifactKind{run.ArtifactDraft, run.ArtifactBodyHTML},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   writerTimeout,

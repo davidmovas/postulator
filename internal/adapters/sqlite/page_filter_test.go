@@ -67,6 +67,9 @@ func TestThePagesAreFilteredByTypeTextFindingsAndSubtreeAndTypedInBulk(t *testin
 		"an open finding":     {pagemap.Query{SiteID: owner.ID, Findings: true}, []string{hub.Path}},
 		"a type and its text": {pagemap.Query{SiteID: owner.ID, PageTypeID: "guide-type", Body: pagemap.BodyWithout}, nil},
 		"by title":            {pagemap.Query{SiteID: owner.ID, Sort: pagemap.SortTitle}, []string{home.Path, guide.Path, hub.Path, child.Path}},
+		"these pages":         {pagemap.Query{SiteID: owner.ID, PageIDs: []string{guide.ID, child.ID, elsewhere.ID}}, []string{guide.Path, child.Path}},
+		"no page at all":      {pagemap.Query{SiteID: owner.ID, PageIDs: []string{}}, nil},
+		"these pages by type": {pagemap.Query{SiteID: owner.ID, PageIDs: []string{guide.ID, child.ID}, PageTypeID: "guide-type"}, []string{guide.Path}},
 	}
 	for name, tc := range cases {
 		listed, listErr := repo.List(t.Context(), tc.q, paging.Request{Limit: 50})
@@ -124,6 +127,21 @@ func TestThePagesAreFilteredByTypeTextFindingsAndSubtreeAndTypedInBulk(t *testin
 	under, err := sqlite.NewPageMapRepo(store).IDsUnder(t.Context(), owner.ID, home.ID+"/"+hub.ID+"/", "category-type")
 	if err != nil || !slices.Equal(under, []string{hub.ID, child.ID}) {
 		t.Fatalf("IDsUnder = %v %v, want the hub and its child", under, err)
+	}
+	for name, tc := range map[string]struct {
+		folder, typeID string
+		want           []string
+	}{
+		"a folder":                 {"/peptides/", "", []string{hub.ID, child.ID}},
+		"a folder's guides":        {"/", "guide-type", []string{guide.ID}},
+		"the whole site":           {"/", "", []string{home.ID, guide.ID, hub.ID, child.ID}},
+		"a folder that holds none": {"/peptides/healing/", "guide-type", []string{}},
+		"a wildcard is a letter":   {"/pep%/", "", []string{}},
+	} {
+		at, atErr := sqlite.NewPageMapRepo(store).IDsAt(t.Context(), owner.ID, tc.folder, tc.typeID)
+		if atErr != nil || !slices.Equal(at, tc.want) {
+			t.Errorf("IDsAt %s = %v %v, want %v", name, at, atErr, tc.want)
+		}
 	}
 
 	types := sqlite.NewPageTypeRepo(store)

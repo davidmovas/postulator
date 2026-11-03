@@ -37,11 +37,19 @@ func (f sitesFake) TestConnection(context.Context, sites.TestConnectionRequest) 
 	return answer[sites.TestConnectionResponse](f.mode)
 }
 
+func (f sitesFake) ClearData(context.Context, sites.ClearDataRequest) (sites.ClearDataResponse, error) {
+	return answer[sites.ClearDataResponse](f.mode)
+}
+
+func (f sitesFake) DataCounts(context.Context, sites.DataCountsRequest) (sites.DataCountsResponse, error) {
+	return answer[sites.DataCountsResponse](f.mode)
+}
+
 func TestSitesServiceConvertsEveryFailure(t *testing.T) {
 	t.Parallel()
 
 	assertMethodNames(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{})), []string{
-		"Create", "Delete", "Get", "List", "TestConnection", "Update",
+		"ClearData", "Create", "DataCounts", "Delete", "Get", "List", "TestConnection", "Update",
 	})
 	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{mode: missing})), missingBody)
 	assertEveryMethodConverts(t, wails.NewSitesService(zap.NewNop(), ready[wails.SitesUseCase](sitesFake{mode: panicking})), panicBody)

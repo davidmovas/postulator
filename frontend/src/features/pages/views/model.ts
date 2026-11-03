@@ -105,6 +105,9 @@ export function filterWords(filter: PageFacets, naming: Naming): string {
     if (filter.unmapped === true) {
         parts.push(said.describe.unmapped);
     }
+    if ((filter.gap ?? "") !== "") {
+        parts.push(said.describe.noHub);
+    }
     return parts.length === 0 ? said.describe.everyPage : said.describe.every(parts);
 }
 

@@ -197,9 +197,14 @@ func (e *Engine) startsFresh(ctx context.Context, held *claim) (bool, error) {
 
 func required(step run.StepDef, params map[string]any, available map[run.ArtifactKind]run.Artifact) []run.Artifact {
 	kinds := step.RequiresFor(params)
-	out := make([]run.Artifact, 0, len(kinds))
+	out := make([]run.Artifact, 0, len(kinds)+len(step.Reads))
 	for _, kind := range kinds {
 		if artifact, ok := available[kind]; ok {
+			out = append(out, artifact)
+		}
+	}
+	for _, kind := range step.Reads {
+		if artifact, ok := available[kind]; ok && !artifact.Purged {
 			out = append(out, artifact)
 		}
 	}

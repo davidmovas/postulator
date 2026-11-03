@@ -7,6 +7,7 @@ import (
 
 	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 )
 
 func TestEveryGapIsSaidOfItsPage(t *testing.T) {
@@ -56,6 +57,57 @@ func TestEveryGapIsSaidOfItsPage(t *testing.T) {
 	at := slices.IndexFunc(rows, func(row contextpack.GapRow) bool { return row.Page.Path == "/bpc-157/" })
 	if rows[at].MissingRequired != 2 || !slices.Equal(rows[at].Findings, []finding.Code{finding.ParentDiffers}) {
 		t.Errorf("/bpc-157/ = %+v, want two required links missing and parent_differs", rows[at])
+	}
+}
+
+func TestAPageWhoseEntityHasNoHubAboveIsSaidSo(t *testing.T) {
+	t.Parallel()
+
+	f := replicaLike()
+	for i := range f.pages {
+		switch f.pages[i].ID {
+		case "bpc-5":
+			f.pages[i] = mapped(f.pages[i], "e-five")
+		case "bpc-10":
+			f.pages[i] = mapped(f.pages[i], "e-ten")
+		case "tb-500":
+			f.pages[i] = mapped(f.pages[i], "e-tb")
+		case "ghk":
+			f.pages[i] = mapped(f.pages[i], "e-ghk")
+		case "guides":
+			f.pages[i] = mapped(f.pages[i], "e-guides")
+		}
+	}
+	f.entities = append(f.entities,
+		graph.Entity{ID: "e-research", SiteID: siteID, Name: "Researchers", Source: graph.SourceSite},
+		graph.Entity{ID: "e-lyophilised", SiteID: siteID, Name: "Lyophilised", Source: graph.SourceSite},
+		graph.Entity{ID: "e-five", SiteID: siteID, Name: "BPC-157 5 mg", CanonicalPageID: new("bpc-5"), Source: graph.SourceSite},
+		graph.Entity{ID: "e-ten", SiteID: siteID, Name: "BPC-157 10 mg", CanonicalPageID: new("bpc-10"), Source: graph.SourceSite},
+		graph.Entity{ID: "e-tb", SiteID: siteID, Name: "TB-500", CanonicalPageID: new("tb-500"), Source: graph.SourceSite},
+		graph.Entity{ID: "e-ghk", SiteID: siteID, Name: "GHK-Cu", CanonicalPageID: new("ghk"), Source: graph.SourceSite},
+		graph.Entity{ID: "e-guides", SiteID: siteID, Name: "Lab Guides", CanonicalPageID: new("guides"), Source: graph.SourceSite},
+	)
+	proposed := parentEdge("g7", "e-ghk", "e-peptides")
+	proposed.Status = graph.StatusProposed
+	f.edges = append(f.edges,
+		parentEdge("g3", "e-five", "e-research"),
+		parentEdge("g4", "e-lyophilised", "e-peptides"),
+		parentEdge("g5", "e-ten", "e-lyophilised"),
+		parentEdge("g6", "e-tb", "e-bpc"),
+		proposed,
+	)
+	s := f.snapshot(t)
+
+	hubless := make([]string, 0)
+	for _, row := range s.Gaps(nil) {
+		if slices.Contains(row.Gaps, contextpack.GapNoHub) {
+			hubless = append(hubless, row.Page.Path)
+		}
+	}
+	want := []string{"/lab-guides/", "/product/bpc-157-5mg/", "/product/ghk-cu/"}
+	if !slices.Equal(hubless, want) {
+		t.Errorf("no hub above = %v, want %v: a topic with no page is no hub, a proposed edge is no parent, "+
+			"a hub two levels up counts, a hub is never hubless itself and an unmapped page is unmapped", hubless, want)
 	}
 }
 

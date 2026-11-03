@@ -226,6 +226,7 @@ export interface LLMUsagePayload {
     completionTokens: number;
     reasoningTokens: number;
     cacheWriteTokens: number;
+    webSearches: number;
     usd: number;
 }
 

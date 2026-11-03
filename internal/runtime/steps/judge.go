@@ -26,6 +26,7 @@ func Judge(deps Deps) run.StepDef {
 		Name:     NameJudge,
 		Role:     domainllm.RoleJudge,
 		Requires: []run.ArtifactKind{run.ArtifactBodyHTML},
+		Reads:    []run.ArtifactKind{run.ArtifactResearch},
 		Produces: []run.ArtifactKind{run.ArtifactJudgeReport},
 		Retry:    run.RetryPolicy{Max: 2},
 		Price: run.Price{
@@ -100,7 +101,11 @@ func judgement(ctx context.Context, deps Deps, sc *run.StepContext) (report Judg
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}
-	seen, err := deps.pictureOf(ctx, sc, bodyField(sc), links, deps.inputBudget(ctx, call, appcontent.JudgeTokens))
+	research, err := researchOf(sc)
+	if err != nil {
+		return JudgeReport{}, 0, err
+	}
+	seen, err := deps.pictureOf(ctx, sc, bodyField(sc), links, deps.inputBudget(ctx, call, appcontent.JudgeTokens), research)
 	if err != nil {
 		return JudgeReport{}, 0, err
 	}

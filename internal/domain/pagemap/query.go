@@ -32,6 +32,7 @@ func (b BodyFilter) Valid() bool {
 type Query struct {
 	SiteID     string
 	Status     *Status
+	PageIDs    []string
 	EntityIDs  []string
 	Unmapped   bool
 	PathPrefix string

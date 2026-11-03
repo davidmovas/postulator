@@ -2,10 +2,13 @@ package contextpack
 
 import (
 	"cmp"
+	"math"
 	"slices"
 
 	"github.com/davidmovas/postulator/internal/domain/finding"
+	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
+	"github.com/davidmovas/postulator/internal/domain/pagetype"
 )
 
 type Gap string
@@ -17,10 +20,11 @@ const (
 	GapOrphan       Gap = "orphan"
 	GapMissingLinks Gap = "missing_links"
 	GapFindings     Gap = "findings"
+	GapNoHub        Gap = "no_hub"
 )
 
 func Gaps() []Gap {
-	return []Gap{GapPlanned, GapEmpty, GapUnmapped, GapOrphan, GapMissingLinks, GapFindings}
+	return []Gap{GapPlanned, GapEmpty, GapUnmapped, GapOrphan, GapMissingLinks, GapFindings, GapNoHub}
 }
 
 type LinkFacts struct {
@@ -79,9 +83,35 @@ func (s Snapshot) has(page pagemap.Page, gap Gap, linked LinkFacts, findings boo
 		return linked.Orphan
 	case GapMissingLinks:
 		return linked.MissingRequired > 0
+	case GapNoHub:
+		return s.NoHubAbove(page)
 	default:
 		return findings
 	}
+}
+
+func (s Snapshot) NoHubAbove(page pagemap.Page) bool {
+	if page.EntityID == nil || !s.writable(page) {
+		return false
+	}
+	if role := s.typeOf(page).Preset.Role(); role != pagetype.RoleEntity && role != pagetype.RoleProduct {
+		return false
+	}
+	above := s.Graph.Parents(*page.EntityID, math.MaxInt)
+	for i := range above {
+		if s.hubEntity(&above[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (s Snapshot) hubEntity(entity *graph.Entity) bool {
+	if entity.CanonicalPageID == nil {
+		return false
+	}
+	page, found := s.Index.ByID(*entity.CanonicalPageID)
+	return found && live(page) && s.typeOf(page).Preset.Role() == pagetype.RoleHub
 }
 
 func (s Snapshot) openCodes() map[string][]finding.Code {

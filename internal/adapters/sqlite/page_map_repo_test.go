@@ -133,6 +133,29 @@ func TestPageMapRepoKeepsTheMapAndSaysWhenItMoved(t *testing.T) {
 	}
 }
 
+func TestTheAddressOfAFolderHoldsItsMapRowsAndItsFoldedStoreCategoriesOnly(t *testing.T) {
+	t.Parallel()
+
+	store := sqlitetest.Open(t)
+	owner := sqlitetest.Site(t, store, "shop")
+	hub := sqlitetest.Page(t, store, owner.ID, "/peptides/")
+	term := sqlitetest.Page(t, store, owner.ID, "/peptides/category/")
+	gone := sqlitetest.Page(t, store, owner.ID, "/peptides/old/")
+	folded := mapRow(term, hub.ID, hub.ID+"/"+term.ID+"/")
+	folded.Row, folded.HubID = false, hub.ID
+	archived := mapRow(gone, "", "")
+	archived.Row = false
+	rows := []contextpack.MapRow{mapRow(hub, "", hub.ID+"/"), folded, archived}
+	if err := sqlite.NewPageMapRepo(store).Write(t.Context(), owner.ID, rows, nil, 1); err != nil {
+		t.Fatalf("Write the map: %v", err)
+	}
+
+	got, err := sqlite.NewPageMapRepo(store).IDsAt(t.Context(), owner.ID, "/peptides/", "")
+	if err != nil || !slices.Equal(got, []string{hub.ID, term.ID}) {
+		t.Errorf("IDsAt = %v %v, want the hub and the store category it folds, never the archived page", got, err)
+	}
+}
+
 func TestPageMapRepoWalksTheTreeLevelByLevel(t *testing.T) {
 	t.Parallel()
 

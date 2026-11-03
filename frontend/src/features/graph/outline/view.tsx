@@ -154,9 +154,9 @@ export function OutlineView({ siteId, index, rows, selectedId, matched, onSelect
                 <TableCell>
                     <span className="flex items-center justify-end gap-1">
                         {(flags?.proposed ?? 0) > 0 ? <CountBadge tone="info" count={flags?.proposed ?? 0} /> : null}
-                        {flags?.orphan ? (
+                        {flags?.noHub ? (
                             <StatusBadge tone="warn" dot={false}>
-                                {copy.graph.lens.orphan}
+                                {copy.graph.lens.noHub}
                             </StatusBadge>
                         ) : null}
                         {flags?.multiParent ? <CallSplitIcon size={12} className="text-ink-dim" /> : null}

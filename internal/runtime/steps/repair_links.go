@@ -259,7 +259,7 @@ func (w *sentenceWriter) picture(ctx context.Context) (sitemodel.Picture, error)
 	if w.seen != nil {
 		return *w.seen, nil
 	}
-	seen, err := w.deps.pictureOf(ctx, w.sc, bodyField(w.sc), &w.links, w.deps.inputBudget(ctx, w.call, repairTokens))
+	seen, err := w.deps.pictureOf(ctx, w.sc, bodyField(w.sc), &w.links, w.deps.inputBudget(ctx, w.call, repairTokens), nil)
 	if err != nil {
 		return sitemodel.Picture{}, err
 	}

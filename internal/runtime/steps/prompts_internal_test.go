@@ -75,6 +75,7 @@ func TestEveryPromptExecutes(t *testing.T) {
 			Page: page, Picture: fullPicture,
 			Asked: []askedField{{Key: "excerpt", Name: "Excerpt", Rules: []string{"Field: Excerpt", "Length: at most 160 characters"}}},
 		},
+		NameResearch: researchPrompt{Picture: fullPicture, Spec: spec, Focus: "storage and stability", Product: true},
 		NameRepairLinks: repairPrompt{
 			Page: page, Entity: entity, Phrase: "home", Why: "the parent", Paragraph: "Peptides are short chains.",
 			Identity: "Peptides (/peptides/, Hub)", About: "Home (/): Entity for Home",

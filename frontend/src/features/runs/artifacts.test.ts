@@ -13,6 +13,7 @@ import {
     owedTargets,
     publishView,
     relinkView,
+    researchView,
     revertView,
     syncView,
     validationView,
@@ -184,6 +185,29 @@ describe("weigh", () => {
     it("reads an unknown severity as info", () => {
         const view = validationView({ compliance: { items: [{ severity: "fatal", code: "x", message: "y" }] } });
         expect(view?.compliance[0].severity).toBe("info");
+    });
+});
+
+describe("researchView", () => {
+    it("reads the facts line by line without their markup, and the sources it cites", () => {
+        const view = researchView({
+            text: "## Dosage\n- Caffeine peaks within an hour [who.int]\n\n* Its half life is five hours [nih.gov]",
+            sources: [{ url: "https://www.who.int/caffeine", title: "WHO" }, { url: "" }, { url: "https://nih.gov/" }],
+            searches: 3,
+        });
+        expect(view).toStrictEqual({
+            facts: ["Dosage", "Caffeine peaks within an hour [who.int]", "Its half life is five hours [nih.gov]"],
+            sources: [
+                { url: "https://www.who.int/caffeine", title: "WHO" },
+                { url: "https://nih.gov/", title: "" },
+            ],
+            searches: 3,
+        });
+    });
+
+    it("answers null for what is not a research", () => {
+        expect(researchView(null)).toBeNull();
+        expect(researchView({ sources: [] })).toBeNull();
     });
 });
 

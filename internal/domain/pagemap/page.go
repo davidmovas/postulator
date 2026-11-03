@@ -97,6 +97,10 @@ func (p Page) Live() bool {
 	return p.WPID != nil && p.Status == StatusPublished
 }
 
+func (p Page) CreatedUnderParent() bool {
+	return p.WPType == WPPage && p.WPID == nil
+}
+
 type LinkType string
 
 const (

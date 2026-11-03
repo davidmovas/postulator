@@ -86,7 +86,8 @@ revert of an updated page stand down.
 ## Non-goals
 
 - Not a general-purpose SEO suite: no rank tracking, no backlink research, no competitor
-  analysis, no keyword research product.
+  analysis, no keyword research product. The web search a template or the assistant may run serves
+  the facts one page is written from, and nothing else.
 - Not a CMS. The site owns its theme, its snippets and its structure; we edit page content and
   fields through the model, and only the fields a page type's scope allows.
 - Not a site builder. We create no products, no terms, no menus; a page builder's content is

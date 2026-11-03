@@ -37,6 +37,7 @@ type Deps struct {
 	Clock       clock.Clock
 	Logger      *zap.Logger
 	ToolLoading func() agentapp.ToolLoading
+	WebSearch   func() *llm.WebSearch
 }
 
 type Runner struct {
@@ -125,6 +126,10 @@ func cacheKey(situation agentapp.SiteContext) string {
 func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *turn {
 	built := r.deps.Registry.Build(spec.Binding)
 	offered := r.offered(built)
+	var search *llm.WebSearch
+	if r.deps.WebSearch != nil {
+		search = r.deps.WebSearch()
+	}
 
 	return &turn{
 		spec:    spec,
@@ -134,18 +139,19 @@ func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *tu
 			store: r.deps.History, clock: r.deps.Clock, conversationID: spec.Binding.ConversationID,
 			budget: spec.HistoryBudget, cap: historyCeiling(spec),
 		},
-		guard:  newGuard(spec, built, resultCeiling(spec)),
-		usage:  &tally{},
-		spoken: &answer{},
+		guard:   newGuard(spec, built, resultCeiling(spec)),
+		usage:   &tally{},
+		spoken:  &answer{},
+		browsed: &browsing{},
 		asked: llm.Request{
-			Ref:    spec.Ref,
-			System: instructions,
-			Tools:  offered,
+			Ref:       spec.Ref,
+			System:    instructions,
+			Tools:     offered,
+			WebSearch: search,
 			Meta: llm.CallMeta{
 				RunID: spec.Binding.RunID, ConversationID: spec.Binding.ConversationID,
 				Step: ChatStep, Role: domainllm.RoleChat,
 			},
-			Effort:   domainllm.EffortNone,
 			Tier:     domainllm.TierDefault,
 			CacheKey: cacheKey(spec.Context),
 		},

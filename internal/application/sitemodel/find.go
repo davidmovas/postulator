@@ -3,6 +3,7 @@ package sitemodel
 import (
 	"cmp"
 	"context"
+	"maps"
 	"slices"
 	"strings"
 
@@ -36,9 +37,7 @@ func (s *Service) Find(ctx context.Context, req FindRequest) (paging.List[contex
 	case req.SiteID == "":
 		return paging.List[contextpack.MapNode]{}, errors.New(errors.Invalid, "name the site whose pages to find").WithDetail("field", "siteId")
 	case req.Gap != "" && !slices.Contains(contextpack.Gaps(), req.Gap):
-		return paging.List[contextpack.MapNode]{}, errors.New(errors.Invalid,
-			"the gap must be one of planned, empty, unmapped, orphan, missing_links or findings").
-			WithDetail("field", "gap").WithDetail("value", string(req.Gap))
+		return paging.List[contextpack.MapNode]{}, unknownGap(req.Gap)
 	case req.Status != "" && !req.Status.Valid():
 		return paging.List[contextpack.MapNode]{}, errors.New(errors.Invalid,
 			"the status must be one of planned, exists, published or archived").
@@ -138,6 +137,25 @@ func (s *Service) found(ctx context.Context, req FindRequest) ([]contextpack.Map
 		kept = append(kept, row)
 	}
 	return kept, nil
+}
+
+func unknownGap(gap contextpack.Gap) error {
+	return errors.New(errors.Invalid, "the gap must be one of planned, empty, unmapped, orphan, missing_links, findings or no_hub").
+		WithDetail("field", "gap").WithDetail("value", string(gap))
+}
+
+func (s *Service) Gapped(ctx context.Context, siteID string, gap contextpack.Gap) ([]string, error) {
+	switch {
+	case siteID == "":
+		return nil, errors.New(errors.Invalid, "name the site whose pages to find").WithDetail("field", "siteId")
+	case !slices.Contains(contextpack.Gaps(), gap):
+		return nil, unknownGap(gap)
+	}
+	held, err := s.gapped(ctx, siteID, gap)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Sorted(maps.Keys(held)), nil
 }
 
 func (s *Service) gapped(ctx context.Context, siteID string, gap contextpack.Gap) (map[string]struct{}, error) {

@@ -6,6 +6,7 @@ type StepName string
 
 const (
 	StepResolveContext  StepName = "resolve_context"
+	StepResearch        StepName = "research"
 	StepGenerateBody    StepName = "generate_body"
 	StepGenerateMeta    StepName = "generate_meta"
 	StepGenerateFields  StepName = "generate_fields"
@@ -35,7 +36,7 @@ const (
 )
 
 var stepNames = []StepName{
-	StepResolveContext, StepGenerateBody, StepGenerateMeta, StepGenerateFields, StepInsertLinks, StepRepairLinks,
+	StepResolveContext, StepResearch, StepGenerateBody, StepGenerateMeta, StepGenerateFields, StepInsertLinks, StepRepairLinks,
 	StepGenerateImages, StepValidate, StepJudge, StepPublish, StepRelinkNeighbors, StepSyncBack,
 	StepReport,
 }

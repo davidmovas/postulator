@@ -6070,3 +6070,131 @@ product page, and no word of why, while `/cart/` was typed rightly. He held the 
   come in through `/content` whatever WooCommerce answers, and their store fields still need `wc/v3`.
 - **Proposed, not built**: a message on the run screen when the store cannot be read, with the site's
   answer, so a site with neither way open says why.
+
+## 2026-11-02 — 2.11.0: pages by address, no hub above, types by role
+
+The client has product entities with no hub above them and wanted to find them all and give them his
+own template at once. Pages → Tree did not help: it showed the breadcrumb hierarchy, so
+`/products/p1/` sat under `/researchers/products/`, and ticking a page for a run pulled in its whole
+chain of planned parents up to the root. He also no longer knew where Hub had gone among Category,
+Store category and the rest.
+
+### What the code showed
+
+- **The planner walked parents nobody needed.** `runs.ancestors` started from every target, a page
+  already on the site and a post or custom type included, and followed the derived parent; the
+  publish step (`steps.parentFor`) already asked for a parent only from a WordPress page it creates.
+  The two now share `pagemap.Page.CreatedUnderParent`, so a run adds only the planned pages a
+  creation needs.
+- **Hub never went away**: it is a role, and Landing, Category and the Hub from before the rules all
+  play it. The screens listed ten presets loose, with nothing saying which role each plays.
+
+### The rulings
+
+- **Two hierarchies, each where it belongs (amends "one tree").** The Pages tree, the by-type tree
+  and their selections are the site by address (`contextpack.Folders`, `sitemodel.AddressTree`,
+  `Selection.Folders` resolved by `PageMapRepo.IDsAt`); the Site map, the writer's pack and the graph
+  keep the derived, breadcrumb hierarchy. A selection's subtree by page (`Selection.Subtrees`) stays
+  for the agent's `under`, which names the model's hierarchy.
+- **No hub above is a gap** (`contextpack.GapNoHub`): a live article or product whose entity has no
+  approved ancestor, at any depth, with a hub page. A page-less topic is no hub, a proposed edge is no
+  parent, a hub, store category, catalog or technical page is never hubless, an unmapped page is
+  `unmapped`. It is a Pages filter (`PageFilter.Gap`, through a reader `pages` declares and
+  `sitemodel.Gapped` answers), so "select all matching" → Template → Run works on it; the graph's
+  orphan lens became the same rule; `pages_find` takes it, and the agent's `select` takes `gap`
+  alone or with `ofType`, never with `under`.
+- **Collections were not built.** The owner proposed folders the client fills by hand from the graph;
+  the filter answers this request with no new record, and folders wait for a case a filter cannot
+  name.
+- **A type is shown under the role it plays.** The vocabulary exports each role's presets from
+  `pagetype` (`hubPageTypePresets` and the rest), the graph's filter and legend group by them and
+  offer a preset no new type starts from only where the site has one, a type's card and drawer say
+  what it works as, and no label or hint names an application version.
+
+## 2026-11-03 — 2.11.0, continued: a site that deletes and clears, a writer that researches
+
+Two client reports on the unreleased 2.11.0. He could not delete a site: the dialog said "Something
+else changed this first. The view has been refreshed." And he had no way to wipe what Postulator
+built for a site short of deleting it and connecting it again. Separately, the writer got the
+structure right and the content thin, and the assistant was not smart enough; he asked first for
+OpenAI's web search, set up by him and paid by him.
+
+### What the code showed
+
+- **The delete failed in the cascade.** `DELETE FROM sites` removed the entities row by row;
+  `entities.scope_entity_id` is `ON DELETE SET NULL` and `entities_site_scope_name` is unique on
+  `(site_id, coalesce(scope_entity_id, ''), name)`. Since 2.9.0 the breadcrumbs give two parents a
+  child of one name, so a parent deleted before its child orphaned the child into a root name that
+  existed: `CONSTRAINT_UNIQUE`, which `dbx` maps to `CONFLICT`, which every screen shows as the
+  generic conflict. `graph.DeleteEntity` never hit it (`settleScopesWithout`); the site delete had no
+  such step. A test reproduced it on three graphs, then two scope loops.
+- **The assistant never reasoned.** `runner.open` sent every chat round at effort `none`, fixed in
+  code (the 2026-10-03 ruling "chat is not a setting"), so raising the other roles' effort never
+  reached it.
+- **The writer was told to know nothing.** "Never state a fact the picture does not hold" left a page
+  the site knows little about with nothing to say, while the judge docked it for lacking specifics.
+
+### The owner's answers (2026-11-02)
+
+- **Clear site data by groups**, not one button: the model, the graph, the history.
+- **Web search for the writer as a research step**, not inside the writer's call.
+- **The assistant's effort a setting, medium by default.**
+- **The client sets the search's depth, its searches per call and the domain lists**; no location.
+- **The writer may say what is well established about a topic**; never a specific of the business.
+
+### The rulings
+
+- **A site's entities go leaves first** (`Store.deleteEntitiesLeavesFirst`): delete the entities no
+  other scopes until none is left (SQLite collects the set before it deletes), then free a scope loop
+  by naming each by its id, then the rest; `SiteRepo.Delete` and the graph group of a clear share it.
+- **Clear site data** (`SitesService.ClearData`, `DataCounts`) removes, in one unit: the model (pages
+  and all that cascades, every finding of the site, the observation's stamps and technical pages, so
+  the next sync is a first full walk), the graph (entities leaves first, their edges, anchors, terms,
+  findings and entity-aimed schedules, and every `topic_builds` row, so the next sync builds the graph
+  again from the breadcrumbs) or the history (runs with their items, events, execs and artifacts;
+  conversations with their messages, histories, plans, pending actions and tool calls). The model
+  takes the history with it: run items cascade from pages and a chat's brief names them. The
+  connection, the password, the site's settings, types, rules, templates, link policies, workbook
+  mappings and the spend ledger (`llm_calls`, which carries no site) are never touched. A model clear
+  leaves the `topic_builds` rows keyed by page ids: ids are never reused, so they are inert, and the
+  new pages adopt the kept graph's entities by name. A sync-harness test proves the next sync reads the
+  same pages and builds the same entities after each group, and that without the stamps' reset it
+  would read one page.
+- **A busy site refuses a clear and a delete**: a run `pending` or `running` may still commit a batch,
+  so both answer `CONFLICT` with `code: site_busy` and the run ids, and the dialogs say so with a link
+  to Runs instead of the generic copy; a `waiting` or `paused` run is inert and goes with its group.
+  Neither is an agent tool.
+- **The assistant's effort is `llm.effort.chat`** (medium), amending 2026-10-03: the runner leaves the
+  effort to the tuning link as every step does, and keeps the standard tier.
+- **Web search is a field of the request, not a tool of the registry** (`llm.Request.WebSearch`:
+  depth, searches per call, domains to keep to and to leave out). The OpenAI client sends the hosted
+  `web_search` with `max_tool_calls` and `include: web_search_call.action.sources`, reads the billed
+  searches from `tool_usage.web_search.num_requests` (else counts the search items), the sources from
+  the `url_citation` annotations (else those the searches read), drops the private-use citation marks
+  U+E200–E202 whole or split across chunks, and never sends a search item back as input under
+  `store: false`. `Usage.WebSearches` carries the count; `llm.Cost` adds `llm.WebSearchUSDPerThousand`
+  ($10, OpenAI's price for every model as of 2026-11-02), a provider's price and so a constant, not a
+  catalog row; the ledger keeps it in `llm_calls.web_searches` (0091), and the spend report,
+  `llm.usage`, a chat round's cost and a run's cap all see it.
+- **The research step** (`research`, a `StepName` after `resolve_context`, off in every recipe until a
+  template turns it on, with the template's `focus`) asks the new role `researcher` (effort low,
+  standard tier, its own model, input budget and catalog default) with the page's pack, the
+  template's sections and the run's brief, searching as `llm.webSearch.*` allows, for a plain list of
+  facts with their sources. No `text.format` rides with a search: OpenAI does not document the two
+  together and the forum reports truncated JSON and leaked citation marks. Its artifact is read, when
+  present, by `generate_body`, `generate_meta`, `generate_fields` and `judge` as the pack's research
+  section after the card, and enters their input hash through `StepDef.Reads`, an artifact read and
+  hashed only when there; the linker never reads it, its one sentence needs no fact. The estimate
+  prices a step's searches (`Price.Searches`: the per-call limit and a cautious allowance of 3,000,
+  6,000 or 12,000 tokens a search by depth, until a funded key measures them); the step's prompt is
+  unmeasured, so it takes the 800 default overhead. A blank template keeps the research off.
+- **The writers may say what is well established about the topic**, and never invent anything about
+  the business or its products the picture does not hold (prices, delivery, guarantees, addresses,
+  figures, names, awards, claims); the judge grades against the picture and the search.
+- **The assistant searches when `agent.webSearch` is on** (off by default): each round carries the
+  search, the instructions say in one sentence to search only for what the model cannot hold (the
+  ceiling rises to 2,194 tokens, measured with the search on), the transcript shows each search with
+  its query, and an answer ends with the sources it drew on and did not already link.
+- **What stays owed**: the request shapes (a research call, a chat round with function tools and the
+  search, `blocked_domains`) are proven against the fake only; a key with no credit proves them for
+  free, and a funded one measures the search's tokens and whether the model searches at effort low.

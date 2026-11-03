@@ -302,7 +302,7 @@ func (s *Service) ancestors(ctx context.Context, siteID string, targets []string
 		}
 		neededBy := child.Path
 
-		for {
+		for child.CreatedUnderParent() {
 			parent, found, parentErr := s.parentOf(ctx, child)
 			if parentErr != nil || !found {
 				if parentErr != nil {
@@ -332,12 +332,9 @@ func (s *Service) ancestors(ctx context.Context, siteID string, targets []string
 }
 
 func (s *Service) parentOf(ctx context.Context, child pagemap.Page) (pagemap.Page, bool, error) {
-	if child.WPType.StoreAddressed() {
-		return pagemap.Page{}, false, nil
-	}
 	above := pagemap.ParentPath(child.Path)
 	if child.ParentPageID == nil {
-		if above == "" || above == pagemap.RootPath || child.WPID != nil {
+		if above == "" || above == pagemap.RootPath {
 			return pagemap.Page{}, false, nil
 		}
 		return pagemap.Page{}, false, invalid("the page map holds no page at "+above+", so "+child.Path+

@@ -47,6 +47,7 @@ type Usage struct {
 	Output      int `json:"output"`
 	Reasoning   int `json:"reasoning"`
 	Total       int `json:"total"`
+	WebSearches int `json:"webSearches"`
 }
 
 type Spent struct {
@@ -57,6 +58,7 @@ type Spent struct {
 	CacheWrite  int     `json:"cacheWrite"`
 	Output      int     `json:"output"`
 	Reasoning   int     `json:"reasoning"`
+	WebSearches int     `json:"webSearches"`
 	USD         float64 `json:"usd"`
 }
 
@@ -133,14 +135,15 @@ func refView(ref llm.ModelRef) *ModelRef {
 func usageView(usage llm.Usage) Usage {
 	return Usage{
 		Input: usage.Input, CachedInput: usage.CachedInput, CacheWrite: usage.CacheWrite, Output: usage.Output,
-		Reasoning: usage.Reasoning, Total: usage.Total,
+		Reasoning: usage.Reasoning, Total: usage.Total, WebSearches: usage.WebSearches,
 	}
 }
 
 func spentView(slice llm.SpendSlice) Spent {
 	return Spent{
 		Calls: slice.Calls, Failed: slice.Failed, Input: slice.Input, CachedInput: slice.CachedInput,
-		CacheWrite: slice.CacheWrite, Output: slice.Output, Reasoning: slice.Reasoning, USD: slice.USD,
+		CacheWrite: slice.CacheWrite, Output: slice.Output, Reasoning: slice.Reasoning, WebSearches: slice.WebSearches,
+		USD: slice.USD,
 	}
 }
 
@@ -148,7 +151,8 @@ func (s Spent) plus(other Spent) Spent {
 	return Spent{
 		Calls: s.Calls + other.Calls, Failed: s.Failed + other.Failed, Input: s.Input + other.Input,
 		CachedInput: s.CachedInput + other.CachedInput, CacheWrite: s.CacheWrite + other.CacheWrite,
-		Output: s.Output + other.Output, Reasoning: s.Reasoning + other.Reasoning, USD: s.USD + other.USD,
+		Output: s.Output + other.Output, Reasoning: s.Reasoning + other.Reasoning,
+		WebSearches: s.WebSearches + other.WebSearches, USD: s.USD + other.USD,
 	}
 }
 

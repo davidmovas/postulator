@@ -11,6 +11,7 @@ type ArtifactKind string
 
 const (
 	ArtifactLinkContext      ArtifactKind = "link_context"
+	ArtifactResearch         ArtifactKind = "research"
 	ArtifactDraft            ArtifactKind = "draft"
 	ArtifactBodyHTML         ArtifactKind = "body_html"
 	ArtifactMeta             ArtifactKind = "meta"
@@ -28,7 +29,7 @@ const (
 
 func ArtifactKinds() []ArtifactKind {
 	return []ArtifactKind{
-		ArtifactLinkContext, ArtifactDraft, ArtifactBodyHTML, ArtifactMeta, ArtifactFields, ArtifactImages,
+		ArtifactLinkContext, ArtifactResearch, ArtifactDraft, ArtifactBodyHTML, ArtifactMeta, ArtifactFields, ArtifactImages,
 		ArtifactValidationReport, ArtifactJudgeReport, ArtifactPublishResult, ArtifactRelinkResult,
 		ArtifactSyncResult, ArtifactFinalReport, ArtifactRevertResult, ArtifactEditPlan,
 	}

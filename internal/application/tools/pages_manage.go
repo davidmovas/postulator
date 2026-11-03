@@ -149,8 +149,8 @@ func (deps Deps) updatePage(ctx context.Context, pageID string, in *pagesManageA
 }
 
 func (deps Deps) manageMany(ctx context.Context, b Binding, in *pagesManageArgs) (any, error) {
-	if in.Select.empty() {
-		return nil, errors.New(errors.Invalid, "name the pages: pageIds, under or ofType").WithDetail("field", "select")
+	if err := in.Select.checked(); err != nil {
+		return nil, err
 	}
 	sel := in.Select.selection(b.SiteID)
 	if in.Op == opSetTypes {

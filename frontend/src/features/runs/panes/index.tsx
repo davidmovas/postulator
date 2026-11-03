@@ -21,6 +21,7 @@ import {
     artifactMeta,
     artifactPublishResult,
     artifactRelinkResult,
+    artifactResearch,
     artifactRevertResult,
     artifactSyncResult,
     artifactValidationReport,
@@ -31,6 +32,7 @@ import { JudgePane } from "./judge.js";
 import { LinkContextPane, ValidationPane } from "./links.js";
 import { EditPlanPane } from "./plan.js";
 import { FinalPane, PublishPane, RelinkPane, RevertPane, SyncPane } from "./publish.js";
+import { ResearchPane } from "./research.js";
 import { Unreadable } from "./shared.js";
 import { SiteSyncPane } from "./sync.js";
 
@@ -47,6 +49,8 @@ function Payload({ itemId, runId, kind, pageId, payload, choice }: PayloadProps)
     switch (kind) {
         case artifactLinkContext:
             return <LinkContextPane context={linkContextView(payload)} />;
+        case artifactResearch:
+            return <ResearchPane payload={payload} />;
         case artifactDraft:
             return <DraftPane payload={payload} />;
         case artifactMeta:

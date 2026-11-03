@@ -285,6 +285,9 @@ func filtered(builder squirrel.SelectBuilder, q pagemap.Query) squirrel.SelectBu
 	if q.Status != nil {
 		builder = builder.Where(squirrel.Eq{"status": string(*q.Status)})
 	}
+	if q.PageIDs != nil {
+		builder = builder.Where(squirrel.Eq{"id": q.PageIDs})
+	}
 	if q.EntityIDs != nil {
 		builder = builder.Where(squirrel.Eq{"entity_id": q.EntityIDs})
 	}

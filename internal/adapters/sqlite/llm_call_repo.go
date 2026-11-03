@@ -17,22 +17,23 @@ const (
 	servedTier = `CASE service_tier WHEN '' THEN '` + string(llm.TierDefault) + `' ELSE service_tier END`
 
 	writtenCallColumns = `id, run_id, item_id, step, conversation_id, provider, model, input_tokens, cached_input_tokens,
-		cache_write_tokens, output_tokens, reasoning_tokens, usd, latency_ms, status, error_code, service_tier, created_at`
+		cache_write_tokens, output_tokens, reasoning_tokens, web_searches, usd, latency_ms, status, error_code, service_tier,
+		created_at`
 	readCallColumns = `id, run_id, item_id, step, conversation_id, provider, model, input_tokens, cached_input_tokens,
-		cache_write_tokens, output_tokens, reasoning_tokens, usd, latency_ms, status, error_code, ` + servedTier + `,
+		cache_write_tokens, output_tokens, reasoning_tokens, web_searches, usd, latency_ms, status, error_code, ` + servedTier + `,
 		created_at`
 	insertCall = `INSERT INTO llm_calls (` + writtenCallColumns + `)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	sumColumns = `coalesce(sum(input_tokens), 0), coalesce(sum(cached_input_tokens), 0),
 		coalesce(sum(cache_write_tokens), 0), coalesce(sum(output_tokens), 0), coalesce(sum(reasoning_tokens), 0),
-		coalesce(sum(usd), 0), count(*)`
+		coalesce(sum(web_searches), 0), coalesce(sum(usd), 0), count(*)`
 	sumByRun          = `SELECT ` + sumColumns + ` FROM llm_calls WHERE run_id = ?`
 	sumByConversation = `SELECT ` + sumColumns + ` FROM llm_calls WHERE conversation_id = ?`
 	sumAll            = `SELECT ` + sumColumns + ` FROM llm_calls`
 
 	sliceTotals = `sum(CASE WHEN status = ? THEN 1 ELSE 0 END), sum(CASE WHEN status = ? THEN 0 ELSE 1 END),
 		sum(input_tokens), sum(cached_input_tokens), sum(cache_write_tokens), sum(output_tokens),
-		sum(reasoning_tokens), sum(usd)`
+		sum(reasoning_tokens), sum(web_searches), sum(usd)`
 )
 
 type LLMCallRepo struct {
@@ -50,7 +51,7 @@ func (r *LLMCallRepo) Insert(ctx context.Context, call llm.Call) error {
 	_, err := execWrite(ctx, r.store.writeFrom(ctx), insertCall, []any{
 		call.ID, call.RunID, call.ItemID, call.Step, call.ConversationID, call.Ref.Provider, call.Ref.Model,
 		call.Usage.Input, call.Usage.CachedInput, call.Usage.CacheWrite, call.Usage.Output, call.Usage.Reasoning,
-		call.USD, call.Latency.Milliseconds(), string(call.Status), call.ErrorCode, string(call.Tier),
+		call.Usage.WebSearches, call.USD, call.Latency.Milliseconds(), string(call.Status), call.ErrorCode, string(call.Tier),
 		formatTime(call.CreatedAt),
 	}, nil, "record the llm call")
 	return err
@@ -75,7 +76,7 @@ func (r *LLMCallRepo) sum(ctx context.Context, query, key, message string) (llm.
 func total(row *sql.Row, message string) (llm.Spend, error) {
 	var spend llm.Spend
 	if err := row.Scan(&spend.Usage.Input, &spend.Usage.CachedInput, &spend.Usage.CacheWrite, &spend.Usage.Output,
-		&spend.Usage.Reasoning, &spend.USD, &spend.Calls); err != nil {
+		&spend.Usage.Reasoning, &spend.Usage.WebSearches, &spend.USD, &spend.Calls); err != nil {
 		return llm.Spend{}, dbx.Convert(err, message)
 	}
 	spend.Usage.Total = spend.Usage.Input + spend.Usage.Output
@@ -137,7 +138,7 @@ func scanSpendSlice(rows *sql.Rows) (llm.SpendSlice, error) {
 	)
 	if err := rows.Scan(
 		&purpose, &slice.Provider, &slice.Model, &tier, &slice.Step, &slice.Calls, &slice.Failed,
-		&slice.Input, &slice.CachedInput, &slice.CacheWrite, &slice.Output, &slice.Reasoning, &slice.USD,
+		&slice.Input, &slice.CachedInput, &slice.CacheWrite, &slice.Output, &slice.Reasoning, &slice.WebSearches, &slice.USD,
 	); err != nil {
 		return llm.SpendSlice{}, err
 	}
@@ -178,7 +179,7 @@ func scanCall(rows *sql.Rows) (llm.Call, error) {
 	if err := rows.Scan(
 		&call.ID, &call.RunID, &call.ItemID, &call.Step, &call.ConversationID, &call.Ref.Provider, &call.Ref.Model,
 		&call.Usage.Input, &call.Usage.CachedInput, &call.Usage.CacheWrite, &call.Usage.Output, &call.Usage.Reasoning,
-		&call.USD, &latency, &status, &call.ErrorCode, &tier, &createdAt,
+		&call.Usage.WebSearches, &call.USD, &latency, &status, &call.ErrorCode, &tier, &createdAt,
 	); err != nil {
 		return llm.Call{}, err
 	}

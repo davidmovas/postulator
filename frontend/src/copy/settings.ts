@@ -44,9 +44,11 @@ export const settings = {
         characters: "characters",
         bytes: "bytes",
         tokens: "tokens",
+        searches: "searches",
     },
     sections: {
         reasoning: "Reasoning, speed and input",
+        webSearch: "Web search",
         modelCalls: "Model calls",
         endpoints: "Endpoints",
         images: "Images",
@@ -95,6 +97,14 @@ export const settings = {
         "llm.effort.linker": effortLabels,
         "llm.effort.judge": effortLabels,
         "llm.effort.titler": effortLabels,
+        "llm.effort.chat": effortLabels,
+        "llm.effort.researcher": effortLabels,
+        "llm.tier.researcher": tierLabels,
+        "llm.webSearch.depth": {
+            low: "Short",
+            medium: "Medium",
+            high: "Thorough",
+        },
         "llm.tier.writer": tierLabels,
         "llm.tier.editor": tierLabels,
         "llm.tier.linker": tierLabels,
@@ -126,6 +136,26 @@ export const settings = {
             label: "Tool loading",
             help: "All tools every round is the default. Loading tools on demand sends fewer tokens per round; it stays experimental until it has been tested with your key.",
         },
+        "agent.webSearch": {
+            label: "The assistant searches the web",
+            help: "Off by default. When on, the assistant may search the web while it answers, and its answer ends with the sources it used. OpenAI charges $10 for every thousand searches, plus what each search reads at the model's input price; the spend panel counts both.",
+        },
+        "llm.webSearch.depth": {
+            label: "How much a search reads",
+            help: "How much of what a search finds the model reads. Thorough finds more and costs more, since what it reads is paid for like input.",
+        },
+        "llm.webSearch.maxCalls": {
+            label: "Searches in one call",
+            help: "The most searches one research step or one step of the assistant may make. Each search is paid for, so this is also the most one call can spend on searching.",
+        },
+        "llm.webSearch.allowedDomains": {
+            label: "Search only these sites",
+            help: "Domains such as who.int or cdc.gov, separated by commas or new lines, at most 100. Empty means the whole web.",
+        },
+        "llm.webSearch.blockedDomains": {
+            label: "Never search these sites",
+            help: "Domains a search leaves out, such as a competitor's, separated by commas or new lines, at most 100.",
+        },
         "agent.turnTimeout": {
             label: "Time limit for one answer",
             help: "An answer that takes longer than this is stopped.",
@@ -149,6 +179,22 @@ export const settings = {
         "import.maxRows": {
             label: "Largest spreadsheet accepted",
             help: "A spreadsheet with more rows than this is refused rather than half read.",
+        },
+        "llm.effort.chat": {
+            label: "Reasoning of the assistant",
+            help: "How long the assistant thinks before each step of an answer: which page to read, which tool to call, what to propose. Medium plans well; high plans better and each answer takes longer and costs more, since an answer is many steps.",
+        },
+        "llm.effort.researcher": {
+            label: "Reasoning when researching",
+            help: "How long the model thinks while it searches the web for a page's facts, in a template whose recipe turns the research on. Low is usually enough; more weighs the sources more carefully and costs more.",
+        },
+        "llm.tier.researcher": {
+            label: "Speed when researching",
+            help: flexHelp,
+        },
+        "llm.inputBudget.researcher": {
+            label: "Input budget when researching",
+            help: budgetHelp("a call that searches the web for a page's facts"),
         },
         "llm.effort.editor": {
             label: "Reasoning when editing",
@@ -379,6 +425,7 @@ export const settings = {
             loading: "Adding up what the models cost",
             calls: (count: number) => (count === 1 ? "1 call" : `${count.toLocaleString("en")} calls`),
             failed: (count: number) => `${count.toLocaleString("en")} failed`,
+            searches: (count: number) => (count === 1 ? "1 web search" : `${count.toLocaleString("en")} web searches`),
             nothing: (days: number) => `Nothing was spent on models in the last ${days} days.`,
             nothingHint: "A run, the assistant or a provider test shows up here as soon as it calls a model.",
             shares: {

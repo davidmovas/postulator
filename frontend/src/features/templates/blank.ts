@@ -1,7 +1,7 @@
 import { copy } from "../../copy/index.js";
 import { stepNames } from "../../generated/vocab.js";
 import type { SpecDraft } from "./spec.js";
-import { imageStep } from "./spec.js";
+import { imageStep, researchStep } from "./spec.js";
 
 export function blankDraft(): SpecDraft {
     return {
@@ -30,6 +30,11 @@ export function blankDraft(): SpecDraft {
         imageSource: "wpmedia",
         product: null,
         profiles: [],
-        recipe: stepNames.map((name) => ({ name, enabled: name !== imageStep, declared: true, params: null })),
+        recipe: stepNames.map((name) => ({
+            name,
+            enabled: name !== imageStep && name !== researchStep,
+            declared: true,
+            params: null,
+        })),
     };
 }

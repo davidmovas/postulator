@@ -19,6 +19,7 @@ const (
 func all(deps Deps) []run.StepDef {
 	return []run.StepDef{
 		ResolveContext(deps),
+		Research(deps),
 		GenerateBody(deps),
 		GenerateMeta(deps),
 		GenerateFields(deps),

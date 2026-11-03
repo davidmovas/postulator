@@ -52,6 +52,7 @@ function call(overrides: Partial<ModelCall>): ModelCall {
         output: 3_100,
         reasoning: 1_200,
         total: 15_500,
+        webSearches: 0,
         usd: 0.031,
         latencyMs: 41_000,
         status: "ok",

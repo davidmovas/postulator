@@ -19,6 +19,7 @@ import type {
     ScheduleFilter,
     SiteFilter,
     SiteMapFilter,
+    AddressFilter,
     TemplateFilter,
     WriterDirections,
 } from "./types.js";
@@ -60,6 +61,7 @@ export const keys = {
         detail: (id: string) => [scope, "sites", "detail", id] as const,
         typesAll: () => [scope, "sites", "types"] as const,
         types: (siteId: string) => [scope, "sites", "types", siteId] as const,
+        held: (siteId: string) => [scope, "sites", "held", siteId] as const,
     },
     pages: {
         root: () => [scope, "pages"] as const,
@@ -79,6 +81,7 @@ export const keys = {
             [scope, "pages", "pack", pageId, field, directions] as const,
         maps: () => [scope, "pages", "map"] as const,
         map: (filter: SiteMapFilter, limit?: number) => [scope, "pages", "map", filter, limitSegment(limit)] as const,
+        address: (filter: AddressFilter, limit?: number) => [scope, "pages", "map", "address", filter, limitSegment(limit)] as const,
         counts: () => [scope, "pages", "count"] as const,
         count: (request: PageCountRequest) => [scope, "pages", "count", request] as const,
         selections: () => [scope, "pages", "selection"] as const,

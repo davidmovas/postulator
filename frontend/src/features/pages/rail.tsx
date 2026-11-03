@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
 
 import { copy } from "../../copy/index.js";
-import { usePagePaths } from "../../data/hooks/pages.js";
+import { usePageCount, usePagePaths } from "../../data/hooks/pages.js";
 import { useSiteOverview } from "../../data/hooks/reports.js";
 import { pageStatuses } from "../../generated/vocab.js";
 import type { SegmentedOption, SelectOption } from "../../ui/index.js";
@@ -10,8 +10,9 @@ import { Button, Checkbox, cx, Input, SectionLabel, Segmented, Select } from "..
 import { PageSearch } from "../findings/page-search.js";
 import type { EntityIndex } from "./entities.js";
 import { pageStatusLabel } from "./labels.js";
-import { defaultQuery, narrowed } from "./params.js";
+import { defaultQuery, narrowed, noHubGap } from "./params.js";
 import type { BodyChoice, PagesQuery } from "./params.js";
+import { byRole, typeWithRole } from "../settings/types/labels.js";
 import type { TypeNaming } from "./views/naming.js";
 
 const anyEntity = "any";
@@ -143,10 +144,11 @@ export interface PageRailProps {
 export function PageRail({ siteId, query, index, naming, onChange }: PageRailProps): ReactElement {
     const overview = useSiteOverview(siteId);
     const totals = overview.data?.pages;
+    const hubless = usePageCount({ siteId, gap: noHubGap });
 
     const typeOptions: SelectOption<string>[] = [
         { value: anyType, label: said.anyType },
-        ...naming.types.map((type) => ({ value: type.id, label: type.name })),
+        ...byRole(naming.types).map((type) => ({ value: type.id, label: typeWithRole(type) })),
     ];
 
     const entityOptions: SelectOption<string>[] = [
@@ -271,12 +273,23 @@ export function PageRail({ siteId, query, index, naming, onChange }: PageRailPro
                             onChange({
                                 ...query,
                                 unmapped: event.target.checked,
+                                noHub: event.target.checked ? false : query.noHub,
                                 entityId: event.target.checked ? "" : query.entityId,
                                 descendants: event.target.checked ? false : query.descendants,
                             });
                         }}
                     />
                     <span className="shrink-0 font-mono text-2xs text-ink-faint">{totals?.unmapped ?? ""}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2" title={copy.pages.filters.noHubHint}>
+                    <Checkbox
+                        checked={query.noHub}
+                        label={copy.pages.filters.noHub}
+                        onChange={(event) => {
+                            onChange({ ...query, noHub: event.target.checked, unmapped: event.target.checked ? false : query.unmapped });
+                        }}
+                    />
+                    <span className="shrink-0 font-mono text-2xs text-ink-faint">{hubless.data?.pages ?? ""}</span>
                 </div>
             </div>
         </div>

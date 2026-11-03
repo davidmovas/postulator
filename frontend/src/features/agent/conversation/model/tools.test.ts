@@ -87,6 +87,12 @@ describe("toolLabel", () => {
 });
 
 describe("resultSummary", () => {
+    it("says what a web search looked for", () => {
+        expect(toolLabel("web_search")).toBe("Search the web");
+        expect(resultSummary("web_search", { query: "caffeine half life" })).toBe("“caffeine half life”");
+        expect(resultSummary("web_search", { query: "" })).toBe("searched");
+    });
+
     it("names a confirmation request", () => {
         expect(resultSummary("pages_manage", { status: "confirmationRequired", actionId: "a1", summary: "x" })).toBe(
             "asked for approval",

@@ -104,7 +104,7 @@ func replay(resp port.Response) <-chan port.Delta {
 		out <- port.Delta{Call: &resp.Calls[i]}
 	}
 	usage := resp.Usage
-	out <- port.Delta{Done: true, Usage: &usage, Finish: resp.FinishReason, Tier: resp.Tier}
+	out <- port.Delta{Done: true, Usage: &usage, Finish: resp.FinishReason, Tier: resp.Tier, Sources: resp.Sources}
 	close(out)
 	return out
 }
@@ -138,7 +138,7 @@ func (c *Client) recordStream(ctx context.Context, req port.Request) (<-chan por
 			}
 			if delta.Done {
 				finished = true
-				heard.FinishReason, heard.Tier = delta.Finish, delta.Tier
+				heard.FinishReason, heard.Tier, heard.Sources = delta.Finish, delta.Tier, delta.Sources
 				if delta.Usage != nil {
 					heard.Usage = *delta.Usage
 				}

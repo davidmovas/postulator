@@ -89,6 +89,8 @@ func Serves(step StepName, scope []field.Key) bool {
 	switch step {
 	case StepResolveContext, StepGenerateBody, StepGenerateImages:
 		return drawsTheBody(scope)
+	case StepResearch:
+		return WritesBody(scope) || slices.ContainsFunc(scope, func(key field.Key) bool { return Producer(key, scope) == StepGenerateFields })
 	case StepInsertLinks, StepRepairLinks, StepValidate, StepJudge, StepRelinkNeighbors:
 		return WritesBody(scope)
 	case StepGenerateMeta, StepGenerateFields:
