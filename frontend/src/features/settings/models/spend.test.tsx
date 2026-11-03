@@ -41,6 +41,7 @@ function slice(overrides: Partial<SpendSlice>): SpendSlice {
         cacheWrite: 0,
         output: 0,
         reasoning: 0,
+        webSearches: 0,
         usd: 0,
         ...overrides,
     };
@@ -58,6 +59,7 @@ const month: SpendReport = {
         cacheWrite: 0,
         output: 410_000,
         reasoning: 168_100,
+        webSearches: 37,
         usd: 4.12,
         cachedShare: 0.86,
         reasoningShare: 0.41,
@@ -108,6 +110,7 @@ const nothing: SpendReport = {
         cacheWrite: 0,
         output: 0,
         reasoning: 0,
+        webSearches: 0,
         usd: 0,
         cachedShare: 0,
         reasoningShare: 0,
@@ -134,6 +137,7 @@ describe("the spend panel", () => {
         expect(screen.getByText("$4.12")).toBeDefined();
         expect(screen.getByText(said.over(30))).toBeDefined();
         expect(screen.getByText(said.calls(1204))).toBeDefined();
+        expect(screen.getByText(said.searches(37))).toBeDefined();
         expect(screen.getByText(said.failed(3))).toBeDefined();
     });
 

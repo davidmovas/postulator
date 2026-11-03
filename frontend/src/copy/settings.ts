@@ -425,6 +425,7 @@ export const settings = {
             loading: "Adding up what the models cost",
             calls: (count: number) => (count === 1 ? "1 call" : `${count.toLocaleString("en")} calls`),
             failed: (count: number) => `${count.toLocaleString("en")} failed`,
+            searches: (count: number) => (count === 1 ? "1 web search" : `${count.toLocaleString("en")} web searches`),
             nothing: (days: number) => `Nothing was spent on models in the last ${days} days.`,
             nothingHint: "A run, the assistant or a provider test shows up here as soon as it calls a model.",
             shares: {
