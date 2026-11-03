@@ -448,8 +448,8 @@ func TestAChatTurnTalksToTheProviderWithItsToolsAndNothingStored(t *testing.T) {
 		if store, ok := body["store"].(bool); !ok || store || body["stream"] != true {
 			t.Fatalf("round %d asks with store %v and stream %v", index+1, body["store"], body["stream"])
 		}
-		if effort, carried := effortOf(body); !carried || effort != "none" {
-			t.Fatalf("round %d asks with effort %q, want none", index+1, effort)
+		if effort, carried := effortOf(body); !carried || effort != "medium" {
+			t.Fatalf("round %d asks with effort %q, want the assistant's default, medium", index+1, effort)
 		}
 		if body["prompt_cache_key"] != "chat:autonomous" || body["service_tier"] != "default" {
 			t.Fatalf("round %d asks with %v on %v", index+1, body["prompt_cache_key"], body["service_tier"])
