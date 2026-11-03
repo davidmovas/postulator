@@ -28,7 +28,7 @@ the composition root binds the two.
 | Service | Methods |
 |---|---|
 | `HealthService` | `Ping` |
-| `SitesService` | `Create Update Delete Get List TestConnection` |
+| `SitesService` | `ClearData Create DataCounts Delete Get List TestConnection Update` |
 | `GraphService` | `LoadGraph CreateEntity UpdateEntity DeleteEntity GetEntity ListEntities SetAnchors AddEdge ApproveEdge RejectEdge DeleteEdge ListEdges RecomputeScores ProposeFromPages PreviewFromPages ProposeFromKeywords ApplyProposals ProposeRelated MoveEntity CardProposals AcceptCard DismissCard AdoptParents` |
 | `PagesService` | `Create Update Delete Get List Count Tree MapToEntity Unmap SetCanonical PreviewLink SetType ResolveSelection SetTypes SetTemplates Model ModelSummary WriterPack SiteMap` |
 | `TemplatesService` | `CreateTemplate UpdateTemplate DeleteTemplate GetTemplate ListTemplates SetOverride DeleteOverride ResolveForPage ListPageTypes CreatePageType SavePageType DeletePageType SetScope ListRules SaveRule DeleteRule ReorderRules TestRule PreviewClassification PreviewClassificationPages ApplyClassification` |
@@ -128,6 +128,13 @@ refusing the batch; `ApplyProposals` takes the preview's `source` and writes a s
 parent edge approved. `ProposeFromPages` stays the model's. `RunsService.Start` takes `fields` (the field keys a run is scoped to; the
 steps they do not need are disabled) and `rewrite` (the pages whose client text a person confirmed
 may be rewritten).
+
+`SitesService.ClearData{id, model?, graph?, history?}` (2026-11-03) removes the chosen groups of one
+site in one unit and answers what it still holds, `held {pages findings entities edges runs unfinished
+chats}`; `model` takes `history` with it, naming none is `INVALID`. `DataCounts{id}` answers `held` and
+`busy`, the ids of the site's `pending` and `running` runs. `ClearData` and `Delete` refuse a site with
+such a run, `CONFLICT` with `details.code` `site_busy` and `details.runIds`. A clear publishes
+`sites.changed`, and `pages.changed` and `graph.changed` for the model or the graph.
 
 `SitesService.Update{…, settings?}` takes a site's settings since 2026-10-18 (`userAgent`, the
 `observe` block's `renderConcurrency` 1–16 and `fullWalkEvery` ≥ 1, `linkUrlForm`), keeping the
@@ -389,6 +396,11 @@ because a run whose every remaining item is waiting for a person has nothing lef
 
 ## Artifacts
 
+`research` (2026-11-03, written by the `research` step) is `{text, sources [{url, title?}], searches}`:
+the facts a web search found, one per line, the sources the answer cited (or those the searches read)
+and the searches billed. `generate_body`, `generate_meta`, `generate_fields` and `judge` read it when
+present (`StepDef.Reads`) and their input hash carries it then.
+
 `judge_report.score` and `final_report.score` are **optional**: absent means nothing scored
 the page, where a final report used to default to a perfect `1` and a judge that could not be
 reached used to store a `0`. Both carry `findings`, as `meta` and `images` now do; `images` is
@@ -552,20 +564,25 @@ field; it carries the input, cached input, cache write and output prices and the
 input and output declared together), and no reasoning effort. A model offers flex when its flex
 input price is above zero, and a price left at zero on a built-in model reads as the built-in
 price. `SetProfile` refuses another provider. The effort and the tier of each role are settings,
-`llm.effort.<writer|editor|linker|judge|titler>` (`none low medium high xhigh`) and
-`llm.tier.<role>` (`standard flex`), beside `llm.flexPatience`; `serviceTiers` in `vocab.ts` names
-the tier a call was served at, `default` or `flex`.
+`llm.effort.<writer|editor|linker|judge|titler|researcher|chat>` (`none low medium high xhigh`; the
+assistant's since 2026-11-03, medium) and `llm.tier.<writer|editor|linker|judge|titler|researcher>`
+(`standard flex`), beside `llm.flexPatience`; `serviceTiers` in `vocab.ts` names the tier a call was
+served at, `default` or `flex`. The web search's settings are `llm.webSearch.depth` (`low medium
+high`, medium), `llm.webSearch.maxCalls` (1–20, 5), `llm.webSearch.allowedDomains` and
+`llm.webSearch.blockedDomains` (hosts separated by commas, spaces or lines, at most 100, a scheme or a
+path cut away), and `agent.webSearch` (off) lets the assistant search; the `research` step searches
+whenever a recipe enables it. A search costs `llm.WebSearchUSDPerThousand` ($10) on top of its tokens.
 
 `SpendReport{days?, runId?}` totals the ledger over the last 1 to 366 days, 30 when left out, or
 one run whole and step by step, with `since` null. It answers `{since, days, runId, totals,
 slices}`: `totals` counts `calls` (the `ok` rows), `failed`, `input`, `cachedInput`, `cacheWrite`,
-`output`, `reasoning` and `usd` (every row) with `cachedShare`, `reasoningShare` and `flexShare`,
+`output`, `reasoning`, `webSearches` and `usd` (every row) with `cachedShare`, `reasoningShare` and `flexShare`,
 and `slices` holds one row per `purpose` (from `spendPurposes`: `run chat title probe graph audit
 other`), `provider`, `model`, `tier` and, for a run, `step`, dearest first. It is an aggregate whose
 rows the catalog bounds, not a list, so it takes no cursor. `ListCalls{cursor?, limit?, sort?,
 runId?, conversationId?}` pages the ledger by cursor, newest first unless a sort says otherwise,
 refuses a run and a conversation together, and answers each call with its purpose, step, provider,
-model, tier, tokens (`input cachedInput cacheWrite output reasoning total`), `usd`, `latencyMs`,
+model, tier, tokens (`input cachedInput cacheWrite output reasoning total webSearches`), `usd`, `latencyMs`,
 `status`, `errorCode` and the run, item or conversation it served.
 
 ## The companion plugin's version
