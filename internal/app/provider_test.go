@@ -281,13 +281,14 @@ func TestEveryRoleHasADefaultOnAFreshInstall(t *testing.T) {
 	}
 
 	want := map[string]string{
-		"writer": "gpt-5.6-terra",
-		"editor": "gpt-5.6-luna",
-		"linker": "gpt-5.6-luna",
-		"judge":  "gpt-5.6-luna",
-		"chat":   "gpt-5.6-terra",
-		"image":  "gpt-image-2",
-		"titler": "gpt-5.6-luna",
+		"writer":     "gpt-5.6-terra",
+		"editor":     "gpt-5.6-luna",
+		"linker":     "gpt-5.6-luna",
+		"judge":      "gpt-5.6-luna",
+		"chat":       "gpt-5.6-terra",
+		"image":      "gpt-image-2",
+		"titler":     "gpt-5.6-luna",
+		"researcher": "gpt-5.6-terra",
 	}
 	if len(answered.Profiles) != len(want) {
 		t.Fatalf("profiles = %d, want %d", len(answered.Profiles), len(want))

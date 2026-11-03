@@ -98,6 +98,8 @@ export const settings = {
         "llm.effort.judge": effortLabels,
         "llm.effort.titler": effortLabels,
         "llm.effort.chat": effortLabels,
+        "llm.effort.researcher": effortLabels,
+        "llm.tier.researcher": tierLabels,
         "llm.webSearch.depth": {
             low: "Short",
             medium: "Medium",
@@ -181,6 +183,18 @@ export const settings = {
         "llm.effort.chat": {
             label: "Reasoning of the assistant",
             help: "How long the assistant thinks before each step of an answer: which page to read, which tool to call, what to propose. Medium plans well; high plans better and each answer takes longer and costs more, since an answer is many steps.",
+        },
+        "llm.effort.researcher": {
+            label: "Reasoning when researching",
+            help: "How long the model thinks while it searches the web for a page's facts, in a template whose recipe turns the research on. Low is usually enough; more weighs the sources more carefully and costs more.",
+        },
+        "llm.tier.researcher": {
+            label: "Speed when researching",
+            help: flexHelp,
+        },
+        "llm.inputBudget.researcher": {
+            label: "Input budget when researching",
+            help: budgetHelp("a call that searches the web for a page's facts"),
         },
         "llm.effort.editor": {
             label: "Reasoning when editing",

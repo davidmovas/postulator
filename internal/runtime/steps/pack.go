@@ -51,7 +51,8 @@ func (d Deps) inputBudget(ctx context.Context, call modelCall, ceiling int, fixe
 	return max(room, 1)
 }
 
-func (d Deps) pictureOf(ctx context.Context, sc *run.StepContext, key field.Key, links *content.LinkContext, budget int) (sitemodel.Picture, error) {
+func (d Deps) pictureOf(ctx context.Context, sc *run.StepContext, key field.Key, links *content.LinkContext, budget int,
+	research *content.Research) (sitemodel.Picture, error) {
 	set, err := d.Types.Set(ctx, sc.Run.SiteID)
 	if err != nil {
 		return sitemodel.Picture{}, err
@@ -69,7 +70,7 @@ func (d Deps) pictureOf(ctx context.Context, sc *run.StepContext, key field.Key,
 		claim.Type = &sc.Type
 	}
 	return d.Pictures.Picture(ctx, directedRequest(sitemodel.PackRequest{
-		PageID: sc.Page.ID, Field: string(key), Budget: budget, Claim: claim,
+		PageID: sc.Page.ID, Field: string(key), Budget: budget, Claim: claim, Research: research,
 	}, sc.Run.Brief, sc.Item.Directive))
 }
 
@@ -89,7 +90,11 @@ func (d Deps) fitted(ctx context.Context, sc *run.StepContext, call modelCall, k
 	if err != nil {
 		return sitemodel.Picture{}, err
 	}
-	return d.pictureOf(ctx, sc, key, links, d.inputBudget(ctx, call, ceiling, system, user, schema))
+	research, err := researchOf(sc)
+	if err != nil {
+		return sitemodel.Picture{}, err
+	}
+	return d.pictureOf(ctx, sc, key, links, d.inputBudget(ctx, call, ceiling, system, user, schema), research)
 }
 
 const CodeInputBudgetTooSmall = "input_budget_too_small"

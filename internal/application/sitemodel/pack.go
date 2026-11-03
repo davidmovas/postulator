@@ -26,17 +26,18 @@ type Claim struct {
 }
 
 type PackRequest struct {
-	PageID    string         `json:"pageId"`
-	Field     string         `json:"field"`
-	Budget    int            `json:"budget"`
-	Brief     *run.Brief     `json:"brief,omitempty"`
-	Directive *run.Directive `json:"directive,omitempty"`
-	RunID     string         `json:"runId,omitempty"`
-	Claim     *Claim         `json:"-"`
+	PageID    string            `json:"pageId"`
+	Field     string            `json:"field"`
+	Budget    int               `json:"budget"`
+	Brief     *run.Brief        `json:"brief,omitempty"`
+	Directive *run.Directive    `json:"directive,omitempty"`
+	RunID     string            `json:"runId,omitempty"`
+	Research  *content.Research `json:"-"`
+	Claim     *Claim            `json:"-"`
 }
 
 func (r PackRequest) directed() bool {
-	return r.Brief != nil || r.Directive != nil
+	return r.Brief != nil || r.Directive != nil || r.Research != nil
 }
 
 type Picture struct {
@@ -61,11 +62,12 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 		if err != nil {
 			return err
 		}
-		if req.directed() {
+		if req.Brief != nil || req.Directive != nil {
 			if facts.Directions, err = s.directions(c, req); err != nil {
 				return err
 			}
 		}
+		facts.Research = req.Research
 		pack := contextpack.Build(facts, scope)
 		fitted, err := contextpack.Fit(pack, req.Budget)
 		if err != nil {

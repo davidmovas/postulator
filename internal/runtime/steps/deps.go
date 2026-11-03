@@ -114,6 +114,7 @@ type Deps struct {
 	Types         typeSets
 	Profiles      profileResolver
 	Tuning        stepTuning
+	Search        searchTuning
 	Models        modelInfo
 	Pictures      pictures
 	Content       judgeService

@@ -3,22 +3,23 @@ package llm
 type Role string
 
 const (
-	RoleWriter Role = "writer"
-	RoleEditor Role = "editor"
-	RoleLinker Role = "linker"
-	RoleJudge  Role = "judge"
-	RoleChat   Role = "chat"
-	RoleImage  Role = "image"
-	RoleTitler Role = "titler"
+	RoleWriter     Role = "writer"
+	RoleEditor     Role = "editor"
+	RoleLinker     Role = "linker"
+	RoleJudge      Role = "judge"
+	RoleChat       Role = "chat"
+	RoleImage      Role = "image"
+	RoleTitler     Role = "titler"
+	RoleResearcher Role = "researcher"
 )
 
 func Roles() []Role {
-	return []Role{RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler}
+	return []Role{RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler, RoleResearcher}
 }
 
 func (r Role) Valid() bool {
 	switch r {
-	case RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler:
+	case RoleWriter, RoleEditor, RoleLinker, RoleJudge, RoleChat, RoleImage, RoleTitler, RoleResearcher:
 		return true
 	default:
 		return false

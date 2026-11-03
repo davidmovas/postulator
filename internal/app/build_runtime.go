@@ -74,6 +74,7 @@ func (c *Core) stepDeps(stores repos, llm llmParts, writing authoring, observer 
 		Types:         writing.pageTypes,
 		Profiles:      llm.profiles,
 		Tuning:        llm.tuning,
+		Search:        llm.tuning,
 		Models:        llm.catalog,
 		Pictures:      writing.siteModel,
 		Content:       writing.content,

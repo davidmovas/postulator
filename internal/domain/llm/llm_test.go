@@ -11,7 +11,9 @@ import (
 func TestRoles(t *testing.T) {
 	t.Parallel()
 
-	want := []llm.Role{llm.RoleWriter, llm.RoleEditor, llm.RoleLinker, llm.RoleJudge, llm.RoleChat, llm.RoleImage, llm.RoleTitler}
+	want := []llm.Role{
+		llm.RoleWriter, llm.RoleEditor, llm.RoleLinker, llm.RoleJudge, llm.RoleChat, llm.RoleImage, llm.RoleTitler, llm.RoleResearcher,
+	}
 	got := llm.Roles()
 	if len(got) != len(want) {
 		t.Fatalf("Roles() = %v, want %v", got, want)

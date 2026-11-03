@@ -7,6 +7,7 @@ export const runs = {
     logFailed: "The run log could not be read",
     steps: {
         resolve_context: "Resolve context",
+        research: "Research the web",
         generate_body: "Write the body",
         generate_meta: "Write the meta",
         generate_fields: "Write the other fields",
@@ -453,6 +454,7 @@ export const runs = {
         },
         kinds: {
             link_context: "Targets",
+            research: "Research",
             draft: "Draft",
             body_html: "Body",
             meta: "Meta",
@@ -497,6 +499,14 @@ export const runs = {
             clean: "No compliance finding on this page.",
             warningsDoNotFail: "A warning does not fail the item; an error does.",
             score: (score: number) => `score ${score.toFixed(2)}`,
+        },
+        research: {
+            summary: (facts: number, sources: number, searches: number) =>
+                `${facts === 1 ? "1 fact" : `${facts} facts`} from ${sources === 1 ? "1 source" : `${sources} sources`}, found in ${searches === 1 ? "1 search" : `${searches} searches`}. The writer, the meta writer and the judge read them; the page never links them.`,
+            facts: "What the search found",
+            noFacts: "The search found nothing it could confirm, so the writer works from the site alone.",
+            sources: "Sources",
+            noSources: "The answer named no source.",
         },
         judge: {
             score: "Score",

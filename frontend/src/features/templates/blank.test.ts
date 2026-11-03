@@ -25,11 +25,11 @@ describe("blankDraft", () => {
         expect(draft.profiles).toStrictEqual([]);
     });
 
-    it("declares every shipped step, all on but the image step", () => {
+    it("declares every shipped step, all on but the two that cost extra: the images and the web research", () => {
         expect(draft.recipe.map((step) => step.name)).toStrictEqual([...stepNames]);
         expect(draft.recipe.every((step) => step.declared)).toBe(true);
         for (const step of draft.recipe) {
-            expect(step.enabled).toBe(step.name !== "generate_images");
+            expect(step.enabled).toBe(step.name !== "generate_images" && step.name !== "research");
         }
     });
 

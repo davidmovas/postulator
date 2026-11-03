@@ -234,6 +234,12 @@ func (e *Engine) price(ctx context.Context, record run.Run, def run.StepDef, tar
 		return err
 	}
 	usage := usageOf(input, outputOf(def, *target), reasoningOf(info, e.deps.Tuning.Effort(def.Role)))
+	if def.Price.Searches != nil {
+		searches, each := def.Price.Searches()
+		usage.Input += searches * each
+		usage.Total += searches * each
+		usage.WebSearches = searches
+	}
 	priced.tokens += usage.Total * calls
 	priced.usd += llm.Cost(usage, info, e.deps.Tuning.Tier(def.Role)) * float64(calls)
 	return nil

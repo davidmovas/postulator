@@ -478,6 +478,7 @@ export type Actor = (typeof actors)[number];
 
 export const artifactKinds = [
     "link_context",
+    "research",
     "draft",
     "body_html",
     "meta",
@@ -498,6 +499,7 @@ export const purgeableArtifactKinds: readonly ArtifactKind[] = ["draft", "body_h
 
 export const stepNames = [
     "resolve_context",
+    "research",
     "generate_body",
     "generate_meta",
     "generate_fields",
@@ -534,7 +536,16 @@ export type AnchorStrategy = (typeof anchorStrategies)[number];
 export const imageSources = ["ai", "wpmedia", "local"] as const;
 export type ImageSource = (typeof imageSources)[number];
 
-export const modelRoles = ["writer", "editor", "linker", "judge", "chat", "image", "titler"] as const;
+export const modelRoles = [
+    "writer",
+    "editor",
+    "linker",
+    "judge",
+    "chat",
+    "image",
+    "titler",
+    "researcher",
+] as const;
 export type ModelRole = (typeof modelRoles)[number];
 
 export const reasoningEfforts = ["none", "low", "medium", "high", "xhigh"] as const;

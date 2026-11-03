@@ -69,6 +69,7 @@ type pipeline struct {
 	parent  int64
 	recipe  []template.StepSpec
 	llm     *fake.Scripted
+	search  searchStub
 	current *clock.Fake
 	types   *pagetypes.Service
 }
@@ -215,6 +216,7 @@ func (p *pipeline) start(t *testing.T) *runtime.Engine {
 		Types:         p.types,
 		Profiles:      stubProfiles{},
 		Tuning:        stubTuning{},
+		Search:        p.search,
 		Models:        stubCatalog{},
 		Pictures:      siteModelOf(p.store, p.types),
 		Bodies:        sqlite.NewPageBodyRepo(p.store),

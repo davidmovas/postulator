@@ -9,13 +9,13 @@ import (
 )
 
 type modelProfileArgs struct {
-	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler" description:"Model job"`
+	Role     string `json:"role" enum:"writer,editor,linker,judge,chat,image,titler,researcher" description:"Model job"`
 	Provider string `json:"provider" description:"Provider, openai"`
 	Model    string `json:"model" description:"Name from the models list"`
 }
 
 type stepArgs struct {
-	Name        string `json:"name" enum:"resolve_context,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Step name"`
+	Name        string `json:"name" enum:"resolve_context,research,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Step name"`
 	Enabled     bool   `json:"enabled,omitempty" description:"Run it; false keeps it skipped"`
 	AllowErrors *bool  `json:"allowErrors,omitempty" description:"validate only: go on despite faults"`
 	Iterations  *int   `json:"iterations,omitempty" minimum:"1" description:"repair_links only: max passes"`

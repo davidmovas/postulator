@@ -82,6 +82,55 @@ func TestARunScopedToFieldsKeepsOnlyTheStepsTheyNeed(t *testing.T) {
 	}
 }
 
+func TestTheResearchStaysWithTheWritersThatReadIt(t *testing.T) {
+	t.Parallel()
+
+	recipe := slices.Insert(run.GenerateRecipe(), 1, template.StepSpec{Name: string(run.StepResearch), Enabled: true})
+	cases := []struct {
+		name   string
+		fields []string
+		kept   bool
+	}{
+		{name: "the body", fields: []string{"body"}, kept: true},
+		{name: "a product's description", fields: []string{"product_description"}, kept: true},
+		{name: "the excerpt", fields: []string{"excerpt"}, kept: true},
+		{name: "a custom field", fields: []string{"meta:dosage"}, kept: true},
+		{name: "the seo pair alone", fields: []string{"seo_title", "seo_description"}},
+		{name: "the featured image alone", fields: []string{"featured_image"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			scoped, err := run.ScopeRecipe(recipe, tc.fields)
+			if err != nil {
+				t.Fatalf("ScopeRecipe(%v): %v", tc.fields, err)
+			}
+			if kept := slices.Contains(enabledNames(scoped), string(run.StepResearch)); kept != tc.kept {
+				t.Fatalf("ScopeRecipe(%v) keeps the research = %t, want %t", tc.fields, kept, tc.kept)
+			}
+		})
+	}
+}
+
+func TestTheResearchIsATemplateStepAfterTheContext(t *testing.T) {
+	t.Parallel()
+
+	names := run.StepNames()
+	if at := slices.Index(names, run.StepResearch); at != 1 || names[0] != run.StepResolveContext {
+		t.Fatalf("StepNames() = %v, want research right after resolve_context", names)
+	}
+	if run.PerKindStep(string(run.StepResearch)) {
+		t.Fatal("the research belongs to no run kind of its own")
+	}
+	if !run.ArtifactResearch.Valid() {
+		t.Fatal("the research artifact is not a kind the store keeps")
+	}
+	if slices.ContainsFunc(run.GenerateRecipe(), func(spec template.StepSpec) bool { return spec.Name == string(run.StepResearch) }) {
+		t.Fatal("the generate recipe searches the web by default; a template turns it on")
+	}
+}
+
 func TestAScopeKeepsAStepsOwnParamsAndListsEachFieldOnce(t *testing.T) {
 	t.Parallel()
 

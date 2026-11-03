@@ -113,6 +113,7 @@ type Facts struct {
 	Notes        []note.Note             `json:"notes"`
 	Findings     []finding.Finding       `json:"findings"`
 	Directions   *Directions             `json:"directions,omitempty"`
+	Research     *content.Research       `json:"research,omitempty"`
 }
 
 func (f Facts) Field(key field.Key) (FieldFacts, bool) {

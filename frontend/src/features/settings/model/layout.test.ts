@@ -22,7 +22,7 @@ describe("the placement of every declared setting", () => {
     it("keeps the promised settings out of the advanced cards", () => {
         const open = (tab: (typeof settingsTabKeys)[number]): number =>
             tabLayout(tab, declared).plain.flatMap((section) => section.keys).length;
-        expect(open("models")).toBe(21);
+        expect(open("models")).toBe(24);
         expect(open("types")).toBe(0);
         expect(open("runs")).toBe(7);
         expect(open("agent")).toBe(2);
@@ -52,7 +52,7 @@ describe("the placement of every declared setting", () => {
         expect(keys.slice(-2)).toEqual(["llm.effort.chat", "llm.flexPatience"]);
     });
 
-    it.each(["writer", "editor", "linker", "judge"])("sets the %s's input budget beside its reasoning and speed", (role) => {
+    it.each(["writer", "editor", "linker", "judge", "researcher"])("sets the %s's input budget beside its reasoning and speed", (role) => {
         const keys = tabLayout("models", declared).plain[0]?.keys ?? [];
         const at = keys.indexOf(`llm.inputBudget.${role}`);
         expect(keys.slice(at - 2, at)).toEqual([`llm.effort.${role}`, `llm.tier.${role}`]);

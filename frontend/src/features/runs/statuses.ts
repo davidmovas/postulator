@@ -42,6 +42,7 @@ export const stepValidate: StepName = "validate";
 export const stepGenerateBody: StepName = "generate_body";
 
 export const artifactLinkContext: ArtifactKind = "link_context";
+export const artifactResearch: ArtifactKind = "research";
 export const artifactDraft: ArtifactKind = "draft";
 export const artifactBodyHtml: ArtifactKind = "body_html";
 export const artifactMeta: ArtifactKind = "meta";

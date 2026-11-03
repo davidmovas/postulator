@@ -8,6 +8,8 @@ import (
 	"github.com/davidmovas/postulator/internal/application/reports"
 	"github.com/davidmovas/postulator/internal/application/sitemodel"
 	"github.com/davidmovas/postulator/internal/application/sitemodel/sitemodeltest"
+	"github.com/davidmovas/postulator/internal/domain/content"
+	"github.com/davidmovas/postulator/internal/domain/contextpack"
 	"github.com/davidmovas/postulator/internal/domain/graph"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/pagetype"
@@ -210,6 +212,31 @@ func TestWhatTheWriterWillSeeHoldsARunsBriefAndThePagesDirective(t *testing.T) {
 		if section.Name == "brief" {
 			t.Fatal("a pack without a brief shows one")
 		}
+	}
+}
+
+func TestThePictureOfAResearchedPageCarriesTheResearch(t *testing.T) {
+	t.Parallel()
+
+	m := site1()
+	ctx := m.Service().Remembering(t.Context())
+	plain, err := m.Service().Picture(ctx, sitemodel.PackRequest{PageID: "bpc", Field: "body"})
+	if err != nil {
+		t.Fatalf("Picture: %v", err)
+	}
+	researched, err := m.Service().Picture(ctx, sitemodel.PackRequest{
+		PageID: "bpc", Field: "body", Research: &content.Research{Text: "- BPC-157 is stored at -20 °C [example.org]"},
+	})
+	if err != nil {
+		t.Fatalf("Picture with research: %v", err)
+	}
+	carries := func(picture sitemodel.Picture) bool {
+		return slices.ContainsFunc(picture.Fitted.Sections, func(section contextpack.Section) bool {
+			return section.Name == contextpack.SectionResearch && slices.Contains(section.Items, "BPC-157 is stored at -20 °C [example.org]")
+		})
+	}
+	if carries(plain) || !carries(researched) {
+		t.Fatalf("plain carries research %t, researched %t; want only the researched picture to", carries(plain), carries(researched))
 	}
 }
 

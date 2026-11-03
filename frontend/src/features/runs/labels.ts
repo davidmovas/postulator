@@ -38,6 +38,7 @@ import {
     ShieldIcon,
     SyncAltIcon,
     TaskAltIcon,
+    TravelExploreIcon,
     VisibilityIcon,
     WarningIcon,
 } from "../../ui/index.js";
@@ -185,6 +186,7 @@ export function eventName(type: RunEventType): string {
 
 const artifactIcons: Readonly<Record<ArtifactKind, IconComponent>> = {
     link_context: PolylineIcon,
+    research: TravelExploreIcon,
     draft: DescriptionIcon,
     body_html: VisibilityIcon,
     meta: DescriptionIcon,

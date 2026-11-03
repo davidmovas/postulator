@@ -56,7 +56,7 @@ type runsControlArgs struct {
 	PageIDs        []string        `json:"pageIds,omitempty" description:"start, estimate: the pages, or give select"`
 	Select         *selectArgs     `json:"select,omitempty" description:"start, estimate: the pages by subtree or type"`
 	TemplateID     string          `json:"templateId,omitempty" description:"start, estimate: the template to move the pages to; default their own"`
-	Steps          []string        `json:"steps,omitempty" enum:"resolve_context,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"start, estimate: the steps in order; default the template's recipe"`
+	Steps          []string        `json:"steps,omitempty" enum:"resolve_context,research,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"start, estimate: the steps in order; default the template's recipe"`
 	Fields         []string        `json:"fields,omitempty" description:"start, estimate: the field keys the run writes, its other steps skipped; revert: the fields to put back; default every field"`
 	Rewrite        []string        `json:"rewrite,omitempty" description:"start, estimate: page ids whose owner's text the run may rewrite"`
 	PublishMode    string          `json:"publishMode,omitempty" enum:"draft,publish" description:"start, estimate: default draft"`

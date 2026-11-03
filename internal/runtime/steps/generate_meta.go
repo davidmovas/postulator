@@ -96,6 +96,7 @@ func GenerateMeta(deps Deps) run.StepDef {
 		Role:      domainllm.RoleEditor,
 		Requires:  []run.ArtifactKind{run.ArtifactDraft},
 		Scoped:    metaRequires,
+		Reads:     []run.ArtifactKind{run.ArtifactResearch},
 		Produces:  []run.ArtifactKind{run.ArtifactMeta},
 		Retry:     run.RetryPolicy{Max: 3},
 		Timeout:   editorTimeout,

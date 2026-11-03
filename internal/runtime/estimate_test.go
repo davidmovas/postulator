@@ -121,6 +121,34 @@ func TestEstimatePricesOneCallPerRepairIteration(t *testing.T) {
 	}
 }
 
+func TestEstimatePricesTheSearchesAStepMayMakeAndWhatTheyRead(t *testing.T) {
+	t.Parallel()
+
+	harness := newHarness(t, 1)
+	quiet := pricedStep("research", llm.RoleResearcher, run.Price{OutputTokens: 800})
+	engine := harness.engine(t, mustRegister(t, quiet))
+	unsearched, err := engine.EstimateRun(t.Context(), harness.newRun(recipeOf("research")), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun: %v", err)
+	}
+
+	searching := pricedStep("research", llm.RoleResearcher, run.Price{
+		OutputTokens: 800, Searches: func() (int, int) { return 4, 6000 },
+	})
+	priced := newHarness(t, 1)
+	searched, err := priced.engine(t, mustRegister(t, searching)).EstimateRun(t.Context(), priced.newRun(recipeOf("research")), nil)
+	if err != nil {
+		t.Fatalf("EstimateRun with searches: %v", err)
+	}
+
+	if searched.Tokens != unsearched.Tokens+4*6000 {
+		t.Errorf("tokens = %d, want %d and the four searches' 24,000", searched.Tokens, unsearched.Tokens)
+	}
+	if searched.USD-unsearched.USD < llm.SearchFee(4) {
+		t.Errorf("usd = %v against %v, want at least the four searches' fee of %v on top", searched.USD, unsearched.USD, llm.SearchFee(4))
+	}
+}
+
 func TestEstimateNamesTheStepItCannotPrice(t *testing.T) {
 	t.Parallel()
 
