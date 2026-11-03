@@ -184,6 +184,7 @@ func (s *Service) siteContext(ctx context.Context, conversation domainagent.Conv
 	built := SiteContext{
 		Mode:      string(conversation.Mode),
 		Templates: []string{},
+		WebSearch: s.deps.WebSearch != nil && s.deps.WebSearch(),
 	}
 
 	listed, err := s.deps.Templates.ListTemplates(ctx, templates.ListTemplatesRequest{})

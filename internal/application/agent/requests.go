@@ -30,6 +30,7 @@ type SiteContext struct {
 	Pages     int
 	Published int
 	Unmapped  int
+	WebSearch bool
 }
 
 type Stream interface {

@@ -21,6 +21,7 @@ type turn struct {
 	guard   *guard
 	usage   *tally
 	spoken  *answer
+	browsed *browsing
 	asked   llm.Request
 	opening []llm.Message
 }
@@ -112,6 +113,9 @@ func (t *turn) ask(ctx context.Context, round int, messages []llm.Message) (hear
 				muted = !t.show(ctx, delta.Text)
 			}
 		}
+		if delta.Browsing != nil {
+			t.browse(ctx, *delta.Browsing)
+		}
 		answered.carry(delta)
 		if delta.Done {
 			ended := delta
@@ -126,6 +130,12 @@ func (t *turn) ask(ctx context.Context, round int, messages []llm.Message) (hear
 		return heard{}, unfinished(ctx)
 	}
 
+	if note := sourcesNote(said.String(), done.Sources); note != "" {
+		said.WriteString(note)
+		if !muted {
+			t.show(ctx, note)
+		}
+	}
 	answered.text = said.String()
 	t.spoken.spoke(answered.text)
 	t.bill(ctx, round, *done)

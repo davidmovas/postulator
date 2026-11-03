@@ -254,6 +254,7 @@ export const agent = {
             },
         },
         pages_find: { label: "Find pages", acts: {} },
+        web_search: { label: "Search the web", acts: {} },
         pages_tree: {
             label: "Walk the tree",
             acts: {

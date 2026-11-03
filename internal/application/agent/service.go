@@ -97,6 +97,7 @@ type Deps struct {
 	HistoryBudget     func() int
 	MaxToolResult     func() int
 	HistoryToolResult func() int
+	WebSearch         func() bool
 	Dropped           func(err error)
 }
 

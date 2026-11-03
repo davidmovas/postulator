@@ -270,7 +270,13 @@ function runsSummary(result: Record<string, unknown>): string | null {
     return recordAt(result, "report") === null ? null : said.report;
 }
 
+function searchSummary(result: Record<string, unknown>): string {
+    const query = typeof result["query"] === "string" ? result["query"].trim() : "";
+    return query === "" ? "searched" : `“${query}”`;
+}
+
 const summaries: Readonly<Record<string, (result: Record<string, unknown>) => string | null>> = {
+    web_search: searchSummary,
     sites: sitesSummary,
     pages_get: pageSummary,
     pages_tree: treeSummary,
