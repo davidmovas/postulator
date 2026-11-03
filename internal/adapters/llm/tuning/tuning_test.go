@@ -85,7 +85,7 @@ func TestTheDefaultsTuneEveryRoleThatCallsAModel(t *testing.T) {
 		{role: llm.RoleLinker, effort: llm.EffortLow, tier: llm.TierDefault},
 		{role: llm.RoleJudge, effort: llm.EffortLow, tier: llm.TierDefault},
 		{role: llm.RoleTitler, effort: llm.EffortNone, tier: llm.TierDefault},
-		{role: llm.RoleChat},
+		{role: llm.RoleChat, effort: llm.EffortMedium},
 		{role: llm.RoleImage},
 		{role: ""},
 	}
@@ -198,7 +198,8 @@ func TestTheSettingsRefuseWhatTheProviderRefuses(t *testing.T) {
 		{name: "no reasoning", key: "llm.effort.judge", value: `"none"`, ok: true},
 		{name: "minimal is refused by the provider", key: "llm.effort.editor", value: `"minimal"`},
 		{name: "an unknown effort", key: "llm.effort.linker", value: `"extreme"`},
-		{name: "a chat effort is not a setting", key: "llm.effort.chat", value: `"low"`},
+		{name: "the assistant's effort", key: "llm.effort.chat", value: `"high"`, ok: true},
+		{name: "the assistant is never left at minimal", key: "llm.effort.chat", value: `"minimal"`},
 		{name: "flex", key: "llm.tier.editor", value: `"flex"`, ok: true},
 		{name: "standard", key: "llm.tier.writer", value: `"standard"`, ok: true},
 		{name: "the wire name of the standard tier", key: "llm.tier.writer", value: `"default"`},
@@ -247,6 +248,7 @@ func TestTheSettingsDescribeTheirChoices(t *testing.T) {
 		{key: "llm.effort.linker", kind: "enum", fallback: `"low"`, enum: []string{"none", "low", "medium", "high", "xhigh"}},
 		{key: "llm.effort.judge", kind: "enum", fallback: `"low"`, enum: []string{"none", "low", "medium", "high", "xhigh"}},
 		{key: "llm.effort.titler", kind: "enum", fallback: `"none"`, enum: []string{"none", "low", "medium", "high", "xhigh"}},
+		{key: "llm.effort.chat", kind: "enum", fallback: `"medium"`, enum: []string{"none", "low", "medium", "high", "xhigh"}},
 		{key: "llm.tier.writer", kind: "enum", fallback: `"flex"`, enum: []string{"standard", "flex"}},
 		{key: "llm.tier.editor", kind: "enum", fallback: `"standard"`, enum: []string{"standard", "flex"}},
 		{key: "llm.tier.linker", kind: "enum", fallback: `"standard"`, enum: []string{"standard", "flex"}},
@@ -312,14 +314,15 @@ func TestTheClientFillsWhatTheRequestLeavesOpen(t *testing.T) {
 			}(),
 			effort: llm.EffortLow, tier: llm.TierFlex,
 		},
+		{name: "the assistant thinks at its setting on the standard tier", req: request(llm.RoleChat), effort: llm.EffortMedium},
 		{
-			name: "chat sets its own effort and no setting overrides it",
+			name: "an assistant round that names its effort keeps it",
 			req: func() port.Request {
 				req := request(llm.RoleChat)
-				req.Effort = llm.EffortNone
+				req.Effort = llm.EffortHigh
 				return req
 			}(),
-			effort: llm.EffortNone,
+			effort: llm.EffortHigh,
 		},
 		{name: "a call that names no role is left as it came", req: request("")},
 	}

@@ -676,7 +676,7 @@ func TestEveryRoundAsksInTheShapeTheCacheKeeps(t *testing.T) {
 		if req.System != asked[0].System || strings.Contains(req.System, " entities, ") {
 			t.Fatalf("round %d carries other instructions or the site in them: %q", index+1, req.System)
 		}
-		if req.CacheKey != "chat:confirm:"+h.siteID || req.Effort != domainllm.EffortNone || req.Tier != domainllm.TierDefault {
+		if req.CacheKey != "chat:confirm:"+h.siteID || req.Effort != "" || req.Tier != domainllm.TierDefault {
 			t.Fatalf("round %d asks with %q, %q and %q", index+1, req.CacheKey, req.Effort, req.Tier)
 		}
 		if req.Meta.Step != agentrunner.ChatStep || req.Meta.Role != domainllm.RoleChat || req.Meta.ConversationID != conversation {

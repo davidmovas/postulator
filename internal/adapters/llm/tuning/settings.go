@@ -28,6 +28,7 @@ var (
 		llm.RoleLinker: settings.Enum("llm.effort.linker", string(llm.EffortLow), efforts),
 		llm.RoleJudge:  settings.Enum("llm.effort.judge", string(llm.EffortLow), efforts),
 		llm.RoleTitler: settings.Enum("llm.effort.titler", string(llm.EffortNone), efforts),
+		llm.RoleChat:   settings.Enum("llm.effort.chat", string(llm.EffortMedium), efforts),
 	}
 
 	tierSettings = map[llm.Role]*settings.Setting[string]{

@@ -95,6 +95,7 @@ export const settings = {
         "llm.effort.linker": effortLabels,
         "llm.effort.judge": effortLabels,
         "llm.effort.titler": effortLabels,
+        "llm.effort.chat": effortLabels,
         "llm.tier.writer": tierLabels,
         "llm.tier.editor": tierLabels,
         "llm.tier.linker": tierLabels,
@@ -149,6 +150,10 @@ export const settings = {
         "import.maxRows": {
             label: "Largest spreadsheet accepted",
             help: "A spreadsheet with more rows than this is refused rather than half read.",
+        },
+        "llm.effort.chat": {
+            label: "Reasoning of the assistant",
+            help: "How long the assistant thinks before each step of an answer: which page to read, which tool to call, what to propose. Medium plans well; high plans better and each answer takes longer and costs more, since an answer is many steps.",
         },
         "llm.effort.editor": {
             label: "Reasoning when editing",

@@ -145,7 +145,6 @@ func (r *Runner) open(spec agentapp.RunSpec, instructions, situation string) *tu
 				RunID: spec.Binding.RunID, ConversationID: spec.Binding.ConversationID,
 				Step: ChatStep, Role: domainllm.RoleChat,
 			},
-			Effort:   domainllm.EffortNone,
 			Tier:     domainllm.TierDefault,
 			CacheKey: cacheKey(spec.Context),
 		},

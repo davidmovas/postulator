@@ -80,6 +80,7 @@ export const placements: readonly Placement[] = [
     { key: "llm.inputBudget.judge", section: "reasoning", unit: "tokens" },
     { key: "llm.effort.titler", section: "reasoning" },
     { key: "llm.tier.titler", section: "reasoning" },
+    { key: "llm.effort.chat", section: "reasoning" },
     { key: "llm.flexPatience", section: "reasoning" },
     { key: "llm.timeout", section: "modelCalls" },
     { key: "llm.retries", section: "modelCalls", unit: "times" },
