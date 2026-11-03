@@ -4,22 +4,22 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.10.0` on 2026-10-30 (PR #37 merged, tagged; store categories, products and the
-front page in the topical map, `/cart/` technical, notes under **Release 2.10.0**). **2.10.1 is built
-on `dev`** (2026-10-30): products read through the plugin when WordPress hides them and the store
-refuses; its notes are under **Release 2.10.1**, and its pull request is open. **2.11.0 is built on
-`dev`** (2026-11-02, not pushed): the Pages tree by address, a run's parents only for a creation, the
-No hub above filter and lens, types shown under their role; notes under **Release 2.11.0**.
+**Released:** `v2.10.1` on 2026-10-30 (PR #38 merged, tagged; products read through the plugin
+when WordPress hides them and the store refuses, notes under **Release 2.10.1**). **2.11.0 is in a pull
+request from `dev`** (2026-11-03): the Pages tree by address, a run's parents only for a creation, the
+No hub above filter and lens, types shown under their role, then a site that deletes again, Clear
+data, the assistant's reasoning as a setting and the web search; notes under **Release 2.11.0**.
 
 ## Next, in order
 
-1. **2.11.0 goes to `master` when the owner asks** (with 2.10.1 if its pull request is still open).
-   Its gate before the second part (2026-11-02): `go test ./...` green but `internal/app/scale`, which
-   outran the default ten minutes and needs `-timeout 30m`; vitest, typecheck, both lints and
-   `task build` green; on both stands the whole loop, the client's loop, page types and the product
-   loop passed (replica 190 s, vanilla 329 s). The second part (2026-11-03: delete, clear data, the
-   assistant's effort, web search) ran every package it touched, vitest, typecheck and the lint, and no
-   stand. Not run: race, the scale package, `e2e:full`, the stands' suites, the UI harness walk.
+1. **The owner merges 2.11.0 into `master` and tags it.** Its gate, 2026-11-03 after the second part:
+   `go test` over all 98 packages but `internal/app/scale` (in five groups, `-p 2`, for the machine's
+   memory) green; vitest over all 228 files (2,684 tests), typecheck and `golangci-lint` green; on the
+   replica eleven suites green (the whole loop, the client's loop, the observation, page types, the
+   product loop, the writer's picture, the run brief, the agent seeing the site and editing a block,
+   the assistant reading the site and planning content; 167 s and 294 s). Before the second part,
+   2026-11-02, `task build` and both stands' four suites passed. Not run: race, the scale package,
+   `e2e:full`, vanilla since the second part, `task build` since it, the UI harness walk.
 2. **Prove the web search's request shapes for free** with a key that has no credit (it validates a
    request before it refuses it): a research call (the hosted `web_search` with `search_context_size`,
    `filters.allowed_domains` and `blocked_domains`, `max_tool_calls`, `include`, no `text.format`) and a
