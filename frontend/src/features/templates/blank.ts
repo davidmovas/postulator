@@ -28,6 +28,9 @@ export function blankDraft(): SpecDraft {
         featuredImage: false,
         inlineImages: 0,
         imageSource: "wpmedia",
+        sourceMax: 3,
+        sourcePerDomain: 1,
+        sourceMin: 0,
         product: null,
         profiles: [],
         recipe: stepNames.map((name) => ({

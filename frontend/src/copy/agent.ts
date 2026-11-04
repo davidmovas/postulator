@@ -605,8 +605,6 @@ export const agent = {
                 paragraphs === 1 ? "The parent link in the first paragraph" : `The parent link within ${paragraphs} paragraphs`,
             childrenSection: "A list of the children at the end",
             noChildrenSection: "No list of the children",
-            forbidExternal: "External links forbidden",
-            allowExternal: "External links allowed",
             forbidSelf: "Self links forbidden",
             allowSelf: "Self links allowed",
             anchors: (strategy: string) => `Anchors: ${strategy}`,

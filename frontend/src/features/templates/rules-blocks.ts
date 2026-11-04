@@ -187,6 +187,45 @@ export const ruleBlocks: readonly RuleBlock[] = [
             },
         ],
     },
+    {
+        key: "sources",
+        title: copy.templates.sources.title,
+        rules: [
+            {
+                kind: "number",
+                key: "sourceMax",
+                label: copy.templates.sources.max,
+                hint: copy.templates.sources.maxHint,
+                field: "sourceLinks.max",
+                path: paths.sourceMax,
+                min: 0,
+                read: (draft) => draft.sourceMax,
+                write: (sourceMax) => ({ sourceMax }),
+            },
+            {
+                kind: "number",
+                key: "sourcePerDomain",
+                label: copy.templates.sources.perDomain,
+                hint: copy.templates.sources.perDomainHint,
+                field: "sourceLinks.perDomain",
+                path: paths.sourcePerDomain,
+                min: 0,
+                read: (draft) => draft.sourcePerDomain,
+                write: (sourcePerDomain) => ({ sourcePerDomain }),
+            },
+            {
+                kind: "number",
+                key: "sourceMin",
+                label: copy.templates.sources.min,
+                hint: copy.templates.sources.minHint,
+                field: "sourceLinks.min",
+                path: paths.sourceMin,
+                min: 0,
+                read: (draft) => draft.sourceMin,
+                write: (sourceMin) => ({ sourceMin }),
+            },
+        ],
+    },
 ];
 
 export const allRules: readonly Rule[] = ruleBlocks.flatMap((block) => block.rules);

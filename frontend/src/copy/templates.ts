@@ -225,6 +225,26 @@ export const templates = {
                   ? "asks for one inline image"
                   : `asks for ${images} inline images`,
         imageSource: (source: string) => `takes images from ${source}`,
+        sourceMax: (count: number) =>
+            count === 0
+                ? "links none of the research's sources"
+                : count === 1
+                  ? "links one of the research's sources at most"
+                  : `links up to ${count} of the research's sources`,
+        sourcePerDomain: (count: number) =>
+            count === 0
+                ? "lets the links to sources go to any site as often as they cite it"
+                : count === 1
+                  ? "links one source per site at most"
+                  : `links up to ${count} sources per site`,
+        sourceMin: (count: number) =>
+            count === 0
+                ? "asks for no least number of sources"
+                : count === 1
+                  ? "warns when a researched page links no source"
+                  : `warns when a researched page links fewer than ${count} sources`,
+        researchFocus: (focus: string) =>
+            focus === "" ? "lets the research look for what the sections need" : `has the research look for “${focus}”`,
         profile: (role: string, provider: string, model: string) => `uses ${provider} ${model} for the ${role}`,
         profileNone: (role: string) => `lets the ${role} fall back to the site model`,
         stepsOff: (steps: string) => `skips ${steps}`,
@@ -312,6 +332,16 @@ export const templates = {
         sourceHint: "A source is required as soon as any image is asked for.",
         noSource: "Not chosen",
     },
+    sources: {
+        title: "Links to the research's sources",
+        max: "Most links to sources",
+        maxHint:
+            "How many links the body may carry to the pages the web search cited, each on the words that state its fact. 0 links none. It applies only when the recipe searches the web first. Links to the site's own pages are set per page type, under the body's links.",
+        perDomain: "Most links to one site",
+        perDomainHint: "0 for no limit. An address is never linked twice.",
+        min: "Fewest sources to link",
+        minHint: "When a researched page links fewer of its sources, the checks warn. It never stops the page.",
+    },
     imageSource: {
         ai: "the image model",
         wpmedia: "the WordPress media library",
@@ -350,6 +380,10 @@ export const templates = {
             focusHint:
                 "What the search should find for every page of this template, such as current safety guidance or the standards that apply. Empty, it searches for what the sections need. Each search is paid for; Settings → Models sets how many a page may make.",
             focusPlaceholder: "Optional: what the search should find",
+            sources: (max: number) =>
+                max === 0 ? "Links no source" : max === 1 ? "Links 1 source" : `Links up to ${max} sources`,
+            sourcesHint:
+                "How many of the sources the search cited the body may link. Set it under Rules, in Links to the research's sources.",
         },
     },
     steps: {

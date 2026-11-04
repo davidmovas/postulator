@@ -61,15 +61,7 @@ export function LinkPolicyEditor({ policy, disabled, error, onChange }: LinkPoli
                 }}
             />
             <p className="text-2xs text-ink-faint">{said.linksHint}</p>
-            <Switch
-                className="w-full"
-                label={said.forbidExternal}
-                checked={policy.forbidExternal}
-                disabled={off}
-                onChange={(event) => {
-                    onChange({ ...policy, forbidExternal: event.target.checked });
-                }}
-            />
+            <p className="text-2xs text-ink-faint">{said.sourcesHint}</p>
             <Switch
                 className="w-full"
                 label={said.forbidSelf}

@@ -199,6 +199,25 @@ describe("the template cards", () => {
         expect(joined).not.toContain("Overview");
     });
 
+    it("reads the research's focus and the links to its sources the agent writes", () => {
+        const view = describeAction(
+            "templates",
+            {
+                op: "override",
+                templateId: "t1",
+                spec: {
+                    sourceLinks: { max: 4 },
+                    recipe: [{ name: "research", enabled: true, focus: "the doses" }],
+                },
+            },
+            null,
+            none,
+        );
+        const joined = joinedOf(view);
+        expect(joined).toContain("links up to 4 of the research's sources");
+        expect(joined).toContain("has the research look for “the doses”");
+    });
+
     it("reads an override for one page, or for the site, as sentences", () => {
         const page = described("templates", "override");
         expect(refs(page.title)).toStrictEqual(["template:t1", "page:p1"]);

@@ -47,10 +47,6 @@ function policyLines(policy: Args): Line[] {
     if (rules !== null) {
         lines.push(...ruleLines(rules));
     }
-    const external = flag(policy, "forbidExternal");
-    if (external !== null) {
-        lines.push(line("link", external ? said.forbidExternal : said.allowExternal));
-    }
     const self = flag(policy, "forbidSelf");
     if (self !== null) {
         lines.push(line("link", self ? said.forbidSelf : said.allowSelf));

@@ -27,6 +27,7 @@ const hub: JsonObject = {
     keywordRules: { primaryInTitle: true, primaryInH1: true, primaryInFirstParagraph: true, maxDensity: 0.025 },
     metaRules: { titlePattern: "{primaryKeyword} | {siteName}", descriptionMax: 155 },
     images: { featured: true, inline: 0, source: "ai" },
+    sourceLinks: { max: 3, perDomain: 1, min: 2 },
     modelProfiles: {},
     recipe: [
         { name: "resolve_context", enabled: true },
@@ -98,6 +99,16 @@ describe("template spec drafts", () => {
 
     it("rebuilds the same document it read", () => {
         expect(specJsonOf(draftFromJson(hub))).toStrictEqual(hub);
+    });
+
+    it("reads the links to the research's sources, and none where a stored spec predates them", () => {
+        const draft = draftFromJson(hub);
+        expect([draft.sourceMax, draft.sourcePerDomain, draft.sourceMin]).toStrictEqual([3, 1, 2]);
+
+        const { sourceLinks: _dropped, ...older } = hub;
+        const before = draftFromJson(older);
+        expect([before.sourceMax, before.sourcePerDomain, before.sourceMin]).toStrictEqual([0, 0, 0]);
+        expect(specJsonOf(before)["sourceLinks"]).toStrictEqual({ max: 0, perDomain: 0, min: 0 });
     });
 
     it("writes no link rules, which live in the page types now", () => {

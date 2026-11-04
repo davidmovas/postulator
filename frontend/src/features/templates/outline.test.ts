@@ -26,6 +26,11 @@ describe("changedGroups", () => {
         },
         { name: "the tone marks rules", patch: { tone: "plain" }, want: ["rules", "overrides"] },
         {
+            name: "the links to the research's sources mark rules",
+            patch: { sourceLinks: { max: 5 } },
+            want: ["rules", "overrides"],
+        },
+        {
             name: "a pinned model marks models",
             patch: { modelProfiles: { writer: { provider: "openai", model: "gpt-5.1" } } },
             want: ["models", "overrides"],

@@ -3,7 +3,7 @@ export type Severity = "error" | "warn" | "info";
 export const severityError: Severity = "error";
 export const severityWarn: Severity = "warn";
 
-export type LinkClass = "graph" | "self" | "external" | "unknown_internal";
+export type LinkClass = "graph" | "source" | "self" | "external" | "unknown_internal";
 
 export const codeTargetMissing = "target_missing";
 
@@ -13,7 +13,7 @@ export const linkClassByCode: Readonly<Record<string, LinkClass>> = {
     unknown_internal_link: "unknown_internal",
 };
 
-export const linkClasses: readonly LinkClass[] = ["graph", "self", "external", "unknown_internal"];
+export const linkClasses: readonly LinkClass[] = ["graph", "source", "self", "external", "unknown_internal"];
 
 export function decodeArtifact(content: string): unknown {
     if (content === "") {
