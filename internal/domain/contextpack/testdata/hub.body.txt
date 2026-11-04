@@ -8,7 +8,7 @@ THE FIELD'S RULES
 Field: Body
 Instruction: Introduce the category and send the reader to its products.
 Length: between 1200 and 6000 characters
-Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: Peptides

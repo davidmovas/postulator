@@ -398,8 +398,18 @@ because a run whose every remaining item is waiting for a person has nothing lef
 
 `research` (2026-11-03, written by the `research` step) is `{text, sources [{url, title?}], searches}`:
 the facts a web search found, one per line, the sources the answer cited (or those the searches read)
-and the searches billed. `generate_body`, `generate_meta`, `generate_fields` and `judge` read it when
-present (`StepDef.Reads`) and their input hash carries it then.
+and the searches billed. `generate_body`, `generate_meta`, `generate_fields`, `validate` and `judge` read
+it when present (`StepDef.Reads`) and their input hash carries it then. Since 2026-11-04 each fact ends
+with the full address of the page that states it in square brackets; `content.Research.Citations()`
+reads a fact's address from that bracket, a trailing `(https://…)` or a markdown citation the model
+wrote, and keeps it only when it is one of `sources` compared without `utm_*` parameters, a fragment
+or a trailing slash (`content.SourceHref` is the address written, tracking gone). A research written
+before keeps its facts and links nothing.
+
+`validation_report.sources` (2026-11-04) is `[{href, anchor}]`: the links the writer's part of the body
+carries to the research's sources, which the run screen lists as `source` links. A `markup_stripped`
+finding's `details.sources` is `[{href, anchor, reason}]`, each link off the site the sanitizer dropped
+with its reason (`uncited`, `words`, `repeat`, `most`, `site`), and its message names them.
 
 `judge_report.score` and `final_report.score` are **optional**: absent means nothing scored
 the page, where a final report used to default to a perfect `1` and a judge that could not be
@@ -688,9 +698,11 @@ scopes every call. Twenty-three tools since phase 18, one per job: `sites`, `sit
 `pages_fields`, `pages_manage`, `pages_judge`, `links`, `pagetypes`, `pagetypes_classify`, `templates`,
 `runs`, `runs_control`, `imports`, `findings`, `models`, `schedules` and `plans`. A read selects by a
 `view` enum and a write by an `op` enum; `RiskOf` reads the op, so one tool reads, writes and deletes
-at the risk of what it is asked. They measure 48,858 bytes and 11,164 `o200k_base` tokens of schema
+at the risk of what it is asked. They measure 49,258 bytes and 11,261 `o200k_base` tokens of schema
 resent on every round of every turn, which `TestTheToolSchemasFitTheirCeiling` holds against
-`schemaCeilingBytes` (48,858) and `schemaCeilingTokens` (11,164) and logs with the eight widest.
+`schemaCeilingBytes` (49,258) and `schemaCeilingTokens` (11,261) and logs with the eight widest; 2.12.0
+added the template's `sourceLinks` and the research step's `focus` and took `forbidExternal` out of
+the link policy.
 A selection (`select` of `pages_manage` and `runs_control`) takes `gap` alone or with `ofType`, never
 with `under`, so the agent re-templates or runs every page `pages_find` names by a gap in one call.
 Since phase 19 `runs_control` starts no sync, a sync being the site's own (`sites_manage op sync`),

@@ -217,6 +217,7 @@ export function orderedKinds(present: readonly string[]): readonly ArtifactKind[
 
 const linkClassTones: Readonly<Record<LinkClass, Tone>> = {
     graph: "ok",
+    source: "ok",
     self: "danger",
     external: "warn",
     unknown_internal: "warn",

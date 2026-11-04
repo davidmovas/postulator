@@ -93,6 +93,16 @@ type Images struct {
 	Source   ImageSource `json:"source" enum:"ai,wpmedia,local" description:"Where the images come from: drawn by a model, picked from the WordPress library, or read from a folder"`
 }
 
+type SourceLinks struct {
+	Max       int `json:"max" minimum:"0" description:"The most links the body may carry to the sources the research found; 0 links none"`
+	PerDomain int `json:"perDomain" minimum:"0" description:"The most of those links to one site; 0 for no cap beyond one link to each address"`
+	Min       int `json:"min" minimum:"0" description:"The fewest sources the body should link when the page was researched; fewer is a warning"`
+}
+
+func (s SourceLinks) Cites() bool {
+	return s.Max > 0
+}
+
 type ProductShortDescription struct {
 	Enabled        bool   `json:"enabled" description:"Write the product's short description, the text the store shows beside the price"`
 	Intent         string `json:"intent" description:"What the short description has to say, one short sentence to the writer"`
@@ -125,6 +135,7 @@ type TemplateSpec struct {
 	KeywordRules  KeywordRules              `json:"keywordRules"`
 	MetaRules     MetaRules                 `json:"metaRules"`
 	Images        Images                    `json:"images"`
+	SourceLinks   SourceLinks               `json:"sourceLinks"`
 	Product       *Product                  `json:"product,omitempty"`
 	ModelProfiles map[llm.Role]llm.ModelRef `json:"modelProfiles"`
 	Recipe        []StepSpec                `json:"recipe"`

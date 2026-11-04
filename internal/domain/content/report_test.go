@@ -105,7 +105,7 @@ func TestComplianceOnHandWrittenBodies(t *testing.T) {
 			t.Parallel()
 
 			doc := mustParse(t, tc.body)
-			report := content.Compliance(doc, lc, policy(field.LinkRules{}), "self")
+			report := content.Compliance(doc, lc, policy(field.LinkRules{}), content.Sources{}, "self")
 
 			if len(report.Items) != len(tc.codes) {
 				t.Fatalf("findings = %v, want %v", codesOf(report), tc.codes)
@@ -174,17 +174,17 @@ func TestCompliancePolicySwitchesAndCaps(t *testing.T) {
 	doc := mustParse(t, body)
 
 	permissive := field.LinkPolicy{Rules: field.LinkRules{MaxLinks: 2}}
-	report := content.Compliance(doc, lc, permissive, "self")
-	if hasCode(report, content.CodeSelfLink) || hasCode(report, content.CodeExternalLink) {
-		t.Fatalf("a permissive policy allows both: %v", codesOf(report))
+	report := content.Compliance(doc, lc, permissive, content.Sources{}, "self")
+	if hasCode(report, content.CodeSelfLink) {
+		t.Fatalf("a permissive policy allows the self link: %v", codesOf(report))
 	}
-	if report.HasErrors() {
-		t.Fatalf("a permissive policy reports no error: %v", codesOf(report))
+	if !hasCode(report, content.CodeExternalLink) {
+		t.Fatalf("an external link no research cited is refused under any policy: %v", codesOf(report))
 	}
 
-	strict := content.Compliance(doc, lc, policy(field.LinkRules{}), "self")
-	if !strict.HasErrors() {
-		t.Fatalf("a strict policy reports errors: %v", codesOf(strict))
+	strict := content.Compliance(doc, lc, policy(field.LinkRules{}), content.Sources{}, "self")
+	if !hasCode(strict, content.CodeSelfLink) {
+		t.Fatalf("a strict policy refuses the self link: %v", codesOf(strict))
 	}
 }
 
@@ -196,11 +196,11 @@ func TestTheClientsOwnLinksAreNeverGradedButStillSatisfyWhatThePageOwes(t *testi
 	ours := `<p>Espresso is brewed under pressure.</p>`
 	whole := mustParse(t, theirs+ours)
 
-	graded := content.ComplianceOf(whole, mustParse(t, ours), lc, policy(field.LinkRules{}), "self")
+	graded := content.ComplianceOf(whole, mustParse(t, ours), lc, policy(field.LinkRules{}), content.Sources{}, "self")
 	if hasCode(graded, content.CodeExternalLink) || hasCode(graded, content.CodeTargetMissing) || graded.HasErrors() {
 		t.Errorf("the kept page = %v, want the client's external link ungraded and his link to the parent counted", codesOf(graded))
 	}
-	ourLink := content.ComplianceOf(whole, mustParse(t, ours+`<p><a href="https://example.com/">ours</a></p>`), lc, policy(field.LinkRules{}), "self")
+	ourLink := content.ComplianceOf(whole, mustParse(t, ours+`<p><a href="https://example.com/">ours</a></p>`), lc, policy(field.LinkRules{}), content.Sources{}, "self")
 	if !hasCode(ourLink, content.CodeExternalLink) {
 		t.Errorf("our own external link = %v, want it graded", codesOf(ourLink))
 	}
@@ -247,7 +247,7 @@ func TestTheLinkCapCountsGraphLinksOnBothSides(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			report := content.Compliance(mustParse(t, tc.body), lc, policy(rules), "self")
+			report := content.Compliance(mustParse(t, tc.body), lc, policy(rules), content.Sources{}, "self")
 			if hasCode(report, content.CodeTooManyLinks) != tc.capped {
 				t.Fatalf("the cap finding = %v, want capped=%t", codesOf(report), tc.capped)
 			}
@@ -276,7 +276,7 @@ func TestComplianceFloorsTheScore(t *testing.T) {
 	}
 
 	report := content.Compliance(mustParse(t, "<p>Nothing.</p>"), contextOf(targets...),
-		policy(field.LinkRules{}), "self")
+		policy(field.LinkRules{}), content.Sources{}, "self")
 	if report.Score != 0 {
 		t.Fatalf("Score = %v, want the floor", report.Score)
 	}

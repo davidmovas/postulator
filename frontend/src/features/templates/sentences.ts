@@ -85,6 +85,20 @@ function imageSentences(after: SpecDraft, held: JsonValue | undefined): string[]
     return out;
 }
 
+function sourceSentences(after: SpecDraft, held: JsonValue | undefined): string[] {
+    const out: string[] = [];
+    for (const key of keysOf(held, ["max", "perDomain", "min"])) {
+        if (key === "max") {
+            out.push(said.sourceMax(after.sourceMax));
+        } else if (key === "perDomain") {
+            out.push(said.sourcePerDomain(after.sourcePerDomain));
+        } else {
+            out.push(said.sourceMin(after.sourceMin));
+        }
+    }
+    return out;
+}
+
 function profileSentences(after: SpecDraft, held: JsonValue | undefined): string[] {
     if (!isJsonObject(held)) {
         return after.profiles.map((profile) => said.profile(profile.role, profile.provider, profile.model));
@@ -134,6 +148,9 @@ function paramSentences(base: SpecDraft, after: SpecDraft): string[] {
         if (step.name === "repair_links" && typeof held["iterations"] === "number" && was?.["iterations"] !== held["iterations"]) {
             out.push(said.repairIterations(held["iterations"]));
         }
+        if (step.name === "research" && typeof held["focus"] === "string" && was?.["focus"] !== held["focus"]) {
+            out.push(said.researchFocus(held["focus"].trim()));
+        }
     }
     return out;
 }
@@ -179,6 +196,8 @@ export function sentencesOf(base: SpecDraft, patch: JsonObject | null): string[]
             out.push(...metaSentences(after, held));
         } else if (key === "images") {
             out.push(...imageSentences(after, held));
+        } else if (key === "sourceLinks") {
+            out.push(...sourceSentences(after, held));
         } else if (key === "modelProfiles") {
             out.push(...profileSentences(after, held));
         } else if (key === "recipe") {

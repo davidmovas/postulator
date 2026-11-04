@@ -85,6 +85,93 @@ func TestAResearchedRunHandsTheFactsToTheWritersAndTheJudge(t *testing.T) {
 	}
 }
 
+const (
+	citedSource = "https://sca.coffee/ratio"
+	citedFact   = "A double espresso takes 18 grams of ground coffee."
+)
+
+func TestTheWriterLinksTheSourcesItsResearchCitedAsTheTemplateAllows(t *testing.T) {
+	t.Parallel()
+
+	citedDraft := strings.Replace(guideDraft, `bed level and pull the shot`,
+		`bed level with <a href=\"`+citedSource+`?utm_source=openai\">eighteen grams in the basket</a>, `+
+			`<a href=\"https://rival.example/espresso\">as a rival says</a>, and pull the shot`, 1)
+	p := newPipeline(t)
+	p.llm = fake.NewScripted(
+		fake.Reply{
+			Step: steps.NameResearch, Text: "- " + citedFact + " ([sca.coffee](" + citedSource + "?utm_source=openai)) [sca.coffee]",
+			Sources: []port.Source{{URL: citedSource + "?utm_source=openai", Title: "Brew ratios"}},
+		},
+		fake.Reply{Step: steps.NameGenerateBody, Text: citedDraft},
+		fake.Reply{Step: steps.NameGenerateMeta, Text: guideMeta},
+		fake.Reply{Step: steps.NameJudge, Text: guideJudge},
+		fake.Reply{Step: steps.NameRepairLinks, Text: repairSentence},
+	)
+	p.search = searchStub{}
+	p.start(t)
+
+	recipe := slices.Insert(slices.Clone(p.recipe), 1, template.StepSpec{Name: steps.NameResearch, Enabled: true})
+	queued, err := p.engine.Enqueue(t.Context(), run.Run{
+		ID: id.New(), SiteID: p.siteID, Kind: run.KindGenerate, Targets: []string{p.pageID},
+		Recipe: recipe, TemplateID: "guide", TemplateVersion: 1, PublishMode: run.PublishDraft,
+	})
+	if err != nil {
+		t.Fatalf("Enqueue: %v", err)
+	}
+	item := p.waitFor(t, queued.ID)
+
+	body := p.rawArtifactOf(t, item.ID, run.ArtifactBodyHTML)
+	if !strings.Contains(body, `<a href="`+citedSource+`">eighteen grams in the basket</a>`) {
+		t.Errorf("the body lost the link to the cited source:\n%s", body)
+	}
+	if strings.Contains(body, "rival.example") || !strings.Contains(body, "as a rival says") {
+		t.Errorf("the body kept the link to an address the research never cited:\n%s", body)
+	}
+
+	cited := citedFact + " (source: " + citedSource + ")"
+	for _, step := range []string{steps.NameGenerateBody, steps.NameJudge} {
+		if prompt := p.promptTo(t, step); !strings.Contains(prompt, cited) {
+			t.Errorf("the %s prompt lacks the fact with its source's address", step)
+		}
+	}
+	writer := p.requestTo(t, steps.NameGenerateBody).System
+	for _, want := range []string{"at most 3 such links", "at most 1 to one site", "never the whole sentence, the bare address"} {
+		if !strings.Contains(writer, want) {
+			t.Errorf("the writer is not told %q:\n%s", want, writer)
+		}
+	}
+	if meta := p.promptTo(t, steps.NameGenerateMeta); strings.Contains(meta, citedSource) || !strings.Contains(meta, citedFact+" [sca.coffee]") {
+		t.Errorf("the meta writer, which links nothing, was handed the source's address or lost the fact")
+	}
+
+	var report steps.ValidationReport
+	p.artifactOf(t, item.ID, run.ArtifactValidationReport, &report)
+	if len(report.Sources) != 1 || report.Sources[0] != (content.SourceLink{Href: citedSource, Anchor: "eighteen grams in the basket"}) {
+		t.Errorf("the validation lists the links to sources %+v, want the one the body carries", report.Sources)
+	}
+	for _, finding := range report.Compliance.Items {
+		if finding.Code == content.CodeExternalLink || finding.Code == content.CodeTooManySourceLinks {
+			t.Errorf("the validation refused the link to the cited source: %+v", finding)
+		}
+	}
+}
+
+func (p *pipeline) rawArtifactOf(t *testing.T, itemID string, kind run.ArtifactKind) string {
+	t.Helper()
+
+	stored, err := p.blobs.ByItem(t.Context(), itemID)
+	if err != nil {
+		t.Fatalf("read the artifacts: %v", err)
+	}
+	for i := len(stored) - 1; i >= 0; i-- {
+		if stored[i].Kind == kind {
+			return string(stored[i].Blob)
+		}
+	}
+	t.Fatalf("the item produced no %s artifact", kind)
+	return ""
+}
+
 func (p *pipeline) requestTo(t *testing.T, step string) port.Request {
 	t.Helper()
 

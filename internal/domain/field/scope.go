@@ -51,7 +51,6 @@ type LinkRules struct {
 type LinkPolicy struct {
 	Links          bool           `json:"links" description:"Carries contextual links"`
 	Rules          LinkRules      `json:"rules" description:"Links owed and allowed"`
-	ForbidExternal bool           `json:"forbidExternal" description:"Refuse external links"`
 	ForbidSelf     bool           `json:"forbidSelf" description:"Refuse self links"`
 	AnchorStrategy AnchorStrategy `json:"anchorStrategy" enum:"prefer_user,rotate" description:"prefer_user takes human anchors first"`
 }

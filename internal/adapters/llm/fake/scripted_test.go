@@ -49,6 +49,28 @@ func TestScriptedAnswersPerStep(t *testing.T) {
 	}
 }
 
+func TestAScriptedSearchAnswersWithTheSourcesItFound(t *testing.T) {
+	t.Parallel()
+
+	found := []port.Source{{URL: "https://www.who.int/caffeine?utm_source=openai", Title: "WHO"}}
+	client := fake.NewScripted(fake.Reply{Step: "research", Text: "- Caffeine peaks within an hour.", Sources: found})
+
+	searched, err := client.Complete(t.Context(), scriptedRequest("research"))
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if len(searched.Sources) != 1 || searched.Sources[0] != found[0] {
+		t.Fatalf("sources = %+v, want the scripted ones", searched.Sources)
+	}
+	written, err := client.Complete(t.Context(), scriptedRequest("generate_body"))
+	if err != nil {
+		t.Fatalf("Complete an unscripted step: %v", err)
+	}
+	if len(written.Sources) != 0 {
+		t.Fatalf("an unscripted step answered with sources %+v", written.Sources)
+	}
+}
+
 func TestScriptedStreams(t *testing.T) {
 	t.Parallel()
 

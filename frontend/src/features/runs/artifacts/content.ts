@@ -19,12 +19,26 @@ export interface ResearchView {
     searches: number;
 }
 
+const citation = /\(?\[[^\]]*\]\(https?:\/\/[^\s()]+\)\)?/g;
+const trailingAddress = /\s*[[(](https?:\/\/[^\s\])]+)[\])]\s*$/;
+
+function siteOf(address: string): string {
+    try {
+        return new URL(address).hostname.replace(/^www\./, "");
+    } catch {
+        return address;
+    }
+}
+
 function factOf(line: string): string {
     return line
         .trim()
         .replace(/^#+\s*/, "")
         .replace(/^([-*•]|\d+[.)])\s+/, "")
-        .trim();
+        .replace(citation, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(trailingAddress, (_whole, address: string) => ` [${siteOf(address)}]`);
 }
 
 export function researchView(held: unknown): ResearchView | null {

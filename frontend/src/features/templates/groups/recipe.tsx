@@ -15,28 +15,38 @@ const defaultIterations = 2;
 
 interface SettingProps {
     step: StepDraft;
+    sourceMax: number;
     onParam: (key: string, value: JsonValue) => void;
 }
 
-function Setting({ step, onParam }: SettingProps): ReactElement | null {
+function Setting({ step, sourceMax, onParam }: SettingProps): ReactElement | null {
     const said = copy.templates.recipe.params;
     if (step.name === researchStep) {
         const held = step.params?.["focus"];
         return (
-            <span className="flex w-72 shrink-0 items-center gap-2" title={said.focusHint}>
-                <span className="shrink-0 text-2xs text-ink-faint">{said.focus}</span>
-                <Input
-                    size="sm"
-                    value={typeof held === "string" ? held : ""}
-                    disabled={!step.enabled}
-                    placeholder={said.focusPlaceholder}
-                    aria-label={said.focus}
-                    data-recipe-focus={true}
-                    onChange={(event) => {
-                        onParam("focus", event.target.value);
-                    }}
-                />
-            </span>
+            <>
+                <span className="flex w-72 shrink-0 items-center gap-2" title={said.focusHint}>
+                    <span className="shrink-0 text-2xs text-ink-faint">{said.focus}</span>
+                    <Input
+                        size="sm"
+                        value={typeof held === "string" ? held : ""}
+                        disabled={!step.enabled}
+                        placeholder={said.focusPlaceholder}
+                        aria-label={said.focus}
+                        data-recipe-focus={true}
+                        onChange={(event) => {
+                            onParam("focus", event.target.value);
+                        }}
+                    />
+                </span>
+                <span
+                    className={cx("w-32 shrink-0 truncate text-2xs", step.enabled ? "text-ink-soft" : "text-ink-faint")}
+                    title={said.sourcesHint}
+                    data-recipe-sources={true}
+                >
+                    {said.sources(sourceMax)}
+                </span>
+            </>
         );
     }
     if (step.name === "validate") {
@@ -137,6 +147,7 @@ export function RecipeGroup({ draft, below, error, onChange }: RecipeGroupProps)
                             )}
                             <Setting
                                 step={step}
+                                sourceMax={draft.sourceMax}
                                 onParam={(key, value) => {
                                     patchStep(step.name, (held) => ({
                                         ...held,

@@ -46,6 +46,9 @@ export interface SpecDraft {
     featuredImage: boolean;
     inlineImages: number;
     imageSource: string;
+    sourceMax: number;
+    sourcePerDomain: number;
+    sourceMin: number;
     product: ProductDraft | null;
     profiles: ProfileDraft[];
     recipe: StepDraft[];
@@ -185,6 +188,7 @@ export function draftFromJson(value: JsonValue): SpecDraft {
     const keywords = branch(root, "keywordRules");
     const meta = branch(root, "metaRules");
     const images = branch(root, "images");
+    const sources = branch(root, "sourceLinks");
     return {
         sections: series(root, "sections").map(sectionOf),
         tone: text(root, "tone"),
@@ -200,6 +204,9 @@ export function draftFromJson(value: JsonValue): SpecDraft {
         featuredImage: flag(images, "featured"),
         inlineImages: count(images, "inline"),
         imageSource: text(images, "source"),
+        sourceMax: count(sources, "max"),
+        sourcePerDomain: count(sources, "perDomain"),
+        sourceMin: count(sources, "min"),
         product: productOf(branch(root, "product")),
         profiles: profilesOf(branch(root, "modelProfiles")),
         recipe: recipeOf(series(root, "recipe")),
@@ -248,6 +255,7 @@ export function specJsonOf(draft: SpecDraft): JsonObject {
         keywordRules,
         metaRules: { titlePattern: draft.titlePattern, descriptionMax: draft.descriptionMax },
         images: { featured: draft.featuredImage, inline: draft.inlineImages, source: draft.imageSource },
+        sourceLinks: { max: draft.sourceMax, perDomain: draft.sourcePerDomain, min: draft.sourceMin },
         modelProfiles: profiles,
         recipe,
     };

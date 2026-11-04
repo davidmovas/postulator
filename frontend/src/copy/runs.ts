@@ -487,12 +487,13 @@ export const runs = {
             actualEmpty: "No link was recorded on this page.",
             classes: {
                 graph: "graph",
+                source: "source",
                 self: "self",
                 external: "external",
                 unknown_internal: "unknown internal",
             },
             classesNote:
-                "Graph links come from the placements the run made; the rest are the links compliance flagged, so a clean non-graph link leaves no record.",
+                "Graph links come from the placements the run made and source links from the research the body cites; the rest are the links compliance flagged, so another clean link leaves no record.",
             findings: "Findings",
             errors: (count: number) => (count === 1 ? "1 error — the item fails" : `${count} errors — the item fails`),
             warnings: (count: number) => (count === 1 ? "1 warning" : `${count} warnings`),

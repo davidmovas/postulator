@@ -23,6 +23,12 @@ describe("blankDraft", () => {
         expect(draft.featuredImage).toBe(false);
         expect(draft.imageSource).toBe("wpmedia");
         expect(draft.profiles).toStrictEqual([]);
+        expect(draft.sourceMin).toBeLessThanOrEqual(draft.sourceMax);
+        expect(draft.sourcePerDomain).toBeGreaterThanOrEqual(0);
+    });
+
+    it("links three of the research's sources, one to a site, once the recipe turns the research on", () => {
+        expect([draft.sourceMax, draft.sourcePerDomain, draft.sourceMin]).toStrictEqual([3, 1, 0]);
     });
 
     it("declares every shipped step, all on but the two that cost extra: the images and the web research", () => {

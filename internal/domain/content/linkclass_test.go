@@ -169,7 +169,7 @@ func TestEveryClassifierResolvesAnHrefAlike(t *testing.T) {
 					tc.href, resolution.Class, resolution.SameDocument, tc.want, tc.sameDoc)
 			}
 
-			report := content.Compliance(mustParse(t, body), lc, policy(field.LinkRules{}), lc.PageID)
+			report := content.Compliance(mustParse(t, body), lc, policy(field.LinkRules{}), content.Sources{}, lc.PageID)
 			wantCompliance := tc.want
 			if tc.sameDoc {
 				wantCompliance = content.ClassGraph

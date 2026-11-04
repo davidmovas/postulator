@@ -514,7 +514,7 @@ func (f *fixture) plan(t *testing.T, page pagemap.Page, entityID string, rules f
 
 	return content.PlanLinks(built, pagemap.NewIndex(pages), content.Subject{
 		Site: pagemap.NewSite(owner.BaseURL), PageID: page.ID, PagePath: page.Path, EntityID: entityID,
-	}, field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true}).Context
+	}, field.LinkPolicy{Links: true, Rules: rules, ForbidSelf: true}).Context
 }
 
 func TestASecondPageOfAnEntityIsAuditedAndValidatedAlike(t *testing.T) {
@@ -563,8 +563,8 @@ func TestASecondPageOfAnEntityIsAuditedAndValidatedAlike(t *testing.T) {
 			}
 
 			report := content.Compliance(doc, lc, field.LinkPolicy{
-				Links: true, Rules: detail.Rules, ForbidExternal: true, ForbidSelf: true,
-			}, second.ID)
+				Links: true, Rules: detail.Rules, ForbidSelf: true,
+			}, content.Sources{}, second.ID)
 			selfLinks, offGraph := 0, 0
 			for _, item := range report.Items {
 				switch item.Code {

@@ -10,7 +10,7 @@ import (
 )
 
 func policy(rules field.LinkRules) field.LinkPolicy {
-	return field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+	return field.LinkPolicy{Links: true, Rules: rules, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 }
 
 func target(url string, anchors []string, relation content.Relation, required bool) content.LinkTarget {
@@ -224,8 +224,8 @@ func TestInsertLinksFollowsTheAnchorStrategy(t *testing.T) {
 			result := content.InsertLinks(doc,
 				contextOf(target("/beans/", []string{"beans", "coffee"}, content.RelationDown, false)),
 				field.LinkPolicy{
-					Rules:          field.LinkRules{MaxPerTarget: 2},
-					ForbidExternal: true, ForbidSelf: true, AnchorStrategy: tc.strategy,
+					Rules:      field.LinkRules{MaxPerTarget: 2},
+					ForbidSelf: true, AnchorStrategy: tc.strategy,
 				})
 
 			if got := bodyOf(t, doc); got != tc.want {

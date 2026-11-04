@@ -39,7 +39,7 @@ func DefaultScope(preset Preset, key field.Key, typeID string) field.Scope {
 		}
 	}
 	if rules, linked := roleRules[preset.Role()]; linked && key == LinkField(preset) {
-		scope.Links = field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+		scope.Links = field.LinkPolicy{Links: true, Rules: rules, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 	}
 	return scope
 }

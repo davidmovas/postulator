@@ -20,7 +20,7 @@ const (
 	NameResearch = string(run.StepResearch)
 	ParamFocus   = "focus"
 
-	researchAnswerTokens = 1600
+	researchAnswerTokens = 2400
 	researchTimeout      = 10 * time.Minute
 )
 

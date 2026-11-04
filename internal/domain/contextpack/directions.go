@@ -1,9 +1,11 @@
 package contextpack
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/davidmovas/postulator/internal/domain/content"
 	"github.com/davidmovas/postulator/internal/domain/pagemap"
 	"github.com/davidmovas/postulator/internal/domain/run"
 )
@@ -23,7 +25,20 @@ func researchSection(f Facts) Section {
 	if f.Research == nil {
 		return section
 	}
-	section.Items = f.Research.Facts()
+	citations := f.Research.Citations()
+	if !f.CiteSources || !slices.ContainsFunc(citations, func(c content.Citation) bool { return c.URL != "" }) {
+		section.Items = f.Research.Facts()
+		return section
+	}
+	section.Heading = "What a web search found for this page, each fact with the address of the source it cites; " +
+		"use what serves the page and link a source only where the rules for sources allow"
+	for _, citation := range citations {
+		item := citation.Tagged()
+		if citation.URL != "" {
+			item = citation.Fact + " (source: " + citation.URL + ")"
+		}
+		section.Items = append(section.Items, item)
+	}
 	return section
 }
 

@@ -6198,3 +6198,78 @@ OpenAI's web search, set up by him and paid by him.
 - **What stays owed**: the request shapes (a research call, a chat round with function tools and the
   search, `blocked_domains`) are proven against the fake only; a key with no credit proves them for
   free, and a funded one measures the search's tokens and whether the model searches at effort low.
+
+## 2026-11-04 — 2.12.0: the writer links the research's sources
+
+The client turned the research on and saw no effect: he had expected the writer not only to use what
+the web search found but to link it. He asked for levers on the template: how many links to the
+research's sources a page carries, and the like, so he controls how many hyperlinks the writer puts
+in the text.
+
+### What the code showed
+
+- **Linking a source was forbidden three times over.** The research section of the pack said "never
+  link its sources"; the facts carried a `[domain]` and no address the writer could use; and
+  `content.Sanitize` kept only `ClassGraph` links, whatever the policy said. Every page type's link
+  policy also had `forbidExternal` on by default, which only `Compliance` read.
+- **A live run proved it** (a funded key, 2026-11-03, the replica's `/reconstitution/`): two searches,
+  ten sources, `utm_source=openai` on every address, no link off the site in the body. The research
+  cost $0.088 for 19,743 input tokens at medium depth, the writer $0.022 on flex.
+- **The model's own citations cannot be relied on.** The first run wrote markdown citations
+  `([domain](url))` with `url_citation` annotations; the second, the same prompt and page, wrote none,
+  and its sources came from the searches' `action.sources` alone (36 addresses, no titles). Only an
+  address the research is asked to write after each fact links facts to sources every time.
+- **Nothing else touched a link off the site.** The linker, the repair, the relink and the publish
+  count and place graph links only (`MaxLinks` counts `ClassGraph`), and `"a"` is a zone `InsertLinks`
+  never writes into; the link audit stores no external link at all.
+
+### The owner's answers (2026-11-03)
+
+- **The levers live on the template**, beside the research, and the page type's switch goes: one
+  lever, not two to turn on.
+- **Three levers**: the most links to sources on a page, the most to one site, and the fewest (fewer
+  is a warning, never a stop). No nofollow, new tab or list of sources.
+- **The links to the site's own pages stay on the page type**, where 0062 moved them; the template
+  only says where they are set.
+- **Prove it live before and after.**
+
+### The rulings
+
+- **`TemplateSpec.SourceLinks {max, perDomain, min}`**: `max` 0 links none (a spec stored before
+  decodes so, and the template screen says it), `perDomain` 0 is no cap beyond one link to an address,
+  `min` warns on a researched page and needs `max` at least as large (`template.Validate`). The blank
+  template and the five built-ins carry `{3, 1, 0}` (the built-ins through `seed/superseded/2026-11-03-*`),
+  and 0092 gives `{3, 1, 0}` to every stored template whose recipe already researches, so the client
+  sees the effect without a visit to each template.
+- **`field.LinkPolicy.ForbidExternal` is gone** (0092 strips it from `field_scopes.link_policy`, which
+  `ParsePolicy` decodes strictly, and from a pending `pagetypes` action's and an open plan step's
+  arguments, which the tools decode strictly; its down puts it back on every linked field). Links off
+  the site are the template's alone.
+- **The research writes the address of each fact** (`research.tmpl`): `content.Research.Citations()`
+  keeps an address only when it is one of the research's `sources`, compared by `SourceHref`'s form
+  (no `utm_*`, escaped or not, no fragment, no trailing slash), so an address the model made up links
+  nothing. `Facts()` reads each fact with its site in brackets, and only the field that carries the
+  page's links (the body, or a product's description) sees the addresses: the pack's `CiteSources`,
+  set by `pictureOf` for the type's link field when the template cites, which makes it the writer's and
+  the judge's and never the meta's or the fields'. The research's answer allowance rises to 2,400
+  tokens for the addresses.
+- **The writer is told to back its facts with links** (not "may"), on the short phrase that names the
+  fact, never the whole sentence or the bare address, at most `max`, at most `perDomain` to a site,
+  spread over the sites, each address once, at least `min`. Each wording was a live run: "may" linked
+  none once; "the words of the sentence" linked whole sentences; without "spread over the sites" the
+  writer linked one site twice and lost the second link. The last run linked three sources on three
+  sites with short anchors.
+- **`Sanitize` keeps a link off the site only to a cited address, within the template's caps**, and
+  writes it with the source's address alone (tracking gone, `href` only); these links spend nothing
+  of the page type's `MaxLinks`. Each one it drops is said, with why, in the `markup_stripped` finding
+  (`DroppedSource`: `uncited`, `words`, `repeat`, `most`, `site`).
+- **`Compliance` grades links off the site against the same `content.Sources`**: an address the
+  research did not cite, or any when the template links none, is `external_link` (an error, as
+  before); over the caps is `too_many_source_links`, under `min` on a researched page
+  `too_few_source_links`, both warnings. The client's own blocks stay ungraded. `validate` reads the
+  research and lists the links in `validation_report.sources`, which the run screen shows as `source`.
+- **The agent's `templates` tool takes `sourceLinks` and the research's `focus`**, which an `update`
+  used to drop; the schemas measure 49,258 bytes and 11,261 tokens.
+- **What stays as it was**: a block the agent replaces with HTML (`edit_page`, `SanitizeBlock`) keeps
+  no link, a source's included; the link audit neither stores nor shows links off the site; an
+  `update` by the agent still drops `publish.refuseDrift`.

@@ -1,4 +1,4 @@
-=== / · Entity · body · 354 tokens
+=== / · Entity · body · 349 tokens
 THE PAGE
 Path: /
 Title: Home
@@ -8,7 +8,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 Research peptides for the laboratory, shipped cold and sealed under nitrogen.
@@ -24,7 +24,7 @@ ITS OTHER FIELDS
 - Title: Home
 --- fits in 3000 tokens
 
-=== /bpc-157/ · Hub · body · 806 tokens
+=== /bpc-157/ · Hub · body · 801 tokens
 THE PAGE
 Path: /bpc-157/
 Title: BPC-157
@@ -34,7 +34,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: BPC-157
@@ -142,7 +142,7 @@ ITS OTHER FIELDS
 - Title: Checkout
 --- fits in 3000 tokens
 
-=== /healing-peptides/ · Hub · body · 726 tokens
+=== /healing-peptides/ · Hub · body · 721 tokens
 THE PAGE
 Path: /healing-peptides/
 Title: Healing Peptides
@@ -151,7 +151,7 @@ WordPress type: page; on the site, published
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: Healing Peptides
@@ -189,7 +189,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb inside the content area; a product listing of 4 links inside the content area; 20 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /hello-world/ · Entity · body · 386 tokens
+=== /hello-world/ · Entity · body · 381 tokens
 THE PAGE
 Path: /hello-world/
 Title: Hello world!
@@ -200,7 +200,7 @@ Terms: category Uncategorized
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 Welcome to WordPress. This is your first post. Edit or delete it, then start writing!
@@ -218,7 +218,7 @@ ITS OTHER FIELDS
 - Title: Hello world!
 --- fits in 3000 tokens
 
-=== /lab-guides/ · Entity · body · 500 tokens
+=== /lab-guides/ · Entity · body · 495 tokens
 THE PAGE
 Path: /lab-guides/
 Title: Lab Guides
@@ -228,7 +228,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: Lab Guides
@@ -291,7 +291,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 content a shortcode or a dynamic block renders; 17 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /peptides/ · Hub · body · 684 tokens
+=== /peptides/ · Hub · body · 679 tokens
 THE PAGE
 Path: /peptides/
 Title: Peptides
@@ -300,7 +300,7 @@ WordPress type: page; on the site, published
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: Peptides
@@ -393,7 +393,7 @@ ITS OTHER FIELDS
 - Title: Privacy Policy
 --- fits in 3000 tokens
 
-=== /product-category/peptides/ · Store category · body · 556 tokens
+=== /product-category/peptides/ · Store category · body · 551 tokens
 THE PAGE
 Path: /product-category/peptides/
 Title: Peptides
@@ -403,7 +403,7 @@ Read only: term
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.
@@ -432,7 +432,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a product listing of 12 links inside the content area; 125 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product-category/peptides/healing-peptides/ · Store category · body · 653 tokens
+=== /product-category/peptides/healing-peptides/ · Store category · body · 648 tokens
 THE PAGE
 Path: /product-category/peptides/healing-peptides/
 Title: Healing Peptides
@@ -442,7 +442,7 @@ Read only: term
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.
@@ -475,7 +475,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a product listing of 10 links inside the content area; 113 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product-category/uncategorized/ · Store category · body · 441 tokens
+=== /product-category/uncategorized/ · Store category · body · 436 tokens
 THE PAGE
 Path: /product-category/uncategorized/
 Title: Uncategorized
@@ -486,7 +486,7 @@ Read only: term
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.
@@ -509,7 +509,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 8 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product/bacteriostatic-water/ · Product · product_description · 364 tokens
+=== /product/bacteriostatic-water/ · Product · product_description · 359 tokens
 THE PAGE
 Path: /product/bacteriostatic-water/
 Title: Bacteriostatic Water
@@ -520,7 +520,7 @@ Terms: product_cat Peptides; product_type simple
 THE FIELD'S RULES
 Field: Product description
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 Reconstitute any of our Peptides with it.
@@ -538,7 +538,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content
 --- fits in 3000 tokens
 
-=== /product/bpc-157-capsules/ · Product · product_description · 664 tokens
+=== /product/bpc-157-capsules/ · Product · product_description · 659 tokens
 THE PAGE
 Path: /product/bpc-157-capsules/
 Title: BPC-157 Capsules
@@ -548,7 +548,7 @@ Terms: entity BPC-157; product_cat Healing Peptides; product_type simple
 
 THE FIELD'S RULES
 Field: Product description
-Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.
@@ -578,7 +578,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a product listing of 8 links inside the content area; a breadcrumb inside the content area; 164 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product/bpc-157-nasal-spray/ · Product · product_description · 689 tokens
+=== /product/bpc-157-nasal-spray/ · Product · product_description · 684 tokens
 THE PAGE
 Path: /product/bpc-157-nasal-spray/
 Title: BPC-157 Nasal Spray
@@ -589,7 +589,7 @@ Terms: entity BPC-157; product_cat Healing Peptides; product_type simple
 THE FIELD'S RULES
 Field: Product description
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 BPC-157 in a metered nasal spray for research use.
@@ -619,7 +619,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content; a product listing of 8 links outside the content
 --- fits in 3000 tokens
 
-=== /product/bpc-157-peptide/ · Product · product_description · 801 tokens
+=== /product/bpc-157-peptide/ · Product · product_description · 796 tokens
 THE PAGE
 Path: /product/bpc-157-peptide/
 Title: BPC-157 Peptide
@@ -630,7 +630,7 @@ Terms: entity BPC-157; pa_strength 5 mg; pa_strength 10 mg; product_cat Healing 
 THE FIELD'S RULES
 Field: Product description
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: BPC-157 Peptide
@@ -668,7 +668,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content; a product listing of 7 links outside the content
 --- fits in 3000 tokens
 
-=== /product/tb-500-peptide/ · Product · product_description · 695 tokens
+=== /product/tb-500-peptide/ · Product · product_description · 690 tokens
 THE PAGE
 Path: /product/tb-500-peptide/
 Title: TB-500 Peptide
@@ -679,7 +679,7 @@ Terms: entity TB-500; pa_strength 5 mg; pa_strength 2 mg; product_cat Healing Pe
 THE FIELD'S RULES
 Field: Product description
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 TB-500 is a synthetic fragment of thymosin beta-4.
@@ -709,7 +709,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content; a product listing of 7 links outside the content
 --- fits in 3000 tokens
 
-=== /reconstitution/ · Entity · body · 439 tokens
+=== /reconstitution/ · Entity · body · 434 tokens
 THE PAGE
 Path: /reconstitution/
 Title: Reconstitution
@@ -719,7 +719,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: Reconstitution
@@ -808,7 +808,7 @@ ITS OTHER FIELDS
 - Title: Refund and Returns Policy
 --- fits in 3000 tokens
 
-=== /sample-page/ · Entity · body · 622 tokens
+=== /sample-page/ · Entity · body · 617 tokens
 THE PAGE
 Path: /sample-page/
 Title: Sample Page
@@ -818,7 +818,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 This is an example page. It's different from a blog post because it will stay in one place and will show up in your site navigation (in most themes). Most people start with an About page that introduces them to potential site visitors. It might say something like this:
@@ -840,7 +840,7 @@ ITS OTHER FIELDS
 - Title: Sample Page
 --- fits in 3000 tokens
 
-=== /shop/ · Catalog · body · 550 tokens
+=== /shop/ · Catalog · body · 545 tokens
 THE PAGE
 Path: /shop/
 Title: Shop
@@ -850,7 +850,7 @@ Technical: shop
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.
@@ -879,7 +879,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a product listing of 12 links inside the content area; 120 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /tb-500/ · Hub · body · 589 tokens
+=== /tb-500/ · Hub · body · 584 tokens
 THE PAGE
 Path: /tb-500/
 Title: TB-500
@@ -889,7 +889,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 20 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: TB-500

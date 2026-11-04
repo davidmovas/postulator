@@ -76,6 +76,22 @@ export interface ValidationView {
     structure: readonly Finding[];
     placed: readonly PlacementView[];
     missing: readonly LinkTargetView[];
+    sources: readonly SourceLinkView[];
+}
+
+export interface SourceLinkView {
+    href: string;
+    anchor: string;
+}
+
+function sourcesOf(held: unknown): readonly SourceLinkView[] {
+    const out: SourceLinkView[] = [];
+    for (const entry of listAt(held, "sources")) {
+        if (record(entry) !== null) {
+            out.push({ href: stringAt(entry, "href"), anchor: stringAt(entry, "anchor") });
+        }
+    }
+    return out;
 }
 
 export function validationView(held: unknown): ValidationView | null {
@@ -105,6 +121,7 @@ export function validationView(held: unknown): ValidationView | null {
         structure: findingsAt(structure, "items"),
         placed,
         missing: targetsAt(links, "missing"),
+        sources: sourcesOf(held),
     };
 }
 
@@ -119,6 +136,9 @@ export function actualLinks(view: ValidationView): readonly ActualLink[] {
     for (const placement of view.placed) {
         out.push({ href: placement.target.url, anchor: placement.anchor, kind: "graph" });
     }
+    for (const source of view.sources) {
+        out.push({ href: source.href, anchor: source.anchor, kind: "source" });
+    }
     for (const finding of view.compliance) {
         const kind = linkClassByCode[finding.code];
         if (kind === undefined) {
@@ -131,7 +151,7 @@ export function actualLinks(view: ValidationView): readonly ActualLink[] {
 }
 
 export function countByClass(links: readonly ActualLink[]): Readonly<Record<LinkClass, number>> {
-    const counts: Record<LinkClass, number> = { graph: 0, self: 0, external: 0, unknown_internal: 0 };
+    const counts: Record<LinkClass, number> = { graph: 0, source: 0, self: 0, external: 0, unknown_internal: 0 };
     for (const link of links) {
         counts[link.kind] += 1;
     }

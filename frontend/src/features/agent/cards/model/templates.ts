@@ -31,13 +31,16 @@ function recipeOf(listed: JsonValue): JsonValue {
         if (!isJsonObject(held)) {
             return held;
         }
-        const { allowErrors, iterations, ...rest } = held;
+        const { allowErrors, iterations, focus, ...rest } = held;
         const params: JsonObject = {};
         if (allowErrors !== undefined) {
             params.allowErrors = allowErrors;
         }
         if (iterations !== undefined) {
             params.iterations = iterations;
+        }
+        if (focus !== undefined) {
+            params.focus = focus;
         }
         return Object.keys(params).length === 0 ? rest : { ...rest, params };
     });

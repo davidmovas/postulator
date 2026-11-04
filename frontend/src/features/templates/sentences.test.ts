@@ -51,6 +51,23 @@ describe("sentencesOf", () => {
         expect(sentencesOf(outputs, { product: null })).toStrictEqual(["drops the product outputs"]);
     });
 
+    it("says what a layer does to the links to the research's sources", () => {
+        expect(sentencesOf(draft, { sourceLinks: { max: 4, min: 2 } })).toStrictEqual([
+            "links up to 4 of the research's sources",
+            "warns when a researched page links fewer than 2 sources",
+        ]);
+        expect(sentencesOf(draft, { sourceLinks: { max: 0 } })).toStrictEqual(["links none of the research's sources"]);
+        expect(sentencesOf(draft, { sourceLinks: { perDomain: 1 } })).toStrictEqual(["links one source per site at most"]);
+    });
+
+    it("says what the research looks for", () => {
+        expect(
+            sentencesOf(draft, {
+                recipe: [{ name: "research", enabled: true, params: { focus: " the doses " } }],
+            }),
+        ).toContain("has the research look for “the doses”");
+    });
+
     it("says the site shortened the page", () => {
         expect(sentencesOf(draft, { length: { min: 600, max: 900 } })).toStrictEqual([
             "shortens the page to 600–900 words",

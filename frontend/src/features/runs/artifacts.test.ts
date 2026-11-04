@@ -93,6 +93,7 @@ const validation = {
         missing: [{ pageId: "p3", url: "/c/", relation: "down", required: true, anchors: [] }],
         decisions: [],
     },
+    sources: [{ href: "https://www.who.int/peptides", anchor: "frozen storage" }],
 };
 
 describe("validationView", () => {
@@ -118,20 +119,27 @@ describe("validationView", () => {
 });
 
 describe("actualLinks", () => {
-    it("classifies placements as graph links and reads the rest off the findings", () => {
+    it("classifies placements as graph links, the cited sources as source links, and reads the rest off the findings", () => {
         const view = validationView(validation);
         const links = actualLinks(view ?? { ...emptyValidation });
         expect(links).toStrictEqual([
             { href: "/b/", anchor: "b", kind: "graph" },
+            { href: "https://www.who.int/peptides", anchor: "frozen storage", kind: "source" },
             { href: "/x/", anchor: "", kind: "unknown_internal" },
             { href: "/a/", anchor: "", kind: "self" },
         ]);
+    });
+
+    it("reads no source link from a report written before the sources were listed", () => {
+        const { sources: _dropped, ...older } = validation;
+        expect(validationView(older)?.sources).toStrictEqual([]);
     });
 
     it("counts each class", () => {
         const view = validationView(validation);
         expect(countByClass(actualLinks(view ?? { ...emptyValidation }))).toStrictEqual({
             graph: 1,
+            source: 1,
             self: 1,
             external: 0,
             unknown_internal: 1,
@@ -148,6 +156,7 @@ const emptyValidation = {
     structure: [],
     placed: [],
     missing: [],
+    sources: [],
 };
 
 describe("owedTargets", () => {
@@ -203,6 +212,24 @@ describe("researchView", () => {
             ],
             searches: 3,
         });
+    });
+
+    it("reads a fact without the citation the search wrote into it", () => {
+        const view = researchView({
+            text: "- Store aliquots frozen. ([who.int](https://www.who.int/peptides?utm_source=openai)) [who.int]",
+            sources: [],
+            searches: 1,
+        });
+        expect(view?.facts).toStrictEqual(["Store aliquots frozen. [who.int]"]);
+    });
+
+    it("shows the site of the address a fact ends with", () => {
+        const view = researchView({
+            text: "- Discard a vial within 28 days. [https://www.cdc.gov/injection-safety/]\n- Keep it cold. (https://nih.gov/cold)",
+            sources: [],
+            searches: 1,
+        });
+        expect(view?.facts).toStrictEqual(["Discard a vial within 28 days. [cdc.gov]", "Keep it cold. [nih.gov]"]);
     });
 
     it("answers null for what is not a research", () => {

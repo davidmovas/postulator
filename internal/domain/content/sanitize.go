@@ -23,6 +23,7 @@ type Stripped struct {
 	Elements   []string
 	Attributes int
 	Demoted    int
+	Sources    []DroppedSource
 }
 
 func (s Stripped) Any() bool {
@@ -34,30 +35,66 @@ type LinkAllowance struct {
 	policy  field.LinkPolicy
 	placed  map[string]int
 	total   int
+	sources Sources
+	cited   sourceCount
 }
 
 func NewLinkAllowance(lc LinkContext, policy field.LinkPolicy) *LinkAllowance {
-	return &LinkAllowance{context: lc, policy: policy, placed: make(map[string]int)}
+	return &LinkAllowance{context: lc, policy: policy, placed: make(map[string]int), cited: newSourceCount()}
+}
+
+func (a *LinkAllowance) WithSources(sources Sources) *LinkAllowance {
+	a.sources = sources
+	return a
 }
 
 func (a *LinkAllowance) Context() LinkContext {
 	return a.context
 }
 
-func (a *LinkAllowance) keep(node *html.Node) (string, bool) {
-	if a == nil || !a.policy.Links {
-		return "", false
+type verdict struct {
+	href    string
+	kept    bool
+	dropped *DroppedSource
+}
+
+func (a *LinkAllowance) keep(node *html.Node) verdict {
+	if a == nil {
+		return verdict{}
 	}
-	resolved := a.context.Resolve(Attr(node, "href"))
-	if resolved.Class != ClassGraph || !AnchorAllowed(resolved.Target, TextOf(node)) {
-		return "", false
+	href := Attr(node, "href")
+	resolved := a.context.Resolve(href)
+	if resolved.Class == ClassExternal {
+		return a.keepSource(href, TextOf(node))
+	}
+	if !a.policy.Links || resolved.Class != ClassGraph || !AnchorAllowed(resolved.Target, TextOf(node)) {
+		return verdict{}
 	}
 	if rules := a.policy.Rules; (rules.MaxLinks > 0 && a.total >= rules.MaxLinks) || a.placed[resolved.Target.PageID] >= max(rules.MaxPerTarget, 1) {
-		return "", false
+		return verdict{}
 	}
 	a.placed[resolved.Target.PageID]++
 	a.total++
-	return a.context.Href(resolved.Target), true
+	return verdict{href: a.context.Href(resolved.Target), kept: true}
+}
+
+func (a *LinkAllowance) keepSource(href, anchor string) verdict {
+	words := strings.TrimSpace(anchor)
+	target, cited := a.sources.lookup(href)
+	reason := DroppedUncited
+	switch {
+	case !cited:
+		target = href
+	case bareAddress(words):
+		reason = DroppedWords
+	default:
+		reason = a.cited.refusal(target, a.sources.rules)
+	}
+	if reason != "" {
+		return verdict{dropped: &DroppedSource{Href: target, Anchor: words, Reason: reason}}
+	}
+	a.cited.add(target)
+	return verdict{href: target, kept: true}
 }
 
 type demotion struct {
@@ -110,10 +147,14 @@ func scrub(parent *html.Node, allowance *LinkAllowance, rule demotion, stripped 
 			parent.RemoveChild(child)
 			stripped.Elements = append(stripped.Elements, child.Data)
 		case child.Data == "a":
-			if href, kept := allowance.keep(child); kept {
-				child.Attr = []html.Attribute{{Key: "href", Val: href}}
+			held := allowance.keep(child)
+			if held.kept {
+				child.Attr = []html.Attribute{{Key: "href", Val: held.href}}
 				scrub(child, nil, rule, stripped)
 				break
+			}
+			if held.dropped != nil {
+				stripped.Sources = append(stripped.Sources, *held.dropped)
 			}
 			scrub(child, nil, rule, stripped)
 			unwrap(parent, child)
@@ -174,6 +215,13 @@ func strippedFindings(heading string, stripped Stripped) []Finding {
 	if stripped.Demoted > 0 {
 		said = append(said, plural(stripped.Demoted, "heading demoted to h3"))
 	}
+	if len(stripped.Sources) > 0 {
+		dropped := make([]string, 0, len(stripped.Sources))
+		for _, source := range stripped.Sources {
+			dropped = append(dropped, source.said())
+		}
+		said = append(said, "the links off the site it dropped: "+strings.Join(dropped, ", "))
+	}
 	where := "a section of its own"
 	if heading != "" {
 		where = "the section " + heading
@@ -183,7 +231,7 @@ func strippedFindings(heading string, stripped Stripped) []Finding {
 		Message: "the writer put markup it may not into " + where + ": " + strings.Join(said, "; "),
 		Details: map[string]any{
 			"heading": heading, "links": stripped.Links, "elements": stripped.Elements,
-			"attributes": stripped.Attributes, "demoted": stripped.Demoted,
+			"attributes": stripped.Attributes, "demoted": stripped.Demoted, "sources": stripped.Sources,
 		},
 	}}
 }

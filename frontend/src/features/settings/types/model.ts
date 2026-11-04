@@ -71,7 +71,6 @@ function sameRules(left: LinkRules, right: LinkRules): boolean {
 function samePolicy(left: LinkPolicy, right: LinkPolicy): boolean {
     return (
         left.links === right.links &&
-        left.forbidExternal === right.forbidExternal &&
         left.forbidSelf === right.forbidSelf &&
         left.anchorStrategy === right.anchorStrategy &&
         sameRules(left.rules, right.rules)
@@ -216,7 +215,6 @@ export function noLinks(): LinkPolicy {
             parentLinkWithinParagraphs: 0,
             childrenSection: false,
         },
-        forbidExternal: false,
         forbidSelf: false,
         anchorStrategy: asAnchor(anchorStrategies[0]),
     };

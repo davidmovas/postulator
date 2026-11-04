@@ -59,7 +59,8 @@ func (d Deps) pictureOf(ctx context.Context, sc *run.StepContext, key field.Key,
 	}
 	kind := claimedType(set, sc)
 	scope, _ := set.Scope(kind.ID, key)
-	if key == pagetype.LinkField(kind.Preset) {
+	linking := key == pagetype.LinkField(kind.Preset)
+	if linking {
 		scope.Links = sc.Links
 	}
 	if key == pageKey(sc.Page) && sc.Rewrites(sc.Page.ID) {
@@ -71,6 +72,7 @@ func (d Deps) pictureOf(ctx context.Context, sc *run.StepContext, key field.Key,
 	}
 	return d.Pictures.Picture(ctx, directedRequest(sitemodel.PackRequest{
 		PageID: sc.Page.ID, Field: string(key), Budget: budget, Claim: claim, Research: research,
+		CiteSources: linking && sc.Spec.SourceLinks.Cites(),
 	}, sc.Run.Brief, sc.Item.Directive))
 }
 

@@ -36,7 +36,6 @@ export function hubLinks(): LinkPolicy {
             parentLinkWithinParagraphs: 2,
             childrenSection: true,
         },
-        forbidExternal: true,
         forbidSelf: true,
     };
 }

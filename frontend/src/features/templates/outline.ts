@@ -7,7 +7,14 @@ export type GroupKey = "sections" | "product" | "rules" | "models" | "recipe" | 
 
 export const groupKeys: readonly GroupKey[] = ["sections", "product", "rules", "models", "recipe", "overrides"];
 
-const ruleRoots: readonly SpecPath[] = [paths.tone, ["length"], ["keywordRules"], ["metaRules"], ["images"]];
+const ruleRoots: readonly SpecPath[] = [
+    paths.tone,
+    ["length"],
+    ["keywordRules"],
+    ["metaRules"],
+    ["images"],
+    ["sourceLinks"],
+];
 
 const watched: Readonly<Record<GroupKey, readonly SpecPath[]>> = {
     sections: [paths.sections],

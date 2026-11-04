@@ -45,7 +45,7 @@ ITS OTHER FIELDS
 - Title: Checkout
 --- fits in 3000 tokens
 
-=== /guide/ · Entity · body · 310 tokens
+=== /guide/ · Entity · body · 305 tokens
 THE PAGE
 Path: /guide/
 Title: Guide
@@ -55,7 +55,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: Guide
@@ -77,7 +77,7 @@ ITS OTHER FIELDS
 - Title: Guide
 --- fits in 3000 tokens
 
-=== /guide/setup/ · Entity · body · 353 tokens
+=== /guide/setup/ · Entity · body · 348 tokens
 THE PAGE
 Path: /guide/setup/
 Title: Setup
@@ -87,7 +87,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE ENTITY
 Entity: Setup
@@ -110,7 +110,7 @@ ITS OTHER FIELDS
 - Title: Setup
 --- fits in 3000 tokens
 
-=== /hello-world/ · Entity · body · 237 tokens
+=== /hello-world/ · Entity · body · 232 tokens
 THE PAGE
 Path: /hello-world/
 Title: Hello world!
@@ -121,7 +121,7 @@ Terms: category Uncategorized
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 Welcome to WordPress. This is your first post. Edit or delete it, then start writing!
@@ -196,7 +196,7 @@ ITS OTHER FIELDS
 - Title: Privacy Policy
 --- fits in 3000 tokens
 
-=== /product-category/koffein/ · Store category · body · 342 tokens
+=== /product-category/koffein/ · Store category · body · 337 tokens
 THE PAGE
 Path: /product-category/koffein/
 Title: Koffein
@@ -206,7 +206,7 @@ Read only: term
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.
@@ -226,7 +226,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb inside the content area; a product listing of 6 links inside the content area; 55 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product-category/uncategorized/ · Store category · body · 227 tokens
+=== /product-category/uncategorized/ · Store category · body · 222 tokens
 THE PAGE
 Path: /product-category/uncategorized/
 Title: Uncategorized
@@ -236,7 +236,7 @@ Read only: term
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.
@@ -248,7 +248,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb inside the content area; 19 words the site generates inside the content area
 --- fits in 3000 tokens
 
-=== /product/coffee-beans/ · Product · product_description · 347 tokens
+=== /product/coffee-beans/ · Product · product_description · 342 tokens
 THE PAGE
 Path: /product/coffee-beans/
 Title: Coffee Beans
@@ -259,7 +259,7 @@ Terms: product_cat Koffein; product_type variable
 THE FIELD'S RULES
 Field: Product description
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 Roasted every week and sold whole.
@@ -279,7 +279,7 @@ WHAT THE SITE ADDS AROUND THE FIELD
 a breadcrumb outside the content
 --- fits in 3000 tokens
 
-=== /product/powder/ · Product · product_description · 328 tokens
+=== /product/powder/ · Product · product_description · 323 tokens
 THE PAGE
 Path: /product/powder/
 Title: Powder
@@ -290,7 +290,7 @@ Terms: product_cat Koffein; product_type simple
 THE FIELD'S RULES
 Field: Product description
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 3 links; at most 1 per target; up 1 level(s); sideways to related pages weighted at least 1; the parent linked within the first 1 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 See Koffein.
@@ -361,7 +361,7 @@ ITS OTHER FIELDS
 - Title: Refund and Returns Policy
 --- fits in 3000 tokens
 
-=== /sample-page/ · Entity · body · 470 tokens
+=== /sample-page/ · Entity · body · 465 tokens
 THE PAGE
 Path: /sample-page/
 Title: Sample Page
@@ -371,7 +371,7 @@ WordPress type: page; on the site, published
 THE FIELD'S RULES
 Field: Body
 The current value is the client's: keep it as it stands and write only what it lacks.
-Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no external links; no link to the page itself; the client's anchors first
+Links: at most 12 links; at most 1 per target; up 2 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 2 paragraph(s); no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE (THE CLIENT'S)
 This is an example page. It's different from a blog post because it will stay in one place and will show up in your site navigation (in most themes). Most people start with an About page that introduces them to potential site visitors. It might say something like this:
@@ -384,7 +384,7 @@ ITS OTHER FIELDS
 - Title: Sample Page
 --- fits in 3000 tokens
 
-=== /shop/ · Catalog · body · 276 tokens
+=== /shop/ · Catalog · body · 271 tokens
 THE PAGE
 Path: /shop/
 Title: Shop
@@ -394,7 +394,7 @@ Technical: shop
 
 THE FIELD'S RULES
 Field: Body
-Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no external links; no link to the page itself; the client's anchors first
+Links: at most 15 links; at most 1 per target; up 1 level(s); down to the children; sideways to related pages weighted at least 0.5; the parent linked within the first 1 paragraph(s); a children section; no link to the page itself; the client's anchors first
 
 THE FIELD'S CURRENT VALUE
 The field is empty.

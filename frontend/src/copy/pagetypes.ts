@@ -254,7 +254,8 @@ export const pageTypes = {
         title: "Links in this field",
         links: "Carries contextual links",
         linksHint: "Off, Postulator places no internal link in this field.",
-        forbidExternal: "Forbid links off the site",
+        sourcesHint:
+            "Links off the site go only to the sources a web search found, as many as the page's template allows under Links to the research's sources.",
         forbidSelf: "Forbid a page linking to itself",
         anchorStrategy: "Anchor text",
         anchorStrategyHint: "How the anchor is chosen when an entity carries several.",

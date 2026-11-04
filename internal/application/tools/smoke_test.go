@@ -481,6 +481,39 @@ func TestATemplateToolDeclaresWhatAProductGets(t *testing.T) {
 	}
 }
 
+func TestATemplateToolKeepsTheResearchsFocusAndItsSourceLinks(t *testing.T) {
+	t.Parallel()
+
+	registry, binding, _ := wired(t)
+	binding.Mode = domainagent.ModeAutonomous
+
+	researched := strings.TrimSuffix(minimalSpec, "}") +
+		`,"sourceLinks":{"max":4,"perDomain":1,"min":2},"recipe":[{"name":"resolve_context","enabled":true},` +
+		`{"name":"research","enabled":true,"focus":"the doses and the storage temperatures"},{"name":"generate_body","enabled":true}]}`
+	out, err := registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"Researched","spec":`+researched+`}`))
+	if err != nil {
+		t.Fatalf("templates create: %v", err)
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		t.Fatalf("encode the answer: %v", err)
+	}
+	for _, want := range []string{
+		`"sourceLinks":{"max":4,"perDomain":1,"min":2}`, `"params":{"focus":"the doses and the storage temperatures"}`,
+	} {
+		if !strings.Contains(string(encoded), want) {
+			t.Errorf("the template lost %s: %s", want, encoded)
+		}
+	}
+
+	refused := strings.TrimSuffix(minimalSpec, "}") + `,"sourceLinks":{"max":1,"min":2}}`
+	if _, err = registry.Call(t.Context(), binding, "templates",
+		json.RawMessage(`{"op":"create","name":"Asks more than it allows","spec":`+refused+`}`)); err == nil {
+		t.Error("a template asking for more sources than it allows was taken")
+	}
+}
+
 func argumentsFor(name string) json.RawMessage {
 	switch name {
 	case "imports_inspect", "imports_preview":

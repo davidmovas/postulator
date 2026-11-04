@@ -217,7 +217,7 @@ func harnessLinks() field.LinkPolicy {
 			UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.6, MaxLinks: 10, MaxPerTarget: 1,
 			ParentLinkWithinParagraphs: 2, ChildrenSection: true,
 		},
-		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorRotate,
+		ForbidSelf: true, AnchorStrategy: field.AnchorRotate,
 	}
 }
 

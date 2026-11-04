@@ -22,6 +22,7 @@ type ValidationReport struct {
 	Compliance content.Report       `json:"compliance"`
 	Structure  content.Report       `json:"structure"`
 	Links      content.InsertResult `json:"links"`
+	Sources    []content.SourceLink `json:"sources"`
 	Score      float64              `json:"score"`
 }
 
@@ -29,6 +30,7 @@ func Validate(deps Deps) run.StepDef {
 	return run.StepDef{
 		Name:     NameValidate,
 		Requires: []run.ArtifactKind{run.ArtifactLinkContext, run.ArtifactBodyHTML},
+		Reads:    []run.ArtifactKind{run.ArtifactResearch},
 		Produces: []run.ArtifactKind{run.ArtifactValidationReport},
 		Retry:    run.RetryPolicy{Max: 2},
 		Timeout:  pureStepTimeout,
@@ -69,12 +71,18 @@ func Validate(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			research, err := researchOf(sc)
+			if err != nil {
+				return run.Result{}, err
+			}
+			sources := content.SourcesOf(research, sc.Spec.SourceLinks)
 			keywords := pagemap.Keywords(sc.Page, entity)
 			report := ValidationReport{
 				PageID:     sc.Page.ID,
-				Compliance: content.ComplianceOf(whole, doc, lc, policy, sc.Page.ID),
+				Compliance: content.ComplianceOf(whole, doc, lc, policy, sources, sc.Page.ID),
 				Structure:  content.Structure(doc, keywords, sc.Spec),
 				Links:      links,
+				Sources:    sources.Linked(doc, lc),
 			}
 			report.Compliance.Items = append(report.Compliance.Items, content.Unpublished(whole, lc, live, sc.Page.ID)...)
 			report.Compliance.Score = content.ScoreOf(report.Compliance.Items)

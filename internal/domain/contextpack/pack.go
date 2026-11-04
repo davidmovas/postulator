@@ -216,9 +216,6 @@ func policyLine(policy field.LinkPolicy) string {
 	if rules.ChildrenSection {
 		parts = append(parts, "a children section")
 	}
-	if policy.ForbidExternal {
-		parts = append(parts, "no external links")
-	}
 	if policy.ForbidSelf {
 		parts = append(parts, "no link to the page itself")
 	}

@@ -135,7 +135,7 @@ func typedSite(t *testing.T, store *sqlite.Store, siteID string, rules field.Lin
 		if !preset.Writable() {
 			continue
 		}
-		links := field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+		links := field.LinkPolicy{Links: true, Rules: rules, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 		if _, err = service.SetScope(t.Context(), pagetypes.SetScopeRequest{
 			PageTypeID: listed.Types[i].ID, Field: string(pagetype.LinkField(preset)), Enabled: true, AIWrites: true, Links: links,
 		}); err != nil {

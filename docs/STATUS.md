@@ -4,28 +4,30 @@ The handoff point between sessions. Read this first. The reasoning behind every 
 every ruling is in [`DECISIONS.md`](DECISIONS.md).
 
 **Branch:** `dev`, the development branch; `master` takes a PR from it when the owner asks.
-**Released:** `v2.10.1` on 2026-10-30 (PR #38 merged, tagged; products read through the plugin
-when WordPress hides them and the store refuses, notes under **Release 2.10.1**). **2.11.0 is in a pull
-request from `dev`** (2026-11-03): the Pages tree by address, a run's parents only for a creation, the
-No hub above filter and lens, types shown under their role, then a site that deletes again, Clear
-data, the assistant's reasoning as a setting and the web search; notes under **Release 2.11.0**.
+**Released:** `v2.11.0` on 2026-11-03 (PR #39 merged, tagged; notes under **Release 2.11.0**).
+**2.12.0 is in a pull request from `dev`** (2026-11-04): the writer links the sources its research
+cited, as the template's three new levers allow, and the page type's external switch is gone; notes
+under **Release 2.12.0**.
 
 ## Next, in order
 
-1. **The owner merges 2.11.0 into `master` and tags it.** Its gate, 2026-11-03 after the second part:
-   `go test` over all 98 packages but `internal/app/scale` (in five groups, `-p 2`, for the machine's
-   memory) green; vitest over all 228 files (2,684 tests), typecheck and `golangci-lint` green; on the
-   replica eleven suites green (the whole loop, the client's loop, the observation, page types, the
-   product loop, the writer's picture, the run brief, the agent seeing the site and editing a block,
-   the assistant reading the site and planning content; 167 s and 294 s). Before the second part,
-   2026-11-02, `task build` and both stands' four suites passed. Not run: race, the scale package,
-   `e2e:full`, vanilla since the second part, `task build` since it, the UI harness walk.
-2. **Prove the web search's request shapes for free** with a key that has no credit (it validates a
-   request before it refuses it): a research call (the hosted `web_search` with `search_context_size`,
-   `filters.allowed_domains` and `blocked_domains`, `max_tool_calls`, `include`, no `text.format`) and a
-   streamed chat round with the function tools and the search. Then, with a funded key, read a page's
-   research and the ledger's `web_searches` and `input_tokens`, and settle the search allowance by depth
-   (`steps.searchTokensByDepth`) and the research step's overhead (the 800 default).
+1. **The owner merges 2.12.0 into `master` and tags it.** Its gate, 2026-11-04: `go test` over every
+   package but `internal/app/scale` green (kernel, domain, application, runtime, adapters and
+   `internal/app` in one `-p 2` run the memory reaper stopped after its 85th green package, then
+   transport, `frontend`, `wp-plugin` and `cmd` on their own); `golangci-lint` green over the tree and
+   with `--build-tags e2e`; typecheck green; vitest over the four areas it touches (templates, runs,
+   settings, agent: 86 files, 1,075 tests) green; `task build` green; the new
+   `TestAResearchedPageReachesTheSiteWithTheLinksToItsSources` green on the replica and on vanilla; a
+   live run on the replica (a funded key, six times while the prompts were settled) linked three
+   sources on three sites. Not run: vitest over the other areas, race, the scale package, the stands'
+   other suites, `e2e:full`, the UI harness walk. The stands are stopped (`docker stop`, volumes kept).
+2. **The web search with a funded key, what is left.** A research call is proven live (2026-11-03/04,
+   gpt-5.6-terra, medium depth): two searches a page whatever `maxCalls` allows, 19,700 to 22,100 input
+   tokens (about 10,000 a search against the 6,000 `steps.searchTokensByDepth` prices, which the five
+   searches it prices more than cover), 2,300 to 2,400 output tokens, $0.088 to $0.093; the writer
+   $0.021 on flex. Still owed: a streamed chat round with the function tools and the search, the
+   domain lists, and settling the allowance by depth and the research step's overhead (the 800
+   default). Rotate the key the owner pasted into the chat once the checks are done.
 3. **The client installs it and syncs once**: his products come in as pages with their
    entities. If there are still none, the cause is not this one: look at the Sites panel (is the
    plugin found, and what does it say about WooCommerce) and at `https://<site>/wp-json/wp/v2/types`.
@@ -101,6 +103,29 @@ through it; [`VISION.md`](VISION.md) is the longer version.
 - **A run's brief**: a goal, a focus, a tone, what to avoid, a reference and a style sample for the
   run, and per page notes, sections, keywords, anchors, must-links and a length, read first by the
   writer, the linker and the judge.
+
+## Release 2.12.0
+
+- **The writer links the research's sources.** A researched page's body now carries links to the
+  pages the web search cited, each on the short phrase that names the fact it backs, written with the
+  source's own address (the search's tracking parameter removed). Before, the writer was told never
+  to link them and every such link was removed.
+- **Three levers on the template**, under Rules → Links to the research's sources: the most links to
+  sources on a page (0 links none), the most to one site, and the fewest (a researched page that links
+  fewer gets a warning, never a stop). The recipe's research row says how many it links. New and
+  built-in templates link up to three, one to a site; a template that already researched gets the same
+  on upgrade; any other keeps none until the client sets it.
+- **The page type's "Forbid links off the site" is gone.** Links off the site go only to the research's
+  sources, as many as the template allows; links to the site's own pages stay on the page type.
+- **The run screen says what happened.** The links pane lists the source links; when the writer linked
+  more than the template allows, a warning names each link it removed and why (over the most, over
+  one site, not a cited address, already linked, no words of its own).
+- **The research writes each fact's address**, checked against the pages the search really returned,
+  so a made-up address links nothing; the facts read cleaner on the run screen.
+- **The assistant** sets the links to sources on a template and keeps the research's focus, which an
+  update of a template used to drop.
+- **Migration 0092** (the link policies lose `forbidExternal`; researching templates get links to
+  sources); the plugin stays 1.5.2.
 
 ## Release 2.11.0
 

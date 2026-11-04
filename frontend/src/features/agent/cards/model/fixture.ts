@@ -26,7 +26,6 @@ const scope = {
     links: {
         links: true,
         rules: { upDepth: 1, downLinks: true, siblingMinWeight: 0.5, maxLinks: 20, maxPerTarget: 1, parentLinkWithinParagraphs: 2, childrenSection: true },
-        forbidExternal: true,
         forbidSelf: true,
         anchorStrategy: "rotate",
     },
