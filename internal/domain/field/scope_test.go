@@ -140,14 +140,17 @@ func TestAStoredPolicyMustSayWhetherItCarriesLinks(t *testing.T) {
 	if _, err := field.ParsePolicy([]byte(`{"rules":{"maxLinks":3}}`)); err == nil {
 		t.Error("a policy without links was read as no links")
 	}
-	got, err := field.ParsePolicy([]byte(`{"links":true,"rules":{"upDepth":1,"downLinks":true,"siblingMinWeight":0.5,"maxLinks":20,"maxPerTarget":1,"parentLinkWithinParagraphs":2,"childrenSection":true},"forbidExternal":true,"forbidSelf":true,"anchorStrategy":"prefer_user"}`))
+	if _, err := field.ParsePolicy([]byte(`{"links":true,"forbidExternal":true}`)); err == nil {
+		t.Error("a policy still carrying the external switch the template's source links replaced was read")
+	}
+	got, err := field.ParsePolicy([]byte(`{"links":true,"rules":{"upDepth":1,"downLinks":true,"siblingMinWeight":0.5,"maxLinks":20,"maxPerTarget":1,"parentLinkWithinParagraphs":2,"childrenSection":true},"forbidSelf":true,"anchorStrategy":"prefer_user"}`))
 	if err != nil {
 		t.Fatalf("ParsePolicy: %v", err)
 	}
 	want := field.LinkPolicy{
-		Links:          true,
-		Rules:          field.LinkRules{UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 20, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2, ChildrenSection: true},
-		ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser,
+		Links:      true,
+		Rules:      field.LinkRules{UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 20, MaxPerTarget: 1, ParentLinkWithinParagraphs: 2, ChildrenSection: true},
+		ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser,
 	}
 	if got != want {
 		t.Errorf("ParsePolicy = %+v, want %+v", got, want)

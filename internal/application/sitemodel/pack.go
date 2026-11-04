@@ -26,14 +26,15 @@ type Claim struct {
 }
 
 type PackRequest struct {
-	PageID    string            `json:"pageId"`
-	Field     string            `json:"field"`
-	Budget    int               `json:"budget"`
-	Brief     *run.Brief        `json:"brief,omitempty"`
-	Directive *run.Directive    `json:"directive,omitempty"`
-	RunID     string            `json:"runId,omitempty"`
-	Research  *content.Research `json:"-"`
-	Claim     *Claim            `json:"-"`
+	PageID      string            `json:"pageId"`
+	Field       string            `json:"field"`
+	Budget      int               `json:"budget"`
+	Brief       *run.Brief        `json:"brief,omitempty"`
+	Directive   *run.Directive    `json:"directive,omitempty"`
+	RunID       string            `json:"runId,omitempty"`
+	Research    *content.Research `json:"-"`
+	CiteSources bool              `json:"-"`
+	Claim       *Claim            `json:"-"`
 }
 
 func (r PackRequest) directed() bool {
@@ -67,7 +68,7 @@ func (s *Service) Picture(ctx context.Context, req PackRequest) (Picture, error)
 				return err
 			}
 		}
-		facts.Research = req.Research
+		facts.Research, facts.CiteSources = req.Research, req.CiteSources
 		pack := contextpack.Build(facts, scope)
 		fitted, err := contextpack.Fit(pack, req.Budget)
 		if err != nil {

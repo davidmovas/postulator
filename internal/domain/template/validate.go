@@ -63,6 +63,9 @@ func Validate(spec TemplateSpec) error {
 	if (spec.Images.Featured || spec.Images.Inline > 0) && spec.Images.Source == "" {
 		return invalid("image source is required when images are requested", "images.source")
 	}
+	if err := validateSourceLinks(spec.SourceLinks); err != nil {
+		return err
+	}
 	if spec.Product != nil {
 		if err := validateProduct(*spec.Product); err != nil {
 			return err
@@ -90,6 +93,21 @@ func Validate(spec TemplateSpec) error {
 		seen[name] = struct{}{}
 	}
 	return nil
+}
+
+func validateSourceLinks(links SourceLinks) error {
+	switch {
+	case links.Max < 0:
+		return invalid("the number of links to sources must not be negative", "sourceLinks.max")
+	case links.PerDomain < 0:
+		return invalid("the number of links to one site must not be negative", "sourceLinks.perDomain")
+	case links.Min < 0:
+		return invalid("the fewest sources to link must not be negative", "sourceLinks.min")
+	case links.Min > links.Max:
+		return invalid("the fewest sources to link must not be above the most links to sources", "sourceLinks.min")
+	default:
+		return nil
+	}
 }
 
 func validateProduct(product Product) error {

@@ -117,6 +117,23 @@ func TestValidateSpec(t *testing.T) {
 		{name: "a model of a removed provider stays saveable", mutate: func(s *template.TemplateSpec) {
 			s.ModelProfiles = map[llm.Role]llm.ModelRef{llm.RoleWriter: {Provider: "retired", Model: "old-model"}}
 		}},
+		{name: "links to the research's sources", mutate: func(s *template.TemplateSpec) {
+			s.SourceLinks = template.SourceLinks{Max: 3, PerDomain: 1, Min: 2}
+		}},
+		{name: "no links to sources is fine", mutate: func(s *template.TemplateSpec) { s.SourceLinks = template.SourceLinks{} }},
+		{name: "negative source links", mutate: func(s *template.TemplateSpec) { s.SourceLinks.Max = -1 }, field: "sourceLinks.max"},
+		{name: "negative source links per domain", mutate: func(s *template.TemplateSpec) {
+			s.SourceLinks = template.SourceLinks{Max: 2, PerDomain: -1}
+		}, field: "sourceLinks.perDomain"},
+		{name: "negative least source links", mutate: func(s *template.TemplateSpec) {
+			s.SourceLinks = template.SourceLinks{Max: 2, Min: -1}
+		}, field: "sourceLinks.min"},
+		{name: "more source links asked than allowed", mutate: func(s *template.TemplateSpec) {
+			s.SourceLinks = template.SourceLinks{Max: 2, Min: 3}
+		}, field: "sourceLinks.min"},
+		{name: "source links asked while none are allowed", mutate: func(s *template.TemplateSpec) {
+			s.SourceLinks = template.SourceLinks{Min: 1}
+		}, field: "sourceLinks.min"},
 		{name: "blank step", mutate: func(s *template.TemplateSpec) { s.Recipe[1].Name = "" }, field: "recipe[1].name"},
 		{name: "repeated step", mutate: func(s *template.TemplateSpec) { s.Recipe[1].Name = "resolve_context" }, field: "recipe[1].name"},
 		{name: "empty recipe is allowed", mutate: func(s *template.TemplateSpec) { s.Recipe = nil }},

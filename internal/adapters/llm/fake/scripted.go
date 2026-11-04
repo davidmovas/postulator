@@ -8,10 +8,11 @@ import (
 )
 
 type Reply struct {
-	Make  func(req port.Request) string
-	Step  string
-	Match string
-	Text  string
+	Make    func(req port.Request) string
+	Step    string
+	Match   string
+	Text    string
+	Sources []port.Source
 }
 
 type Scripted struct {
@@ -28,7 +29,14 @@ func NewScriptedOver(client *Client, replies ...Reply) *Scripted {
 }
 
 func (s *Scripted) Complete(ctx context.Context, req port.Request) (port.Response, error) {
-	return s.client.Complete(ctx, s.directed(req))
+	answer, err := s.client.Complete(ctx, s.directed(req))
+	if err != nil {
+		return answer, err
+	}
+	if reply, found := s.match(req); found && len(reply.Sources) > 0 {
+		answer.Sources = append([]port.Source(nil), reply.Sources...)
+	}
+	return answer, nil
 }
 
 func (s *Scripted) Stream(ctx context.Context, req port.Request) (<-chan port.Delta, error) {
@@ -63,6 +71,17 @@ func (s *Scripted) directed(req port.Request) port.Request {
 }
 
 func (s *Scripted) reply(req port.Request) (string, bool) {
+	reply, found := s.match(req)
+	if !found {
+		return "", false
+	}
+	if reply.Text == "" && reply.Make != nil {
+		return reply.Make(req), true
+	}
+	return reply.Text, true
+}
+
+func (s *Scripted) match(req port.Request) (Reply, bool) {
 	prompt := ""
 	if len(req.Messages) > 0 {
 		prompt = req.Messages[len(req.Messages)-1].Text
@@ -75,10 +94,7 @@ func (s *Scripted) reply(req port.Request) (string, bool) {
 		if reply.Match != "" && !strings.Contains(prompt, reply.Match) {
 			continue
 		}
-		if reply.Text == "" && reply.Make != nil {
-			return reply.Make(req), true
-		}
-		return reply.Text, true
+		return reply, true
 	}
-	return "", false
+	return Reply{}, false
 }

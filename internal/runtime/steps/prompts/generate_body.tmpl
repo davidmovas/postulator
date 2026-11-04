@@ -6,9 +6,14 @@ and html. The slot is the number of the section in the brief below, or 0 for a s
 heading is the heading the brief gives, exactly as written. The html field holds only body markup:
 paragraphs, lists, tables, inline emphasis and links. It never holds a heading tag, a script, a style, an
 iframe, a class or an id.
-You may link only to a page listed under PAGES THIS FIELD LINKS TO, with the href exactly as listed and one
+You may link to a page listed under PAGES THIS FIELD LINKS TO, with the href exactly as listed and one
 of its anchors as the link text, where the sentence gives the reader a reason to go there, and at most once
-to each page; any other link is removed. A later step places every link that is still owed, and needs the
+to each page.{{if .Sources.Max}} Back the facts you take from a web search with links to their sources: put each link
+on the short phrase of the sentence that names the fact, never the whole sentence, the bare address or words like here
+or source, with the address written after that fact under WHAT A WEB SEARCH FOUND as the href exactly as written;
+at most {{.Sources.Max}} such links{{if .Sources.PerDomain}}, at most {{.Sources.PerDomain}} to one site, so spread them over the sites whose addresses the facts carry{{end}}, and each address once{{if .Sources.Min}};
+at least {{.Sources.Min}} of them{{end}}.{{end}} Any other link is removed.
+A later step places every link that is still owed, and needs the
 exact phrases listed under REQUIRED PHRASES to appear verbatim in the body text, where the brief says.
 The full picture of the page comes first: what the page is, the rules of the field you write, its entity,
 what the field holds now, where the page sits on the site, the pages it links to, the products it lists and

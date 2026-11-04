@@ -99,7 +99,7 @@ func TestThePageTypesFollowTheSite(t *testing.T) {
 				UpDepth: 2, DownLinks: true, SiblingMinWeight: 0.6, MaxLinks: 8, MaxPerTarget: 1,
 				ParentLinkWithinParagraphs: 2, ChildrenSection: true,
 			},
-			ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorRotate,
+			ForbidSelf: true, AnchorStrategy: field.AnchorRotate,
 		},
 	}
 	if _, err = core.PageTypes.SetScope(t.Context(), edit); err != nil {

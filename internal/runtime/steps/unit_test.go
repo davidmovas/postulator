@@ -133,7 +133,7 @@ type typesStub struct {
 }
 
 func linksOf(rules field.LinkRules) field.LinkPolicy {
-	return field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+	return field.LinkPolicy{Links: true, Rules: rules, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 }
 
 func unitLinks() field.LinkPolicy {

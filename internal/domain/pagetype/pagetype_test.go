@@ -328,7 +328,7 @@ func TestEachPresetCarriesTheFormerRules(t *testing.T) {
 	t.Parallel()
 
 	flags := func(rules field.LinkRules) field.LinkPolicy {
-		return field.LinkPolicy{Links: true, Rules: rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+		return field.LinkPolicy{Links: true, Rules: rules, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 	}
 	category := flags(field.LinkRules{UpDepth: 1, DownLinks: true, SiblingMinWeight: 0.5, MaxLinks: 15, MaxPerTarget: 1, ParentLinkWithinParagraphs: 1, ChildrenSection: true})
 	cases := map[string]struct {
@@ -379,7 +379,7 @@ func TestEachPresetCarriesTheRulesItsFormerBuiltInTemplateHad(t *testing.T) {
 	}
 	for _, tc := range cases {
 		got := pagetype.DefaultScope(tc.preset, pagetype.LinkField(tc.preset), "type-1").Links
-		want := field.LinkPolicy{Links: true, Rules: tc.rules, ForbidExternal: true, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
+		want := field.LinkPolicy{Links: true, Rules: tc.rules, ForbidSelf: true, AnchorStrategy: field.AnchorPreferUser}
 		if got != want {
 			t.Errorf("%s answers %+v, the built-in %s answered %+v under the Default policy", tc.preset, got, tc.former, want)
 		}

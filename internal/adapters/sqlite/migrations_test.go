@@ -19,7 +19,7 @@ import (
 	"github.com/davidmovas/postulator/internal/kernel/id"
 )
 
-const latestMigration = 91
+const latestMigration = 92
 
 func TestMigrationsAreEmbedded(t *testing.T) {
 	t.Parallel()
@@ -113,6 +113,7 @@ func TestMigrationsAreEmbedded(t *testing.T) {
 		"0089_topic_builds.sql",
 		"0090_technical_slugs_rule.sql",
 		"0091_llm_calls_web_searches.sql",
+		"0092_source_links.sql",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("embedded migrations = %v, want %v", names, want)
@@ -1584,6 +1585,7 @@ func TestTheMigrationSeedsWhatTheApplicationSeeds(t *testing.T) {
 		}
 		want = append(want, pagetype.DefaultScopes(types[i].Preset, types[i].ID)...)
 	}
+	asUpgradedBy0092(t, store)
 	got, err := NewFieldScopeRepo(store).ListBySite(t.Context(), "s1")
 	if err != nil {
 		t.Fatalf("ListBySite scopes: %v", err)
@@ -1686,6 +1688,7 @@ func TestTheNewPresetsJoinEverySiteThatHasTypesAndNoPageMoves(t *testing.T) {
 			newTypes = append(newTypes, added76[i].ID)
 		}
 	}
+	asUpgradedBy0092(t, store)
 	scopes, err := NewFieldScopeRepo(store).ListBySite(t.Context(), "s1")
 	if err != nil {
 		t.Fatalf("ListBySite scopes: %v", err)

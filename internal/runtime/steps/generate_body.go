@@ -31,6 +31,7 @@ type bodyPrompt struct {
 	Entity  graph.Entity
 	Spec    template.TemplateSpec
 	Brief   content.Brief
+	Sources template.SourceLinks
 	Product bool
 	Picture string
 }
@@ -68,10 +69,18 @@ func GenerateBody(deps Deps) run.StepDef {
 			if err != nil {
 				return run.Result{}, err
 			}
+			research, err := researchOf(sc)
+			if err != nil {
+				return run.Result{}, err
+			}
+			sources := content.SourcesOf(research, sc.Spec.SourceLinks)
 			brief := content.NewBrief(sc.Spec, sc.Links.Rules, sc.Page, named, entity, lc)
-			brief.Links = content.NewLinkAllowance(lc, sc.Links)
+			brief.Links = content.NewLinkAllowance(lc, sc.Links).WithSources(sources)
 			prompt := bodyPrompt{
 				Page: sc.Page, Type: sc.Type.Name, Entity: entity, Spec: sc.Spec, Brief: brief, Product: sc.Page.WPType == pagemap.WPProduct,
+			}
+			if sources.Cites() {
+				prompt.Sources = sources.Rules()
 			}
 			ceiling := writerCeiling(sc.Spec, sc.Item.Directive.MaxWords, sc.Item.Attempts)
 			seen, err := deps.fitted(ctx, sc, call, bodyField(sc), &lc, ceiling, func() (string, string, error) {

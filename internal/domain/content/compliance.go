@@ -44,6 +44,8 @@ const (
 	CodeUnknownInternal    = "unknown_internal_link"
 	CodeAnchorNotAllowed   = "anchor_not_allowed"
 	CodeTooManyLinks       = "too_many_links"
+	CodeTooManySourceLinks = "too_many_source_links"
+	CodeTooFewSourceLinks  = "too_few_source_links"
 
 	CountedGraphLinks = "graph_links"
 
@@ -51,11 +53,11 @@ const (
 	warnPenalty  = 0.05
 )
 
-func Compliance(doc *Document, lc LinkContext, policy field.LinkPolicy, pageID string) Report {
-	return ComplianceOf(doc, doc, lc, policy, pageID)
+func Compliance(doc *Document, lc LinkContext, policy field.LinkPolicy, sources Sources, pageID string) Report {
+	return ComplianceOf(doc, doc, lc, policy, sources, pageID)
 }
 
-func ComplianceOf(owed, judged *Document, lc LinkContext, policy field.LinkPolicy, pageID string) Report {
+func ComplianceOf(owed, judged *Document, lc LinkContext, policy field.LinkPolicy, sources Sources, pageID string) Report {
 	report := Report{Items: make([]Finding, 0)}
 
 	for _, target := range lc.Targets {
@@ -74,6 +76,8 @@ func ComplianceOf(owed, judged *Document, lc LinkContext, policy field.LinkPolic
 	}
 
 	graphLinks := 0
+	cited := newSourceCount()
+	crowded := false
 	for _, link := range judged.Links() {
 		href := strings.TrimSpace(link.Href)
 		resolution := lc.Resolve(href)
@@ -100,13 +104,17 @@ func ComplianceOf(owed, judged *Document, lc LinkContext, policy field.LinkPolic
 				})
 			}
 		case ClassExternal:
-			if policy.ForbidExternal {
+			source, known := sources.lookup(href)
+			if !known || !sources.rules.Cites() {
 				report.Items = append(report.Items, Finding{
 					Severity: SeverityError, Code: CodeExternalLink,
-					Message: "the page links outside the site",
+					Message: "the page links outside the site to an address its research did not cite",
 					Details: map[string]any{"href": href},
 				})
+				break
 			}
+			crowded = crowded || !cited.admits(source, sources.rules)
+			cited.add(source)
 		case ClassUnknownInternal:
 			report.Items = append(report.Items, Finding{
 				Severity: SeverityWarn, Code: CodeUnknownInternal,
@@ -126,9 +134,31 @@ func ComplianceOf(owed, judged *Document, lc LinkContext, policy field.LinkPolic
 			},
 		})
 	}
+	report.Items = append(report.Items, sourceFindings(sources, cited, crowded)...)
 
 	report.Score = scoreOf(report.Items)
 	return report
+}
+
+func sourceFindings(sources Sources, cited sourceCount, crowded bool) []Finding {
+	rules := sources.rules
+	switch {
+	case crowded:
+		return []Finding{{
+			Severity: SeverityWarn, Code: CodeTooManySourceLinks,
+			Message: "the page carries " + strconv.Itoa(cited.total) + " links to its sources, more than its template allows",
+			Details: map[string]any{"linked": cited.total, "max": rules.Max, "perDomain": rules.PerDomain},
+		}}
+	case sources.researched && cited.total < rules.Min:
+		return []Finding{{
+			Severity: SeverityWarn, Code: CodeTooFewSourceLinks,
+			Message: "the page links " + strconv.Itoa(cited.total) + " of its sources, fewer than the " + strconv.Itoa(rules.Min) +
+				" its template asks; the research cited " + strconv.Itoa(sources.Found()),
+			Details: map[string]any{"linked": cited.total, "min": rules.Min, "found": sources.Found()},
+		}}
+	default:
+		return nil
+	}
 }
 
 func Unpublished(doc *Document, lc LinkContext, live map[string]bool, pageID string) []Finding {
