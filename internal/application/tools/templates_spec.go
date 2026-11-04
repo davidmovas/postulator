@@ -15,10 +15,11 @@ type modelProfileArgs struct {
 }
 
 type stepArgs struct {
-	Name        string `json:"name" enum:"resolve_context,research,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Step name"`
-	Enabled     bool   `json:"enabled,omitempty" description:"Run it; false keeps it skipped"`
-	AllowErrors *bool  `json:"allowErrors,omitempty" description:"validate only: go on despite faults"`
-	Iterations  *int   `json:"iterations,omitempty" minimum:"1" description:"repair_links only: max passes"`
+	Name        string  `json:"name" enum:"resolve_context,research,generate_body,generate_meta,generate_fields,insert_links,repair_links,generate_images,validate,judge,publish,relink_neighbors,sync_back,report" description:"Step name"`
+	Enabled     bool    `json:"enabled,omitempty" description:"Run it; false keeps it skipped"`
+	AllowErrors *bool   `json:"allowErrors,omitempty" description:"validate only: go on despite faults"`
+	Iterations  *int    `json:"iterations,omitempty" minimum:"1" description:"repair_links only: max passes"`
+	Focus       *string `json:"focus,omitempty" description:"research only: what to look for"`
 }
 
 type sectionKeywordRulesArgs struct {
@@ -106,6 +107,16 @@ func (a imagesArgs) images() template.Images {
 	return template.Images{Featured: a.Featured, Inline: a.Inline, Source: a.Source}
 }
 
+type sourceLinksArgs struct {
+	Max       int `json:"max,omitempty" minimum:"0" description:"Most links to the research's sources; 0 none"`
+	PerDomain int `json:"perDomain,omitempty" minimum:"0" description:"Most to one site; 0 no cap"`
+	Min       int `json:"min,omitempty" minimum:"0" description:"Fewest; fewer warns"`
+}
+
+func (a sourceLinksArgs) links() template.SourceLinks {
+	return template.SourceLinks{Max: a.Max, PerDomain: a.PerDomain, Min: a.Min}
+}
+
 type productShortDescriptionArgs struct {
 	Enabled        bool   `json:"enabled,omitempty" description:"Write it"`
 	Intent         string `json:"intent,omitempty" description:"What it says"`
@@ -135,6 +146,7 @@ type templateSpecArgs struct {
 	KeywordRules  *keywordRulesArgs  `json:"keywordRules,omitempty" description:"Keyword placement and density"`
 	MetaRules     *metaRulesArgs     `json:"metaRules,omitempty" description:"SEO title and description"`
 	Images        *imagesArgs        `json:"images,omitempty" description:"Images; default none"`
+	SourceLinks   *sourceLinksArgs   `json:"sourceLinks,omitempty" description:"Body links to the research's sources; default none"`
 	Product       *productArgs       `json:"product,omitempty" description:"Product outputs; omit for pages"`
 	ModelProfiles []modelProfileArgs `json:"modelProfiles,omitempty" description:"Model per job; default the site's"`
 	Recipe        []stepArgs         `json:"recipe,omitempty" description:"Steps in order; default recipe"`
@@ -158,6 +170,9 @@ func (a templateSpecArgs) spec() template.TemplateSpec {
 	}
 	if a.Images != nil {
 		built.Images = a.Images.images()
+	}
+	if a.SourceLinks != nil {
+		built.SourceLinks = a.SourceLinks.links()
 	}
 	if a.Product != nil {
 		built.Product = a.Product.product()
@@ -199,6 +214,9 @@ func paramsOf(step stepArgs) map[string]any {
 	if step.Iterations != nil {
 		params["iterations"] = *step.Iterations
 	}
+	if step.Focus != nil {
+		params["focus"] = *step.Focus
+	}
 	if len(params) == 0 {
 		return nil
 	}
@@ -224,6 +242,9 @@ func (a templateSpecArgs) patch() (json.RawMessage, error) {
 	}
 	if a.Images != nil {
 		written["images"] = a.Images.images()
+	}
+	if a.SourceLinks != nil {
+		written["sourceLinks"] = a.SourceLinks.links()
 	}
 	if a.Product != nil {
 		written["product"] = a.Product.product()

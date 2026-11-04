@@ -144,7 +144,7 @@ func specSaid(spec *templateSpecArgs) string {
 	if spec == nil {
 		return ""
 	}
-	parts := make([]string, 0, 9)
+	parts := make([]string, 0, 10)
 	if len(spec.Sections) > 0 {
 		parts = append(parts, plural(len(spec.Sections), "section"))
 	}
@@ -153,7 +153,8 @@ func specSaid(spec *templateSpecArgs) string {
 		name string
 	}{
 		{spec.Tone != nil, "tone"}, {spec.Length != nil, "length"}, {spec.KeywordRules != nil, "keyword rules"},
-		{spec.MetaRules != nil, "meta rules"}, {spec.Images != nil, "images"}, {spec.Product != nil, "product outputs"},
+		{spec.MetaRules != nil, "meta rules"}, {spec.Images != nil, "images"}, {spec.SourceLinks != nil, "links to sources"},
+		{spec.Product != nil, "product outputs"},
 		{len(spec.ModelProfiles) > 0, strconv.Itoa(len(spec.ModelProfiles)) + " model jobs"}, {len(spec.Recipe) > 0, "recipe"},
 	}
 	for _, held := range named {
